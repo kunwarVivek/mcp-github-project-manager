@@ -1,0 +1,10 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "module": "CommonJS",
+    "types": ["node", "jest"],
+    "isolatedModules": false
+  },
+  "include": ["src/**/*.ts", "src/**/*.test.ts"],
+  "exclude": ["node_modules", "build"]
+}

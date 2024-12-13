@@ -1,0 +1,9 @@
+{
+  "extends": "./tsconfig.json",
+  "exclude": ["src/**/*.test.ts", "src/__tests__/**/*"],
+  "compilerOptions": {
+    "sourceMap": true,
+    "outDir": "build",
+    "rootDir": "src"
+  }
+}
