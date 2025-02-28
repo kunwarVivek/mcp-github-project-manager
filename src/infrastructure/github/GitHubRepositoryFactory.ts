@@ -1,8 +1,8 @@
-import { GitHubConfig } from "./GitHubConfig";
-import { GitHubIssueRepository } from "./repositories/GitHubIssueRepository";
-import { GitHubMilestoneRepository } from "./repositories/GitHubMilestoneRepository";
-import { GitHubProjectRepository } from "./repositories/GitHubProjectRepository";
-import { GitHubSprintRepository } from "./repositories/GitHubSprintRepository";
+import { GitHubConfig } from "./GitHubConfig.js";
+import { GitHubIssueRepository } from "./repositories/GitHubIssueRepository.js";
+import { GitHubMilestoneRepository } from "./repositories/GitHubMilestoneRepository.js";
+import { GitHubProjectRepository } from "./repositories/GitHubProjectRepository.js";
+import { GitHubSprintRepository } from "./repositories/GitHubSprintRepository.js";
 
 export class GitHubRepositoryFactory {
   private static instance: GitHubRepositoryFactory;
