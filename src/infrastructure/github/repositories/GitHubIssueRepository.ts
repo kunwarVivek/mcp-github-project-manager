@@ -38,8 +38,15 @@ export class GitHubIssueRepository implements IssueRepository {
       ],
     };
 
-    const response = await this.octokit.issues.create(params);
-    return this.mapRestToIssue(response.data);
+    try {
+      const response = await this.octokit.issues.create(params);
+      return this.mapRestToIssue(response.data);
+    } catch (error) {
+      if (error instanceof Error) {
+        throw new Error(`GitHub API error: ${error.message}`);
+      }
+      throw error;
+    }
   }
 
   async update(id: IssueId, data: Partial<Issue>): Promise<Issue> {

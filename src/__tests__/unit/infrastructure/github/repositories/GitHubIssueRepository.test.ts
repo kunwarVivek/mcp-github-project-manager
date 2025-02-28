@@ -51,6 +51,9 @@ describe("GitHubIssueRepository", () => {
 
       mockOctokit.issues.create.mockResolvedValueOnce({
         data: mockData.issue,
+        headers: {},
+        status: 201,
+        url: "https://api.github.com/repos/test-owner/test-repo/issues/1",
       });
 
       // Act
@@ -114,6 +117,9 @@ describe("GitHubIssueRepository", () => {
       // Arrange
       mockOctokit.issues.get.mockResolvedValueOnce({
         data: mockData.issue,
+        headers: {},
+        status: 200,
+        url: "https://api.github.com/repos/test-owner/test-repo/issues/1",
       });
 
       // Act
@@ -152,6 +158,9 @@ describe("GitHubIssueRepository", () => {
       // Arrange
       mockOctokit.issues.listForRepo.mockResolvedValueOnce({
         data: [mockData.issue],
+        headers: {},
+        status: 200,
+        url: "https://api.github.com/repos/test-owner/test-repo/issues",
       });
 
       // Act
@@ -178,6 +187,9 @@ describe("GitHubIssueRepository", () => {
       // Arrange
       mockOctokit.issues.listForRepo.mockResolvedValueOnce({
         data: [mockData.issue],
+        headers: {},
+        status: 200,
+        url: "https://api.github.com/repos/test-owner/test-repo/issues",
       });
 
       // Act
@@ -203,6 +215,9 @@ describe("GitHubIssueRepository", () => {
       // Arrange
       mockOctokit.issues.update.mockResolvedValueOnce({
         data: { ...mockData.issue, state: "closed" },
+        headers: {},
+        status: 200,
+        url: "https://api.github.com/repos/test-owner/test-repo/issues/1",
       });
 
       // Act
