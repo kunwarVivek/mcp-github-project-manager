@@ -7,7 +7,7 @@ import {
   Sprint,
   SprintId,
 } from "../domain/types";
-import { GitHubRepositoryFactory } from "../infrastructure/github/GitHubRepositoryFactory";
+import { GitHubRepositoryFactory } from "../infrastructure/github/GitHubRepositoryFactory.js";
 
 export class ProjectManagementService {
   private factory: GitHubRepositoryFactory;

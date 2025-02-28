@@ -7,7 +7,7 @@ import {
   ListToolsRequestSchema,
   McpError,
 } from "@modelcontextprotocol/sdk/types.js";
-import { ProjectManagementService } from "./services/ProjectManagementService";
+import { ProjectManagementService } from "./services/ProjectManagementService.js";
 
 function getRequiredEnvVar(name: string): string {
   const value = process.env[name];
