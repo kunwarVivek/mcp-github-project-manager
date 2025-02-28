@@ -37,22 +37,29 @@ export class GitHubProjectRepository implements ProjectRepository {
       }
     `;
 
-    const response = await this.octokit.graphql<
-      GraphQLResponse<CreateProjectV2Response>
-    >(query, {
-      input: {
-        ownerId: this.config.owner,
-        title: data.title,
-        description: data.description,
-        visibility: data.visibility?.toUpperCase(),
-      },
-    });
+    try {
+      const response = await this.octokit.graphql<
+        GraphQLResponse<CreateProjectV2Response>
+      >(query, {
+        input: {
+          ownerId: this.config.owner,
+          title: data.title,
+          description: data.description,
+          visibility: data.visibility?.toUpperCase(),
+        },
+      });
 
-    if (!response.data?.createProjectV2?.projectV2) {
-      throw new Error("Failed to create project");
+      if (!response.data?.createProjectV2?.projectV2) {
+        throw new Error("Failed to create project");
+      }
+
+      return this.mapGraphQLToProject(response.data.createProjectV2.projectV2);
+    } catch (error) {
+      if (error instanceof Error) {
+        throw new Error(`GitHub API error: ${error.message}`);
+      }
+      throw error;
     }
-
-    return this.mapGraphQLToProject(response.data.createProjectV2.projectV2);
   }
 
   async update(id: ProjectId, data: Partial<Project>): Promise<Project> {
