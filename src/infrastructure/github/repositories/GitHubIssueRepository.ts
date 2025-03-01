@@ -4,6 +4,7 @@ import {
   IssueId,
   IssueRepository,
   MilestoneId,
+  FieldId,
 } from "../../../domain/types";
 import { GitHubConfig } from "../GitHubConfig";
 import {
@@ -12,6 +13,10 @@ import {
   RestIssue,
   RestLabel,
   UpdateIssueParams,
+  CustomFieldValue,
+  GraphQLItemResponse,
+  GraphQLResponse,
+  mapOctokitResponseToRestIssue,
 } from "../rest-types";
 
 export class GitHubIssueRepository implements IssueRepository {
@@ -39,7 +44,8 @@ export class GitHubIssueRepository implements IssueRepository {
     };
 
     const response = await this.octokit.issues.create(params);
-    return this.mapRestToIssue(response.data);
+    const restIssue = mapOctokitResponseToRestIssue(response.data);
+    return this.mapRestToIssue(restIssue);
   }
 
   async update(id: IssueId, data: Partial<Issue>): Promise<Issue> {
@@ -49,7 +55,7 @@ export class GitHubIssueRepository implements IssueRepository {
       issue_number: id,
       ...(data.title && { title: data.title }),
       ...(data.description && { body: data.description }),
-      ...(data.status && { state: data.status }),
+      ...(data.status && { state: data.status as "open" | "closed" }),
       ...(data.milestoneId !== undefined && { milestone: data.milestoneId }),
       ...(data.assignees && { assignees: data.assignees }),
     };
@@ -71,7 +77,8 @@ export class GitHubIssueRepository implements IssueRepository {
     }
 
     const response = await this.octokit.issues.update(params);
-    return this.mapRestToIssue(response.data);
+    const restIssue = mapOctokitResponseToRestIssue(response.data);
+    return this.mapRestToIssue(restIssue);
   }
 
   async delete(id: IssueId): Promise<void> {
@@ -81,8 +88,8 @@ export class GitHubIssueRepository implements IssueRepository {
       owner: this.config.owner,
       repo: this.config.repo,
       issue_number: id,
-      state: "closed",
-      state_reason: "not_planned",
+      state: "closed" as const,
+      state_reason: "not_planned" as const,
     });
   }
 
@@ -94,7 +101,8 @@ export class GitHubIssueRepository implements IssueRepository {
         issue_number: id,
       });
 
-      return this.mapRestToIssue(response.data);
+      const restIssue = mapOctokitResponseToRestIssue(response.data);
+      return this.mapRestToIssue(restIssue);
     } catch (error) {
       if ((error as any).status === 404) return null;
       throw error;
@@ -116,23 +124,89 @@ export class GitHubIssueRepository implements IssueRepository {
     };
 
     const response = await this.octokit.issues.listForRepo(params);
-    return response.data.map(this.mapRestToIssue);
+    return response.data.map(item => this.mapRestToIssue(mapOctokitResponseToRestIssue(item)));
+  }
+
+  async updateCustomField(issueId: IssueId, fieldId: FieldId, value: any): Promise<void> {
+    const query = `
+      mutation($input: UpdateProjectV2ItemFieldValueInput!) {
+        updateProjectV2ItemFieldValue(input: $input) {
+          projectV2Item {
+            id
+          }
+        }
+      }
+    `;
+
+    // First, get the project item ID for this issue
+    const itemQuery = `
+      query($owner: String!, $repo: String!, $number: Int!) {
+        repository(owner: $owner, name: $repo) {
+          issue(number: $number) {
+            projectV2Items(first: 1) {
+              nodes {
+                id
+              }
+            }
+          }
+        }
+      }
+    `;
+
+    const itemResponse = await this.octokit.graphql<GraphQLResponse<GraphQLItemResponse>>(itemQuery, {
+      owner: this.config.owner,
+      repo: this.config.repo,
+      number: issueId,
+    });
+
+    const itemId = itemResponse.data.repository?.issue?.projectV2Items?.nodes?.[0]?.id;
+    if (!itemId) {
+      throw new Error(`Issue #${issueId} is not part of any project`);
+    }
+
+    // Convert the value to the appropriate GraphQL input type
+    const fieldValue = this.convertToFieldValue(value);
+
+    // Update the field value
+    await this.octokit.graphql(query, {
+      input: {
+        projectId: itemId,
+        fieldId: fieldId,
+        value: fieldValue,
+      },
+    });
+  }
+
+  private convertToFieldValue(value: any): CustomFieldValue {
+    if (typeof value === "string") {
+      // Check if it's a date string
+      if (value.match(/^\d{4}-\d{2}-\d{2}$/)) {
+        return { date: value };
+      }
+      return { text: value };
+    }
+    if (typeof value === "number") {
+      return { number: value };
+    }
+    if (value && typeof value === "object") {
+      if ("startDate" in value && "duration" in value) {
+        return {
+          iteration: {
+            startDate: value.startDate,
+            duration: value.duration,
+          },
+        };
+      }
+    }
+    return { text: String(value) };
   }
 
   private mapRestToIssue(data: RestIssue): Issue {
-    // Convert API labels to our RestLabel type
-    const labels = (data.labels || []).map((label): RestLabel => {
-      if (typeof label === "string") {
-        return { name: label };
-      }
-      return {
-        ...label,
-        name: label.name || "",
-      };
-    });
-
     // Extract label names
-    const labelNames = labels.map((label) => label.name);
+    const labelNames = data.labels.map((label) =>
+      typeof label === "string" ? label : label.name
+    );
+
     const priorityLabel = labelNames.find((name) =>
       name.startsWith("priority:")
     );
@@ -153,7 +227,7 @@ export class GitHubIssueRepository implements IssueRepository {
         | "medium"
         | "low",
       type: typeLabel?.split(":")[1] as Issue["type"],
-      assignees: data.assignees?.map((a) => a.login) || [],
+      assignees: data.assignees.map((a) => a.login),
       labels: customLabels,
       milestoneId: data.milestone?.number,
       createdAt: new Date(data.created_at),

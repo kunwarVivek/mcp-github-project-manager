@@ -2,6 +2,11 @@ export type ProjectId = string;
 export type IssueId = number;
 export type MilestoneId = number;
 export type SprintId = string;
+export type ViewId = string;
+export type FieldId = string;
+
+export type ViewLayout = "table" | "board" | "roadmap";
+export type FieldType = "text" | "number" | "date" | "single_select" | "iteration";
 
 export interface Project {
   id: ProjectId;
@@ -11,6 +16,41 @@ export interface Project {
   status: "open" | "closed";
   createdAt: Date;
   updatedAt: Date;
+  views?: ProjectView[];
+  fields?: CustomField[];
+}
+
+export interface ProjectView {
+  id: ViewId;
+  name: string;
+  layout: ViewLayout;
+  settings: {
+    groupBy?: string;
+    sortBy?: Array<{
+      field: string;
+      direction: "asc" | "desc";
+    }>;
+  };
+}
+
+export interface ViewFilter {
+  field: string;
+  operator: "equals" | "contains" | "gt" | "lt" | "empty" | "not_empty";
+  value?: any;
+}
+
+export interface CustomField {
+  id: FieldId;
+  name: string;
+  type: FieldType;
+  options?: string[]; // For single_select fields
+  settings?: {
+    dateFormat?: string;
+    iterations?: {
+      startDate: Date;
+      duration: number;
+    }[];
+  };
 }
 
 export interface Issue {
@@ -25,6 +65,7 @@ export interface Issue {
   milestoneId?: MilestoneId;
   createdAt: Date;
   updatedAt: Date;
+  customFields?: Record<string, any>;
 }
 
 export interface Milestone {
@@ -56,7 +97,13 @@ export interface ProjectRepository {
   update(id: ProjectId, data: Partial<Project>): Promise<Project>;
   delete(id: ProjectId): Promise<void>;
   findById(id: ProjectId): Promise<Project | null>;
-  findAll(filters?: { status?: "open" | "closed" }): Promise<Project[]>;
+  findAll(filters?: { status?: "open" | "closed" }, page?: number): Promise<Project[]>;
+  createView(projectId: ProjectId, view: Omit<ProjectView, "id">): Promise<ProjectView>;
+  updateView(projectId: ProjectId, viewId: ViewId, data: Partial<ProjectView>): Promise<ProjectView>;
+  deleteView(projectId: ProjectId, viewId: ViewId): Promise<void>;
+  createField(projectId: ProjectId, field: Omit<CustomField, "id">): Promise<CustomField>;
+  updateField(projectId: ProjectId, fieldId: FieldId, data: Partial<CustomField>): Promise<CustomField>;
+  deleteField(projectId: ProjectId, fieldId: FieldId): Promise<void>;
 }
 
 export interface IssueRepository {
@@ -69,6 +116,7 @@ export interface IssueRepository {
     milestoneId?: MilestoneId;
     assignee?: string;
   }): Promise<Issue[]>;
+  updateCustomField(id: IssueId, fieldId: FieldId, value: any): Promise<void>;
 }
 
 export interface MilestoneRepository {
@@ -93,4 +141,10 @@ export interface SprintRepository {
   findAll(filters?: {
     status?: "planned" | "active" | "completed";
   }): Promise<Sprint[]>;
+  getSprintMetrics(id: SprintId): Promise<{
+    totalIssues: number;
+    completedIssues: number;
+    remainingIssues: number;
+    completionPercentage: number;
+  }>;
 }

@@ -1,189 +1,228 @@
-import type { components } from "@octokit/openapi-types";
-import type { Octokit } from "@octokit/rest";
+import { Octokit } from "@octokit/rest";
+import { components } from "@octokit/openapi-types";
 
-// Base types from Octokit's OpenAPI definitions
-export type RestIssue = components["schemas"]["issue"];
-export type RestMilestone = components["schemas"]["milestone"];
-export type RestComment = components["schemas"]["issue-comment"];
-export type RestUser = components["schemas"]["simple-user"];
+type OctokitIssue = components["schemas"]["issue"];
 
-// Define a more flexible label type that matches GitHub's API
-export type RestLabel = {
-  id?: number;
-  node_id?: string;
+export interface RequestParameters {
+  [key: string]: any;
+}
+
+export interface RestUser {
+  login: string;
+  id: number;
+  avatar_url?: string;
+  gravatar_id?: string | null;
   url?: string;
+}
+
+export interface RestLabel {
+  id?: number;
   name: string;
-  description?: string | null;
   color?: string | null;
+  description?: string | null;
   default?: boolean;
-};
-
-// Extract method types from Octokit instance type
-type OctokitInstance = InstanceType<typeof Octokit>;
-
-// Parameter types extracted from Octokit's method signatures
-export type CreateIssueParams = Parameters<
-  OctokitInstance["issues"]["create"]
->[0];
-export type UpdateIssueParams = Parameters<
-  OctokitInstance["issues"]["update"]
->[0];
-export type ListIssuesParams = Parameters<
-  OctokitInstance["issues"]["listForRepo"]
->[0];
-export type CreateMilestoneParams = Parameters<
-  OctokitInstance["issues"]["createMilestone"]
->[0];
-export type UpdateMilestoneParams = Parameters<
-  OctokitInstance["issues"]["updateMilestone"]
->[0];
-export type ListMilestonesParams = Parameters<
-  OctokitInstance["issues"]["listMilestones"]
->[0];
-export type CreateCommentParams = Parameters<
-  OctokitInstance["issues"]["createComment"]
->[0];
-export type UpdateCommentParams = Parameters<
-  OctokitInstance["issues"]["updateComment"]
->[0];
-export type ListCommentsParams = Parameters<
-  OctokitInstance["issues"]["listComments"]
->[0];
-export type AddAssigneesParams = Parameters<
-  OctokitInstance["issues"]["addAssignees"]
->[0];
-export type RemoveAssigneesParams = Parameters<
-  OctokitInstance["issues"]["removeAssignees"]
->[0];
-export type AddLabelsParams = Parameters<
-  OctokitInstance["issues"]["addLabels"]
->[0];
-export type RemoveLabelParams = Parameters<
-  OctokitInstance["issues"]["removeLabel"]
->[0];
-
-// Response types with proper data shapes
-export interface IssueResponse {
-  data: RestIssue;
+  url?: string;
 }
 
-export interface MilestoneResponse {
-  data: RestMilestone;
+export interface RestMilestone {
+  number: number;
+  title: string;
+  description: string | null;
+  due_on: string | null;
+  state: "open" | "closed";
+  open_issues: number;
+  closed_issues: number;
+  created_at?: string;
+  updated_at?: string;
+  closed_at?: string | null;
+  url?: string;
 }
 
-export interface CommentResponse {
-  data: RestComment;
+// Define the core fields we need for our application
+export interface RestIssue {
+  id: number;
+  node_id: string;
+  number: number;
+  title: string;
+  body: string | null;
+  state: "open" | "closed";
+  labels: Array<string | RestLabel>;
+  assignees: RestUser[];
+  milestone?: RestMilestone | null;
+  created_at: string;
+  updated_at: string;
+  closed_at?: string | null;
+  url: string;
+  repository_url: string;
+  labels_url: string;
+  comments_url: string;
+  events_url: string;
+  html_url: string;
+  user: RestUser;
 }
 
-export interface ListIssuesResponse {
-  data: RestIssue[];
+export interface CreateIssueParams extends RequestParameters {
+  owner: string;
+  repo: string;
+  title: string;
+  body?: string;
+  milestone?: number;
+  assignees?: string[];
+  labels?: string[];
+  state?: "open" | "closed";
 }
 
-export interface ListMilestonesResponse {
-  data: RestMilestone[];
+export interface UpdateIssueParams extends RequestParameters {
+  owner: string;
+  repo: string;
+  issue_number: number;
+  title?: string;
+  body?: string;
+  state?: "open" | "closed";
+  milestone?: number | null;
+  assignees?: string[];
+  labels?: string[];
 }
 
-export interface ListCommentsResponse {
-  data: RestComment[];
+export interface ListIssuesParams extends RequestParameters {
+  owner: string;
+  repo: string;
+  state?: "open" | "closed" | "all";
+  milestone?: string;
+  assignee?: string;
+  per_page?: number;
 }
 
-// Error types
-export interface RestErrorResponse {
-  status: number;
-  message: string;
-  documentation_url?: string;
+export interface CreateMilestoneParams extends RequestParameters {
+  owner: string;
+  repo: string;
+  title: string;
+  state?: "open" | "closed";
+  description?: string;
+  due_on?: string;
+}
+
+export interface UpdateMilestoneParams extends RequestParameters {
+  owner: string;
+  repo: string;
+  milestone_number: number;
+  title?: string;
+  state?: "open" | "closed";
+  description?: string;
+  due_on?: string;
+}
+
+export interface ListMilestonesParams extends RequestParameters {
+  owner: string;
+  repo: string;
+  state?: "open" | "closed" | "all";
+  sort?: "due_on" | "completeness";
+  direction?: "asc" | "desc";
+  per_page?: number;
+}
+
+export interface CustomFieldValue {
+  text?: string;
+  number?: number;
+  date?: string;
+  singleSelect?: string;
+  iteration?: {
+    startDate: string;
+    duration: number;
+  };
+}
+
+// GraphQL Types
+export interface GraphQLItemResponse {
+  repository?: {
+    issue?: {
+      projectV2Items?: {
+        nodes?: Array<{
+          id: string;
+        }>;
+      };
+    };
+  };
+}
+
+export interface GraphQLResponse<T> {
+  data: T;
   errors?: Array<{
-    resource: string;
-    field: string;
-    code: string;
-    message?: string;
+    message: string;
+    locations?: Array<{
+      line: number;
+      column: number;
+    }>;
+    path?: string[];
   }>;
 }
 
-// Type guards
-export function isRestErrorResponse(
-  error: unknown
-): error is RestErrorResponse {
-  return (
-    typeof error === "object" &&
-    error !== null &&
-    "message" in error &&
-    typeof (error as RestErrorResponse).message === "string" &&
-    "status" in error &&
-    typeof (error as RestErrorResponse).status === "number"
-  );
-}
+// Helper function to ensure type safety when mapping API responses
+export function mapOctokitResponseToRestIssue(response: OctokitIssue): RestIssue {
+  const user = response.user || {
+    login: "unknown",
+    id: 0,
+    type: "User",
+  };
 
-// Helper types for strongly typed request bodies
-export interface IssueBody {
-  title: string;
-  body?: string;
-  assignees?: string[];
-  milestone?: number | null;
-  labels?: string[];
-  state?: "open" | "closed";
-  state_reason?: "completed" | "not_planned" | "reopened";
+  return {
+    id: response.id,
+    node_id: response.node_id,
+    number: response.number,
+    title: response.title || "",
+    body: response.body ?? null,
+    state: response.state === "closed" ? "closed" : "open",
+    labels: Array.isArray(response.labels)
+      ? response.labels.map(label =>
+          typeof label === "string"
+            ? label
+            : {
+                id: label.id,
+                name: label.name || "",
+                color: label.color ?? null,
+                description: label.description ?? null,
+                default: label.default,
+                url: label.url,
+              }
+        )
+      : [],
+    assignees: (response.assignees || []).map(assignee => ({
+      login: assignee.login,
+      id: assignee.id,
+      avatar_url: assignee.avatar_url,
+      gravatar_id: assignee.gravatar_id ?? null,
+      url: assignee.url,
+    })),
+    milestone: response.milestone
+      ? {
+          number: response.milestone.number,
+          title: response.milestone.title || "",
+          description: response.milestone.description ?? null,
+          due_on: response.milestone.due_on ?? null,
+          state: response.milestone.state === "closed" ? "closed" : "open",
+          open_issues: response.milestone.open_issues || 0,
+          closed_issues: response.milestone.closed_issues || 0,
+          created_at: response.milestone.created_at,
+          updated_at: response.milestone.updated_at,
+          closed_at: response.milestone.closed_at ?? null,
+          url: response.milestone.url,
+        }
+      : null,
+    created_at: response.created_at,
+    updated_at: response.updated_at,
+    closed_at: response.closed_at ?? null,
+    url: response.url,
+    repository_url: response.repository_url,
+    labels_url: response.labels_url,
+    comments_url: response.comments_url,
+    events_url: response.events_url,
+    html_url: response.html_url,
+    user: {
+      login: user.login,
+      id: user.id,
+      avatar_url: (user as any).avatar_url,
+      gravatar_id: (user as any).gravatar_id ?? null,
+      url: (user as any).url,
+    },
+  };
 }
-
-export interface MilestoneBody {
-  title: string;
-  description?: string;
-  due_on?: string;
-  state?: "open" | "closed";
-}
-
-export interface CommentBody {
-  body: string;
-}
-
-// Helper functions for type checking
-export function isIssue(data: unknown): data is RestIssue {
-  return (
-    typeof data === "object" &&
-    data !== null &&
-    "number" in data &&
-    "title" in data &&
-    "state" in data
-  );
-}
-
-export function isMilestone(data: unknown): data is RestMilestone {
-  return (
-    typeof data === "object" &&
-    data !== null &&
-    "number" in data &&
-    "title" in data &&
-    "state" in data &&
-    "open_issues" in data &&
-    "closed_issues" in data
-  );
-}
-
-export function isComment(data: unknown): data is RestComment {
-  return (
-    typeof data === "object" &&
-    data !== null &&
-    "id" in data &&
-    "body" in data &&
-    "user" in data
-  );
-}
-
-// Type assertions for label handling
-export function isLabelObject(label: string | RestLabel): label is RestLabel {
-  return (
-    typeof label !== "string" &&
-    typeof label === "object" &&
-    label !== null &&
-    typeof (label as RestLabel).name === "string"
-  );
-}
-
-export function getLabelName(label: string | RestLabel): string {
-  if (typeof label === "string") return label;
-  return label.name || "";
-}
-
-// Helper type for label arrays
-export type Label = string | RestLabel;
-export type Labels = Array<Label>;

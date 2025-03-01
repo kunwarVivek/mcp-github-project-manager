@@ -13,6 +13,7 @@
     "rootDir": "src",
     "types": ["node", "jest"],
     "baseUrl": ".",
+    "resolveJsonModule": true,
     "paths": {
       "@/*": ["src/*"]
     }
