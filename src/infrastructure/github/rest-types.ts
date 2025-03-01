@@ -156,6 +156,27 @@ export interface GraphQLResponse<T> {
     path?: string[];
   }>;
 }
+// GitHub API Event types
+export interface IssueEvent {
+  id: number;
+  node_id: string;
+  url: string;
+  actor: {
+    login: string;
+    id: number;
+  };
+  event: string;
+  commit_id?: string | null;
+  commit_url?: string | null;
+  created_at: string;
+  performed_via_github_app?: boolean;
+  label?: {
+    name: string;
+    color?: string | null;
+  };
+  assignee?: RestUser;
+  milestone?: RestMilestone;
+}
 
 // Helper function to ensure type safety when mapping API responses
 export function mapOctokitResponseToRestIssue(response: OctokitIssue): RestIssue {

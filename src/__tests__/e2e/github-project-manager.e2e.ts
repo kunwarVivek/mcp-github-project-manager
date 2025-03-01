@@ -177,4 +177,72 @@ describe("GitHub Project Manager E2E Tests", () => {
       expect(upcomingMilestones.length).toBeGreaterThan(0);
     });
   });
+
+  describe("Issue Management", () => {
+    let testIssueId: number;
+
+    beforeAll(async () => {
+      // Create a test issue for management operations
+      const issue = await service.createIssue({
+        title: "Test Management Issue",
+        description: "Issue for testing management operations",
+        priority: "medium",
+        type: "feature",
+        labels: ["e2e-test-management"],
+        status: "open",
+        assignees: [],
+      });
+      testIssueId = issue.id;
+    });
+
+    it("should update issue status and track changes", async () => {
+      // Update status to closed
+      await service.updateIssueStatus(testIssueId, "closed");
+      let issue = await service.getIssue(testIssueId);
+      expect(issue.status).toBe("closed");
+
+      // Update status back to open
+      await service.updateIssueStatus(testIssueId, "open");
+      issue = await service.getIssue(testIssueId);
+      expect(issue.status).toBe("open");
+
+      // Get issue history
+      const history = await service.getIssueHistory(testIssueId);
+      expect(history).toHaveLength(2);
+      expect(history[0].field).toBe("status");
+    });
+
+    it("should reassign issues between milestones", async () => {
+      // Create a new milestone for reassignment
+      const newMilestone = await service.createMilestone({
+        title: "Reassignment Test",
+        description: "Milestone for testing reassignment",
+        dueDate: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000),
+        status: "open",
+      });
+
+      // Assign issue to milestone
+      await service.assignIssueToMilestone(testIssueId, newMilestone.id);
+      const issue = await service.getIssue(testIssueId);
+      expect(issue.milestoneId).toBe(newMilestone.id);
+    });
+
+    it("should track issue dependencies", async () => {
+      // Create dependent issue
+      const dependentIssue = await service.createIssue({
+        title: "Dependent Issue",
+        description: "This issue depends on the test issue",
+        priority: "low",
+        type: "feature",
+        labels: ["e2e-test-dependency"],
+        status: "open",
+        assignees: [],
+      });
+
+      // Add dependency relationship
+      await service.addIssueDependency(dependentIssue.id, testIssueId);
+      const dependencies = await service.getIssueDependencies(dependentIssue.id);
+      expect(dependencies).toContainEqual(expect.objectContaining({ id: testIssueId }));
+    });
+  });
 });

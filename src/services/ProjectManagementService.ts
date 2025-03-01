@@ -303,4 +303,126 @@ export class ProjectManagementService {
       throw error;
     }
   }
+
+  // Issue Management
+  async createIssue(data: Omit<Issue, "id" | "createdAt" | "updatedAt">): Promise<Issue> {
+    const issueRepo = this.factory.createIssueRepository();
+    try {
+      return await issueRepo.create(data);
+    } catch (error) {
+      if (error instanceof Error) {
+        throw new Error(`Failed to create issue: ${error.message}`);
+      }
+      throw error;
+    }
+  }
+
+  async getIssue(id: IssueId): Promise<Issue> {
+    const issueRepo = this.factory.createIssueRepository();
+    try {
+      const issue = await issueRepo.findById(id);
+      if (!issue) throw new Error(`Issue #${id} not found`);
+      return issue;
+    } catch (error) {
+      if (error instanceof Error) {
+        throw new Error(`Failed to get issue: ${error.message}`);
+      }
+      throw error;
+    }
+  }
+
+  async updateIssueStatus(id: IssueId, status: Issue["status"]): Promise<void> {
+    const issueRepo = this.factory.createIssueRepository();
+    try {
+      await issueRepo.update(id, { status });
+    } catch (error) {
+      if (error instanceof Error) {
+        throw new Error(`Failed to update issue status: ${error.message}`);
+      }
+      throw error;
+    }
+  }
+
+  async getIssueHistory(id: IssueId): Promise<Array<{
+    field: string;
+    oldValue: any;
+    newValue: any;
+    timestamp: Date;
+    actor: string;
+  }>> {
+    const issueRepo = this.factory.createIssueRepository();
+    try {
+      return await issueRepo.getHistory(id);
+    } catch (error) {
+      if (error instanceof Error) {
+        throw new Error(`Failed to get issue history: ${error.message}`);
+      }
+      throw error;
+    }
+  }
+
+  async assignIssueToMilestone(issueId: IssueId, milestoneId: MilestoneId): Promise<void> {
+    const issueRepo = this.factory.createIssueRepository();
+    const milestoneRepo = this.factory.createMilestoneRepository();
+    try {
+      // Verify milestone exists
+      const milestone = await milestoneRepo.findById(milestoneId);
+      if (!milestone) throw new Error(`Milestone #${milestoneId} not found`);
+
+      // Update issue's milestone
+      await issueRepo.update(issueId, { milestoneId });
+    } catch (error) {
+      if (error instanceof Error) {
+        throw new Error(`Failed to assign issue to milestone: ${error.message}`);
+      }
+      throw error;
+    }
+  }
+
+  async addIssueDependency(issueId: IssueId, dependsOnId: IssueId): Promise<void> {
+    const issueRepo = this.factory.createIssueRepository();
+    try {
+      // Verify both issues exist
+      const [issue, dependsOn] = await Promise.all([
+        issueRepo.findById(issueId),
+        issueRepo.findById(dependsOnId)
+      ]);
+      if (!issue) throw new Error(`Issue #${issueId} not found`);
+      if (!dependsOn) throw new Error(`Dependency issue #${dependsOnId} not found`);
+
+      // Add dependency
+      await issueRepo.addDependency(issueId, dependsOnId);
+    } catch (error) {
+      if (error instanceof Error) {
+        throw new Error(`Failed to add issue dependency: ${error.message}`);
+      }
+      throw error;
+    }
+  }
+
+  async getIssueDependencies(issueId: IssueId): Promise<Issue[]> {
+    const issueRepo = this.factory.createIssueRepository();
+    try {
+      return await issueRepo.getDependencies(issueId);
+    } catch (error) {
+      if (error instanceof Error) {
+        throw new Error(`Failed to get issue dependencies: ${error.message}`);
+      }
+      throw error;
+    }
+  }
+
+  // Milestone Management
+  async createMilestone(data: Omit<Milestone, "id" | "progress">): Promise<Milestone> {
+    const milestoneRepo = this.factory.createMilestoneRepository();
+    try {
+      const milestone = await milestoneRepo.create(data);
+      return milestone;
+    } catch (error) {
+      if (error instanceof Error) {
+        throw new Error(`Failed to create milestone: ${error.message}`);
+      }
+      throw error;
+    }
+  }
 }
