@@ -1,169 +1,106 @@
-# Project Roadmap
+# Development Roadmap
 
-This document outlines the planned enhancements and improvements for the GitHub Project Manager.
+## Current Status
 
-## Q2 2025
+The GitHub Project Manager MCP server currently has basic functionality implemented:
+- Core MCP server infrastructure using @modelcontextprotocol/sdk
+- Basic tool definitions for project management
+- GitHub API integration through service layer
+- StdioTransport for client communication
 
-### Core Architecture Improvements
-- [ ] Implement dependency injection container
-  - Use TypeDI or similar DI container
-  - Refactor services to use constructor injection
-  - Add service lifecycle management
+## Implementation Phases
 
-- [ ] Add caching layer
-  - Implement cache abstraction
-  - Add Redis/Memcached support
-  - Cache frequently accessed API responses
-  - Implement cache invalidation strategy
+### Phase 1: MCP Resource Implementation (2 weeks)
+- [ ] Define resource schemas for GitHub Project entities
+- [ ] Implement resource lifecycle management
+- [ ] Add relationship handling between resources
+- [ ] Implement resource caching layer
+- [ ] Add resource validation
 
-- [ ] Enhance error handling
-  - Add custom error types
-  - Implement error boundaries
-  - Add structured error logging
-  - Improve error reporting
+### Phase 2: Response Enhancement (1 week)
+- [ ] Implement structured content responses
+- [ ] Add proper MCP response formatting
+- [ ] Implement content type validation
+- [ ] Add rich content support
+- [ ] Enhance error response formatting
 
-### Performance Optimizations
-- [ ] Add request rate limiting
-  - Implement token bucket algorithm
-  - Add configurable rate limits
-  - Handle GitHub API rate limits gracefully
+### Phase 3: Tool Enhancement (2 weeks)
+- [ ] Add comprehensive tool documentation
+- [ ] Implement robust parameter validation
+- [ ] Add proper tool result formatting
+- [ ] Enhance error handling with MCP codes
+- [ ] Add tool usage examples
 
-- [ ] Implement circuit breaker
-  - Add circuit breaker for API calls
-  - Handle service degradation gracefully
-  - Add automatic recovery mechanisms
+### Phase 4: Security & Performance (1 week)
+- [ ] Add transport layer security
+- [ ] Implement authentication handling
+- [ ] Add request validation
+- [ ] Implement rate limiting
+- [ ] Add performance monitoring
 
-### Monitoring & Observability
-- [ ] Add logging infrastructure
-  - Implement structured logging
-  - Add log levels and contexts
-  - Support multiple log destinations
-  - Add log correlation IDs
+## Planned Features
 
-- [ ] Add metrics collection
-  - Track API response times
-  - Monitor error rates
-  - Collect usage statistics
-  - Add performance metrics
+### Resource Types
+- [ ] Project Resources
+  - Project details
+  - View configurations
+  - Custom fields
+- [ ] Item Resources
+  - Issues
+  - Pull requests
+  - Draft items
+- [ ] View Resources
+  - Table views
+  - Board views
+  - Timeline views
 
-## Q3 2025
+### Tool Improvements
+- [ ] Enhanced schema validation
+- [ ] Better error messages
+- [ ] Operation retry handling
+- [ ] Progress reporting
+- [ ] Batch operations
 
-### Feature Enhancements
-- [ ] Enhanced project templates
-  - Custom project templates
-  - Template sharing
-  - Template versioning
-  - Default configurations
+### System Enhancements
+- [ ] Resource caching
+- [ ] Rate limit handling
+- [ ] Error recovery
+- [ ] Metrics collection
+- [ ] Performance optimization
 
-- [ ] Advanced sprint planning
-  - Capacity planning
-  - Resource allocation
-  - Sprint velocity tracking
-  - Burndown charts
+## Future Considerations
 
-### API Improvements
-- [ ] API versioning
-  - Implement versioning strategy
-  - Version migration tools
-  - Backward compatibility
-  - API deprecation process
+### Potential Features
+- GraphQL subscription support
+- Real-time updates
+- Webhook integration
+- Custom field types
+- Advanced automation
 
-- [ ] GraphQL enhancements
-  - Optimize queries
-  - Add field selection
-  - Implement query batching
-  - Add query caching
+### Technical Debt
+- Implement dependency injection
+- Add comprehensive logging
+- Improve error handling
+- Add performance metrics
+- Enhance test coverage
 
-## Q4 2025
+## Timeline
 
-### Integration Enhancements
-- [ ] Add webhooks support
-  - Event subscriptions
-  - Custom event handlers
-  - Event filtering
-  - Retry mechanisms
+1. Q1 2025
+   - Phase 1: Resource Implementation
+   - Phase 2: Response Enhancement
 
-- [ ] External integrations
-  - Jira integration
-  - Slack notifications
-  - Microsoft Teams integration
-  - Custom webhook endpoints
+2. Q2 2025
+   - Phase 3: Tool Enhancement
+   - Phase 4: Security & Performance
+   - Initial production release
 
-### Security Enhancements
-- [ ] Enhanced authentication
-  - OAuth 2.0 support
-  - JWT implementation
-  - Role-based access control
-  - API key management
+3. Q3 2025
+   - Additional resource types
+   - Advanced features
+   - Performance optimization
 
-- [ ] Security features
-  - Audit logging
-  - Activity monitoring
-  - Security event alerts
-  - Access control lists
-
-## 2026 and Beyond
-
-### Advanced Features
-- [ ] AI/ML capabilities
-  - Sprint planning assistance
-  - Issue categorization
-  - Workload prediction
-  - Anomaly detection
-
-- [ ] Advanced analytics
-  - Custom dashboards
-  - Report generation
-  - Data visualization
-  - Trend analysis
-
-### Enterprise Features
-- [ ] Multi-organization support
-  - Organization management
-  - Cross-org projects
-  - Organization templates
-  - Resource sharing
-
-- [ ] Compliance features
-  - Compliance reporting
-  - Policy enforcement
-  - Data retention
-  - Audit trails
-
-## Continuous Improvements
-
-### Testing & Quality
-- [ ] Expand test coverage
-  - Property-based testing
-  - Snapshot testing
-  - Performance testing
-  - Load testing
-
-- [ ] Code quality
-  - Static analysis
-  - Code coverage
-  - Documentation
-  - Style guide enforcement
-
-### Developer Experience
-- [ ] Improved documentation
-  - API reference
-  - Integration guides
-  - Best practices
-  - Example implementations
-
-- [ ] Developer tools
-  - CLI tools
-  - Development utilities
-  - Debug helpers
-  - Testing utilities
-
-## Notes
-
-- Priorities may shift based on user feedback and requirements
-- Each feature will go through design review and RFC process
-- Breaking changes will follow semantic versioning
-- Features may be implemented out of order based on demand
-- Regular security audits and updates will be performed
-- Performance benchmarks will be maintained
-- Backward compatibility will be preserved where possible
+4. Q4 2025
+   - Production hardening
+   - Advanced automation
+   - Custom integrations

@@ -16,14 +16,26 @@ The server follows Clean Architecture principles with clear separation of concer
 ```
 src/
 ├── domain/           # Domain entities and interfaces
-│   └── types.ts
+│   ├── types.ts
+│   ├── errors.ts
+│   ├── mcp-types.ts
+│   └── resource-types.ts
 ├── infrastructure/   # GitHub API integration
 │   ├── github/
 │   │   ├── repositories/
+│   │   │   ├── BaseGitHubRepository.ts
+│   │   │   ├── GitHubIssueRepository.ts
+│   │   │   └── ...
 │   │   ├── GitHubConfig.ts
+│   │   ├── GitHubErrorHandler.ts
 │   │   ├── GitHubRepositoryFactory.ts
 │   │   ├── graphql-types.ts
 │   │   └── rest-types.ts
+│   ├── mcp/
+│   │   ├── MCPErrorHandler.ts
+│   │   └── MCPResponseFormatter.ts
+│   └── cache/
+│       └── ResourceCache.ts
 ├── services/        # Business logic layer
 │   └── ProjectManagementService.ts
 └── index.ts         # MCP server implementation
@@ -47,168 +59,125 @@ src/
 - Implements business workflows
 - Handles transaction boundaries
 
-## Key Design Patterns
+## Key Features and Patterns
 
-### Repository Pattern
-- Abstracts data access logic
-- Provides consistent interface for data operations
-- Enables easy switching of data sources
-- Facilitates testing through mocking
-
-### Type-Safe API Integration
-- Strong typing for API requests and responses
-- Runtime type validation
-- Consistent error handling
-- Proper mapping between API and domain types
-
-## Testing Strategy
-
-### Unit Tests
-- Tests individual components in isolation
-- Mocks external dependencies
-- Focuses on business logic
-- Fast and reliable
-
-### Integration Tests
-- Tests component interactions
-- Verifies API integration
-- Uses test doubles when appropriate
-- Validates data flow
-
-### E2E Tests
-- Tests complete workflows
-- Uses real GitHub API
-- Validates system behavior
-- Ensures feature completeness
-
-## Areas for Enhancement
-
-### Dependency Injection
+### Error Handling System
 ```typescript
-// Current approach
-class ProjectManagementService {
-  constructor(owner: string, repo: string, token: string) {
-    // Direct instantiation
-    this.repository = new GitHubProjectRepository(...);
-  }
-}
-
-// Recommended approach
-interface ProjectManagementDependencies {
-  projectRepository: ProjectRepository;
-  issueRepository: IssueRepository;
-  // ...other dependencies
-}
-
-class ProjectManagementService {
-  constructor(dependencies: ProjectManagementDependencies) {
-    this.projectRepository = dependencies.projectRepository;
-  }
-}
-```
-
-### Caching Layer
-```typescript
-interface CacheStrategy {
-  get<T>(key: string): Promise<T | null>;
-  set<T>(key: string, value: T, ttl?: number): Promise<void>;
-}
-
-class CachedProjectRepository implements ProjectRepository {
-  constructor(
-    private repository: ProjectRepository,
-    private cache: CacheStrategy
-  ) {}
-
-  async findById(id: string): Promise<Project | null> {
-    const cached = await this.cache.get(`project:${id}`);
-    if (cached) return cached;
-
-    const project = await this.repository.findById(id);
-    if (project) {
-      await this.cache.set(`project:${id}`, project);
+// Standardized error handling across the application
+class GitHubErrorHandler {
+  static handleError(error: unknown, context: string): Error {
+    // Maps GitHub API errors to domain errors
+    if (error instanceof RequestError) {
+      return this.mapRequestError(error, context);
     }
-    return project;
+    // ... other error handling logic
+  }
+
+  static shouldRetry(error: unknown): boolean {
+    // Determines if operation should be retried
+    if (error instanceof RequestError) {
+      return error.status === 429 || error.status >= 500;
+    }
+    return false;
   }
 }
 ```
 
-### Logging Infrastructure
+### Resource Management
 ```typescript
-interface Logger {
-  info(message: string, context?: Record<string, unknown>): void;
-  error(error: Error, context?: Record<string, unknown>): void;
-  warn(message: string, context?: Record<string, unknown>): void;
-  debug(message: string, context?: Record<string, unknown>): void;
-}
+// Base repository with shared functionality
+abstract class BaseGitHubRepository<T extends Resource> {
+  // Retry mechanism with exponential backoff
+  private retryAttempts = 3;
+  private retryDelay = 1000;
 
-class ProjectManagementService {
-  constructor(
-    private dependencies: ProjectManagementDependencies,
-    private logger: Logger
-  ) {}
-
-  async createProject(data: CreateProjectInput): Promise<Project> {
-    this.logger.info('Creating project', { data });
-    try {
-      const project = await this.dependencies.projectRepository.create(data);
-      this.logger.info('Project created', { projectId: project.id });
-      return project;
-    } catch (error) {
-      this.logger.error(error as Error, { data });
-      throw error;
+  protected async executeOperation<R>(
+    operation: () => Promise<R>,
+    context: string
+  ): Promise<R> {
+    let attempt = 0;
+    while (attempt < this.retryAttempts) {
+      try {
+        return await operation();
+      } catch (error) {
+        // Retry logic with exponential backoff
+      }
     }
   }
+
+  // Generic CRUD operations
+  protected async createResource<D>(
+    endpoint: string,
+    data: D,
+    mapFn: (response: any) => T
+  ): Promise<T> {
+    // ... implementation
+  }
 }
 ```
 
-### Rate Limiting
+### Response Formatting
 ```typescript
-class RateLimitedRepository implements ProjectRepository {
-  private tokenBucket: TokenBucket;
-
-  constructor(
-    private repository: ProjectRepository,
-    private rateLimit: number,
-    private timePeriod: number
-  ) {
-    this.tokenBucket = new TokenBucket(rateLimit, timePeriod);
-  }
-
-  async findById(id: string): Promise<Project | null> {
-    await this.tokenBucket.consume(1);
-    return this.repository.findById(id);
+// Consistent MCP response formatting
+class MCPResponseFormatter {
+  static format(data: unknown, contentType: MCPContentType = MCPContentType.JSON): MCPResponse {
+    return {
+      content: [{
+        type: this.getTypeFromContentType(contentType),
+        text: this.formatContent(data, contentType),
+        contentType,
+      }],
+      metadata: {
+        timestamp: new Date().toISOString(),
+        status: 200,
+      },
+    };
   }
 }
 ```
 
-### API Versioning
+### Type Safety and Validation
 ```typescript
-interface ApiVersion {
-  version: string;
-  handler: typeof ProjectRepository;
-}
+// Runtime type validation with Zod
+const ResourceSchema = z.object({
+  id: z.string(),
+  type: z.nativeEnum(ResourceType),
+  version: z.number(),
+  status: z.nativeEnum(ResourceStatus),
+  // ... other fields
+});
 
-class VersionedProjectRepository implements ProjectRepository {
-  constructor(private versions: ApiVersion[]) {}
-
-  async findById(id: string, version?: string): Promise<Project | null> {
-    const handler = this.getVersionHandler(version);
-    return handler.findById(id);
-  }
-
-  private getVersionHandler(version?: string): typeof ProjectRepository {
-    if (!version) {
-      return this.versions[this.versions.length - 1].handler;
-    }
-    const handler = this.versions.find(v => v.version === version);
-    if (!handler) {
-      throw new Error(`Unsupported API version: ${version}`);
-    }
-    return handler.handler;
-  }
-}
+// Type guard functions
+export const isResource = (value: unknown): value is Resource => {
+  return ResourceSchema.safeParse(value).success;
+};
 ```
+
+## Recent Improvements
+
+1. Enhanced Error Handling
+- Added consistent error mapping across repositories
+- Implemented retry mechanism with exponential backoff
+- Added detailed error context and validation
+- Proper rate limit handling
+
+2. Resource Management
+- Created BaseGitHubRepository for shared functionality
+- Added optimistic locking support
+- Implemented proper request retries
+- Added validation for required fields
+
+3. Response Formatting
+- Standardized MCP response structure
+- Added support for multiple content types
+- Improved error response formatting
+- Added pagination support
+
+4. Type Safety
+- Added comprehensive type definitions
+- Implemented runtime type validation
+- Added proper type guards
+- Improved null safety
 
 ## Next Steps
 
