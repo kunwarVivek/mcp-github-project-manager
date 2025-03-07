@@ -1,62 +1,106 @@
-import { GitHubConfig } from "./GitHubConfig";
+import { Octokit } from "@octokit/rest";
+import { IGitHubRepository } from "./repositories/BaseRepository";
+import { GitHubErrorHandler } from "./GitHubErrorHandler";
+import { OctokitInstance } from "./types";
+import { GitHubConfig } from "./config";
 import { GitHubIssueRepository } from "./repositories/GitHubIssueRepository";
 import { GitHubMilestoneRepository } from "./repositories/GitHubMilestoneRepository";
 import { GitHubProjectRepository } from "./repositories/GitHubProjectRepository";
 import { GitHubSprintRepository } from "./repositories/GitHubSprintRepository";
 
-export class GitHubRepositoryFactory {
-  private static instance: GitHubRepositoryFactory;
-  private config: GitHubConfig | null = null;
-
-  private constructor() {}
-
-  static getInstance(): GitHubRepositoryFactory {
-    if (!GitHubRepositoryFactory.instance) {
-      GitHubRepositoryFactory.instance = new GitHubRepositoryFactory();
-    }
-    return GitHubRepositoryFactory.instance;
-  }
-
-  configure(owner: string, repo: string, token: string): void {
-    this.config = new GitHubConfig(owner, repo, token);
-  }
-
-  createProjectRepository(): GitHubProjectRepository {
-    this.ensureConfigured();
-    return new GitHubProjectRepository(this.config!);
-  }
-
-  createIssueRepository(): GitHubIssueRepository {
-    this.ensureConfigured();
-    return new GitHubIssueRepository(this.config!);
-  }
-
-  createMilestoneRepository(): GitHubMilestoneRepository {
-    this.ensureConfigured();
-    return new GitHubMilestoneRepository(this.config!);
-  }
-
-  createSprintRepository(): GitHubSprintRepository {
-    this.ensureConfigured();
-    return new GitHubSprintRepository(this.config!);
-  }
-
-  private ensureConfigured(): void {
-    if (!this.config) {
-      throw new Error(
-        "GitHubRepositoryFactory must be configured with owner, repo, and token before use"
-      );
-    }
-  }
+export interface RepositoryFactoryOptions {
+  baseUrl?: string;
+  previews?: string[];
 }
 
-// Example usage:
-/*
-const factory = GitHubRepositoryFactory.getInstance();
-factory.configure("owner", "repo", "github-token");
+export class GitHubRepositoryFactory {
+  private readonly octokit: OctokitInstance;
+  private readonly errorHandler: GitHubErrorHandler;
+  private readonly config: GitHubConfig;
 
-const projectRepo = factory.createProjectRepository();
-const issueRepo = factory.createIssueRepository();
-const milestoneRepo = factory.createMilestoneRepository();
-const sprintRepo = factory.createSprintRepository();
-*/
+  constructor(
+    token: string,
+    owner: string,
+    repo: string,
+    options: RepositoryFactoryOptions = {}
+  ) {
+    this.config = GitHubConfig.create(owner, repo, token);
+    this.errorHandler = new GitHubErrorHandler();
+    
+    this.octokit = new Octokit({
+      auth: token,
+      baseUrl: options.baseUrl || "https://api.github.com",
+      previews: options.previews || ["inertia-preview"],
+    });
+  }
+
+  getErrorHandler(): GitHubErrorHandler {
+    return this.errorHandler;
+  }
+
+  getOctokit(): OctokitInstance {
+    return this.octokit;
+  }
+
+  getConfig(): GitHubConfig {
+    return this.config;
+  }
+
+  /**
+   * Creates an instance of an Issue Repository
+   */
+  createIssueRepository(): GitHubIssueRepository {
+    return new GitHubIssueRepository(this.octokit, this.config);
+  }
+
+  /**
+   * Creates an instance of a Milestone Repository
+   */
+  createMilestoneRepository(): GitHubMilestoneRepository {
+    return new GitHubMilestoneRepository(this.octokit, this.config);
+  }
+
+  /**
+   * Creates an instance of a Project Repository
+   */
+  createProjectRepository(): GitHubProjectRepository {
+    return new GitHubProjectRepository(this.octokit, this.config);
+  }
+
+  /**
+   * Creates an instance of a Sprint Repository
+   */
+  createSprintRepository(): GitHubSprintRepository {
+    return new GitHubSprintRepository(this.octokit, this.config);
+  }
+
+  /**
+   * Creates an instance of any GitHub repository implementation
+   * @param RepositoryClass The repository class to instantiate
+   */
+  protected createRepository<T extends IGitHubRepository>(
+    RepositoryClass: new (octokit: OctokitInstance, config: GitHubConfig) => T
+  ): T {
+    return new RepositoryClass(this.octokit, this.config);
+  }
+
+  /**
+   * Creates a new factory instance from environment variables
+   */
+  static create(env: {
+    GITHUB_TOKEN: string;
+    GITHUB_OWNER: string;
+    GITHUB_REPO: string;
+  }, options?: RepositoryFactoryOptions): GitHubRepositoryFactory {
+    if (!env.GITHUB_TOKEN || !env.GITHUB_OWNER || !env.GITHUB_REPO) {
+      throw new Error('Missing required GitHub configuration');
+    }
+
+    return new GitHubRepositoryFactory(
+      env.GITHUB_TOKEN,
+      env.GITHUB_OWNER,
+      env.GITHUB_REPO,
+      options
+    );
+  }
+}

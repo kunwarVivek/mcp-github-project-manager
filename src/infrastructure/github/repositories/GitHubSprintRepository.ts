@@ -1,23 +1,48 @@
-import { Octokit } from "@octokit/rest";
+import { BaseGitHubRepository } from "./BaseRepository";
 import { IssueId, Sprint, SprintId, SprintRepository } from "../../../domain/types";
-import { GitHubConfig } from "../GitHubConfig";
+import { ResourceStatus, ResourceType } from "../../../domain/resource-types";
 import {
   CreateProjectV2FieldResponse,
-  CreateProjectV2IterationFieldResponse,
-  GetIterationFieldResponse,
+  CreateProjectV2FieldResponse as CreateProjectV2IterationFieldResponse,
   GraphQLResponse,
-  ListIterationFieldsResponse,
-  UpdateProjectV2IterationFieldResponse,
 } from "../graphql-types";
 
-export class GitHubSprintRepository implements SprintRepository {
-  private octokit: Octokit;
+interface GetIterationFieldResponse {
+  iteration: {
+    id: string;
+    title: string;
+    startDate: string;
+    duration: number;
+    items?: {
+      nodes?: Array<{
+        content: {
+          number: number;
+        };
+      }>;
+    };
+  };
+}
 
-  constructor(private config: GitHubConfig) {
-    this.octokit = new Octokit({ auth: config.token });
-  }
+interface ListIterationFieldsResponse {
+  iterations: {
+    nodes: Array<{
+      id: string;
+      title: string;
+      startDate: string;
+      duration: number;
+      items?: {
+        nodes?: Array<{
+          content: {
+            number: number;
+          };
+        }>;
+      };
+    }>;
+  };
+}
 
-  async create(data: Omit<Sprint, "id">): Promise<Sprint> {
+export class GitHubSprintRepository extends BaseGitHubRepository implements SprintRepository {
+  async create(data: Omit<Sprint, "id" | "createdAt" | "updatedAt" | "type">): Promise<Sprint> {
     const createFieldQuery = `
       mutation($input: CreateProjectV2FieldInput!) {
         createProjectV2Field(input: $input) {
@@ -29,17 +54,15 @@ export class GitHubSprintRepository implements SprintRepository {
       }
     `;
 
-    const fieldResponse = await this.octokit.graphql<
-      GraphQLResponse<CreateProjectV2FieldResponse>
-    >(createFieldQuery, {
+    const fieldResponse = await this.graphql<CreateProjectV2FieldResponse>(createFieldQuery, {
       input: {
-        projectId: this.config.repo,
+        projectId: this.repo,
         name: "Sprint",
         dataType: "ITERATION",
       },
     });
 
-    if (!fieldResponse.data?.createProjectV2Field?.projectV2Field) {
+    if (!fieldResponse.createProjectV2Field?.projectV2Field) {
       throw new Error("Failed to create sprint field");
     }
 
@@ -57,44 +80,56 @@ export class GitHubSprintRepository implements SprintRepository {
     `;
 
     const durationWeeks = Math.ceil(
-      (data.endDate.getTime() - data.startDate.getTime()) /
+      (new Date(data.endDate).getTime() - new Date(data.startDate).getTime()) /
         (1000 * 60 * 60 * 24 * 7)
     );
 
-    const iterationResponse = await this.octokit.graphql<
-      GraphQLResponse<CreateProjectV2IterationFieldResponse>
-    >(createIterationQuery, {
-      input: {
-        fieldId: fieldResponse.data.createProjectV2Field.projectV2Field.id,
-        title: data.title,
-        startDate: data.startDate.toISOString(),
-        duration: durationWeeks,
-      },
-    });
+    const iterationResponse = await this.graphql<CreateProjectV2IterationFieldResponse>(
+      createIterationQuery,
+      {
+        input: {
+          fieldId: fieldResponse.createProjectV2Field.projectV2Field.id,
+          title: data.title,
+          startDate: this.toISOString(data.startDate),
+          duration: durationWeeks,
+        },
+      }
+    );
 
-    if (!iterationResponse.data?.createProjectV2IterationField?.iteration) {
+    if (!iterationResponse.createProjectV2Field?.projectV2Field) {
       throw new Error("Failed to create sprint iteration");
     }
 
-    const iteration = iterationResponse.data.createProjectV2IterationField.iteration;
+    const iteration = iterationResponse.createProjectV2Field.projectV2Field;
 
     if (data.issues.length > 0) {
       await this.addIssuesToSprint(iteration.id, data.issues);
     }
 
-    return {
+    const sprint: Sprint = {
       id: iteration.id,
+      type: ResourceType.SPRINT,
+      version: 1,
       title: data.title,
       startDate: data.startDate,
       endDate: data.endDate,
-      status: this.determineSprintStatus(data.startDate, data.endDate),
+      status: this.determineSprintStatus(new Date(data.startDate), new Date(data.endDate)),
       goals: data.goals,
       issues: data.issues,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
     };
+
+    return sprint;
   }
 
   async update(id: SprintId, data: Partial<Sprint>): Promise<Sprint> {
-    const updateIterationQuery = `
+    const sprint = await this.findById(id);
+    if (!sprint) {
+      throw new Error("Sprint not found");
+    }
+
+    const updateQuery = `
       mutation($input: UpdateProjectV2IterationFieldIterationInput!) {
         updateProjectV2IterationField(input: $input) {
           iteration {
@@ -107,38 +142,29 @@ export class GitHubSprintRepository implements SprintRepository {
       }
     `;
 
-    const updateData = {
-      iterationId: id,
-      ...(data.title && { title: data.title }),
-      ...(data.startDate && { startDate: data.startDate.toISOString() }),
-      ...(data.endDate && data.startDate && {
-        duration: Math.ceil(
-          (data.endDate.getTime() - data.startDate.getTime()) /
-            (1000 * 60 * 60 * 24 * 7)
-        ),
-      }),
-    };
+    if (data.startDate || data.endDate) {
+      const startDate = data.startDate ? new Date(data.startDate) : new Date(sprint.startDate);
+      const endDate = data.endDate ? new Date(data.endDate) : new Date(sprint.endDate);
+      
+      const durationWeeks = Math.ceil(
+        (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24 * 7)
+      );
 
-    const response = await this.octokit.graphql<
-      GraphQLResponse<UpdateProjectV2IterationFieldResponse>
-    >(updateIterationQuery, {
-      input: updateData,
-    });
-
-    if (!response.data?.updateProjectV2IterationField?.iteration) {
-      throw new Error("Failed to update sprint");
+      await this.graphql(updateQuery, {
+        input: {
+          iterationId: id,
+          startDate: this.toISOString(startDate),
+          duration: durationWeeks,
+          title: data.title || sprint.title,
+        },
+      });
     }
 
     if (data.issues) {
       await this.updateSprintIssues(id, data.issues);
     }
 
-    const sprint = await this.findById(id);
-    if (!sprint) {
-      throw new Error("Sprint not found after update");
-    }
-
-    return {
+    const updatedSprint: Sprint = {
       ...sprint,
       ...(data.title && { title: data.title }),
       ...(data.startDate && { startDate: data.startDate }),
@@ -146,11 +172,14 @@ export class GitHubSprintRepository implements SprintRepository {
       ...(data.status && { status: data.status }),
       ...(data.goals && { goals: data.goals }),
       ...(data.issues && { issues: data.issues }),
+      updatedAt: new Date().toISOString(),
     };
+
+    return updatedSprint;
   }
 
   async delete(id: SprintId): Promise<void> {
-    const deleteIterationQuery = `
+    const query = `
       mutation($input: DeleteProjectV2IterationFieldIterationInput!) {
         deleteProjectV2IterationField(input: $input) {
           iteration {
@@ -160,7 +189,7 @@ export class GitHubSprintRepository implements SprintRepository {
       }
     `;
 
-    await this.octokit.graphql(deleteIterationQuery, {
+    await this.graphql(query, {
       input: {
         iterationId: id,
       },
@@ -192,9 +221,7 @@ export class GitHubSprintRepository implements SprintRepository {
       }
     `;
 
-    const response = await this.octokit.graphql<
-      GraphQLResponse<GetIterationFieldResponse>
-    >(query, {
+    const response = await this.graphql<{ data: GetIterationFieldResponse }>(query, {
       iterationId: id,
     });
 
@@ -205,37 +232,41 @@ export class GitHubSprintRepository implements SprintRepository {
     const endDate = new Date(startDate);
     endDate.setDate(endDate.getDate() + iteration.duration * 7);
 
-    return {
+    const sprint: Sprint = {
       id: iteration.id,
+      type: ResourceType.SPRINT,
+      version: 1,
       title: iteration.title,
-      startDate,
-      endDate,
+      startDate: this.toISOString(startDate),
+      endDate: this.toISOString(endDate),
       status: this.determineSprintStatus(startDate, endDate),
       goals: [],
-      issues: iteration.items?.nodes?.map(
-        (node: { content: { number: number } }) => node.content.number
-      ) || [],
+      issues: iteration.items?.nodes?.map(node => node.content.number.toString()) || [],
+      createdAt: this.toISOString(startDate),
+      updatedAt: this.toISOString(new Date()),
     };
+
+    return sprint;
   }
 
-  async findAll(filters?: {
-    status?: "planned" | "active" | "completed";
-  }): Promise<Sprint[]> {
+  async findAll(filters?: { status?: Sprint["status"] }): Promise<Sprint[]> {
     const query = `
-      query($projectId: ID!) {
-        node(id: $projectId) {
-          ... on ProjectV2 {
-            iterations(first: 100) {
-              nodes {
-                id
-                title
-                startDate
-                duration
-                items {
-                  nodes {
-                    content {
-                      ... on Issue {
-                        number
+      query($owner: String!, $repo: String!) {
+        repository(owner: $owner, name: $repo) {
+          projectsV2(first: 1) {
+            nodes {
+              iterations(first: 100) {
+                nodes {
+                  id
+                  title
+                  startDate
+                  duration
+                  items {
+                    nodes {
+                      content {
+                        ... on Issue {
+                          number
+                        }
                       }
                     }
                   }
@@ -247,29 +278,32 @@ export class GitHubSprintRepository implements SprintRepository {
       }
     `;
 
-    const response = await this.octokit.graphql<
-      GraphQLResponse<ListIterationFieldsResponse>
-    >(query, {
-      projectId: this.config.repo,
+    const response = await this.graphql<{ data: ListIterationFieldsResponse }>(query, {
+      owner: this.owner,
+      repo: this.repo,
     });
 
     if (!response.data?.iterations?.nodes) {
       return [];
     }
 
-    const sprints = response.data.iterations.nodes.map((iteration) => {
+    const sprints: Sprint[] = response.data.iterations.nodes.map(iteration => {
       const startDate = new Date(iteration.startDate);
       const endDate = new Date(startDate);
       endDate.setDate(endDate.getDate() + iteration.duration * 7);
 
       return {
         id: iteration.id,
+        type: ResourceType.SPRINT,
+        version: 1,
         title: iteration.title,
-        startDate,
-        endDate,
+        startDate: this.toISOString(startDate),
+        endDate: this.toISOString(endDate),
         status: this.determineSprintStatus(startDate, endDate),
         goals: [],
-        issues: iteration.items?.nodes?.map(node => node.content.number) || [],
+        issues: iteration.items?.nodes?.map(node => node.content.number.toString()) || [],
+        createdAt: this.toISOString(startDate),
+        updatedAt: this.toISOString(new Date()),
       };
     });
 
@@ -280,78 +314,14 @@ export class GitHubSprintRepository implements SprintRepository {
     return sprints;
   }
 
-  async getSprintMetrics(id: SprintId): Promise<{
-    totalIssues: number;
-    completedIssues: number;
-    remainingIssues: number;
-    completionPercentage: number;
-  }> {
-    const sprint = await this.findById(id);
-    if (!sprint) {
-      throw new Error("Sprint not found");
-    }
-
-    const issueQuery = `
-      query($owner: String!, $repo: String!, $issueIds: [ID!]!) {
-        repository(owner: $owner, name: $repo) {
-          issues(first: 100, where: { ids: $issueIds }) {
-            nodes {
-              id
-              state
-            }
-          }
-        }
-      }
-    `;
-
-    interface IssueQueryResponse {
-      repository: {
-        issues: {
-          nodes: Array<{
-            id: string;
-            state: string;
-          }>;
-        };
-      };
-    }
-
-    const response = await this.octokit.graphql<GraphQLResponse<IssueQueryResponse>>(
-      issueQuery,
-      {
-        owner: this.config.owner,
-        repo: this.config.repo,
-        issueIds: sprint.issues.map(id => `Issue_${id}`),
-      }
-    );
-
-    const issues = response.data.repository.issues.nodes;
-    const totalIssues = issues.length;
-    const completedIssues = issues.filter(issue => issue.state === "CLOSED").length;
-    const remainingIssues = totalIssues - completedIssues;
-    const completionPercentage = totalIssues > 0 ? (completedIssues / totalIssues) * 100 : 0;
-
-    return {
-      totalIssues,
-      completedIssues,
-      remainingIssues,
-      completionPercentage,
-    };
-  }
-
-  private determineSprintStatus(
-    startDate: Date,
-    endDate: Date
-  ): "planned" | "active" | "completed" {
+  private determineSprintStatus(startDate: Date, endDate: Date): ResourceStatus {
     const now = new Date();
-    if (now < startDate) return "planned";
-    if (now > endDate) return "completed";
-    return "active";
+    if (now < startDate) return ResourceStatus.PLANNED;
+    if (now > endDate) return ResourceStatus.COMPLETED;
+    return ResourceStatus.ACTIVE;
   }
 
-  private async addIssuesToSprint(
-    sprintId: string,
-    issueIds: IssueId[]
-  ): Promise<void> {
+  private async addIssuesToSprint(sprintId: string, issueIds: IssueId[]): Promise<void> {
     const addItemQuery = `
       mutation($input: UpdateProjectV2ItemFieldValueInput!) {
         updateProjectV2ItemFieldValue(input: $input) {
@@ -363,9 +333,9 @@ export class GitHubSprintRepository implements SprintRepository {
     `;
 
     for (const issueId of issueIds) {
-      await this.octokit.graphql(addItemQuery, {
+      await this.graphql(addItemQuery, {
         input: {
-          projectId: this.config.repo,
+          projectId: this.repo,
           itemId: `Issue_${issueId}`,
           fieldId: sprintId,
           value: "ITERATION",
@@ -374,11 +344,14 @@ export class GitHubSprintRepository implements SprintRepository {
     }
   }
 
-  private async updateSprintIssues(
-    sprintId: string,
-    issueIds: IssueId[]
-  ): Promise<void> {
-    const removeItemQuery = `
+  private async updateSprintIssues(sprintId: string, issueIds: IssueId[]): Promise<void> {
+    const sprint = await this.findById(sprintId);
+    if (!sprint) {
+      throw new Error("Sprint not found");
+    }
+
+    // Remove existing issues
+    const removeQuery = `
       mutation($input: UpdateProjectV2ItemFieldValueInput!) {
         updateProjectV2ItemFieldValue(input: $input) {
           projectV2Item {
@@ -388,15 +361,10 @@ export class GitHubSprintRepository implements SprintRepository {
       }
     `;
 
-    const currentSprint = await this.findById(sprintId);
-    if (!currentSprint) {
-      throw new Error("Sprint not found");
-    }
-
-    for (const issueId of currentSprint.issues) {
-      await this.octokit.graphql(removeItemQuery, {
+    for (const issueId of sprint.issues) {
+      await this.graphql(removeQuery, {
         input: {
-          projectId: this.config.repo,
+          projectId: this.repo,
           itemId: `Issue_${issueId}`,
           fieldId: sprintId,
           value: null,
@@ -404,6 +372,7 @@ export class GitHubSprintRepository implements SprintRepository {
       });
     }
 
+    // Add new issues
     await this.addIssuesToSprint(sprintId, issueIds);
   }
 }

@@ -1,30 +1,29 @@
 {
   "name": "github-project-manager",
   "version": "0.1.0",
-  "description": "GitHub Project Management Tool with MCP Integration",
   "type": "module",
+  "exports": "./build/index.js",
   "engines": {
     "node": ">=18.0.0"
   },
   "scripts": {
-    "build": "tsc",
+    "clean": "rimraf build",
+    "prebuild": "npm run clean",
+    "build": "tsc -p tsconfig.build.json",
+    "postbuild": "chmod +x build/index.js",
     "start": "node build/index.js",
     "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
     "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js --config jest.config.cjs",
-    "test:watch": "node --experimental-vm-modules node_modules/jest/bin/jest.js --watch --config jest.config.cjs",
-    "test:coverage": "node --experimental-vm-modules node_modules/jest/bin/jest.js --coverage --config jest.config.cjs",
+    "test:watch": "node --experimental-vm-modules node_modules/jest/bin/jest.js --config jest.config.cjs --watch",
+    "test:coverage": "node --experimental-vm-modules node_modules/jest/bin/jest.js --config jest.config.cjs --coverage",
     "test:e2e": "node --experimental-vm-modules node_modules/jest/bin/jest.js --config jest.e2e.config.mjs",
     "lint": "eslint . --ext .ts",
-    "prettier": "prettier --write \"src/**/*.ts\"",
-    "clean": "rimraf build coverage",
+    "format": "prettier --write \"src/**/*.ts\"",
     "prepare": "husky install"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.6.1",
-    "@octokit/openapi-types": "^24.0.0",
+    "@modelcontextprotocol/sdk": "*",
     "@octokit/rest": "^21.1.1",
-    "@octokit/types": "^13.8.0",
-    "axios": "^1.8.1",
     "uuid": "^11.1.0",
     "zod": "^3.24.2"
   },
@@ -38,7 +37,7 @@
     "@typescript-eslint/eslint-plugin": "^8.26.0",
     "@typescript-eslint/parser": "^8.26.0",
     "eslint": "^9.21.0",
-    "eslint-config-prettier": "^10.0.2",
+    "eslint-config-prettier": "^10.1.0",
     "eslint-plugin-jest": "^28.11.0",
     "eslint-plugin-prettier": "^5.2.3",
     "husky": "^9.1.7",

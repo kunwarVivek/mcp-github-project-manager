@@ -1,428 +1,247 @@
+import { GitHubRepositoryFactory } from "../infrastructure/github/GitHubRepositoryFactory";
+import { GitHubIssueRepository } from "../infrastructure/github/repositories/GitHubIssueRepository";
+import { GitHubMilestoneRepository } from "../infrastructure/github/repositories/GitHubMilestoneRepository";
+import { GitHubProjectRepository } from "../infrastructure/github/repositories/GitHubProjectRepository";
+import { GitHubSprintRepository } from "../infrastructure/github/repositories/GitHubSprintRepository";
+import { ResourceStatus, ResourceType } from "../domain/resource-types";
 import {
   Issue,
-  IssueId,
+  CreateIssue,
   Milestone,
-  MilestoneId,
+  CreateMilestone,
   Project,
-  ProjectId,
+  CreateProject,
   Sprint,
-  SprintId,
-  ProjectView,
+  CreateSprint,
   CustomField,
-  ViewId,
-  FieldId,
+  ProjectView,
+  createResource
 } from "../domain/types";
-import { GitHubRepositoryFactory } from "../infrastructure/github/GitHubRepositoryFactory";
+import { GitHubTypeConverter } from "../infrastructure/github/util/conversion";
 
 export class ProjectManagementService {
-  private factory: GitHubRepositoryFactory;
+  private readonly factory: GitHubRepositoryFactory;
 
   constructor(owner: string, repo: string, token: string) {
-    this.factory = GitHubRepositoryFactory.getInstance();
-    this.factory.configure(owner, repo, token);
+    this.factory = new GitHubRepositoryFactory(token, owner, repo);
   }
 
+  private get issueRepo(): GitHubIssueRepository {
+    return this.factory.createIssueRepository();
+  }
+
+  private get milestoneRepo(): GitHubMilestoneRepository {
+    return this.factory.createMilestoneRepository();
+  }
+
+  private get projectRepo(): GitHubProjectRepository {
+    return this.factory.createProjectRepository();
+  }
+
+  private get sprintRepo(): GitHubSprintRepository {
+    return this.factory.createSprintRepository();
+  }
+
+  // Roadmap Management
   async createRoadmap(data: {
-    project: Omit<Project, "id" | "createdAt" | "updatedAt">;
+    project: CreateProject;
     milestones: Array<{
-      milestone: Omit<Milestone, "id" | "progress">;
-      issues: Array<Omit<Issue, "id" | "createdAt" | "updatedAt">>;
+      milestone: CreateMilestone;
+      issues: CreateIssue[];
     }>;
   }): Promise<{
     project: Project;
-    milestones: Array<{
-      milestone: Milestone;
-      issues: Issue[];
-    }>;
+    milestones: Array<Milestone & { issues: Issue[] }>;
   }> {
-    const projectRepo = this.factory.createProjectRepository();
-    const milestoneRepo = this.factory.createMilestoneRepository();
-    const issueRepo = this.factory.createIssueRepository();
+    const project = await this.projectRepo.create(
+      createResource<Project>(ResourceType.PROJECT, data.project)
+    );
 
-    try {
-      // Create project
-      const project = await projectRepo.create(data.project);
+    const milestones = [];
 
-      // Create default views if not specified
-      if (!data.project.views) {
-        await this.createDefaultViews(project.id);
-      }
-
-      // Create milestones and their issues
-      const milestones = await Promise.all(
-        data.milestones.map(async ({ milestone, issues }) => {
-          const createdMilestone = await milestoneRepo.create(milestone);
-          const createdIssues = await Promise.all(
-            issues.map((issue) =>
-              issueRepo.create({
-                ...issue,
-                milestoneId: createdMilestone.id,
-              })
-            )
-          );
-          return { milestone: createdMilestone, issues: createdIssues };
-        })
+    for (const { milestone, issues } of data.milestones) {
+      const createdMilestone = await this.milestoneRepo.create(
+        createResource<Milestone>(ResourceType.MILESTONE, milestone)
       );
 
-      return { project, milestones };
-    } catch (error) {
-      if (error instanceof Error) {
-        throw new Error(`Failed to create roadmap: ${error.message}`);
-      }
-      throw error;
+      const createdIssues = await Promise.all(
+        issues.map(issue =>
+          this.issueRepo.create(
+            createResource<Issue>(ResourceType.ISSUE, {
+              ...issue,
+              milestoneId: createdMilestone.id,
+            })
+          )
+        )
+      );
+
+      milestones.push({
+        ...createdMilestone,
+        issues: createdIssues,
+      });
     }
+
+    return { project, milestones };
   }
 
-  private async createDefaultViews(projectId: ProjectId): Promise<ProjectView[]> {
-    const projectRepo = this.factory.createProjectRepository();
-    
-    const views = [
-      {
-        name: "Table",
-        layout: "table" as const,
-        settings: {
-          sortBy: [{ field: "Title", direction: "asc" as const }],
-        },
-      },
-      {
-        name: "Board",
-        layout: "board" as const,
-        settings: {
-          groupBy: "Status",
-        },
-      },
-      {
-        name: "Roadmap",
-        layout: "roadmap" as const,
-        settings: {
-          groupBy: "Milestone",
-        },
-      },
-    ];
-
-    return Promise.all(views.map((view) => projectRepo.createView(projectId, view)));
-  }
-
+  // Sprint Management
   async planSprint(data: {
-    sprint: Omit<Sprint, "id">;
-    issueIds: IssueId[];
+    sprint: CreateSprint;
+    issueIds: string[];
   }): Promise<Sprint> {
-    const sprintRepo = this.factory.createSprintRepository();
-    const issueRepo = this.factory.createIssueRepository();
-
-    try {
-      // Verify all issues exist
-      await Promise.all(
-        data.issueIds.map(async (id) => {
-          const issue = await issueRepo.findById(id);
-          if (!issue) throw new Error(`Issue #${id} not found`);
-          return issue;
-        })
-      );
-
-      // Create sprint with verified issues
-      return sprintRepo.create({
+    const sprint = await this.sprintRepo.create(
+      createResource<Sprint>(ResourceType.SPRINT, {
         ...data.sprint,
         issues: data.issueIds,
-      });
-    } catch (error) {
-      if (error instanceof Error) {
-        throw new Error(`Failed to plan sprint: ${error.message}`);
-      }
-      throw error;
+      })
+    );
+
+    if (data.issueIds.length > 0) {
+      await Promise.all(
+        data.issueIds.map(issueId =>
+          this.issueRepo.update(issueId, { milestoneId: sprint.id })
+        )
+      );
     }
+
+    return sprint;
   }
 
-  // Project Views Management
-  async createProjectView(projectId: ProjectId, view: Omit<ProjectView, "id">): Promise<ProjectView> {
-    const projectRepo = this.factory.createProjectRepository();
-    try {
-      return await projectRepo.createView(projectId, view);
-    } catch (error) {
-      if (error instanceof Error) {
-        throw new Error(`Failed to create project view: ${error.message}`);
-      }
-      throw error;
-    }
+  async findSprints(filters?: { status?: ResourceStatus }): Promise<Sprint[]> {
+    return this.sprintRepo.findAll(filters);
   }
 
-  async updateProjectView(
-    projectId: ProjectId,
-    viewId: ViewId,
-    data: Partial<ProjectView>
-  ): Promise<ProjectView> {
-    const projectRepo = this.factory.createProjectRepository();
-    try {
-      return await projectRepo.updateView(projectId, viewId, data);
-    } catch (error) {
-      if (error instanceof Error) {
-        throw new Error(`Failed to update project view: ${error.message}`);
-      }
-      throw error;
-    }
+  async updateSprint(id: string, data: Partial<Sprint>): Promise<Sprint> {
+    return this.sprintRepo.update(id, data);
   }
 
-  async deleteProjectView(projectId: ProjectId, viewId: ViewId): Promise<void> {
-    const projectRepo = this.factory.createProjectRepository();
-    try {
-      await projectRepo.deleteView(projectId, viewId);
-    } catch (error) {
-      if (error instanceof Error) {
-        throw new Error(`Failed to delete project view: ${error.message}`);
-      }
-      throw error;
-    }
-  }
-
-  // Custom Fields Management
-  async createCustomField(
-    projectId: ProjectId,
-    field: Omit<CustomField, "id">
-  ): Promise<CustomField> {
-    const projectRepo = this.factory.createProjectRepository();
-    try {
-      return await projectRepo.createField(projectId, field);
-    } catch (error) {
-      if (error instanceof Error) {
-        throw new Error(`Failed to create custom field: ${error.message}`);
-      }
-      throw error;
-    }
-  }
-
-  async updateCustomField(
-    projectId: ProjectId,
-    fieldId: FieldId,
-    data: Partial<CustomField>
-  ): Promise<CustomField> {
-    const projectRepo = this.factory.createProjectRepository();
-    try {
-      return await projectRepo.updateField(projectId, fieldId, data);
-    } catch (error) {
-      if (error instanceof Error) {
-        throw new Error(`Failed to update custom field: ${error.message}`);
-      }
-      throw error;
-    }
-  }
-
-  async deleteCustomField(projectId: ProjectId, fieldId: FieldId): Promise<void> {
-    const projectRepo = this.factory.createProjectRepository();
-    try {
-      await projectRepo.deleteField(projectId, fieldId);
-    } catch (error) {
-      if (error instanceof Error) {
-        throw new Error(`Failed to delete custom field: ${error.message}`);
-      }
-      throw error;
-    }
-  }
-
-  // Issue Custom Field Management
-  async updateIssueCustomField(
-    issueId: IssueId,
-    fieldId: FieldId,
-    value: any
-  ): Promise<void> {
-    const issueRepo = this.factory.createIssueRepository();
-    try {
-      await issueRepo.updateCustomField(issueId, fieldId, value);
-    } catch (error) {
-      if (error instanceof Error) {
-        throw new Error(`Failed to update issue custom field: ${error.message}`);
-      }
-      throw error;
-    }
-  }
-
-  // Milestone Progress Tracking
-  async getMilestoneProgress(
-    id: MilestoneId
-  ): Promise<{ openIssues: number; closedIssues: number }> {
-    const milestoneRepo = this.factory.createMilestoneRepository();
-    try {
-      return await milestoneRepo.getProgress(id);
-    } catch (error) {
-      if (error instanceof Error) {
-        throw new Error(`Failed to get milestone progress: ${error.message}`);
-      }
-      throw error;
-    }
-  }
-
-  async getMilestoneCompletionPercentage(id: MilestoneId): Promise<number> {
-    const milestoneRepo = this.factory.createMilestoneRepository();
-    try {
-      return await milestoneRepo.getCompletionPercentage(id);
-    } catch (error) {
-      if (error instanceof Error) {
-        throw new Error(`Failed to get milestone completion percentage: ${error.message}`);
-      }
-      throw error;
-    }
-  }
-
-  async getOverdueMilestones(): Promise<Milestone[]> {
-    const milestoneRepo = this.factory.createMilestoneRepository();
-    try {
-      return await milestoneRepo.getOverdue();
-    } catch (error) {
-      if (error instanceof Error) {
-        throw new Error(`Failed to get overdue milestones: ${error.message}`);
-      }
-      throw error;
-    }
-  }
-
-  async getMilestonesInNext(days: number): Promise<Milestone[]> {
-    const milestoneRepo = this.factory.createMilestoneRepository();
-    try {
-      return await milestoneRepo.getDueInNext(days);
-    } catch (error) {
-      if (error instanceof Error) {
-        throw new Error(`Failed to get upcoming milestones: ${error.message}`);
-      }
-      throw error;
-    }
-  }
-
-  // Sprint Metrics
-  async getSprintMetrics(id: SprintId): Promise<{
+  async getSprintMetrics(id: string): Promise<{
     totalIssues: number;
     completedIssues: number;
     remainingIssues: number;
     completionPercentage: number;
   }> {
-    const sprintRepo = this.factory.createSprintRepository();
-    try {
-      return await sprintRepo.getSprintMetrics(id);
-    } catch (error) {
-      if (error instanceof Error) {
-        throw new Error(`Failed to get sprint metrics: ${error.message}`);
-      }
-      throw error;
+    const sprint = await this.sprintRepo.findById(id);
+    if (!sprint) {
+      throw new Error("Sprint not found");
     }
+
+    const issues = await Promise.all(
+      sprint.issues.map(issueId => this.issueRepo.findById(issueId))
+    );
+
+    const totalIssues = issues.length;
+    const completedIssues = issues.filter(
+      issue => issue?.status === ResourceStatus.CLOSED || issue?.status === ResourceStatus.COMPLETED
+    ).length;
+    const remainingIssues = totalIssues - completedIssues;
+    const completionPercentage = totalIssues > 0 ? (completedIssues / totalIssues) * 100 : 0;
+
+    return {
+      totalIssues,
+      completedIssues,
+      remainingIssues,
+      completionPercentage,
+    };
   }
 
   // Issue Management
-  async createIssue(data: Omit<Issue, "id" | "createdAt" | "updatedAt">): Promise<Issue> {
-    const issueRepo = this.factory.createIssueRepository();
-    try {
-      return await issueRepo.create(data);
-    } catch (error) {
-      if (error instanceof Error) {
-        throw new Error(`Failed to create issue: ${error.message}`);
-      }
-      throw error;
-    }
+  async createIssue(data: CreateIssue): Promise<Issue> {
+    return this.issueRepo.create(
+      createResource<Issue>(ResourceType.ISSUE, data)
+    );
   }
 
-  async getIssue(id: IssueId): Promise<Issue> {
-    const issueRepo = this.factory.createIssueRepository();
-    try {
-      const issue = await issueRepo.findById(id);
-      if (!issue) throw new Error(`Issue #${id} not found`);
-      return issue;
-    } catch (error) {
-      if (error instanceof Error) {
-        throw new Error(`Failed to get issue: ${error.message}`);
-      }
-      throw error;
-    }
+  async updateIssue(id: string, data: Partial<Issue>): Promise<Issue> {
+    return this.issueRepo.update(id, data);
   }
 
-  async updateIssueStatus(id: IssueId, status: Issue["status"]): Promise<void> {
-    const issueRepo = this.factory.createIssueRepository();
-    try {
-      await issueRepo.update(id, { status });
-    } catch (error) {
-      if (error instanceof Error) {
-        throw new Error(`Failed to update issue status: ${error.message}`);
-      }
-      throw error;
-    }
+  async deleteIssue(id: string): Promise<void> {
+    return this.issueRepo.delete(id);
   }
 
-  async getIssueHistory(id: IssueId): Promise<Array<{
+  async getIssue(id: string): Promise<Issue | null> {
+    return this.issueRepo.findById(id);
+  }
+
+  async findIssues(): Promise<Issue[]> {
+    return this.issueRepo.findAll();
+  }
+
+  async updateIssueStatus(
+    id: string,
+    status: ResourceStatus
+  ): Promise<void> {
+    await this.issueRepo.update(id, { status });
+  }
+
+  async getIssueHistory(id: string): Promise<Array<{
+    timestamp: string;
     field: string;
-    oldValue: any;
-    newValue: any;
-    timestamp: Date;
-    actor: string;
+    from: string;
+    to: string;
   }>> {
-    const issueRepo = this.factory.createIssueRepository();
-    try {
-      return await issueRepo.getHistory(id);
-    } catch (error) {
-      if (error instanceof Error) {
-        throw new Error(`Failed to get issue history: ${error.message}`);
-      }
-      throw error;
+    const issue = await this.issueRepo.findById(id);
+    if (!issue) {
+      throw new Error("Issue not found");
     }
-  }
-
-  async assignIssueToMilestone(issueId: IssueId, milestoneId: MilestoneId): Promise<void> {
-    const issueRepo = this.factory.createIssueRepository();
-    const milestoneRepo = this.factory.createMilestoneRepository();
-    try {
-      // Verify milestone exists
-      const milestone = await milestoneRepo.findById(milestoneId);
-      if (!milestone) throw new Error(`Milestone #${milestoneId} not found`);
-
-      // Update issue's milestone
-      await issueRepo.update(issueId, { milestoneId });
-    } catch (error) {
-      if (error instanceof Error) {
-        throw new Error(`Failed to assign issue to milestone: ${error.message}`);
-      }
-      throw error;
-    }
-  }
-
-  async addIssueDependency(issueId: IssueId, dependsOnId: IssueId): Promise<void> {
-    const issueRepo = this.factory.createIssueRepository();
-    try {
-      // Verify both issues exist
-      const [issue, dependsOn] = await Promise.all([
-        issueRepo.findById(issueId),
-        issueRepo.findById(dependsOnId)
-      ]);
-      if (!issue) throw new Error(`Issue #${issueId} not found`);
-      if (!dependsOn) throw new Error(`Dependency issue #${dependsOnId} not found`);
-
-      // Add dependency
-      await issueRepo.addDependency(issueId, dependsOnId);
-    } catch (error) {
-      if (error instanceof Error) {
-        throw new Error(`Failed to add issue dependency: ${error.message}`);
-      }
-      throw error;
-    }
-  }
-
-  async getIssueDependencies(issueId: IssueId): Promise<Issue[]> {
-    const issueRepo = this.factory.createIssueRepository();
-    try {
-      return await issueRepo.getDependencies(issueId);
-    } catch (error) {
-      if (error instanceof Error) {
-        throw new Error(`Failed to get issue dependencies: ${error.message}`);
-      }
-      throw error;
-    }
+    // TODO: Implement issue history tracking
+    return [];
   }
 
   // Milestone Management
-  async createMilestone(data: Omit<Milestone, "id" | "progress">): Promise<Milestone> {
-    const milestoneRepo = this.factory.createMilestoneRepository();
-    try {
-      const milestone = await milestoneRepo.create(data);
-      return milestone;
-    } catch (error) {
-      if (error instanceof Error) {
-        throw new Error(`Failed to create milestone: ${error.message}`);
-      }
-      throw error;
+  async createMilestone(data: CreateMilestone): Promise<Milestone> {
+    return this.milestoneRepo.create(
+      createResource<Milestone>(ResourceType.MILESTONE, data)
+    );
+  }
+
+  async updateMilestone(
+    id: string,
+    data: Partial<Milestone>
+  ): Promise<Milestone> {
+    return this.milestoneRepo.update(id, data);
+  }
+
+  async deleteMilestone(id: string): Promise<void> {
+    return this.milestoneRepo.delete(id);
+  }
+
+  async getMilestone(id: string): Promise<Milestone | null> {
+    return this.milestoneRepo.findById(id);
+  }
+
+  async findMilestones(): Promise<Milestone[]> {
+    return this.milestoneRepo.findAll();
+  }
+
+  async assignIssueToMilestone(
+    issueId: string,
+    milestoneId: string
+  ): Promise<void> {
+    await this.issueRepo.update(issueId, { milestoneId });
+  }
+
+  async addIssueDependency(
+    issueId: string,
+    dependsOnId: string
+  ): Promise<void> {
+    const issue = await this.issueRepo.findById(issueId);
+    const dependsOn = await this.issueRepo.findById(dependsOnId);
+
+    if (!issue || !dependsOn) {
+      throw new Error("One or both issues not found");
     }
+
+    // TODO: Implement dependency tracking
+  }
+
+  async getIssueDependencies(issueId: string): Promise<string[]> {
+    const issue = await this.issueRepo.findById(issueId);
+    if (!issue) {
+      throw new Error("Issue not found");
+    }
+    // TODO: Implement dependency tracking
+    return [];
   }
 }

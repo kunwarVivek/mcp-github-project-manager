@@ -1,40 +1,11 @@
-import { FieldType, ViewLayout } from "../../domain/types";
+import { ViewLayout, FieldType } from "../../domain/types";
 
 export interface GraphQLResponse<T> {
-  data: T;
+  data?: T;
   errors?: Array<{
     message: string;
-    locations?: Array<{
-      line: number;
-      column: number;
-    }>;
+    locations?: Array<{ line: number; column: number }>;
     path?: string[];
-  }>;
-}
-
-export interface ProjectV2ViewNode {
-  id: string;
-  name: string;
-  layout: string;
-  groupByField?: {
-    field: {
-      name: string;
-    };
-  };
-  sortByFields?: Array<{
-    field: {
-      name: string;
-    };
-    direction: string;
-  }>;
-}
-
-export interface ProjectV2FieldNode {
-  id: string;
-  name: string;
-  dataType: string;
-  options?: Array<{
-    name: string;
   }>;
 }
 
@@ -55,171 +26,109 @@ export interface ProjectV2Node {
   };
 }
 
-export interface IterationFieldConfiguration {
-  iterations: {
-    nodes: Array<{
-      id: string;
-      title: string;
-      startDate: string;
-      duration: number;
-      items?: {
-        nodes?: Array<{
-          content: {
-            number: number;
-          };
-        }>;
-      };
-    }>;
+export interface ProjectV2ViewNode {
+  id: string;
+  name: string;
+  layout: string;
+  groupByField?: {
+    field: { name: string };
   };
+  sortByFields?: Array<{
+    field: { name: string };
+    direction: string;
+  }>;
+}
+
+export interface ProjectV2FieldNode {
+  id: string;
+  name: string;
+  dataType: string;
+  options?: Array<{ name: string }>;
 }
 
 export interface CreateProjectV2Response {
-  createProjectV2?: {
+  createProjectV2: {
     projectV2: ProjectV2Node;
   };
 }
 
 export interface UpdateProjectV2Response {
-  updateProjectV2?: {
+  updateProjectV2: {
     projectV2: ProjectV2Node;
   };
 }
 
 export interface GetProjectV2Response {
-  repository?: {
+  repository: {
     projectV2: ProjectV2Node;
   };
 }
 
 export interface ListProjectsV2Response {
-  repository?: {
+  repository: {
     projectsV2: {
-      pageInfo: {
-        hasNextPage: boolean;
-        endCursor: string;
-      };
       nodes: ProjectV2Node[];
     };
   };
 }
 
 export interface CreateProjectV2ViewResponse {
-  createProjectV2View?: {
+  createProjectV2View: {
     projectV2View: ProjectV2ViewNode;
   };
 }
 
 export interface UpdateProjectV2ViewResponse {
-  updateProjectV2View?: {
+  updateProjectV2View: {
     projectV2View: ProjectV2ViewNode;
   };
 }
 
 export interface CreateProjectV2FieldResponse {
-  createProjectV2Field?: {
+  createProjectV2Field: {
     projectV2Field: ProjectV2FieldNode;
   };
 }
 
 export interface UpdateProjectV2FieldResponse {
-  updateProjectV2Field?: {
+  updateProjectV2Field: {
     projectV2Field: ProjectV2FieldNode;
   };
 }
 
-export interface CreateProjectV2IterationFieldResponse {
-  createProjectV2IterationField?: {
-    iteration: {
-      id: string;
-      title: string;
-      startDate: string;
-      duration: number;
-    };
-  };
-}
+type GraphQLViewLayout = 'BOARD_LAYOUT' | 'TABLE_LAYOUT' | 'TIMELINE_LAYOUT' | 'ROADMAP_LAYOUT';
+type GraphQLFieldType = 'TEXT' | 'NUMBER' | 'DATE' | 'SINGLE_SELECT' | 'MULTI_SELECT' | 'ITERATION';
 
-export interface UpdateProjectV2IterationFieldResponse {
-  updateProjectV2IterationField?: {
-    iteration: {
-      id: string;
-      title: string;
-      startDate: string;
-      duration: number;
-    };
-  };
-}
-
-export interface GetIterationFieldResponse {
-  iteration?: {
-    id: string;
-    title: string;
-    startDate: string;
-    duration: number;
-    items?: {
-      nodes?: Array<{
-        content: {
-          number: number;
-        };
-      }>;
-    };
-  };
-}
-
-export interface ListIterationFieldsResponse {
-  iterations?: {
-    nodes: Array<{
-      id: string;
-      title: string;
-      startDate: string;
-      duration: number;
-      items?: {
-        nodes?: Array<{
-          content: {
-            number: number;
-          };
-        }>;
-      };
-    }>;
-  };
-}
-
-// Type mapping helpers
-export const graphqlToViewLayout = (layout: string): ViewLayout => {
-  const mapping: Record<string, ViewLayout> = {
-    TABLE: "table",
-    BOARD: "board",
-    ROADMAP: "roadmap",
-  };
-  return mapping[layout.toUpperCase()] || "table";
+const VIEW_LAYOUT_MAP: Record<ViewLayout, GraphQLViewLayout> = {
+  board: 'BOARD_LAYOUT',
+  table: 'TABLE_LAYOUT',
+  timeline: 'TIMELINE_LAYOUT',
+  roadmap: 'ROADMAP_LAYOUT'
 };
 
-export const viewLayoutToGraphQL = (layout: ViewLayout): string => {
-  const mapping: Record<ViewLayout, string> = {
-    table: "TABLE",
-    board: "BOARD",
-    roadmap: "ROADMAP",
-  };
-  return mapping[layout];
+const FIELD_TYPE_MAP: Record<FieldType, GraphQLFieldType> = {
+  text: 'TEXT',
+  number: 'NUMBER',
+  date: 'DATE',
+  single_select: 'SINGLE_SELECT',
+  multi_select: 'MULTI_SELECT',
+  iteration: 'ITERATION'
+};
+
+export const viewLayoutToGraphQL = (layout: ViewLayout): GraphQLViewLayout => {
+  return VIEW_LAYOUT_MAP[layout];
+};
+
+export const graphqlToViewLayout = (layout: string): ViewLayout => {
+  const reverseMap = Object.entries(VIEW_LAYOUT_MAP).find(([_, value]) => value === layout);
+  return (reverseMap?.[0] as ViewLayout) || 'table';
+};
+
+export const fieldTypeToGraphQL = (type: FieldType): GraphQLFieldType => {
+  return FIELD_TYPE_MAP[type];
 };
 
 export const graphqlToFieldType = (type: string): FieldType => {
-  const mapping: Record<string, FieldType> = {
-    TEXT: "text",
-    NUMBER: "number",
-    DATE: "date",
-    SINGLE_SELECT: "single_select",
-    ITERATION: "iteration",
-  };
-  return mapping[type.toUpperCase()] as FieldType;
-};
-
-export const fieldTypeToGraphQL = (type: FieldType): string => {
-  const mapping: Record<FieldType, string> = {
-    text: "TEXT",
-    number: "NUMBER",
-    date: "DATE",
-    single_select: "SINGLE_SELECT",
-    iteration: "ITERATION",
-  };
-  return mapping[type];
+  const reverseMap = Object.entries(FIELD_TYPE_MAP).find(([_, value]) => value === type);
+  return (reverseMap?.[0] as FieldType) || 'text';
 };

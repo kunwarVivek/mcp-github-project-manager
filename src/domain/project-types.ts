@@ -1,95 +1,99 @@
-import { z } from "zod";
-import { Resource, ResourceSchema, ResourceType, ResourceStatus } from "./resource-types";
+import { Resource, ResourceType, ResourceStatus } from "./resource-types";
 
-// Project-specific fields schema
-export const ProjectFieldsSchema = z.object({
-  title: z.string(),
-  description: z.string().optional(),
-  visibility: z.enum(["public", "private"]),
-  views: z.array(z.object({
-    id: z.string(),
-    name: z.string(),
-    layout: z.enum(["table", "board", "roadmap"]),
-    settings: z.object({
-      sortBy: z.array(z.object({
-        field: z.string(),
-        direction: z.enum(["asc", "desc"]),
-      })).optional(),
-      groupBy: z.string().optional(),
-      columns: z.array(z.string()).optional(),
-    }),
-  })).default([]),
-  fields: z.array(z.object({
-    id: z.string(),
-    name: z.string(),
-    type: z.enum(["text", "number", "date", "select", "iteration"]),
-    options: z.array(z.object({
-      id: z.string(),
-      name: z.string(),
-      color: z.string().optional(),
-    })).optional(),
-    defaultValue: z.any().optional(),
-  })).default([]),
-});
-
-// Project type definition
-export interface ProjectFields {
+export interface BaseProjectResource extends Resource {
   title: string;
-  description?: string;
-  visibility: "public" | "private";
-  views: Array<{
-    id: string;
-    name: string;
-    layout: "table" | "board" | "roadmap";
-    settings: {
-      sortBy?: Array<{
-        field: string;
-        direction: "asc" | "desc";
-      }>;
-      groupBy?: string;
-      columns?: string[];
-    };
-  }>;
-  fields: Array<{
-    id: string;
-    name: string;
-    type: "text" | "number" | "date" | "select" | "iteration";
-    options?: Array<{
-      id: string;
-      name: string;
-      color?: string;
-    }>;
-    defaultValue?: any;
-  }>;
+  description: string;
 }
 
-export interface Project extends Resource, ProjectFields {}
-
-// Type for creating a new project
-export interface CreateProjectData extends ProjectFields {
+export interface ProjectLink {
+  id: string;
+  type: 'parent' | 'child' | 'related';
+  sourceId: string;
+  targetId: string;
   metadata?: Record<string, unknown>;
 }
 
-// Type for updating a project
-export type UpdateProjectData = Partial<ProjectFields> & {
+export interface ProjectField {
+  id: string;
+  name: string;
+  type: 'text' | 'number' | 'date' | 'select' | 'multi-select';
+  options?: string[];
+  required?: boolean;
   metadata?: Record<string, unknown>;
+}
+
+export interface ProjectView {
+  id: string;
+  name: string;
+  type: 'board' | 'list' | 'calendar' | 'timeline';
+  config: {
+    groupBy?: string;
+    sortBy?: string[];
+    filters?: Record<string, unknown>;
+  };
+  metadata?: Record<string, unknown>;
+}
+
+export interface ProjectSettings {
+  defaultView?: string;
+  labelColors?: Record<string, string>;
+  customFields?: ProjectField[];
+  notifications?: {
+    enabled: boolean;
+    channels?: string[];
+  };
+  metadata?: Record<string, unknown>;
+}
+
+export interface ProjectStats {
+  totalIssues: number;
+  openIssues: number;
+  closedIssues: number;
+  overdueMilestones: number;
+  upcomingMilestones: number;
+  lastUpdated: string;
+}
+
+export interface ProjectValidationRule {
+  field: string;
+  type: 'required' | 'format' | 'custom';
+  value?: unknown;
+  message: string;
+  validate: (value: unknown) => boolean;
+}
+
+export interface ProjectWorkflow {
+  id: string;
+  name: string;
+  states: {
+    name: string;
+    status: ResourceStatus;
+    transitions: string[];
+  }[];
+  metadata?: Record<string, unknown>;
+}
+
+export const defaultProjectSettings: ProjectSettings = {
+  defaultView: 'board',
+  labelColors: {},
+  customFields: [],
+  notifications: {
+    enabled: true,
+    channels: ['email'],
+  },
 };
 
-// Helper to create a new resource from project data
-export const createProjectResource = (data: CreateProjectData): Omit<Project, "id" | "version" | "createdAt" | "updatedAt" | "deletedAt"> => ({
-  type: ResourceType.PROJECT,
-  status: ResourceStatus.ACTIVE,
-  ...data,
-  metadata: data.metadata ?? {},
-});
-
-// Validation functions
-export const validateCreateProjectData = (data: unknown): CreateProjectData => {
-  const validatedData = ProjectFieldsSchema.parse(data);
-  return validatedData;
-};
-
-export const validateUpdateProjectData = (data: unknown): UpdateProjectData => {
-  const validatedData = ProjectFieldsSchema.partial().parse(data);
-  return validatedData;
-};
+export const defaultValidationRules: ProjectValidationRule[] = [
+  {
+    field: 'title',
+    type: 'required',
+    message: 'Title is required',
+    validate: (value) => Boolean(value && typeof value === 'string' && value.trim()),
+  },
+  {
+    field: 'status',
+    type: 'format',
+    message: 'Invalid status',
+    validate: (value) => Object.values(ResourceStatus).includes(value as ResourceStatus),
+  },
+];

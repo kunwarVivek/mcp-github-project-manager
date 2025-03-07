@@ -1,59 +1,32 @@
-import { z } from "zod";
-
+// Resource Type Enum
 export enum ResourceType {
-  PROJECT = "project",
-  MILESTONE = "milestone",
-  ISSUE = "issue",
-  SPRINT = "sprint",
-  FEATURE = "feature",
-  BUG = "bug",
-  TASK = "task",
+  PROJECT = 'project',
+  ISSUE = 'issue',
+  MILESTONE = 'milestone',
+  SPRINT = 'sprint'
 }
 
+// Resource Status Enum
 export enum ResourceStatus {
-  ACTIVE = "active",
-  DELETED = "deleted",
-  ARCHIVED = "archived",
-  OPEN = "open",
-  CLOSED = "closed",
-  PLANNED = "planned",
-  IN_PROGRESS = "in_progress",
-  COMPLETED = "completed",
+  ACTIVE = 'active',
+  ARCHIVED = 'archived',
+  DELETED = 'deleted',
+  OPEN = 'open',
+  CLOSED = 'closed',
+  PLANNED = 'planned',
+  COMPLETED = 'completed'
 }
 
+// Resource Event Types
 export enum ResourceEventType {
-  CREATED = "created",
-  UPDATED = "updated",
-  DELETED = "deleted",
-  ARCHIVED = "archived",
-  STATUS_CHANGED = "status_changed",
-  VERSION_UPDATED = "version_updated",
+  CREATED = 'created',
+  UPDATED = 'updated',
+  DELETED = 'deleted',
+  ARCHIVED = 'archived',
+  RESTORED = 'restored'
 }
 
-// Base Resource Schema
-export const ResourceSchema = z.object({
-  id: z.string(),
-  type: z.nativeEnum(ResourceType),
-  version: z.number(),
-  status: z.nativeEnum(ResourceStatus),
-  createdAt: z.string(),
-  updatedAt: z.string(),
-  deletedAt: z.string().nullable(),
-  metadata: z.record(z.unknown()).optional(),
-});
-
-// Resource Event Schema
-export const ResourceEventSchema = z.object({
-  id: z.string(),
-  type: z.nativeEnum(ResourceEventType),
-  resourceId: z.string(),
-  resourceType: z.nativeEnum(ResourceType),
-  timestamp: z.string(),
-  actor: z.string(),
-  payload: z.unknown(),
-});
-
-// Base Resource interface
+// Base Resource Interface
 export interface Resource {
   id: string;
   type: ResourceType;
@@ -61,134 +34,168 @@ export interface Resource {
   status: ResourceStatus;
   createdAt: string;
   updatedAt: string;
-  deletedAt: string | null;
+  deletedAt?: string | null;
   metadata?: Record<string, unknown>;
 }
 
-// Resource Event interface
-export interface ResourceEvent {
-  id: string;
+// Resource Event Interface
+export interface ResourceEvent<T = unknown> {
   type: ResourceEventType;
   resourceId: string;
   resourceType: ResourceType;
   timestamp: string;
-  actor: string;
-  payload: unknown;
+  data: T;
 }
 
-// Cache options
+// Cache Options
 export interface ResourceCacheOptions {
   ttl?: number;
-  tags?: string[];
-}
-
-// Query options
-export interface ResourceQueryOptions {
   includeDeleted?: boolean;
-  includeTags?: string[];
-  metadata?: Record<string, unknown>;
+  tags?: string[];
+  namespaces?: string[];
 }
 
-// Update options
+// Resource Lock Options
+export interface ResourceLockOptions {
+  ttl?: number;
+  owner?: string;
+  retries?: number;
+  retryDelay?: number;
+}
+
+// Resource Update Options
 export interface ResourceUpdateOptions {
   optimisticLock?: boolean;
   expectedVersion?: number;
+  retainMetadata?: boolean;
 }
 
-// Update data type
-export type ResourceUpdateData<T extends Resource> = Partial<Omit<T, keyof Resource>> & {
+// Query Options
+export interface ResourceQueryOptions {
+  includeDeleted?: boolean;
   version?: number;
-  metadata?: Record<string, unknown>;
-};
+}
 
-// Custom Error Types
+// Error Classes
 export class ResourceError extends Error {
   constructor(message: string) {
     super(message);
-    this.name = "ResourceError";
+    this.name = this.constructor.name;
   }
 }
 
 export class ResourceNotFoundError extends ResourceError {
-  constructor(type: ResourceType, id: string) {
-    super(`Resource ${type}:${id} not found`);
-    this.name = "ResourceNotFoundError";
+  constructor(resourceType: ResourceType, id: string) {
+    super(`${resourceType} with id ${id} not found`);
   }
 }
 
 export class ResourceVersionError extends ResourceError {
   constructor(
-    type: ResourceType,
-    id: string,
-    expectedVersion: number,
+    resourceType: ResourceType, 
+    id: string, 
+    expectedVersion: number, 
     actualVersion: number
   ) {
     super(
-      `Version conflict for ${type}:${id}. Expected ${expectedVersion}, got ${actualVersion}`
+      `${resourceType} ${id} version mismatch: expected ${expectedVersion}, got ${actualVersion}`
     );
-    this.name = "ResourceVersionError";
   }
 }
 
 export class ResourceValidationError extends ResourceError {
-  constructor(message: string, public details?: Record<string, string>) {
+  constructor(message: string) {
     super(message);
-    this.name = "ResourceValidationError";
+  }
+}
+
+export class ResourceLockError extends ResourceError {
+  constructor(resourceType: ResourceType, id: string) {
+    super(`Failed to acquire lock for ${resourceType} ${id}`);
   }
 }
 
 // Type Guards
-export const isResource = (value: unknown): value is Resource => {
-  return ResourceSchema.safeParse(value).success;
+export function isResourceType(value: unknown): value is ResourceType {
+  return Object.values(ResourceType).includes(value as ResourceType);
+}
+
+export function isResourceStatus(value: unknown): value is ResourceStatus {
+  return Object.values(ResourceStatus).includes(value as ResourceStatus);
+}
+
+export function isResource(value: unknown): value is Resource {
+  if (!value || typeof value !== 'object') return false;
+  
+  const resource = value as Partial<Resource>;
+  return (
+    typeof resource.id === 'string' &&
+    isResourceType(resource.type) &&
+    typeof resource.version === 'number' &&
+    isResourceStatus(resource.status) &&
+    typeof resource.createdAt === 'string' &&
+    typeof resource.updatedAt === 'string' &&
+    (resource.deletedAt === undefined || 
+     resource.deletedAt === null || 
+     typeof resource.deletedAt === 'string') &&
+    (resource.metadata === undefined || 
+     typeof resource.metadata === 'object')
+  );
+}
+
+// Status Transition Rules
+export const allowedStatusTransitions: Record<ResourceStatus, ResourceStatus[]> = {
+  [ResourceStatus.ACTIVE]: [
+    ResourceStatus.ARCHIVED,
+    ResourceStatus.DELETED,
+    ResourceStatus.CLOSED,
+    ResourceStatus.COMPLETED
+  ],
+  [ResourceStatus.ARCHIVED]: [
+    ResourceStatus.ACTIVE,
+    ResourceStatus.DELETED
+  ],
+  [ResourceStatus.DELETED]: [],
+  [ResourceStatus.OPEN]: [
+    ResourceStatus.CLOSED,
+    ResourceStatus.ARCHIVED,
+    ResourceStatus.DELETED
+  ],
+  [ResourceStatus.CLOSED]: [
+    ResourceStatus.OPEN,
+    ResourceStatus.ARCHIVED,
+    ResourceStatus.DELETED
+  ],
+  [ResourceStatus.PLANNED]: [
+    ResourceStatus.ACTIVE,
+    ResourceStatus.DELETED
+  ],
+  [ResourceStatus.COMPLETED]: [
+    ResourceStatus.ACTIVE,
+    ResourceStatus.ARCHIVED
+  ]
 };
 
-export const isResourceEvent = (value: unknown): value is ResourceEvent => {
-  return ResourceEventSchema.safeParse(value).success;
-};
+export function isValidStatusTransition(
+  currentStatus: ResourceStatus,
+  newStatus: ResourceStatus
+): boolean {
+  if (currentStatus === newStatus) return true;
+  return allowedStatusTransitions[currentStatus]?.includes(newStatus) ?? false;
+}
 
-// Utility Types
-export type ResourceFields<T extends Resource> = Omit<T, keyof Resource>;
-export type CreateResourceData<T extends Resource> = Omit<T, keyof Resource> & {
-  metadata?: Record<string, unknown>;
-};
+// Resource Validation Rules
+export interface ResourceValidationRule {
+  field: string;
+  validate: (value: unknown) => boolean;
+  message: string;
+}
 
-// Helper Functions
-export const mapStatus = (status: string): ResourceStatus => {
-  switch (status.toLowerCase()) {
-    case "open":
-      return ResourceStatus.OPEN;
-    case "closed":
-      return ResourceStatus.CLOSED;
-    case "planned":
-      return ResourceStatus.PLANNED;
-    case "in_progress":
-      return ResourceStatus.IN_PROGRESS;
-    case "completed":
-      return ResourceStatus.COMPLETED;
-    case "deleted":
-      return ResourceStatus.DELETED;
-    case "archived":
-      return ResourceStatus.ARCHIVED;
-    default:
-      return ResourceStatus.ACTIVE;
-  }
-};
-
-export const mapType = (type: string): ResourceType => {
-  switch (type.toLowerCase()) {
-    case "feature":
-      return ResourceType.FEATURE;
-    case "bug":
-      return ResourceType.BUG;
-    case "task":
-      return ResourceType.TASK;
-    case "milestone":
-      return ResourceType.MILESTONE;
-    case "sprint":
-      return ResourceType.SPRINT;
-    case "issue":
-      return ResourceType.ISSUE;
-    default:
-      return ResourceType.PROJECT;
-  }
-};
+export function validateResource(
+  resource: Resource,
+  rules: ResourceValidationRule[]
+): string[] {
+  return rules
+    .filter(rule => !rule.validate((resource as any)[rule.field]))
+    .map(rule => rule.message);
+}

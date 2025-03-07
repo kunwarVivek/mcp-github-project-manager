@@ -1,9 +1,15 @@
 {
   "extends": "./tsconfig.json",
-  "exclude": ["src/**/*.test.ts", "src/__tests__/**/*"],
+  "exclude": [
+    "node_modules",
+    "**/*.test.ts",
+    "**/*.spec.ts",
+    "**/*.e2e.ts",
+    "src/__tests__"
+  ],
   "compilerOptions": {
     "sourceMap": true,
-    "outDir": "build",
-    "rootDir": "src"
+    "inlineSourceMap": false,
+    "removeComments": true
   }
 }

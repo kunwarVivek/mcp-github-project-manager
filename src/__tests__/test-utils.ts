@@ -1,157 +1,139 @@
 import { 
-  Resource, 
-  ResourceType, 
-  ResourceStatus,
-  mapStatus,
-  mapType 
-} from '../domain/resource-types';
-import { Project, Milestone, Issue, Sprint } from '../domain/types';
+  Resource,
+  ResourceStatus, 
+  ResourceType 
+} from "../domain/resource-types";
+import { 
+  Issue, 
+  Milestone, 
+  Project, 
+  Sprint,
+  CreateIssue,
+  CreateProject,
+  CreateMilestone,
+  CreateSprint,
+  IssueType,
+  IssuePriority,
+  ProjectView,
+  CustomField,
+  createResource
+} from "../domain/types";
 
-export class TestUtils {
-  static baseResource: Resource = {
-    id: 'test-id',
-    type: ResourceType.PROJECT,
-    status: ResourceStatus.ACTIVE,
-    version: 1,
-    createdAt: '2025-03-01T12:00:00Z',
-    updatedAt: '2025-03-01T12:00:00Z',
-    deletedAt: null,
-    metadata: {},
-  };
+export class TestFactory {
+  static createProject(overrides: Partial<CreateProject> = {}): CreateProject {
+    return {
+      title: "Test Project",
+      description: "A test project",
+      status: ResourceStatus.ACTIVE,
+      visibility: "private",
+      views: [],
+      fields: [],
+      ...overrides
+    };
+  }
 
-  static project: Project = {
-    ...this.baseResource,
-    title: 'Test Project',
-    description: 'Test Description',
-    visibility: 'private',
-    views: [],
-    fields: [],
-  };
+  static createMilestone(overrides: Partial<CreateMilestone> = {}): CreateMilestone {
+    return {
+      title: "Test Milestone",
+      description: "A test milestone",
+      status: ResourceStatus.ACTIVE,
+      dueDate: this.futureDate(30),
+      ...overrides
+    };
+  }
 
-  static milestone: Milestone = {
-    ...this.baseResource,
-    type: ResourceType.MILESTONE,
-    title: 'Test Milestone',
-    description: 'Test Description',
-    dueDate: '2025-04-01T12:00:00Z',
-    progress: {
-      openIssues: 0,
-      closedIssues: 0,
-      completionPercentage: 0,
-    },
-    url: 'https://github.com/test-owner/test-repo/milestone/1',
-  };
+  static createIssue(overrides: Partial<CreateIssue> = {}): CreateIssue {
+    return {
+      title: "Test Issue",
+      description: "A test issue",
+      status: ResourceStatus.ACTIVE,
+      priority: "medium" as IssuePriority,
+      issueType: "feature" as IssueType,
+      assignees: [],
+      labels: [],
+      ...overrides
+    };
+  }
 
-  static issue: Issue = {
-    ...this.baseResource,
-    type: ResourceType.ISSUE,
-    number: 1,
-    title: 'Test Issue',
-    description: 'Test Description',
-    milestoneId: undefined,
-    assignees: [],
-    labels: [],
-    closedAt: null,
-    url: 'https://github.com/test-owner/test-repo/issues/1',
-  };
+  static createSprint(overrides: Partial<CreateSprint> = {}): CreateSprint {
+    const startDate = new Date();
+    const endDate = new Date(startDate);
+    endDate.setDate(endDate.getDate() + 14);
 
-  static sprint: Sprint = {
-    ...this.baseResource,
-    type: ResourceType.SPRINT,
-    title: 'Test Sprint',
-    startDate: '2025-03-01T12:00:00Z',
-    endDate: '2025-03-15T12:00:00Z',
-    goals: ['Complete feature X', 'Fix critical bugs'],
-    issues: [],
-  };
+    return {
+      title: "Test Sprint",
+      status: ResourceStatus.PLANNED,
+      startDate: startDate.toISOString(),
+      endDate: endDate.toISOString(),
+      goals: ["Complete test tasks"],
+      issues: [],
+      ...overrides
+    };
+  }
 
-  static createDate(date: Date = new Date()): string {
+  static createProjectView(overrides: Partial<ProjectView> = {}): ProjectView {
+    return {
+      id: `view-${Date.now()}`,
+      name: "Test View",
+      layout: "board",
+      settings: {
+        groupBy: "status",
+        sortBy: [{ field: "priority", direction: "desc" }]
+      },
+      ...overrides
+    };
+  }
+
+  static createCustomField(overrides: Partial<CustomField> = {}): CustomField {
+    return {
+      id: `field-${Date.now()}`,
+      name: "Test Field",
+      type: "text",
+      options: [],
+      ...overrides
+    };
+  }
+
+  static completeProject(data: CreateProject = this.createProject()): Project {
+    return createResource<Project>(ResourceType.PROJECT, data);
+  }
+
+  static completeMilestone(data: CreateMilestone = this.createMilestone()): Milestone {
+    return {
+      ...createResource<Milestone>(ResourceType.MILESTONE, data),
+      progress: {
+        openIssues: 0,
+        closedIssues: 0,
+        completionPercentage: 0
+      }
+    };
+  }
+
+  static completeIssue(data: CreateIssue = this.createIssue()): Issue {
+    return createResource<Issue>(ResourceType.ISSUE, data);
+  }
+
+  static completeSprint(data: CreateSprint = this.createSprint()): Sprint {
+    return createResource<Sprint>(ResourceType.SPRINT, data);
+  }
+
+  static futureDate(daysFromNow: number): string {
+    const date = new Date();
+    date.setDate(date.getDate() + daysFromNow);
     return date.toISOString();
   }
 
-  static createResourceId(): string {
-    return `test-${Math.random().toString(36).substring(2, 9)}`;
-  }
-
-  static createMetadata(): Record<string, unknown> {
-    return {
-      testKey: 'testValue',
-      timestamp: this.createDate(),
-    };
-  }
-
-  static mapStatus(status: string): ResourceStatus {
-    return mapStatus(status);
-  }
-
-  static mapType(type: string): ResourceType {
-    return mapType(type);
-  }
-
-  static mockCurrentDate(): void {
-    jest.useFakeTimers();
-    jest.setSystemTime(new Date('2025-03-01T12:00:00Z'));
-  }
-
-  static restoreCurrentDate(): void {
-    jest.useRealTimers();
-  }
-
-  static createMockProject(overrides: Partial<Project> = {}): Project {
-    return {
-      ...this.project,
-      ...overrides,
-      id: overrides.id ?? this.createResourceId(),
-      createdAt: overrides.createdAt ?? this.createDate(),
-      updatedAt: overrides.updatedAt ?? this.createDate(),
-    };
-  }
-
-  static createMockMilestone(overrides: Partial<Milestone> = {}): Milestone {
-    return {
-      ...this.milestone,
-      ...overrides,
-      id: overrides.id ?? this.createResourceId(),
-      createdAt: overrides.createdAt ?? this.createDate(),
-      updatedAt: overrides.updatedAt ?? this.createDate(),
-    };
-  }
-
-  static createMockIssue(overrides: Partial<Issue> = {}): Issue {
-    return {
-      ...this.issue,
-      ...overrides,
-      id: overrides.id ?? this.createResourceId(),
-      createdAt: overrides.createdAt ?? this.createDate(),
-      updatedAt: overrides.updatedAt ?? this.createDate(),
-    };
-  }
-
-  static createMockSprint(overrides: Partial<Sprint> = {}): Sprint {
-    return {
-      ...this.sprint,
-      ...overrides,
-      id: overrides.id ?? this.createResourceId(),
-      createdAt: overrides.createdAt ?? this.createDate(),
-      updatedAt: overrides.updatedAt ?? this.createDate(),
-    };
-  }
-
-  // Type conversion helpers
-  static convertToISOString(date: Date): string {
+  static pastDate(daysAgo: number): string {
+    const date = new Date();
+    date.setDate(date.getDate() - daysAgo);
     return date.toISOString();
   }
 
-  static convertToResourceId(id: number | string): string {
-    return String(id);
+  static randomId(): string {
+    return Math.random().toString(36).substring(2, 15);
+  }
+
+  static mockGitHubResponse<T>(data: T): Promise<{ data: T }> {
+    return Promise.resolve({ data });
   }
 }
-
-export const mockData = {
-  ...TestUtils,
-  baseResource: TestUtils.baseResource,
-  project: TestUtils.project,
-  milestone: TestUtils.milestone,
-  issue: TestUtils.issue,
-  sprint: TestUtils.sprint,
-};

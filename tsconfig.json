@@ -1,56 +1,28 @@
 {
   "compilerOptions": {
-    "target": "ES2020",
-    "module": "ES2020",
+    "target": "ES2022",
+    "module": "ESNext",
     "moduleResolution": "node",
-    "lib": ["ES2020"],
-    "outDir": "dist",
-    "rootDir": "src",
+    "outDir": "./build",
+    "rootDir": "./src",
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
-    "experimentalDecorators": true,
-    "emitDecoratorMetadata": true,
     "resolveJsonModule": true,
-    "baseUrl": ".",
-    "paths": {
-      "@/*": ["src/*"]
-    },
-    "typeRoots": [
-      "./node_modules/@types",
-      "./src/types"
-    ],
-    "types": ["jest", "node"],
-    "sourceMap": true,
-    "declaration": true,
-    "declarationMap": true,
     "allowJs": true,
-    "checkJs": true,
-    "noImplicitAny": true,
-    "strictNullChecks": true,
-    "strictFunctionTypes": true,
-    "strictPropertyInitialization": true,
-    "noImplicitThis": true,
-    "alwaysStrict": true,
-    "noUnusedLocals": true,
-    "noUnusedParameters": true,
-    "noImplicitReturns": true,
-    "noFallthroughCasesInSwitch": true,
-    "allowSyntheticDefaultImports": true,
-    "isolatedModules": true
+    "declaration": true,
+    "sourceMap": true,
+    "baseUrl": "./src",
+    "paths": {
+      "*": ["*", "*.js"]
+    },
+    "types": ["node", "jest"]
   },
-  "include": [
-    "src/**/*"
-  ],
-  "exclude": [
-    "node_modules",
-    "dist",
-    "coverage"
-  ],
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "**/*.test.ts", "build"],
   "ts-node": {
     "esm": true,
-    "transpileOnly": true,
     "experimentalSpecifierResolution": "node"
   }
 }

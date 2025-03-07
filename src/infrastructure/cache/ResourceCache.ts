@@ -1,146 +1,107 @@
-import { Resource, ResourceType, ResourceCacheOptions } from "../../domain/resource-types";
+import { Resource, ResourceCacheOptions } from "../../domain/resource-types";
 
-interface CacheProvider {
-  get(key: string): Promise<unknown | null>;
-  set(key: string, value: unknown, options?: ResourceCacheOptions): Promise<void>;
-  delete(key: string): Promise<void>;
-  clear(pattern?: string): Promise<void>;
-}
-
-class InMemoryCacheProvider implements CacheProvider {
-  private cache = new Map<string, { value: unknown; expires?: number }>();
-
-  async get(key: string): Promise<unknown | null> {
-    const entry = this.cache.get(key);
-    if (!entry) return null;
-    if (entry.expires && entry.expires < Date.now()) {
-      this.cache.delete(key);
-      return null;
-    }
-    return entry.value;
-  }
-
-  async set(key: string, value: unknown, options?: ResourceCacheOptions): Promise<void> {
-    const expires = options?.ttl ? Date.now() + options.ttl * 1000 : undefined;
-    this.cache.set(key, { value, expires });
-  }
-
-  async delete(key: string): Promise<void> {
-    this.cache.delete(key);
-  }
-
-  async clear(pattern?: string): Promise<void> {
-    if (!pattern) {
-      this.cache.clear();
-      return;
-    }
-    const regex = new RegExp(pattern);
-    for (const key of this.cache.keys()) {
-      if (regex.test(key)) {
-        this.cache.delete(key);
-      }
-    }
-  }
+interface CacheEntry<T> {
+  value: T;
+  expiresAt?: number;
+  tags?: string[];
 }
 
 export class ResourceCache {
-  private static instance: ResourceCache;
-  private provider: CacheProvider;
+  private cache: Map<string, CacheEntry<any>>;
+  private defaultTTL: number = 3600000; // 1 hour in milliseconds
 
-  private constructor() {
-    this.provider = new InMemoryCacheProvider();
+  constructor() {
+    this.cache = new Map();
   }
 
-  static getInstance(): ResourceCache {
-    if (!ResourceCache.instance) {
-      ResourceCache.instance = new ResourceCache();
-    }
-    return ResourceCache.instance;
+  async set<T extends Resource>(
+    id: string,
+    value: T,
+    options?: ResourceCacheOptions
+  ): Promise<void> {
+    const ttl = options?.ttl || this.defaultTTL;
+    const expiresAt = Date.now() + ttl;
+
+    const entry: CacheEntry<T> = {
+      value,
+      expiresAt,
+      tags: options?.tags,
+    };
+
+    this.cache.set(id, entry);
   }
 
-  setProvider(provider: CacheProvider): void {
-    this.provider = provider;
-  }
+  async get<T extends Resource>(
+    id: string,
+    options?: ResourceCacheOptions
+  ): Promise<T | null> {
+    const entry = this.cache.get(id) as CacheEntry<T> | undefined;
 
-  private generateKey(type: ResourceType, id: string): string {
-    return `${type}:${id}`;
-  }
-
-  async get<T extends Resource>(type: ResourceType, id: string): Promise<T | null> {
-    try {
-      const key = this.generateKey(type, id);
-      const cached = await this.provider.get(key);
-      return cached as T || null;
-    } catch (error) {
-      console.error("Cache get error:", error);
+    if (!entry) {
       return null;
     }
-  }
 
-  async set(resource: Resource, options?: ResourceCacheOptions): Promise<void> {
-    try {
-      const key = this.generateKey(resource.type, resource.id);
-      await this.provider.set(key, resource, options);
+    if (entry.expiresAt && Date.now() > entry.expiresAt) {
+      this.cache.delete(id);
+      return null;
+    }
 
-      // If tags are provided, create tag-based indices
-      if (options?.tags?.length) {
-        for (const tag of options.tags) {
-          const tagKey = `tag:${tag}:${resource.type}`;
-          const taggedIds = (await this.provider.get(tagKey) as string[]) || [];
-          if (!taggedIds.includes(resource.id)) {
-            taggedIds.push(resource.id);
-            await this.provider.set(tagKey, taggedIds);
-          }
-        }
+    if (options?.includeDeleted === false && this.isDeleted(entry.value)) {
+      return null;
+    }
+
+    if (options?.tags?.length) {
+      if (!this.hasMatchingTags(entry, options.tags)) {
+        return null;
       }
-    } catch (error) {
-      console.error("Cache set error:", error);
     }
+
+    return entry.value;
   }
 
-  async delete(type: ResourceType, id: string): Promise<void> {
-    try {
-      const key = this.generateKey(type, id);
-      await this.provider.delete(key);
-    } catch (error) {
-      console.error("Cache delete error:", error);
-    }
+  async delete(id: string): Promise<void> {
+    this.cache.delete(id);
   }
 
-  async clearByType(type: ResourceType): Promise<void> {
-    try {
-      await this.provider.clear(`^${type}:`);
-    } catch (error) {
-      console.error("Cache clear error:", error);
-    }
+  async clear(): Promise<void> {
+    this.cache.clear();
   }
 
-  async clearByTag(tag: string): Promise<void> {
-    try {
-      const tagPattern = `^tag:${tag}:`;
-      await this.provider.clear(tagPattern);
-    } catch (error) {
-      console.error("Cache clear by tag error:", error);
-    }
-  }
-
-  async getByTag<T extends Resource>(tag: string, type: ResourceType): Promise<T[]> {
-    try {
-      const tagKey = `tag:${tag}:${type}`;
-      const ids = (await this.provider.get(tagKey) as string[]) || [];
-      const resources: T[] = [];
-
-      for (const id of ids) {
-        const resource = await this.get<T>(type, id);
-        if (resource) {
-          resources.push(resource);
-        }
+  async invalidateByTags(tags: string[]): Promise<void> {
+    for (const [id, entry] of this.cache.entries()) {
+      if (this.hasMatchingTags(entry, tags)) {
+        this.cache.delete(id);
       }
-
-      return resources;
-    } catch (error) {
-      console.error("Cache get by tag error:", error);
-      return [];
     }
+  }
+
+  async setTags(id: string, tags: string[]): Promise<void> {
+    const entry = this.cache.get(id);
+    if (entry) {
+      entry.tags = tags;
+      this.cache.set(id, entry);
+    }
+  }
+
+  private isDeleted(value: Resource): boolean {
+    return value.deletedAt !== null && value.deletedAt !== undefined;
+  }
+
+  private hasMatchingTags(entry: CacheEntry<any>, tags: string[]): boolean {
+    if (!entry.tags) return false;
+    return tags.some(tag => entry.tags!.includes(tag));
+  }
+
+  // Utility methods for testing and monitoring
+  getSize(): number {
+    return this.cache.size;
+  }
+
+  getKeys(): string[] {
+    return Array.from(this.cache.keys());
+  }
+
+  getTags(id: string): string[] | undefined {
+    return this.cache.get(id)?.tags;
   }
 }

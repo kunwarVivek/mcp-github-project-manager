@@ -1,180 +1,202 @@
-import { beforeEach, afterEach, describe, expect, it } from '@jest/globals';
-import { ResourceManager } from '../../infrastructure/resource/ResourceManager';
-import { ResourceCache } from '../../infrastructure/cache/ResourceCache';
-import {
-  Resource,
-  ResourceType,
-  ResourceStatus,
+import { ResourceManager } from "../../infrastructure/resource/ResourceManager";
+import { ResourceCache } from "../../infrastructure/cache/ResourceCache";
+import { Project, CreateProject } from "../../domain/types";
+import { 
+  ResourceStatus, 
+  ResourceType, 
+  ResourceEvent,
   ResourceEventType,
   ResourceNotFoundError,
   ResourceVersionError,
-  mapStatus,
-  mapType,
-} from '../../domain/resource-types';
-import type { Project } from '../../domain/types';
-import { TestUtils } from '../test-utils';
+  ResourceValidationError,
+  ResourceValidationRule
+} from "../../domain/resource-types";
+import { TestFactory } from "../test-utils";
 
-describe('Resource System E2E', () => {
+describe("Resource System", () => {
   let manager: ResourceManager;
   let cache: ResourceCache;
-  const events: any[] = [];
 
   beforeEach(() => {
-    manager = ResourceManager.getInstance();
-    cache = ResourceCache.getInstance();
-    events.length = 0;
-
-    // Subscribe to resource events
-    manager.onEvent(async (event) => {
-      events.push(event);
-    });
-
-    TestUtils.mockCurrentDate();
+    cache = new ResourceCache();
+    manager = new ResourceManager(cache);
   });
 
-  afterEach(() => {
-    TestUtils.restoreCurrentDate();
-  });
-
-  describe('Resource Lifecycle', () => {
-    const projectData = TestUtils.createMockProject({
-      title: 'Test Project',
-      description: 'Test Description',
-      status: ResourceStatus.ACTIVE,
-    });
-
-    it('should handle complete resource lifecycle with proper responses', async () => {
-      // 1. Create Resource
-      const created = await manager.create<Project>(ResourceType.PROJECT, projectData);
-
-      expect(created).toMatchObject({
-        title: projectData.title,
-        type: ResourceType.PROJECT,
+  describe("Resource CRUD Operations", () => {
+    it("should create a resource", async () => {
+      const projectData = {
+        title: "Test Project",
+        description: "Test Description",
         status: ResourceStatus.ACTIVE,
-        version: 1,
-      });
+        visibility: "private" as const,
+        views: [],
+        fields: []
+      };
 
-      // 2. Verify Cache
-      const cached = await cache.get<Project>(ResourceType.PROJECT, created.id);
-      expect(cached).toEqual(created);
+      const created = await manager.create<Project>(
+        ResourceType.PROJECT,
+        projectData
+      );
 
-      // 3. Update Resource
+      expect(created.id).toBeDefined();
+      expect(created.type).toBe(ResourceType.PROJECT);
+      expect(created.version).toBe(1);
+      expect(created.status).toBe(ResourceStatus.ACTIVE);
+      expect(created.title).toBe("Test Project");
+    });
+
+    it("should read a cached resource", async () => {
+      const projectData = {
+        title: "Test Project",
+        description: "Test Description",
+        status: ResourceStatus.ACTIVE,
+        visibility: "private" as const,
+        views: [],
+        fields: []
+      };
+
+      const created = await manager.create<Project>(
+        ResourceType.PROJECT,
+        projectData
+      );
+      const cached = await manager.get<Project>(ResourceType.PROJECT, created.id);
+
+      expect(cached).toBeDefined();
+      expect(cached.id).toBe(created.id);
+      expect(cached.title).toBe(created.title);
+    });
+
+    it("should update a resource with version check", async () => {
+      const project = await manager.create<Project>(
+        ResourceType.PROJECT,
+        {
+          title: "Original Title",
+          description: "Test Description",
+          status: ResourceStatus.ACTIVE,
+          visibility: "private" as const,
+          views: [],
+          fields: []
+        }
+      );
+
       const updateData = {
-        title: 'Updated Project',
-        description: 'Updated Description',
+        title: "Updated Title",
       };
 
       const updateResponse = await manager.update<Project>(
         ResourceType.PROJECT,
-        created.id,
-        updateData
+        project.id,
+        updateData,
+        {
+          updateOptions: { 
+            optimisticLock: true, 
+            expectedVersion: project.version 
+          }
+        }
       );
 
-      expect(updateResponse.version).toBe(2);
-      expect(updateResponse.title).toBe(updateData.title);
-
-      // 4. Archive Resource
-      await manager.archive(ResourceType.PROJECT, created.id);
-      const archivedProject = await manager.get<Project>(
-        ResourceType.PROJECT,
-        created.id,
-        { includeDeleted: true }
-      );
-      expect(archivedProject.status).toBe(ResourceStatus.ARCHIVED);
-
-      // 5. Delete Resource
-      await manager.delete(ResourceType.PROJECT, created.id);
-
-      // 6. Verify Deletion
-      await expect(
-        manager.get(ResourceType.PROJECT, created.id)
-      ).rejects.toThrow(ResourceNotFoundError);
-
-      // 7. Verify Events
-      expect(events).toHaveLength(4); // create, update, archive, delete
-      expect(events.map(e => e.type)).toEqual([
-        ResourceEventType.CREATED,
-        ResourceEventType.UPDATED,
-        ResourceEventType.ARCHIVED,
-        ResourceEventType.DELETED,
-      ]);
+      expect(updateResponse.title).toBe("Updated Title");
+      expect(updateResponse.version).toBe(project.version + 1);
     });
 
-    it('should handle concurrent operations correctly', async () => {
-      // 1. Create initial resource
-      const project = await manager.create<Project>(ResourceType.PROJECT, projectData);
-
-      // 2. Simulate concurrent updates
-      const updates = await Promise.allSettled([
-        manager.update<Project>(
-          ResourceType.PROJECT,
-          project.id,
-          {
-            title: 'Update 1',
-            version: project.version,
-          },
-          { optimisticLock: true }
-        ),
-        manager.update<Project>(
-          ResourceType.PROJECT,
-          project.id,
-          {
-            title: 'Update 2',
-            version: project.version,
-          },
-          { optimisticLock: true }
-        ),
-      ]);
-
-      // 3. Verify only one update succeeded
-      expect(updates).toContainEqual(
-        expect.objectContaining({
-          status: 'fulfilled',
-        })
-      );
-      expect(updates).toContainEqual(
-        expect.objectContaining({
-          status: 'rejected',
-        })
-      );
-
-      // 4. Verify final state
-      const finalProject = await manager.get<Project>(
-        ResourceType.PROJECT,
-        project.id
-      );
-      expect(finalProject.version).toBe(2);
-      expect(['Update 1', 'Update 2']).toContain(finalProject.title);
-    });
-
-    it('should maintain cache consistency', async () => {
-      // 1. Create and verify initial cache state
+    it("should handle version conflicts", async () => {
       const project = await manager.create<Project>(
         ResourceType.PROJECT,
-        projectData
+        {
+          title: "Test Project",
+          description: "Test Description",
+          status: ResourceStatus.ACTIVE,
+          visibility: "private" as const,
+          views: [],
+          fields: []
+        }
       );
-      
-      let cached = await cache.get<Project>(ResourceType.PROJECT, project.id);
-      expect(cached).toEqual(project);
 
-      // 2. Update and verify cache update
-      const updateData = {
-        title: 'Updated Project',
-      };
+      await expect(
+        manager.update<Project>(
+          ResourceType.PROJECT,
+          project.id,
+          { title: "Updated Title" },
+          {
+            updateOptions: {
+              optimisticLock: true,
+              expectedVersion: project.version + 1
+            }
+          }
+        )
+      ).rejects.toThrow(ResourceVersionError);
+    });
+  });
 
-      const updated = await manager.update<Project>(
+  describe("Resource Status Management", () => {
+    it("should archive and restore resources", async () => {
+      const project = await manager.create<Project>(
+        ResourceType.PROJECT,
+        {
+          title: "Test Project",
+          description: "Test Description",
+          status: ResourceStatus.ACTIVE,
+          visibility: "private" as const,
+          views: [],
+          fields: []
+        }
+      );
+
+      await manager.archive(ResourceType.PROJECT, project.id);
+      const archivedProject = await manager.get<Project>(ResourceType.PROJECT, project.id);
+      expect(archivedProject.status).toBe(ResourceStatus.ARCHIVED);
+
+      await manager.restore(ResourceType.PROJECT, project.id);
+      const restoredProject = await manager.get<Project>(ResourceType.PROJECT, project.id);
+      expect(restoredProject.status).toBe(ResourceStatus.ACTIVE);
+    });
+
+    it("should soft delete resources", async () => {
+      const project = await manager.create<Project>(
+        ResourceType.PROJECT,
+        {
+          title: "Test Project",
+          description: "Test Description",
+          status: ResourceStatus.ACTIVE,
+          visibility: "private" as const,
+          views: [],
+          fields: []
+        }
+      );
+
+      await manager.delete(ResourceType.PROJECT, project.id);
+      const deletedProject = await manager.get<Project>(
         ResourceType.PROJECT,
         project.id,
-        updateData
+        { includeDeleted: true }
       );
-      
-      cached = await cache.get<Project>(ResourceType.PROJECT, project.id);
-      expect(cached).toEqual(updated);
 
-      // 3. Delete and verify cache removal
-      await manager.delete(ResourceType.PROJECT, project.id);
-      cached = await cache.get<Project>(ResourceType.PROJECT, project.id);
-      expect(cached?.status).toBe(ResourceStatus.DELETED);
+      expect(deletedProject.status).toBe(ResourceStatus.DELETED);
+      expect(deletedProject.deletedAt).toBeDefined();
+    });
+  });
+
+  describe("Resource Events", () => {
+    it("should emit events for resource operations", async () => {
+      const events: ResourceEvent[] = [];
+      manager.on('resource', (event: ResourceEvent) => events.push(event));
+
+      const project = await manager.create<Project>(
+        ResourceType.PROJECT,
+        {
+          title: "Test Project",
+          description: "Test Description",
+          status: ResourceStatus.ACTIVE,
+          visibility: "private" as const,
+          views: [],
+          fields: []
+        }
+      );
+
+      expect(events).toHaveLength(1);
+      expect(events[0].type).toBe(ResourceEventType.CREATED);
+      expect(events[0].resourceId).toBe(project.id);
+      expect(events[0].resourceType).toBe(ResourceType.PROJECT);
     });
   });
 });

@@ -7,19 +7,8 @@ import {
   ListToolsRequestSchema,
   McpError,
 } from "@modelcontextprotocol/sdk/types.js";
-import { ProjectManagementService } from "./services/ProjectManagementService";
-
-function getRequiredEnvVar(name: string): string {
-  const value = process.env[name];
-  if (!value) {
-    throw new Error(`${name} environment variable is required`);
-  }
-  return value;
-}
-
-const GITHUB_TOKEN = getRequiredEnvVar("GITHUB_TOKEN");
-const GITHUB_OWNER = getRequiredEnvVar("GITHUB_OWNER");
-const GITHUB_REPO = getRequiredEnvVar("GITHUB_REPO");
+import { ProjectManagementService } from "./services/ProjectManagementService.js";
+import { GITHUB_TOKEN, GITHUB_OWNER, GITHUB_REPO } from "./env.js";
 
 class GitHubProjectManagerServer {
   private server: Server;
@@ -148,47 +137,6 @@ class GitHubProjectManagerServer {
             required: ["sprint", "issueIds"],
           },
         },
-        {
-          name: "get_milestone_metrics",
-          description: "Get progress metrics for a milestone",
-          inputSchema: {
-            type: "object",
-            properties: {
-              milestoneId: { type: "number" },
-            },
-            required: ["milestoneId"],
-          },
-        },
-        {
-          name: "get_sprint_metrics",
-          description: "Get metrics for a specific sprint",
-          inputSchema: {
-            type: "object",
-            properties: {
-              sprintId: { type: "string" },
-            },
-            required: ["sprintId"],
-          },
-        },
-        {
-          name: "get_overdue_milestones",
-          description: "Get all overdue milestones",
-          inputSchema: {
-            type: "object",
-            properties: {},
-          },
-        },
-        {
-          name: "get_upcoming_milestones",
-          description: "Get milestones due in the next N days",
-          inputSchema: {
-            type: "object",
-            properties: {
-              days: { type: "number", minimum: 1 },
-            },
-            required: ["days"],
-          },
-        },
       ],
     }));
 
@@ -199,18 +147,6 @@ class GitHubProjectManagerServer {
             return await this.handleCreateRoadmap(request.params.arguments);
           case "plan_sprint":
             return await this.handlePlanSprint(request.params.arguments);
-          case "get_milestone_metrics":
-            return await this.handleGetMilestoneMetrics(
-              request.params.arguments
-            );
-          case "get_sprint_metrics":
-            return await this.handleGetSprintMetrics(request.params.arguments);
-          case "get_overdue_milestones":
-            return await this.handleGetOverdueMilestones();
-          case "get_upcoming_milestones":
-            return await this.handleGetUpcomingMilestones(
-              request.params.arguments
-            );
           default:
             throw new McpError(
               ErrorCode.MethodNotFound,
@@ -249,61 +185,6 @@ class GitHubProjectManagerServer {
     };
   }
 
-  private async handleGetMilestoneMetrics(args: any) {
-    const progress = await this.service.getMilestoneProgress(args.milestoneId);
-    const percentage = await this.service.getMilestoneCompletionPercentage(
-      args.milestoneId
-    );
-    return {
-      content: [
-        {
-          type: "text",
-          text: JSON.stringify(
-            { ...progress, completionPercentage: percentage },
-            null,
-            2
-          ),
-        },
-      ],
-    };
-  }
-
-  private async handleGetSprintMetrics(args: any) {
-    const metrics = await this.service.getSprintMetrics(args.sprintId);
-    return {
-      content: [
-        {
-          type: "text",
-          text: JSON.stringify(metrics, null, 2),
-        },
-      ],
-    };
-  }
-
-  private async handleGetOverdueMilestones() {
-    const milestones = await this.service.getOverdueMilestones();
-    return {
-      content: [
-        {
-          type: "text",
-          text: JSON.stringify(milestones, null, 2),
-        },
-      ],
-    };
-  }
-
-  private async handleGetUpcomingMilestones(args: any) {
-    const milestones = await this.service.getMilestonesInNext(args.days);
-    return {
-      content: [
-        {
-          type: "text",
-          text: JSON.stringify(milestones, null, 2),
-        },
-      ],
-    };
-  }
-
   async run() {
     const transport = new StdioServerTransport();
     await this.server.connect(transport);
@@ -312,4 +193,7 @@ class GitHubProjectManagerServer {
 }
 
 const server = new GitHubProjectManagerServer();
-server.run().catch(console.error);
+server.run().catch((error) => {
+  console.error("Failed to start server:", error);
+  process.exit(1);
+});

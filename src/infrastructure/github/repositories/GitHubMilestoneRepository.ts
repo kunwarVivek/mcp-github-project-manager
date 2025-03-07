@@ -1,139 +1,221 @@
-import { Octokit } from "@octokit/rest";
-import {
-  Milestone,
-  MilestoneId,
-  MilestoneRepository,
-} from "../../../domain/types";
-import { GitHubConfig } from "../GitHubConfig";
-import {
-  CreateMilestoneParams,
-  ListMilestonesParams,
-  RestMilestone,
-  UpdateMilestoneParams,
-} from "../rest-types";
+import { BaseGitHubRepository } from "./BaseRepository";
+import { Milestone, CreateMilestone, MilestoneRepository, MilestoneId } from "../../../domain/types";
+import { ResourceType, ResourceStatus } from "../../../domain/resource-types";
 
-export class GitHubMilestoneRepository implements MilestoneRepository {
-  private octokit: Octokit;
+interface GitHubMilestone {
+  id: string;
+  number: number;
+  title: string;
+  description: string | null;
+  dueOn: string | null;
+  state: "open" | "closed";
+  createdAt: string;
+  updatedAt: string;
+  closedAt: string | null;
+  progress: {
+    enabled: boolean;
+    openIssues: number;
+    closedIssues: number;
+    completionPercentage: number;
+  };
+}
 
-  constructor(private config: GitHubConfig) {
-    this.octokit = new Octokit({ auth: config.token });
+interface CreateMilestoneResponse {
+  createMilestone: {
+    milestone: GitHubMilestone;
+  };
+}
+
+interface UpdateMilestoneResponse {
+  updateMilestone: {
+    milestone: GitHubMilestone;
+  };
+}
+
+interface GetMilestoneResponse {
+  repository: {
+    milestone: GitHubMilestone | null;
+  };
+}
+
+interface ListMilestonesResponse {
+  repository: {
+    milestones: {
+      nodes: GitHubMilestone[];
+    };
+  };
+}
+
+export class GitHubMilestoneRepository extends BaseGitHubRepository implements MilestoneRepository {
+  private mapGitHubMilestoneToMilestone(githubMilestone: GitHubMilestone): Milestone {
+    return {
+      id: githubMilestone.id,
+      type: ResourceType.MILESTONE,
+      version: 1,
+      title: githubMilestone.title,
+      description: githubMilestone.description || undefined,
+      dueDate: githubMilestone.dueOn || undefined,
+      status: githubMilestone.state === "open" ? ResourceStatus.ACTIVE : ResourceStatus.CLOSED,
+      progress: {
+        openIssues: githubMilestone.progress?.openIssues || 0,
+        closedIssues: githubMilestone.progress?.closedIssues || 0,
+        completionPercentage: githubMilestone.progress?.completionPercentage || 0,
+      },
+      createdAt: githubMilestone.createdAt,
+      updatedAt: githubMilestone.updatedAt,
+      deletedAt: null,
+    };
   }
 
-  async create(data: Omit<Milestone, "id" | "progress">): Promise<Milestone> {
-    const params: CreateMilestoneParams = {
-      owner: this.config.owner,
-      repo: this.config.repo,
-      title: data.title,
-      description: data.description,
-      due_on: data.dueDate?.toISOString(),
-      state: data.status,
-    };
+  async create(data: CreateMilestone): Promise<Milestone> {
+    const mutation = `
+      mutation($input: CreateMilestoneInput!) {
+        createMilestone(input: $input) {
+          milestone {
+            id
+            number
+            title
+            description
+            dueOn
+            state
+            createdAt
+            updatedAt
+          }
+        }
+      }
+    `;
 
-    const response = await this.octokit.issues.createMilestone(params);
-    return this.mapRestToMilestone(response.data);
+    const response = await this.graphql<CreateMilestoneResponse>(mutation, {
+      input: {
+        repositoryId: this.repo,
+        title: data.title,
+        description: data.description,
+        dueOn: data.dueDate,
+        state: data.status === ResourceStatus.CLOSED ? "closed" : "open",
+      },
+    });
+
+    return this.mapGitHubMilestoneToMilestone(response.createMilestone.milestone);
   }
 
   async update(id: MilestoneId, data: Partial<Milestone>): Promise<Milestone> {
-    const params: UpdateMilestoneParams = {
-      owner: this.config.owner,
-      repo: this.config.repo,
-      milestone_number: id,
-      ...(data.title && { title: data.title }),
-      ...(data.description && { description: data.description }),
-      ...(data.dueDate && { due_on: data.dueDate.toISOString() }),
-      ...(data.status && { state: data.status }),
-    };
+    const mutation = `
+      mutation($input: UpdateMilestoneInput!) {
+        updateMilestone(input: $input) {
+          milestone {
+            id
+            number
+            title
+            description
+            dueOn
+            state
+            updatedAt
+            createdAt
+          }
+        }
+      }
+    `;
 
-    const response = await this.octokit.issues.updateMilestone(params);
-    return this.mapRestToMilestone(response.data);
+    const response = await this.graphql<UpdateMilestoneResponse>(mutation, {
+      input: {
+        milestoneId: id,
+        title: data.title,
+        description: data.description,
+        dueOn: data.dueDate,
+        state: data.status === ResourceStatus.CLOSED ? "closed" : "open",
+      },
+    });
+
+    return this.mapGitHubMilestoneToMilestone(response.updateMilestone.milestone);
   }
 
   async delete(id: MilestoneId): Promise<void> {
-    await this.octokit.issues.deleteMilestone({
-      owner: this.config.owner,
-      repo: this.config.repo,
-      milestone_number: id,
+    const mutation = `
+      mutation($input: DeleteMilestoneInput!) {
+        deleteMilestone(input: $input) {
+          milestone {
+            id
+          }
+        }
+      }
+    `;
+
+    await this.graphql(mutation, {
+      input: {
+        milestoneId: id,
+      },
     });
   }
 
   async findById(id: MilestoneId): Promise<Milestone | null> {
-    try {
-      const response = await this.octokit.issues.getMilestone({
-        owner: this.config.owner,
-        repo: this.config.repo,
-        milestone_number: id,
-      });
+    const query = `
+      query($owner: String!, $repo: String!, $number: Int!) {
+        repository(owner: $owner, name: $repo) {
+          milestone(number: $number) {
+            id
+            number
+            title
+            description
+            dueOn
+            state
+            createdAt
+            updatedAt
+          }
+        }
+      }
+    `;
 
-      return this.mapRestToMilestone(response.data);
-    } catch (error) {
-      if ((error as any).status === 404) return null;
-      throw error;
-    }
+    const response = await this.graphql<GetMilestoneResponse>(query, {
+      owner: this.owner,
+      repo: this.repo,
+      number: parseInt(id),
+    });
+
+    const milestone = response.repository.milestone;
+    if (!milestone) return null;
+
+    return this.mapGitHubMilestoneToMilestone(milestone);
   }
 
-  async findAll(filters?: {
-    status?: "open" | "closed";
-  }): Promise<Milestone[]> {
-    const params: ListMilestonesParams = {
-      owner: this.config.owner,
-      repo: this.config.repo,
-      state: filters?.status || "all",
-      sort: "due_on",
-      direction: "asc",
-      per_page: 100,
-    };
+  async findAll(): Promise<Milestone[]> {
+    const query = `
+      query($owner: String!, $repo: String!) {
+        repository(owner: $owner, name: $repo) {
+          milestones(first: 100) {
+            nodes {
+              id
+              number
+              title
+              description
+              dueOn
+              state
+              createdAt
+              updatedAt
+            }
+          }
+        }
+      }
+    `;
 
-    const response = await this.octokit.issues.listMilestones(params);
-    return response.data.map(this.mapRestToMilestone);
-  }
+    const response = await this.graphql<ListMilestonesResponse>(query, {
+      owner: this.owner,
+      repo: this.repo,
+    });
 
-  private mapRestToMilestone(data: RestMilestone): Milestone {
-    return {
-      id: data.number,
-      title: data.title,
-      description: data.description || "",
-      dueDate: data.due_on ? new Date(data.due_on) : undefined,
-      status: data.state as "open" | "closed",
-      progress: {
-        openIssues: data.open_issues,
-        closedIssues: data.closed_issues,
-      },
-    };
-  }
-
-  async getProgress(
-    id: MilestoneId
-  ): Promise<{ openIssues: number; closedIssues: number }> {
-    const milestone = await this.findById(id);
-    if (!milestone) {
-      throw new Error(`Milestone #${id} not found`);
-    }
-    return milestone.progress;
-  }
-
-  async getCompletionPercentage(id: MilestoneId): Promise<number> {
-    const { openIssues, closedIssues } = await this.getProgress(id);
-    const total = openIssues + closedIssues;
-    if (total === 0) return 0;
-    return (closedIssues / total) * 100;
-  }
-
-  async getDueInNext(days: number): Promise<Milestone[]> {
-    const allMilestones = await this.findAll({ status: "open" });
-    const cutoffDate = new Date();
-    cutoffDate.setDate(cutoffDate.getDate() + days);
-
-    return allMilestones.filter(
-      (milestone) => milestone.dueDate && milestone.dueDate <= cutoffDate
+    return response.repository.milestones.nodes.map(milestone => 
+      this.mapGitHubMilestoneToMilestone(milestone)
     );
+  }
+
+  async findByDueDate(before: Date): Promise<Milestone[]> {
+    const all = await this.findAll();
+    return all.filter(milestone => {
+      if (!milestone.dueDate) return false;
+      return new Date(milestone.dueDate) <= before;
+    });
   }
 
   async getOverdue(): Promise<Milestone[]> {
-    const allMilestones = await this.findAll({ status: "open" });
-    const now = new Date();
-
-    return allMilestones.filter(
-      (milestone) => milestone.dueDate && milestone.dueDate < now
-    );
+    return this.findByDueDate(new Date());
   }
 }
