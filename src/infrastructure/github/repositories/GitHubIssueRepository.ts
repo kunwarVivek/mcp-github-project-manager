@@ -56,19 +56,16 @@ export class GitHubIssueRepository extends BaseGitHubRepository implements Issue
   private mapGitHubIssueToIssue(githubIssue: GitHubIssue): Issue {
     return {
       id: githubIssue.id,
-      type: ResourceType.ISSUE,
-      version: 1,
+      number: parseInt(githubIssue.number.toString()),
       title: githubIssue.title,
       description: githubIssue.body || "",
       status: githubIssue.state === "OPEN" ? ResourceStatus.ACTIVE : ResourceStatus.CLOSED,
-      priority: "medium", // TODO: Map GitHub labels to priority
-      issueType: "feature", // TODO: Map GitHub labels to type
       assignees: githubIssue.assignees.nodes.map(node => node.login),
       labels: githubIssue.labels.nodes.map(node => node.name),
       milestoneId: githubIssue.milestone?.id,
       createdAt: githubIssue.createdAt,
       updatedAt: githubIssue.updatedAt,
-      deletedAt: null,
+      url: `https://github.com/${this.owner}/${this.repo}/issues/${githubIssue.number}`
     };
   }
 
@@ -241,6 +238,49 @@ export class GitHubIssueRepository extends BaseGitHubRepository implements Issue
     const response = await this.graphql<ListIssuesResponse>(query, {
       owner: this.owner,
       repo: this.repo,
+    });
+
+    return response.repository.issues.nodes.map(issue =>
+      this.mapGitHubIssueToIssue(issue)
+    );
+  }
+
+  async findByMilestone(milestoneId: string): Promise<Issue[]> {
+    const query = `
+      query($owner: String!, $repo: String!, $milestoneId: ID!) {
+        repository(owner: $owner, name: $repo) {
+          issues(first: 100, filterBy: { milestoneId: $milestoneId }) {
+            nodes {
+              id
+              number
+              title
+              body
+              state
+              createdAt
+              updatedAt
+              assignees(first: 100) {
+                nodes {
+                  login
+                }
+              }
+              labels(first: 100) {
+                nodes {
+                  name
+                }
+              }
+              milestone {
+                id
+              }
+            }
+          }
+        }
+      }
+    `;
+
+    const response = await this.graphql<ListIssuesResponse>(query, {
+      owner: this.owner,
+      repo: this.repo,
+      milestoneId
     });
 
     return response.repository.issues.nodes.map(issue =>

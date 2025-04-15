@@ -1,21 +1,28 @@
-import { MCPError, MCPErrorCode, MCPResponse, MCPContentType } from "../../domain/mcp-types";
+import { MCPError, MCPErrorCode, MCPResponse, MCPContentType, MCPErrorResponse } from "../../domain/mcp-types";
 import { MCPResponseFormatter } from "./MCPResponseFormatter";
-import { ValidationError, NotFoundError, UnauthorizedError, RateLimitError } from "../../domain/errors";
+import { ValidationError, ResourceNotFoundError, UnauthorizedError, RateLimitError } from "../../domain/errors";
 
 export class MCPErrorHandler {
   /**
    * Convert any error to a standardized MCP error response
    */
-  static handle(error: unknown, requestId?: string): MCPResponse {
+  static handle(error: unknown, requestId?: string): MCPErrorResponse {
     const mcpError = this.createMCPError(error);
-    const response = MCPResponseFormatter.format(mcpError, MCPContentType.JSON);
     
-    response.metadata.status = this.getStatusCode(mcpError.code);
-    if (requestId) {
-      response.metadata.requestId = requestId;
-    }
-    
-    return response;
+    // Create proper MCPErrorResponse object
+    return {
+      version: "1.0",
+      requestId: requestId || `req-${Date.now()}`,
+      status: "error",
+      error: {
+        code: mcpError.code,
+        message: mcpError.message,
+        details: mcpError.details ? [{ 
+          code: "details", 
+          message: JSON.stringify(mcpError.details) 
+        }] : undefined
+      }
+    };
   }
 
   /**
@@ -54,7 +61,7 @@ export class MCPErrorHandler {
     if (error instanceof ValidationError) {
       return MCPErrorCode.VALIDATION_ERROR;
     }
-    if (error instanceof NotFoundError) {
+    if (error instanceof ResourceNotFoundError) {
       return MCPErrorCode.RESOURCE_NOT_FOUND;
     }
     if (error instanceof UnauthorizedError) {

@@ -12,8 +12,15 @@ import {
   ResourceVersionError,
   ResourceCacheOptions,
   ResourceUpdateOptions,
+  RelationshipType,
 } from '../../domain/resource-types';
 import { ResourceCache } from '../cache/ResourceCache';
+import { 
+  ResourceSchema, 
+  ResourceSchemaMap, 
+  validateResourceByType,
+  resourceSchemas
+} from '../../domain/resource-schemas';
 
 export class ResourceManager extends EventEmitter {
   constructor(private cache: ResourceCache) {
@@ -28,19 +35,35 @@ export class ResourceManager extends EventEmitter {
       cacheOptions?: ResourceCacheOptions;
     }
   ): Promise<T> {
-    if (options?.validationRules) {
-      this.validateResource(data, options.validationRules);
-    }
-
+    // Create the resource
+    const now = new Date();
     const resource: T = {
       id: uuidv4(),
       type,
       version: 1,
       status: ResourceStatus.ACTIVE,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+      createdAt: now,
+      updatedAt: now,
       ...data,
     } as T;
+
+    // Validate with Zod schema if available
+    const schema = resourceSchemas[type]; // Use the exported variable instead of the type
+    if (schema) {
+      try {
+        schema.parse(resource); // This will throw if validation fails
+      } catch (error) {
+        throw new ResourceValidationError(
+          type,
+          `Zod validation failed: ${error instanceof Error ? error.message : String(error)}`
+        );
+      }
+    }
+
+    // Also validate with legacy validation rules if provided
+    if (options?.validationRules) {
+      this.validateResource(data, options.validationRules);
+    }
 
     await this.cache.set(resource.id, resource, options?.cacheOptions);
 
@@ -57,14 +80,61 @@ export class ResourceManager extends EventEmitter {
 
   async get<T extends Resource>(
     type: ResourceType,
-    id: string,
-    options?: ResourceCacheOptions
+    id: string
   ): Promise<T> {
-    const resource = await this.cache.get<T>(id, options);
+    const resource = await this.cache.get<T>(id);
+    
     if (!resource) {
       throw new ResourceNotFoundError(type, id);
     }
+    
+    if (resource.type !== type) {
+      throw new ResourceValidationError(
+        type, 
+        `Found resource with type ${resource.type} instead of ${type}`
+      );
+    }
+    
     return resource;
+  }
+
+  async getAll<T extends Resource>(
+    type: ResourceType,
+    options?: {
+      status?: ResourceStatus;
+      filter?: (resource: T) => boolean;
+    }
+  ): Promise<T[]> {
+    const resources = await this.cache.getByType<T>(type);
+    
+    return resources.filter(
+      resource =>
+        (options?.status === undefined || resource.status === options.status) &&
+        (options?.filter === undefined || options.filter(resource))
+    );
+  }
+
+  async getByIds<T extends Resource>(
+    type: ResourceType,
+    ids: string[]
+  ): Promise<T[]> {
+    const resources = await Promise.all(
+      ids.map(async id => {
+        try {
+          return await this.get<T>(type, id);
+        } catch (e) {
+          if (e instanceof ResourceNotFoundError) {
+            return null;
+          }
+          throw e;
+        }
+      })
+    );
+    
+    // Fix the type predicate issue
+    return resources.filter((resource): resource is Awaited<T> => 
+      resource !== null
+    ) as unknown as T[];
   }
 
   async update<T extends Resource>(
@@ -78,28 +148,46 @@ export class ResourceManager extends EventEmitter {
     }
   ): Promise<T> {
     const current = await this.get<T>(type, id);
-
-    if (options?.validationRules) {
-      this.validateResource({ ...current, ...data }, options.validationRules);
-    }
-
-    if (options?.updateOptions?.optimisticLock) {
-      if (current.version !== options.updateOptions.expectedVersion) {
-        throw new ResourceVersionError(
-          type,
-          id,
-          options.updateOptions.expectedVersion!,
-          current.version
-        );
-      }
-    }
+    
+    // Handle the case where version is undefined
+    const currentVersion = current.version ?? 0;
 
     const updated: T = {
       ...current,
       ...data,
-      version: current.version + 1,
-      updatedAt: new Date().toISOString(),
+      version: currentVersion + 1,
+      updatedAt: new Date(),
     };
+
+    // Validate with Zod schema if available
+    const schema = resourceSchemas[type];
+    if (schema) {
+      try {
+        schema.parse(updated);
+      } catch (error) {
+        throw new ResourceValidationError(
+          type,
+          `Zod validation failed: ${error instanceof Error ? error.message : String(error)}`
+        );
+      }
+    }
+
+    // Also validate with legacy validation rules if provided
+    if (options?.validationRules) {
+      this.validateResource(updated, options.validationRules);
+    }
+
+    // Check for optimistic locking
+    if (options?.updateOptions?.optimisticLock && options.updateOptions.expectedVersion !== undefined) {
+      if (currentVersion !== options.updateOptions.expectedVersion) {
+        throw new ResourceVersionError(
+          type,
+          id,
+          currentVersion,
+          options.updateOptions.expectedVersion
+        );
+      }
+    }
 
     await this.cache.set(id, updated, options?.cacheOptions);
 
@@ -116,13 +204,17 @@ export class ResourceManager extends EventEmitter {
 
   async delete(type: ResourceType, id: string): Promise<void> {
     const resource = await this.get(type, id);
+    const now = new Date();
+
+    // Handle the case where version might be undefined
+    const currentVersion = resource.version ?? 0;
 
     const updated = {
       ...resource,
       status: ResourceStatus.DELETED,
-      deletedAt: new Date().toISOString(),
-      version: resource.version + 1,
-      updatedAt: new Date().toISOString(),
+      deletedAt: now,
+      version: currentVersion + 1,
+      updatedAt: now,
     };
 
     await this.cache.set(id, updated);
@@ -138,12 +230,16 @@ export class ResourceManager extends EventEmitter {
 
   async archive(type: ResourceType, id: string): Promise<void> {
     const resource = await this.get(type, id);
+    const now = new Date();
+
+    // Handle the case where version might be undefined
+    const currentVersion = resource.version ?? 0;
 
     const updated = {
       ...resource,
       status: ResourceStatus.ARCHIVED,
-      version: resource.version + 1,
-      updatedAt: new Date().toISOString(),
+      version: currentVersion + 1,
+      updatedAt: now,
     };
 
     await this.cache.set(id, updated);
@@ -159,13 +255,14 @@ export class ResourceManager extends EventEmitter {
 
   async restore(type: ResourceType, id: string): Promise<void> {
     const resource = await this.get(type, id);
+    const now = new Date();
 
     const updated = {
       ...resource,
       status: ResourceStatus.ACTIVE,
-      version: resource.version + 1,
-      updatedAt: new Date().toISOString(),
-      deletedAt: null,
+      version: resource.version ? resource.version + 1 : 1,
+      updatedAt: now,
+      deletedAt: undefined, // Changed from null to undefined
     };
 
     await this.cache.set(id, updated);
@@ -179,16 +276,103 @@ export class ResourceManager extends EventEmitter {
     });
   }
 
+  async createRelationship(
+    sourceType: ResourceType,
+    sourceId: string,
+    relationshipType: RelationshipType,
+    targetType: ResourceType,
+    targetId: string
+  ): Promise<void> {
+    // Verify both resources exist
+    await this.get(sourceType, sourceId);
+    await this.get(targetType, targetId);
+    
+    // Store the relationship
+    await this.cache.setRelationship(
+      sourceId,
+      relationshipType,
+      targetId
+    );
+    
+    this.emit('resource', {
+      type: ResourceEventType.RELATIONSHIP_CREATED,
+      resourceId: sourceId,
+      resourceType: sourceType,
+      timestamp: new Date(),
+      data: {
+        sourceId,
+        relationshipType,
+        targetId,
+      },
+    });
+  }
+
+  async getRelatedResources<T extends Resource>(
+    type: ResourceType,
+    id: string,
+    relationshipType: RelationshipType,
+    targetType: ResourceType
+  ): Promise<T[]> {
+    // Verify source resource exists
+    await this.get(type, id);
+    
+    // Get related resource IDs
+    const relatedIds = await this.cache.getRelationships(id, relationshipType);
+    
+    // Get all related resources
+    return this.getByIds<T>(targetType, relatedIds);
+  }
+
+  async removeRelationship(
+    sourceType: ResourceType,
+    sourceId: string,
+    relationshipType: RelationshipType,
+    targetId: string
+  ): Promise<void> {
+    // Verify source resource exists
+    await this.get(sourceType, sourceId);
+    
+    // Remove the relationship
+    await this.cache.removeRelationship(sourceId, relationshipType, targetId);
+    
+    this.emit('resource', {
+      type: ResourceEventType.RELATIONSHIP_REMOVED,
+      resourceId: sourceId,
+      resourceType: sourceType,
+      timestamp: new Date(),
+      data: {
+        sourceId,
+        relationshipType,
+        targetId,
+      },
+    });
+  }
+
   private validateResource(
     data: any,
     rules: ResourceValidationRule[]
   ): void {
     const errors = rules
-      .filter(rule => !rule.validate(data[rule.field]))
-      .map(rule => rule.message);
+      .filter(rule => !rule.validate(data))
+      .map(rule => rule.getErrorMessage(data));
 
     if (errors.length > 0) {
-      throw new ResourceValidationError(`Validation failed: ${errors.join(', ')}`);
+      throw new ResourceValidationError(
+        data.type,
+        `Validation failed: ${errors.join(', ')}`
+      );
+    }
+  }
+
+  // Modified method to work with the validateResource function that returns string[] instead of validation result
+  validateWithZod(type: ResourceType, data: unknown): any {
+    try {
+      return validateResourceByType(type, data);
+    } catch (error) {
+      throw new ResourceValidationError(
+        type,
+        `Validation failed: ${error instanceof Error ? error.message : String(error)}`
+      );
     }
   }
 }

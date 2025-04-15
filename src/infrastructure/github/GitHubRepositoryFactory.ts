@@ -2,7 +2,7 @@ import { Octokit } from "@octokit/rest";
 import { IGitHubRepository } from "./repositories/BaseRepository";
 import { GitHubErrorHandler } from "./GitHubErrorHandler";
 import { OctokitInstance } from "./types";
-import { GitHubConfig } from "./config";
+import { GitHubConfig } from "./GitHubConfig"; // Fixed import path
 import { GitHubIssueRepository } from "./repositories/GitHubIssueRepository";
 import { GitHubMilestoneRepository } from "./repositories/GitHubMilestoneRepository";
 import { GitHubProjectRepository } from "./repositories/GitHubProjectRepository";

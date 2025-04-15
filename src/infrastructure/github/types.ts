@@ -4,6 +4,7 @@ export interface GitHubConfig {
   owner: string;
   repo: string;
   token: string;
+  projectId?: string; // Adding the missing projectId property
 }
 
 export interface GitHubError extends Error {
@@ -12,8 +13,16 @@ export interface GitHubError extends Error {
     status: number;
     data: any;
     headers?: Record<string, string>;
+    url?: string; // Added the missing url property
   };
   headers?: Record<string, string>;
+}
+
+export interface GitHubErrorResponse {
+  status: number;
+  data: any;
+  headers?: Record<string, string>;
+  url?: string; // Adding the missing url property
 }
 
 export interface GitHubLabel {

@@ -1,201 +1,121 @@
-// Resource Type Enum
+// Domain resource types and enums
 export enum ResourceType {
-  PROJECT = 'project',
-  ISSUE = 'issue',
-  MILESTONE = 'milestone',
-  SPRINT = 'sprint'
+  PROJECT = "project",
+  ISSUE = "issue",
+  MILESTONE = "milestone",
+  SPRINT = "sprint",
+  RELATIONSHIP = "relationship",
+  PULL_REQUEST = "pull_request",
+  LABEL = "label",
+  VIEW = "view",
+  FIELD = "field",
+  COMMENT = "comment"
 }
 
-// Resource Status Enum
 export enum ResourceStatus {
-  ACTIVE = 'active',
-  ARCHIVED = 'archived',
-  DELETED = 'deleted',
-  OPEN = 'open',
-  CLOSED = 'closed',
-  PLANNED = 'planned',
-  COMPLETED = 'completed'
+  ACTIVE = "active",
+  CLOSED = "closed",
+  ARCHIVED = "archived",
+  DELETED = "deleted",
+  PLANNED = "planned",
+  COMPLETED = "completed"
 }
 
-// Resource Event Types
-export enum ResourceEventType {
-  CREATED = 'created',
-  UPDATED = 'updated',
-  DELETED = 'deleted',
-  ARCHIVED = 'archived',
-  RESTORED = 'restored'
+export enum RelationshipType {
+  LINKED = "linked",
+  DEPENDENCY_OF = "dependency_of",
+  BLOCKED_BY = "blocked_by",
+  PARENT_CHILD = "parent_child",
+  DEPENDENCY = "dependency"
 }
 
-// Base Resource Interface
 export interface Resource {
   id: string;
   type: ResourceType;
-  version: number;
-  status: ResourceStatus;
-  createdAt: string;
-  updatedAt: string;
-  deletedAt?: string | null;
-  metadata?: Record<string, unknown>;
+  createdAt: Date;
+  updatedAt?: Date;
+  deletedAt?: Date;
+  version?: number;
+  status?: ResourceStatus;
 }
 
-// Resource Event Interface
-export interface ResourceEvent<T = unknown> {
-  type: ResourceEventType;
+export interface Relationship extends Resource {
+  sourceId: string;
+  sourceType: ResourceType;
+  targetId: string;
+  targetType: ResourceType;
+  relationshipType: RelationshipType;
+}
+
+export enum ResourceEventType {
+  CREATED = "created",
+  UPDATED = "updated",
+  DELETED = "deleted",
+  ARCHIVED = "archived",
+  RESTORED = "restored",
+  RELATIONSHIP_CREATED = "relationship_created",
+  RELATIONSHIP_DELETED = "relationship_deleted",
+  RELATIONSHIP_REMOVED = "relationship_removed"
+}
+
+export interface ResourceEvent {
+  id: string;
   resourceId: string;
   resourceType: ResourceType;
-  timestamp: string;
-  data: T;
+  eventType: ResourceEventType;
+  timestamp: Date;
+  metadata?: Record<string, any>;
 }
 
-// Cache Options
+export class ResourceNotFoundError extends Error {
+  constructor(resourceType: ResourceType, resourceId: string) {
+    super(`${resourceType} with ID ${resourceId} not found`);
+    this.name = "ResourceNotFoundError";
+  }
+}
+
+export class ResourceVersionError extends Error {
+  constructor(resourceType: ResourceType, resourceId: string, currentVersion: number, expectedVersion: number) {
+    super(`Version mismatch for ${resourceType} with ID ${resourceId}: current=${currentVersion}, expected=${expectedVersion}`);
+    this.name = "ResourceVersionError";
+  }
+}
+
+export class ResourceValidationError extends Error {
+  constructor(resourceType: ResourceType, details: string) {
+    super(`Validation failed for ${resourceType}: ${details}`);
+    this.name = "ResourceValidationError";
+  }
+}
+
+export interface ResourceValidationRule {
+  field: string; // Added this field property
+  validate(resource: any): boolean;
+  getErrorMessage(resource: any): string;
+  message: string; // Added this message property
+}
+
 export interface ResourceCacheOptions {
   ttl?: number;
+  refreshInterval?: number;
+  maxSize?: number;
+  tags?: string[];
+  namespaces?: string[];
   includeDeleted?: boolean;
+}
+
+export interface ResourceUpdateOptions {
+  expectedVersion?: number;
+  validate?: boolean;
+  optimisticLock?: boolean;
   tags?: string[];
   namespaces?: string[];
 }
 
-// Resource Lock Options
-export interface ResourceLockOptions {
-  ttl?: number;
-  owner?: string;
-  retries?: number;
-  retryDelay?: number;
-}
-
-// Resource Update Options
-export interface ResourceUpdateOptions {
-  optimisticLock?: boolean;
-  expectedVersion?: number;
-  retainMetadata?: boolean;
-}
-
-// Query Options
-export interface ResourceQueryOptions {
-  includeDeleted?: boolean;
-  version?: number;
-}
-
-// Error Classes
-export class ResourceError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = this.constructor.name;
-  }
-}
-
-export class ResourceNotFoundError extends ResourceError {
-  constructor(resourceType: ResourceType, id: string) {
-    super(`${resourceType} with id ${id} not found`);
-  }
-}
-
-export class ResourceVersionError extends ResourceError {
-  constructor(
-    resourceType: ResourceType, 
-    id: string, 
-    expectedVersion: number, 
-    actualVersion: number
-  ) {
-    super(
-      `${resourceType} ${id} version mismatch: expected ${expectedVersion}, got ${actualVersion}`
-    );
-  }
-}
-
-export class ResourceValidationError extends ResourceError {
-  constructor(message: string) {
-    super(message);
-  }
-}
-
-export class ResourceLockError extends ResourceError {
-  constructor(resourceType: ResourceType, id: string) {
-    super(`Failed to acquire lock for ${resourceType} ${id}`);
-  }
-}
-
-// Type Guards
-export function isResourceType(value: unknown): value is ResourceType {
-  return Object.values(ResourceType).includes(value as ResourceType);
-}
-
-export function isResourceStatus(value: unknown): value is ResourceStatus {
-  return Object.values(ResourceStatus).includes(value as ResourceStatus);
-}
-
-export function isResource(value: unknown): value is Resource {
-  if (!value || typeof value !== 'object') return false;
-  
-  const resource = value as Partial<Resource>;
-  return (
-    typeof resource.id === 'string' &&
-    isResourceType(resource.type) &&
-    typeof resource.version === 'number' &&
-    isResourceStatus(resource.status) &&
-    typeof resource.createdAt === 'string' &&
-    typeof resource.updatedAt === 'string' &&
-    (resource.deletedAt === undefined || 
-     resource.deletedAt === null || 
-     typeof resource.deletedAt === 'string') &&
-    (resource.metadata === undefined || 
-     typeof resource.metadata === 'object')
-  );
-}
-
-// Status Transition Rules
-export const allowedStatusTransitions: Record<ResourceStatus, ResourceStatus[]> = {
-  [ResourceStatus.ACTIVE]: [
-    ResourceStatus.ARCHIVED,
-    ResourceStatus.DELETED,
-    ResourceStatus.CLOSED,
-    ResourceStatus.COMPLETED
-  ],
-  [ResourceStatus.ARCHIVED]: [
-    ResourceStatus.ACTIVE,
-    ResourceStatus.DELETED
-  ],
-  [ResourceStatus.DELETED]: [],
-  [ResourceStatus.OPEN]: [
-    ResourceStatus.CLOSED,
-    ResourceStatus.ARCHIVED,
-    ResourceStatus.DELETED
-  ],
-  [ResourceStatus.CLOSED]: [
-    ResourceStatus.OPEN,
-    ResourceStatus.ARCHIVED,
-    ResourceStatus.DELETED
-  ],
-  [ResourceStatus.PLANNED]: [
-    ResourceStatus.ACTIVE,
-    ResourceStatus.DELETED
-  ],
-  [ResourceStatus.COMPLETED]: [
-    ResourceStatus.ACTIVE,
-    ResourceStatus.ARCHIVED
-  ]
-};
-
-export function isValidStatusTransition(
-  currentStatus: ResourceStatus,
-  newStatus: ResourceStatus
-): boolean {
-  if (currentStatus === newStatus) return true;
-  return allowedStatusTransitions[currentStatus]?.includes(newStatus) ?? false;
-}
-
-// Resource Validation Rules
-export interface ResourceValidationRule {
-  field: string;
-  validate: (value: unknown) => boolean;
-  message: string;
-}
-
-export function validateResource(
-  resource: Resource,
-  rules: ResourceValidationRule[]
-): string[] {
-  return rules
-    .filter(rule => !rule.validate((resource as any)[rule.field]))
-    .map(rule => rule.message);
+export interface ResourceRepository<T extends Resource> {
+  create(data: Omit<T, "id" | "createdAt" | "updatedAt">): Promise<T>;
+  update(id: string, data: Partial<T>): Promise<T>;
+  delete(id: string): Promise<void>;
+  findById(id: string): Promise<T | null>;
+  findAll(options?: any): Promise<T[]>;
 }

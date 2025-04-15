@@ -9,10 +9,15 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 import { ProjectManagementService } from "./services/ProjectManagementService.js";
 import { GITHUB_TOKEN, GITHUB_OWNER, GITHUB_REPO } from "./env.js";
+import { ToolRegistry } from "./infrastructure/tools/ToolRegistry.js";
+import { ToolValidator } from "./infrastructure/tools/ToolValidator.js";
+import { ToolResultFormatter } from "./infrastructure/tools/ToolResultFormatter.js";
+import { MCPContentType } from "./domain/mcp-types.js";
 
 class GitHubProjectManagerServer {
   private server: Server;
   private service: ProjectManagementService;
+  private toolRegistry: ToolRegistry;
 
   constructor() {
     this.server = new Server(
@@ -32,6 +37,9 @@ class GitHubProjectManagerServer {
       GITHUB_REPO,
       GITHUB_TOKEN
     );
+    
+    // Get the tool registry instance
+    this.toolRegistry = ToolRegistry.getInstance();
 
     this.setupToolHandlers();
 
@@ -43,117 +51,58 @@ class GitHubProjectManagerServer {
   }
 
   private setupToolHandlers() {
+    // Handle list_tools request by returning registered tools from the registry
     this.server.setRequestHandler(ListToolsRequestSchema, async () => ({
-      tools: [
-        {
-          name: "create_roadmap",
-          description: "Create a project roadmap with milestones and tasks",
-          inputSchema: {
-            type: "object",
-            properties: {
-              project: {
-                type: "object",
-                properties: {
-                  title: { type: "string" },
-                  description: { type: "string" },
-                  visibility: { enum: ["private", "public"] },
-                },
-                required: ["title", "description"],
-              },
-              milestones: {
-                type: "array",
-                items: {
-                  type: "object",
-                  properties: {
-                    milestone: {
-                      type: "object",
-                      properties: {
-                        title: { type: "string" },
-                        description: { type: "string" },
-                        dueDate: { type: "string", format: "date" },
-                      },
-                      required: ["title", "description"],
-                    },
-                    issues: {
-                      type: "array",
-                      items: {
-                        type: "object",
-                        properties: {
-                          title: { type: "string" },
-                          description: { type: "string" },
-                          priority: { enum: ["high", "medium", "low"] },
-                          type: {
-                            enum: [
-                              "bug",
-                              "feature",
-                              "enhancement",
-                              "documentation",
-                            ],
-                          },
-                          assignees: {
-                            type: "array",
-                            items: { type: "string" },
-                          },
-                          labels: {
-                            type: "array",
-                            items: { type: "string" },
-                          },
-                        },
-                        required: ["title", "description", "priority"],
-                      },
-                    },
-                  },
-                  required: ["milestone", "issues"],
-                },
-              },
-            },
-            required: ["project", "milestones"],
-          },
-        },
-        {
-          name: "plan_sprint",
-          description: "Plan a new sprint with selected issues",
-          inputSchema: {
-            type: "object",
-            properties: {
-              sprint: {
-                type: "object",
-                properties: {
-                  title: { type: "string" },
-                  startDate: { type: "string", format: "date-time" },
-                  endDate: { type: "string", format: "date-time" },
-                  goals: {
-                    type: "array",
-                    items: { type: "string" },
-                  },
-                },
-                required: ["title", "startDate", "endDate"],
-              },
-              issueIds: {
-                type: "array",
-                items: { type: "number" },
-              },
-            },
-            required: ["sprint", "issueIds"],
-          },
-        },
-      ],
+      tools: this.toolRegistry.getToolsForMCP(),
     }));
 
+    // Handle call_tool requests with validation and proper response formatting
     this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
       try {
-        switch (request.params.name) {
-          case "create_roadmap":
-            return await this.handleCreateRoadmap(request.params.arguments);
-          case "plan_sprint":
-            return await this.handlePlanSprint(request.params.arguments);
-          default:
-            throw new McpError(
-              ErrorCode.MethodNotFound,
-              `Unknown tool: ${request.params.name}`
-            );
+        const { name: toolName, arguments: args } = request.params;
+        const tool = this.toolRegistry.getTool(toolName);
+        
+        if (!tool) {
+          throw new McpError(
+            ErrorCode.MethodNotFound,
+            `Unknown tool: ${toolName}`
+          );
         }
+        
+        // Validate tool arguments against the schema
+        const validatedArgs = ToolValidator.validate(toolName, args, tool.schema);
+        
+        // Execute the tool based on its name
+        const result = await this.executeToolHandler(toolName, validatedArgs);
+        
+        // Format the result as an MCP response
+        const mcpResponse = ToolResultFormatter.formatSuccess(toolName, result, {
+          contentType: MCPContentType.JSON,
+        });
+        
+        // Convert our custom MCPResponse to the format expected by the SDK
+        // Only success responses have the output property
+        if (mcpResponse.status === "success") {
+          return {
+            tools: this.toolRegistry.getToolsForMCP(),
+            output: mcpResponse.output.content,
+            _meta: mcpResponse.output.context
+          };
+        } else {
+          // Handle error case (though this shouldn't happen in the success formatter)
+          throw new McpError(
+            ErrorCode.InternalError,
+            "Unexpected response format from tool execution"
+          );
+        }
+        
       } catch (error) {
+        if (error instanceof McpError) {
+          throw error; // Re-throw MCP errors directly
+        }
+        
+        // Log and convert other errors to MCP errors
+        console.error("Tool execution error:", error);
         const message =
           error instanceof Error ? error.message : "An unknown error occurred";
         throw new McpError(ErrorCode.InternalError, message);
@@ -161,28 +110,35 @@ class GitHubProjectManagerServer {
     });
   }
 
-  private async handleCreateRoadmap(args: any) {
-    const result = await this.service.createRoadmap(args);
-    return {
-      content: [
-        {
-          type: "text",
-          text: JSON.stringify(result, null, 2),
-        },
-      ],
-    };
-  }
-
-  private async handlePlanSprint(args: any) {
-    const result = await this.service.planSprint(args);
-    return {
-      content: [
-        {
-          type: "text",
-          text: JSON.stringify(result, null, 2),
-        },
-      ],
-    };
+  /**
+   * Execute the appropriate tool handler based on the tool name
+   */
+  private async executeToolHandler(toolName: string, args: any): Promise<any> {
+    switch (toolName) {
+      case "create_roadmap":
+        return await this.service.createRoadmap(args);
+        
+      case "plan_sprint":
+        return await this.service.planSprint(args);
+        
+      case "get_milestone_metrics":
+        return await this.service.getMilestoneMetrics(args.milestoneId, args.includeIssues);
+        
+      case "get_sprint_metrics":
+        return await this.service.getSprintMetrics(args.sprintId, args.includeIssues);
+        
+      case "get_overdue_milestones":
+        return await this.service.getOverdueMilestones(args.limit, args.includeIssues);
+        
+      case "get_upcoming_milestones":
+        return await this.service.getUpcomingMilestones(args.daysAhead, args.limit, args.includeIssues);
+        
+      default:
+        throw new McpError(
+          ErrorCode.MethodNotFound,
+          `Tool handler not implemented: ${toolName}`
+        );
+    }
   }
 
   async run() {

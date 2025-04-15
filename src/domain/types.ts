@@ -1,135 +1,52 @@
-import { Resource, ResourceStatus, ResourceType } from "./resource-types";
+// Domain types for GitHub Project Manager
+import { ResourceStatus, ResourceType } from "./resource-types";
 
-// View and Field Types
-export type ViewLayout = 'board' | 'table' | 'timeline' | 'roadmap';
-export type FieldType = 'text' | 'number' | 'date' | 'single_select' | 'multi_select' | 'iteration';
-
-// Issue Types
-export type IssueType = 'bug' | 'feature' | 'enhancement' | 'documentation';
-export type IssuePriority = 'high' | 'medium' | 'low';
-export type IssueId = string;
-
-// Project Types
+// Project-related types
 export type ProjectId = string;
-export type ViewId = string;
 export type FieldId = string;
-
-// Milestone Types
+export type ItemId = string;
+export type IssueId = string;
 export type MilestoneId = string;
 export type SprintId = string;
 
-// Create Types without id and timestamps
+// Field types supported by GitHub Projects v2
+export type FieldType = 
+  | 'text'
+  | 'number'
+  | 'date'
+  | 'single_select'
+  | 'iteration'
+  | 'milestone'
+  | 'assignees'
+  | 'labels'
+  | 'repository'
+  | 'tracked_by'
+  | 'tracks';
+
+// View layouts supported by GitHub Projects v2
+export type ViewLayout = 'board' | 'table' | 'timeline' | 'roadmap';
+
+// Issue-related types
+export interface Issue {
+  id: IssueId;
+  number: number;
+  title: string;
+  description: string;
+  status: ResourceStatus;
+  assignees: string[];
+  labels: string[];
+  milestoneId?: MilestoneId;
+  createdAt: string;
+  updatedAt: string;
+  url: string;
+}
+
 export interface CreateIssue {
   title: string;
   description: string;
-  status: ResourceStatus;
-  priority: IssuePriority;
-  issueType: IssueType;
-  assignees: string[];
-  labels: string[];
-  milestoneId?: string;
-}
-
-export interface CreateProject {
-  title: string;
-  description: string;
-  status: ResourceStatus;
-  visibility: 'public' | 'private';
-  views: ProjectView[];
-  fields: CustomField[];
-}
-
-export interface CreateMilestone {
-  title: string;
-  description?: string;
-  status: ResourceStatus;
-  dueDate?: string | null;
-}
-
-export interface CreateSprint {
-  title: string;
-  status: ResourceStatus;
-  startDate: string;
-  endDate: string;
-  goals: string[];
-  issues: IssueId[];
-}
-
-// Full Resource Types
-export interface Issue extends Resource {
-  type: ResourceType.ISSUE;
-  title: string;
-  description: string;
-  status: ResourceStatus;
-  priority: IssuePriority;
-  issueType: IssueType;
-  assignees: string[];
-  labels: string[];
-  milestoneId?: string;
-}
-
-export interface Project extends Resource {
-  type: ResourceType.PROJECT;
-  title: string;
-  description: string;
-  visibility: 'public' | 'private';
-  views: ProjectView[];
-  fields: CustomField[];
-}
-
-export interface Milestone extends Resource {
-  type: ResourceType.MILESTONE;
-  title: string;
-  description?: string;
-  dueDate?: string | null;
-  progress: {
-    openIssues: number;
-    closedIssues: number;
-    completionPercentage: number;
-  };
-}
-
-export interface Sprint extends Resource {
-  type: ResourceType.SPRINT;
-  title: string;
-  startDate: string;
-  endDate: string;
-  goals: string[];
-  issues: IssueId[];
-}
-
-// UI Component Types
-export interface ProjectView {
-  id: string;
-  name: string;
-  layout: ViewLayout;
-  settings: {
-    groupBy?: string;
-    sortBy?: Array<{
-      field: string;
-      direction: 'asc' | 'desc';
-    }>;
-  };
-}
-
-export interface CustomField {
-  id: string;
-  name: string;
-  type: FieldType;
-  options?: string[];
-}
-
-// Repository Interfaces
-export interface ProjectRepository {
-  create(data: CreateProject): Promise<Project>;
-  update(id: ProjectId, data: Partial<Project>): Promise<Project>;
-  delete(id: ProjectId): Promise<void>;
-  findById(id: ProjectId): Promise<Project | null>;
-  findAll(): Promise<Project[]>;
-  createView(projectId: ProjectId, view: Omit<ProjectView, "id">): Promise<ProjectView>;
-  updateView(projectId: ProjectId, viewId: ViewId, data: Partial<ProjectView>): Promise<ProjectView>;
-  deleteView(projectId: ProjectId, viewId: ViewId): Promise<void>;
-  createField(projectId: ProjectId, field: Omit<CustomField, "id">): Promise<CustomField>;
+  assignees?: string[];
+  labels?: string[];
+  milestoneId?: MilestoneId;
 }
 
 export interface IssueRepository {
@@ -137,15 +54,32 @@ export interface IssueRepository {
   update(id: IssueId, data: Partial<Issue>): Promise<Issue>;
   delete(id: IssueId): Promise<void>;
   findById(id: IssueId): Promise<Issue | null>;
-  findAll(): Promise<Issue[]>;
+  findByMilestone(milestoneId: MilestoneId): Promise<Issue[]>;
+  findAll(options?: { status?: ResourceStatus }): Promise<Issue[]>;
 }
 
-export interface SprintRepository {
-  create(data: CreateSprint): Promise<Sprint>;
-  update(id: SprintId, data: Partial<Sprint>): Promise<Sprint>;
-  delete(id: SprintId): Promise<void>;
-  findById(id: SprintId): Promise<Sprint | null>;
-  findAll(filters?: { status?: ResourceStatus }): Promise<Sprint[]>;
+// Milestone-related types
+export interface Milestone {
+  id: MilestoneId;
+  number: number;
+  title: string;
+  description: string;
+  dueDate?: string;
+  status: ResourceStatus;
+  createdAt: string;
+  updatedAt: string;
+  url: string;
+  progress?: {
+    percent: number;
+    complete: number;
+    total: number;
+  };
+}
+
+export interface CreateMilestone {
+  title: string;
+  description: string;
+  dueDate?: string;
 }
 
 export interface MilestoneRepository {
@@ -153,22 +87,172 @@ export interface MilestoneRepository {
   update(id: MilestoneId, data: Partial<Milestone>): Promise<Milestone>;
   delete(id: MilestoneId): Promise<void>;
   findById(id: MilestoneId): Promise<Milestone | null>;
-  findAll(): Promise<Milestone[]>;
-  findByDueDate(before: Date): Promise<Milestone[]>;
-  getOverdue(): Promise<Milestone[]>;
+  findAll(options?: { status?: ResourceStatus }): Promise<Milestone[]>;
+  getIssues(id: MilestoneId): Promise<Issue[]>;
 }
 
-// Helper function to attach common resource fields
-export function createResource<T extends Resource>(
-  type: ResourceType,
-  data: any
-): T {
-  return {
-    ...data,
-    type,
-    version: 1,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-    deletedAt: null,
-  } as T;
+// Sprint-related types
+export interface Sprint {
+  id: SprintId;
+  title: string;
+  description: string;
+  startDate: string;
+  endDate: string;
+  status: ResourceStatus;
+  issues: IssueId[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateSprint {
+  title: string;
+  description: string;
+  startDate: string;
+  endDate: string;
+  status?: ResourceStatus;
+  issues?: IssueId[];
+}
+
+export interface SprintRepository {
+  create(data: CreateSprint): Promise<Sprint>;
+  update(id: SprintId, data: Partial<Sprint>): Promise<Sprint>;
+  delete(id: SprintId): Promise<void>;
+  findById(id: SprintId): Promise<Sprint | null>;
+  findAll(options?: { status?: ResourceStatus }): Promise<Sprint[]>;
+  findCurrent(): Promise<Sprint | null>;
+  addIssue(sprintId: SprintId, issueId: IssueId): Promise<Sprint>;
+  removeIssue(sprintId: SprintId, issueId: IssueId): Promise<Sprint>;
+  getIssues(sprintId: SprintId): Promise<Issue[]>;
+}
+
+// Helper function to create resources (referenced in ProjectManagementService)
+export function createResource<T>(type: ResourceType, data: T): T & { type: ResourceType } {
+  return { ...data, type };
+}
+
+// Custom field configuration
+export interface CustomField {
+  id: FieldId;
+  name: string;
+  type: FieldType;
+  options?: Array<{
+    id: string;
+    name: string;
+    color?: string;
+    description?: string;
+  }>;
+  description?: string;
+  required?: boolean;
+  defaultValue?: any;
+  validation?: Record<string, any>;
+  config?: Record<string, any>;
+}
+
+// Field creation data
+export interface CreateField {
+  name: string;
+  type: FieldType;
+  options?: Array<{
+    name: string;
+    color?: string;
+    description?: string;
+  }>;
+  description?: string;
+  required?: boolean;
+  defaultValue?: any;
+  validation?: Record<string, any>;
+  config?: Record<string, any>;
+}
+
+// Field update data
+export interface UpdateField {
+  name?: string;
+  options?: Array<{
+    id?: string;
+    name: string;
+    color?: string;
+    description?: string;
+  }>;
+  description?: string;
+  required?: boolean;
+  defaultValue?: any;
+  validation?: Record<string, any>;
+  config?: Record<string, any>;
+}
+
+// Project view configuration
+export interface ProjectView {
+  id: string;
+  name: string;
+  layout: ViewLayout;
+  fields?: CustomField[];
+  sortBy?: Array<{
+    field: string;
+    direction: 'ASC' | 'DESC';
+  }>;
+  groupBy?: string;
+  filters?: Array<{
+    field: string;
+    operator: string;
+    value: any;
+  }>;
+  settings?: Record<string, any>;
+}
+
+// Project item interface
+export interface ProjectItem {
+  id: ItemId;
+  contentId: string;
+  contentType: ResourceType;
+  projectId: ProjectId;
+  fieldValues: Record<FieldId, any>;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// Project interface
+export interface Project {
+  id: ProjectId;
+  title: string;
+  description: string;
+  owner: string;
+  number: number;
+  url: string;
+  fields: CustomField[];
+  views?: ProjectView[];
+  closed: boolean;
+  createdAt: string;
+  updatedAt: string;
+  status?: ResourceStatus;
+  visibility?: string;
+  version?: number;
+}
+
+export interface CreateProject {
+  title: string;
+  description: string;
+  owner: string;
+  visibility?: 'private' | 'public';
+  views?: ProjectView[];
+  fields?: CustomField[];
+}
+
+// Project repository interface
+export interface ProjectRepository {
+  create(project: CreateProject): Promise<Project>;
+  update(id: ProjectId, data: Partial<Project>): Promise<Project>;
+  delete(id: ProjectId): Promise<void>;
+  findById(id: ProjectId): Promise<Project | null>;
+  findByOwner(owner: string): Promise<Project[]>;
+  findAll(): Promise<Project[]>;
+  
+  // Field operations
+  createField(projectId: ProjectId, field: CreateField): Promise<CustomField>;
+  updateField(projectId: ProjectId, fieldId: FieldId, data: UpdateField): Promise<CustomField>;
+  deleteField(projectId: ProjectId, fieldId: FieldId): Promise<void>;
+  
+  // View operations
+  createView(projectId: ProjectId, name: string, layout: ViewLayout): Promise<ProjectView>;
+  updateView(projectId: ProjectId, viewId: string, data: Partial<ProjectView>): Promise<ProjectView>;
+  deleteView(projectId: ProjectId, viewId: string): Promise<void>;
 }

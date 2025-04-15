@@ -1,6 +1,7 @@
 import { BaseGitHubRepository } from "./BaseRepository";
-import { Milestone, CreateMilestone, MilestoneRepository, MilestoneId } from "../../../domain/types";
+import { Milestone, CreateMilestone, MilestoneRepository, MilestoneId, Issue } from "../../../domain/types";
 import { ResourceType, ResourceStatus } from "../../../domain/resource-types";
+import { GitHubIssueRepository } from "./GitHubIssueRepository";
 
 interface GitHubMilestone {
   id: string;
@@ -47,23 +48,34 @@ interface ListMilestonesResponse {
 }
 
 export class GitHubMilestoneRepository extends BaseGitHubRepository implements MilestoneRepository {
+  private readonly factory: any;
+
+  constructor(octokit: any, config: any) {
+    super(octokit, config);
+    // We need to add a factory field to the class in order to create other repositories
+    this.factory = {
+      createIssueRepository: () => {
+        return new GitHubIssueRepository(octokit, config);
+      }
+    };
+  }
+
   private mapGitHubMilestoneToMilestone(githubMilestone: GitHubMilestone): Milestone {
     return {
       id: githubMilestone.id,
-      type: ResourceType.MILESTONE,
-      version: 1,
+      number: parseInt(githubMilestone.number.toString()),
       title: githubMilestone.title,
-      description: githubMilestone.description || undefined,
+      description: githubMilestone.description || "",
       dueDate: githubMilestone.dueOn || undefined,
       status: githubMilestone.state === "open" ? ResourceStatus.ACTIVE : ResourceStatus.CLOSED,
       progress: {
-        openIssues: githubMilestone.progress?.openIssues || 0,
-        closedIssues: githubMilestone.progress?.closedIssues || 0,
-        completionPercentage: githubMilestone.progress?.completionPercentage || 0,
+        percent: githubMilestone.progress?.completionPercentage || 0,
+        complete: githubMilestone.progress?.closedIssues || 0,
+        total: (githubMilestone.progress?.openIssues || 0) + (githubMilestone.progress?.closedIssues || 0)
       },
       createdAt: githubMilestone.createdAt,
       updatedAt: githubMilestone.updatedAt,
-      deletedAt: null,
+      url: `https://github.com/${this.owner}/${this.repo}/milestone/${githubMilestone.number}`
     };
   }
 
@@ -91,7 +103,8 @@ export class GitHubMilestoneRepository extends BaseGitHubRepository implements M
         title: data.title,
         description: data.description,
         dueOn: data.dueDate,
-        state: data.status === ResourceStatus.CLOSED ? "closed" : "open",
+        // Default to "open" since status is not available in CreateMilestone
+        state: "open",
       },
     });
 
@@ -217,5 +230,11 @@ export class GitHubMilestoneRepository extends BaseGitHubRepository implements M
 
   async getOverdue(): Promise<Milestone[]> {
     return this.findByDueDate(new Date());
+  }
+
+  async getIssues(id: MilestoneId): Promise<Issue[]> {
+    // We can leverage the IssueRepository's findByMilestone method
+    const issueRepo = this.factory.createIssueRepository();
+    return issueRepo.findByMilestone(id);
   }
 }

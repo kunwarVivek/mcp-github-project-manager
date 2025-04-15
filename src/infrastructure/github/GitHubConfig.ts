@@ -2,8 +2,9 @@ export class GitHubConfig {
   #owner: string;
   #repo: string;
   #token: string;
+  #projectId?: string;
 
-  constructor(owner: string, repo: string, token: string) {
+  constructor(owner: string, repo: string, token: string, projectId?: string) {
     if (!owner) throw new Error("Owner is required");
     if (!repo) throw new Error("Repository is required");
     if (!token) throw new Error("Token is required");
@@ -11,6 +12,7 @@ export class GitHubConfig {
     this.#owner = owner;
     this.#repo = repo;
     this.#token = token;
+    this.#projectId = projectId;
 
     // Make properties read-only but accessible
     Object.defineProperties(this, {
@@ -29,7 +31,16 @@ export class GitHubConfig {
         enumerable: true,
         configurable: false,
       },
+      projectId: {
+        get: () => this.#projectId,
+        enumerable: true,
+        configurable: false,
+      },
     });
+  }
+  
+  static create(owner: string, repo: string, token: string, projectId?: string): GitHubConfig {
+    return new GitHubConfig(owner, repo, token, projectId);
   }
 }
 
@@ -39,5 +50,6 @@ declare module "./GitHubConfig" {
     readonly owner: string;
     readonly repo: string;
     readonly token: string;
+    readonly projectId?: string;
   }
 }

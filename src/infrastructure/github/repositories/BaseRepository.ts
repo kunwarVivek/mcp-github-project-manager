@@ -1,8 +1,10 @@
 import { Octokit } from "@octokit/rest";
 import { GitHubError, OctokitInstance } from "../types";
 import { GitHubErrorHandler } from "../GitHubErrorHandler";
-import { GitHubConfig } from "../config";
+import { GitHubConfig } from "../GitHubConfig"; // Fixed import path
 import { Resource, ResourceStatus } from "../../../domain/resource-types";
+import { GitHubApiUtil, PaginationOptions } from "../util/GitHubApiUtil";
+import { Logger, getLogger } from "../../logger";
 
 export interface IGitHubRepository {
   readonly octokit: OctokitInstance;
@@ -12,12 +14,16 @@ export interface IGitHubRepository {
 export abstract class BaseGitHubRepository implements IGitHubRepository {
   private readonly errorHandler: GitHubErrorHandler;
   protected readonly retryAttempts: number = 3;
+  protected readonly apiUtil: GitHubApiUtil;
+  protected readonly logger: Logger;
 
   constructor(
     public readonly octokit: OctokitInstance,
     public readonly config: GitHubConfig
   ) {
     this.errorHandler = new GitHubErrorHandler();
+    this.apiUtil = GitHubApiUtil.getInstance();
+    this.logger = getLogger(this.constructor.name);
   }
 
   protected get owner(): string {
@@ -32,6 +38,9 @@ export abstract class BaseGitHubRepository implements IGitHubRepository {
     return this.config.token;
   }
 
+  /**
+   * Execute operation with automatic retries and rate limit handling
+   */
   protected async withRetry<T>(
     operation: () => Promise<T>,
     context?: string
@@ -41,6 +50,12 @@ export abstract class BaseGitHubRepository implements IGitHubRepository {
 
     for (let attempt = 0; attempt < this.retryAttempts; attempt++) {
       try {
+        // Check if we should throttle due to rate limits
+        if (await this.apiUtil.shouldThrottle(this.octokit)) {
+          const delay = await this.apiUtil.calculateRequestDelay(this.octokit);
+          await new Promise(resolve => setTimeout(resolve, delay));
+        }
+
         return await operation();
       } catch (e) {
         error = e;
@@ -65,6 +80,9 @@ export abstract class BaseGitHubRepository implements IGitHubRepository {
     throw this.errorHandler.handleError(lastError, context);
   }
 
+  /**
+   * Execute GraphQL query with rate limiting support
+   */
   protected async graphql<T>(
     query: string,
     variables: Record<string, unknown> = {}
@@ -80,6 +98,17 @@ export abstract class BaseGitHubRepository implements IGitHubRepository {
     );
   }
 
+  /**
+   * Handle GraphQL errors consistently
+   */
+  protected handleGraphQLError(error: unknown): Error {
+    this.logger.error('GraphQL operation failed', error);
+    return this.errorHandler.handleError(error, 'GraphQL operation');
+  }
+
+  /**
+   * Execute REST API call with rate limiting support
+   */
   protected async rest<T>(
     operation: (params: any) => Promise<{ data: T }>,
     params?: Record<string, unknown>
@@ -89,6 +118,64 @@ export abstract class BaseGitHubRepository implements IGitHubRepository {
       'executing REST API call'
     );
     return result.data;
+  }
+
+  /**
+   * Execute paginated REST API call with comprehensive pagination support
+   */
+  protected async paginatedRest<T>(
+    operation: (params: any) => Promise<{ data: T[] }>,
+    params?: Record<string, unknown>,
+    paginationOptions?: PaginationOptions
+  ): Promise<T[]> {
+    const finalParams = this.getRequestParams(params);
+    
+    return this.apiUtil.paginateRequest<T>(
+      (paginationParams) => operation({
+        ...finalParams,
+        ...paginationParams
+      }),
+      paginationOptions
+    );
+  }
+
+  /**
+   * Execute paginated GraphQL query with cursor-based pagination support
+   */
+  protected async paginatedGraphQL<T>(
+    query: string,
+    getNodesAndPageInfo: (data: any) => {
+      pageInfo: { hasNextPage: boolean; endCursor?: string };
+      nodes: T[];
+    },
+    variables: Record<string, unknown> = {},
+    options: { 
+      pageSize?: number; 
+      maxItems?: number; 
+      initialCursor?: string 
+    } = {}
+  ): Promise<T[]> {
+    return this.apiUtil.paginateGraphQL<T>(
+      async ({ cursor, pageSize }) => {
+        const data = await this.graphql(query, {
+          ...variables,
+          first: pageSize,
+          after: cursor,
+          owner: this.owner,
+          repo: this.repo,
+        });
+        
+        return getNodesAndPageInfo(data);
+      },
+      options
+    );
+  }
+
+  /**
+   * Get rate limit information
+   */
+  protected async getRateLimit() {
+    return this.apiUtil.getRateLimit(this.octokit);
   }
 
   protected getRequestParams<T extends Record<string, unknown>>(

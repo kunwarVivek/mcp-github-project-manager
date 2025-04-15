@@ -96,39 +96,69 @@ export interface UpdateProjectV2FieldResponse {
   };
 }
 
-type GraphQLViewLayout = 'BOARD_LAYOUT' | 'TABLE_LAYOUT' | 'TIMELINE_LAYOUT' | 'ROADMAP_LAYOUT';
-type GraphQLFieldType = 'TEXT' | 'NUMBER' | 'DATE' | 'SINGLE_SELECT' | 'MULTI_SELECT' | 'ITERATION';
+export type GraphQLViewLayout = 'BOARD_LAYOUT' | 'TABLE_LAYOUT' | 'TIMELINE_LAYOUT' | 'ROADMAP_LAYOUT';
+export type GraphQLFieldType = 
+  | 'TEXT' 
+  | 'NUMBER' 
+  | 'DATE' 
+  | 'SINGLE_SELECT' 
+  | 'ITERATION' 
+  | 'MILESTONE' 
+  | 'ASSIGNEES' 
+  | 'LABELS'
+  | 'REPOSITORY'
+  | 'TRACKED_BY'  // Fixed name to match mapToGraphQLFieldType
+  | 'TRACKS';     // Fixed name to match mapToGraphQLFieldType
 
-const VIEW_LAYOUT_MAP: Record<ViewLayout, GraphQLViewLayout> = {
-  board: 'BOARD_LAYOUT',
-  table: 'TABLE_LAYOUT',
-  timeline: 'TIMELINE_LAYOUT',
-  roadmap: 'ROADMAP_LAYOUT'
-};
+/**
+ * Maps domain view layout to GitHub GraphQL layout
+ */
+export function mapToGraphQLViewLayout(layout: ViewLayout): GraphQLViewLayout {
+  const mappings: Record<ViewLayout, GraphQLViewLayout> = {
+    'board': 'BOARD_LAYOUT',
+    'table': 'TABLE_LAYOUT',
+    'timeline': 'TIMELINE_LAYOUT',
+    'roadmap': 'ROADMAP_LAYOUT'
+  };
+  return mappings[layout];
+}
 
-const FIELD_TYPE_MAP: Record<FieldType, GraphQLFieldType> = {
-  text: 'TEXT',
-  number: 'NUMBER',
-  date: 'DATE',
-  single_select: 'SINGLE_SELECT',
-  multi_select: 'MULTI_SELECT',
-  iteration: 'ITERATION'
-};
+/**
+ * Maps domain field type to GitHub GraphQL field type
+ */
+export function mapToGraphQLFieldType(type: FieldType): GraphQLFieldType {
+  const mappings: Partial<Record<string, GraphQLFieldType>> = {
+    'text': 'TEXT',
+    'number': 'NUMBER',
+    'date': 'DATE',
+    'single_select': 'SINGLE_SELECT',
+    'iteration': 'ITERATION',
+    'milestone': 'MILESTONE',
+    'assignees': 'ASSIGNEES',
+    'labels': 'LABELS',
+    'repository': 'REPOSITORY',
+    'tracked_by': 'TRACKED_BY',
+    'tracks': 'TRACKS'
+  };
+  return mappings[type] || 'TEXT';
+}
 
-export const viewLayoutToGraphQL = (layout: ViewLayout): GraphQLViewLayout => {
-  return VIEW_LAYOUT_MAP[layout];
-};
-
-export const graphqlToViewLayout = (layout: string): ViewLayout => {
-  const reverseMap = Object.entries(VIEW_LAYOUT_MAP).find(([_, value]) => value === layout);
-  return (reverseMap?.[0] as ViewLayout) || 'table';
-};
-
-export const fieldTypeToGraphQL = (type: FieldType): GraphQLFieldType => {
-  return FIELD_TYPE_MAP[type];
-};
-
-export const graphqlToFieldType = (type: string): FieldType => {
-  const reverseMap = Object.entries(FIELD_TYPE_MAP).find(([_, value]) => value === type);
-  return (reverseMap?.[0] as FieldType) || 'text';
-};
+/**
+ * Maps GitHub GraphQL field type to domain field type
+ */
+export function mapFromGraphQLFieldType(type: GraphQLFieldType): FieldType {
+  const mappings: Partial<Record<GraphQLFieldType, FieldType>> = {
+    'TEXT': 'text',
+    'NUMBER': 'number',
+    'DATE': 'date',
+    'SINGLE_SELECT': 'single_select',
+    'ITERATION': 'iteration',
+    'MILESTONE': 'milestone',
+    'ASSIGNEES': 'assignees',
+    'LABELS': 'labels',
+    'REPOSITORY': 'repository',
+    'TRACKED_BY': 'tracked_by'
+    // Remove the 'TRACKS' mapping as it doesn't have a corresponding FieldType
+  };
+  return mappings[type] || 'text';
+}

@@ -17,7 +17,9 @@
     "paths": {
       "*": ["*", "*.js"]
     },
-    "types": ["node", "jest"]
+    "types": ["node", "jest"],
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "**/*.test.ts", "build"],
