@@ -130,7 +130,7 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for detailed architecture documentation.
 
 Despite the recent improvements, the following functional gaps still exist and are prioritized for future development:
 
-1. **Persistent Caching Strategy**: 
+1. **Persistent Caching Strategy**:
    - While the ResourceCache provides in-memory caching, it lacks persistence across server restarts
    - No distributed caching for multi-instance deployments
    - Missing cache eviction policies for memory management
@@ -160,9 +160,16 @@ See [docs/mcp/gaps-analysis.md](docs/mcp/gaps-analysis.md) for detailed implemen
 ## Documentation
 
 - [User Guide](docs/user-guide.md) - Detailed usage instructions
+- [API Reference](docs/api-reference/index.md) - Comprehensive tool documentation
+- [Tutorials](docs/tutorials/getting-started.md) - Step-by-step guides
+- [Examples](examples/README.md) - Code examples for common tasks
 - [Architecture](ARCHITECTURE.md) - System architecture and design
-- [Contributing](CONTRIBUTING.md) - Development guidelines
+- [Contributing](docs/contributing/index.md) - Development guidelines
 - [MCP Documentation](docs/mcp/) - MCP-specific details
+
+### Interactive Documentation
+
+For an interactive exploration of the API, open the [API Explorer](docs/api-explorer.html) in your browser.
 
 ## Development
 
@@ -192,7 +199,12 @@ npm run format
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for development guidelines.
+We welcome contributions to the GitHub Project Manager MCP Server! Please see our [Contributing Guide](docs/contributing/index.md) for details on:
+
+- [Development Workflow](docs/contributing/development-workflow.md)
+- [Code Standards](docs/contributing/index.md#coding-standards)
+- [Testing Guidelines](docs/contributing/index.md#testing-guidelines)
+- [Documentation Guidelines](docs/contributing/index.md#documentation-guidelines)
 
 ## License
 

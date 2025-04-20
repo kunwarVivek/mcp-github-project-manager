@@ -19,14 +19,17 @@
     "test:e2e": "node --experimental-vm-modules node_modules/jest/bin/jest.js --config jest.e2e.config.mjs",
     "lint": "eslint . --ext .ts",
     "format": "prettier --write \"src/**/*.ts\"",
-    "prepare": "husky install"
+    "prepare": "husky install",
+    "docs:api": "ts-node scripts/generate-openapi.ts",
+    "docs:serve": "npx http-server docs -o api-explorer.html",
+    "examples": "ts-node examples/basic/create-simple-project.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "*",
     "@octokit/rest": "^21.1.1",
-    "tsyringe": "^4.9.1",
+    "tsyringe": "^4.10.0",
     "uuid": "^11.1.0",
-    "zod": "^3.24.2"
+    "zod": "^3.24.3"
   },
   "devDependencies": {
     "@jest/globals": "^29.7.0",
@@ -35,9 +38,9 @@
     "@types/jest": "^29.5.14",
     "@types/node": "^22.14.1",
     "@types/uuid": "^10.0.0",
-    "@typescript-eslint/eslint-plugin": "^8.29.1",
-    "@typescript-eslint/parser": "^8.29.1",
-    "eslint": "^9.24.0",
+    "@typescript-eslint/eslint-plugin": "^8.30.1",
+    "@typescript-eslint/parser": "^8.30.1",
+    "eslint": "^9.25.0",
     "eslint-config-prettier": "^10.1.2",
     "eslint-plugin-jest": "^28.11.0",
     "eslint-plugin-prettier": "^5.2.6",
