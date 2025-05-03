@@ -1,3 +1,5 @@
+[![MseeP.ai Security Assessment Badge](https://mseep.net/pr/kunwarvivek-mcp-github-project-manager-badge.png)](https://mseep.ai/app/kunwarvivek-mcp-github-project-manager)
+
 # GitHub Project Manager MCP Server
 
 A Model Context Protocol (MCP) server implementation that provides GitHub Projects functionality through standardized tools and resources. This server enables LLM clients to manage GitHub Projects programmatically through the MCP interface.
