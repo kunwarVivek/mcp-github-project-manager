@@ -1,12 +1,12 @@
-# GitHub Project Manager MCP Examples
+# MCP GitHub Project Manager Examples
 
-This directory contains example code demonstrating how to use the GitHub Project Manager MCP Server for various project management tasks.
+This directory contains example code demonstrating how to use the MCP GitHub Project Manager for various project management tasks.
 
 ## Directory Structure
 
 - `basic/` - Basic examples for common operations
 - `advanced/` - Advanced examples for complex scenarios
-- `integration/` - Examples showing integration with other systems
+- `integration/` - Examples showing integration with other systems and frameworks
 
 ## Running the Examples
 
@@ -14,33 +14,41 @@ This directory contains example code demonstrating how to use the GitHub Project
 
 1. Node.js 18.x or higher
 2. TypeScript installed (`npm install -g typescript ts-node`)
-3. GitHub Project Manager MCP Server installed and configured
+3. MCP GitHub Project Manager installed (`npm install mcp-github-project-manager`)
 4. Valid GitHub token with appropriate permissions
 
 ### Setup
 
-1. Create a `.env` file in the project root with your GitHub credentials:
-
-```env
-GITHUB_TOKEN=your_personal_access_token
-GITHUB_OWNER=your_github_username_or_org
-GITHUB_REPO=your_repository_name
-```
-
-2. Install dependencies:
-
 ```bash
-npm install
-# or
-pnpm install
-```
+# Install the package
+npm install mcp-github-project-manager
 
-### Running an Example
+# Configure environment variables
+export GITHUB_TOKEN=your_github_token
+export GITHUB_OWNER=your_github_username_or_org
+export GITHUB_REPO=your_repository_name
 
-Use `ts-node` to run any example:
-
-```bash
+# Run an example
 ts-node examples/basic/create-simple-project.ts
+```
+
+### Installation Options
+
+#### Option 1: Using npm (for application integration)
+
+```bash
+# Install in your project
+npm install mcp-github-project-manager
+```
+
+#### Option 2: Install globally (for CLI usage)
+
+```bash
+# Install globally
+npm install -g mcp-github-project-manager
+
+# Run the MCP server
+mcp-github-project-manager
 ```
 
 ## Basic Examples
@@ -110,3 +118,67 @@ Feel free to contribute additional examples by following the [Contributing Guide
 ## License
 
 These examples are licensed under the same license as the main project.
+
+## Integration Examples
+
+### Node.js Integration
+
+```javascript
+import { Server } from "mcp-github-project-manager";
+
+const server = new Server({
+  transport: "stdio",
+  config: {
+    githubToken: process.env.GITHUB_TOKEN
+  }
+});
+
+server.start();
+```
+
+### Using with OpenAI Function Calling
+
+```javascript
+import { OpenAI } from "openai";
+import { spawn } from "child_process";
+import { McpClient } from "@modelcontextprotocol/client";
+
+// Start MCP server as a child process
+const serverProcess = spawn("mcp-github-project-manager", [], {
+  env: { ...process.env, GITHUB_TOKEN: "your_token" }
+});
+
+// Create MCP client
+const mcpClient = new McpClient({
+  transport: {
+    type: "process",
+    process: serverProcess
+  }
+});
+
+// Get available tools
+const tools = await mcpClient.listTools();
+
+// Configure OpenAI with tools
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+const completion = await openai.chat.completions.create({
+  model: "gpt-4",
+  messages: [{ role: "user", content: "Create a project roadmap for Q3 2025" }],
+  tools: tools.map(tool => ({
+    type: "function",
+    function: {
+      name: tool.name,
+      description: tool.description,
+      parameters: tool.parameters
+    }
+  }))
+});
+
+// Handle tool calls from OpenAI
+if (completion.choices[0].message.tool_calls) {
+  // Process and execute tool calls with MCP client
+}
+```
+
+See individual example files for more details and use cases.

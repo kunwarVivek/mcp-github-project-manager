@@ -1,0 +1,30 @@
+# Source files
+src/
+examples/
+scripts/
+docs/
+
+# Config files
+.env
+.env.example
+.eslintrc
+.eslintignore
+.prettierrc
+.prettierignore
+jest.config.*
+tsconfig*.json
+.husky/
+
+# Development files
+coverage/
+handoffs/
+.git/
+.github/
+.vscode/
+.idea/
+
+# Other files
+*.log
+npm-debug.log*
+pnpm-debug.log*
+.DS_Store

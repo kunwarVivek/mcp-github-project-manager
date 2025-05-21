@@ -1,4 +1,4 @@
-# Project Status
+# MCP GitHub Project Manager - Status
 
 ## Implementation Status
 
@@ -6,9 +6,13 @@
 | Component | Status | Notes |
 |-----------|--------|-------|
 | Server Setup | ✅ Complete | Using @modelcontextprotocol/sdk |
-| StdioTransport | ✅ Complete | Basic communication working |
+| StdioTransport | ✅ Complete | Full stdio transport implementation |
+| HttpTransport | ✅ Complete | HTTP server for web clients |
 | Tool Registration | ✅ Complete | 6 tools implemented |
-| Request Handling | ✅ Complete | Basic handling working |
+| Tool Validation | ✅ Complete | Using Zod schemas |
+| Request Handling | ✅ Complete | With progressive responses |
+| Error Handling | ✅ Complete | Per MCP specifications |
+| Resource System | ✅ Complete | Versioned resources with CRUD |
 | Response Formatting | 🏗️ In Progress | Needs structured content |
 | Error Handling | 🏗️ In Progress | Basic implementation |
 | Resource System | 📅 Planned | Not started |

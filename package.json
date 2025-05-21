@@ -1,10 +1,23 @@
 {
-  "name": "github-project-manager",
+  "name": "mcp-github-project-manager",
   "version": "0.1.0",
+  "description": "A Model Context Protocol (MCP) server for managing GitHub Projects",
   "type": "module",
   "exports": "./build/index.js",
+  "bin": {
+    "mcp-github-project-manager": "./build/index.js"
+  },
+  "main": "./build/index.js",
+  "types": "./build/index.d.ts",
   "engines": {
     "node": ">=18.0.0"
+  },
+  "keywords": ["mcp", "github", "projects", "llm", "model-context-protocol", "project-management"],
+  "author": "",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yourusername/mcp-github-project-manager.git"
   },
   "scripts": {
     "clean": "rimraf build",
@@ -22,7 +35,9 @@
     "prepare": "husky install",
     "docs:api": "ts-node scripts/generate-openapi.ts",
     "docs:serve": "npx http-server docs -o api-explorer.html",
-    "examples": "ts-node examples/basic/create-simple-project.ts"
+    "examples": "ts-node examples/basic/create-simple-project.ts",
+    "prepublishOnly": "npm run build",
+    "release": "node --loader ts-node/esm scripts/publish.js"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "*",

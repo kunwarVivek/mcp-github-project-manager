@@ -1,10 +1,14 @@
-# GitHub Project Manager MCP Server
+# MCP GitHub Project Manager
 
-A Model Context Protocol (MCP) server implementation that provides GitHub Projects functionality through standardized tools and resources. This server enables LLM clients to manage GitHub Projects programmatically through the MCP interface.
+A Model Context Protocol (MCP) server implementation that provides GitHub Projects functionality through standardized tools and resources. This server enables LLM clients and applications to manage GitHub Projects programmatically through the MCP interface.
+
+[![npm version](https://img.shields.io/npm/v/mcp-github-project-manager.svg)](https://www.npmjs.com/package/mcp-github-project-manager)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Node.js Version](https://img.shields.io/node/v/mcp-github-project-manager.svg)](https://nodejs.org/)
 
 ## Overview
 
-This server implements the [Model Context Protocol](https://modelcontextprotocol.io) to expose GitHub Projects functionality to LLM clients. It provides tools for managing projects, milestones, sprints, and metrics through GitHub's GraphQL API while maintaining state and handling errors according to MCP specifications.
+This server implements the [Model Context Protocol](https://modelcontextprotocol.io) to expose GitHub Projects functionality to LLM clients and applications. It provides tools for managing projects, milestones, sprints, and metrics through GitHub's GraphQL API while maintaining state and handling errors according to MCP specifications.
 
 ## Key Features
 
@@ -34,14 +38,38 @@ This server implements the [Model Context Protocol](https://modelcontextprotocol
 
 ## Installation
 
+### Option 1: Install from npm (recommended)
+
 ```bash
+# Install the package globally
+npm install -g mcp-github-project-manager
+
+# Or install in your project
+npm install mcp-github-project-manager
+```
+
+### Option 2: Install from source
+
+```bash
+# Clone the repository
+git clone https://github.com/yourusername/mcp-github-project-manager.git
+cd mcp-github-project-manager
+
 # Install dependencies
 npm install
 # or
 pnpm install
 
-# Set up environment variables
+# Build the project
+npm run build
+```
+
+### Set up environment variables
+
+```bash
+# Copy the example environment file
 cp .env.example .env
+
 # Edit .env with your GitHub token and details
 ```
 
@@ -61,16 +89,64 @@ The GitHub token requires these permissions:
 
 ## Usage
 
-```bash
-# Start the MCP server
-npm start
+### As a command-line tool
 
-# Run tests
-npm test
-npm run test:e2e
+If installed globally:
+
+```bash
+# Start the MCP server using stdio transport
+mcp-github-project-manager
+
+# Start with environment variables
+GITHUB_TOKEN=your_token mcp-github-project-manager
 ```
 
-See the [User Guide](docs/user-guide.md) for detailed usage instructions.
+### As a Node.js module
+
+```javascript
+import { Server } from "mcp-github-project-manager";
+
+// Create and start an MCP server instance
+const server = new Server({
+  transport: "stdio", // or "http" for HTTP server
+  config: {
+    githubToken: process.env.GITHUB_TOKEN,
+    githubOwner: process.env.GITHUB_OWNER,
+    githubRepo: process.env.GITHUB_REPO
+  }
+});
+
+server.start();
+```
+
+### Integration with MCP clients
+
+```javascript
+// Example using an MCP client library
+import { McpClient } from "@modelcontextprotocol/client";
+import { spawn } from "child_process";
+
+// Create a child process running the MCP server
+const serverProcess = spawn("mcp-github-project-manager", [], {
+  env: { ...process.env, GITHUB_TOKEN: "your_token" }
+});
+
+// Connect the MCP client to the server
+const client = new McpClient({
+  transport: {
+    type: "process",
+    process: serverProcess
+  }
+});
+
+// Call MCP tools
+const result = await client.callTool("create_project", {
+  title: "My Project",
+  description: "A new GitHub project"
+});
+```
+
+For more examples, see the [User Guide](docs/user-guide.md) and the [examples/](examples/) directory.
 
 ## Architecture
 
@@ -82,6 +158,26 @@ The server follows Clean Architecture principles with distinct layers:
 - **MCP Layer**: Tool definitions and request handling
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for detailed architecture documentation.
+
+## Contributing
+
+Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+
+1. Fork the repository
+2. Create a feature branch: `git checkout -b feature/amazing-feature`
+3. Commit your changes: `git commit -m 'Add some amazing feature'`
+4. Push to the branch: `git push origin feature/amazing-feature`
+5. Open a Pull Request
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## References
+
+- [Model Context Protocol](https://modelcontextprotocol.io)
+- [GitHub Projects API](https://docs.github.com/en/issues/planning-and-tracking-with-projects/automating-your-project/using-the-api-to-manage-projects)
+- [Project Roadmap](ROADMAP.md)
 
 ## Current Status
 
@@ -99,6 +195,12 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for detailed architecture documentation.
 | Component | Status | Notes |
 |-----------|--------|-------|
 | Tool Definitions | ✅ Complete | All core tools implemented with Zod validation |
+| Resource Management | ✅ Complete | Full CRUD operations with versioning |
+| Security | ✅ Complete | Token validation and scope checking |
+| Error Handling | ✅ Complete | According to MCP specifications |
+| Transport | ✅ Complete | Stdio and HTTP support |
+
+See [STATUS.md](STATUS.md) for detailed implementation status.
 | Resource Management | ✅ Complete | With optimistic locking and relationship tracking |
 | Response Handling | ✅ Complete | Rich content formatting with multiple content types |
 | Error Handling | ✅ Complete | Comprehensive error mapping to MCP error codes |
