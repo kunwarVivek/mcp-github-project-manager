@@ -10,6 +10,37 @@ A Model Context Protocol (MCP) server implementation that provides GitHub Projec
 
 This server implements the [Model Context Protocol](https://modelcontextprotocol.io) to expose GitHub Projects functionality to LLM clients and applications. It provides tools for managing projects, milestones, sprints, and metrics through GitHub's GraphQL API while maintaining state and handling errors according to MCP specifications.
 
+## Quick Start
+
+### Using NPM
+```bash
+# Install the package globally
+npm install -g mcp-github-project-manager
+
+# Set up your environment variables
+export GITHUB_TOKEN="your_github_token"
+export GITHUB_OWNER="your_github_username_or_organization"
+export GITHUB_REPO="your_repository_name"
+
+# Run the MCP server
+mcp-github-project-manager
+```
+
+### Using Docker
+```bash
+# Build the Docker image
+docker build -t mcp-github-project-manager .
+
+# Run with environment variables
+docker run -it \
+  -e GITHUB_TOKEN=your_github_token \
+  -e GITHUB_OWNER=your_github_username_or_organization \
+  -e GITHUB_REPO=your_repository_name \
+  mcp-github-project-manager
+```
+
+For more details on Docker usage, see [DOCKER.md](DOCKER.md).
+
 ## Key Features
 
 - **Project Management**
