@@ -1,0 +1,66 @@
+// filepath: /Users/vivek/grad-saas/mcp-github-project-manager/src/__tests__/unit/infrastructure/resource/ResourceManager.test.ts
+import { beforeEach, describe, expect, it, jest } from '@jest/globals';
+import { ResourceManager } from '../../../../infrastructure/resource/ResourceManager';
+import { Resource, ResourceType } from '../../../../domain/resource-types';
+
+// Mock the ResourceCache class
+jest.mock('../../../../infrastructure/cache/ResourceCache', () => {
+  return {
+    ResourceCache: jest.fn().mockImplementation(() => {
+      return {
+        set: jest.fn().mockImplementation(() => Promise.resolve()),
+        get: jest.fn().mockImplementation(() => Promise.resolve(null)),
+        getByType: jest.fn().mockImplementation(() => Promise.resolve([])),
+        getByTags: jest.fn().mockImplementation(() => Promise.resolve([])),
+        getByNamespace: jest.fn().mockImplementation(() => Promise.resolve([])),
+        delete: jest.fn().mockImplementation(() => Promise.resolve(true)),
+        clear: jest.fn().mockImplementation(() => Promise.resolve(undefined)),
+        invalidateByTags: jest.fn().mockImplementation(() => Promise.resolve(0)),
+        invalidateByType: jest.fn().mockImplementation(() => Promise.resolve(0)),
+        invalidateByNamespace: jest.fn().mockImplementation(() => Promise.resolve(0))
+      };
+    })
+  };
+});
+
+// Import the mocked class
+import { ResourceCache } from '../../../../infrastructure/cache/ResourceCache';
+
+describe('ResourceManager', () => {
+  let resourceManager: ResourceManager;
+  let mockCache: ResourceCache;
+  
+  beforeEach(() => {
+    // Reset mocks before each test
+    jest.clearAllMocks();
+    
+    // Create a new instance of the mocked ResourceCache
+    mockCache = new ResourceCache();
+    
+    // Create resourceManager with mocked cache
+    resourceManager = new ResourceManager(mockCache);
+  });
+
+  it('should initialize correctly', () => {
+    expect(resourceManager).toBeDefined();
+  });
+  
+  // Add more test cases as needed
+  it('should create a resource correctly', async () => {
+    // Setup the test data and expectations
+    mockCache.set = jest.fn().mockImplementation(() => Promise.resolve());
+    
+    // Create a resource
+    const createdResource = await resourceManager.create(
+      ResourceType.PROJECT,
+      { name: 'Test Project' }
+    );
+    
+    // Assertions
+    expect(createdResource).toBeDefined();
+    expect(createdResource.id).toBeDefined();
+    expect(createdResource.type).toBe(ResourceType.PROJECT);
+    expect(createdResource.name).toBe('Test Project');
+    expect(mockCache.set).toHaveBeenCalled();
+  });
+});

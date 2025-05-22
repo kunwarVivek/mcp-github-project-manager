@@ -13,9 +13,10 @@
     "allowJs": true,
     "declaration": true,
     "sourceMap": true,
-    "baseUrl": "./src",
+    "baseUrl": ".",
     "paths": {
-      "*": ["*", "*.js"]
+      "*": ["*", "*.js"],
+      "@/*": ["src/*"]
     },
     "types": ["node", "jest"],
     "experimentalDecorators": true,

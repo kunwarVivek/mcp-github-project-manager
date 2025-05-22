@@ -1,10 +1,10 @@
+// filepath: /Users/vivek/grad-saas/mcp-github-project-manager/src/__tests__/unit/infrastructure/github/repositories/GitHubMilestoneRepository.test.ts
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { Octokit } from "@octokit/rest";
 import { GitHubConfig } from "../../../../../infrastructure/github/GitHubConfig";
 import { GitHubMilestoneRepository } from "../../../../../infrastructure/github/repositories/GitHubMilestoneRepository";
 import { mockData } from "../../../../setup";
-import { ResourceType, ResourceStatus } from "../../../../../domain/resource-types";
-import { CreateMilestone, MilestoneId, Issue } from "../../../../../domain/types";
+import { CreateMilestone, MilestoneId, ResourceStatus } from "../../../../../domain/types";
 
 // Mock Octokit and GraphQL response
 jest.mock("@octokit/rest");
@@ -202,23 +202,20 @@ describe("GitHubMilestoneRepository", () => {
     it("should get issues for a milestone", async () => {
       // Arrange - need to mock the factory.createIssueRepository method
       const mockIssueRepository = {
-        findByMilestone: jest.fn().mockImplementation(() => {
-          return Promise.resolve([
-            {
-              id: "issue-123",
-              number: 42,
-              title: "Test Issue",
-              description: "Description",
-              status: ResourceStatus.ACTIVE,
-              assignees: ["user1"],
-              labels: ["bug"],
-              createdAt: "2023-01-01T00:00:00Z",
-              updatedAt: "2023-01-01T00:00:00Z",
-              url: "https://github.com/test-owner/test-repo/issues/42",
-              milestoneId: "milestone-123"
-            } as Issue
-          ]);
-        })
+        findByMilestone: jest.fn().mockResolvedValue([
+          {
+            id: "issue-123",
+            number: 42,
+            title: "Test Issue",
+            description: "Description",
+            status: ResourceStatus.ACTIVE,
+            assignees: ["user1"],
+            labels: ["bug"],
+            createdAt: "2023-01-01T00:00:00Z",
+            updatedAt: "2023-01-01T00:00:00Z",
+            url: "https://github.com/test-owner/test-repo/issues/42"
+          }
+        ])
       };
 
       // Mock the private factory field using reflection or replace it directly

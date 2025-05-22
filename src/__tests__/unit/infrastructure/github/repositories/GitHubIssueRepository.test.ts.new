@@ -1,0 +1,292 @@
+import { beforeEach, describe, expect, it, jest } from "@jest/globals";
+import { Octokit } from "@octokit/rest";
+import { ResourceStatus } from "../../../../../domain/resource-types";
+import { CreateIssue } from "../../../../../domain/types";
+import { GitHubConfig } from "../../../../../infrastructure/github/GitHubConfig";
+import { GitHubIssueRepository } from "../../../../../infrastructure/github/repositories/GitHubIssueRepository";
+import { mockData } from "../../../../setup";
+
+// Mock Octokit
+jest.mock("@octokit/rest");
+
+describe("GitHubIssueRepository", () => {
+  let repository: GitHubIssueRepository;
+  let mockOctokit: jest.Mocked<Octokit>;
+  const config = new GitHubConfig("test-owner", "test-repo", "test-token");
+
+  beforeEach(() => {
+    // Clear all mocks
+    jest.clearAllMocks();
+
+    // Create mock Octokit instance
+    mockOctokit = {
+      graphql: jest.fn(),
+      rest: {
+        issues: {
+          create: jest.fn(),
+          update: jest.fn(),
+          get: jest.fn(),
+          listForRepo: jest.fn(),
+        },
+      },
+    } as any;
+
+    (Octokit as jest.MockedClass<typeof Octokit>).mockImplementation(
+      () => mockOctokit
+    );
+
+    // Create repository instance
+    repository = new GitHubIssueRepository(config, mockOctokit);
+  });
+
+  describe("create", () => {
+    it("should create an issue successfully", async () => {
+      // Arrange
+      const issueData: CreateIssue = {
+        title: "Test Issue",
+        description: "Test Description",
+        assignees: ["user1"],
+        labels: ["test-label"],
+        milestoneId: "milestone-1",
+      };
+
+      mockOctokit.graphql.mockResolvedValueOnce({
+        createIssue: {
+          issue: {
+            id: "test-issue-id",
+            number: 42,
+            title: issueData.title,
+            body: issueData.description,
+            state: "OPEN",
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            assignees: { nodes: [{ login: "user1" }] },
+            labels: { nodes: [{ name: "test-label" }] },
+            milestone: { id: issueData.milestoneId },
+          },
+        },
+      });
+
+      // Act
+      const result = await repository.create(issueData);
+
+      // Assert
+      expect(result).toBeDefined();
+      expect(result.id).toBe("test-issue-id");
+      expect(result.title).toBe(issueData.title);
+      expect(result.status).toBe(ResourceStatus.ACTIVE);
+      expect(mockOctokit.graphql).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({
+          input: expect.objectContaining({
+            title: issueData.title,
+            body: issueData.description,
+            repositoryId: expect.any(String),
+          }),
+        })
+      );
+    });
+
+    it("should handle GraphQL API errors", async () => {
+      // Arrange
+      const issueData: CreateIssue = {
+        title: "Test Issue",
+        description: "Test Description",
+        assignees: [],
+        labels: [],
+      };
+
+      mockOctokit.graphql.mockRejectedValueOnce(new Error("GraphQL Error"));
+
+      // Act & Assert
+      await expect(repository.create(issueData)).rejects.toThrow();
+    });
+  });
+
+  describe("findById", () => {
+    it("should retrieve an issue by ID", async () => {
+      // Arrange
+      mockOctokit.graphql.mockResolvedValueOnce({
+        repository: {
+          issue: {
+            id: "test-issue-id",
+            number: 42,
+            title: "Test Issue",
+            body: "Test Description",
+            state: "OPEN",
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            assignees: { nodes: [] },
+            labels: { nodes: [] },
+            milestone: null,
+          },
+        },
+      });
+
+      // Act
+      const result = await repository.findById("test-issue-id");
+
+      // Assert
+      expect(result).toBeDefined();
+      expect(result?.id).toBe("test-issue-id");
+      expect(mockOctokit.graphql).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({
+          owner: config.getOwner(),
+          repo: config.getRepo(),
+        })
+      );
+    });
+
+    it("should return null if issue doesn't exist", async () => {
+      // Arrange
+      mockOctokit.graphql.mockResolvedValueOnce({ repository: { issue: null } });
+
+      // Act
+      const result = await repository.findById("non-existent-id");
+
+      // Assert
+      expect(result).toBeNull();
+    });
+  });
+
+  describe("findAll", () => {
+    it("should retrieve all issues", async () => {
+      // Arrange
+      mockOctokit.graphql.mockResolvedValueOnce({
+        repository: {
+          issues: {
+            nodes: [
+              {
+                id: "test-issue-id",
+                number: 42,
+                title: "Test Issue",
+                body: "Test Description",
+                state: "OPEN",
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+                assignees: { nodes: [] },
+                labels: { nodes: [] },
+                milestone: null,
+              },
+            ],
+          },
+        },
+      });
+
+      // Act
+      const result = await repository.findAll();
+
+      // Assert
+      expect(result).toHaveLength(1);
+      expect(result[0].id).toBe("test-issue-id");
+    });
+
+    it("should filter issues by status", async () => {
+      // Arrange
+      mockOctokit.graphql.mockResolvedValueOnce({
+        repository: {
+          issues: {
+            nodes: [
+              {
+                id: "test-issue-id",
+                number: 42,
+                title: "Test Issue",
+                body: "Test Description",
+                state: "OPEN",
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+                assignees: { nodes: [] },
+                labels: { nodes: [] },
+                milestone: null,
+              },
+            ],
+          },
+        },
+      });
+
+      // Act
+      const result = await repository.findAll({ status: ResourceStatus.ACTIVE });
+
+      // Assert
+      expect(result).toHaveLength(1);
+      expect(mockOctokit.graphql).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({
+          owner: config.getOwner(),
+          repo: config.getRepo(),
+          states: ["OPEN"],
+        })
+      );
+    });
+  });
+
+  describe("update", () => {
+    it("should update an issue", async () => {
+      // Arrange
+      mockOctokit.graphql.mockResolvedValueOnce({
+        updateIssue: {
+          issue: {
+            id: "test-issue-id",
+            number: 42,
+            title: "Updated Title",
+            body: "Updated Description",
+            state: "OPEN",
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            assignees: { nodes: [] },
+            labels: { nodes: [] },
+            milestone: null,
+          },
+        },
+      });
+
+      // Act
+      const result = await repository.update("test-issue-id", {
+        title: "Updated Title",
+        description: "Updated Description",
+      });
+
+      // Assert
+      expect(result).toBeDefined();
+      expect(result.title).toBe("Updated Title");
+      expect(result.description).toBe("Updated Description");
+    });
+  });
+
+  describe("delete", () => {
+    it("should close an issue when deleted", async () => {
+      // Arrange
+      mockOctokit.graphql.mockResolvedValueOnce({
+        updateIssue: {
+          issue: {
+            id: "test-issue-id",
+            number: 42,
+            title: "Test Issue",
+            body: "Test Description",
+            state: "CLOSED",
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            assignees: { nodes: [] },
+            labels: { nodes: [] },
+            milestone: null,
+          },
+        },
+      });
+
+      // Act
+      await repository.delete("test-issue-id");
+
+      // Assert
+      expect(mockOctokit.graphql).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({
+          input: expect.objectContaining({
+            id: "test-issue-id",
+            state: "CLOSED",
+          }),
+        })
+      );
+    });
+  });
+});

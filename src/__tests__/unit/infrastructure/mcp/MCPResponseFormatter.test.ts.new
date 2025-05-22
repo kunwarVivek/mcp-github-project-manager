@@ -1,0 +1,51 @@
+import { MCPResponseFormatter } from "../../../../infrastructure/mcp/MCPResponseFormatter";
+import { MCPContentType } from "../../../../domain/mcp-types";
+
+describe("MCPResponseFormatter", () => {
+  const testData = {
+    name: "Test Project",
+    description: "A test project",
+  };
+
+  beforeEach(() => {
+    jest.useFakeTimers();
+    jest.setSystemTime(new Date("2025-03-01T12:00:00Z"));
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  it("should format JSON data correctly", () => {
+    const response = MCPResponseFormatter.format(testData, MCPContentType.JSON);
+
+    // Check the structure based on the actual implementation
+    expect(response.status).toBe("success");
+    expect(response.version).toBe("1.0");
+    expect(response.output).toBeDefined();
+    expect(response.output.content).toBeDefined();
+    
+    // Parse the JSON content
+    const contentObj = JSON.parse(response.output.content);
+    expect(contentObj).toEqual(testData);
+  });
+
+  it("should format text data correctly", () => {
+    const textData = "Hello World";
+    const response = MCPResponseFormatter.format(textData, MCPContentType.TEXT);
+
+    // Check the structure based on the actual implementation
+    expect(response.status).toBe("success");
+    expect(response.version).toBe("1.0");
+    expect(response.output).toBeDefined();
+    expect(response.output.content).toBe(textData);
+    expect(response.output.format.type).toBe("text");
+  });
+
+  it("should include request ID when provided", () => {
+    const requestId = "test-123";
+    const response = MCPResponseFormatter.format(testData, MCPContentType.JSON, requestId);
+    
+    expect(response.requestId).toBe(requestId);
+  });
+});

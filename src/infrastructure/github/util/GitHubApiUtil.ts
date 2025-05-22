@@ -35,27 +35,37 @@ export class GitHubApiUtil {
    */
   public async getRateLimit(octokit: OctokitInstance): Promise<RateLimitInfo> {
     try {
-      const response = await octokit.rateLimit.get();
-      const { limit, remaining, reset, used } = response.data.rate;
-      
-      return {
-        limit,
-        remaining, 
-        reset,
-        used,
-        resetDate: new Date(reset * 1000)
-      };
+      // Check if octokit.rest exists before trying to use it
+      if (octokit.rest && octokit.rest.rateLimit) {
+        const response = await octokit.rest.rateLimit.get();
+        const { limit, remaining, reset, used } = response.data.rate;
+        
+        return {
+          limit,
+          remaining, 
+          reset,
+          used,
+          resetDate: new Date(reset * 1000)
+        };
+      } else {
+        // For tests or other environments where rateLimit might not be available
+        return this.getDefaultRateLimitInfo();
+      }
     } catch (error) {
       console.error("Failed to get rate limit info:", error);
       // Return default values if we can't get rate limit info
-      return {
-        limit: 5000,
-        remaining: 5000,
-        reset: Math.floor(Date.now() / 1000) + 3600,
-        used: 0,
-        resetDate: new Date(Date.now() + 3600000)
-      };
+      return this.getDefaultRateLimitInfo();
     }
+  }
+  
+  private getDefaultRateLimitInfo(): RateLimitInfo {
+    return {
+      limit: 5000,
+      remaining: 5000,
+      reset: Math.floor(Date.now() / 1000) + 3600,
+      used: 0,
+      resetDate: new Date(Date.now() + 3600000)
+    };
   }
 
   /**

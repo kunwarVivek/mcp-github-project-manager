@@ -1,0 +1,266 @@
+// filepath: /Users/vivek/grad-saas/mcp-github-project-manager/src/__tests__/unit/services/ProjectManagementService.test.ts
+import { beforeEach, describe, expect, it, jest } from "@jest/globals";
+import { Issue, Milestone, Project, Sprint, CreateIssue } from "../../../domain/types";
+import { ResourceStatus } from "../../../domain/resource-types";
+import { GitHubIssueRepository } from "../../../infrastructure/github/repositories/GitHubIssueRepository";
+import { GitHubMilestoneRepository } from "../../../infrastructure/github/repositories/GitHubMilestoneRepository";
+import { GitHubProjectRepository } from "../../../infrastructure/github/repositories/GitHubProjectRepository";
+import { GitHubSprintRepository } from "../../../infrastructure/github/repositories/GitHubSprintRepository";
+import { ProjectManagementService } from "../../../services/ProjectManagementService";
+
+// Mock repositories
+jest.mock(
+  "../../../infrastructure/github/repositories/GitHubProjectRepository"
+);
+jest.mock(
+  "../../../infrastructure/github/repositories/GitHubIssueRepository"
+);
+jest.mock(
+  "../../../infrastructure/github/repositories/GitHubMilestoneRepository"
+);
+jest.mock(
+  "../../../infrastructure/github/repositories/GitHubSprintRepository"
+);
+
+describe("ProjectManagementService", () => {
+  let service: ProjectManagementService;
+  let mockProjectRepo: jest.Mocked<GitHubProjectRepository>;
+  let mockIssueRepo: jest.Mocked<GitHubIssueRepository>;
+  let mockMilestoneRepo: jest.Mocked<GitHubMilestoneRepository>;
+  let mockSprintRepo: jest.Mocked<GitHubSprintRepository>;
+
+  beforeEach(() => {
+    // Clear all mocks
+    jest.clearAllMocks();
+
+    // Create service instance
+    service = new ProjectManagementService(
+      "test-owner",
+      "test-repo",
+      "test-token"
+    );
+
+    // Get mock instances
+    mockProjectRepo =
+      GitHubProjectRepository.prototype as jest.Mocked<GitHubProjectRepository>;
+    mockIssueRepo =
+      GitHubIssueRepository.prototype as jest.Mocked<GitHubIssueRepository>;
+    mockMilestoneRepo =
+      GitHubMilestoneRepository.prototype as jest.Mocked<GitHubMilestoneRepository>;
+    mockSprintRepo =
+      GitHubSprintRepository.prototype as jest.Mocked<GitHubSprintRepository>;
+  });
+
+  describe("createRoadmap", () => {
+    it("should create a project with milestones and issues", async () => {
+      // Arrange
+      const roadmapData = {
+        project: {
+          title: "Q1 2024 Roadmap",
+          description: "Product roadmap for Q1 2024",
+          owner: "test-owner",
+          visibility: "private" as const,
+        },
+        milestones: [
+          {
+            milestone: {
+              title: "MVP Release",
+              description: "Initial feature set",
+              dueDate: "2024-03-31T00:00:00Z",
+            },
+            issues: [
+              {
+                title: "User Authentication",
+                description: "Implement OAuth login",
+                assignees: ["developer1"],
+                labels: ["auth"],
+              } as CreateIssue,
+            ],
+          },
+        ],
+      };
+
+      // Mock repository responses
+      const createdProject: Project = {
+        ...roadmapData.project,
+        id: "project-123",
+        status: ResourceStatus.ACTIVE,
+        fields: [],
+        views: [],
+        number: 1,
+        url: "https://github.com/test-owner/projects/1",
+        closed: false,
+        createdAt: "2024-01-01T00:00:00Z",
+        updatedAt: "2024-01-01T00:00:00Z",
+      };
+
+      const createdMilestone: Milestone = {
+        ...roadmapData.milestones[0].milestone,
+        id: "milestone-123",
+        number: 1,
+        status: ResourceStatus.ACTIVE,
+        progress: { 
+          percent: 0,
+          complete: 0,
+          total: 1
+        },
+        url: "https://github.com/test-owner/test-repo/milestone/1",
+        createdAt: "2024-01-01T00:00:00Z",
+        updatedAt: "2024-01-01T00:00:00Z",
+      };
+
+      const createdIssue: Issue = {
+        id: "issue-123",
+        number: 1,
+        title: "User Authentication",
+        description: "Implement OAuth login",
+        status: ResourceStatus.ACTIVE,
+        assignees: ["developer1"],
+        labels: ["auth"],
+        milestoneId: "milestone-123",
+        createdAt: "2024-01-01T00:00:00Z",
+        updatedAt: "2024-01-01T00:00:00Z",
+        url: "https://github.com/test-owner/test-repo/issues/1",
+      };
+
+      mockProjectRepo.create.mockResolvedValueOnce(createdProject);
+      mockMilestoneRepo.create.mockResolvedValueOnce(createdMilestone);
+      mockIssueRepo.create.mockResolvedValueOnce(createdIssue);
+
+      // Act
+      const result = await service.createRoadmap(roadmapData);
+
+      // Assert
+      expect(mockProjectRepo.create).toHaveBeenCalledWith(roadmapData.project);
+      expect(mockMilestoneRepo.create).toHaveBeenCalledWith(
+        roadmapData.milestones[0].milestone
+      );
+      expect(mockIssueRepo.create).toHaveBeenCalledWith({
+        ...roadmapData.milestones[0].issues[0],
+        milestoneId: "milestone-123",
+      });
+
+      expect(result.project.id).toBe("project-123");
+      expect(result.milestones).toHaveLength(1);
+      expect(result.milestones[0].milestone.id).toBe("milestone-123");
+      expect(result.milestones[0].issues).toHaveLength(1);
+      expect(result.milestones[0].issues[0].id).toBe("issue-123");
+    });
+
+    it("should handle errors during roadmap creation", async () => {
+      // Arrange
+      const roadmapData = {
+        project: {
+          title: "Q1 2024 Roadmap",
+          description: "Product roadmap for Q1 2024",
+          owner: "test-owner",
+          visibility: "private" as const,
+        },
+        milestones: [],
+      };
+
+      mockProjectRepo.create.mockRejectedValueOnce(
+        new Error("Project creation failed")
+      );
+
+      // Act & Assert
+      await expect(service.createRoadmap(roadmapData)).rejects.toThrow(
+        "Project creation failed"
+      );
+    });
+  });
+
+  describe("planSprint", () => {
+    it("should create a sprint and verify issues", async () => {
+      // Arrange
+      const sprintData = {
+        sprint: {
+          title: "Sprint 1",
+          description: "First sprint",
+          startDate: "2024-01-01T00:00:00Z",
+          endDate: "2024-01-14T00:00:00Z",
+          status: ResourceStatus.PLANNED,
+          goals: ["Complete authentication features"],
+        },
+        issueIds: ["issue-1", "issue-2"],
+      };
+
+      const issue1: Issue = {
+        id: "issue-1",
+        number: 1,
+        title: "Issue 1",
+        description: "Test",
+        status: ResourceStatus.ACTIVE,
+        assignees: [],
+        labels: [],
+        createdAt: "2024-01-01T00:00:00Z",
+        updatedAt: "2024-01-01T00:00:00Z",
+        url: "https://github.com/test-owner/test-repo/issues/1",
+      };
+
+      const issue2: Issue = {
+        id: "issue-2",
+        number: 2,
+        title: "Issue 2",
+        description: "Test",
+        status: ResourceStatus.ACTIVE,
+        assignees: [],
+        labels: [],
+        createdAt: "2024-01-01T00:00:00Z",
+        updatedAt: "2024-01-01T00:00:00Z",
+        url: "https://github.com/test-owner/test-repo/issues/2",
+      };
+
+      mockIssueRepo.findById.mockImplementation((id) => {
+        if (id === "issue-1") return Promise.resolve(issue1);
+        if (id === "issue-2") return Promise.resolve(issue2);
+        return Promise.resolve(null);
+      });
+
+      const createdSprint: Sprint = {
+        ...sprintData.sprint,
+        id: "sprint-1",
+        issues: sprintData.issueIds,
+        createdAt: "2024-01-01T00:00:00Z",
+        updatedAt: "2024-01-01T00:00:00Z",
+        url: "https://github.com/test-owner/test-repo/projects/sprint/1",
+      };
+
+      mockSprintRepo.create.mockResolvedValueOnce(createdSprint);
+
+      // Act
+      const result = await service.planSprint(sprintData);
+
+      // Assert
+      expect(mockIssueRepo.findById).toHaveBeenCalledTimes(2);
+      expect(mockSprintRepo.create).toHaveBeenCalledWith({
+        ...sprintData.sprint,
+        issues: sprintData.issueIds,
+      });
+      expect(result.id).toBe("sprint-1");
+      expect(result.issues).toEqual(sprintData.issueIds);
+    });
+
+    it("should throw error if issue not found", async () => {
+      // Arrange
+      const sprintData = {
+        sprint: {
+          title: "Sprint 1",
+          description: "First sprint",
+          startDate: "2024-01-01T00:00:00Z",
+          endDate: "2024-01-14T00:00:00Z",
+          status: ResourceStatus.PLANNED,
+          goals: ["Complete authentication features"],
+        },
+        issueIds: ["non-existent-issue"],
+      };
+
+      mockIssueRepo.findById.mockResolvedValueOnce(null);
+
+      // Act & Assert
+      await expect(service.planSprint(sprintData)).rejects.toThrow(
+        /Issue #non-existent-issue not found/
+      );
+    });
+  });
+});

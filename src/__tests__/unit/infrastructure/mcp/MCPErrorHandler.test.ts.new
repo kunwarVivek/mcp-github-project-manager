@@ -6,7 +6,7 @@ import {
   RateLimitError,
 } from "../../../../domain/errors";
 import { MCPErrorCode } from "../../../../domain/mcp-types";
-import { ResourceNotFoundError, ResourceType } from '../../../../domain/resource-types';
+import { ResourceNotFoundError } from '../../../../domain/resource-types';
 
 describe("MCPErrorHandler", () => {
   beforeEach(() => {
@@ -29,12 +29,12 @@ describe("MCPErrorHandler", () => {
     });
 
     it("should handle NotFoundError correctly", () => {
-      const error = new ResourceNotFoundError(ResourceType.ISSUE, "123");
+      const error = new ResourceNotFoundError("Resource not found");
       const response = MCPErrorHandler.handle(error);
 
       expect(response.status).toBe("error");
       expect(response.error.code).toBe(MCPErrorCode.RESOURCE_NOT_FOUND);
-      expect(response.error.message).toBe("issue with ID 123 not found");
+      expect(response.error.message).toBe("Resource not found");
     });
 
     it("should handle UnauthorizedError correctly", () => {

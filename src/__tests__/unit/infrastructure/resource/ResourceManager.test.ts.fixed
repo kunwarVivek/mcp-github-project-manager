@@ -1,0 +1,206 @@
+// filepath: /Users/vivek/grad-saas/mcp-github-project-manager/src/__tests__/unit/infrastructure/resource/ResourceManager.test.ts
+import { beforeEach, describe, expect, it, jest } from '@jest/globals';
+import {
+  ResourceType,
+  ResourceStatus,
+  ResourceEventType,
+  ResourceNotFoundError,
+  ResourceVersionError,
+} from '../../../../domain/resource-types';
+import { Project } from '../../../../domain/types';
+import { ResourceManager } from '../../../../infrastructure/resource/ResourceManager';
+import { ResourceCache } from '../../../../infrastructure/cache/ResourceCache';
+import { mockData } from '../../../setup';
+
+// Mock ResourceCache
+jest.mock('../../../../infrastructure/cache/ResourceCache', () => {
+  const mockGet = jest.fn();
+  const mockSet = jest.fn();
+  const mockDelete = jest.fn();
+  const mockClearByType = jest.fn();
+  const mockClearByTag = jest.fn();
+  const mockGetByTag = jest.fn();
+
+  return {
+    ResourceCache: {
+      getInstance: jest.fn(() => ({
+        get: mockGet,
+        set: mockSet,
+        delete: mockDelete,
+        clearByType: mockClearByType,
+        clearByTag: mockClearByTag,
+        getByTag: mockGetByTag,
+      })),
+    },
+  };
+});
+
+// Mock UUID
+jest.mock('uuid', () => ({
+  v4: () => 'test-uuid-123'
+}));
+
+describe("ResourceManager", () => {
+  let manager: ResourceManager;
+  let mockCache: jest.Mocked<ResourceCache>;
+  const events: any[] = [];
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockCache = ResourceCache.getInstance() as jest.Mocked<ResourceCache>;
+    manager = ResourceManager.getInstance();
+    events.length = 0;
+
+    manager.onEvent(async (event) => {
+      events.push(event);
+    });
+  });
+
+  const mockCreateData = {
+    title: "Test Project",
+    description: "A test project",
+    visibility: "private" as const,
+    views: [],
+    fields: [],
+  };
+
+  describe("create", () => {
+    it("should create a new resource with correct properties", async () => {
+      const created = await manager.create<Project>(ResourceType.PROJECT, mockCreateData);
+
+      expect(created).toMatchObject({
+        ...mockCreateData,
+        type: ResourceType.PROJECT,
+        status: ResourceStatus.ACTIVE,
+        version: 1,
+        id: expect.any(String),
+        createdAt: expect.any(String),
+        updatedAt: expect.any(String),
+        deletedAt: null,
+      });
+
+      expect(mockCache.set).toHaveBeenCalledWith(created, undefined);
+    });
+
+    it("should emit creation event", async () => {
+      const created = await manager.create<Project>(ResourceType.PROJECT, mockCreateData);
+
+      expect(events[0]).toMatchObject({
+        type: ResourceEventType.CREATED,
+        resourceId: created.id,
+        resourceType: ResourceType.PROJECT,
+      });
+    });
+  });
+
+  describe("get", () => {
+    it("should retrieve a resource from cache", async () => {
+      mockCache.get.mockResolvedValueOnce(mockData.project);
+      
+      const retrieved = await manager.get<Project>(ResourceType.PROJECT, mockData.project.id);
+      expect(retrieved).toEqual(mockData.project);
+    });
+
+    it("should throw ResourceNotFoundError when resource doesn't exist", async () => {
+      mockCache.get.mockResolvedValueOnce(null);
+
+      await expect(
+        manager.get(ResourceType.PROJECT, "non-existent")
+      ).rejects.toThrow(ResourceNotFoundError);
+    });
+
+    it("should not return deleted resources by default", async () => {
+      mockCache.get.mockResolvedValueOnce({
+        ...mockData.project,
+        status: ResourceStatus.DELETED,
+      });
+
+      await expect(
+        manager.get(ResourceType.PROJECT, mockData.project.id)
+      ).rejects.toThrow(ResourceNotFoundError);
+    });
+  });
+
+  describe("update", () => {
+    it("should update a resource and increment version", async () => {
+      mockCache.get.mockResolvedValueOnce(mockData.project);
+
+      const updateData = {
+        title: "Updated Project",
+      };
+
+      const updated = await manager.update<Project>(
+        ResourceType.PROJECT,
+        mockData.project.id,
+        updateData
+      );
+
+      expect(updated).toMatchObject({
+        ...mockData.project,
+        ...updateData,
+        version: mockData.project.version + 1,
+      });
+
+      expect(mockCache.set).toHaveBeenCalled();
+    });
+
+    it("should emit update event", async () => {
+      mockCache.get.mockResolvedValueOnce(mockData.project);
+
+      await manager.update<Project>(
+        ResourceType.PROJECT,
+        mockData.project.id,
+        { title: "Updated" }
+      );
+
+      expect(events[0]).toMatchObject({
+        type: ResourceEventType.UPDATED,
+        resourceId: mockData.project.id,
+        resourceType: ResourceType.PROJECT,
+      });
+    });
+
+    it("should handle version conflicts", async () => {
+      mockCache.get.mockResolvedValueOnce(mockData.project);
+
+      await expect(
+        manager.update<Project>(
+          ResourceType.PROJECT,
+          mockData.project.id,
+          { title: "Updated" },
+          { optimisticLock: true, expectedVersion: mockData.project.version + 1 }
+        )
+      ).rejects.toThrow(ResourceVersionError);
+    });
+  });
+
+  describe("delete", () => {
+    it("should mark a resource as deleted", async () => {
+      mockCache.get.mockResolvedValueOnce(mockData.project);
+
+      await manager.delete(ResourceType.PROJECT, mockData.project.id);
+
+      expect(mockCache.set).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: mockData.project.id,
+          status: ResourceStatus.DELETED,
+          deletedAt: expect.any(String),
+          version: mockData.project.version + 1,
+        }),
+        undefined
+      );
+    });
+
+    it("should emit delete event", async () => {
+      mockCache.get.mockResolvedValueOnce(mockData.project);
+
+      await manager.delete(ResourceType.PROJECT, mockData.project.id);
+
+      expect(events[0]).toMatchObject({
+        type: ResourceEventType.DELETED,
+        resourceId: mockData.project.id,
+        resourceType: ResourceType.PROJECT,
+      });
+    });
+  });
+});

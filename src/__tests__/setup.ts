@@ -15,51 +15,49 @@ export const mockToken = "test-token";
 
 export const mockProject: Project = {
   id: "test-project-id",
-  type: ResourceType.PROJECT,
-  version: 1,
-  status: ResourceStatus.ACTIVE,
   title: "Test Project",
   description: "Test Description",
-  visibility: "private",
-  views: [],
+  owner: "test-owner",
+  number: 123,
+  url: "https://github.com/test-owner/test-repo/projects/123",
   fields: [],
+  views: [],
+  closed: false,
+  visibility: "private",
+  status: ResourceStatus.ACTIVE,
+  version: 1,
   createdAt: new Date().toISOString(),
   updatedAt: new Date().toISOString(),
-  deletedAt: null,
 };
 
 export const mockMilestone: Milestone = {
   id: "test-milestone-id",
-  type: ResourceType.MILESTONE,
-  version: 1,
-  status: ResourceStatus.ACTIVE,
+  number: 1,
   title: "Test Milestone",
   description: "Test Description",
   dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+  status: ResourceStatus.ACTIVE,
   progress: {
-    openIssues: 0,
-    closedIssues: 0,
-    completionPercentage: 0,
+    percent: 0,
+    complete: 0,
+    total: 5
   },
+  url: "https://github.com/test-owner/test-repo/milestones/1",
   createdAt: new Date().toISOString(),
   updatedAt: new Date().toISOString(),
-  deletedAt: null,
 };
 
 export const mockIssue: Issue = {
   id: "test-issue-id",
-  type: ResourceType.ISSUE,
-  version: 1,
-  status: ResourceStatus.ACTIVE,
+  number: 42,
   title: "Test Issue",
   description: "Test Description",
-  priority: "medium",
-  issueType: "feature",
+  status: ResourceStatus.ACTIVE,
   assignees: [],
   labels: [],
+  url: "https://github.com/test-owner/test-repo/issues/42",
   createdAt: new Date().toISOString(),
   updatedAt: new Date().toISOString(),
-  deletedAt: null,
 };
 
 // Mock API Response Data
@@ -92,6 +90,14 @@ export const mockGitHubResponses = {
     labels: { nodes: [] },
     milestone: null,
   },
+};
+
+// Export mockData to fix import errors in tests
+export const mockData = {
+  project: mockProject,
+  milestone: mockMilestone,
+  issue: mockIssue,
+  responses: mockGitHubResponses
 };
 
 // Mock Factory Functions

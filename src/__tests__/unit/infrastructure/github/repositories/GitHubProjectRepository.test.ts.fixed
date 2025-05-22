@@ -1,8 +1,7 @@
 // filepath: /Users/vivek/grad-saas/mcp-github-project-manager/src/__tests__/unit/infrastructure/github/repositories/GitHubProjectRepository.test.ts
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { Octokit } from "@octokit/rest";
-import { CreateProject, ProjectId } from "../../../../../domain/types";
-import { ResourceStatus } from "../../../../../domain/resource-types";
+import { CreateProject, ProjectId, ResourceStatus } from "../../../../../domain/types";
 import { GitHubConfig } from "../../../../../infrastructure/github/GitHubConfig";
 import { GitHubProjectRepository } from "../../../../../infrastructure/github/repositories/GitHubProjectRepository";
 import { mockData } from "../../../../setup";
@@ -41,7 +40,6 @@ describe("GitHubProjectRepository", () => {
       const projectData: CreateProject = {
         title: "Test Project",
         description: "Test Description",
-        owner: "test-owner",
         visibility: "private",
         fields: [],
         views: []
@@ -100,7 +98,6 @@ describe("GitHubProjectRepository", () => {
       const projectData: CreateProject = {
         title: "Test Project",
         description: "Test Description",
-        owner: "test-owner",
         visibility: "private",
         fields: [],
         views: []
@@ -221,13 +218,12 @@ describe("GitHubProjectRepository", () => {
       });
 
       // Act
-      const result = await repository.findAll();
-      const filteredResult = result.filter(p => p.status === ResourceStatus.ACTIVE);
+      const result = await repository.findAll({ status: ResourceStatus.ACTIVE });
 
       // Assert
-      expect(filteredResult.length).toBe(1);
-      expect(filteredResult[0].title).toBe("Active Project");
-      expect(filteredResult[0].status).toBe(ResourceStatus.ACTIVE);
+      expect(result.length).toBe(1);
+      expect(result[0].title).toBe("Active Project");
+      expect(result[0].status).toBe(ResourceStatus.ACTIVE);
     });
   });
 
