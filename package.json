@@ -20,12 +20,21 @@
     "model-context-protocol",
     "project-management"
   ],
-  "author": "",
+  "author": "kvs <kunwarviveksingh@gmail.com> (https://github.com/kunwarVivek)",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/yourusername/mcp-github-project-manager.git"
+    "url": "https://github.com/kunwarVivek/mcp-github-project-manager.git"
   },
+  "homepage": "https://github.com/kunwarVivek/mcp-github-project-manager#readme",
+  "bugs": {
+    "url": "https://github.com/kunwarVivek/mcp-github-project-manager/issues"
+  },
+  "files": [
+    "build/**/*",
+    "LICENSE",
+    "README.md"
+  ],
   "scripts": {
     "clean": "rimraf build",
     "prebuild": "npm run clean",
@@ -47,13 +56,20 @@
     "release": "node --loader ts-node/esm scripts/publish.js"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "*",
+    "@modelcontextprotocol/sdk": "^1.6.1",
     "@octokit/rest": "^21.1.1",
     "commander": "^14.0.0",
     "dotenv": "^16.5.0",
     "tsyringe": "^4.10.0",
     "uuid": "^11.1.0",
     "zod": "^3.25.23"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "funding": {
+    "type": "github",
+    "url": "https://github.com/sponsors/kunwarVivek"
   },
   "devDependencies": {
     "@jest/globals": "^29.7.0",

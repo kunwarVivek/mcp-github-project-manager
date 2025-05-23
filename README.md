@@ -109,7 +109,7 @@ npm install mcp-github-project-manager
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/mcp-github-project-manager.git
+git clone https://github.com/kunwarVivek/mcp-github-project-manager.git
 cd mcp-github-project-manager
 
 # Install dependencies

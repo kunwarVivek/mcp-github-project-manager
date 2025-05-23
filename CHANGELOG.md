@@ -12,6 +12,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Enhanced documentation for public use
 - Publication scripts and workflows
 
+### Changed
+- Updated package.json for npm publication
+  - Added proper author information
+  - Fixed repository, homepage, and bugs URLs
+  - Added files field to control package contents
+  - Set specific version for @modelcontextprotocol/sdk dependency
+  - Added publishConfig for public access
+  - Added funding information
+
 ## [0.1.0] - 2025-05-21
 
 ### Added
