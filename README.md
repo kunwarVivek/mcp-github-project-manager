@@ -10,6 +10,32 @@ A Model Context Protocol (MCP) server implementation that provides GitHub Projec
 
 This server implements the [Model Context Protocol](https://modelcontextprotocol.io) to expose GitHub Projects functionality to LLM clients and applications. It provides tools for managing projects, milestones, sprints, and metrics through GitHub's GraphQL API while maintaining state and handling errors according to MCP specifications.
 
+## Table of Contents
+
+- [Overview](#overview)
+- [Quick Start](#quick-start)
+- [Key Features](#key-features)
+- [Installation](#installation)
+- [Configuration](#configuration)
+- [Usage](#usage)
+  - [As a command-line tool](#as-a-command-line-tool)
+  - [Running from source with TypeScript](#running-from-source-with-typescript)
+  - [As a Node.js module](#as-a-nodejs-module)
+  - [Integration with MCP clients](#integration-with-mcp-clients)
+  - [Installing in AI Assistants](#installing-in-ai-assistants)
+    - [Claude](#install-in-claude)
+    - [Roocode](#install-in-roocode)
+    - [Windsurf](#install-in-windsurf)
+    - [VS Code](#install-in-vs-code)
+    - [Cursor](#install-in-cursor)
+    - [Using Docker](#using-docker)
+  - [Troubleshooting](#troubleshooting)
+- [Architecture](#architecture)
+- [Contributing](#contributing)
+- [License](#license)
+- [References](#references)
+- [Current Status](#current-status)
+
 ## Quick Start
 
 ### Using NPM
@@ -130,7 +156,51 @@ mcp-github-project-manager
 
 # Start with environment variables
 GITHUB_TOKEN=your_token mcp-github-project-manager
+
+# Start with command line arguments
+mcp-github-project-manager --token=your_token --owner=your_username --repo=your_repo
+
+# Use a specific .env file
+mcp-github-project-manager --env-file=.env.production
+
+# Show verbose output
+mcp-github-project-manager --verbose
+
+# Display help information
+mcp-github-project-manager --help
 ```
+
+### Running from source with TypeScript
+
+If you're developing or running from source:
+
+```bash
+# Run directly with ts-node
+node --loader ts-node/esm src/index.ts
+
+# Run with command line arguments
+node --loader ts-node/esm src/index.ts --token=your_token --owner=your_username --repo=your_repo
+
+# Use the npm dev script (watches for changes)
+npm run dev
+
+# Display help information
+node --loader ts-node/esm src/index.ts --help
+```
+
+#### Command Line Options
+
+| Option | Short | Description |
+|--------|-------|-------------|
+| `--token <token>` | `-t` | GitHub personal access token |
+| `--owner <owner>` | `-o` | GitHub repository owner (username or organization) |
+| `--repo <repo>` | `-r` | GitHub repository name |
+| `--env-file <path>` | `-e` | Path to .env file (default: .env in project root) |
+| `--verbose` | `-v` | Enable verbose logging |
+| `--help` | `-h` | Display help information |
+| `--version` | | Display version information |
+
+Command line arguments take precedence over environment variables.
 
 ### As a Node.js module
 
@@ -178,6 +248,210 @@ const result = await client.callTool("create_project", {
 ```
 
 For more examples, see the [User Guide](docs/user-guide.md) and the [examples/](examples/) directory.
+
+### Installing in AI Assistants
+
+#### Install in Claude
+
+To install the MCP server in Claude Desktop:
+
+```json
+{
+  "mcpServers": {
+    "github-project-manager": {
+      "command": "npx",
+      "args": ["-y", "mcp-github-project-manager"],
+      "env": {
+        "GITHUB_TOKEN": "your_github_token",
+        "GITHUB_OWNER": "your_username",
+        "GITHUB_REPO": "your_repo"
+      }
+    }
+  }
+}
+```
+
+For Claude Code CLI, run:
+
+```bash
+claude mcp add github-project-manager -- npx -y mcp-github-project-manager
+```
+
+#### Install in Roocode
+
+Add this to your Roocode configuration:
+
+```json
+{
+  "mcpServers": {
+    "github-project-manager": {
+      "command": "npx",
+      "args": ["-y", "mcp-github-project-manager"],
+      "env": {
+        "GITHUB_TOKEN": "your_github_token",
+        "GITHUB_OWNER": "your_username",
+        "GITHUB_REPO": "your_repo"
+      }
+    }
+  }
+}
+```
+
+#### Install in Windsurf
+
+Add this to your Windsurf MCP config file:
+
+```json
+{
+  "mcpServers": {
+    "github-project-manager": {
+      "command": "npx",
+      "args": ["-y", "mcp-github-project-manager"],
+      "env": {
+        "GITHUB_TOKEN": "your_github_token",
+        "GITHUB_OWNER": "your_username",
+        "GITHUB_REPO": "your_repo"
+      }
+    }
+  }
+}
+```
+
+See [Windsurf MCP docs](https://docs.windsurf.com/windsurf/mcp) for more information.
+
+#### Install in VS Code
+
+Add this to your VS Code MCP config file:
+
+```json
+{
+  "servers": {
+    "github-project-manager": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "mcp-github-project-manager"],
+      "env": {
+        "GITHUB_TOKEN": "your_github_token",
+        "GITHUB_OWNER": "your_username",
+        "GITHUB_REPO": "your_repo"
+      }
+    }
+  }
+}
+```
+
+See [VS Code MCP docs](https://code.visualstudio.com/docs/copilot/chat/mcp-servers) for more information.
+
+#### Install in Cursor
+
+Add this to your Cursor MCP config file:
+
+```json
+{
+  "mcpServers": {
+    "github-project-manager": {
+      "command": "npx",
+      "args": ["-y", "mcp-github-project-manager"],
+      "env": {
+        "GITHUB_TOKEN": "your_github_token",
+        "GITHUB_OWNER": "your_username",
+        "GITHUB_REPO": "your_repo"
+      }
+    }
+  }
+}
+```
+
+See [Cursor MCP docs](https://docs.cursor.com/context/model-context-protocol) for more information.
+
+#### Using Docker
+
+If you prefer to run the MCP server in a Docker container:
+
+1. **Build the Docker Image:**
+
+   Create a `Dockerfile` in your project directory:
+
+   ```dockerfile
+   FROM node:18-alpine
+
+   WORKDIR /app
+
+   # Install the package globally
+   RUN npm install -g mcp-github-project-manager
+
+   # Default command to run the server
+   CMD ["mcp-github-project-manager"]
+   ```
+
+   Build the image:
+
+   ```bash
+   docker build -t github-project-manager-mcp .
+   ```
+
+2. **Configure Your MCP Client:**
+
+   Update your MCP client's configuration to use the Docker command:
+
+   ```json
+   {
+     "mcpServers": {
+       "github-project-manager": {
+         "command": "docker",
+         "args": ["run", "-i", "--rm", "github-project-manager-mcp"],
+         "env": {
+           "GITHUB_TOKEN": "your_github_token",
+           "GITHUB_OWNER": "your_username",
+           "GITHUB_REPO": "your_repo"
+         }
+       }
+     }
+   }
+   ```
+
+### Troubleshooting
+
+#### Common Issues
+
+1. **Module Not Found Errors**
+
+   If you encounter module resolution issues, try using `bunx` instead of `npx`:
+
+   ```json
+   {
+     "mcpServers": {
+       "github-project-manager": {
+         "command": "bunx",
+         "args": ["-y", "mcp-github-project-manager"]
+       }
+     }
+   }
+   ```
+
+2. **Windows-Specific Configuration**
+
+   On Windows, you may need to use `cmd` to run the command:
+
+   ```json
+   {
+     "mcpServers": {
+       "github-project-manager": {
+         "command": "cmd",
+         "args": [
+           "/c",
+           "npx",
+           "-y",
+           "mcp-github-project-manager"
+         ]
+       }
+     }
+   }
+   ```
+
+3. **Permission Issues**
+
+   If you encounter permission issues, make sure your GitHub token has the required permissions listed in the Configuration section.
 
 ## Architecture
 

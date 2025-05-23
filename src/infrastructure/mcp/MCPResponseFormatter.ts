@@ -1,11 +1,11 @@
-import { 
-  MCPContent, 
-  MCPContentType, 
-  MCPResponse, 
-  MCPErrorSchema, 
+import {
+  MCPContent,
+  MCPContentType,
+  MCPResponse,
+  MCPErrorSchema,
   MCPErrorCode,
   MCPSuccessResponse,
-  MCPErrorResponse 
+  MCPErrorResponse
 } from "../../domain/mcp-types";
 import { z } from "zod";
 
@@ -27,7 +27,7 @@ export class MCPResponseFormatter {
    * Format data into MCP response format with proper content type handling
    */
   static format(
-    data: unknown, 
+    data: unknown,
     contentType: MCPContentType = MCPContentType.JSON,
     metadata?: Record<string, unknown>
   ): MCPSuccessResponse {
@@ -79,12 +79,12 @@ export class MCPResponseFormatter {
    * Format rich content with multiple types and proper structure
    */
   static formatRich(
-    contents: RichContent[], 
+    contents: RichContent[],
     metadata?: Record<string, unknown>
   ): MCPSuccessResponse {
     // Combine content from multiple rich content objects
     let combinedContent = "";
-    
+
     contents.forEach(({ type, data }) => {
       const contentType = this.getContentTypeFromType(type);
       combinedContent += this.formatContent(data, contentType) + "\n\n";
@@ -109,7 +109,7 @@ export class MCPResponseFormatter {
    * Format data to markdown table (for structured data)
    */
   static formatAsMarkdownTable<T extends Record<string, unknown>>(
-    data: T[], 
+    data: T[],
     options?: {
       title?: string;
       columns?: Array<{key: keyof T; header: string}>;
@@ -118,7 +118,7 @@ export class MCPResponseFormatter {
     if (data.length === 0) return 'No data available';
 
     // Determine columns
-    const columns = options?.columns || 
+    const columns = options?.columns ||
       Object.keys(data[0]).map(key => ({
         key: key as keyof T,
         header: String(key),
@@ -126,16 +126,16 @@ export class MCPResponseFormatter {
 
     // Build header
     let markdown = options?.title ? `# ${options.title}\n\n` : '';
-    
+
     // Build table header
     markdown += '| ' + columns.map(col => col.header).join(' | ') + ' |\n';
     markdown += '| ' + columns.map(() => '---').join(' | ') + ' |\n';
-    
+
     // Build table rows
     for (const row of data) {
       markdown += '| ' + columns.map(col => String(row[col.key] ?? '')).join(' | ') + ' |\n';
     }
-    
+
     return markdown;
   }
 
@@ -143,7 +143,7 @@ export class MCPResponseFormatter {
    * Format as rich HTML (with classes for styling)
    */
   static formatAsRichHtml<T>(
-    data: T, 
+    data: T,
     template: (data: T) => string
   ): string {
     return template(data);
@@ -164,9 +164,9 @@ export class MCPResponseFormatter {
       message,
       details,
     };
-    
+
     MCPErrorSchema.parse(errorData);
-    
+
     // Create a properly formatted error response
     return {
       version: "1.0",
@@ -208,13 +208,13 @@ export class MCPResponseFormatter {
    * Create success response with optional request ID
    */
   static success<T>(
-    data: T, 
-    contentType?: MCPContentType, 
+    data: T,
+    contentType?: MCPContentType,
     requestId?: string,
     metadata?: Record<string, unknown>
   ): MCPSuccessResponse {
     const formattedContent = this.formatContent(data, contentType || MCPContentType.JSON);
-    
+
     return {
       version: "1.0",
       requestId: requestId || `req-${Date.now()}`,
@@ -243,7 +243,7 @@ export class MCPResponseFormatter {
     }
   ): MCPSuccessResponse {
     const formattedContent = this.formatContent(data, options?.contentType || MCPContentType.JSON);
-    
+
     return {
       version: "1.0",
       requestId: options?.requestId || `req-${Date.now()}`,
@@ -279,7 +279,7 @@ export class MCPResponseFormatter {
         status: z.number(),
       }).nonstrict(),
     }).safeParse(response);
-    
+
     return result.success;
   }
 
@@ -287,13 +287,13 @@ export class MCPResponseFormatter {
     switch (contentType) {
       case MCPContentType.JSON:
         return JSON.stringify(data, null, 2);
-      
+
       case MCPContentType.TEXT:
         return String(data);
-      
+
       case MCPContentType.MARKDOWN:
         if (typeof data === "string") return data;
-        
+
         // Create a simple markdown representation for objects
         if (data && typeof data === "object") {
           if (Array.isArray(data)) {
@@ -304,9 +304,9 @@ export class MCPResponseFormatter {
               .join('\n\n');
           }
         }
-        
+
         return String(data);
-      
+
       case MCPContentType.HTML:
         if (typeof data === "string") {
           // Check if it's already HTML
@@ -315,7 +315,7 @@ export class MCPResponseFormatter {
           }
           return `<pre>${data}</pre>`;
         }
-        
+
         // Create a simple HTML representation for objects
         if (data && typeof data === "object") {
           if (Array.isArray(data)) {
@@ -333,9 +333,9 @@ export class MCPResponseFormatter {
             </div>`;
           }
         }
-        
+
         return `<pre>${String(data)}</pre>`;
-      
+
       default:
         return String(data);
     }

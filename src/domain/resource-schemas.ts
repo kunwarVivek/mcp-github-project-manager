@@ -100,15 +100,15 @@ export type ResourceSchema = z.ZodType<any, any, any>;
 export function validateResourceByType(type: ResourceType, resource: any): any {
   // Remove generic type parameter which was causing the compilation error
   const schema = resourceSchemas[type];
-  
+
   if (!schema) {
     throw new Error(`No schema found for resource type: ${type}`);
   }
-  
+
   const result = schema.safeParse(resource);
   if (!result.success) {
     throw result.error;
   }
-  
+
   return result.data;
 }

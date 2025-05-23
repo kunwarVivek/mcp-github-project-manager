@@ -91,29 +91,29 @@ export class GitHubErrorHandler {
       const status = error.status || error.response?.status;
       const message = error.message || error.response?.data?.message || 'Unknown GitHub error';
       const contextMessage = context ? ` while ${context}` : '';
-      
+
       // Handle rate limit errors
       if (status === 429 || this.isRateLimitError(error)) {
         const resetTimestamp = error.response?.headers?.['x-ratelimit-reset'];
-        const resetDate = resetTimestamp 
+        const resetDate = resetTimestamp
           ? new Date(parseInt(resetTimestamp) * 1000)
           : new Date(Date.now() + 60000); // Default to 1 minute from now
-        
+
         return new GitHubRateLimitError(
           `GitHub API rate limit exceeded${contextMessage}. Reset at ${resetDate.toLocaleTimeString()}`,
           resetDate
         );
       }
-      
+
       // Handle not found errors
       if (status === 404) {
         const resourceType = this.extractResourceType(error);
         const resourceId = this.extractResourceId(error);
-        
+
         if (resourceType && resourceId) {
           return new ResourceNotFoundError(resourceType, resourceId);
         }
-        
+
         return new GitHubApiError(
           `Resource not found${contextMessage}: ${message}`,
           status,
@@ -121,7 +121,7 @@ export class GitHubErrorHandler {
           MCPErrorCode.RESOURCE_NOT_FOUND
         );
       }
-      
+
       // Handle authentication errors
       if (status === 401) {
         return new GitHubApiError(
@@ -131,7 +131,7 @@ export class GitHubErrorHandler {
           MCPErrorCode.UNAUTHORIZED
         );
       }
-      
+
       // Handle permission errors
       if (status === 403 && !this.isRateLimitError(error)) {
         return new GitHubApiError(
@@ -141,12 +141,12 @@ export class GitHubErrorHandler {
           MCPErrorCode.UNAUTHORIZED
         );
       }
-      
+
       // Handle validation errors
       if (status === 422) {
         const errors = error.response?.data?.errors || [];
         const details = errors.length > 0 ? { validationErrors: errors } : undefined;
-        
+
         return new GitHubApiError(
           `Validation error${contextMessage}: ${message}`,
           status,
@@ -155,7 +155,7 @@ export class GitHubErrorHandler {
           details
         );
       }
-      
+
       // Handle other API errors
       return new GitHubApiError(
         `GitHub API error (${status})${contextMessage}: ${message}`,
@@ -200,7 +200,7 @@ export class GitHubErrorHandler {
     // Use exponential backoff with jitter
     const retryAfter = headers['retry-after'];
     const baseDelay = retryAfter ? parseInt(retryAfter) * 1000 : this.defaultRetryDelay;
-    
+
     return {
       baseDelay,
       jitter: Math.random() * (baseDelay * 0.1), // 10% jitter
@@ -232,14 +232,14 @@ export class GitHubErrorHandler {
   private extractResourceType(error: GitHubError): ResourceType | null {
     // Try to determine the resource type from the URL
     const url = error.response?.url || '';
-    
+
     if (url.includes('/issues/')) return ResourceType.ISSUE;
     if (url.includes('/milestones/')) return ResourceType.MILESTONE;
     if (url.includes('/projects/')) return ResourceType.PROJECT;
     if (url.includes('/pulls/')) return ResourceType.PULL_REQUEST;
     if (url.includes('/comments/')) return ResourceType.COMMENT;
     if (url.includes('/labels/')) return ResourceType.LABEL;
-    
+
     // Use NotFoundError for unrecognized resource types
     return null;
   }
@@ -251,7 +251,7 @@ export class GitHubErrorHandler {
     // Try to determine the resource ID from the URL
     const url = error.response?.url || '';
     const urlParts = url.split('/');
-    
+
     // The ID is usually the last part of the URL
     if (urlParts.length > 0) {
       const lastPart = urlParts[urlParts.length - 1];
@@ -259,7 +259,7 @@ export class GitHubErrorHandler {
         return lastPart;
       }
     }
-    
+
     return null;
   }
 
@@ -268,7 +268,7 @@ export class GitHubErrorHandler {
    */
   private mapStatusToMCPErrorCode(status?: number): MCPErrorCode {
     if (!status) return MCPErrorCode.INTERNAL_ERROR;
-    
+
     switch (true) {
       case status === 400:
         return MCPErrorCode.VALIDATION_ERROR;

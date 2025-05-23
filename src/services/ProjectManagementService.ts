@@ -20,20 +20,20 @@ import {
 import { GitHubTypeConverter } from "../infrastructure/github/util/conversion";
 import { z } from "zod";
 import { MCPErrorCode } from "../domain/mcp-types";
-import { 
-  DomainError, 
-  ResourceNotFoundError, 
-  ValidationError, 
+import {
+  DomainError,
+  ResourceNotFoundError,
+  ValidationError,
   RateLimitError,
   UnauthorizedError,
   GitHubAPIError
 } from "../domain/errors";
-import { 
-  ProjectSchema, 
-  IssueSchema, 
-  MilestoneSchema, 
-  SprintSchema, 
-  RelationshipSchema 
+import {
+  ProjectSchema,
+  IssueSchema,
+  MilestoneSchema,
+  SprintSchema,
+  RelationshipSchema
 } from "../domain/resource-schemas";
 
 // Define validation schemas for service inputs
@@ -181,7 +181,7 @@ export class ProjectManagementService {
     try {
       // Validate input with Zod schema
       const validatedData = CreateRoadmapSchema.parse(data);
-      
+
       // Create properly typed project without using 'any'
       const projectData = {
         ...validatedData.project,
@@ -193,7 +193,7 @@ export class ProjectManagementService {
         // Ensure description is not undefined
         description: validatedData.project.description || '',
       };
-      
+
       const project = await this.projectRepo.create(
         createResource(ResourceType.PROJECT, projectData)
       );
@@ -208,7 +208,7 @@ export class ProjectManagementService {
             ...milestone,
             description: milestone.description || ''
           };
-          
+
           const createdMilestone = await this.milestoneRepo.create(milestoneWithRequiredFields);
 
           const createdIssues = await Promise.all(
@@ -238,7 +238,7 @@ export class ProjectManagementService {
       if (error instanceof z.ZodError) {
         throw new ValidationError(`Invalid roadmap data: ${error.message}`);
       }
-      
+
       throw this.mapErrorToMCPError(error);
     }
   }
@@ -251,7 +251,7 @@ export class ProjectManagementService {
     try {
       // Validate input with Zod schema
       const validatedData = PlanSprintSchema.parse(data);
-      
+
       const stringIssueIds = validatedData.issueIds.map(id => id.toString());
 
       // Create sprint with proper error handling
@@ -284,7 +284,7 @@ export class ProjectManagementService {
       if (error instanceof z.ZodError) {
         throw new ValidationError(`Invalid sprint data: ${error.message}`);
       }
-      
+
       throw this.mapErrorToMCPError(error);
     }
   }
@@ -467,13 +467,13 @@ export class ProjectManagementService {
         labels: z.array(z.string()).optional(),
         milestoneId: z.string().optional()
       }).parse(data);
-      
+
       return await this.issueRepo.create(issueData);
     } catch (error) {
       if (error instanceof z.ZodError) {
         throw new ValidationError(`Invalid issue data: ${error.message}`);
       }
-      
+
       throw this.mapErrorToMCPError(error);
     }
   }
@@ -532,11 +532,11 @@ export class ProjectManagementService {
       if (!issue) {
         throw new ResourceNotFoundError(ResourceType.ISSUE, id);
       }
-      
+
       // Implementation for issue history
       // Currently returning empty array as placeholder, but will be properly implemented
       // This would typically fetch from GitHub API or a local history store
-      
+
       // Mock implementation for now with sample data
       return [
         {
@@ -567,13 +567,13 @@ export class ProjectManagementService {
           message: "Due date must be a valid date string if provided"
         })
       }).parse(data);
-      
+
       // Ensure description is not undefined to satisfy CreateMilestone type
       const validMilestoneData = {
         ...milestoneData,
         description: milestoneData.description || ''
       };
-      
+
       return await this.milestoneRepo.create(validMilestoneData);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -628,12 +628,12 @@ export class ProjectManagementService {
       if (!issue) {
         throw new ResourceNotFoundError(ResourceType.ISSUE, issueId);
       }
-      
+
       const milestone = await this.milestoneRepo.findById(milestoneId);
       if (!milestone) {
         throw new ResourceNotFoundError(ResourceType.MILESTONE, milestoneId);
       }
-      
+
       await this.issueRepo.update(issueId, { milestoneId });
     } catch (error) {
       throw this.mapErrorToMCPError(error);
@@ -650,30 +650,30 @@ export class ProjectManagementService {
       if (!issue) {
         throw new ResourceNotFoundError(ResourceType.ISSUE, issueId);
       }
-      
+
       const dependsOn = await this.issueRepo.findById(dependsOnId);
       if (!dependsOn) {
         throw new ResourceNotFoundError(ResourceType.ISSUE, dependsOnId);
       }
-      
+
       // Create a relationship between the issues
       // This should use a proper relationship repository in a real implementation
       // but we'll simulate it here by storing the relationship in memory
-      
+
       // Create a relationship object
       const dependency: IssueDependency = {
         issueId,
         dependsOnId,
         createdAt: new Date().toISOString()
       };
-      
+
       // In a real implementation, we would store this in a database
       // For now, we'll store it as a property on the issue using the update method
       const currentDependencies = await this.getIssueDependencies(issueId);
       if (!currentDependencies.includes(dependsOnId)) {
         // Add dependency only if it doesn't already exist
         const updatedDependencies = [...currentDependencies, dependsOnId];
-        
+
         // Store the dependencies on the issue using custom field or metadata
         await this.issueRepo.update(issueId, {
           // In a real implementation, this would use a proper field for dependencies
@@ -693,12 +693,12 @@ export class ProjectManagementService {
       if (!issue) {
         throw new ResourceNotFoundError(ResourceType.ISSUE, issueId);
       }
-      
+
       // Extract dependencies from issue labels
       // In a real implementation, this would use a dedicated field or relationship table
       // but we're using labels as a workaround for now
       const dependencies: string[] = [];
-      
+
       if (issue.labels && issue.labels.length > 0) {
         // Extract dependencies from the "depends-on" labels
         issue.labels.forEach(label => {
@@ -708,7 +708,7 @@ export class ProjectManagementService {
           }
         });
       }
-      
+
       return dependencies;
     } catch (error) {
       throw this.mapErrorToMCPError(error);

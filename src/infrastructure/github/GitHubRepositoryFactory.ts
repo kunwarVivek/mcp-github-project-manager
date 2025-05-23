@@ -2,7 +2,7 @@ import { Octokit } from "@octokit/rest";
 import { IGitHubRepository } from "./repositories/BaseRepository";
 import { GitHubErrorHandler } from "./GitHubErrorHandler";
 import { OctokitInstance } from "./types";
-import { GitHubConfig } from "./GitHubConfig"; // Fixed import path
+import { GitHubConfig } from "./GitHubConfig";
 import { GitHubIssueRepository } from "./repositories/GitHubIssueRepository";
 import { GitHubMilestoneRepository } from "./repositories/GitHubMilestoneRepository";
 import { GitHubProjectRepository } from "./repositories/GitHubProjectRepository";
@@ -26,7 +26,7 @@ export class GitHubRepositoryFactory {
   ) {
     this.config = GitHubConfig.create(owner, repo, token);
     this.errorHandler = new GitHubErrorHandler();
-    
+
     this.octokit = new Octokit({
       auth: token,
       baseUrl: options.baseUrl || "https://api.github.com",
