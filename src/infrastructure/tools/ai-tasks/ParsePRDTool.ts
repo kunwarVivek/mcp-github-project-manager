@@ -20,7 +20,12 @@ const parsePRDSchema = z.object({
   createLifecycle: z.boolean().default(true).describe('Whether to create lifecycle tracking for tasks'),
   createTraceabilityMatrix: z.boolean().default(true).describe('Whether to create comprehensive requirements traceability matrix'),
   includeUseCases: z.boolean().default(true).describe('Whether to generate use cases from features'),
-  projectId: z.string().optional().describe('Project ID for traceability matrix')
+  projectId: z.string().optional().describe('Project ID for traceability matrix'),
+  enhancedGeneration: z.boolean().default(true).describe('Whether to use enhanced task generation with full context'),
+  contextLevel: z.enum(['minimal', 'standard', 'full']).default('full').describe('Level of contextual information to include'),
+  includeBusinessContext: z.boolean().default(true).describe('Whether to include business context in tasks'),
+  includeTechnicalContext: z.boolean().default(true).describe('Whether to include technical context in tasks'),
+  includeImplementationGuidance: z.boolean().default(true).describe('Whether to include implementation guidance in tasks')
 });
 
 export type ParsePRDArgs = z.infer<typeof parsePRDSchema>;
@@ -37,14 +42,36 @@ async function executeParsePRD(args: ParsePRDArgs): Promise<MCPResponse> {
     // First, try to extract features from the PRD
     const features = await prdService.extractFeaturesFromPRD(args.prdContent);
 
-    // Generate tasks from the PRD content
-    const tasks = await taskService.generateTasksFromPRD({
-      prd: args.prdContent,
-      maxTasks: args.maxTasks,
-      includeSubtasks: args.includeSubtasks,
-      autoEstimate: args.autoEstimate,
-      autoPrioritize: args.autoPrioritize
-    });
+    // Generate tasks from the PRD content using enhanced generation if enabled
+    const tasks = args.enhancedGeneration
+      ? await taskService.generateEnhancedTasksFromPRD({
+          prd: args.prdContent,
+          maxTasks: args.maxTasks,
+          includeSubtasks: args.includeSubtasks,
+          autoEstimate: args.autoEstimate,
+          autoPrioritize: args.autoPrioritize,
+          projectId: args.projectId,
+          enhancedConfig: {
+            enableEnhancedGeneration: args.enhancedGeneration,
+            createTraceabilityMatrix: args.createTraceabilityMatrix,
+            generateUseCases: args.includeUseCases,
+            createLifecycleTracking: args.createLifecycle,
+            contextLevel: args.contextLevel,
+            includeBusinessContext: args.includeBusinessContext,
+            includeTechnicalContext: args.includeTechnicalContext,
+            includeImplementationGuidance: args.includeImplementationGuidance,
+            enforceTraceability: args.createTraceabilityMatrix,
+            requireBusinessJustification: args.includeBusinessContext,
+            trackRequirementCoverage: args.createTraceabilityMatrix
+          }
+        })
+      : await taskService.generateTasksFromPRD({
+          prd: args.prdContent,
+          maxTasks: args.maxTasks,
+          includeSubtasks: args.includeSubtasks,
+          autoEstimate: args.autoEstimate,
+          autoPrioritize: args.autoPrioritize
+        });
 
     // Filter tasks by target complexity if specified
     let filteredTasks = tasks;
@@ -399,7 +426,12 @@ export const parsePRDTool: ToolDefinition<ParsePRDArgs> = {
         createLifecycle: true,
         createTraceabilityMatrix: true,
         includeUseCases: true,
-        projectId: "task-management-app"
+        projectId: "task-management-app",
+        enhancedGeneration: true,
+        contextLevel: "full" as const,
+        includeBusinessContext: true,
+        includeTechnicalContext: true,
+        includeImplementationGuidance: true
       }
     }
   ]

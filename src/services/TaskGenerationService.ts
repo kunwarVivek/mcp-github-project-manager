@@ -13,8 +13,22 @@ import {
   MAX_TASKS_PER_PRD,
   MAX_SUBTASK_DEPTH,
   AUTO_DEPENDENCY_DETECTION,
-  AUTO_EFFORT_ESTIMATION
+  AUTO_EFFORT_ESTIMATION,
+  ENHANCED_TASK_GENERATION,
+  AUTO_CREATE_TRACEABILITY,
+  AUTO_GENERATE_USE_CASES,
+  AUTO_CREATE_LIFECYCLE,
+  ENHANCED_CONTEXT_LEVEL,
+  INCLUDE_BUSINESS_CONTEXT,
+  INCLUDE_TECHNICAL_CONTEXT,
+  INCLUDE_IMPLEMENTATION_GUIDANCE
 } from '../env.js';
+import {
+  EnhancedTaskGenerationConfig,
+  EnhancedTaskGenerationParams,
+  EnhancedAITask
+} from '../domain/ai-types.js';
+import { RequirementsTraceabilityService } from './RequirementsTraceabilityService.js';
 import { v4 as uuidv4 } from 'uuid';
 
 /**
@@ -22,15 +36,124 @@ import { v4 as uuidv4 } from 'uuid';
  */
 export class TaskGenerationService {
   private aiProcessor: AITaskProcessor;
+  private traceabilityService: RequirementsTraceabilityService;
 
   constructor() {
     this.aiProcessor = new AITaskProcessor();
+    this.traceabilityService = new RequirementsTraceabilityService();
   }
 
   /**
-   * Generate comprehensive task list from PRD
+   * Get default enhanced task generation configuration from environment
+   */
+  private getDefaultEnhancedConfig(): EnhancedTaskGenerationConfig {
+    return {
+      enableEnhancedGeneration: ENHANCED_TASK_GENERATION,
+      createTraceabilityMatrix: AUTO_CREATE_TRACEABILITY,
+      generateUseCases: AUTO_GENERATE_USE_CASES,
+      createLifecycleTracking: AUTO_CREATE_LIFECYCLE,
+      contextLevel: ENHANCED_CONTEXT_LEVEL as 'minimal' | 'standard' | 'full',
+      includeBusinessContext: INCLUDE_BUSINESS_CONTEXT,
+      includeTechnicalContext: INCLUDE_TECHNICAL_CONTEXT,
+      includeImplementationGuidance: INCLUDE_IMPLEMENTATION_GUIDANCE,
+      enforceTraceability: AUTO_CREATE_TRACEABILITY,
+      requireBusinessJustification: INCLUDE_BUSINESS_CONTEXT,
+      trackRequirementCoverage: AUTO_CREATE_TRACEABILITY
+    };
+  }
+
+  /**
+   * Generate enhanced task list from PRD with full traceability and context
+   */
+  async generateEnhancedTasksFromPRD(params: EnhancedTaskGenerationParams): Promise<EnhancedAITask[]> {
+    const config = { ...this.getDefaultEnhancedConfig(), ...params.enhancedConfig };
+
+    if (!config.enableEnhancedGeneration) {
+      // Fall back to basic task generation
+      const basicTasks = await this.generateBasicTasksFromPRD(params);
+      return basicTasks.map(task => ({ ...task } as EnhancedAITask));
+    }
+
+    try {
+      const prdContent = typeof params.prd === 'string'
+        ? params.prd
+        : JSON.stringify(params.prd, null, 2);
+
+      // Generate basic tasks first
+      const basicTasks = await this.generateBasicTasksFromPRD(params);
+
+      // Create traceability matrix if enabled
+      let traceabilityMatrix;
+      if (config.createTraceabilityMatrix) {
+        // Create mock PRD for traceability
+        const mockPRD = {
+          id: params.projectId || `prd-${Date.now()}`,
+          title: 'Generated PRD',
+          overview: prdContent.substring(0, 500),
+          objectives: params.businessObjectives || ['Deliver high-quality software solution'],
+          successMetrics: ['User satisfaction > 90%'],
+          features: [],
+          author: 'system',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          aiGenerated: true,
+          aiMetadata: {
+            generatedBy: 'enhanced-task-generation',
+            generatedAt: new Date().toISOString(),
+            prompt: 'Enhanced task generation from PRD',
+            confidence: 0.8,
+            version: '1.0.0'
+          }
+        };
+
+        traceabilityMatrix = this.traceabilityService.createTraceabilityMatrix(
+          params.projectId || 'enhanced-project',
+          mockPRD as any,
+          [], // Features will be extracted
+          basicTasks
+        );
+      }
+
+      // Enhance tasks with traceability and context
+      const enhancedTasks = config.createTraceabilityMatrix && traceabilityMatrix
+        ? traceabilityMatrix.tasks as EnhancedAITask[]
+        : basicTasks.map(task => ({ ...task } as EnhancedAITask));
+
+      return enhancedTasks;
+    } catch (error) {
+      console.error('Error generating enhanced tasks from PRD:', error);
+      throw new Error(`Failed to generate enhanced tasks: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Generate comprehensive task list from PRD (legacy method - now uses enhanced generation by default)
    */
   async generateTasksFromPRD(params: {
+    prd: PRDDocument | string;
+    maxTasks?: number;
+    includeSubtasks?: boolean;
+    autoEstimate?: boolean;
+    autoPrioritize?: boolean;
+  }): Promise<AITask[]> {
+    // Check if enhanced generation is enabled by default
+    if (ENHANCED_TASK_GENERATION) {
+      const enhancedParams: EnhancedTaskGenerationParams = {
+        ...params,
+        enhancedConfig: this.getDefaultEnhancedConfig()
+      };
+      const enhancedTasks = await this.generateEnhancedTasksFromPRD(enhancedParams);
+      return enhancedTasks as AITask[]; // Return as basic tasks for backward compatibility
+    }
+
+    // Fall back to basic generation
+    return this.generateBasicTasksFromPRD(params);
+  }
+
+  /**
+   * Generate basic task list from PRD (without enhanced features)
+   */
+  async generateBasicTasksFromPRD(params: {
     prd: PRDDocument | string;
     maxTasks?: number;
     includeSubtasks?: boolean;
@@ -66,8 +189,8 @@ export class TaskGenerationService {
       // Ensure all tasks have required metadata
       return tasks.map(task => this.enrichTaskMetadata(task, params.prd));
     } catch (error) {
-      console.error('Error generating tasks from PRD:', error);
-      throw new Error(`Failed to generate tasks: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      console.error('Error generating basic tasks from PRD:', error);
+      throw new Error(`Failed to generate basic tasks: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 

@@ -1,6 +1,6 @@
 # MCP GitHub Project Manager
 
-A Model Context Protocol (MCP) server implementation that provides GitHub Projects functionality through standardized tools and resources. This server enables LLM clients and applications to manage GitHub Projects programmatically through the MCP interface.
+A comprehensive Model Context Protocol (MCP) server that provides advanced GitHub project management capabilities with **AI-powered task management** and **complete requirements traceability**. Transform your project ideas into actionable tasks with full end-to-end tracking from business requirements to implementation.
 
 [![npm version](https://img.shields.io/npm/v/mcp-github-project-manager.svg)](https://www.npmjs.com/package/mcp-github-project-manager)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -8,7 +8,14 @@ A Model Context Protocol (MCP) server implementation that provides GitHub Projec
 
 ## Overview
 
-This server implements the [Model Context Protocol](https://modelcontextprotocol.io) to expose GitHub Projects functionality to LLM clients and applications. It provides tools for managing projects, milestones, sprints, and metrics through GitHub's GraphQL API while maintaining state and handling errors according to MCP specifications.
+This server implements the [Model Context Protocol](https://modelcontextprotocol.io) to provide comprehensive GitHub project management with advanced AI capabilities. Beyond traditional project management, it offers AI-powered task generation, requirements traceability, and intelligent project planning through GitHub's GraphQL API while maintaining state and handling errors according to MCP specifications.
+
+### 🚀 What Makes This Special
+
+- **AI-Powered**: Transform project ideas into comprehensive PRDs and actionable tasks using multiple AI providers
+- **Complete Traceability**: Full end-to-end tracking from business requirements → features → use cases → tasks
+- **Intelligent Analysis**: AI-powered complexity analysis, effort estimation, and task recommendations
+- **Professional Standards**: IEEE 830 compliant requirements documentation with enterprise-grade change management
 
 ## Table of Contents
 
@@ -69,29 +76,44 @@ For more details on Docker usage, see [DOCKER.md](DOCKER.md).
 
 ## Key Features
 
-- **Project Management**
-  - Create and manage GitHub Projects (v2)
-  - Handle project settings and configurations
-  - Manage project visibility and access
+### 🤖 AI-Powered Task Management
+- **PRD Generation** (`generate_prd`): Transform project ideas into comprehensive Product Requirements Documents
+- **Intelligent Task Breakdown** (`parse_prd`): AI-powered parsing of PRDs into actionable development tasks
+- **Smart Feature Addition** (`add_feature`): Add new features with automatic impact analysis and task generation
+- **Task Complexity Analysis** (`analyze_task_complexity`): Detailed AI analysis of task complexity, effort estimation, and risk assessment
+- **Next Task Recommendations** (`get_next_task`): AI-powered recommendations for optimal task prioritization
+- **Task Expansion** (`expand_task`): Break down complex tasks into manageable subtasks automatically
+- **PRD Enhancement** (`enhance_prd`): Improve existing PRDs with AI-powered gap analysis and improvements
 
-- **Project Resources**
-  - Issues and milestones management
-  - Sprint planning and tracking
-  - Custom fields and views
-  - Resource versioning and locking
+### 🔗 Complete Requirements Traceability
+- **End-to-End Tracking** (`create_traceability_matrix`): Full traceability from PRD business requirements → features → use cases → tasks
+- **Bidirectional Links**: Complete bidirectional traceability with impact analysis
+- **Use Case Management**: Professional actor-goal-scenario use case generation and tracking
+- **Coverage Analysis**: Comprehensive coverage metrics with gap identification
+- **Orphaned Task Detection**: Identify tasks without requirements links
+- **Change Impact Analysis**: Track requirement changes and their impact across all levels
 
-- **MCP Implementation**
-  - Full MCP specification compliance
-  - Standardized tool definitions with Zod validation
-  - Resource state management
-  - Progressive response handling
-  - Comprehensive error handling
+### 📊 Multi-Provider AI Support
+- **Anthropic Claude**: Primary AI provider for complex reasoning
+- **OpenAI GPT**: Alternative provider with fallback support
+- **Google Gemini**: Additional AI capabilities
+- **Perplexity**: Research and analysis tasks
+- **Automatic Fallback**: Seamless switching between providers
 
-- **GitHub Integration**
-  - GraphQL API integration with pagination support
-  - Intelligent rate limit handling
-  - Optimistic concurrency
-  - Webhook support (planned)
+### 🏗️ Core Project Management
+- **Project Management**: Create and manage GitHub Projects (v2)
+- **Issues and Milestones**: Full CRUD operations with advanced filtering
+- **Sprint Planning**: Plan and manage development sprints with AI assistance
+- **Custom Fields and Views**: Create different views (board, table, timeline, roadmap)
+- **Resource Versioning**: Intelligent caching and optimistic locking
+
+### ⚡ Advanced Features
+- **MCP Implementation**: Full MCP specification compliance with Zod validation
+- **GitHub Integration**: GraphQL API integration with intelligent rate limiting
+- **Real-time Sync**: Bidirectional synchronization with GitHub
+- **Webhook Integration**: Real-time updates via GitHub webhooks
+- **Progress Tracking**: Comprehensive metrics and progress reporting
+- **Event System**: Track and replay project events
 
 ## Installation
 
@@ -132,7 +154,9 @@ cp .env.example .env
 
 ## Configuration
 
-Required environment variables:
+### Required Environment Variables
+
+#### GitHub Configuration
 ```env
 GITHUB_TOKEN=your_github_token
 GITHUB_OWNER=repository_owner
@@ -143,6 +167,52 @@ The GitHub token requires these permissions:
 - `repo` (Full repository access)
 - `project` (Project access)
 - `write:org` (Organization access)
+
+#### AI Provider Configuration
+At least one AI provider is required for AI-powered features:
+
+```env
+# Primary AI providers (at least one required)
+ANTHROPIC_API_KEY=your_anthropic_api_key_here
+OPENAI_API_KEY=your_openai_api_key_here
+GOOGLE_API_KEY=your_google_api_key_here
+PERPLEXITY_API_KEY=your_perplexity_api_key_here
+
+# AI Model Configuration (optional - uses defaults if not specified)
+AI_MAIN_MODEL=claude-3-5-sonnet-20241022
+AI_RESEARCH_MODEL=perplexity-llama-3.1-sonar-large-128k-online
+AI_FALLBACK_MODEL=gpt-4o
+AI_PRD_MODEL=claude-3-5-sonnet-20241022
+
+# AI Task Generation Configuration (optional)
+MAX_TASKS_PER_PRD=50
+DEFAULT_COMPLEXITY_THRESHOLD=7
+MAX_SUBTASK_DEPTH=3
+AUTO_DEPENDENCY_DETECTION=true
+AUTO_EFFORT_ESTIMATION=true
+```
+
+### AI Provider Setup
+
+#### Anthropic Claude
+1. Sign up at [Anthropic Console](https://console.anthropic.com/)
+2. Create an API key
+3. Set `ANTHROPIC_API_KEY` in your environment
+
+#### OpenAI
+1. Sign up at [OpenAI Platform](https://platform.openai.com/)
+2. Create an API key
+3. Set `OPENAI_API_KEY` in your environment
+
+#### Google Gemini
+1. Sign up at [Google AI Studio](https://aistudio.google.com/)
+2. Create an API key
+3. Set `GOOGLE_API_KEY` in your environment
+
+#### Perplexity
+1. Sign up at [Perplexity API](https://www.perplexity.ai/settings/api)
+2. Create an API key
+3. Set `PERPLEXITY_API_KEY` in your environment
 
 ## Usage
 
@@ -249,6 +319,97 @@ const result = await client.callTool("create_project", {
 
 For more examples, see the [User Guide](docs/user-guide.md) and the [examples/](examples/) directory.
 
+### AI Tools Usage Examples
+
+#### Complete Project Workflow
+```bash
+# 1. Generate PRD from project idea
+generate_prd({
+  "projectIdea": "AI-powered task management system with real-time collaboration",
+  "projectName": "TaskAI Pro",
+  "author": "product-team",
+  "complexity": "high",
+  "timeline": "6 months",
+  "includeResearch": true
+})
+
+# 2. Parse PRD and generate tasks with traceability
+parse_prd({
+  "prdContent": "<generated PRD content>",
+  "maxTasks": 30,
+  "createTraceabilityMatrix": true,
+  "includeUseCases": true,
+  "projectId": "task-ai-pro"
+})
+
+# 3. Get next task recommendations
+get_next_task({
+  "sprintCapacity": 40,
+  "teamSkills": ["react", "node.js", "typescript"],
+  "maxComplexity": 7,
+  "includeAnalysis": true
+})
+
+# 4. Analyze complex tasks
+analyze_task_complexity({
+  "taskTitle": "Implement real-time collaboration",
+  "taskDescription": "Build WebSocket-based real-time collaboration with conflict resolution",
+  "teamExperience": "mixed",
+  "includeBreakdown": true,
+  "includeRisks": true
+})
+
+# 5. Break down complex tasks
+expand_task({
+  "taskTitle": "Build analytics dashboard",
+  "taskDescription": "Create comprehensive analytics dashboard with AI insights",
+  "currentComplexity": 8,
+  "targetComplexity": 3,
+  "includeEstimates": true,
+  "includeDependencies": true
+})
+```
+
+#### Feature Addition Workflow
+```bash
+# Add new feature with complete lifecycle
+add_feature({
+  "featureIdea": "Advanced Analytics Dashboard",
+  "description": "Real-time analytics with custom charts and AI-powered insights",
+  "requestedBy": "product-manager",
+  "businessJustification": "Increase user engagement and provide actionable insights",
+  "targetUsers": ["project-managers", "team-leads", "executives"],
+  "autoApprove": true,
+  "expandToTasks": true,
+  "createLifecycle": true
+})
+
+# This automatically creates:
+# ✅ Business requirement analysis
+# ✅ Use cases with actor-goal-scenario structure
+# ✅ Tasks with complete traceability links
+# ✅ Lifecycle tracking for all tasks
+```
+
+#### Requirements Traceability
+```bash
+# Create comprehensive traceability matrix
+create_traceability_matrix({
+  "projectId": "task-ai-pro",
+  "prdContent": "<PRD content>",
+  "features": [...],
+  "tasks": [...],
+  "validateCompleteness": true
+})
+
+# Output includes:
+# ✅ Business Requirements → Features → Use Cases → Tasks
+# ✅ Bidirectional traceability links
+# ✅ Coverage analysis with gap identification
+# ✅ Orphaned task detection
+# ✅ Unimplemented requirement tracking
+```
+
 ### Installing in AI Assistants
 
 #### Install in Claude
@@ -264,7 +425,11 @@ To install the MCP server in Claude Desktop:
       "env": {
         "GITHUB_TOKEN": "your_github_token",
         "GITHUB_OWNER": "your_username",
-        "GITHUB_REPO": "your_repo"
+        "GITHUB_REPO": "your_repo",
+        "ANTHROPIC_API_KEY": "your_anthropic_api_key",
+        "OPENAI_API_KEY": "your_openai_api_key",
+        "GOOGLE_API_KEY": "your_google_api_key",
+        "PERPLEXITY_API_KEY": "your_perplexity_api_key"
       }
     }
   }
@@ -495,6 +660,28 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 | Issue Management | ✅ Complete | With custom fields support |
 | Resource Versioning | ✅ Complete | With optimistic locking and schema validation |
 | Webhook Integration | 📅 Planned | Real-time updates |
+
+### AI-Powered Features
+| Feature | Status | Notes |
+|---------|--------|-------|
+| PRD Generation | ✅ Complete | Multi-provider AI support with comprehensive PRD creation |
+| Task Generation | ✅ Complete | AI-powered parsing of PRDs into actionable tasks |
+| Feature Addition | ✅ Complete | Smart feature addition with impact analysis |
+| Task Complexity Analysis | ✅ Complete | Detailed AI analysis with risk assessment |
+| Task Recommendations | ✅ Complete | AI-powered next task recommendations |
+| Task Expansion | ✅ Complete | Break down complex tasks into subtasks |
+| PRD Enhancement | ✅ Complete | AI-powered PRD improvement and gap analysis |
+| Requirements Traceability | ✅ Complete | End-to-end traceability matrix with coverage analysis |
+
+### Requirements Traceability
+| Feature | Status | Notes |
+|---------|--------|-------|
+| Business Requirements Extraction | ✅ Complete | Extract from PRD objectives and success metrics |
+| Use Case Generation | ✅ Complete | Actor-goal-scenario structure with alternatives |
+| Traceability Links | ✅ Complete | Bidirectional links with impact analysis |
+| Coverage Analysis | ✅ Complete | Gap identification and orphaned task detection |
+| Change Tracking | ✅ Complete | Requirement change impact analysis |
+| Verification Tracking | ✅ Complete | Test case mapping and verification status |
 
 ### MCP Implementation
 | Component | Status | Notes |

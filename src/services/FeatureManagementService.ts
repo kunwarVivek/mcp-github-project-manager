@@ -1,7 +1,7 @@
 import { generateText, generateObject } from 'ai';
 import { z } from 'zod';
 import { AIServiceFactory } from './ai/AIServiceFactory.js';
-import { 
+import {
   FeatureAdditionRequest,
   FeatureExpansionResult,
   TaskLifecycleState,
@@ -16,7 +16,7 @@ import {
   FeatureRequirementSchema,
   FeatureAdditionRequestSchema
 } from '../domain/ai-types.js';
-import { 
+import {
   FEATURE_PROMPT_CONFIGS,
   formatFeaturePrompt
 } from './ai/prompts/FeatureAdditionPrompts.js';
@@ -60,7 +60,11 @@ export class FeatureManagementService {
   }> {
     try {
       const config = FEATURE_PROMPT_CONFIGS.analyzeRequest;
-      const model = this.aiFactory.getMainModel();
+      const model = this.aiFactory.getMainModel() || this.aiFactory.getBestAvailableModel();
+
+      if (!model) {
+        throw new Error('AI service is not available. Please configure at least one AI provider (ANTHROPIC_API_KEY, OPENAI_API_KEY, GOOGLE_API_KEY, or PERPLEXITY_API_KEY).');
+      }
 
       const prompt = formatFeaturePrompt(config.userPrompt, {
         featureIdea: params.featureIdea,
@@ -81,7 +85,7 @@ export class FeatureManagementService {
 
       // Parse the analysis (in a real implementation, use structured output)
       const analysis = result.text;
-      
+
       // Extract key information (simplified - would use structured output in production)
       const recommendation = this.extractRecommendation(analysis);
       const priority = this.extractPriority(analysis);
@@ -185,7 +189,11 @@ export class FeatureManagementService {
   }): Promise<FeatureExpansionResult> {
     try {
       const config = FEATURE_PROMPT_CONFIGS.expandToTasks;
-      const model = this.aiFactory.getMainModel();
+      const model = this.aiFactory.getMainModel() || this.aiFactory.getBestAvailableModel();
+
+      if (!model) {
+        throw new Error('AI service is not available. Please configure at least one AI provider (ANTHROPIC_API_KEY, OPENAI_API_KEY, GOOGLE_API_KEY, or PERPLEXITY_API_KEY).');
+      }
 
       const prompt = formatFeaturePrompt(config.userPrompt, {
         featureTitle: params.feature.title,
@@ -314,7 +322,7 @@ export class FeatureManagementService {
       });
 
       // Step 5: Create lifecycle states for all tasks
-      const lifecycleStates = expansionResult.tasks.map(task => 
+      const lifecycleStates = expansionResult.tasks.map(task =>
         this.createInitialTaskLifecycleState(task)
       );
 
@@ -359,7 +367,7 @@ export class FeatureManagementService {
   }): Promise<TaskLifecycleState> {
     try {
       const updatedState = { ...params.currentState };
-      
+
       // Update the specific phase if provided
       if (params.updateData.phase && params.updateData.status) {
         const phase = params.updateData.phase as keyof typeof updatedState.phases;
@@ -411,7 +419,11 @@ export class FeatureManagementService {
   }> {
     try {
       const config = FEATURE_PROMPT_CONFIGS.trackLifecycle;
-      const model = this.aiFactory.getMainModel();
+      const model = this.aiFactory.getMainModel() || this.aiFactory.getBestAvailableModel();
+
+      if (!model) {
+        throw new Error('AI service is not available. Please configure at least one AI provider (ANTHROPIC_API_KEY, OPENAI_API_KEY, GOOGLE_API_KEY, or PERPLEXITY_API_KEY).');
+      }
 
       const prompt = formatFeaturePrompt(config.userPrompt, {
         taskTitle: `Task ${taskLifecycle.taskId}`,
@@ -502,7 +514,7 @@ export class FeatureManagementService {
   } {
     const highComplexityTasks = tasks.filter(t => t.complexity >= 7).length;
     const totalTasks = tasks.length;
-    
+
     let level: 'low' | 'medium' | 'high' = 'low';
     if (highComplexityTasks > totalTasks * 0.3) level = 'high';
     else if (highComplexityTasks > totalTasks * 0.1) level = 'medium';
@@ -566,7 +578,7 @@ export class FeatureManagementService {
 
   private determineCurrentPhase(state: TaskLifecycleState): TaskLifecycleState['currentPhase'] {
     const phaseOrder: (keyof TaskLifecycleState['phases'])[] = ['planning', 'development', 'testing', 'review', 'deployment'];
-    
+
     for (const phase of phaseOrder) {
       if (state.phases[phase].status !== 'completed') {
         return phase;

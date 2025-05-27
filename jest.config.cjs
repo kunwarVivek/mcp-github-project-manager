@@ -22,6 +22,8 @@ module.exports = {
   testMatch: [
     '**/__tests__/**/*.test.ts',
     '**/__tests__/**/*.spec.ts',
+    '**/tests/**/*.test.ts',
+    '**/tests/**/*.spec.ts',
   ],
   collectCoverageFrom: [
     'src/**/*.ts',

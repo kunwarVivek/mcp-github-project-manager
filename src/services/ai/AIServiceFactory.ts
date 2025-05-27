@@ -2,6 +2,7 @@ import { anthropic } from '@ai-sdk/anthropic';
 import { openai } from '@ai-sdk/openai';
 import { google } from '@ai-sdk/google';
 import { perplexity } from '@ai-sdk/perplexity';
+import { LanguageModel } from 'ai';
 import {
   ANTHROPIC_API_KEY,
   OPENAI_API_KEY,
@@ -11,7 +12,7 @@ import {
   AI_RESEARCH_MODEL,
   AI_FALLBACK_MODEL,
   AI_PRD_MODEL
-} from '../../env.js';
+} from '../../env';
 
 /**
  * AI Provider Types
@@ -31,10 +32,10 @@ export interface AIModelConfig {
  * AI Service Configuration
  */
 export interface AIServiceConfig {
-  main: AIModelConfig;
-  research: AIModelConfig;
-  fallback: AIModelConfig;
-  prd: AIModelConfig;
+  main: AIModelConfig | null;
+  research: AIModelConfig | null;
+  fallback: AIModelConfig | null;
+  prd: AIModelConfig | null;
 }
 
 /**
@@ -73,7 +74,7 @@ export class AIServiceFactory {
   /**
    * Parse model configuration from model string
    */
-  private parseModelConfig(modelString: string): AIModelConfig {
+  private parseModelConfig(modelString: string): AIModelConfig | null {
     // Extract provider from model name
     let provider: AIProvider;
     let model: string;
@@ -103,7 +104,8 @@ export class AIServiceFactory {
     }
 
     if (!apiKey) {
-      throw new Error(`API key not found for ${provider} provider. Please set the corresponding environment variable.`);
+      console.warn(`⚠️  AI Provider Warning: No API key found for ${provider} provider. AI features using this provider will be disabled.`);
+      return null;
     }
 
     return { provider, model, apiKey };
@@ -112,8 +114,13 @@ export class AIServiceFactory {
   /**
    * Get AI model instance for specific use case
    */
-  public getModel(type: 'main' | 'research' | 'fallback' | 'prd') {
+  public getModel(type: 'main' | 'research' | 'fallback' | 'prd'): LanguageModel | null {
     const config = this.config[type];
+
+    if (!config) {
+      console.warn(`⚠️  AI Model Warning: ${type} model is not available due to missing API key.`);
+      return null;
+    }
 
     switch (config.provider) {
       case 'anthropic':
@@ -136,29 +143,61 @@ export class AIServiceFactory {
   /**
    * Get main AI model (for general task generation)
    */
-  public getMainModel() {
+  public getMainModel(): LanguageModel | null {
     return this.getModel('main');
   }
 
   /**
    * Get research AI model (for enhanced analysis)
    */
-  public getResearchModel() {
+  public getResearchModel(): LanguageModel | null {
     return this.getModel('research');
   }
 
   /**
    * Get fallback AI model (when main model fails)
    */
-  public getFallbackModel() {
+  public getFallbackModel(): LanguageModel | null {
     return this.getModel('fallback');
   }
 
   /**
    * Get PRD AI model (for PRD generation)
    */
-  public getPRDModel() {
+  public getPRDModel(): LanguageModel | null {
     return this.getModel('prd');
+  }
+
+  /**
+   * Get the best available model with fallback logic
+   * Tries models in order of preference: main -> fallback -> any available
+   */
+  public getBestAvailableModel(): LanguageModel | null {
+    // Try main model first
+    const mainModel = this.getMainModel();
+    if (mainModel) return mainModel;
+
+    // Try fallback model
+    const fallbackModel = this.getFallbackModel();
+    if (fallbackModel) return fallbackModel;
+
+    // Try PRD model
+    const prdModel = this.getPRDModel();
+    if (prdModel) return prdModel;
+
+    // Try research model
+    const researchModel = this.getResearchModel();
+    if (researchModel) return researchModel;
+
+    // No models available
+    return null;
+  }
+
+  /**
+   * Check if any AI functionality is available
+   */
+  public isAIAvailable(): boolean {
+    return this.getBestAvailableModel() !== null;
   }
 
   /**
@@ -169,19 +208,57 @@ export class AIServiceFactory {
   }
 
   /**
-   * Check if all required API keys are available
+   * Check AI provider availability and configuration status
    */
-  public validateConfiguration(): { valid: boolean; missing: string[] } {
+  public validateConfiguration(): {
+    hasAnyProvider: boolean;
+    available: string[];
+    missing: string[];
+    availableModels: string[];
+    unavailableModels: string[];
+  } {
     const missing: string[] = [];
+    const available: string[] = [];
+    const availableModels: string[] = [];
+    const unavailableModels: string[] = [];
 
-    if (!ANTHROPIC_API_KEY) missing.push('ANTHROPIC_API_KEY');
-    if (!OPENAI_API_KEY) missing.push('OPENAI_API_KEY');
-    if (!GOOGLE_API_KEY) missing.push('GOOGLE_API_KEY');
-    if (!PERPLEXITY_API_KEY) missing.push('PERPLEXITY_API_KEY');
+    // Check each provider
+    if (!ANTHROPIC_API_KEY) {
+      missing.push('ANTHROPIC_API_KEY');
+    } else {
+      available.push('anthropic');
+    }
+
+    if (!OPENAI_API_KEY) {
+      missing.push('OPENAI_API_KEY');
+    } else {
+      available.push('openai');
+    }
+
+    if (!GOOGLE_API_KEY) {
+      missing.push('GOOGLE_API_KEY');
+    } else {
+      available.push('google');
+    }
+
+    if (!PERPLEXITY_API_KEY) {
+      missing.push('PERPLEXITY_API_KEY');
+    } else {
+      available.push('perplexity');
+    }
+
+    // Check which models are available
+    if (this.config.main) availableModels.push('main'); else unavailableModels.push('main');
+    if (this.config.research) availableModels.push('research'); else unavailableModels.push('research');
+    if (this.config.fallback) availableModels.push('fallback'); else unavailableModels.push('fallback');
+    if (this.config.prd) availableModels.push('prd'); else unavailableModels.push('prd');
 
     return {
-      valid: missing.length === 0,
-      missing
+      hasAnyProvider: available.length > 0,
+      available,
+      missing,
+      availableModels,
+      unavailableModels
     };
   }
 
@@ -200,14 +277,16 @@ export class AIServiceFactory {
     if (ANTHROPIC_API_KEY) {
       try {
         const model = this.getModel('main');
-        // Simple test generation using generateText from ai package
-        const { generateText } = await import('ai');
-        await generateText({
-          model,
-          prompt: 'Test connection',
-          maxTokens: 10
-        });
-        results.anthropic = true;
+        if (model) {
+          // Simple test generation using generateText from ai package
+          const { generateText } = await import('ai');
+          await generateText({
+            model,
+            prompt: 'Test connection',
+            maxTokens: 10
+          });
+          results.anthropic = true;
+        }
       } catch (error) {
         console.warn('Anthropic connection test failed:', error);
       }

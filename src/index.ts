@@ -42,6 +42,7 @@ import { EventSubscriptionManager } from "./infrastructure/events/EventSubscript
 import { EventStore } from "./infrastructure/events/EventStore";
 import { WebhookServer } from "./infrastructure/http/WebhookServer";
 import { Logger } from "./infrastructure/logger/index";
+import { AIServiceFactory } from "./services/ai/AIServiceFactory";
 
 class GitHubProjectManagerServer {
   private server: Server;
@@ -104,11 +105,51 @@ class GitHubProjectManagerServer {
 
     this.setupToolHandlers();
     this.setupEventHandlers();
+    this.logAIServiceStatus();
 
     this.server.onerror = (error) => this.logger.error("[MCP Error]", error);
     process.on("SIGINT", async () => {
       await this.shutdown();
     });
+  }
+
+  /**
+   * Log AI service status during startup
+   */
+  private logAIServiceStatus(): void {
+    try {
+      const aiFactory = AIServiceFactory.getInstance();
+      const validation = aiFactory.validateConfiguration();
+
+      this.logger.info("🤖 AI Service Status Check");
+
+      if (validation.hasAnyProvider) {
+        this.logger.info(`✅ AI Services Available: ${validation.available.join(', ')}`);
+        this.logger.info(`📊 Available Models: ${validation.availableModels.join(', ')}`);
+
+        if (validation.unavailableModels.length > 0) {
+          this.logger.warn(`⚠️  Unavailable Models: ${validation.unavailableModels.join(', ')}`);
+        }
+
+        if (validation.missing.length > 0) {
+          this.logger.warn(`🔑 Missing API Keys: ${validation.missing.join(', ')}`);
+        }
+
+        this.logger.info("🎯 AI-powered tools are ready: generate_prd, enhance_prd, parse_prd, add_feature, get_next_task, analyze_task_complexity, expand_task, create_traceability_matrix");
+      } else {
+        this.logger.warn("⚠️  No AI providers configured - AI features will be unavailable");
+        this.logger.warn("🔑 Missing API Keys: " + validation.missing.join(', '));
+        this.logger.info("💡 To enable AI features, set at least one of these environment variables:");
+        this.logger.info("   - ANTHROPIC_API_KEY (recommended)");
+        this.logger.info("   - OPENAI_API_KEY");
+        this.logger.info("   - GOOGLE_API_KEY");
+        this.logger.info("   - PERPLEXITY_API_KEY");
+        this.logger.info("🚀 Non-AI GitHub project management features remain fully functional");
+      }
+    } catch (error) {
+      this.logger.error("Failed to check AI service status:", error);
+      this.logger.warn("⚠️  AI service status unknown - continuing with startup");
+    }
   }
 
   private setupToolHandlers() {

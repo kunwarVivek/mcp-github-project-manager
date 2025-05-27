@@ -33,6 +33,27 @@ export class AITaskProcessor {
   }
 
   /**
+   * Get AI model with fallback logic
+   */
+  private getModelWithFallback(preferredType?: 'main' | 'research' | 'fallback' | 'prd'): any {
+    let model = null;
+
+    if (preferredType) {
+      model = this.aiFactory.getModel(preferredType);
+    }
+
+    if (!model) {
+      model = this.aiFactory.getBestAvailableModel();
+    }
+
+    if (!model) {
+      throw new Error('AI service is not available. Please configure at least one AI provider (ANTHROPIC_API_KEY, OPENAI_API_KEY, GOOGLE_API_KEY, or PERPLEXITY_API_KEY).');
+    }
+
+    return model;
+  }
+
+  /**
    * Generate PRD from project idea
    */
   async generatePRDFromIdea(params: {
@@ -42,7 +63,7 @@ export class AITaskProcessor {
     complexity?: string;
   }): Promise<PRDDocument> {
     const config = PRD_PROMPT_CONFIGS.generateFromIdea;
-    const model = this.aiFactory.getPRDModel();
+    const model = this.getModelWithFallback('prd');
 
     const prompt = formatPrompt(config.userPrompt, {
       projectIdea: params.projectIdea,
@@ -85,7 +106,7 @@ export class AITaskProcessor {
     focusAreas?: string[];
   }): Promise<PRDDocument> {
     const config = PRD_PROMPT_CONFIGS.enhanceExisting;
-    const model = this.aiFactory.getPRDModel();
+    const model = this.getModelWithFallback('prd');
 
     const prompt = formatPrompt(config.userPrompt, {
       currentPRD: params.currentPRD,
@@ -120,7 +141,7 @@ export class AITaskProcessor {
    */
   async extractFeaturesFromPRD(prdContent: string): Promise<FeatureRequirement[]> {
     const config = PRD_PROMPT_CONFIGS.extractFeatures;
-    const model = this.aiFactory.getMainModel();
+    const model = this.getModelWithFallback('main');
 
     const prompt = formatPrompt(config.userPrompt, {
       prdContent
@@ -156,7 +177,7 @@ export class AITaskProcessor {
     autoEstimate?: boolean;
   }): Promise<AITask[]> {
     const config = TASK_PROMPT_CONFIGS.generateFromPRD;
-    const model = this.aiFactory.getMainModel();
+    const model = this.getModelWithFallback('main');
 
     const prompt = formatTaskPrompt(config.userPrompt, {
       prdContent: params.prdContent,
@@ -209,7 +230,7 @@ export class AITaskProcessor {
     recommendations: string[];
   }> {
     const config = TASK_PROMPT_CONFIGS.analyzeComplexity;
-    const model = this.aiFactory.getMainModel();
+    const model = this.getModelWithFallback('main');
 
     const prompt = formatTaskPrompt(config.userPrompt, {
       taskTitle: params.taskTitle,
@@ -259,7 +280,7 @@ export class AITaskProcessor {
     maxDepth: number;
   }): Promise<any[]> {
     const config = TASK_PROMPT_CONFIGS.expandTask;
-    const model = this.aiFactory.getMainModel();
+    const model = this.getModelWithFallback('main');
 
     const prompt = formatTaskPrompt(config.userPrompt, {
       taskTitle: params.taskTitle,
@@ -318,7 +339,7 @@ export class AITaskProcessor {
     teamSize?: number;
   }): Promise<AITask[]> {
     const config = TASK_PROMPT_CONFIGS.prioritizeTasks;
-    const model = this.aiFactory.getMainModel();
+    const model = this.getModelWithFallback('main');
 
     const prompt = formatTaskPrompt(config.userPrompt, {
       taskList: params.tasks.map(t => ({ id: t.id, title: t.title, description: t.description })),
@@ -380,7 +401,12 @@ export class AITaskProcessor {
    */
   async testConnection(): Promise<boolean> {
     try {
-      const model = this.aiFactory.getMainModel();
+      const model = this.aiFactory.getBestAvailableModel();
+      if (!model) {
+        console.warn('No AI models available for testing');
+        return false;
+      }
+
       await generateText({
         model,
         prompt: 'Test connection',

@@ -130,6 +130,16 @@ export const MAX_SUBTASK_DEPTH = getNumericConfigValue("MAX_SUBTASK_DEPTH", 3);
 export const AUTO_DEPENDENCY_DETECTION = getBooleanConfigValue("AUTO_DEPENDENCY_DETECTION", true);
 export const AUTO_EFFORT_ESTIMATION = getBooleanConfigValue("AUTO_EFFORT_ESTIMATION", true);
 
+// Enhanced Task Generation configuration
+export const ENHANCED_TASK_GENERATION = getBooleanConfigValue("ENHANCED_TASK_GENERATION", true);
+export const AUTO_CREATE_TRACEABILITY = getBooleanConfigValue("AUTO_CREATE_TRACEABILITY", true);
+export const AUTO_GENERATE_USE_CASES = getBooleanConfigValue("AUTO_GENERATE_USE_CASES", true);
+export const AUTO_CREATE_LIFECYCLE = getBooleanConfigValue("AUTO_CREATE_LIFECYCLE", true);
+export const ENHANCED_CONTEXT_LEVEL = getOptionalConfigValue("ENHANCED_CONTEXT_LEVEL", "full"); // minimal, standard, full
+export const INCLUDE_BUSINESS_CONTEXT = getBooleanConfigValue("INCLUDE_BUSINESS_CONTEXT", true);
+export const INCLUDE_TECHNICAL_CONTEXT = getBooleanConfigValue("INCLUDE_TECHNICAL_CONTEXT", true);
+export const INCLUDE_IMPLEMENTATION_GUIDANCE = getBooleanConfigValue("INCLUDE_IMPLEMENTATION_GUIDANCE", true);
+
 // GitHub AI Integration
 export const AUTO_CREATE_PROJECT_FIELDS = getBooleanConfigValue("AUTO_CREATE_PROJECT_FIELDS", true);
 export const AI_BATCH_SIZE = getNumericConfigValue("AI_BATCH_SIZE", 10);

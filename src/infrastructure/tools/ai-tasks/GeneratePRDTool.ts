@@ -53,11 +53,81 @@ async function executeGeneratePRD(args: GeneratePRDArgs): Promise<MCPResponse> {
 
   } catch (error) {
     console.error('Error in generate_prd tool:', error);
+
+    // Check if this is an AI availability error
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    const isAIUnavailable = errorMessage.includes('AI service is not available') ||
+                           errorMessage.includes('API key') ||
+                           errorMessage.includes('provider');
+
+    if (isAIUnavailable) {
+      const aiErrorSummary = formatAIUnavailableMessage('generate_prd', errorMessage);
+      return ToolResultFormatter.formatSuccess('generate_prd', {
+        content: [{ type: 'text', text: aiErrorSummary }],
+        success: false,
+        aiAvailable: false
+      });
+    }
+
     return ToolResultFormatter.formatSuccess('generate_prd', {
-      error: `Failed to generate PRD: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      content: [{
+        type: 'text',
+        text: `# Failed to generate PRD\n\n**Error:** ${errorMessage}\n\nPlease check your input parameters and try again.`
+      }],
       success: false
     });
   }
+}
+
+/**
+ * Helper function to format AI unavailable message
+ */
+function formatAIUnavailableMessage(toolName: string, errorMessage: string): string {
+  return `# AI Service Unavailable
+
+## ${toolName} Tool Status: ⚠️ Temporarily Unavailable
+
+The AI-powered PRD generation feature is currently unavailable because no AI providers are configured.
+
+### What happened?
+${errorMessage}
+
+### How to fix this:
+
+1. **Configure at least one AI provider** by setting environment variables:
+   \`\`\`bash
+   # Anthropic Claude (Recommended)
+   export ANTHROPIC_API_KEY="your_anthropic_api_key_here"
+
+   # OpenAI GPT (Alternative)
+   export OPENAI_API_KEY="your_openai_api_key_here"
+
+   # Google Gemini (Alternative)
+   export GOOGLE_API_KEY="your_google_api_key_here"
+
+   # Perplexity (For research)
+   export PERPLEXITY_API_KEY="your_perplexity_api_key_here"
+   \`\`\`
+
+2. **Restart the MCP server** after setting the environment variables
+
+3. **Try the command again** once AI services are available
+
+### Alternative Options:
+
+While AI services are unavailable, you can still:
+- Use non-AI GitHub project management features
+- Create manual PRDs using templates
+- Manage existing projects and tasks
+- Use other MCP tools that don't require AI
+
+### Need Help?
+
+- Check the documentation for API key setup instructions
+- Verify your API keys are valid and have sufficient credits
+- Contact support if the issue persists
+
+The MCP server will continue to work normally for all non-AI features.`;
 }
 
 /**
