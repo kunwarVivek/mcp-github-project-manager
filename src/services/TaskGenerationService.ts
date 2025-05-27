@@ -29,6 +29,7 @@ import {
   EnhancedAITask
 } from '../domain/ai-types.js';
 import { RequirementsTraceabilityService } from './RequirementsTraceabilityService.js';
+import { TaskContextGenerationService } from './TaskContextGenerationService.js';
 import { v4 as uuidv4 } from 'uuid';
 
 /**
@@ -37,10 +38,12 @@ import { v4 as uuidv4 } from 'uuid';
 export class TaskGenerationService {
   private aiProcessor: AITaskProcessor;
   private traceabilityService: RequirementsTraceabilityService;
+  private contextGenerationService: TaskContextGenerationService;
 
   constructor() {
     this.aiProcessor = new AITaskProcessor();
     this.traceabilityService = new RequirementsTraceabilityService();
+    this.contextGenerationService = new TaskContextGenerationService();
   }
 
   /**
@@ -114,10 +117,13 @@ export class TaskGenerationService {
         );
       }
 
-      // Enhance tasks with traceability and context
-      const enhancedTasks = config.createTraceabilityMatrix && traceabilityMatrix
-        ? traceabilityMatrix.tasks as EnhancedAITask[]
-        : basicTasks.map(task => ({ ...task } as EnhancedAITask));
+      // Enhance tasks with context generation
+      const enhancedTasks = await this.enhanceTasksWithContext(
+        basicTasks,
+        prdContent,
+        config,
+        traceabilityMatrix
+      );
 
       return enhancedTasks;
     } catch (error) {
@@ -192,6 +198,77 @@ export class TaskGenerationService {
       console.error('Error generating basic tasks from PRD:', error);
       throw new Error(`Failed to generate basic tasks: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
+  }
+
+  /**
+   * Enhance tasks with comprehensive context
+   */
+  private async enhanceTasksWithContext(
+    basicTasks: AITask[],
+    prdContent: string,
+    config: EnhancedTaskGenerationConfig,
+    traceabilityMatrix?: any
+  ): Promise<EnhancedAITask[]> {
+    const enhancedTasks: EnhancedAITask[] = [];
+
+    for (const task of basicTasks) {
+      try {
+        // Start with traceability-enhanced task if available
+        let enhancedTask: EnhancedAITask;
+        if (config.createTraceabilityMatrix && traceabilityMatrix) {
+          const traceabilityTask = traceabilityMatrix.tasks.find((t: any) => t.id === task.id);
+          enhancedTask = traceabilityTask || { ...task } as EnhancedAITask;
+        } else {
+          enhancedTask = { ...task } as EnhancedAITask;
+        }
+
+        // Generate comprehensive context
+        const executionContext = await this.contextGenerationService.generateTaskContext(
+          task,
+          prdContent,
+          config
+        );
+
+        // Add execution context to the task
+        enhancedTask.executionContext = executionContext;
+
+        // Generate implementation guidance if enabled
+        if (config.includeImplementationGuidance) {
+          const implementationGuidance = await this.contextGenerationService.generateImplementationGuidance(
+            task
+          );
+          if (implementationGuidance) {
+            enhancedTask.implementationGuidance = implementationGuidance;
+          }
+        }
+
+        // Enhance acceptance criteria
+        enhancedTask.enhancedAcceptanceCriteria = this.enhanceAcceptanceCriteria(task.acceptanceCriteria);
+
+        enhancedTasks.push(enhancedTask);
+      } catch (error) {
+        console.error(`Error enhancing task ${task.id}:`, error);
+        // Fallback to basic enhanced task
+        enhancedTasks.push({ ...task } as EnhancedAITask);
+      }
+    }
+
+    return enhancedTasks;
+  }
+
+  /**
+   * Enhance basic acceptance criteria with additional details
+   */
+  private enhanceAcceptanceCriteria(basicCriteria: any[]): any[] {
+    return basicCriteria.map((criterion, index) => ({
+      id: criterion.id || `ac-${index + 1}`,
+      description: criterion.description,
+      category: 'functional' as const,
+      verificationMethod: 'manual_test' as const,
+      verificationDetails: `Verify that: ${criterion.description}`,
+      priority: 'must_have' as const,
+      completed: criterion.completed || false
+    }));
   }
 
   /**

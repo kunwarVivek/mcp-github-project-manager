@@ -135,10 +135,10 @@ export const ENHANCED_TASK_GENERATION = getBooleanConfigValue("ENHANCED_TASK_GEN
 export const AUTO_CREATE_TRACEABILITY = getBooleanConfigValue("AUTO_CREATE_TRACEABILITY", true);
 export const AUTO_GENERATE_USE_CASES = getBooleanConfigValue("AUTO_GENERATE_USE_CASES", true);
 export const AUTO_CREATE_LIFECYCLE = getBooleanConfigValue("AUTO_CREATE_LIFECYCLE", true);
-export const ENHANCED_CONTEXT_LEVEL = getOptionalConfigValue("ENHANCED_CONTEXT_LEVEL", "full"); // minimal, standard, full
-export const INCLUDE_BUSINESS_CONTEXT = getBooleanConfigValue("INCLUDE_BUSINESS_CONTEXT", true);
-export const INCLUDE_TECHNICAL_CONTEXT = getBooleanConfigValue("INCLUDE_TECHNICAL_CONTEXT", true);
-export const INCLUDE_IMPLEMENTATION_GUIDANCE = getBooleanConfigValue("INCLUDE_IMPLEMENTATION_GUIDANCE", true);
+export const ENHANCED_CONTEXT_LEVEL = getOptionalConfigValue("ENHANCED_CONTEXT_LEVEL", "standard"); // minimal, standard, full
+export const INCLUDE_BUSINESS_CONTEXT = getBooleanConfigValue("INCLUDE_BUSINESS_CONTEXT", false); // Default: traceability only
+export const INCLUDE_TECHNICAL_CONTEXT = getBooleanConfigValue("INCLUDE_TECHNICAL_CONTEXT", false); // Default: traceability only
+export const INCLUDE_IMPLEMENTATION_GUIDANCE = getBooleanConfigValue("INCLUDE_IMPLEMENTATION_GUIDANCE", false); // Default: traceability only
 
 // GitHub AI Integration
 export const AUTO_CREATE_PROJECT_FIELDS = getBooleanConfigValue("AUTO_CREATE_PROJECT_FIELDS", true);

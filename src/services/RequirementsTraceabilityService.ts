@@ -1,8 +1,8 @@
-import { 
-  Requirement, 
-  RequirementType, 
-  RequirementStatus, 
-  TraceabilityLink, 
+import {
+  Requirement,
+  RequirementType,
+  RequirementStatus,
+  TraceabilityLink,
   TraceabilityLinkType,
   UseCase,
   EnhancedFeatureRequirement,
@@ -219,15 +219,15 @@ export class RequirementsTraceabilityService {
    * Enhance tasks with full requirements traceability
    */
   enhanceTasksWithTraceability(
-    tasks: AITask[], 
-    useCases: UseCase[], 
-    features: FeatureRequirement[], 
+    tasks: AITask[],
+    useCases: UseCase[],
+    features: FeatureRequirement[],
     businessRequirements: Requirement[],
     prdId: string
   ): EnhancedAITask[] {
     return tasks.map(task => {
       // Find related use cases based on task title/description
-      const relatedUseCases = useCases.filter(uc => 
+      const relatedUseCases = useCases.filter(uc =>
         this.isTaskRelatedToUseCase(task, uc)
       );
 
@@ -246,7 +246,7 @@ export class RequirementsTraceabilityService {
         businessRequirement: relatedBusinessReqs[0]?.id || '',
         functionalRequirement: relatedFeatures[0]?.id || '',
         useCase: relatedUseCases[0]?.id || '',
-        acceptanceCriteria: relatedUseCases.flatMap(uc => 
+        acceptanceCriteria: relatedUseCases.flatMap(uc =>
           uc.acceptanceCriteria.map(ac => ac.id)
         )
       };
@@ -290,7 +290,7 @@ export class RequirementsTraceabilityService {
     const businessRequirements = this.extractBusinessRequirementsFromPRD(prd);
 
     // Generate use cases from features
-    const useCases = features.flatMap(feature => 
+    const useCases = features.flatMap(feature =>
       this.generateUseCasesFromFeature(feature, businessRequirements)
     );
 
@@ -373,7 +373,7 @@ export class RequirementsTraceabilityService {
     // Use Cases -> Tasks
     useCases.forEach(useCase => {
       tasks.forEach(task => {
-        if (task.implementsUseCases.includes(useCase.id)) {
+        if (task.implementsUseCases?.includes(useCase.id)) {
           links.push({
             id: `link-${useCase.id}-${task.id}`,
             fromRequirementId: useCase.id,
@@ -408,23 +408,23 @@ export class RequirementsTraceabilityService {
     ).length;
 
     const useCasesCovered = useCases.filter(uc =>
-      tasks.some(task => task.implementsUseCases.includes(uc.id))
+      tasks.some(task => task.implementsUseCases?.includes(uc.id))
     ).length;
 
     const tasksWithTraceability = tasks.filter(task =>
-      task.implementsRequirements.length > 0 || 
-      task.implementsUseCases.length > 0 || 
-      task.implementsFeatures.length > 0
+      (task.implementsRequirements?.length || 0) > 0 ||
+      (task.implementsUseCases?.length || 0) > 0 ||
+      (task.implementsFeatures?.length || 0) > 0
     ).length;
 
     const orphanedTasks = tasks
-      .filter(task => task.implementsRequirements.length === 0 && 
-                     task.implementsUseCases.length === 0 && 
-                     task.implementsFeatures.length === 0)
+      .filter(task => (task.implementsRequirements?.length || 0) === 0 &&
+                     (task.implementsUseCases?.length || 0) === 0 &&
+                     (task.implementsFeatures?.length || 0) === 0)
       .map(task => task.id);
 
     const unimplementedRequirements = businessRequirements
-      .filter(req => !tasks.some(task => task.implementsRequirements.includes(req.id)))
+      .filter(req => !tasks.some(task => task.implementsRequirements?.includes(req.id)))
       .map(req => req.id);
 
     return {
@@ -441,7 +441,7 @@ export class RequirementsTraceabilityService {
   private isTaskRelatedToUseCase(task: AITask, useCase: UseCase): boolean {
     const taskText = `${task.title} ${task.description}`.toLowerCase();
     const useCaseText = `${useCase.title} ${useCase.goal}`.toLowerCase();
-    
+
     // Simple keyword matching - in production, use more sophisticated NLP
     const keywords = useCase.goal.toLowerCase().split(' ').filter(word => word.length > 3);
     return keywords.some(keyword => taskText.includes(keyword));
@@ -450,7 +450,7 @@ export class RequirementsTraceabilityService {
   private isTaskRelatedToFeature(task: AITask, feature: FeatureRequirement): boolean {
     const taskText = `${task.title} ${task.description}`.toLowerCase();
     const featureText = `${feature.title} ${feature.description}`.toLowerCase();
-    
+
     const keywords = feature.title.toLowerCase().split(' ').filter(word => word.length > 3);
     return keywords.some(keyword => taskText.includes(keyword));
   }
@@ -458,7 +458,7 @@ export class RequirementsTraceabilityService {
   private isTaskRelatedToBusinessRequirement(task: AITask, requirement: Requirement): boolean {
     const taskText = `${task.title} ${task.description}`.toLowerCase();
     const reqText = requirement.description.toLowerCase();
-    
+
     const keywords = reqText.split(' ').filter(word => word.length > 4);
     return keywords.some(keyword => taskText.includes(keyword));
   }
@@ -466,7 +466,7 @@ export class RequirementsTraceabilityService {
   private isFeatureRelatedToBusinessRequirement(feature: FeatureRequirement, requirement: Requirement): boolean {
     const featureText = `${feature.title} ${feature.description}`.toLowerCase();
     const reqText = requirement.description.toLowerCase();
-    
+
     const keywords = reqText.split(' ').filter(word => word.length > 4);
     return keywords.some(keyword => featureText.includes(keyword));
   }

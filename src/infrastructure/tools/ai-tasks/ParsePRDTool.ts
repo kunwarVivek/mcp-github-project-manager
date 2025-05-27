@@ -21,11 +21,11 @@ const parsePRDSchema = z.object({
   createTraceabilityMatrix: z.boolean().default(true).describe('Whether to create comprehensive requirements traceability matrix'),
   includeUseCases: z.boolean().default(true).describe('Whether to generate use cases from features'),
   projectId: z.string().optional().describe('Project ID for traceability matrix'),
-  enhancedGeneration: z.boolean().default(true).describe('Whether to use enhanced task generation with full context'),
-  contextLevel: z.enum(['minimal', 'standard', 'full']).default('full').describe('Level of contextual information to include'),
-  includeBusinessContext: z.boolean().default(true).describe('Whether to include business context in tasks'),
-  includeTechnicalContext: z.boolean().default(true).describe('Whether to include technical context in tasks'),
-  includeImplementationGuidance: z.boolean().default(true).describe('Whether to include implementation guidance in tasks')
+  enhancedGeneration: z.boolean().default(true).describe('Whether to use enhanced task generation with context'),
+  contextLevel: z.enum(['minimal', 'standard', 'full']).default('standard').describe('Level of contextual information to include'),
+  includeBusinessContext: z.boolean().default(false).describe('Whether to include AI-generated business context (requires AI)'),
+  includeTechnicalContext: z.boolean().default(false).describe('Whether to include AI-generated technical context (requires AI)'),
+  includeImplementationGuidance: z.boolean().default(false).describe('Whether to include AI-generated implementation guidance (requires AI)')
 });
 
 export type ParsePRDArgs = z.infer<typeof parsePRDSchema>;
@@ -428,10 +428,10 @@ export const parsePRDTool: ToolDefinition<ParsePRDArgs> = {
         includeUseCases: true,
         projectId: "task-management-app",
         enhancedGeneration: true,
-        contextLevel: "full" as const,
-        includeBusinessContext: true,
-        includeTechnicalContext: true,
-        includeImplementationGuidance: true
+        contextLevel: "standard" as const,
+        includeBusinessContext: false,
+        includeTechnicalContext: false,
+        includeImplementationGuidance: false
       }
     }
   ]
