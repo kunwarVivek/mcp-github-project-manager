@@ -115,6 +115,7 @@ class GitHubProjectManagerServer {
    */
   private async executeToolHandler(toolName: string, args: any): Promise<any> {
     switch (toolName) {
+      // Roadmap and planning tools
       case "create_roadmap":
         return await this.service.createRoadmap(args);
 
@@ -132,6 +133,115 @@ class GitHubProjectManagerServer {
 
       case "get_upcoming_milestones":
         return await this.service.getUpcomingMilestones(args.daysAhead, args.limit, args.includeIssues);
+      
+      // Project tools
+      case "create_project":
+        return await this.service.createProject(args);
+        
+      case "list_projects":
+        return await this.service.listProjects(args.status, args.limit);
+        
+      case "get_project":
+        return await this.service.getProject(args.projectId);
+        
+      case "update_project":
+        return await this.service.updateProject(args);
+        
+      case "delete_project":
+        return await this.service.deleteProject(args);
+        
+      case "list_project_fields":
+        return await this.service.listProjectFields(args);
+        
+      case "update_project_field":
+        return await this.service.updateProjectField(args);
+      
+      // Milestone tools
+      case "create_milestone":
+        return await this.service.createMilestone(args);
+        
+      case "list_milestones":
+        return await this.service.listMilestones(args.status, args.sort, args.direction);
+        
+      case "update_milestone":
+        return await this.service.updateMilestone(args);
+        
+      case "delete_milestone":
+        return await this.service.deleteMilestone(args);
+      
+      // Issue tools
+      case "create_issue":
+        return await this.service.createIssue(args);
+        
+      case "list_issues":
+        return await this.service.listIssues(args);
+        
+      case "get_issue":
+        return await this.service.getIssue(args.issueId);
+        
+      case "update_issue":
+        return await this.service.updateIssue(args.issueId, {
+          title: args.title,
+          description: args.description,
+          status: args.status,
+          milestoneId: args.milestoneId,
+          assignees: args.assignees,
+          labels: args.labels
+        });
+        
+      // Sprint tools
+      case "create_sprint":
+        return await this.service.createSprint(args);
+        
+      case "list_sprints":
+        return await this.service.listSprints(args.status);
+        
+      case "get_current_sprint":
+        return await this.service.getCurrentSprint(args.includeIssues);
+        
+      case "update_sprint":
+        return await this.service.updateSprint(args);
+        
+      case "add_issues_to_sprint":
+        return await this.service.addIssuesToSprint(args);
+        
+      case "remove_issues_from_sprint":
+        return await this.service.removeIssuesFromSprint(args);
+        
+      // Label tools
+      case "create_label":
+        return await this.service.createLabel(args);
+        
+      case "list_labels":
+        return await this.service.listLabels(args);
+        
+      // Project field tools
+        
+      // Project view tools
+      case "create_project_view":
+        return await this.service.createProjectView(args);
+        
+      case "list_project_views":
+        return await this.service.listProjectViews(args);
+        
+      case "update_project_view":
+        return await this.service.updateProjectView(args);
+        
+      // Project item tools
+      case "add_project_item":
+        return await this.service.addProjectItem(args);
+        
+      case "remove_project_item":
+        return await this.service.removeProjectItem(args);
+        
+      case "list_project_items":
+        return await this.service.listProjectItems(args);
+        
+      case "set_field_value":
+        return await this.service.setFieldValue(args);
+        
+      case "get_field_value":
+        return await this.service.getFieldValue(args);
 
       default:
         throw new McpError(

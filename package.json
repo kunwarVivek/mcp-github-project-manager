@@ -53,16 +53,17 @@
     "docs:serve": "npx http-server docs -o api-explorer.html",
     "examples": "ts-node examples/basic/create-simple-project.ts",
     "prepublishOnly": "npm run build",
-    "release": "node --loader ts-node/esm scripts/publish.js"
+    "release": "node --loader ts-node/esm scripts/publish.js",
+    "inspect": "npx @modelcontextprotocol/inspector node --loader ts-node/esm build/index.js"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.6.1",
-    "@octokit/rest": "^21.1.1",
+    "@modelcontextprotocol/sdk": "^1.12.0",
+    "@octokit/rest": "^22.0.0",
     "commander": "^14.0.0",
     "dotenv": "^16.5.0",
     "tsyringe": "^4.10.0",
     "uuid": "^11.1.0",
-    "zod": "^3.25.23"
+    "zod": "^3.25.28"
   },
   "publishConfig": {
     "access": "public"
@@ -73,8 +74,8 @@
   },
   "devDependencies": {
     "@jest/globals": "^29.7.0",
-    "@octokit/openapi-types": "^25.0.0",
-    "@octokit/types": "^14.0.0",
+    "@octokit/openapi-types": "^25.1.0",
+    "@octokit/types": "^14.1.0",
     "@types/jest": "^29.5.14",
     "@types/node": "^22.15.21",
     "@types/uuid": "^10.0.0",

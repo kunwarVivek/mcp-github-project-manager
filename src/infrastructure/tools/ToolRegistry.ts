@@ -1,11 +1,58 @@
 import { ToolDefinition } from "./ToolValidator.js";
 import {
+  // Original tools
   createRoadmapTool,
   planSprintTool,
   getMilestoneMetricsTool,
   getSprintMetricsTool,
   getOverdueMilestonesTool,
   getUpcomingMilestonesTool,
+  createProjectTool,
+  listProjectsTool,
+  getProjectTool,
+  createMilestoneTool,
+  listMilestonesTool,
+  createIssueTool,
+  listIssuesTool,
+  getIssueTool,
+  updateIssueTool,
+  createSprintTool,
+  listSprintsTool,
+  getCurrentSprintTool,
+  createProjectFieldTool,
+  createProjectViewTool,
+  
+  // New project tools
+  updateProjectTool,
+  deleteProjectTool,
+  listProjectFieldsTool,
+  updateProjectFieldTool,
+  
+  // Project item tools
+  addProjectItemTool,
+  removeProjectItemTool,
+  listProjectItemsTool,
+  
+  // Field values tools
+  setFieldValueTool,
+  getFieldValueTool,
+  
+  // View tools
+  listProjectViewsTool,
+  updateProjectViewTool,
+  
+  // Milestone tools
+  updateMilestoneTool,
+  deleteMilestoneTool,
+  
+  // Sprint tools
+  updateSprintTool,
+  addIssuesToSprintTool,
+  removeIssuesFromSprintTool,
+  
+  // Label tools
+  createLabelTool,
+  listLabelsTool,
 } from "./ToolSchemas.js";
 
 /**
@@ -73,13 +120,63 @@ export class ToolRegistry {
    * Register all built-in tools
    */
   private registerBuiltInTools(): void {
-    // Register all standard tools
+    // Register roadmap and planning tools
     this.registerTool(createRoadmapTool);
     this.registerTool(planSprintTool);
     this.registerTool(getMilestoneMetricsTool);
     this.registerTool(getSprintMetricsTool);
     this.registerTool(getOverdueMilestonesTool);
     this.registerTool(getUpcomingMilestonesTool);
+    
+    // Register project tools
+    this.registerTool(createProjectTool);
+    this.registerTool(listProjectsTool);
+    this.registerTool(getProjectTool);
+    this.registerTool(updateProjectTool);
+    this.registerTool(deleteProjectTool);
+    
+    // Register milestone tools
+    this.registerTool(createMilestoneTool);
+    this.registerTool(listMilestonesTool);
+    this.registerTool(updateMilestoneTool);
+    this.registerTool(deleteMilestoneTool);
+    
+    // Register issue tools
+    this.registerTool(createIssueTool);
+    this.registerTool(listIssuesTool);
+    this.registerTool(getIssueTool);
+    this.registerTool(updateIssueTool);
+    
+    // Register sprint tools
+    this.registerTool(createSprintTool);
+    this.registerTool(listSprintsTool);
+    this.registerTool(getCurrentSprintTool);
+    this.registerTool(updateSprintTool);
+    this.registerTool(addIssuesToSprintTool);
+    this.registerTool(removeIssuesFromSprintTool);
+    
+    // Register project field tools
+    this.registerTool(createProjectFieldTool);
+    this.registerTool(listProjectFieldsTool);
+    this.registerTool(updateProjectFieldTool);
+    
+    // Register project view tools
+    this.registerTool(createProjectViewTool);
+    this.registerTool(listProjectViewsTool);
+    this.registerTool(updateProjectViewTool);
+    
+    // Register project item tools
+    this.registerTool(addProjectItemTool);
+    this.registerTool(removeProjectItemTool);
+    this.registerTool(listProjectItemsTool);
+    
+    // Register field value tools
+    this.registerTool(setFieldValueTool);
+    this.registerTool(getFieldValueTool);
+    
+    // Register label tools
+    this.registerTool(createLabelTool);
+    this.registerTool(listLabelsTool);
   }
 
   /**

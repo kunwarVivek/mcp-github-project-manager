@@ -38,12 +38,33 @@ export class GitHubRepositoryFactory {
     return this.errorHandler;
   }
 
-  getOctokit(): OctokitInstance {
+  /**
+   * Returns the octokit instance for direct GraphQL queries
+   */
+  public getOctokit(): OctokitInstance {
     return this.octokit;
   }
-
-  getConfig(): GitHubConfig {
+  
+  /**
+   * Get the configuration
+   */
+  public getConfig(): GitHubConfig {
     return this.config;
+  }
+
+  /**
+   * Execute a GraphQL query directly
+   */
+  public async graphql<T>(query: string, variables: Record<string, any> = {}): Promise<T> {
+    try {
+      return await this.octokit.graphql<T>(query, {
+        ...variables,
+        owner: this.config.owner,
+        repo: this.config.repo,
+      });
+    } catch (error) {
+      throw this.errorHandler.handleError(error, 'GraphQL operation');
+    }
   }
 
   /**

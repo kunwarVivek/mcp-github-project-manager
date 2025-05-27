@@ -15,7 +15,11 @@ import {
   CreateSprint,
   CustomField,
   ProjectView,
-  createResource
+  createResource,
+  CreateField,
+  UpdateField,
+  FieldType,
+  ProjectItem
 } from "../domain/types";
 import { GitHubTypeConverter } from "../infrastructure/github/util/conversion";
 import { z } from "zod";
@@ -297,9 +301,106 @@ export class ProjectManagementService {
     }
   }
 
-  async updateSprint(id: string, data: Partial<Sprint>): Promise<Sprint> {
+  async updateSprint(data: {
+    sprintId: string;
+    title?: string;
+    description?: string;
+    startDate?: string;
+    endDate?: string;
+    status?: 'planned' | 'active' | 'completed';
+  }): Promise<Sprint> {
     try {
-      return await this.sprintRepo.update(id, data);
+      // Convert status string to ResourceStatus enum if provided
+      let resourceStatus: ResourceStatus | undefined;
+      if (data.status) {
+        switch (data.status) {
+          case 'planned':
+            resourceStatus = ResourceStatus.PLANNED;
+            break;
+          case 'active':
+            resourceStatus = ResourceStatus.ACTIVE;
+            break;
+          case 'completed':
+            resourceStatus = ResourceStatus.CLOSED;
+            break;
+        }
+      }
+
+      // Map input data to domain model
+      const sprintData: Partial<Sprint> = {
+        title: data.title,
+        description: data.description,
+        startDate: data.startDate,
+        endDate: data.endDate,
+        status: resourceStatus
+      };
+      
+      // Clean up undefined values
+      Object.keys(sprintData).forEach(key => {
+        if (sprintData[key as keyof Partial<Sprint>] === undefined) {
+          delete sprintData[key as keyof Partial<Sprint>];
+        }
+      });
+      
+      return await this.sprintRepo.update(data.sprintId, sprintData);
+    } catch (error) {
+      throw this.mapErrorToMCPError(error);
+    }
+  }
+
+  async addIssuesToSprint(data: {
+    sprintId: string;
+    issueIds: number[];
+  }): Promise<{ success: boolean; addedIssues: number; message: string }> {
+    try {
+      let addedCount = 0;
+      const issues = [];
+      
+      // Add each issue to the sprint
+      for (const issueId of data.issueIds) {
+        try {
+          await this.sprintRepo.addIssue(data.sprintId, issueId.toString());
+          addedCount++;
+          issues.push(issueId);
+        } catch (error) {
+          console.error(`Failed to add issue ${issueId} to sprint: ${error}`);
+        }
+      }
+      
+      return {
+        success: addedCount > 0,
+        addedIssues: addedCount,
+        message: `Added ${addedCount} issue(s) to sprint ${data.sprintId}`
+      };
+    } catch (error) {
+      throw this.mapErrorToMCPError(error);
+    }
+  }
+
+  async removeIssuesFromSprint(data: {
+    sprintId: string;
+    issueIds: number[];
+  }): Promise<{ success: boolean; removedIssues: number; message: string }> {
+    try {
+      let removedCount = 0;
+      const issues = [];
+      
+      // Remove each issue from the sprint
+      for (const issueId of data.issueIds) {
+        try {
+          await this.sprintRepo.removeIssue(data.sprintId, issueId.toString());
+          removedCount++;
+          issues.push(issueId);
+        } catch (error) {
+          console.error(`Failed to remove issue ${issueId} from sprint: ${error}`);
+        }
+      }
+      
+      return {
+        success: removedCount > 0,
+        removedIssues: removedCount,
+        message: `Removed ${removedCount} issue(s) from sprint ${data.sprintId}`
+      };
     } catch (error) {
       throw this.mapErrorToMCPError(error);
     }
@@ -457,259 +558,1252 @@ export class ProjectManagementService {
     }
   }
 
-  async createIssue(data: CreateIssue): Promise<Issue> {
+  // Project Management
+  async createProject(data: {
+    title: string;
+    description: string;
+    visibility?: 'private' | 'public';
+  }): Promise<Project> {
     try {
-      // Validate data using zod schema
-      const issueData = z.object({
-        title: z.string().min(1, "Issue title is required"),
-        description: z.string(),
-        assignees: z.array(z.string()).optional(),
-        labels: z.array(z.string()).optional(),
-        milestoneId: z.string().optional()
-      }).parse(data);
+      const projectData: CreateProject = {
+        title: data.title,
+        description: data.description,
+        owner: this.factory.getConfig().owner,
+        visibility: data.visibility || 'private',
+      };
+
+      return await this.projectRepo.create(projectData);
+    } catch (error) {
+      throw this.mapErrorToMCPError(error);
+    }
+  }
+
+  async listProjects(status: string = 'active', limit: number = 10): Promise<Project[]> {
+    try {
+      const projects = await this.projectRepo.findAll();
+      
+      // Filter by status if needed
+      let filteredProjects = projects;
+      if (status !== 'all') {
+        const resourceStatus = status === 'active' ? ResourceStatus.ACTIVE : ResourceStatus.CLOSED;
+        filteredProjects = projects.filter(project => project.status === resourceStatus);
+      }
+      
+      // Apply limit
+      return filteredProjects.slice(0, limit);
+    } catch (error) {
+      throw this.mapErrorToMCPError(error);
+    }
+  }
+
+  async getProject(projectId: string): Promise<Project | null> {
+    try {
+      return await this.projectRepo.findById(projectId);
+    } catch (error) {
+      throw this.mapErrorToMCPError(error);
+    }
+  }
+
+  // Milestone Management
+  async createMilestone(data: {
+    title: string;
+    description: string;
+    dueDate?: string;
+  }): Promise<Milestone> {
+    try {
+      const milestoneData: CreateMilestone = {
+        title: data.title,
+        description: data.description,
+        dueDate: data.dueDate,
+      };
+
+      return await this.milestoneRepo.create(milestoneData);
+    } catch (error) {
+      throw this.mapErrorToMCPError(error);
+    }
+  }
+
+  async listMilestones(
+    status: string = 'open',
+    sort: string = 'created_at',
+    direction: string = 'asc'
+  ): Promise<Milestone[]> {
+    try {
+      // Get all milestones
+      const milestones = await this.milestoneRepo.findAll();
+      
+      // Filter by status if needed
+      let filteredMilestones = milestones;
+      if (status !== 'all') {
+        const resourceStatus = status === 'open' ? ResourceStatus.ACTIVE : ResourceStatus.CLOSED;
+        filteredMilestones = milestones.filter(milestone => milestone.status === resourceStatus);
+      }
+      
+      // Sort the milestones
+      filteredMilestones.sort((a, b) => {
+        let valueA, valueB;
+        
+        switch(sort) {
+          case 'due_date':
+            valueA = a.dueDate || '';
+            valueB = b.dueDate || '';
+            break;
+          case 'title':
+            valueA = a.title;
+            valueB = b.title;
+            break;
+          case 'created_at':
+          default:
+            valueA = a.createdAt;
+            valueB = b.createdAt;
+        }
+        
+        const comparison = valueA.localeCompare(valueB);
+        return direction === 'asc' ? comparison : -comparison;
+      });
+      
+      return filteredMilestones;
+    } catch (error) {
+      throw this.mapErrorToMCPError(error);
+    }
+  }
+
+  // Issue Management
+  async createIssue(data: {
+    title: string;
+    description: string;
+    milestoneId?: number;
+    assignees?: string[];
+    labels?: string[];
+    priority?: string;
+    type?: string;
+  }): Promise<Issue> {
+    try {
+      // Convert milestone ID from number to string if provided
+      const milestoneId = data.milestoneId ? data.milestoneId.toString() : undefined;
+      
+      // Create labels based on priority and type if provided
+      const labels = data.labels || [];
+      if (data.priority) {
+        labels.push(`priority:${data.priority}`);
+      }
+      if (data.type) {
+        labels.push(`type:${data.type}`);
+      }
+      
+      const issueData: CreateIssue = {
+        title: data.title,
+        description: data.description,
+        assignees: data.assignees || [],
+        labels,
+        milestoneId,
+      };
 
       return await this.issueRepo.create(issueData);
     } catch (error) {
-      if (error instanceof z.ZodError) {
-        throw new ValidationError(`Invalid issue data: ${error.message}`);
+      throw this.mapErrorToMCPError(error);
+    }
+  }
+
+  async listIssues(options: {
+    status?: string;
+    milestone?: number;
+    labels?: string[];
+    assignee?: string;
+    sort?: string;
+    direction?: string;
+    limit?: number;
+  } = {}): Promise<Issue[]> {
+    try {
+      // Set default values
+      const {
+        status = 'open',
+        milestone,
+        labels = [],
+        assignee,
+        sort = 'created',
+        direction = 'desc',
+        limit = 30
+      } = options;
+      
+      let issues: Issue[];
+      
+      if (milestone) {
+        // If milestone is specified, get issues for that milestone
+        issues = await this.issueRepo.findByMilestone(milestone.toString());
+      } else {
+        // Otherwise get all issues
+        issues = await this.issueRepo.findAll();
       }
-
-      throw this.mapErrorToMCPError(error);
-    }
-  }
-
-  async updateIssue(id: string, data: Partial<Issue>): Promise<Issue> {
-    try {
-      return await this.issueRepo.update(id, data);
-    } catch (error) {
-      throw this.mapErrorToMCPError(error);
-    }
-  }
-
-  async deleteIssue(id: string): Promise<void> {
-    try {
-      return await this.issueRepo.delete(id);
-    } catch (error) {
-      throw this.mapErrorToMCPError(error);
-    }
-  }
-
-  async getIssue(id: string): Promise<Issue | null> {
-    try {
-      return await this.issueRepo.findById(id);
-    } catch (error) {
-      throw this.mapErrorToMCPError(error);
-    }
-  }
-
-  async findIssues(): Promise<Issue[]> {
-    try {
-      return await this.issueRepo.findAll();
-    } catch (error) {
-      throw this.mapErrorToMCPError(error);
-    }
-  }
-
-  async updateIssueStatus(
-    id: string,
-    status: ResourceStatus
-  ): Promise<void> {
-    try {
-      await this.issueRepo.update(id, { status });
-    } catch (error) {
-      throw this.mapErrorToMCPError(error);
-    }
-  }
-
-  async getIssueHistory(id: string): Promise<Array<{
-    timestamp: string;
-    field: string;
-    from: string;
-    to: string;
-  }>> {
-    try {
-      const issue = await this.issueRepo.findById(id);
-      if (!issue) {
-        throw new ResourceNotFoundError(ResourceType.ISSUE, id);
+      
+      // Filter by status
+      if (status !== 'all') {
+        const resourceStatus = status === 'open' ? ResourceStatus.ACTIVE : ResourceStatus.CLOSED;
+        issues = issues.filter(issue => issue.status === resourceStatus);
       }
-
-      // Implementation for issue history
-      // Currently returning empty array as placeholder, but will be properly implemented
-      // This would typically fetch from GitHub API or a local history store
-
-      // Mock implementation for now with sample data
-      return [
-        {
-          timestamp: new Date().toISOString(),
-          field: 'status',
-          from: ResourceStatus.ACTIVE, // Replace OPEN with ACTIVE since OPEN doesn't exist
-          to: issue.status
-        },
-        {
-          timestamp: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
-          field: 'title',
-          from: 'Old title',
-          to: issue.title
+      
+      // Filter by labels if provided
+      if (labels.length > 0) {
+        issues = issues.filter(issue => 
+          labels.every(label => issue.labels.includes(label))
+        );
+      }
+      
+      // Filter by assignee if provided
+      if (assignee) {
+        issues = issues.filter(issue => 
+          issue.assignees.includes(assignee)
+        );
+      }
+      
+      // Sort the issues
+      issues.sort((a, b) => {
+        let valueA, valueB;
+        
+        switch(sort) {
+          case 'updated':
+            valueA = a.updatedAt;
+            valueB = b.updatedAt;
+            break;
+          case 'comments':
+            // Since we don't have comment count in our model, default to created
+          case 'created':
+          default:
+            valueA = a.createdAt;
+            valueB = b.createdAt;
         }
-      ];
+        
+        const comparison = valueA.localeCompare(valueB);
+        return direction === 'desc' ? -comparison : comparison;
+      });
+      
+      // Apply limit
+      return issues.slice(0, limit);
     } catch (error) {
       throw this.mapErrorToMCPError(error);
     }
   }
 
-  async createMilestone(data: CreateMilestone): Promise<Milestone> {
+  async getIssue(issueId: number): Promise<Issue | null> {
     try {
-      // Validate data using zod schema
-      const milestoneData = z.object({
-        title: z.string().min(1, "Milestone title is required"),
-        description: z.string().optional(),
-        dueDate: z.string().optional().refine(val => !val || !isNaN(Date.parse(val)), {
-          message: "Due date must be a valid date string if provided"
-        })
-      }).parse(data);
+      return await this.issueRepo.findById(issueId.toString());
+    } catch (error) {
+      throw this.mapErrorToMCPError(error);
+    }
+  }
 
-      // Ensure description is not undefined to satisfy CreateMilestone type
-      const validMilestoneData = {
-        ...milestoneData,
-        description: milestoneData.description || ''
+  async updateIssue(
+    issueId: number,
+    updates: {
+      title?: string;
+      description?: string;
+      status?: string;
+      milestoneId?: number | null;
+      assignees?: string[];
+      labels?: string[];
+    }
+  ): Promise<Issue> {
+    try {
+      const data: Partial<Issue> = {};
+      
+      if (updates.title) data.title = updates.title;
+      if (updates.description) data.description = updates.description;
+      if (updates.status) {
+        data.status = updates.status === 'open' ? ResourceStatus.ACTIVE : ResourceStatus.CLOSED;
+      }
+      if (updates.assignees) data.assignees = updates.assignees;
+      if (updates.labels) data.labels = updates.labels;
+      
+      // Handle milestoneId explicitly
+      if (updates.milestoneId === null) {
+        data.milestoneId = undefined; // Remove milestone
+      } else if (updates.milestoneId !== undefined) {
+        data.milestoneId = updates.milestoneId.toString();
+      }
+      
+      return await this.issueRepo.update(issueId.toString(), data);
+    } catch (error) {
+      throw this.mapErrorToMCPError(error);
+    }
+  }
+
+  // Sprint Management
+  async createSprint(data: {
+    title: string;
+    description: string;
+    startDate: string;
+    endDate: string;
+    issueIds?: number[];
+  }): Promise<Sprint> {
+    try {
+      // Create data object that matches the expected type
+      const sprintData: Omit<Sprint, "id" | "createdAt" | "updatedAt"> = {
+        title: data.title,
+        description: data.description,
+        startDate: data.startDate,
+        endDate: data.endDate,
+        status: ResourceStatus.PLANNED,
+        issues: data.issueIds?.map(id => id.toString()) || []
       };
 
-      return await this.milestoneRepo.create(validMilestoneData);
+      return await this.sprintRepo.create(sprintData);
     } catch (error) {
-      if (error instanceof z.ZodError) {
-        throw new ValidationError(`Invalid milestone data: ${error.message}`);
+      throw this.mapErrorToMCPError(error);
+    }
+  }
+
+  async listSprints(status: string = 'all'): Promise<Sprint[]> {
+    try {
+      const sprints = await this.sprintRepo.findAll();
+      
+      // Filter by status if needed
+      if (status !== 'all') {
+        let resourceStatus;
+        switch(status) {
+          case 'planned':
+            resourceStatus = ResourceStatus.PLANNED;
+            break;
+          case 'active':
+            resourceStatus = ResourceStatus.ACTIVE;
+            break;
+          case 'completed':
+            resourceStatus = ResourceStatus.COMPLETED;
+            break;
+          default:
+            return sprints;
+        }
+        
+        return sprints.filter(sprint => sprint.status === resourceStatus);
       }
-      throw this.mapErrorToMCPError(error);
-    }
-  }
-
-  async updateMilestone(
-    id: string,
-    data: Partial<Milestone>
-  ): Promise<Milestone> {
-    try {
-      return await this.milestoneRepo.update(id, data);
+      
+      return sprints;
     } catch (error) {
       throw this.mapErrorToMCPError(error);
     }
   }
 
-  async deleteMilestone(id: string): Promise<void> {
+  async getCurrentSprint(includeIssues: boolean = true): Promise<Sprint | null> {
     try {
-      return await this.milestoneRepo.delete(id);
-    } catch (error) {
-      throw this.mapErrorToMCPError(error);
-    }
-  }
-
-  async getMilestone(id: string): Promise<Milestone | null> {
-    try {
-      return await this.milestoneRepo.findById(id);
-    } catch (error) {
-      throw this.mapErrorToMCPError(error);
-    }
-  }
-
-  async findMilestones(): Promise<Milestone[]> {
-    try {
-      return await this.milestoneRepo.findAll();
-    } catch (error) {
-      throw this.mapErrorToMCPError(error);
-    }
-  }
-
-  async assignIssueToMilestone(
-    issueId: string,
-    milestoneId: string
-  ): Promise<void> {
-    try {
-      // Validate issueId and milestoneId exist
-      const issue = await this.issueRepo.findById(issueId);
-      if (!issue) {
-        throw new ResourceNotFoundError(ResourceType.ISSUE, issueId);
+      const currentSprint = await this.sprintRepo.findCurrent();
+      
+      if (!currentSprint) {
+        return null;
       }
-
-      const milestone = await this.milestoneRepo.findById(milestoneId);
-      if (!milestone) {
-        throw new ResourceNotFoundError(ResourceType.MILESTONE, milestoneId);
+      
+      if (includeIssues) {
+        // Add issues data to sprint
+        const issues = await this.sprintRepo.getIssues(currentSprint.id);
+        
+        // We can't modify the sprint directly, so we create a new object
+        return {
+          ...currentSprint,
+          // We're adding this property outside the type definition for convenience
+          // in the response; it won't affect the actual sprint object
+          issueDetails: issues
+        } as Sprint & { issueDetails?: Issue[] };
       }
-
-      await this.issueRepo.update(issueId, { milestoneId });
+      
+      return currentSprint;
     } catch (error) {
       throw this.mapErrorToMCPError(error);
     }
   }
 
-  async addIssueDependency(
-    issueId: string,
-    dependsOnId: string
-  ): Promise<void> {
+  // Project Update and Delete Operations
+  async updateProject(data: {
+    projectId: string;
+    title?: string;
+    description?: string;
+    visibility?: 'private' | 'public';
+    status?: 'active' | 'closed';
+  }): Promise<Project> {
     try {
-      // Validate both issues exist
-      const issue = await this.issueRepo.findById(issueId);
-      if (!issue) {
-        throw new ResourceNotFoundError(ResourceType.ISSUE, issueId);
-      }
-
-      const dependsOn = await this.issueRepo.findById(dependsOnId);
-      if (!dependsOn) {
-        throw new ResourceNotFoundError(ResourceType.ISSUE, dependsOnId);
+      // Convert the status string to ResourceStatus enum
+      let resourceStatus: ResourceStatus | undefined;
+      if (data.status) {
+        resourceStatus = data.status === 'active' ? ResourceStatus.ACTIVE : ResourceStatus.CLOSED;
       }
 
-      // Create a relationship between the issues
-      // This should use a proper relationship repository in a real implementation
-      // but we'll simulate it here by storing the relationship in memory
-
-      // Create a relationship object
-      const dependency: IssueDependency = {
-        issueId,
-        dependsOnId,
-        createdAt: new Date().toISOString()
+      // Map the data to the domain model
+      const projectData: Partial<Project> = {
+        title: data.title,
+        description: data.description,
+        visibility: data.visibility,
+        status: resourceStatus,
       };
 
-      // In a real implementation, we would store this in a database
-      // For now, we'll store it as a property on the issue using the update method
-      const currentDependencies = await this.getIssueDependencies(issueId);
-      if (!currentDependencies.includes(dependsOnId)) {
-        // Add dependency only if it doesn't already exist
-        const updatedDependencies = [...currentDependencies, dependsOnId];
+      // Clean up undefined values
+      Object.keys(projectData).forEach((key) => {
+        if (projectData[key as keyof Partial<Project>] === undefined) {
+          delete projectData[key as keyof Partial<Project>];
+        }
+      });
 
-        // Store the dependencies on the issue using custom field or metadata
-        await this.issueRepo.update(issueId, {
-          // In a real implementation, this would use a proper field for dependencies
-          // but we're simulating it here
-          ...issue,
-          labels: [...(issue.labels || []), `depends-on:${dependsOnId}`]
-        });
-      }
+      return await this.projectRepo.update(data.projectId, projectData);
     } catch (error) {
       throw this.mapErrorToMCPError(error);
     }
   }
 
-  async getIssueDependencies(issueId: string): Promise<string[]> {
+  async deleteProject(data: {
+    projectId: string;
+  }): Promise<{ success: boolean; message: string }> {
     try {
-      const issue = await this.issueRepo.findById(issueId);
-      if (!issue) {
-        throw new ResourceNotFoundError(ResourceType.ISSUE, issueId);
+      await this.projectRepo.delete(data.projectId);
+      return {
+        success: true,
+        message: `Project ${data.projectId} has been deleted`,
+      };
+    } catch (error) {
+      throw this.mapErrorToMCPError(error);
+    }
+  }
+
+  async listProjectFields(data: {
+    projectId: string;
+  }): Promise<CustomField[]> {
+    try {
+      const project = await this.projectRepo.findById(data.projectId);
+      if (!project) {
+        throw new ResourceNotFoundError(ResourceType.PROJECT, data.projectId);
       }
+      return project.fields || [];
+    } catch (error) {
+      throw this.mapErrorToMCPError(error);
+    }
+  }
 
-      // Extract dependencies from issue labels
-      // In a real implementation, this would use a dedicated field or relationship table
-      // but we're using labels as a workaround for now
-      const dependencies: string[] = [];
+  async updateProjectField(data: {
+    projectId: string;
+    fieldId: string;
+    name?: string;
+    options?: Array<{
+      name: string;
+      color?: string;
+    }>;
+  }): Promise<CustomField> {
+    try {
+      const updateData: Partial<CustomField> = {};
+      
+      if (data.name !== undefined) {
+        updateData.name = data.name;
+      }
+      
+      if (data.options !== undefined) {
+        updateData.options = data.options.map(option => ({
+          id: '', // This will be assigned by GitHub
+          name: option.name,
+          color: option.color
+        }));
+      }
+      
+      return await this.projectRepo.updateField(data.projectId, data.fieldId, updateData);
+    } catch (error) {
+      throw this.mapErrorToMCPError(error);
+    }
+  }
 
-      if (issue.labels && issue.labels.length > 0) {
-        // Extract dependencies from the "depends-on" labels
-        issue.labels.forEach(label => {
-          if (label.startsWith('depends-on:')) {
-            const dependencyId = label.substring('depends-on:'.length);
-            dependencies.push(dependencyId);
+  // Project Item Operations
+  async addProjectItem(data: {
+    projectId: string;
+    contentId: string;
+    contentType: 'issue' | 'pull_request';
+  }): Promise<ProjectItem> {
+    try {
+      // GraphQL mutation to add an item to a project
+      const mutation = `
+        mutation($input: AddProjectV2ItemByIdInput!) {
+          addProjectV2ItemById(input: $input) {
+            item {
+              id
+              content {
+                ... on Issue {
+                  id
+                  title
+                }
+                ... on PullRequest {
+                  id
+                  title
+                }
+              }
+            }
           }
-        });
+        }
+      `;
+
+      interface AddProjectItemResponse {
+        addProjectV2ItemById: {
+          item: {
+            id: string;
+            content: {
+              id: string;
+              title: string;
+            };
+          };
+        };
       }
 
-      return dependencies;
+      const response = await this.factory.graphql<AddProjectItemResponse>(mutation, {
+        input: {
+          projectId: data.projectId,
+          contentId: data.contentId
+        }
+      });
+
+      const itemId = response.addProjectV2ItemById.item.id;
+      const contentId = response.addProjectV2ItemById.item.content.id;
+      
+      const resourceType = data.contentType === 'issue' ? ResourceType.ISSUE : ResourceType.PULL_REQUEST;
+
+      return {
+        id: itemId,
+        contentId,
+        contentType: resourceType,
+        projectId: data.projectId,
+        fieldValues: {},
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+    } catch (error) {
+      throw this.mapErrorToMCPError(error);
+    }
+  }
+
+  async removeProjectItem(data: {
+    projectId: string;
+    itemId: string;
+  }): Promise<{ success: boolean; message: string }> {
+    try {
+      const mutation = `
+        mutation($input: DeleteProjectV2ItemInput!) {
+          deleteProjectV2Item(input: $input) {
+            deletedItemId
+          }
+        }
+      `;
+
+      interface DeleteProjectItemResponse {
+        deleteProjectV2Item: {
+          deletedItemId: string;
+        };
+      }
+
+      await this.factory.graphql<DeleteProjectItemResponse>(mutation, {
+        input: {
+          projectId: data.projectId,
+          itemId: data.itemId
+        }
+      });
+
+      return {
+        success: true,
+        message: `Item ${data.itemId} has been removed from project ${data.projectId}`
+      };
+    } catch (error) {
+      throw this.mapErrorToMCPError(error);
+    }
+  }
+
+  async listProjectItems(data: {
+    projectId: string;
+    limit?: number;
+  }): Promise<ProjectItem[]> {
+    try {
+      const limit = data.limit || 50;
+      const query = `
+        query($projectId: ID!, $limit: Int!) {
+          node(id: $projectId) {
+            ... on ProjectV2 {
+              items(first: $limit) {
+                nodes {
+                  id
+                  content {
+                    ... on Issue {
+                      id
+                      title
+                      __typename
+                    }
+                    ... on PullRequest {
+                      id
+                      title
+                      __typename
+                    }
+                  }
+                  fieldValues(first: 20) {
+                    nodes {
+                      ... on ProjectV2ItemFieldTextValue {
+                        text
+                        field {
+                          ... on ProjectV2Field {
+                            id
+                            name
+                          }
+                        }
+                      }
+                      ... on ProjectV2ItemFieldDateValue {
+                        date
+                        field {
+                          ... on ProjectV2Field {
+                            id
+                            name
+                          }
+                        }
+                      }
+                      ... on ProjectV2ItemFieldSingleSelectValue {
+                        name
+                        field {
+                          ... on ProjectV2SingleSelectField {
+                            id
+                            name
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      `;
+
+      interface ListProjectItemsResponse {
+        node: {
+          items: {
+            nodes: Array<{
+              id: string;
+              content?: {
+                id: string;
+                title: string;
+                __typename: string;
+              };
+              fieldValues: {
+                nodes: Array<{
+                  text?: string;
+                  date?: string;
+                  name?: string;
+                  field: {
+                    id: string;
+                    name: string;
+                  }
+                }>
+              }
+            }>
+          }
+        }
+      }
+
+      const response = await this.factory.graphql<ListProjectItemsResponse>(query, {
+        projectId: data.projectId,
+        limit
+      });
+
+      // If project doesn't exist or has no items
+      if (!response.node || !response.node.items || !response.node.items.nodes) {
+        return [];
+      }
+
+      return response.node.items.nodes.map((item) => {
+        // Build field values map
+        const fieldValues: Record<string, any> = {};
+        if (item.fieldValues && item.fieldValues.nodes) {
+          item.fieldValues.nodes.forEach((fieldValue: any) => {
+            if (!fieldValue || !fieldValue.field) return;
+            
+            const fieldId = fieldValue.field.id;
+            const fieldName = fieldValue.field.name;
+            
+            if ('text' in fieldValue) {
+              fieldValues[fieldId] = fieldValue.text;
+            } else if ('date' in fieldValue) {
+              fieldValues[fieldId] = fieldValue.date;
+            } else if ('name' in fieldValue) {
+              fieldValues[fieldId] = fieldValue.name;
+            }
+          });
+        }
+
+        // Determine content type
+        let contentType = ResourceType.ISSUE; // Default
+        if (item.content && item.content.__typename) {
+          contentType = item.content.__typename === 'Issue' 
+            ? ResourceType.ISSUE 
+            : ResourceType.PULL_REQUEST;
+        }
+
+        return {
+          id: item.id,
+          contentId: item.content?.id || '',
+          contentType,
+          projectId: data.projectId,
+          fieldValues,
+          createdAt: new Date().toISOString(), // GitHub API doesn't provide creation date for items
+          updatedAt: new Date().toISOString()
+        };
+      });
+    } catch (error) {
+      throw this.mapErrorToMCPError(error);
+    }
+  }
+
+  // Field Value Operations
+  async setFieldValue(data: {
+    projectId: string;
+    itemId: string;
+    fieldId: string;
+    value: any;
+  }): Promise<{ success: boolean; message: string }> {
+    try {
+      // First, get the field details to determine its type
+      const fieldQuery = `
+        query($projectId: ID!, $fieldId: ID!) {
+          node(id: $projectId) {
+            ... on ProjectV2 {
+              field(id: $fieldId) {
+                ... on ProjectV2Field {
+                  id
+                  name
+                  dataType
+                }
+                ... on ProjectV2IterationField {
+                  id
+                  name
+                  dataType
+                }
+                ... on ProjectV2SingleSelectField {
+                  id
+                  name
+                  dataType
+                  options {
+                    id
+                    name
+                  }
+                }
+              }
+            }
+          }
+        }
+      `;
+
+      interface FieldQueryResponse {
+        node: {
+          field: {
+            id: string;
+            name: string;
+            dataType: string;
+            options?: Array<{ id: string; name: string }>;
+          }
+        }
+      }
+
+      const fieldResponse = await this.factory.graphql<FieldQueryResponse>(fieldQuery, {
+        projectId: data.projectId,
+        fieldId: data.fieldId
+      });
+
+      if (!fieldResponse.node?.field) {
+        throw new ResourceNotFoundError(ResourceType.FIELD, data.fieldId);
+      }
+
+      const field = fieldResponse.node.field;
+      let mutation = '';
+      let variables: Record<string, any> = {
+        projectId: data.projectId,
+        itemId: data.itemId,
+        fieldId: data.fieldId,
+      };
+
+      // Determine the correct mutation based on field type
+      switch (field.dataType) {
+        case 'TEXT':
+          mutation = `
+            mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $text: String!) {
+              updateProjectV2ItemFieldValue(input: {
+                projectId: $projectId
+                itemId: $itemId
+                fieldId: $fieldId
+                value: { text: $text }
+              }) {
+                projectV2Item {
+                  id
+                }
+              }
+            }
+          `;
+          variables.text = String(data.value);
+          break;
+        
+        case 'NUMBER':
+          mutation = `
+            mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $number: Float!) {
+              updateProjectV2ItemFieldValue(input: {
+                projectId: $projectId
+                itemId: $itemId
+                fieldId: $fieldId
+                value: { number: $number }
+              }) {
+                projectV2Item {
+                  id
+                }
+              }
+            }
+          `;
+          variables.number = Number(data.value);
+          break;
+        
+        case 'DATE':
+          mutation = `
+            mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $date: Date!) {
+              updateProjectV2ItemFieldValue(input: {
+                projectId: $projectId
+                itemId: $itemId
+                fieldId: $fieldId
+                value: { date: $date }
+              }) {
+                projectV2Item {
+                  id
+                }
+              }
+            }
+          `;
+          variables.date = String(data.value);
+          break;
+        
+        case 'SINGLE_SELECT':
+          // For single select, we need to find the option ID that matches the provided value
+          const optionId = field.options?.find(opt => opt.name === data.value)?.id;
+          if (!optionId) {
+            throw new ValidationError(`Invalid option value '${data.value}' for field '${field.name}'`);
+          }
+          
+          mutation = `
+            mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $optionId: String!) {
+              updateProjectV2ItemFieldValue(input: {
+                projectId: $projectId
+                itemId: $itemId
+                fieldId: $fieldId
+                value: { singleSelectOptionId: $optionId }
+              }) {
+                projectV2Item {
+                  id
+                }
+              }
+            }
+          `;
+          variables.optionId = optionId;
+          break;
+        
+        default:
+          throw new ValidationError(`Unsupported field type: ${field.dataType}`);
+      }
+
+      interface UpdateFieldValueResponse {
+        updateProjectV2ItemFieldValue: {
+          projectV2Item: {
+            id: string;
+          }
+        }
+      }
+
+      await this.factory.graphql<UpdateFieldValueResponse>(mutation, variables);
+      
+      return {
+        success: true,
+        message: `Field value updated successfully for field '${field.name}'`
+      };
+    } catch (error) {
+      throw this.mapErrorToMCPError(error);
+    }
+  }
+
+  async getFieldValue(data: {
+    projectId: string;
+    itemId: string;
+    fieldId: string;
+  }): Promise<{ fieldName: string; value: any; fieldType: string }> {
+    try {
+      const query = `
+        query($projectId: ID!, $itemId: ID!, $fieldId: ID!) {
+          node(id: $projectId) {
+            ... on ProjectV2 {
+              item(id: $itemId) {
+                fieldValueByName(name: $fieldId) {
+                  ... on ProjectV2ItemFieldTextValue {
+                    text
+                    field {
+                      ... on ProjectV2Field {
+                        name
+                        dataType
+                      }
+                    }
+                  }
+                  ... on ProjectV2ItemFieldNumberValue {
+                    number
+                    field {
+                      ... on ProjectV2Field {
+                        name
+                        dataType
+                      }
+                    }
+                  }
+                  ... on ProjectV2ItemFieldDateValue {
+                    date
+                    field {
+                      ... on ProjectV2Field {
+                        name
+                        dataType
+                      }
+                    }
+                  }
+                  ... on ProjectV2ItemFieldSingleSelectValue {
+                    name
+                    field {
+                      ... on ProjectV2SingleSelectField {
+                        name
+                        dataType
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      `;
+
+      interface FieldValueResponse {
+        node: {
+          item: {
+            fieldValueByName: {
+              text?: string;
+              number?: number;
+              date?: string;
+              name?: string;
+              field: {
+                name: string;
+                dataType: string;
+              }
+            }
+          }
+        }
+      }
+
+      const response = await this.factory.graphql<FieldValueResponse>(query, {
+        projectId: data.projectId,
+        itemId: data.itemId,
+        fieldId: data.fieldId
+      });
+
+      if (!response.node?.item?.fieldValueByName) {
+        throw new ResourceNotFoundError(ResourceType.FIELD, data.fieldId);
+      }
+
+      const fieldValue = response.node.item.fieldValueByName;
+      const field = fieldValue.field;
+      let value = null;
+
+      // Extract the value based on the field type
+      if ('text' in fieldValue && fieldValue.text !== undefined) {
+        value = fieldValue.text;
+      } else if ('number' in fieldValue && fieldValue.number !== undefined) {
+        value = fieldValue.number;
+      } else if ('date' in fieldValue && fieldValue.date !== undefined) {
+        value = fieldValue.date;
+      } else if ('name' in fieldValue && fieldValue.name !== undefined) {
+        value = fieldValue.name;
+      }
+
+      return {
+        fieldName: field.name,
+        value,
+        fieldType: field.dataType
+      };
+    } catch (error) {
+      throw this.mapErrorToMCPError(error);
+    }
+  }
+
+  // Project View Operations
+  async createProjectView(data: {
+    projectId: string;
+    name: string;
+    layout: 'board' | 'table' | 'timeline' | 'roadmap';
+  }): Promise<ProjectView> {
+    try {
+      return await this.projectRepo.createView(
+        data.projectId,
+        data.name,
+        data.layout
+      );
+    } catch (error) {
+      throw this.mapErrorToMCPError(error);
+    }
+  }
+
+  async listProjectViews(data: {
+    projectId: string;
+  }): Promise<ProjectView[]> {
+    try {
+      const query = `
+        query($projectId: ID!) {
+          node(id: $projectId) {
+            ... on ProjectV2 {
+              views(first: 20) {
+                nodes {
+                  id
+                  name
+                  layout
+                }
+              }
+            }
+          }
+        }
+      `;
+
+      interface ListViewsResponse {
+        node: {
+          views: {
+            nodes: Array<{
+              id: string;
+              name: string;
+              layout: string;
+            }>
+          }
+        }
+      }
+
+      const response = await this.factory.graphql<ListViewsResponse>(query, {
+        projectId: data.projectId
+      });
+
+      if (!response.node?.views?.nodes) {
+        return [];
+      }
+
+      return response.node.views.nodes.map(view => ({
+        id: view.id,
+        name: view.name,
+        layout: view.layout.toLowerCase() as 'board' | 'table' | 'timeline' | 'roadmap',
+        fields: [], // These would need to be fetched separately if needed
+        sortBy: [],
+        groupBy: undefined,
+        filters: []
+      }));
+    } catch (error) {
+      throw this.mapErrorToMCPError(error);
+    }
+  }
+
+  async updateProjectView(data: {
+    projectId: string;
+    viewId: string;
+    name?: string;
+    layout?: 'board' | 'table' | 'timeline' | 'roadmap';
+  }): Promise<ProjectView> {
+    try {
+      const mutation = `
+        mutation($input: UpdateProjectV2ViewInput!) {
+          updateProjectV2View(input: $input) {
+            projectV2View {
+              id
+              name
+              layout
+            }
+          }
+        }
+      `;
+
+      interface UpdateViewResponse {
+        updateProjectV2View: {
+          projectV2View: {
+            id: string;
+            name: string;
+            layout: string;
+          }
+        }
+      }
+
+      const input: Record<string, any> = {
+        projectId: data.projectId,
+        id: data.viewId
+      };
+
+      if (data.name) {
+        input.name = data.name;
+      }
+
+      if (data.layout) {
+        input.layout = data.layout.toUpperCase();
+      }
+
+      const response = await this.factory.graphql<UpdateViewResponse>(mutation, {
+        input
+      });
+
+      const view = response.updateProjectV2View.projectV2View;
+
+      return {
+        id: view.id,
+        name: view.name,
+        layout: view.layout.toLowerCase() as 'board' | 'table' | 'timeline' | 'roadmap',
+        fields: [],
+        sortBy: [],
+        groupBy: undefined,
+        filters: []
+      };
+    } catch (error) {
+      throw this.mapErrorToMCPError(error);
+    }
+  }
+
+  // Milestone Management
+  async updateMilestone(data: {
+    milestoneId: number;
+    title?: string;
+    description?: string;
+    dueDate?: string | null;
+    state?: 'open' | 'closed';
+  }): Promise<Milestone> {
+    try {
+      // Convert milestoneId from number to string
+      const milestoneId = data.milestoneId.toString();
+      
+      // Convert state to ResourceStatus if provided
+      let status: ResourceStatus | undefined;
+      if (data.state) {
+        status = data.state === 'open' ? ResourceStatus.ACTIVE : ResourceStatus.CLOSED;
+      }
+      
+      // Map input data to domain model
+      const milestoneData: Partial<Milestone> = {
+        title: data.title,
+        description: data.description,
+        dueDate: data.dueDate === null ? undefined : data.dueDate,
+        status
+      };
+      
+      // Clean up undefined values
+      Object.keys(milestoneData).forEach(key => {
+        if (milestoneData[key as keyof Partial<Milestone>] === undefined) {
+          delete milestoneData[key as keyof Partial<Milestone>];
+        }
+      });
+      
+      return await this.milestoneRepo.update(milestoneId, milestoneData);
+    } catch (error) {
+      throw this.mapErrorToMCPError(error);
+    }
+  }
+
+  async deleteMilestone(data: {
+    milestoneId: number;
+  }): Promise<{ success: boolean; message: string }> {
+    try {
+      // Convert milestoneId from number to string
+      const milestoneId = data.milestoneId.toString();
+      
+      await this.milestoneRepo.delete(milestoneId);
+      
+      return {
+        success: true,
+        message: `Milestone ${data.milestoneId} has been deleted`
+      };
+    } catch (error) {
+      throw this.mapErrorToMCPError(error);
+    }
+  }
+
+  // Label Management
+  async createLabel(data: {
+    name: string;
+    color: string;
+    description?: string;
+  }): Promise<{ id: string; name: string; color: string; description: string }> {
+    try {
+      const mutation = `
+        mutation($input: CreateLabelInput!) {
+          createLabel(input: $input) {
+            label {
+              id
+              name
+              color
+              description
+            }
+          }
+        }
+      `;
+      
+      interface CreateLabelResponse {
+        createLabel: {
+          label: {
+            id: string;
+            name: string;
+            color: string;
+            description: string;
+          }
+        }
+      }
+      
+      const response = await this.factory.graphql<CreateLabelResponse>(mutation, {
+        input: {
+          repositoryId: this.factory.getConfig().repo,
+          name: data.name,
+          color: data.color,
+          description: data.description || ''
+        }
+      });
+      
+      return response.createLabel.label;
+    } catch (error) {
+      throw this.mapErrorToMCPError(error);
+    }
+  }
+  
+  async listLabels(data: {
+    limit?: number;
+  }): Promise<Array<{ id: string; name: string; color: string; description: string }>> {
+    try {
+      const limit = data.limit || 100;
+      
+      const query = `
+        query($owner: String!, $repo: String!, $limit: Int!) {
+          repository(owner: $owner, name: $repo) {
+            labels(first: $limit) {
+              nodes {
+                id
+                name
+                color
+                description
+              }
+            }
+          }
+        }
+      `;
+      
+      interface ListLabelsResponse {
+        repository: {
+          labels: {
+            nodes: Array<{
+              id: string;
+              name: string;
+              color: string;
+              description: string;
+            }>
+          }
+        }
+      }
+      
+      const response = await this.factory.graphql<ListLabelsResponse>(query, {
+        owner: this.factory.getConfig().owner,
+        repo: this.factory.getConfig().repo,
+        limit
+      });
+      
+      if (!response.repository?.labels?.nodes) {
+        return [];
+      }
+      
+      return response.repository.labels.nodes;
     } catch (error) {
       throw this.mapErrorToMCPError(error);
     }
