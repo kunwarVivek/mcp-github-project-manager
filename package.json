@@ -1,6 +1,6 @@
 {
   "name": "mcp-github-project-manager",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "A Model Context Protocol (MCP) server for managing GitHub Projects",
   "type": "module",
   "exports": "./build/index.js",
