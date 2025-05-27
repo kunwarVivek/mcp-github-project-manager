@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { ResourceManager } from '../../../../infrastructure/resource/ResourceManager';
-import { 
-  Resource, 
-  ResourceType, 
-  ResourceStatus, 
+import {
+  Resource,
+  ResourceType,
+  ResourceStatus,
   ResourceNotFoundError,
   ResourceCacheOptions
 } from '../../../../domain/resource-types';
@@ -33,14 +33,14 @@ import { ResourceCache } from '../../../../infrastructure/cache/ResourceCache';
 describe('ResourceManager', () => {
   let resourceManager: ResourceManager;
   let mockCache: any;
-  
+
   beforeEach(() => {
     // Reset mocks before each test
     jest.clearAllMocks();
-    
+
     // Create a new instance of the mocked ResourceCache
     mockCache = new ResourceCache();
-    
+
     // Create resourceManager with mocked cache
     resourceManager = new ResourceManager(mockCache);
   });
@@ -48,7 +48,7 @@ describe('ResourceManager', () => {
   it('should initialize correctly', () => {
     expect(resourceManager).toBeDefined();
   });
-  
+
   it('should create a resource successfully', async () => {
     // Setup
     const resourceData: any = {
@@ -71,12 +71,13 @@ describe('ResourceManager', () => {
     expect((resource as any).description).toBe('This is a test resource');
     expect((resource as any).owner).toBe('test-owner');
     expect(mockCache.set).toHaveBeenCalledWith(
-      resource.id, 
-      resource, 
+      resource.type,
+      resource.id,
+      resource,
       undefined
     );
   });
-  
+
   it('should retrieve a resource by ID', async () => {
     // Setup
     const mockResource = {
@@ -87,19 +88,19 @@ describe('ResourceManager', () => {
       name: 'Test Resource'
     };
     mockCache.get.mockResolvedValueOnce(mockResource);
-    
+
     // Execute
     const resource = await resourceManager.get(ResourceType.PROJECT, 'test-123');
-    
+
     // Verify
     expect(resource).toBe(mockResource);
-    expect(mockCache.get).toHaveBeenCalledWith('test-123');
+    expect(mockCache.get).toHaveBeenCalledWith(ResourceType.PROJECT, 'test-123');
   });
-  
+
   it('should throw NotFoundError when resource is not found', async () => {
     // Setup
     mockCache.get.mockResolvedValueOnce(null);
-    
+
     // Execute & Verify
     await expect(
       resourceManager.get(ResourceType.PROJECT, 'non-existent')

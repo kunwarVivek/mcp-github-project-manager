@@ -129,6 +129,13 @@ export class ProjectManagementService {
     this.factory = new GitHubRepositoryFactory(token, owner, repo);
   }
 
+  /**
+   * Get the repository factory instance for sync service
+   */
+  getRepositoryFactory(): GitHubRepositoryFactory {
+    return this.factory;
+  }
+
   private get issueRepo(): GitHubIssueRepository {
     return this.factory.createIssueRepository();
   }
@@ -334,14 +341,14 @@ export class ProjectManagementService {
         endDate: data.endDate,
         status: resourceStatus
       };
-      
+
       // Clean up undefined values
       Object.keys(sprintData).forEach(key => {
         if (sprintData[key as keyof Partial<Sprint>] === undefined) {
           delete sprintData[key as keyof Partial<Sprint>];
         }
       });
-      
+
       return await this.sprintRepo.update(data.sprintId, sprintData);
     } catch (error) {
       throw this.mapErrorToMCPError(error);
@@ -355,7 +362,7 @@ export class ProjectManagementService {
     try {
       let addedCount = 0;
       const issues = [];
-      
+
       // Add each issue to the sprint
       for (const issueId of data.issueIds) {
         try {
@@ -366,7 +373,7 @@ export class ProjectManagementService {
           console.error(`Failed to add issue ${issueId} to sprint: ${error}`);
         }
       }
-      
+
       return {
         success: addedCount > 0,
         addedIssues: addedCount,
@@ -384,7 +391,7 @@ export class ProjectManagementService {
     try {
       let removedCount = 0;
       const issues = [];
-      
+
       // Remove each issue from the sprint
       for (const issueId of data.issueIds) {
         try {
@@ -395,7 +402,7 @@ export class ProjectManagementService {
           console.error(`Failed to remove issue ${issueId} from sprint: ${error}`);
         }
       }
-      
+
       return {
         success: removedCount > 0,
         removedIssues: removedCount,
@@ -581,14 +588,14 @@ export class ProjectManagementService {
   async listProjects(status: string = 'active', limit: number = 10): Promise<Project[]> {
     try {
       const projects = await this.projectRepo.findAll();
-      
+
       // Filter by status if needed
       let filteredProjects = projects;
       if (status !== 'all') {
         const resourceStatus = status === 'active' ? ResourceStatus.ACTIVE : ResourceStatus.CLOSED;
         filteredProjects = projects.filter(project => project.status === resourceStatus);
       }
-      
+
       // Apply limit
       return filteredProjects.slice(0, limit);
     } catch (error) {
@@ -631,18 +638,18 @@ export class ProjectManagementService {
     try {
       // Get all milestones
       const milestones = await this.milestoneRepo.findAll();
-      
+
       // Filter by status if needed
       let filteredMilestones = milestones;
       if (status !== 'all') {
         const resourceStatus = status === 'open' ? ResourceStatus.ACTIVE : ResourceStatus.CLOSED;
         filteredMilestones = milestones.filter(milestone => milestone.status === resourceStatus);
       }
-      
+
       // Sort the milestones
       filteredMilestones.sort((a, b) => {
         let valueA, valueB;
-        
+
         switch(sort) {
           case 'due_date':
             valueA = a.dueDate || '';
@@ -657,11 +664,11 @@ export class ProjectManagementService {
             valueA = a.createdAt;
             valueB = b.createdAt;
         }
-        
+
         const comparison = valueA.localeCompare(valueB);
         return direction === 'asc' ? comparison : -comparison;
       });
-      
+
       return filteredMilestones;
     } catch (error) {
       throw this.mapErrorToMCPError(error);
@@ -681,7 +688,7 @@ export class ProjectManagementService {
     try {
       // Convert milestone ID from number to string if provided
       const milestoneId = data.milestoneId ? data.milestoneId.toString() : undefined;
-      
+
       // Create labels based on priority and type if provided
       const labels = data.labels || [];
       if (data.priority) {
@@ -690,7 +697,7 @@ export class ProjectManagementService {
       if (data.type) {
         labels.push(`type:${data.type}`);
       }
-      
+
       const issueData: CreateIssue = {
         title: data.title,
         description: data.description,
@@ -725,9 +732,9 @@ export class ProjectManagementService {
         direction = 'desc',
         limit = 30
       } = options;
-      
+
       let issues: Issue[];
-      
+
       if (milestone) {
         // If milestone is specified, get issues for that milestone
         issues = await this.issueRepo.findByMilestone(milestone.toString());
@@ -735,31 +742,31 @@ export class ProjectManagementService {
         // Otherwise get all issues
         issues = await this.issueRepo.findAll();
       }
-      
+
       // Filter by status
       if (status !== 'all') {
         const resourceStatus = status === 'open' ? ResourceStatus.ACTIVE : ResourceStatus.CLOSED;
         issues = issues.filter(issue => issue.status === resourceStatus);
       }
-      
+
       // Filter by labels if provided
       if (labels.length > 0) {
-        issues = issues.filter(issue => 
+        issues = issues.filter(issue =>
           labels.every(label => issue.labels.includes(label))
         );
       }
-      
+
       // Filter by assignee if provided
       if (assignee) {
-        issues = issues.filter(issue => 
+        issues = issues.filter(issue =>
           issue.assignees.includes(assignee)
         );
       }
-      
+
       // Sort the issues
       issues.sort((a, b) => {
         let valueA, valueB;
-        
+
         switch(sort) {
           case 'updated':
             valueA = a.updatedAt;
@@ -772,11 +779,11 @@ export class ProjectManagementService {
             valueA = a.createdAt;
             valueB = b.createdAt;
         }
-        
+
         const comparison = valueA.localeCompare(valueB);
         return direction === 'desc' ? -comparison : comparison;
       });
-      
+
       // Apply limit
       return issues.slice(0, limit);
     } catch (error) {
@@ -805,7 +812,7 @@ export class ProjectManagementService {
   ): Promise<Issue> {
     try {
       const data: Partial<Issue> = {};
-      
+
       if (updates.title) data.title = updates.title;
       if (updates.description) data.description = updates.description;
       if (updates.status) {
@@ -813,14 +820,14 @@ export class ProjectManagementService {
       }
       if (updates.assignees) data.assignees = updates.assignees;
       if (updates.labels) data.labels = updates.labels;
-      
+
       // Handle milestoneId explicitly
       if (updates.milestoneId === null) {
         data.milestoneId = undefined; // Remove milestone
       } else if (updates.milestoneId !== undefined) {
         data.milestoneId = updates.milestoneId.toString();
       }
-      
+
       return await this.issueRepo.update(issueId.toString(), data);
     } catch (error) {
       throw this.mapErrorToMCPError(error);
@@ -855,7 +862,7 @@ export class ProjectManagementService {
   async listSprints(status: string = 'all'): Promise<Sprint[]> {
     try {
       const sprints = await this.sprintRepo.findAll();
-      
+
       // Filter by status if needed
       if (status !== 'all') {
         let resourceStatus;
@@ -872,10 +879,10 @@ export class ProjectManagementService {
           default:
             return sprints;
         }
-        
+
         return sprints.filter(sprint => sprint.status === resourceStatus);
       }
-      
+
       return sprints;
     } catch (error) {
       throw this.mapErrorToMCPError(error);
@@ -885,15 +892,15 @@ export class ProjectManagementService {
   async getCurrentSprint(includeIssues: boolean = true): Promise<Sprint | null> {
     try {
       const currentSprint = await this.sprintRepo.findCurrent();
-      
+
       if (!currentSprint) {
         return null;
       }
-      
+
       if (includeIssues) {
         // Add issues data to sprint
         const issues = await this.sprintRepo.getIssues(currentSprint.id);
-        
+
         // We can't modify the sprint directly, so we create a new object
         return {
           ...currentSprint,
@@ -902,7 +909,7 @@ export class ProjectManagementService {
           issueDetails: issues
         } as Sprint & { issueDetails?: Issue[] };
       }
-      
+
       return currentSprint;
     } catch (error) {
       throw this.mapErrorToMCPError(error);
@@ -984,11 +991,11 @@ export class ProjectManagementService {
   }): Promise<CustomField> {
     try {
       const updateData: Partial<CustomField> = {};
-      
+
       if (data.name !== undefined) {
         updateData.name = data.name;
       }
-      
+
       if (data.options !== undefined) {
         updateData.options = data.options.map(option => ({
           id: '', // This will be assigned by GitHub
@@ -996,7 +1003,7 @@ export class ProjectManagementService {
           color: option.color
         }));
       }
-      
+
       return await this.projectRepo.updateField(data.projectId, data.fieldId, updateData);
     } catch (error) {
       throw this.mapErrorToMCPError(error);
@@ -1052,7 +1059,7 @@ export class ProjectManagementService {
 
       const itemId = response.addProjectV2ItemById.item.id;
       const contentId = response.addProjectV2ItemById.item.content.id;
-      
+
       const resourceType = data.contentType === 'issue' ? ResourceType.ISSUE : ResourceType.PULL_REQUEST;
 
       return {
@@ -1209,10 +1216,10 @@ export class ProjectManagementService {
         if (item.fieldValues && item.fieldValues.nodes) {
           item.fieldValues.nodes.forEach((fieldValue: any) => {
             if (!fieldValue || !fieldValue.field) return;
-            
+
             const fieldId = fieldValue.field.id;
             const fieldName = fieldValue.field.name;
-            
+
             if ('text' in fieldValue) {
               fieldValues[fieldId] = fieldValue.text;
             } else if ('date' in fieldValue) {
@@ -1226,8 +1233,8 @@ export class ProjectManagementService {
         // Determine content type
         let contentType = ResourceType.ISSUE; // Default
         if (item.content && item.content.__typename) {
-          contentType = item.content.__typename === 'Issue' 
-            ? ResourceType.ISSUE 
+          contentType = item.content.__typename === 'Issue'
+            ? ResourceType.ISSUE
             : ResourceType.PULL_REQUEST;
         }
 
@@ -1347,7 +1354,7 @@ export class ProjectManagementService {
           `;
           variables.text = String(data.value);
           break;
-        
+
         case 'NUMBER':
           mutation = `
             mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $number: Float!) {
@@ -1365,7 +1372,7 @@ export class ProjectManagementService {
           `;
           variables.number = Number(data.value);
           break;
-        
+
         case 'DATE':
           mutation = `
             mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $date: Date!) {
@@ -1383,14 +1390,14 @@ export class ProjectManagementService {
           `;
           variables.date = String(data.value);
           break;
-        
+
         case 'SINGLE_SELECT':
           // For single select, we need to find the option ID that matches the provided value
           const optionId = field.options?.find(opt => opt.name === data.value)?.id;
           if (!optionId) {
             throw new ValidationError(`Invalid option value '${data.value}' for field '${field.name}'`);
           }
-          
+
           mutation = `
             mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $optionId: String!) {
               updateProjectV2ItemFieldValue(input: {
@@ -1407,7 +1414,7 @@ export class ProjectManagementService {
           `;
           variables.optionId = optionId;
           break;
-        
+
         case 'ITERATION':
           // For iteration fields, the value should be an iteration ID
           if (!data.value || typeof data.value !== 'string') {
@@ -1429,7 +1436,7 @@ export class ProjectManagementService {
           `;
           variables.iterationId = String(data.value);
           break;
-        
+
         case 'MILESTONE':
           // For milestone fields, the value should be a milestone ID
           if (!data.value || typeof data.value !== 'string') {
@@ -1451,7 +1458,7 @@ export class ProjectManagementService {
           `;
           variables.milestoneId = String(data.value);
           break;
-        
+
         case 'ASSIGNEES':
           // For user fields, the value should be an array of user IDs
           if (!data.value) {
@@ -1477,7 +1484,7 @@ export class ProjectManagementService {
           `;
           variables.userIds = userIds.map((id: any) => String(id));
           break;
-        
+
         case 'LABELS':
           // For label fields, the value should be an array of label IDs
           if (!data.value) {
@@ -1503,7 +1510,7 @@ export class ProjectManagementService {
           `;
           variables.labelIds = labelIds.map((id: any) => String(id));
           break;
-        
+
         default:
           throw new ValidationError(`Unsupported field type: ${field.dataType}. Supported types: TEXT, NUMBER, DATE, SINGLE_SELECT, ITERATION, MILESTONE, ASSIGNEES, LABELS`);
       }
@@ -1517,7 +1524,7 @@ export class ProjectManagementService {
       }
 
       await this.factory.graphql<UpdateFieldValueResponse>(mutation, variables);
-      
+
       return {
         success: true,
         message: `Field value updated successfully for field '${field.name}'`
@@ -1861,13 +1868,13 @@ export class ProjectManagementService {
     try {
       // Convert milestoneId from number to string
       const milestoneId = data.milestoneId.toString();
-      
+
       // Convert state to ResourceStatus if provided
       let status: ResourceStatus | undefined;
       if (data.state) {
         status = data.state === 'open' ? ResourceStatus.ACTIVE : ResourceStatus.CLOSED;
       }
-      
+
       // Map input data to domain model
       const milestoneData: Partial<Milestone> = {
         title: data.title,
@@ -1875,14 +1882,14 @@ export class ProjectManagementService {
         dueDate: data.dueDate === null ? undefined : data.dueDate,
         status
       };
-      
+
       // Clean up undefined values
       Object.keys(milestoneData).forEach(key => {
         if (milestoneData[key as keyof Partial<Milestone>] === undefined) {
           delete milestoneData[key as keyof Partial<Milestone>];
         }
       });
-      
+
       return await this.milestoneRepo.update(milestoneId, milestoneData);
     } catch (error) {
       throw this.mapErrorToMCPError(error);
@@ -1895,9 +1902,9 @@ export class ProjectManagementService {
     try {
       // Convert milestoneId from number to string
       const milestoneId = data.milestoneId.toString();
-      
+
       await this.milestoneRepo.delete(milestoneId);
-      
+
       return {
         success: true,
         message: `Milestone ${data.milestoneId} has been deleted`
@@ -1926,7 +1933,7 @@ export class ProjectManagementService {
           }
         }
       `;
-      
+
       interface CreateLabelResponse {
         createLabel: {
           label: {
@@ -1937,7 +1944,7 @@ export class ProjectManagementService {
           }
         }
       }
-      
+
       const response = await this.factory.graphql<CreateLabelResponse>(mutation, {
         input: {
           repositoryId: this.factory.getConfig().repo,
@@ -1946,19 +1953,19 @@ export class ProjectManagementService {
           description: data.description || ''
         }
       });
-      
+
       return response.createLabel.label;
     } catch (error) {
       throw this.mapErrorToMCPError(error);
     }
   }
-  
+
   async listLabels(data: {
     limit?: number;
   }): Promise<Array<{ id: string; name: string; color: string; description: string }>> {
     try {
       const limit = data.limit || 100;
-      
+
       const query = `
         query($owner: String!, $repo: String!, $limit: Int!) {
           repository(owner: $owner, name: $repo) {
@@ -1973,7 +1980,7 @@ export class ProjectManagementService {
           }
         }
       `;
-      
+
       interface ListLabelsResponse {
         repository: {
           labels: {
@@ -1986,17 +1993,17 @@ export class ProjectManagementService {
           }
         }
       }
-      
+
       const response = await this.factory.graphql<ListLabelsResponse>(query, {
         owner: this.factory.getConfig().owner,
         repo: this.factory.getConfig().repo,
         limit
       });
-      
+
       if (!response.repository?.labels?.nodes) {
         return [];
       }
-      
+
       return response.repository.labels.nodes;
     } catch (error) {
       throw this.mapErrorToMCPError(error);

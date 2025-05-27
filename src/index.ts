@@ -7,19 +7,52 @@ import {
   ListToolsRequestSchema,
   McpError,
 } from "@modelcontextprotocol/sdk/types.js";
-import { ProjectManagementService } from "./services/ProjectManagementService.js";
-import { GITHUB_TOKEN, GITHUB_OWNER, GITHUB_REPO, CLI_OPTIONS } from "./env.js";
-import { ToolRegistry } from "./infrastructure/tools/ToolRegistry.js";
-import { ToolValidator } from "./infrastructure/tools/ToolValidator.js";
-import { ToolResultFormatter } from "./infrastructure/tools/ToolResultFormatter.js";
-import { MCPContentType } from "./domain/mcp-types.js";
+import { ProjectManagementService } from "./services/ProjectManagementService";
+import { GitHubStateSyncService } from "./services/GitHubStateSyncService";
+import {
+  GITHUB_TOKEN,
+  GITHUB_OWNER,
+  GITHUB_REPO,
+  CLI_OPTIONS,
+  SYNC_ENABLED,
+  SYNC_TIMEOUT_MS,
+  CACHE_DIRECTORY,
+  WEBHOOK_SECRET,
+  WEBHOOK_PORT,
+  SSE_ENABLED
+} from "./env";
+import { ToolRegistry } from "./infrastructure/tools/ToolRegistry";
+import { ToolValidator } from "./infrastructure/tools/ToolValidator";
+import { ToolResultFormatter } from "./infrastructure/tools/ToolResultFormatter";
+import { MCPContentType } from "./domain/mcp-types";
+import { ResourceCache } from "./infrastructure/cache/ResourceCache";
+import { FilePersistenceAdapter } from "./infrastructure/persistence/FilePersistenceAdapter";
+import { GitHubWebhookHandler } from "./infrastructure/events/GitHubWebhookHandler";
+import { EventSubscriptionManager } from "./infrastructure/events/EventSubscriptionManager";
+import { EventStore } from "./infrastructure/events/EventStore";
+import { WebhookServer } from "./infrastructure/http/WebhookServer";
+import { Logger } from "./infrastructure/logger/index";
 
 class GitHubProjectManagerServer {
   private server: Server;
   private service: ProjectManagementService;
   private toolRegistry: ToolRegistry;
+  private logger: Logger;
+
+  // Persistence and sync components
+  private cache: ResourceCache;
+  private persistence: FilePersistenceAdapter;
+  private syncService?: GitHubStateSyncService;
+
+  // Event system components
+  private webhookHandler: GitHubWebhookHandler;
+  private subscriptionManager: EventSubscriptionManager;
+  private eventStore: EventStore;
+  private webhookServer?: WebhookServer;
 
   constructor() {
+    this.logger = Logger.getInstance();
+
     this.server = new Server(
       {
         name: "github-project-manager",
@@ -32,6 +65,24 @@ class GitHubProjectManagerServer {
       }
     );
 
+    // Initialize persistence and cache
+    this.cache = ResourceCache.getInstance();
+    this.persistence = new FilePersistenceAdapter({
+      cacheDirectory: CACHE_DIRECTORY,
+      enableCompression: true,
+      maxBackups: 5,
+      atomicWrites: true
+    });
+
+    // Initialize event system
+    this.webhookHandler = new GitHubWebhookHandler(WEBHOOK_SECRET);
+    this.subscriptionManager = new EventSubscriptionManager();
+    this.eventStore = new EventStore({
+      storageDirectory: `${CACHE_DIRECTORY}/events`,
+      enableCompression: true
+    });
+
+    // Initialize main service
     this.service = new ProjectManagementService(
       GITHUB_OWNER,
       GITHUB_REPO,
@@ -42,11 +93,11 @@ class GitHubProjectManagerServer {
     this.toolRegistry = ToolRegistry.getInstance();
 
     this.setupToolHandlers();
+    this.setupEventHandlers();
 
-    this.server.onerror = (error) => console.error("[MCP Error]", error);
+    this.server.onerror = (error) => this.logger.error("[MCP Error]", error);
     process.on("SIGINT", async () => {
-      await this.server.close();
-      process.exit(0);
+      await this.shutdown();
     });
   }
 
@@ -133,52 +184,52 @@ class GitHubProjectManagerServer {
 
       case "get_upcoming_milestones":
         return await this.service.getUpcomingMilestones(args.daysAhead, args.limit, args.includeIssues);
-      
+
       // Project tools
       case "create_project":
         return await this.service.createProject(args);
-        
+
       case "list_projects":
         return await this.service.listProjects(args.status, args.limit);
-        
+
       case "get_project":
         return await this.service.getProject(args.projectId);
-        
+
       case "update_project":
         return await this.service.updateProject(args);
-        
+
       case "delete_project":
         return await this.service.deleteProject(args);
-        
+
       case "list_project_fields":
         return await this.service.listProjectFields(args);
-        
+
       case "update_project_field":
         return await this.service.updateProjectField(args);
-      
+
       // Milestone tools
       case "create_milestone":
         return await this.service.createMilestone(args);
-        
+
       case "list_milestones":
         return await this.service.listMilestones(args.status, args.sort, args.direction);
-        
+
       case "update_milestone":
         return await this.service.updateMilestone(args);
-        
+
       case "delete_milestone":
         return await this.service.deleteMilestone(args);
-      
+
       // Issue tools
       case "create_issue":
         return await this.service.createIssue(args);
-        
+
       case "list_issues":
         return await this.service.listIssues(args);
-        
+
       case "get_issue":
         return await this.service.getIssue(args.issueId);
-        
+
       case "update_issue":
         return await this.service.updateIssue(args.issueId, {
           title: args.title,
@@ -188,60 +239,70 @@ class GitHubProjectManagerServer {
           assignees: args.assignees,
           labels: args.labels
         });
-        
+
       // Sprint tools
       case "create_sprint":
         return await this.service.createSprint(args);
-        
+
       case "list_sprints":
         return await this.service.listSprints(args.status);
-        
+
       case "get_current_sprint":
         return await this.service.getCurrentSprint(args.includeIssues);
-        
+
       case "update_sprint":
         return await this.service.updateSprint(args);
-        
+
       case "add_issues_to_sprint":
         return await this.service.addIssuesToSprint(args);
-        
+
       case "remove_issues_from_sprint":
         return await this.service.removeIssuesFromSprint(args);
-        
+
       // Label tools
       case "create_label":
         return await this.service.createLabel(args);
-        
+
       case "list_labels":
         return await this.service.listLabels(args);
-        
+
       // Project field tools
-        
+
       // Project view tools
       case "create_project_view":
         return await this.service.createProjectView(args);
-        
+
       case "list_project_views":
         return await this.service.listProjectViews(args);
-        
+
       case "update_project_view":
         return await this.service.updateProjectView(args);
-        
+
       // Project item tools
       case "add_project_item":
         return await this.service.addProjectItem(args);
-        
+
       case "remove_project_item":
         return await this.service.removeProjectItem(args);
-        
+
       case "list_project_items":
         return await this.service.listProjectItems(args);
-        
+
       case "set_field_value":
         return await this.service.setFieldValue(args);
-        
+
       case "get_field_value":
         return await this.service.getFieldValue(args);
+
+      // Event management tools
+      case "subscribe_to_events":
+        return await this.handleSubscribeToEvents(args);
+
+      case "get_recent_events":
+        return await this.handleGetRecentEvents(args);
+
+      case "replay_events":
+        return await this.handleReplayEvents(args);
 
       default:
         throw new McpError(
@@ -251,20 +312,244 @@ class GitHubProjectManagerServer {
     }
   }
 
-  async run() {
-    const transport = new StdioServerTransport();
-    await this.server.connect(transport);
+  /**
+   * Handle subscribe to events tool
+   */
+  private async handleSubscribeToEvents(args: any): Promise<any> {
+    try {
+      const subscriptionId = this.subscriptionManager.subscribe({
+        clientId: args.clientId,
+        filters: args.filters || [],
+        transport: args.transport || 'internal',
+        endpoint: args.endpoint,
+        expiresAt: args.expiresAt
+      });
 
-    // Display configuration information if verbose mode is enabled
-    if (CLI_OPTIONS.verbose) {
-      console.error("GitHub Project Manager MCP server configuration:");
-      console.error(`- Owner: ${GITHUB_OWNER}`);
-      console.error(`- Repository: ${GITHUB_REPO}`);
-      console.error(`- Token: ${GITHUB_TOKEN.substring(0, 4)}...${GITHUB_TOKEN.substring(GITHUB_TOKEN.length - 4)}`);
-      console.error(`- Environment file: ${CLI_OPTIONS.envFile || '.env (default)'}`);
+      return {
+        success: true,
+        subscriptionId,
+        message: `Subscription created successfully for client ${args.clientId}`
+      };
+    } catch (error) {
+      this.logger.error("Failed to create event subscription:", error);
+      throw new McpError(
+        ErrorCode.InternalError,
+        `Failed to create subscription: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
+    }
+  }
+
+  /**
+   * Handle get recent events tool
+   */
+  private async handleGetRecentEvents(args: any): Promise<any> {
+    try {
+      const query: any = {};
+
+      if (args.resourceType) query.resourceType = args.resourceType;
+      if (args.resourceId) query.resourceId = args.resourceId;
+      if (args.eventType) query.eventType = args.eventType;
+      if (args.limit) query.limit = args.limit;
+
+      const events = await this.eventStore.getEvents(query);
+
+      return {
+        success: true,
+        events,
+        count: events.length
+      };
+    } catch (error) {
+      this.logger.error("Failed to get recent events:", error);
+      throw new McpError(
+        ErrorCode.InternalError,
+        `Failed to get recent events: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
+    }
+  }
+
+  /**
+   * Handle replay events tool
+   */
+  private async handleReplayEvents(args: any): Promise<any> {
+    try {
+      const query: any = {
+        fromTimestamp: args.fromTimestamp,
+        limit: args.limit || 1000
+      };
+
+      if (args.toTimestamp) query.toTimestamp = args.toTimestamp;
+      if (args.resourceType) query.resourceType = args.resourceType;
+      if (args.resourceId) query.resourceId = args.resourceId;
+
+      const events = await this.eventStore.getEvents(query);
+
+      return {
+        success: true,
+        events,
+        count: events.length,
+        fromTimestamp: args.fromTimestamp,
+        toTimestamp: args.toTimestamp
+      };
+    } catch (error) {
+      this.logger.error("Failed to replay events:", error);
+      throw new McpError(
+        ErrorCode.InternalError,
+        `Failed to replay events: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
+    }
+  }
+
+  /**
+   * Setup event handlers for the event system
+   */
+  private setupEventHandlers(): void {
+    // Handle events from subscription manager
+    this.subscriptionManager.on('internalEvent', ({ subscriptions, event }) => {
+      this.logger.debug(`Internal event notification: ${event.type} ${event.resourceType} ${event.resourceId}`);
+      // Handle internal events (e.g., cache invalidation)
+      this.handleInternalEvent(event);
+    });
+
+    // Store events when they're processed
+    this.subscriptionManager.on('sseEvent', async ({ subscriptions, event }) => {
+      try {
+        await this.eventStore.storeEvent(event);
+      } catch (error) {
+        this.logger.error("Failed to store SSE event:", error);
+      }
+    });
+  }
+
+  /**
+   * Handle internal events (e.g., cache invalidation)
+   */
+  private handleInternalEvent(event: any): void {
+    // Invalidate cache for the affected resource
+    if (event.resourceType && event.resourceId) {
+      this.cache.invalidate(event.resourceType, event.resourceId);
+      this.logger.debug(`Invalidated cache for ${event.resourceType}:${event.resourceId}`);
+    }
+  }
+
+  /**
+   * Initialize sync service and perform initial sync
+   */
+  private async initializeSync(): Promise<void> {
+    if (!SYNC_ENABLED) {
+      this.logger.info("Sync is disabled, skipping initialization");
+      return;
     }
 
-    console.error("GitHub Project Manager MCP server running on stdio");
+    try {
+      // Initialize sync service
+      const factory = this.service.getRepositoryFactory();
+      this.syncService = new GitHubStateSyncService(factory, this.cache, this.persistence);
+
+      // Perform initial sync with timeout
+      this.logger.info("Starting initial GitHub state sync...");
+      const syncResult = await this.syncService.performInitialSync(SYNC_TIMEOUT_MS);
+
+      if (syncResult.success) {
+        this.logger.info(`Initial sync completed successfully: ${syncResult.syncedResources} resources synced, ${syncResult.skippedResources} skipped in ${syncResult.duration}ms`);
+      } else {
+        this.logger.warn(`Initial sync completed with errors: ${syncResult.errors.join(', ')}`);
+      }
+    } catch (error) {
+      this.logger.error("Failed to initialize sync service:", error);
+      this.logger.warn("Continuing without sync - cache will be populated on demand");
+    }
+  }
+
+  /**
+   * Initialize webhook server
+   */
+  private async initializeWebhookServer(): Promise<void> {
+    if (!SSE_ENABLED && !WEBHOOK_SECRET) {
+      this.logger.info("Event system disabled (no SSE and no webhook secret), skipping webhook server");
+      return;
+    }
+
+    try {
+      this.webhookServer = new WebhookServer(
+        this.webhookHandler,
+        this.subscriptionManager,
+        this.eventStore,
+        {
+          port: WEBHOOK_PORT,
+          enableSSE: SSE_ENABLED
+        }
+      );
+
+      await this.webhookServer.start();
+      this.logger.info(`Webhook server started on port ${WEBHOOK_PORT}`);
+    } catch (error) {
+      this.logger.error("Failed to start webhook server:", error);
+      this.logger.warn("Continuing without webhook server - real-time events will not be available");
+    }
+  }
+
+  /**
+   * Graceful shutdown
+   */
+  private async shutdown(): Promise<void> {
+    this.logger.info("Shutting down GitHub Project Manager server...");
+
+    try {
+      // Stop webhook server
+      if (this.webhookServer) {
+        await this.webhookServer.stop();
+        this.logger.info("Webhook server stopped");
+      }
+
+      // Cleanup event store
+      await this.eventStore.cleanup();
+      this.logger.info("Event store cleaned up");
+
+      // Cleanup persistence
+      await this.persistence.cleanup();
+      this.logger.info("Persistence cleaned up");
+
+      // Close MCP server
+      await this.server.close();
+      this.logger.info("MCP server closed");
+
+    } catch (error) {
+      this.logger.error("Error during shutdown:", error);
+    } finally {
+      process.exit(0);
+    }
+  }
+
+  async run() {
+    try {
+      // Initialize sync service first
+      await this.initializeSync();
+
+      // Initialize webhook server
+      await this.initializeWebhookServer();
+
+      // Connect MCP server
+      const transport = new StdioServerTransport();
+      await this.server.connect(transport);
+
+      // Display configuration information if verbose mode is enabled
+      if (CLI_OPTIONS.verbose) {
+        console.error("GitHub Project Manager MCP server configuration:");
+        console.error(`- Owner: ${GITHUB_OWNER}`);
+        console.error(`- Repository: ${GITHUB_REPO}`);
+        console.error(`- Token: ${GITHUB_TOKEN.substring(0, 4)}...${GITHUB_TOKEN.substring(GITHUB_TOKEN.length - 4)}`);
+        console.error(`- Environment file: ${CLI_OPTIONS.envFile || '.env (default)'}`);
+        console.error(`- Sync enabled: ${SYNC_ENABLED}`);
+        console.error(`- Cache directory: ${CACHE_DIRECTORY}`);
+        console.error(`- Webhook port: ${WEBHOOK_PORT}`);
+        console.error(`- SSE enabled: ${SSE_ENABLED}`);
+      }
+
+      console.error("GitHub Project Manager MCP server running on stdio");
+    } catch (error) {
+      this.logger.error("Failed to start server:", error);
+      throw error;
+    }
   }
 }
 

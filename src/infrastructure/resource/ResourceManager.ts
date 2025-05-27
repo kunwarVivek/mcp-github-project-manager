@@ -15,9 +15,9 @@ import {
   RelationshipType,
 } from '../../domain/resource-types';
 import { ResourceCache } from '../cache/ResourceCache';
-import { 
-  ResourceSchema, 
-  ResourceSchemaMap, 
+import {
+  ResourceSchema,
+  ResourceSchemaMap,
   validateResourceByType,
   resourceSchemas
 } from '../../domain/resource-schemas';
@@ -65,7 +65,7 @@ export class ResourceManager extends EventEmitter {
       this.validateResource(data, options.validationRules);
     }
 
-    await this.cache.set(resource.id, resource, options?.cacheOptions);
+    await this.cache.set(resource.type, resource.id, resource, options?.cacheOptions);
 
     this.emit('resource', {
       type: ResourceEventType.CREATED,
@@ -82,19 +82,19 @@ export class ResourceManager extends EventEmitter {
     type: ResourceType,
     id: string
   ): Promise<T> {
-    const resource = await this.cache.get<T>(id);
-    
+    const resource = await this.cache.get<T>(type, id);
+
     if (!resource) {
       throw new ResourceNotFoundError(type, id);
     }
-    
+
     if (resource.type !== type) {
       throw new ResourceValidationError(
-        type, 
+        type,
         `Found resource with type ${resource.type} instead of ${type}`
       );
     }
-    
+
     return resource;
   }
 
@@ -106,7 +106,7 @@ export class ResourceManager extends EventEmitter {
     }
   ): Promise<T[]> {
     const resources = await this.cache.getByType<T>(type);
-    
+
     return resources.filter(
       resource =>
         (options?.status === undefined || resource.status === options.status) &&
@@ -130,9 +130,9 @@ export class ResourceManager extends EventEmitter {
         }
       })
     );
-    
+
     // Fix the type predicate issue
-    return resources.filter((resource): resource is Awaited<T> => 
+    return resources.filter((resource): resource is Awaited<T> =>
       resource !== null
     ) as unknown as T[];
   }
@@ -148,7 +148,7 @@ export class ResourceManager extends EventEmitter {
     }
   ): Promise<T> {
     const current = await this.get<T>(type, id);
-    
+
     // Handle the case where version is undefined
     const currentVersion = current.version ?? 0;
 
@@ -189,7 +189,7 @@ export class ResourceManager extends EventEmitter {
       }
     }
 
-    await this.cache.set(id, updated, options?.cacheOptions);
+    await this.cache.set(type, id, updated, options?.cacheOptions);
 
     this.emit('resource', {
       type: ResourceEventType.UPDATED,
@@ -217,7 +217,7 @@ export class ResourceManager extends EventEmitter {
       updatedAt: now,
     };
 
-    await this.cache.set(id, updated);
+    await this.cache.set(type, id, updated);
 
     this.emit('resource', {
       type: ResourceEventType.DELETED,
@@ -242,7 +242,7 @@ export class ResourceManager extends EventEmitter {
       updatedAt: now,
     };
 
-    await this.cache.set(id, updated);
+    await this.cache.set(type, id, updated);
 
     this.emit('resource', {
       type: ResourceEventType.ARCHIVED,
@@ -265,7 +265,7 @@ export class ResourceManager extends EventEmitter {
       deletedAt: undefined, // Changed from null to undefined
     };
 
-    await this.cache.set(id, updated);
+    await this.cache.set(type, id, updated);
 
     this.emit('resource', {
       type: ResourceEventType.RESTORED,
@@ -286,14 +286,14 @@ export class ResourceManager extends EventEmitter {
     // Verify both resources exist
     await this.get(sourceType, sourceId);
     await this.get(targetType, targetId);
-    
+
     // Store the relationship
     await this.cache.setRelationship(
       sourceId,
       relationshipType,
       targetId
     );
-    
+
     this.emit('resource', {
       type: ResourceEventType.RELATIONSHIP_CREATED,
       resourceId: sourceId,
@@ -315,10 +315,10 @@ export class ResourceManager extends EventEmitter {
   ): Promise<T[]> {
     // Verify source resource exists
     await this.get(type, id);
-    
+
     // Get related resource IDs
     const relatedIds = await this.cache.getRelationships(id, relationshipType);
-    
+
     // Get all related resources
     return this.getByIds<T>(targetType, relatedIds);
   }
@@ -331,10 +331,10 @@ export class ResourceManager extends EventEmitter {
   ): Promise<void> {
     // Verify source resource exists
     await this.get(sourceType, sourceId);
-    
+
     // Remove the relationship
     await this.cache.removeRelationship(sourceId, relationshipType, targetId);
-    
+
     this.emit('resource', {
       type: ResourceEventType.RELATIONSHIP_REMOVED,
       resourceId: sourceId,

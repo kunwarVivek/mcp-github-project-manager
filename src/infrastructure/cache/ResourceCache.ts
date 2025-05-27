@@ -1,10 +1,13 @@
 import { Resource, ResourceCacheOptions, ResourceType } from "../../domain/resource-types";
+import { SyncMetadata } from "../../services/GitHubStateSyncService";
 
 interface CacheEntry<T> {
   value: T;
   expiresAt?: number;
   tags?: string[];
   namespace?: string;
+  lastModified?: string;
+  version?: number;
 }
 
 export class ResourceCache {
@@ -13,6 +16,7 @@ export class ResourceCache {
   private tagIndex: Map<string, Set<string>>;
   private typeIndex: Map<ResourceType, Set<string>>;
   private namespaceIndex: Map<string, Set<string>>;
+  private static instance: ResourceCache;
 
   constructor() {
     this.cache = new Map();
@@ -21,7 +25,23 @@ export class ResourceCache {
     this.namespaceIndex = new Map();
   }
 
-  async set<T extends Resource>(
+  /**
+   * Get singleton instance
+   */
+  static getInstance(): ResourceCache {
+    if (!ResourceCache.instance) {
+      ResourceCache.instance = new ResourceCache();
+    }
+    return ResourceCache.instance;
+  }
+
+
+
+  /**
+   * Set resource with type information for persistence
+   */
+  async set<T>(
+    type: ResourceType,
     id: string,
     value: T,
     options?: ResourceCacheOptions
@@ -36,33 +56,39 @@ export class ResourceCache {
       value,
       expiresAt,
       tags,
+      lastModified: (value as any).updatedAt || new Date().toISOString(),
+      version: (value as any).version || 1,
     };
 
-    this.cache.set(id, entry);
+    const cacheKey = this.getCacheKey(type, id);
+    this.cache.set(cacheKey, entry);
 
     // Index by type
-    if (value.type) {
-      this.addToTypeIndex(value.type, id);
-    }
+    this.addToTypeIndex(type, cacheKey);
 
     // Index by tags
     if (tags.length > 0) {
-      this.addToTagIndex(id, tags);
+      this.addToTagIndex(cacheKey, tags);
     }
 
     // Index by namespaces
     if (namespaces.length > 0) {
       namespaces.forEach((namespace: string) => {
-        this.addToNamespaceIndex(namespace, id);
+        this.addToNamespaceIndex(namespace, cacheKey);
       });
     }
   }
 
+  /**
+   * Get resource by type and ID
+   */
   async get<T extends Resource>(
+    type: ResourceType,
     id: string,
     options?: ResourceCacheOptions
   ): Promise<T | null> {
-    const entry = this.cache.get(id) as CacheEntry<T> | undefined;
+    const cacheKey = this.getCacheKey(type, id);
+    const entry = this.cache.get(cacheKey) as CacheEntry<T> | undefined;
 
     if (!entry) {
       return null;
@@ -70,8 +96,8 @@ export class ResourceCache {
 
     // Check if expired
     if (entry.expiresAt && Date.now() > entry.expiresAt) {
-      this.removeFromIndices(id, entry);
-      this.cache.delete(id);
+      this.removeFromIndices(cacheKey, entry);
+      this.cache.delete(cacheKey);
       return null;
     }
 
@@ -90,6 +116,8 @@ export class ResourceCache {
     return entry.value;
   }
 
+
+
   async getByType<T extends Resource>(
     type: ResourceType,
     options?: ResourceCacheOptions
@@ -101,9 +129,13 @@ export class ResourceCache {
 
     const resources: T[] = [];
     for (const id of ids) {
-      const resource = await this.get<T>(id, options);
-      if (resource) {
-        resources.push(resource);
+      // Parse the cache key to get the actual resource ID
+      const parsed = this.parseCacheKey(id);
+      if (parsed) {
+        const resource = await this.get<T>(parsed.type, parsed.id, options);
+        if (resource) {
+          resources.push(resource);
+        }
       }
     }
 
@@ -122,9 +154,12 @@ export class ResourceCache {
 
     const resources: T[] = [];
     for (const id of ids) {
-      const resource = await this.get<T>(id, options);
-      if (resource && (!type || resource.type === type)) {
-        resources.push(resource);
+      const parsed = this.parseCacheKey(id);
+      if (parsed) {
+        const resource = await this.get<T>(parsed.type, parsed.id, options);
+        if (resource && (!type || resource.type === type)) {
+          resources.push(resource);
+        }
       }
     }
 
@@ -142,9 +177,12 @@ export class ResourceCache {
 
     const resources: T[] = [];
     for (const id of ids) {
-      const resource = await this.get<T>(id, options);
-      if (resource) {
-        resources.push(resource);
+      const parsed = this.parseCacheKey(id);
+      if (parsed) {
+        const resource = await this.get<T>(parsed.type, parsed.id, options);
+        if (resource) {
+          resources.push(resource);
+        }
       }
     }
 
@@ -199,12 +237,12 @@ export class ResourceCache {
   }
 
   async invalidateByPattern(pattern: string | RegExp): Promise<void> {
-    const regex = typeof pattern === 'string' 
+    const regex = typeof pattern === 'string'
       ? new RegExp(pattern.replace(/\*/g, '.*'))
       : pattern;
 
     const idsToRemove: string[] = [];
-    
+
     for (const id of this.cache.keys()) {
       if (regex.test(id)) {
         idsToRemove.push(id);
@@ -257,7 +295,7 @@ export class ResourceCache {
   // Relationship management methods
   async setRelationship(sourceId: string, relationshipType: string, targetId: string): Promise<void> {
     const relationshipKey = this.getRelationshipKey(sourceId, relationshipType, targetId);
-    
+
     // Create a simple relationship entry
     const entry: CacheEntry<any> = {
       value: {
@@ -266,54 +304,54 @@ export class ResourceCache {
         targetId
       }
     };
-    
+
     this.cache.set(relationshipKey, entry);
-    
+
     // Also keep an index of relationships by source id and type
     const sourceTypeKey = `relationship:${sourceId}:${relationshipType}`;
     let relationships = this.cache.get(sourceTypeKey);
-    
+
     if (!relationships) {
       relationships = {
         value: new Set<string>()
       };
       this.cache.set(sourceTypeKey, relationships);
     }
-    
+
     relationships.value.add(targetId);
   }
-  
+
   async getRelationships(sourceId: string, relationshipType: string): Promise<string[]> {
     const sourceTypeKey = `relationship:${sourceId}:${relationshipType}`;
     const relationships = this.cache.get(sourceTypeKey);
-    
+
     if (!relationships) {
       return [];
     }
-    
+
     return Array.from(relationships.value);
   }
-  
+
   async removeRelationship(sourceId: string, relationshipType: string, targetId: string): Promise<void> {
     const relationshipKey = this.getRelationshipKey(sourceId, relationshipType, targetId);
-    
+
     // Remove the relationship entry
     this.cache.delete(relationshipKey);
-    
+
     // Update the relationship index
     const sourceTypeKey = `relationship:${sourceId}:${relationshipType}`;
     const relationships = this.cache.get(sourceTypeKey);
-    
+
     if (relationships) {
       relationships.value.delete(targetId);
-      
+
       // If no more relationships of this type, remove the index entry
       if (relationships.value.size === 0) {
         this.cache.delete(sourceTypeKey);
       }
     }
   }
-  
+
   private getRelationshipKey(sourceId: string, relationshipType: string, targetId: string): string {
     return `relationship:${sourceId}:${relationshipType}:${targetId}`;
   }
@@ -413,5 +451,152 @@ export class ResourceCache {
       typeCount: this.typeIndex.size,
       namespaceCount: this.namespaceIndex.size,
     };
+  }
+
+  /**
+   * Get cache key for type and ID
+   */
+  private getCacheKey(type: ResourceType, id: string): string {
+    return `${type}:${id}`;
+  }
+
+  /**
+   * Parse cache key to get type and ID
+   */
+  private parseCacheKey(cacheKey: string): { type: ResourceType; id: string } | null {
+    const parts = cacheKey.split(':');
+    if (parts.length < 2) {
+      return null;
+    }
+
+    const type = parts[0] as ResourceType;
+    const id = parts.slice(1).join(':'); // Handle IDs that might contain colons
+
+    return { type, id };
+  }
+
+  /**
+   * Check if a resource needs syncing based on metadata
+   */
+  needsSync(type: ResourceType, id: string): boolean {
+    const cacheKey = this.getCacheKey(type, id);
+    const entry = this.cache.get(cacheKey);
+
+    if (!entry) {
+      return true; // Not in cache, needs sync
+    }
+
+    // Check if cache entry is stale (older than 5 minutes)
+    const cacheAge = Date.now() - (entry.expiresAt || 0);
+    const maxCacheAge = 5 * 60 * 1000; // 5 minutes
+
+    return cacheAge > maxCacheAge;
+  }
+
+  /**
+   * Get metadata for all cached resources
+   */
+  getAllMetadata(): SyncMetadata[] {
+    const metadata: SyncMetadata[] = [];
+
+    for (const [cacheKey, entry] of this.cache.entries()) {
+      const parsed = this.parseCacheKey(cacheKey);
+      if (!parsed) {
+        continue; // Skip invalid cache keys
+      }
+
+      metadata.push({
+        resourceId: parsed.id,
+        resourceType: parsed.type,
+        lastModified: entry.lastModified || new Date().toISOString(),
+        version: entry.version || 1,
+        syncedAt: new Date().toISOString()
+      });
+    }
+
+    return metadata;
+  }
+
+  /**
+   * Get metadata for a specific resource
+   */
+  getMetadata(type: ResourceType, id: string): SyncMetadata | null {
+    const cacheKey = this.getCacheKey(type, id);
+    const entry = this.cache.get(cacheKey);
+
+    if (!entry) {
+      return null;
+    }
+
+    return {
+      resourceId: id,
+      resourceType: type,
+      lastModified: entry.lastModified || new Date().toISOString(),
+      version: entry.version || 1,
+      syncedAt: new Date().toISOString()
+    };
+  }
+
+  /**
+   * Update metadata for a resource without changing the cached value
+   */
+  updateMetadata(type: ResourceType, id: string, metadata: Partial<SyncMetadata>): void {
+    const cacheKey = this.getCacheKey(type, id);
+    const entry = this.cache.get(cacheKey);
+
+    if (entry) {
+      if (metadata.lastModified) {
+        entry.lastModified = metadata.lastModified;
+      }
+      if (metadata.version) {
+        entry.version = metadata.version;
+      }
+
+      this.cache.set(cacheKey, entry);
+    }
+  }
+
+  /**
+   * Invalidate cache entry for a specific resource
+   */
+  invalidate(type: ResourceType, id: string): void {
+    const cacheKey = this.getCacheKey(type, id);
+    const entry = this.cache.get(cacheKey);
+
+    if (entry) {
+      this.removeFromIndices(cacheKey, entry);
+      this.cache.delete(cacheKey);
+    }
+  }
+
+  /**
+   * Get all cached resources of a specific type
+   */
+  getAllByType<T>(type: ResourceType): T[] {
+    const resources: T[] = [];
+
+    for (const [cacheKey, entry] of this.cache.entries()) {
+      const parsed = this.parseCacheKey(cacheKey);
+      if (parsed && parsed.type === type) {
+        // Check if expired
+        if (!entry.expiresAt || Date.now() <= entry.expiresAt) {
+          resources.push(entry.value);
+        }
+      }
+    }
+
+    return resources;
+  }
+
+  /**
+   * Warm cache with initial data
+   */
+  warmCache(type: ResourceType, resources: any[]): void {
+    for (const resource of resources) {
+      const id = resource.id?.toString() || resource.number?.toString();
+      if (id) {
+        this.set(type, id, resource);
+      }
+    }
   }
 }
