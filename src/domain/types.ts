@@ -230,11 +230,13 @@ export interface Project {
 
 export interface CreateProject {
   title: string;
-  description: string;
+  shortDescription?: string; // Made optional since it's handled via update after creation
   owner: string;
   visibility?: 'private' | 'public';
   views?: ProjectView[];
   fields?: CustomField[];
+  teamId?: string; // Add support for team association (GitHub schema optional field)
+  clientMutationId?: string; // Add support for mutation tracking (GitHub schema optional field)
 }
 
 // Project repository interface

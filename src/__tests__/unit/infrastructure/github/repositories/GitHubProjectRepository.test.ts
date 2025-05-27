@@ -36,21 +36,120 @@ describe("GitHubProjectRepository", () => {
   });
 
   describe("create", () => {
-    it("should create a project successfully", async () => {
+    it("should create a project successfully with description", async () => {
       // Arrange
       const projectData: CreateProject = {
         title: "Test Project",
-        description: "Test Description",
+        shortDescription: "Test Description",
         owner: "test-owner",
         visibility: "private",
         fields: [],
         views: []
       };
 
-      const mockProjectResponse = {
+      const mockCreateResponse = {
         id: "PVT_kwDOLhQ7gc4AOEbH",
         title: projectData.title,
-        shortDescription: projectData.description,
+        shortDescription: null, // No description on creation
+        closed: false,
+        createdAt: "2023-01-01T00:00:00Z",
+        updatedAt: "2023-01-01T00:00:00Z",
+      };
+
+      const mockUpdateResponse = {
+        id: "PVT_kwDOLhQ7gc4AOEbH",
+        title: projectData.title,
+        shortDescription: projectData.shortDescription,
+        closed: false,
+        createdAt: "2023-01-01T00:00:00Z",
+        updatedAt: "2023-01-01T00:00:00Z",
+      };
+
+      // Mock the create mutation (first call)
+      mockOctokit.graphql
+        .mockResolvedValueOnce({
+          createProjectV2: {
+            projectV2: mockCreateResponse
+          }
+        })
+        // Mock the update mutation (second call for description)
+        .mockResolvedValueOnce({
+          updateProjectV2: {
+            projectV2: mockUpdateResponse
+          }
+        });
+
+      // Act
+      const result = await repository.create(projectData);
+
+      // Assert
+      expect(result).toEqual({
+        id: mockUpdateResponse.id,
+        title: mockUpdateResponse.title,
+        description: mockUpdateResponse.shortDescription,
+        owner: config.owner,
+        number: parseInt(mockUpdateResponse.id.split('_').pop() || '0'),
+        url: `https://github.com/orgs/${config.owner}/projects/${parseInt(mockUpdateResponse.id.split('_').pop() || '0')}`,
+        status: ResourceStatus.ACTIVE,
+        visibility: projectData.visibility,
+        views: projectData.views,
+        fields: projectData.fields,
+        createdAt: mockUpdateResponse.createdAt,
+        updatedAt: mockUpdateResponse.updatedAt,
+        closed: mockUpdateResponse.closed
+      });
+
+      // Verify first call - create project (without description)
+      expect(mockOctokit.graphql).toHaveBeenNthCalledWith(1,
+        expect.stringContaining("mutation($input: CreateProjectV2Input!)"),
+        expect.objectContaining({
+          input: expect.objectContaining({
+            ownerId: config.owner,
+            title: projectData.title,
+            repositoryId: config.repo,
+          })
+        })
+      );
+
+      // Verify the input does NOT contain description (schema compliance)
+      expect(mockOctokit.graphql).toHaveBeenNthCalledWith(1,
+        expect.stringContaining("mutation($input: CreateProjectV2Input!)"),
+        expect.objectContaining({
+          input: expect.not.objectContaining({
+            description: expect.anything(),
+            shortDescription: expect.anything()
+          })
+        })
+      );
+
+      // Verify second call - update project with description
+      expect(mockOctokit.graphql).toHaveBeenNthCalledWith(2,
+        expect.stringContaining("mutation($input: UpdateProjectV2Input!)"),
+        expect.objectContaining({
+          input: expect.objectContaining({
+            projectId: mockCreateResponse.id,
+            shortDescription: projectData.shortDescription
+          })
+        })
+      );
+
+      expect(mockOctokit.graphql).toHaveBeenCalledTimes(2);
+    });
+
+    it("should create a project successfully without description", async () => {
+      // Arrange
+      const projectData: CreateProject = {
+        title: "Test Project",
+        owner: "test-owner",
+        visibility: "private",
+        fields: [],
+        views: []
+      };
+
+      const mockCreateResponse = {
+        id: "PVT_kwDOLhQ7gc4AOEbH",
+        title: projectData.title,
+        shortDescription: null,
         closed: false,
         createdAt: "2023-01-01T00:00:00Z",
         updatedAt: "2023-01-01T00:00:00Z",
@@ -58,7 +157,7 @@ describe("GitHubProjectRepository", () => {
 
       mockOctokit.graphql.mockResolvedValueOnce({
         createProjectV2: {
-          projectV2: mockProjectResponse
+          projectV2: mockCreateResponse
         }
       });
 
@@ -67,28 +166,29 @@ describe("GitHubProjectRepository", () => {
 
       // Assert
       expect(result).toEqual({
-        id: mockProjectResponse.id,
-        title: mockProjectResponse.title,
-        description: mockProjectResponse.shortDescription,
+        id: mockCreateResponse.id,
+        title: mockCreateResponse.title,
+        description: "", // Empty when no description provided
         owner: config.owner,
-        number: parseInt(mockProjectResponse.id.split('_').pop() || '0'),
-        url: `https://github.com/orgs/${config.owner}/projects/${parseInt(mockProjectResponse.id.split('_').pop() || '0')}`,
+        number: parseInt(mockCreateResponse.id.split('_').pop() || '0'),
+        url: `https://github.com/orgs/${config.owner}/projects/${parseInt(mockCreateResponse.id.split('_').pop() || '0')}`,
         status: ResourceStatus.ACTIVE,
         visibility: projectData.visibility,
         views: projectData.views,
         fields: projectData.fields,
-        createdAt: mockProjectResponse.createdAt,
-        updatedAt: mockProjectResponse.updatedAt,
-        closed: mockProjectResponse.closed
+        createdAt: mockCreateResponse.createdAt,
+        updatedAt: mockCreateResponse.updatedAt,
+        closed: mockCreateResponse.closed
       });
 
+      // Verify only one call (no description update needed)
+      expect(mockOctokit.graphql).toHaveBeenCalledTimes(1);
       expect(mockOctokit.graphql).toHaveBeenCalledWith(
         expect.stringContaining("mutation($input: CreateProjectV2Input!)"),
         expect.objectContaining({
           input: expect.objectContaining({
             ownerId: config.owner,
             title: projectData.title,
-            description: projectData.description,
             repositoryId: config.repo,
           })
         })
@@ -99,7 +199,7 @@ describe("GitHubProjectRepository", () => {
       // Arrange
       const projectData: CreateProject = {
         title: "Test Project",
-        description: "Test Description",
+        shortDescription: "Test Description",
         owner: "test-owner",
         visibility: "private",
         fields: [],
@@ -110,6 +210,39 @@ describe("GitHubProjectRepository", () => {
 
       // Act & Assert
       await expect(repository.create(projectData)).rejects.toThrow(/Creation failed/);
+    });
+
+    it("should handle error if project creation succeeds but description update fails", async () => {
+      // Arrange
+      const projectData: CreateProject = {
+        title: "Test Project",
+        shortDescription: "Test Description",
+        owner: "test-owner",
+        visibility: "private",
+        fields: [],
+        views: []
+      };
+
+      const mockCreateResponse = {
+        id: "PVT_kwDOLhQ7gc4AOEbH",
+        title: projectData.title,
+        shortDescription: null,
+        closed: false,
+        createdAt: "2023-01-01T00:00:00Z",
+        updatedAt: "2023-01-01T00:00:00Z",
+      };
+
+      // Mock successful creation but failed description update
+      mockOctokit.graphql
+        .mockResolvedValueOnce({
+          createProjectV2: {
+            projectV2: mockCreateResponse
+          }
+        })
+        .mockRejectedValueOnce(new Error("Update failed"));
+
+      // Act & Assert
+      await expect(repository.create(projectData)).rejects.toThrow(/Update failed/);
     });
   });
 

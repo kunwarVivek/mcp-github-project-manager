@@ -1,5 +1,4 @@
 import { 
-  Resource,
   ResourceStatus, 
   ResourceType 
 } from "../domain/resource-types";
@@ -13,8 +12,7 @@ import {
   CreateMilestone,
   CreateSprint,
   ProjectView,
-  CustomField,
-  createResource
+  CustomField
 } from "../domain/types";
 
 export class TestFactory {
@@ -59,7 +57,7 @@ export class TestFactory {
       description: "A test sprint",
       startDate: startDate.toISOString(),
       endDate: endDate.toISOString(),
-      status: ResourceStatus.PLANNED,
+      status: ResourceStatus.ACTIVE,
       issues: [],
       ...overrides
     };
@@ -70,10 +68,6 @@ export class TestFactory {
       id: `view-${Date.now()}`,
       name: "Test View",
       layout: "board",
-      settings: {
-        groupBy: "status",
-        sortBy: [{ field: "priority", direction: "desc" }]
-      },
       ...overrides
     };
   }
@@ -174,114 +168,5 @@ export class TestFactory {
 
   static mockGitHubResponse<T>(data: T): Promise<{ data: T }> {
     return Promise.resolve({ data });
-  }
-
-  // Field Value Test Data Helpers
-  static createFieldValueTestData(fieldType: string, overrides: any = {}) {
-    const baseData = {
-      projectId: "PVT_kwDOLhQ7gc4AOEbH",
-      itemId: "PVTI_lADOLhQ7gc4AOEbHzM4AOAJ7",
-      fieldId: "PVTF_lADOLhQ7gc4AOEbHzM4AOAI1",
-    };
-
-    const fieldTypeValues = {
-      TEXT: "Sample text value",
-      NUMBER: 42,
-      DATE: "2025-06-15",
-      SINGLE_SELECT: "In Progress",
-      ITERATION: "PVTI_kwDOLhQ7gc4AOEbHzM4AOAIter1",
-      MILESTONE: "MI_kwDOLhQ7gc4AOEbHzM4AOAMile1",
-      ASSIGNEES: ["MDQ6VXNlcjEyMzQ1Njc4", "MDQ6VXNlcjg3NjU0MzIx"],
-      LABELS: ["LA_kwDOLhQ7gc4AOEbHzM4AOAL1", "LA_kwDOLhQ7gc4AOEbHzM4AOAL2"]
-    };
-
-    return {
-      ...baseData,
-      value: fieldTypeValues[fieldType as keyof typeof fieldTypeValues],
-      ...overrides
-    };
-  }
-
-  static createMockField(fieldType: string, overrides: any = {}) {
-    const baseField = {
-      id: "PVTF_lADOLhQ7gc4AOEbHzM4AOAI1",
-      name: `Test ${fieldType} Field`,
-      dataType: fieldType
-    };
-
-    if (fieldType === 'SINGLE_SELECT') {
-      return {
-        ...baseField,
-        options: [
-          { id: 'OPTION_1', name: 'To Do' },
-          { id: 'OPTION_2', name: 'In Progress' },
-          { id: 'OPTION_3', name: 'Done' }
-        ],
-        ...overrides
-      };
-    }
-
-    return { ...baseField, ...overrides };
-  }
-
-  static createMockFieldValueResponse(fieldType: string, value: any) {
-    const baseField = {
-      name: `Test ${fieldType} Field`,
-      dataType: fieldType
-    };
-
-    // Create the field value object based on type
-    let fieldValue: any = { field: baseField };
-
-    switch (fieldType) {
-      case 'TEXT':
-        fieldValue.text = value;
-        break;
-      case 'NUMBER':
-        fieldValue.number = value;
-        break;
-      case 'DATE':
-        fieldValue.date = value;
-        break;
-      case 'SINGLE_SELECT':
-        fieldValue.name = value;
-        break;
-      case 'ITERATION':
-        fieldValue.iterationId = typeof value === 'object' ? value.iterationId : value;
-        fieldValue.title = typeof value === 'object' ? value.title : 'Sprint 1';
-        break;
-      case 'MILESTONE':
-        fieldValue.milestoneId = typeof value === 'object' ? value.milestoneId : value;
-        fieldValue.title = typeof value === 'object' ? value.title : 'v1.0 Release';
-        break;
-      case 'ASSIGNEES':
-        fieldValue.users = {
-          nodes: Array.isArray(value) ? value : [value]
-        };
-        break;
-      case 'LABELS':
-        fieldValue.labels = {
-          nodes: Array.isArray(value) ? value : [value]
-        };
-        break;
-    }
-
-    return {
-      node: {
-        item: {
-          fieldValueByName: fieldValue
-        }
-      }
-    };
-  }
-
-  static createMockUpdateResponse() {
-    return {
-      updateProjectV2ItemFieldValue: {
-        projectV2Item: {
-          id: "PVTI_lADOLhQ7gc4AOEbHzM4AOAJ7"
-        }
-      }
-    };
   }
 }

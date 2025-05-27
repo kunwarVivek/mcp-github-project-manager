@@ -13,6 +13,12 @@ This section provides comprehensive documentation for all tools available in the
 | `get_overdue_milestones` | Get a list of overdue milestones | [Documentation](get-overdue-milestones.md) |
 | `get_upcoming_milestones` | Get a list of upcoming milestones | [Documentation](get-upcoming-milestones.md) |
 
+## Enhanced Features
+
+| Feature | Description | Documentation |
+|---------|-------------|---------------|
+| Enhanced Field Support | Complete coverage of GitHub Project v2 field types | [Documentation](enhanced-field-support.md) |
+
 ## Using the API
 
 All tools follow the Model Context Protocol (MCP) standard for request and response formats. To use a tool:
@@ -28,7 +34,8 @@ All tools follow the Model Context Protocol (MCP) standard for request and respo
   "arguments": {
     "project": {
       "title": "New Project",
-      "description": "Project description",
+      "shortDescription": "Project description",
+      "owner": "repository_owner",
       "visibility": "private"
     },
     "milestones": [

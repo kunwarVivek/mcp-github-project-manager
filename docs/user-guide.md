@@ -112,7 +112,8 @@ The GitHub Project Manager MCP Server provides a Model Context Protocol (MCP) in
    const project = await service.createRoadmap({
      project: {
        title: "Project Name",
-       description: "Project Description",
+       shortDescription: "Project Description",
+       owner: "repository_owner",
        visibility: "private"
      },
      milestones: [

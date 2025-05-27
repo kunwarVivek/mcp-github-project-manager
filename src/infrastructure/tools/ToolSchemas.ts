@@ -5,7 +5,7 @@ import { ToolDefinition, ToolSchema } from "./ToolValidator.js";
 export const createRoadmapSchema = z.object({
   project: z.object({
     title: z.string().min(1, "Project title is required"),
-    description: z.string().min(1, "Project description is required"),
+    shortDescription: z.string().optional(),
     visibility: z.enum(["private", "public"]),
   }),
   milestones: z.array(
@@ -80,7 +80,8 @@ export type GetUpcomingMilestonesArgs = z.infer<typeof getUpcomingMilestonesSche
 // Schema for create_project tool
 export const createProjectSchema = z.object({
   title: z.string().min(1, "Project title is required"),
-  description: z.string().min(1, "Project description is required"),
+  shortDescription: z.string().optional(),
+  owner: z.string().min(1, "Project owner is required"),
   visibility: z.enum(["private", "public"]).default("private"),
 });
 
@@ -238,7 +239,8 @@ export const createProjectTool: ToolDefinition<CreateProjectArgs> = {
       description: "Create a new private GitHub project",
       args: {
         title: "Backend API Development",
-        description: "Project for tracking backend API development tasks",
+        shortDescription: "Project for tracking backend API development tasks",
+        owner: "example-owner",
         visibility: "private"
       }
     }
@@ -488,7 +490,7 @@ export const createRoadmapTool: ToolDefinition<CreateRoadmapArgs> = {
       args: {
         project: {
           title: "New Mobile App",
-          description: "Develop a new mobile application for our users",
+          shortDescription: "Develop a new mobile application for our users",
           visibility: "private",
         },
         milestones: [
@@ -926,17 +928,27 @@ export const listProjectItemsTool: ToolDefinition<ListProjectItemsArgs> = {
 
 export const setFieldValueTool: ToolDefinition<SetFieldValueArgs> = {
   name: "set_field_value",
-  description: "Set a field value for a GitHub project item",
+  description: "Set a field value for a GitHub project item. Supports all field types: TEXT, NUMBER, DATE, SINGLE_SELECT, ITERATION, MILESTONE, ASSIGNEES, LABELS",
   schema: setFieldValueSchema as unknown as ToolSchema<SetFieldValueArgs>,
   examples: [
     {
-      name: "Set status field value",
-      description: "Set status field value for a project item",
+      name: "Set text field value",
+      description: "Set a text field value for a project item",
       args: {
         projectId: "PVT_kwDOLhQ7gc4AOEbH",
         itemId: "PVTI_lADOLhQ7gc4AOEbHzM4AOAJ7",
         fieldId: "PVTF_lADOLhQ7gc4AOEbHzM4AOAI1",
-        value: "In Progress"
+        value: "Updated task description"
+      }
+    },
+    {
+      name: "Set number field value",
+      description: "Set a number field (e.g., story points) for a project item",
+      args: {
+        projectId: "PVT_kwDOLhQ7gc4AOEbH",
+        itemId: "PVTI_lADOLhQ7gc4AOEbHzM4AOAJ7",
+        fieldId: "PVTF_lADOLhQ7gc4AOEbHzM4AOAI2",
+        value: 8
       }
     },
     {
@@ -945,8 +957,78 @@ export const setFieldValueTool: ToolDefinition<SetFieldValueArgs> = {
       args: {
         projectId: "PVT_kwDOLhQ7gc4AOEbH",
         itemId: "PVTI_lADOLhQ7gc4AOEbHzM4AOAJ7",
-        fieldId: "PVTF_lADOLhQ7gc4AOEbHzM4AOAI2",
-        value: "2025-06-15T00:00:00Z"
+        fieldId: "PVTF_lADOLhQ7gc4AOEbHzM4AOAI3",
+        value: "2025-06-15"
+      }
+    },
+    {
+      name: "Set single select field value",
+      description: "Set status field value for a project item",
+      args: {
+        projectId: "PVT_kwDOLhQ7gc4AOEbH",
+        itemId: "PVTI_lADOLhQ7gc4AOEbHzM4AOAJ7",
+        fieldId: "PVTF_lADOLhQ7gc4AOEbHzM4AOAI4",
+        value: "In Progress"
+      }
+    },
+    {
+      name: "Set iteration field value",
+      description: "Assign a project item to a specific iteration/sprint",
+      args: {
+        projectId: "PVT_kwDOLhQ7gc4AOEbH",
+        itemId: "PVTI_lADOLhQ7gc4AOEbHzM4AOAJ7",
+        fieldId: "PVTF_lADOLhQ7gc4AOEbHzM4AOAI5",
+        value: "PVTI_kwDOLhQ7gc4AOEbHzM4AOAIter1"
+      }
+    },
+    {
+      name: "Set milestone field value",
+      description: "Assign a project item to a specific milestone",
+      args: {
+        projectId: "PVT_kwDOLhQ7gc4AOEbH",
+        itemId: "PVTI_lADOLhQ7gc4AOEbHzM4AOAJ7",
+        fieldId: "PVTF_lADOLhQ7gc4AOEbHzM4AOAI6",
+        value: "MI_kwDOLhQ7gc4AOEbHzM4AOAMile1"
+      }
+    },
+    {
+      name: "Set assignees field value",
+      description: "Assign multiple users to a project item",
+      args: {
+        projectId: "PVT_kwDOLhQ7gc4AOEbH",
+        itemId: "PVTI_lADOLhQ7gc4AOEbHzM4AOAJ7",
+        fieldId: "PVTF_lADOLhQ7gc4AOEbHzM4AOAI7",
+        value: ["MDQ6VXNlcjEyMzQ1Njc4", "MDQ6VXNlcjg3NjU0MzIx"]
+      }
+    },
+    {
+      name: "Set single assignee field value",
+      description: "Assign a single user to a project item",
+      args: {
+        projectId: "PVT_kwDOLhQ7gc4AOEbH",
+        itemId: "PVTI_lADOLhQ7gc4AOEbHzM4AOAJ7",
+        fieldId: "PVTF_lADOLhQ7gc4AOEbHzM4AOAI7",
+        value: "MDQ6VXNlcjEyMzQ1Njc4"
+      }
+    },
+    {
+      name: "Set labels field value",
+      description: "Assign multiple labels to a project item",
+      args: {
+        projectId: "PVT_kwDOLhQ7gc4AOEbH",
+        itemId: "PVTI_lADOLhQ7gc4AOEbHzM4AOAJ7",
+        fieldId: "PVTF_lADOLhQ7gc4AOEbHzM4AOAI8",
+        value: ["LA_kwDOLhQ7gc4AOEbHzM4AOAL1", "LA_kwDOLhQ7gc4AOEbHzM4AOAL2"]
+      }
+    },
+    {
+      name: "Set single label field value",
+      description: "Assign a single label to a project item",
+      args: {
+        projectId: "PVT_kwDOLhQ7gc4AOEbH",
+        itemId: "PVTI_lADOLhQ7gc4AOEbHzM4AOAJ7",
+        fieldId: "PVTF_lADOLhQ7gc4AOEbHzM4AOAI8",
+        value: "LA_kwDOLhQ7gc4AOEbHzM4AOAL1"
       }
     }
   ]
@@ -954,16 +1036,61 @@ export const setFieldValueTool: ToolDefinition<SetFieldValueArgs> = {
 
 export const getFieldValueTool: ToolDefinition<GetFieldValueArgs> = {
   name: "get_field_value",
-  description: "Get a field value for a GitHub project item",
+  description: "Get a field value for a GitHub project item. Supports reading all field types: TEXT, NUMBER, DATE, SINGLE_SELECT, ITERATION, MILESTONE, ASSIGNEES, LABELS",
   schema: getFieldValueSchema as unknown as ToolSchema<GetFieldValueArgs>,
   examples: [
     {
-      name: "Get status field value",
-      description: "Get the current status value for an item",
+      name: "Get text field value",
+      description: "Get the current text value for an item",
       args: {
         projectId: "PVT_kwDOLhQ7gc4AOEbH",
         itemId: "PVTI_lADOLhQ7gc4AOEbHzM4AOAJ7",
         fieldId: "PVTF_lADOLhQ7gc4AOEbHzM4AOAI1"
+      }
+    },
+    {
+      name: "Get status field value",
+      description: "Get the current status (single select) value for an item",
+      args: {
+        projectId: "PVT_kwDOLhQ7gc4AOEbH",
+        itemId: "PVTI_lADOLhQ7gc4AOEbHzM4AOAJ7",
+        fieldId: "PVTF_lADOLhQ7gc4AOEbHzM4AOAI2"
+      }
+    },
+    {
+      name: "Get iteration field value",
+      description: "Get the current iteration/sprint assignment for an item",
+      args: {
+        projectId: "PVT_kwDOLhQ7gc4AOEbH",
+        itemId: "PVTI_lADOLhQ7gc4AOEbHzM4AOAJ7",
+        fieldId: "PVTF_lADOLhQ7gc4AOEbHzM4AOAI3"
+      }
+    },
+    {
+      name: "Get milestone field value",
+      description: "Get the current milestone assignment for an item",
+      args: {
+        projectId: "PVT_kwDOLhQ7gc4AOEbH",
+        itemId: "PVTI_lADOLhQ7gc4AOEbHzM4AOAJ7",
+        fieldId: "PVTF_lADOLhQ7gc4AOEbHzM4AOAI4"
+      }
+    },
+    {
+      name: "Get assignees field value",
+      description: "Get the current assignees for an item",
+      args: {
+        projectId: "PVT_kwDOLhQ7gc4AOEbH",
+        itemId: "PVTI_lADOLhQ7gc4AOEbHzM4AOAJ7",
+        fieldId: "PVTF_lADOLhQ7gc4AOEbHzM4AOAI5"
+      }
+    },
+    {
+      name: "Get labels field value",
+      description: "Get the current labels for an item",
+      args: {
+        projectId: "PVT_kwDOLhQ7gc4AOEbH",
+        itemId: "PVTI_lADOLhQ7gc4AOEbHzM4AOAJ7",
+        fieldId: "PVTF_lADOLhQ7gc4AOEbHzM4AOAI6"
       }
     }
   ]
