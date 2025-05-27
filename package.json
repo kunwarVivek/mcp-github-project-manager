@@ -39,7 +39,7 @@
     "clean": "rimraf build",
     "prebuild": "npm run clean",
     "build": "tsc -p tsconfig.build.json",
-    "postbuild": "chmod +x build/index.js",
+    "postbuild": "chmod +x build/index.js && node scripts/fix-imports.js",
     "start": "node build/index.js",
     "dev": "node --loader ts-node/esm --watch src/index.ts",
     "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js --config jest.config.cjs",

@@ -12,7 +12,7 @@ import { GITHUB_TOKEN, GITHUB_OWNER, GITHUB_REPO, CLI_OPTIONS } from "./env.js";
 import { ToolRegistry } from "./infrastructure/tools/ToolRegistry.js";
 import { ToolValidator } from "./infrastructure/tools/ToolValidator.js";
 import { ToolResultFormatter } from "./infrastructure/tools/ToolResultFormatter.js";
-import { MCPContentType } from "./domain/mcp-types";
+import { MCPContentType } from "./domain/mcp-types.js";
 
 class GitHubProjectManagerServer {
   private server: Server;
