@@ -196,13 +196,13 @@ export const createProjectFieldSchema = z.object({
   projectId: z.string().min(1, "Project ID is required"),
   name: z.string().min(1, "Field name is required"),
   type: z.enum([
-    "text", 
-    "number", 
-    "date", 
-    "single_select", 
-    "iteration", 
-    "milestone", 
-    "assignees", 
+    "text",
+    "number",
+    "date",
+    "single_select",
+    "iteration",
+    "milestone",
+    "assignees",
     "labels"
   ]),
   options: z.array(
@@ -1246,6 +1246,121 @@ export const listLabelsTool: ToolDefinition<ListLabelsArgs> = {
       description: "Get all repository labels",
       args: {
         limit: 50
+      }
+    }
+  ]
+};
+
+// Event management schemas
+export const subscribeToEventsSchema = z.object({
+  clientId: z.string().min(1, "Client ID is required"),
+  filters: z.array(
+    z.object({
+      resourceType: z.enum(["PROJECT", "MILESTONE", "ISSUE", "SPRINT"]).optional(),
+      eventType: z.enum(["created", "updated", "deleted", "closed", "reopened"]).optional(),
+      resourceId: z.string().optional(),
+      source: z.enum(["github", "api"]).optional(),
+      tags: z.array(z.string()).optional(),
+    })
+  ).default([]),
+  transport: z.enum(["sse", "webhook", "internal"]).default("sse"),
+  endpoint: z.string().optional(),
+  expiresAt: z.string().datetime().optional(),
+});
+
+export type SubscribeToEventsArgs = z.infer<typeof subscribeToEventsSchema>;
+
+export const getRecentEventsSchema = z.object({
+  resourceType: z.enum(["PROJECT", "MILESTONE", "ISSUE", "SPRINT"]).optional(),
+  resourceId: z.string().optional(),
+  eventType: z.enum(["created", "updated", "deleted", "closed", "reopened"]).optional(),
+  limit: z.number().int().positive().default(100).optional(),
+});
+
+export type GetRecentEventsArgs = z.infer<typeof getRecentEventsSchema>;
+
+export const replayEventsSchema = z.object({
+  fromTimestamp: z.string().datetime("From timestamp must be a valid ISO date string"),
+  toTimestamp: z.string().datetime().optional(),
+  resourceType: z.enum(["PROJECT", "MILESTONE", "ISSUE", "SPRINT"]).optional(),
+  resourceId: z.string().optional(),
+  limit: z.number().int().positive().default(1000).optional(),
+});
+
+export type ReplayEventsArgs = z.infer<typeof replayEventsSchema>;
+
+// Event management tool definitions
+export const subscribeToEventsTool: ToolDefinition<SubscribeToEventsArgs> = {
+  name: "subscribe_to_events",
+  description: "Subscribe to real-time events for GitHub resources",
+  schema: subscribeToEventsSchema as unknown as ToolSchema<SubscribeToEventsArgs>,
+  examples: [
+    {
+      name: "Subscribe to all project events",
+      description: "Subscribe to all events for projects",
+      args: {
+        clientId: "my-client",
+        filters: [{ resourceType: "PROJECT" }],
+        transport: "sse"
+      }
+    },
+    {
+      name: "Subscribe to issue updates",
+      description: "Subscribe to update events for a specific issue",
+      args: {
+        clientId: "my-client",
+        filters: [{ resourceType: "ISSUE", eventType: "updated", resourceId: "123" }],
+        transport: "sse"
+      }
+    }
+  ]
+};
+
+export const getRecentEventsTool: ToolDefinition<GetRecentEventsArgs> = {
+  name: "get_recent_events",
+  description: "Get recent events for GitHub resources",
+  schema: getRecentEventsSchema as unknown as ToolSchema<GetRecentEventsArgs>,
+  examples: [
+    {
+      name: "Get recent project events",
+      description: "Get the last 50 events for projects",
+      args: {
+        resourceType: "PROJECT",
+        limit: 50
+      }
+    },
+    {
+      name: "Get recent events for specific issue",
+      description: "Get recent events for a specific issue",
+      args: {
+        resourceType: "ISSUE",
+        resourceId: "123",
+        limit: 20
+      }
+    }
+  ]
+};
+
+export const replayEventsTool: ToolDefinition<ReplayEventsArgs> = {
+  name: "replay_events",
+  description: "Replay events from a specific timestamp",
+  schema: replayEventsSchema as unknown as ToolSchema<ReplayEventsArgs>,
+  examples: [
+    {
+      name: "Replay events from yesterday",
+      description: "Replay all events from yesterday",
+      args: {
+        fromTimestamp: "2025-01-01T00:00:00Z",
+        limit: 500
+      }
+    },
+    {
+      name: "Replay project events from specific time",
+      description: "Replay project events from a specific timestamp",
+      args: {
+        fromTimestamp: "2025-01-01T12:00:00Z",
+        resourceType: "PROJECT",
+        limit: 100
       }
     }
   ]

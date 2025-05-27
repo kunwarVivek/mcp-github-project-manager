@@ -4,7 +4,7 @@ import { GitHubErrorHandler } from "../GitHubErrorHandler";
 import { GitHubConfig } from "../GitHubConfig"; // Fixed import path
 import { Resource, ResourceStatus } from "../../../domain/resource-types";
 import { GitHubApiUtil, PaginationOptions } from "../util/GitHubApiUtil";
-import { Logger, getLogger } from "../../logger";
+import { ILogger, getLogger } from "../../logger";
 
 export interface IGitHubRepository {
   readonly octokit: OctokitInstance;
@@ -15,7 +15,7 @@ export abstract class BaseGitHubRepository implements IGitHubRepository {
   private readonly errorHandler: GitHubErrorHandler;
   protected readonly retryAttempts: number = 3;
   protected readonly apiUtil: GitHubApiUtil;
-  protected readonly logger: Logger;
+  protected readonly logger: ILogger;
 
   constructor(
     public readonly octokit: OctokitInstance,
@@ -129,7 +129,7 @@ export abstract class BaseGitHubRepository implements IGitHubRepository {
     paginationOptions?: PaginationOptions
   ): Promise<T[]> {
     const finalParams = this.getRequestParams(params);
-    
+
     return this.apiUtil.paginateRequest<T>(
       (paginationParams) => operation({
         ...finalParams,
@@ -149,10 +149,10 @@ export abstract class BaseGitHubRepository implements IGitHubRepository {
       nodes: T[];
     },
     variables: Record<string, unknown> = {},
-    options: { 
-      pageSize?: number; 
-      maxItems?: number; 
-      initialCursor?: string 
+    options: {
+      pageSize?: number;
+      maxItems?: number;
+      initialCursor?: string
     } = {}
   ): Promise<T[]> {
     return this.apiUtil.paginateGraphQL<T>(
@@ -164,7 +164,7 @@ export abstract class BaseGitHubRepository implements IGitHubRepository {
           owner: this.owner,
           repo: this.repo,
         });
-        
+
         return getNodesAndPageInfo(data);
       },
       options

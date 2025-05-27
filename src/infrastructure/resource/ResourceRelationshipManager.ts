@@ -20,7 +20,7 @@ export class ResourceRelationshipManager {
   ): Promise<Relationship> {
     // Create a unique ID for the relationship
     const id = `rel_${sourceId}_${targetId}_${relationshipType}`;
-    
+
     // Create Date objects instead of strings
     const now = new Date();
 
@@ -39,7 +39,7 @@ export class ResourceRelationshipManager {
     };
 
     // Store in cache with appropriate tags
-    await this.cache.set(id, relationship, {
+    await this.cache.set(ResourceType.RELATIONSHIP, id, relationship, {
       tags: [
         ResourceRelationshipManager.RELATIONSHIP_TAG,
         `source:${sourceId}`,
@@ -67,11 +67,11 @@ export class ResourceRelationshipManager {
     type?: RelationshipType
   ): Promise<Relationship[]> {
     const relationships = await this.cache.getByTag(`source:${resourceId}`) as Relationship[];
-    
+
     if (!type) {
       return relationships;
     }
-    
+
     // Make sure to compare relationshipType, not the Resource type
     return relationships.filter(rel => rel.relationshipType === type);
   }
@@ -84,11 +84,11 @@ export class ResourceRelationshipManager {
     type?: RelationshipType
   ): Promise<Relationship[]> {
     const relationships = await this.cache.getByTag(`target:${resourceId}`) as Relationship[];
-    
+
     if (!type) {
       return relationships;
     }
-    
+
     // Make sure to compare relationshipType, not the Resource type
     return relationships.filter(rel => rel.relationshipType === type);
   }
@@ -99,8 +99,8 @@ export class ResourceRelationshipManager {
   async getRelationshipsByType(type: RelationshipType): Promise<Relationship[]> {
     const relationships = await this.cache.getByTag(`type:${type}`);
     // Properly cast the result to Relationship[] instead of just using 'as'
-    return relationships.filter(rel => 
-      rel.type === ResourceType.RELATIONSHIP && 
+    return relationships.filter(rel =>
+      rel.type === ResourceType.RELATIONSHIP &&
       (rel as Relationship).relationshipType === type
     ) as Relationship[];
   }
@@ -115,21 +115,21 @@ export class ResourceRelationshipManager {
   ): Promise<T[]> {
     // Get outgoing relationships that match the criteria
     const relationships = await this.getOutgoingRelationships(resourceId, relationshipType);
-    
+
     // Filter by target type
     const matchingRelationships = relationships.filter(
       rel => rel.targetType === targetType
     );
-    
+
     // Get the actual resources
     const resources: T[] = [];
     for (const rel of matchingRelationships) {
-      const resource = await this.cache.get<T>(rel.targetId);
+      const resource = await this.cache.get<T>(rel.targetType, rel.targetId);
       if (resource) {
         resources.push(resource);
       }
     }
-    
+
     return resources;
   }
 
@@ -141,19 +141,19 @@ export class ResourceRelationshipManager {
   ): Promise<T[]> {
     // Get incoming dependency relationships
     const relationships = await this.getIncomingRelationships(
-      resourceId, 
+      resourceId,
       RelationshipType.DEPENDENCY
     );
-    
+
     // Get the actual resources
     const resources: T[] = [];
     for (const rel of relationships) {
-      const resource = await this.cache.get<T>(rel.sourceId);
+      const resource = await this.cache.get<T>(rel.sourceType, rel.sourceId);
       if (resource) {
         resources.push(resource);
       }
     }
-    
+
     return resources;
   }
 
@@ -165,19 +165,19 @@ export class ResourceRelationshipManager {
   ): Promise<T[]> {
     // Get incoming parent-child relationships
     const relationships = await this.getIncomingRelationships(
-      resourceId, 
+      resourceId,
       RelationshipType.PARENT_CHILD
     );
-    
+
     // Get the actual resources
     const resources: T[] = [];
     for (const rel of relationships) {
-      const resource = await this.cache.get<T>(rel.sourceId);
+      const resource = await this.cache.get<T>(rel.sourceType, rel.sourceId);
       if (resource) {
         resources.push(resource);
       }
     }
-    
+
     return resources;
   }
 
@@ -189,19 +189,19 @@ export class ResourceRelationshipManager {
   ): Promise<T[]> {
     // Get outgoing parent-child relationships
     const relationships = await this.getOutgoingRelationships(
-      resourceId, 
+      resourceId,
       RelationshipType.PARENT_CHILD
     );
-    
+
     // Get the actual resources
     const resources: T[] = [];
     for (const rel of relationships) {
-      const resource = await this.cache.get<T>(rel.targetId);
+      const resource = await this.cache.get<T>(rel.targetType, rel.targetId);
       if (resource) {
         resources.push(resource);
       }
     }
-    
+
     return resources;
   }
 
@@ -211,9 +211,9 @@ export class ResourceRelationshipManager {
   async deleteAllRelationships(resourceId: string): Promise<void> {
     const outgoing = await this.getOutgoingRelationships(resourceId);
     const incoming = await this.getIncomingRelationships(resourceId);
-    
+
     const allRelationships = [...outgoing, ...incoming];
-    
+
     for (const rel of allRelationships) {
       await this.cache.delete(rel.id);
     }
