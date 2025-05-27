@@ -100,15 +100,19 @@
                       properties: {
                         project: {
                           type: "object",
-                          required: ["title", "description", "visibility"],
+                          required: ["title", "owner"],
                           properties: {
                             title: {
                               type: "string",
                               description: "Project title"
                             },
-                            description: {
+                            shortDescription: {
                               type: "string",
-                              description: "Project description"
+                              description: "Project short description (optional)"
+                            },
+                            owner: {
+                              type: "string",
+                              description: "Repository owner"
                             },
                             visibility: {
                               type: "string",

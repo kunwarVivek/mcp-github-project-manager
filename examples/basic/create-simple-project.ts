@@ -43,7 +43,8 @@ async function createSimpleProject() {
     const result = await service.createRoadmap({
       project: {
         title: "Sample Project",
-        description: "A sample project created via the MCP API",
+        shortDescription: "A sample project created via the MCP API",
+        owner: process.env.GITHUB_OWNER!,
         visibility: "private"
       },
       milestones: [
@@ -57,16 +58,12 @@ async function createSimpleProject() {
             {
               title: "Setup project structure",
               description: "Create initial project structure and configuration",
-              priority: "high",
-              type: "feature",
               assignees: [],
               labels: ["setup"]
             },
             {
               title: "Implement core functionality",
               description: "Develop the core features of the application",
-              priority: "medium",
-              type: "feature",
               assignees: [],
               labels: ["core"]
             }

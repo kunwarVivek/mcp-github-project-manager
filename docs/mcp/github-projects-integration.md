@@ -44,7 +44,7 @@ This document details how the MCP server interfaces with GitHub's Projects API (
 ### GraphQL API Usage
 
 ```typescript
-// Example GraphQL Query
+// Example GraphQL Mutations - Schema Compliant Implementation
 const createProjectMutation = `
   mutation($input: CreateProjectV2Input!) {
     createProjectV2(input: $input) {
@@ -60,21 +60,70 @@ const createProjectMutation = `
   }
 `;
 
-// Implementation
+const updateProjectMutation = `
+  mutation($input: UpdateProjectV2Input!) {
+    updateProjectV2(input: $input) {
+      projectV2 {
+        id
+        title
+        shortDescription
+        closed
+        createdAt
+        updatedAt
+      }
+    }
+  }
+`;
+
+// Schema-Compliant Implementation
 class GitHubProjectRepository {
   async create(data: CreateProject): Promise<Project> {
-    const response = await this.graphql(createProjectMutation, {
-      input: {
-        ownerId: this.owner,
-        title: data.title,
-        description: data.description,
-        repositoryId: this.repo,
-      },
+    // Step 1: Create project (without description - schema compliance)
+    const createInput: any = {
+      ownerId: this.owner,
+      title: data.title,
+    };
+    
+    if (this.repo) {
+      createInput.repositoryId = this.repo;
+    }
+    
+    const createResponse = await this.graphql(createProjectMutation, {
+      input: createInput,
     });
-    return this.mapToProject(response.createProjectV2.projectV2);
+    
+    let project = createResponse.createProjectV2.projectV2;
+    
+    // Step 2: Update with description if provided (separate mutation)
+    if (data.description) {
+      const updateResponse = await this.graphql(updateProjectMutation, {
+        input: {
+          projectId: project.id,
+          shortDescription: data.description,
+        },
+      });
+      project = updateResponse.updateProjectV2.projectV2;
+    }
+    
+    return this.mapToProject(project);
   }
 }
 ```
+
+### Schema Compliance Notes
+
+**Important**: GitHub's CreateProjectV2Input schema does NOT accept description fields:
+- ❌ `description` - Not a valid field
+- ❌ `shortDescription` - Not a valid field  
+
+Valid CreateProjectV2Input fields:
+- ✅ `ownerId` (required)
+- ✅ `title` (required) 
+- ✅ `repositoryId` (optional)
+- ✅ `teamId` (optional)
+- ✅ `clientMutationId` (optional)
+
+To set a project description, use a separate UpdateProjectV2Input mutation after creation.
 
 ### API Features
 

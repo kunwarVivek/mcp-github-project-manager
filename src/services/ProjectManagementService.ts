@@ -44,7 +44,7 @@ import {
 const CreateRoadmapSchema = z.object({
   project: z.object({
     title: z.string().min(1, "Project title is required"),
-    description: z.string().optional(),
+    shortDescription: z.string().optional(),
     owner: z.string(),
     visibility: z.enum(['private', 'public']).optional(),
     views: z.array(z.any()).optional(),
@@ -194,8 +194,8 @@ export class ProjectManagementService {
         visibility: validatedData.project.visibility || 'private',
         views: [] as ProjectView[],
         fields: [] as CustomField[],
-        // Ensure description is not undefined
-        description: validatedData.project.description || '',
+        // Ensure shortDescription is used (description is handled via separate update)
+        shortDescription: validatedData.project.shortDescription,
       };
 
       const project = await this.projectRepo.create(
@@ -561,13 +561,13 @@ export class ProjectManagementService {
   // Project Management
   async createProject(data: {
     title: string;
-    description: string;
+    shortDescription?: string;
     visibility?: 'private' | 'public';
   }): Promise<Project> {
     try {
       const projectData: CreateProject = {
         title: data.title,
-        description: data.description,
+        shortDescription: data.shortDescription,
         owner: this.factory.getConfig().owner,
         visibility: data.visibility || 'private',
       };
@@ -1279,6 +1279,21 @@ export class ProjectManagementService {
                     name
                   }
                 }
+                ... on ProjectV2MilestoneField {
+                  id
+                  name
+                  dataType
+                }
+                ... on ProjectV2AssigneesField {
+                  id
+                  name
+                  dataType
+                }
+                ... on ProjectV2LabelsField {
+                  id
+                  name
+                  dataType
+                }
               }
             }
           }
@@ -1393,8 +1408,104 @@ export class ProjectManagementService {
           variables.optionId = optionId;
           break;
         
+        case 'ITERATION':
+          // For iteration fields, the value should be an iteration ID
+          if (!data.value || typeof data.value !== 'string') {
+            throw new ValidationError(`Iteration field '${field.name}' requires a valid iteration ID string`);
+          }
+          mutation = `
+            mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $iterationId: ID!) {
+              updateProjectV2ItemFieldValue(input: {
+                projectId: $projectId
+                itemId: $itemId
+                fieldId: $fieldId
+                value: { iterationId: $iterationId }
+              }) {
+                projectV2Item {
+                  id
+                }
+              }
+            }
+          `;
+          variables.iterationId = String(data.value);
+          break;
+        
+        case 'MILESTONE':
+          // For milestone fields, the value should be a milestone ID
+          if (!data.value || typeof data.value !== 'string') {
+            throw new ValidationError(`Milestone field '${field.name}' requires a valid milestone ID string`);
+          }
+          mutation = `
+            mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $milestoneId: ID!) {
+              updateProjectV2ItemFieldValue(input: {
+                projectId: $projectId
+                itemId: $itemId
+                fieldId: $fieldId
+                value: { milestoneId: $milestoneId }
+              }) {
+                projectV2Item {
+                  id
+                }
+              }
+            }
+          `;
+          variables.milestoneId = String(data.value);
+          break;
+        
+        case 'ASSIGNEES':
+          // For user fields, the value should be an array of user IDs
+          if (!data.value) {
+            throw new ValidationError(`Assignees field '${field.name}' requires at least one user ID`);
+          }
+          const userIds = Array.isArray(data.value) ? data.value : [data.value];
+          if (userIds.length === 0 || userIds.some(id => !id || typeof id !== 'string')) {
+            throw new ValidationError(`Assignees field '${field.name}' requires valid user ID strings`);
+          }
+          mutation = `
+            mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $userIds: [ID!]!) {
+              updateProjectV2ItemFieldValue(input: {
+                projectId: $projectId
+                itemId: $itemId
+                fieldId: $fieldId
+                value: { userIds: $userIds }
+              }) {
+                projectV2Item {
+                  id
+                }
+              }
+            }
+          `;
+          variables.userIds = userIds.map((id: any) => String(id));
+          break;
+        
+        case 'LABELS':
+          // For label fields, the value should be an array of label IDs
+          if (!data.value) {
+            throw new ValidationError(`Labels field '${field.name}' requires at least one label ID`);
+          }
+          const labelIds = Array.isArray(data.value) ? data.value : [data.value];
+          if (labelIds.length === 0 || labelIds.some(id => !id || typeof id !== 'string')) {
+            throw new ValidationError(`Labels field '${field.name}' requires valid label ID strings`);
+          }
+          mutation = `
+            mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $labelIds: [ID!]!) {
+              updateProjectV2ItemFieldValue(input: {
+                projectId: $projectId
+                itemId: $itemId
+                fieldId: $fieldId
+                value: { labelIds: $labelIds }
+              }) {
+                projectV2Item {
+                  id
+                }
+              }
+            }
+          `;
+          variables.labelIds = labelIds.map((id: any) => String(id));
+          break;
+        
         default:
-          throw new ValidationError(`Unsupported field type: ${field.dataType}`);
+          throw new ValidationError(`Unsupported field type: ${field.dataType}. Supported types: TEXT, NUMBER, DATE, SINGLE_SELECT, ITERATION, MILESTONE, ASSIGNEES, LABELS`);
       }
 
       interface UpdateFieldValueResponse {
@@ -1464,6 +1575,54 @@ export class ProjectManagementService {
                       }
                     }
                   }
+                  ... on ProjectV2ItemFieldIterationValue {
+                    iterationId
+                    title
+                    field {
+                      ... on ProjectV2IterationField {
+                        name
+                        dataType
+                      }
+                    }
+                  }
+                  ... on ProjectV2ItemFieldMilestoneValue {
+                    milestoneId
+                    title
+                    field {
+                      ... on ProjectV2MilestoneField {
+                        name
+                        dataType
+                      }
+                    }
+                  }
+                  ... on ProjectV2ItemFieldUserValue {
+                    users {
+                      nodes {
+                        id
+                        login
+                      }
+                    }
+                    field {
+                      ... on ProjectV2AssigneesField {
+                        name
+                        dataType
+                      }
+                    }
+                  }
+                  ... on ProjectV2ItemFieldLabelValue {
+                    labels {
+                      nodes {
+                        id
+                        name
+                      }
+                    }
+                    field {
+                      ... on ProjectV2LabelsField {
+                        name
+                        dataType
+                      }
+                    }
+                  }
                 }
               }
             }
@@ -1479,6 +1638,21 @@ export class ProjectManagementService {
               number?: number;
               date?: string;
               name?: string;
+              iterationId?: string;
+              title?: string;
+              milestoneId?: string;
+              users?: {
+                nodes: Array<{
+                  id: string;
+                  login: string;
+                }>;
+              };
+              labels?: {
+                nodes: Array<{
+                  id: string;
+                  name: string;
+                }>;
+              };
               field: {
                 name: string;
                 dataType: string;
@@ -1511,6 +1685,26 @@ export class ProjectManagementService {
         value = fieldValue.date;
       } else if ('name' in fieldValue && fieldValue.name !== undefined) {
         value = fieldValue.name;
+      } else if ('iterationId' in fieldValue && fieldValue.iterationId !== undefined) {
+        value = {
+          iterationId: fieldValue.iterationId,
+          title: fieldValue.title
+        };
+      } else if ('milestoneId' in fieldValue && fieldValue.milestoneId !== undefined) {
+        value = {
+          milestoneId: fieldValue.milestoneId,
+          title: fieldValue.title
+        };
+      } else if ('users' in fieldValue && fieldValue.users?.nodes) {
+        value = fieldValue.users.nodes.map(user => ({
+          id: user.id,
+          login: user.login
+        }));
+      } else if ('labels' in fieldValue && fieldValue.labels?.nodes) {
+        value = fieldValue.labels.nodes.map(label => ({
+          id: label.id,
+          name: label.name
+        }));
       }
 
       return {

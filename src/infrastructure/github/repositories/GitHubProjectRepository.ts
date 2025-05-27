@@ -46,7 +46,8 @@ interface ListProjectsResponse {
 
 export class GitHubProjectRepository extends BaseGitHubRepository implements ProjectRepository {
   async create(data: CreateProject): Promise<Project> {
-    const mutation = `
+    // Step 1: Create project with valid CreateProjectV2Input schema
+    const createMutation = `
       mutation($input: CreateProjectV2Input!) {
         createProjectV2(input: $input) {
           projectV2 {
@@ -61,16 +62,49 @@ export class GitHubProjectRepository extends BaseGitHubRepository implements Pro
       }
     `;
 
-    const response = await this.graphql<CreateProjectResponse>(mutation, {
-      input: {
-        ownerId: this.owner,
-        title: data.title,
-        description: data.description,
-        repositoryId: this.repo,
-      },
+    // Build input according to official GitHub schema
+    const createInput: any = {
+      ownerId: this.owner,
+      title: data.title,
+    };
+
+    // Add optional repositoryId if available
+    if (this.repo) {
+      createInput.repositoryId = this.repo;
+    }
+
+    const createResponse = await this.graphql<CreateProjectResponse>(createMutation, {
+      input: createInput,
     });
 
-    const project = response.createProjectV2.projectV2;
+    let project = createResponse.createProjectV2.projectV2;
+
+    // Step 2: Update project with description if provided (shortDescription is not part of CreateProjectV2Input)
+    if (data.shortDescription) {
+      const updateMutation = `
+        mutation($input: UpdateProjectV2Input!) {
+          updateProjectV2(input: $input) {
+            projectV2 {
+              id
+              title
+              shortDescription
+              closed
+              createdAt
+              updatedAt
+            }
+          }
+        }
+      `;
+
+      const updateResponse = await this.graphql<UpdateProjectResponse>(updateMutation, {
+        input: {
+          projectId: project.id,
+          shortDescription: data.shortDescription,
+        },
+      });
+
+      project = updateResponse.updateProjectV2.projectV2;
+    }
 
     return {
       id: project.id,
