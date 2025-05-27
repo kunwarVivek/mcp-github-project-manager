@@ -111,5 +111,28 @@ export const EVENT_RETENTION_DAYS = getNumericConfigValue("EVENT_RETENTION_DAYS"
 export const MAX_EVENTS_IN_MEMORY = getNumericConfigValue("MAX_EVENTS_IN_MEMORY", 1000);
 export const WEBHOOK_TIMEOUT_MS = getNumericConfigValue("WEBHOOK_TIMEOUT_MS", 5000);
 
+// AI Provider configuration
+export const ANTHROPIC_API_KEY = getOptionalConfigValue("ANTHROPIC_API_KEY", "");
+export const OPENAI_API_KEY = getOptionalConfigValue("OPENAI_API_KEY", "");
+export const GOOGLE_API_KEY = getOptionalConfigValue("GOOGLE_API_KEY", "");
+export const PERPLEXITY_API_KEY = getOptionalConfigValue("PERPLEXITY_API_KEY", "");
+
+// AI Model configuration
+export const AI_MAIN_MODEL = getOptionalConfigValue("AI_MAIN_MODEL", "claude-3-5-sonnet-20241022");
+export const AI_RESEARCH_MODEL = getOptionalConfigValue("AI_RESEARCH_MODEL", "perplexity-llama-3.1-sonar-large-128k-online");
+export const AI_FALLBACK_MODEL = getOptionalConfigValue("AI_FALLBACK_MODEL", "gpt-4o");
+export const AI_PRD_MODEL = getOptionalConfigValue("AI_PRD_MODEL", "claude-3-5-sonnet-20241022");
+
+// AI Task Generation configuration
+export const MAX_TASKS_PER_PRD = getNumericConfigValue("MAX_TASKS_PER_PRD", 50);
+export const DEFAULT_COMPLEXITY_THRESHOLD = getNumericConfigValue("DEFAULT_COMPLEXITY_THRESHOLD", 7);
+export const MAX_SUBTASK_DEPTH = getNumericConfigValue("MAX_SUBTASK_DEPTH", 3);
+export const AUTO_DEPENDENCY_DETECTION = getBooleanConfigValue("AUTO_DEPENDENCY_DETECTION", true);
+export const AUTO_EFFORT_ESTIMATION = getBooleanConfigValue("AUTO_EFFORT_ESTIMATION", true);
+
+// GitHub AI Integration
+export const AUTO_CREATE_PROJECT_FIELDS = getBooleanConfigValue("AUTO_CREATE_PROJECT_FIELDS", true);
+export const AI_BATCH_SIZE = getNumericConfigValue("AI_BATCH_SIZE", 10);
+
 // Export CLI options for use in other modules
 export const CLI_OPTIONS = cliOptions;

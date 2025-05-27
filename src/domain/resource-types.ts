@@ -9,7 +9,18 @@ export enum ResourceType {
   LABEL = "label",
   VIEW = "view",
   FIELD = "field",
-  COMMENT = "comment"
+  COMMENT = "comment",
+  // AI-related resource types
+  PRD = "prd",
+  AI_TASK = "ai_task",
+  FEATURE_REQUEST = "feature_request",
+  TASK_LIFECYCLE = "task_lifecycle",
+  PROJECT_ROADMAP = "project_roadmap",
+  // Requirements traceability types
+  REQUIREMENT = "requirement",
+  USE_CASE = "use_case",
+  TRACEABILITY_MATRIX = "traceability_matrix",
+  TRACEABILITY_LINK = "traceability_link"
 }
 
 export enum ResourceStatus {

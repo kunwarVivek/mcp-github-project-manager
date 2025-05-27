@@ -23,6 +23,16 @@ import {
 } from "./env";
 import { ToolRegistry } from "./infrastructure/tools/ToolRegistry";
 import { ToolValidator } from "./infrastructure/tools/ToolValidator";
+import {
+  executeAddFeature,
+  executeGeneratePRD,
+  executeParsePRD,
+  executeGetNextTask,
+  executeAnalyzeTaskComplexity,
+  executeExpandTask,
+  executeEnhancePRD,
+  executeCreateTraceabilityMatrix
+} from "./infrastructure/tools/ToolSchemas";
 import { ToolResultFormatter } from "./infrastructure/tools/ToolResultFormatter";
 import { MCPContentType } from "./domain/mcp-types";
 import { ResourceCache } from "./infrastructure/cache/ResourceCache";
@@ -303,6 +313,31 @@ class GitHubProjectManagerServer {
 
       case "replay_events":
         return await this.handleReplayEvents(args);
+
+      // AI Task Management tools
+      case "add_feature":
+        return await executeAddFeature(args);
+
+      case "generate_prd":
+        return await executeGeneratePRD(args);
+
+      case "parse_prd":
+        return await executeParsePRD(args);
+
+      case "get_next_task":
+        return await executeGetNextTask(args);
+
+      case "analyze_task_complexity":
+        return await executeAnalyzeTaskComplexity(args);
+
+      case "expand_task":
+        return await executeExpandTask(args);
+
+      case "enhance_prd":
+        return await executeEnhancePRD(args);
+
+      case "create_traceability_matrix":
+        return await executeCreateTraceabilityMatrix(args);
 
       default:
         throw new McpError(

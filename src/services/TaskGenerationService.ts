@@ -1,0 +1,421 @@
+import { AITaskProcessor } from './ai/AITaskProcessor.js';
+import {
+  AITask,
+  SubTask,
+  PRDDocument,
+  TaskPriority,
+  TaskStatus,
+  TaskComplexity,
+  TaskDependency,
+  AcceptanceCriteria
+} from '../domain/ai-types.js';
+import {
+  MAX_TASKS_PER_PRD,
+  MAX_SUBTASK_DEPTH,
+  AUTO_DEPENDENCY_DETECTION,
+  AUTO_EFFORT_ESTIMATION
+} from '../env.js';
+import { v4 as uuidv4 } from 'uuid';
+
+/**
+ * Service for generating and managing AI-powered tasks
+ */
+export class TaskGenerationService {
+  private aiProcessor: AITaskProcessor;
+
+  constructor() {
+    this.aiProcessor = new AITaskProcessor();
+  }
+
+  /**
+   * Generate comprehensive task list from PRD
+   */
+  async generateTasksFromPRD(params: {
+    prd: PRDDocument | string;
+    maxTasks?: number;
+    includeSubtasks?: boolean;
+    autoEstimate?: boolean;
+    autoPrioritize?: boolean;
+  }): Promise<AITask[]> {
+    try {
+      const prdContent = typeof params.prd === 'string'
+        ? params.prd
+        : JSON.stringify(params.prd, null, 2);
+
+      // Generate initial tasks using AI
+      let tasks = await this.aiProcessor.generateTasksFromPRD({
+        prdContent,
+        maxTasks: params.maxTasks || MAX_TASKS_PER_PRD,
+        includeSubtasks: params.includeSubtasks ?? true,
+        autoEstimate: params.autoEstimate ?? AUTO_EFFORT_ESTIMATION
+      });
+
+      // Auto-prioritize if requested
+      if (params.autoPrioritize) {
+        tasks = await this.prioritizeTaskList({
+          tasks,
+          projectGoals: typeof params.prd === 'object' ? params.prd.objectives.join(', ') : undefined
+        });
+      }
+
+      // Auto-detect dependencies if enabled
+      if (AUTO_DEPENDENCY_DETECTION) {
+        tasks = await this.detectTaskDependencies(tasks);
+      }
+
+      // Ensure all tasks have required metadata
+      return tasks.map(task => this.enrichTaskMetadata(task, params.prd));
+    } catch (error) {
+      console.error('Error generating tasks from PRD:', error);
+      throw new Error(`Failed to generate tasks: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Generate tasks from natural language description
+   */
+  async generateTasksFromDescription(params: {
+    description: string;
+    projectType?: string;
+    maxTasks?: number;
+    complexity?: 'low' | 'medium' | 'high';
+  }): Promise<AITask[]> {
+    try {
+      // Create a minimal PRD-like structure from the description
+      const simplePRD = {
+        overview: params.description,
+        objectives: [`Implement ${params.projectType || 'project'} based on requirements`],
+        features: [],
+        timeline: '1-3 months'
+      };
+
+      return await this.generateTasksFromPRD({
+        prd: JSON.stringify(simplePRD),
+        maxTasks: params.maxTasks || 20,
+        includeSubtasks: true,
+        autoEstimate: true,
+        autoPrioritize: true
+      });
+    } catch (error) {
+      console.error('Error generating tasks from description:', error);
+      throw new Error(`Failed to generate tasks: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Expand a task into subtasks
+   */
+  async expandTaskIntoSubtasks(params: {
+    task: AITask;
+    maxDepth?: number;
+    autoEstimate?: boolean;
+  }): Promise<SubTask[]> {
+    try {
+      if (params.task.subtasks.length > 0) {
+        console.warn('Task already has subtasks. Consider using updateTaskSubtasks instead.');
+      }
+
+      // Use AI to break down the task
+      const subtasks = await this.aiProcessor.expandTaskIntoSubtasks({
+        taskTitle: params.task.title,
+        taskDescription: params.task.description,
+        currentComplexity: params.task.complexity,
+        maxDepth: params.maxDepth || MAX_SUBTASK_DEPTH
+      });
+
+      // Convert to SubTask format and enrich with metadata
+      return subtasks.map((subtask: any) => ({
+        ...subtask,
+        id: subtask.id || uuidv4(),
+        parentTaskId: params.task.id,
+        status: TaskStatus.PENDING,
+        aiGenerated: true,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      }));
+    } catch (error) {
+      console.error('Error expanding task into subtasks:', error);
+      throw new Error(`Failed to expand task: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Analyze and update task complexity
+   */
+  async analyzeTaskComplexity(task: AITask): Promise<{
+    originalComplexity: TaskComplexity;
+    newComplexity: TaskComplexity;
+    estimatedHours: number;
+    analysis: string;
+    recommendations: string[];
+  }> {
+    try {
+      const analysis = await this.aiProcessor.analyzeTaskComplexity({
+        taskTitle: task.title,
+        taskDescription: task.description,
+        currentEstimate: task.estimatedHours
+      });
+
+      return {
+        originalComplexity: task.complexity,
+        newComplexity: analysis.complexity as TaskComplexity,
+        estimatedHours: analysis.estimatedHours,
+        analysis: analysis.analysis,
+        recommendations: analysis.recommendations
+      };
+    } catch (error) {
+      console.error('Error analyzing task complexity:', error);
+      throw new Error(`Failed to analyze complexity: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Prioritize a list of tasks using AI
+   */
+  async prioritizeTaskList(params: {
+    tasks: AITask[];
+    projectGoals?: string;
+    timeline?: string;
+    teamSize?: number;
+  }): Promise<AITask[]> {
+    try {
+      return await this.aiProcessor.prioritizeTasks({
+        tasks: params.tasks,
+        projectGoals: params.projectGoals,
+        timeline: params.timeline,
+        teamSize: params.teamSize
+      });
+    } catch (error) {
+      console.error('Error prioritizing tasks:', error);
+      throw new Error(`Failed to prioritize tasks: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Detect dependencies between tasks
+   */
+  async detectTaskDependencies(tasks: AITask[]): Promise<AITask[]> {
+    try {
+      // For now, implement basic dependency detection logic
+      // In a full implementation, you'd use AI to analyze dependencies
+
+      const tasksWithDependencies = tasks.map(task => {
+        const dependencies: TaskDependency[] = [];
+
+        // Simple heuristic: setup/infrastructure tasks should be dependencies for feature tasks
+        if (task.title.toLowerCase().includes('setup') ||
+            task.title.toLowerCase().includes('infrastructure') ||
+            task.title.toLowerCase().includes('configuration')) {
+          // This is a setup task - other tasks might depend on it
+          return { ...task, dependencies };
+        }
+
+        // Feature tasks might depend on setup tasks
+        const setupTasks = tasks.filter(t =>
+          t.id !== task.id && (
+            t.title.toLowerCase().includes('setup') ||
+            t.title.toLowerCase().includes('infrastructure') ||
+            t.title.toLowerCase().includes('database')
+          )
+        );
+
+        setupTasks.forEach(setupTask => {
+          dependencies.push({
+            id: setupTask.id,
+            type: 'depends_on',
+            description: `Requires ${setupTask.title} to be completed first`
+          });
+        });
+
+        return { ...task, dependencies };
+      });
+
+      return tasksWithDependencies;
+    } catch (error) {
+      console.error('Error detecting task dependencies:', error);
+      return tasks; // Return original tasks if dependency detection fails
+    }
+  }
+
+  /**
+   * Generate acceptance criteria for a task
+   */
+  async generateAcceptanceCriteria(task: AITask): Promise<AcceptanceCriteria[]> {
+    try {
+      // For now, generate basic acceptance criteria
+      // In a full implementation, you'd use AI to generate comprehensive criteria
+
+      const criteria: AcceptanceCriteria[] = [
+        {
+          id: uuidv4(),
+          description: `Task "${task.title}" is implemented according to specifications`,
+          completed: false
+        },
+        {
+          id: uuidv4(),
+          description: 'All unit tests pass',
+          completed: false
+        },
+        {
+          id: uuidv4(),
+          description: 'Code review is completed and approved',
+          completed: false
+        }
+      ];
+
+      // Add specific criteria based on task type
+      if (task.title.toLowerCase().includes('api')) {
+        criteria.push({
+          id: uuidv4(),
+          description: 'API endpoints return correct responses and status codes',
+          completed: false
+        });
+      }
+
+      if (task.title.toLowerCase().includes('ui') || task.title.toLowerCase().includes('frontend')) {
+        criteria.push({
+          id: uuidv4(),
+          description: 'UI is responsive and accessible',
+          completed: false
+        });
+      }
+
+      return criteria;
+    } catch (error) {
+      console.error('Error generating acceptance criteria:', error);
+      throw new Error(`Failed to generate acceptance criteria: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Estimate effort for a task
+   */
+  async estimateTaskEffort(task: AITask): Promise<{
+    estimatedHours: number;
+    breakdown: {
+      analysis: number;
+      implementation: number;
+      testing: number;
+      documentation: number;
+    };
+    confidence: 'high' | 'medium' | 'low';
+    factors: string[];
+  }> {
+    try {
+      // Simple effort estimation based on complexity
+      const baseHours = task.complexity * 3; // 3 hours per complexity point
+
+      const breakdown = {
+        analysis: Math.round(baseHours * 0.15),
+        implementation: Math.round(baseHours * 0.60),
+        testing: Math.round(baseHours * 0.20),
+        documentation: Math.round(baseHours * 0.05)
+      };
+
+      const totalHours = Object.values(breakdown).reduce((sum, hours) => sum + hours, 0);
+
+      return {
+        estimatedHours: totalHours,
+        breakdown,
+        confidence: task.complexity <= 5 ? 'high' : task.complexity <= 7 ? 'medium' : 'low',
+        factors: [
+          `Complexity level: ${task.complexity}/10`,
+          `Task type: ${this.getTaskType(task)}`,
+          `Dependencies: ${task.dependencies.length} identified`
+        ]
+      };
+    } catch (error) {
+      console.error('Error estimating task effort:', error);
+      throw new Error(`Failed to estimate effort: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Get recommended next tasks based on current project state
+   */
+  async getRecommendedNextTasks(params: {
+    allTasks: AITask[];
+    completedTaskIds: string[];
+    currentSprintCapacity?: number;
+    teamSkills?: string[];
+  }): Promise<AITask[]> {
+    try {
+      const availableTasks = params.allTasks.filter(task =>
+        !params.completedTaskIds.includes(task.id) &&
+        task.status !== TaskStatus.DONE &&
+        this.areTaskDependenciesMet(task, params.completedTaskIds)
+      );
+
+      // Sort by priority and complexity
+      const sortedTasks = availableTasks.sort((a, b) => {
+        const priorityOrder = { critical: 4, high: 3, medium: 2, low: 1 };
+        const priorityDiff = priorityOrder[b.priority] - priorityOrder[a.priority];
+
+        if (priorityDiff !== 0) return priorityDiff;
+
+        // If same priority, prefer lower complexity (easier to complete)
+        return a.complexity - b.complexity;
+      });
+
+      // Return top tasks that fit within sprint capacity
+      const capacity = params.currentSprintCapacity || 40; // Default 40 hours
+      const recommendedTasks: AITask[] = [];
+      let totalHours = 0;
+
+      for (const task of sortedTasks) {
+        if (totalHours + task.estimatedHours <= capacity) {
+          recommendedTasks.push(task);
+          totalHours += task.estimatedHours;
+        }
+      }
+
+      return recommendedTasks;
+    } catch (error) {
+      console.error('Error getting recommended next tasks:', error);
+      throw new Error(`Failed to get recommendations: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Check if task dependencies are met
+   */
+  private areTaskDependenciesMet(task: AITask, completedTaskIds: string[]): boolean {
+    return task.dependencies
+      .filter(dep => dep.type === 'depends_on' || dep.type === 'blocks')
+      .every(dep => completedTaskIds.includes(dep.id));
+  }
+
+  /**
+   * Enrich task with additional metadata
+   */
+  private enrichTaskMetadata(task: AITask, prd: PRDDocument | string): AITask {
+    return {
+      ...task,
+      sourcePRD: typeof prd === 'object' ? prd.id : 'external',
+      tags: [
+        ...task.tags,
+        this.getTaskType(task),
+        `complexity-${task.complexity}`,
+        `priority-${task.priority}`
+      ].filter((tag, index, arr) => arr.indexOf(tag) === index) // Remove duplicates
+    };
+  }
+
+  /**
+   * Determine task type based on title and description
+   */
+  private getTaskType(task: AITask): string {
+    const title = task.title.toLowerCase();
+    const description = task.description.toLowerCase();
+
+    if (title.includes('setup') || title.includes('config')) return 'setup';
+    if (title.includes('api') || description.includes('endpoint')) return 'backend';
+    if (title.includes('ui') || title.includes('frontend')) return 'frontend';
+    if (title.includes('test') || description.includes('testing')) return 'testing';
+    if (title.includes('deploy') || title.includes('infrastructure')) return 'devops';
+    if (title.includes('database') || title.includes('migration')) return 'database';
+    if (title.includes('documentation') || title.includes('docs')) return 'documentation';
+
+    return 'feature';
+  }
+}

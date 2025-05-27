@@ -1,5 +1,14 @@
 import { z } from "zod";
 import { ToolDefinition, ToolSchema } from "./ToolValidator.js";
+// Import AI tools
+import { addFeatureTool, executeAddFeature } from "./ai-tasks/AddFeatureTool.js";
+import { generatePRDTool, executeGeneratePRD } from "./ai-tasks/GeneratePRDTool.js";
+import { parsePRDTool, executeParsePRD } from "./ai-tasks/ParsePRDTool.js";
+import { getNextTaskTool, executeGetNextTask } from "./ai-tasks/GetNextTaskTool.js";
+import { analyzeTaskComplexityTool, executeAnalyzeTaskComplexity } from "./ai-tasks/AnalyzeTaskComplexityTool.js";
+import { expandTaskTool, executeExpandTask } from "./ai-tasks/ExpandTaskTool.js";
+import { enhancePRDTool, executeEnhancePRD } from "./ai-tasks/EnhancePRDTool.js";
+import { createTraceabilityMatrixTool, executeCreateTraceabilityMatrix } from "./ai-tasks/CreateTraceabilityMatrixTool.js";
 
 // Schema for create_roadmap tool
 export const createRoadmapSchema = z.object({
@@ -1365,3 +1374,17 @@ export const replayEventsTool: ToolDefinition<ReplayEventsArgs> = {
     }
   ]
 };
+
+// ============================================================================
+// AI Task Management Tools
+// ============================================================================
+
+// Re-export AI tools
+export { addFeatureTool, executeAddFeature };
+export { generatePRDTool, executeGeneratePRD };
+export { parsePRDTool, executeParsePRD };
+export { getNextTaskTool, executeGetNextTask };
+export { analyzeTaskComplexityTool, executeAnalyzeTaskComplexity };
+export { expandTaskTool, executeExpandTask };
+export { enhancePRDTool, executeEnhancePRD };
+export { createTraceabilityMatrixTool, executeCreateTraceabilityMatrix };
