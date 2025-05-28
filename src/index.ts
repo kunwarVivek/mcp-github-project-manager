@@ -204,7 +204,7 @@ class GitHubProjectManagerServer {
         }
 
         // Log and convert other errors to MCP errors
-        console.error("Tool execution error:", error);
+        this.logger.error("Tool execution error:", error);
         const message =
           error instanceof Error ? error.message : "An unknown error occurred";
         throw new McpError(ErrorCode.InternalError, message);

@@ -11,9 +11,11 @@ module.exports = {
       'ts-jest',
       {
         tsconfig: {
-          module: 'commonjs',
+          module: 'esnext',
+          target: 'es2022',
+          moduleResolution: 'node'
         },
-        useESM: false,
+        useESM: true,
       },
     ],
   },
@@ -22,6 +24,7 @@ module.exports = {
   testMatch: [
     '**/__tests__/**/*.test.ts',
     '**/__tests__/**/*.spec.ts',
+    '**/__tests__/**/*.e2e.ts',
     '**/tests/**/*.test.ts',
     '**/tests/**/*.spec.ts',
   ],

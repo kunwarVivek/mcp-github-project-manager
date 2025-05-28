@@ -312,7 +312,7 @@ export class TaskGenerationService {
   }): Promise<SubTask[]> {
     try {
       if (params.task.subtasks.length > 0) {
-        console.warn('Task already has subtasks. Consider using updateTaskSubtasks instead.');
+        process.stderr.write('Task already has subtasks. Consider using updateTaskSubtasks instead.\n');
       }
 
       // Use AI to break down the task

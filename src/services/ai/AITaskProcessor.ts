@@ -403,7 +403,7 @@ export class AITaskProcessor {
     try {
       const model = this.aiFactory.getBestAvailableModel();
       if (!model) {
-        console.warn('No AI models available for testing');
+        process.stderr.write('No AI models available for testing\n');
         return false;
       }
 

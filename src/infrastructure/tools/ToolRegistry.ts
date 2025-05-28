@@ -92,7 +92,7 @@ export class ToolRegistry {
    */
   public registerTool<T>(tool: ToolDefinition<T>): void {
     if (this._tools.has(tool.name)) {
-      console.warn(`Tool '${tool.name}' is already registered and will be overwritten.`);
+      process.stderr.write(`Tool '${tool.name}' is already registered and will be overwritten.\n`);
     }
     this._tools.set(tool.name, tool);
   }

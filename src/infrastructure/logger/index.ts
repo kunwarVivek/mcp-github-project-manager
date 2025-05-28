@@ -10,6 +10,7 @@ export interface ILogger {
 
 /**
  * Default logger implementation that logs to console
+ * All logs go to stderr to avoid interfering with MCP protocol on stdout
  */
 export class ConsoleLogger implements ILogger {
   private readonly prefix: string;
@@ -19,19 +20,35 @@ export class ConsoleLogger implements ILogger {
   }
 
   debug(message: string, ...args: any[]): void {
-    console.debug(`${this.prefix}${message}`, ...args);
+    // Write to stderr to avoid interfering with MCP protocol
+    process.stderr.write(`${this.prefix}${message}\n`);
+    if (args.length > 0) {
+      process.stderr.write(`${JSON.stringify(args, null, 2)}\n`);
+    }
   }
 
   info(message: string, ...args: any[]): void {
-    console.info(`${this.prefix}${message}`, ...args);
+    // Write to stderr to avoid interfering with MCP protocol
+    process.stderr.write(`${this.prefix}${message}\n`);
+    if (args.length > 0) {
+      process.stderr.write(`${JSON.stringify(args, null, 2)}\n`);
+    }
   }
 
   warn(message: string, ...args: any[]): void {
-    console.warn(`${this.prefix}${message}`, ...args);
+    // Write to stderr to avoid interfering with MCP protocol
+    process.stderr.write(`${this.prefix}${message}\n`);
+    if (args.length > 0) {
+      process.stderr.write(`${JSON.stringify(args, null, 2)}\n`);
+    }
   }
 
   error(message: string, ...args: any[]): void {
-    console.error(`${this.prefix}${message}`, ...args);
+    // Write to stderr to avoid interfering with MCP protocol
+    process.stderr.write(`${this.prefix}${message}\n`);
+    if (args.length > 0) {
+      process.stderr.write(`${JSON.stringify(args, null, 2)}\n`);
+    }
   }
 }
 

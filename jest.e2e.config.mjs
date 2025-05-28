@@ -5,7 +5,7 @@ const config = {
   preset: 'ts-jest/presets/default-esm',
   testEnvironment: 'node',
   testMatch: ['**/*.e2e.ts'],
-  setupFiles: ['<rootDir>/src/__tests__/e2e/setup.ts'],
+  setupFilesAfterEnv: ['<rootDir>/src/__tests__/e2e/setup.ts'],
   transformIgnorePatterns: [
     'node_modules/(?!(@octokit)/)',
   ],

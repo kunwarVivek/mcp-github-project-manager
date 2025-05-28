@@ -104,7 +104,7 @@ export class AIServiceFactory {
     }
 
     if (!apiKey) {
-      console.warn(`⚠️  AI Provider Warning: No API key found for ${provider} provider. AI features using this provider will be disabled.`);
+      process.stderr.write(`⚠️  AI Provider Warning: No API key found for ${provider} provider. AI features using this provider will be disabled.\n`);
       return null;
     }
 
@@ -118,7 +118,7 @@ export class AIServiceFactory {
     const config = this.config[type];
 
     if (!config) {
-      console.warn(`⚠️  AI Model Warning: ${type} model is not available due to missing API key.`);
+      process.stderr.write(`⚠️  AI Model Warning: ${type} model is not available due to missing API key.\n`);
       return null;
     }
 
@@ -286,9 +286,8 @@ export class AIServiceFactory {
             maxTokens: 10
           });
           results.anthropic = true;
-        }
-      } catch (error) {
-        console.warn('Anthropic connection test failed:', error);
+        }        } catch (error) {
+        process.stderr.write(`Anthropic connection test failed: ${error}\n`);
       }
     }
 
