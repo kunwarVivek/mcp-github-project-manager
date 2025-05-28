@@ -72,7 +72,7 @@
     "dotenv": "^16.5.0",
     "tsyringe": "^4.10.0",
     "uuid": "^11.1.0",
-    "zod": "^3.25.30"
+    "zod": "^3.25.32"
   },
   "publishConfig": {
     "access": "public"
@@ -86,13 +86,13 @@
     "@octokit/openapi-types": "^25.1.0",
     "@octokit/types": "^14.1.0",
     "@types/jest": "^29.5.14",
-    "@types/node": "^22.15.21",
+    "@types/node": "^22.15.23",
     "@types/uuid": "^10.0.0",
-    "@typescript-eslint/eslint-plugin": "^8.32.1",
-    "@typescript-eslint/parser": "^8.32.1",
+    "@typescript-eslint/eslint-plugin": "^8.33.0",
+    "@typescript-eslint/parser": "^8.33.0",
     "eslint": "^9.27.0",
     "eslint-config-prettier": "^10.1.5",
-    "eslint-plugin-jest": "^28.11.0",
+    "eslint-plugin-jest": "^28.11.1",
     "eslint-plugin-prettier": "^5.4.0",
     "husky": "^9.1.7",
     "jest": "^29.7.0",
