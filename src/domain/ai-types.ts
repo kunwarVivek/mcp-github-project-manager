@@ -187,6 +187,13 @@ export interface PRDDocument {
   features: FeatureRequirement[];
   technicalRequirements: TechnicalRequirement[];
 
+  // Market research (optional)
+  marketResearch?: {
+    competitorAnalysis: string[];
+    marketSize: string;
+    trends: string[];
+  };
+
   // Project details
   timeline: string;
   milestones: string[];
@@ -301,6 +308,11 @@ export const PRDDocumentSchema = z.object({
     rationale: z.string(),
     priority: TaskPrioritySchema
   })),
+  marketResearch: z.object({
+    competitorAnalysis: z.array(z.string()),
+    marketSize: z.string(),
+    trends: z.array(z.string())
+  }).optional(),
   timeline: z.string(),
   milestones: z.array(z.string()),
   successMetrics: z.array(z.string()),

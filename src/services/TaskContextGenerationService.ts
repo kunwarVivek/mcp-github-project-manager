@@ -1,5 +1,5 @@
 import { generateObject } from 'ai';
-import { AIServiceFactory } from './ai/AIServiceFactory.js';
+import { AIServiceFactory } from './ai/AIServiceFactory';
 import {
   CONTEXT_GENERATION_CONFIGS,
   formatContextPrompt,
@@ -8,7 +8,7 @@ import {
   ImplementationGuidanceSchema,
   ContextualReferencesSchema,
   EnhancedAcceptanceCriteriaSchema
-} from './ai/prompts/ContextGenerationPrompts.js';
+} from './ai/prompts/ContextGenerationPrompts';
 import {
   AITask,
   EnhancedAITask,
@@ -19,15 +19,15 @@ import {
   ContextualReferences,
   ImplementationGuidance,
   EnhancedTaskDependency
-} from '../domain/ai-types.js';
-import { RequirementsTraceabilityService } from './RequirementsTraceabilityService.js';
+} from '../domain/ai-types';
+import { RequirementsTraceabilityService } from './RequirementsTraceabilityService';
 import {
   ENHANCED_TASK_GENERATION,
   INCLUDE_BUSINESS_CONTEXT,
   INCLUDE_TECHNICAL_CONTEXT,
   INCLUDE_IMPLEMENTATION_GUIDANCE,
   ENHANCED_CONTEXT_LEVEL
-} from '../env.js';
+} from '../env';
 
 /**
  * Service for generating comprehensive task context using AI and traceability

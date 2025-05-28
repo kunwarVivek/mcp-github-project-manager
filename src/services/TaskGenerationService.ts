@@ -1,4 +1,4 @@
-import { AITaskProcessor } from './ai/AITaskProcessor.js';
+import { AITaskProcessor } from './ai/AITaskProcessor';
 import {
   AITask,
   SubTask,
@@ -8,7 +8,7 @@ import {
   TaskComplexity,
   TaskDependency,
   AcceptanceCriteria
-} from '../domain/ai-types.js';
+} from '../domain/ai-types';
 import {
   MAX_TASKS_PER_PRD,
   MAX_SUBTASK_DEPTH,
@@ -22,14 +22,14 @@ import {
   INCLUDE_BUSINESS_CONTEXT,
   INCLUDE_TECHNICAL_CONTEXT,
   INCLUDE_IMPLEMENTATION_GUIDANCE
-} from '../env.js';
+} from '../env';
 import {
   EnhancedTaskGenerationConfig,
   EnhancedTaskGenerationParams,
   EnhancedAITask
-} from '../domain/ai-types.js';
-import { RequirementsTraceabilityService } from './RequirementsTraceabilityService.js';
-import { TaskContextGenerationService } from './TaskContextGenerationService.js';
+} from '../domain/ai-types';
+import { RequirementsTraceabilityService } from './RequirementsTraceabilityService';
+import { TaskContextGenerationService } from './TaskContextGenerationService';
 import { v4 as uuidv4 } from 'uuid';
 
 /**

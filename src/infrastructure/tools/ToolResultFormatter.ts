@@ -1,5 +1,5 @@
-import { MCPResponseFormatter } from "../mcp/MCPResponseFormatter.js";
-import { MCPContentType, MCPResponse } from "../../domain/mcp-types.js";
+import { MCPResponseFormatter } from "../mcp/MCPResponseFormatter";
+import { MCPContentType, MCPResponse } from "../../domain/mcp-types";
 
 export interface FormattingOptions {
   contentType?: MCPContentType;
@@ -22,13 +22,13 @@ export class ToolResultFormatter {
     switch (contentType) {
       case MCPContentType.MARKDOWN:
         return this.formatAsMarkdown(toolName, result, options);
-      
+
       case MCPContentType.HTML:
         return this.formatAsHtml(toolName, result, options);
-      
+
       case MCPContentType.TEXT:
         return this.formatAsText(toolName, result, options);
-      
+
       case MCPContentType.JSON:
       default:
         return this.formatAsJson(toolName, result, options);
@@ -63,7 +63,7 @@ export class ToolResultFormatter {
   ): MCPResponse {
     // Add a title based on the tool name
     let markdown = `# ${this.formatToolName(toolName)} Result\n\n`;
-    
+
     // Handle different types of results
     if (Array.isArray(result)) {
       // Format array results as a table if possible
@@ -77,7 +77,7 @@ export class ToolResultFormatter {
       // Format key properties as headers with details
       markdown += Object.entries(result).map(([key, value]) => {
         const formattedKey = key.charAt(0).toUpperCase() + key.slice(1).replace(/([A-Z])/g, ' $1');
-        
+
         if (Array.isArray(value)) {
           // Format arrays as lists
           return `## ${formattedKey}\n${value.map(item => `- ${JSON.stringify(item)}`).join('\n')}`;
@@ -92,15 +92,15 @@ export class ToolResultFormatter {
       // Simple value
       markdown += String(result);
     }
-    
+
     // Include raw JSON data if requested
     if (options.includeRawData) {
       markdown += '\n\n## Raw Data\n\n```json\n' + JSON.stringify(result, null, 2) + '\n```';
     }
-    
+
     // Create MCP response with markdown content
     return MCPResponseFormatter.format(
-      markdown, 
+      markdown,
       MCPContentType.MARKDOWN,
       {
         tool: toolName,
@@ -125,7 +125,7 @@ export class ToolResultFormatter {
           <h1 class="tool-name">${this.formatToolName(toolName)} Result</h1>
           <div class="tool-content">
       `;
-      
+
       if (Array.isArray(data)) {
         if (data.length > 0 && typeof data[0] === 'object') {
           // Table for array of objects
@@ -175,12 +175,12 @@ export class ToolResultFormatter {
         // Simple value
         html += `<p class="tool-simple-value">${data}</p>`;
       }
-      
+
       html += `
           </div>
         </div>
       `;
-      
+
       if (options.includeRawData) {
         html += `
           <div class="tool-raw-data">
@@ -189,10 +189,10 @@ export class ToolResultFormatter {
           </div>
         `;
       }
-      
+
       return html;
     };
-    
+
     return MCPResponseFormatter.format(
       MCPResponseFormatter.formatAsRichHtml(result, htmlTemplate),
       MCPContentType.HTML,
@@ -214,13 +214,13 @@ export class ToolResultFormatter {
   ): MCPResponse {
     // Format as simple text representation
     let text = `${this.formatToolName(toolName)} Result:\n\n`;
-    
+
     if (typeof result === 'string') {
       text += result;
     } else {
       text += JSON.stringify(result, null, 2);
     }
-    
+
     return MCPResponseFormatter.format(
       text,
       MCPContentType.TEXT,

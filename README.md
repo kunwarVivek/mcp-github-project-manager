@@ -85,6 +85,17 @@ For more details on Docker usage, see [DOCKER.md](DOCKER.md).
 - **Task Expansion** (`expand_task`): Break down complex tasks into manageable subtasks automatically
 - **PRD Enhancement** (`enhance_prd`): Improve existing PRDs with AI-powered gap analysis and improvements
 
+### 🎯 Enhanced Task Context Generation
+- **Traceability-Based Context** (Default): Rich context from requirements traceability without AI dependency
+- **AI-Enhanced Context** (Optional): Comprehensive business, technical, and implementation context using AI
+- **Configurable Context Levels**: Choose between minimal, standard, and full context depth
+- **Business Context**: Extract business objectives, user impact, and success metrics
+- **Technical Context**: Analyze technical constraints, architecture decisions, and integration points
+- **Implementation Guidance**: AI-generated step-by-step implementation recommendations
+- **Contextual References**: Links to relevant PRD sections, features, and technical specifications
+- **Enhanced Acceptance Criteria**: Detailed, testable criteria with verification methods
+- **Graceful Degradation**: Works perfectly without AI keys, falls back to traceability-based context
+
 ### 🔗 Complete Requirements Traceability
 - **End-to-End Tracking** (`create_traceability_matrix`): Full traceability from PRD business requirements → features → use cases → tasks
 - **Bidirectional Links**: Complete bidirectional traceability with impact analysis
@@ -190,6 +201,16 @@ DEFAULT_COMPLEXITY_THRESHOLD=7
 MAX_SUBTASK_DEPTH=3
 AUTO_DEPENDENCY_DETECTION=true
 AUTO_EFFORT_ESTIMATION=true
+
+# Enhanced Task Context Generation Configuration (optional)
+ENHANCED_TASK_GENERATION=true
+AUTO_CREATE_TRACEABILITY=true
+AUTO_GENERATE_USE_CASES=true
+AUTO_CREATE_LIFECYCLE=true
+ENHANCED_CONTEXT_LEVEL=standard
+INCLUDE_BUSINESS_CONTEXT=false
+INCLUDE_TECHNICAL_CONTEXT=false
+INCLUDE_IMPLEMENTATION_GUIDANCE=false
 ```
 
 ### AI Provider Setup
@@ -409,6 +430,90 @@ create_traceability_matrix({
 # ✅ Orphaned task detection
 # ✅ Unimplemented requirement tracking
 ```
+
+#### Enhanced Task Context Generation
+```bash
+# Default: Traceability-based context (fast, no AI required)
+parse_prd({
+  "prdContent": "<PRD content>",
+  "enhancedGeneration": true,
+  "contextLevel": "standard"
+})
+
+# Enhanced: AI-powered comprehensive context
+parse_prd({
+  "prdContent": "<PRD content>",
+  "enhancedGeneration": true,
+  "contextLevel": "full",
+  "includeBusinessContext": true,
+  "includeTechnicalContext": true,
+  "includeImplementationGuidance": true
+})
+
+# Performance optimized: Minimal context for speed
+parse_prd({
+  "prdContent": "<PRD content>",
+  "enhancedGeneration": true,
+  "contextLevel": "minimal",
+  "includeBusinessContext": false,
+  "includeTechnicalContext": false,
+  "includeImplementationGuidance": false
+})
+```
+
+**Context Generation Levels:**
+- **Minimal**: Basic traceability context only (fastest)
+- **Standard**: Traceability + basic business context (default)
+- **Full**: Complete AI-enhanced context with implementation guidance
+
+**Generated Task Context Includes:**
+- **Business Context**: Why the task matters, user impact, success metrics
+- **Feature Context**: Parent feature information, user stories, business value
+- **Technical Context**: Constraints, architecture decisions, integration points
+- **Implementation Guidance**: Step-by-step recommendations, best practices, pitfalls
+- **Enhanced Acceptance Criteria**: Detailed verification methods and priorities
+- **Contextual References**: Links to relevant PRD sections and technical specs
+
+### 🧪 Testing Enhanced Context Generation
+
+The enhanced context generation functionality includes comprehensive test coverage:
+
+#### **Test Files Created:**
+- `src/__tests__/TaskContextGenerationService.test.ts` - Core context generation service tests
+- `src/__tests__/TaskGenerationService.enhanced.test.ts` - Enhanced task generation integration tests
+- `src/__tests__/ParsePRDTool.enhanced.test.ts` - Tool-level context generation tests
+
+#### **Test Coverage:**
+- **Traceability-based context generation** (default behavior)
+- **AI-enhanced context generation** (when AI is available)
+- **Graceful fallback** when AI services are unavailable
+- **Configuration validation** and environment variable handling
+- **Error handling** and resilience testing
+- **Integration testing** with existing task generation pipeline
+
+#### **Running Context Generation Tests:**
+```bash
+# Run all AI-related tests (includes context generation)
+npm run test:ai
+
+# Run specific context generation tests
+npm test -- --testPathPattern="TaskContextGeneration"
+npm test -- --testPathPattern="enhanced"
+
+# Run all tests
+npm test
+```
+
+#### **Test Scenarios Covered:**
+- ✅ Default traceability-based context (no AI required)
+- ✅ AI-enhanced business context generation
+- ✅ AI-enhanced technical context generation
+- ✅ Implementation guidance generation
+- ✅ Context merging and conflict resolution
+- ✅ Error handling and graceful degradation
+- ✅ Configuration validation and defaults
+- ✅ Tool-level parameter validation
+- ✅ Integration with existing traceability system
 
 ### Installing in AI Assistants
 

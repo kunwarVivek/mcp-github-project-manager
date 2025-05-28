@@ -1,10 +1,10 @@
 import { z } from 'zod';
-import { ToolDefinition, ToolSchema } from '../ToolValidator.js';
-import { TaskGenerationService } from '../../../services/TaskGenerationService.js';
-import { PRDGenerationService } from '../../../services/PRDGenerationService.js';
-import { RequirementsTraceabilityService } from '../../../services/RequirementsTraceabilityService.js';
-import { MCPResponse } from '../../../domain/mcp-types.js';
-import { ToolResultFormatter } from '../ToolResultFormatter.js';
+import { ToolDefinition, ToolSchema } from '../ToolValidator';
+import { TaskGenerationService } from '../../../services/TaskGenerationService';
+import { PRDGenerationService } from '../../../services/PRDGenerationService';
+import { RequirementsTraceabilityService } from '../../../services/RequirementsTraceabilityService';
+import { MCPResponse } from '../../../domain/mcp-types';
+import { ToolResultFormatter } from '../ToolResultFormatter';
 
 // Schema for parse_prd tool
 const parsePRDSchema = z.object({

@@ -1,12 +1,12 @@
-import { AITaskProcessor } from './ai/AITaskProcessor.js';
-import { 
-  PRDDocument, 
-  FeatureRequirement, 
+import { AITaskProcessor } from './ai/AITaskProcessor';
+import {
+  PRDDocument,
+  FeatureRequirement,
   UserPersona,
   ProjectScope,
   TechnicalRequirement,
   PRDDocumentSchema
-} from '../domain/ai-types.js';
+} from '../domain/ai-types';
 import { v4 as uuidv4 } from 'uuid';
 import { z } from 'zod';
 
@@ -79,8 +79,8 @@ export class PRDGenerationService {
     includeResearch?: boolean;
   }): Promise<PRDDocument> {
     try {
-      const currentPRDContent = typeof params.currentPRD === 'string' 
-        ? params.currentPRD 
+      const currentPRDContent = typeof params.currentPRD === 'string'
+        ? params.currentPRD
         : JSON.stringify(params.currentPRD, null, 2);
 
       const enhancedPRD = await this.aiProcessor.enhancePRD({
@@ -109,8 +109,8 @@ export class PRDGenerationService {
    */
   async extractFeaturesFromPRD(prd: PRDDocument | string): Promise<FeatureRequirement[]> {
     try {
-      const prdContent = typeof prd === 'string' 
-        ? prd 
+      const prdContent = typeof prd === 'string'
+        ? prd
         : JSON.stringify(prd, null, 2);
 
       const features = await this.aiProcessor.extractFeaturesFromPRD(prdContent);
@@ -139,7 +139,7 @@ export class PRDGenerationService {
     try {
       // Basic validation using schema
       const validationResult = PRDDocumentSchema.safeParse(prd);
-      
+
       if (!validationResult.success) {
         return {
           isComplete: false,

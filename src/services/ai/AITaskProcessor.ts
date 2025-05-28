@@ -1,6 +1,6 @@
 import { generateObject, generateText } from 'ai';
 import { z } from 'zod';
-import { AIServiceFactory } from './AIServiceFactory.js';
+import { AIServiceFactory } from './AIServiceFactory';
 import {
   PRDDocumentSchema,
   AITaskSchema,
@@ -11,15 +11,15 @@ import {
   TaskPriority,
   TaskStatus,
   AIGenerationMetadata
-} from '../../domain/ai-types.js';
+} from '../../domain/ai-types';
 import {
   PRD_PROMPT_CONFIGS,
   formatPrompt
-} from './prompts/PRDGenerationPrompts.js';
+} from './prompts/PRDGenerationPrompts';
 import {
   TASK_PROMPT_CONFIGS,
   formatTaskPrompt
-} from './prompts/TaskGenerationPrompts.js';
+} from './prompts/TaskGenerationPrompts';
 import { v4 as uuidv4 } from 'uuid';
 
 /**

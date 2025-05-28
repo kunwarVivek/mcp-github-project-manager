@@ -1,8 +1,8 @@
 import { z } from 'zod';
-import { ToolDefinition, ToolSchema } from '../ToolValidator.js';
-import { PRDGenerationService } from '../../../services/PRDGenerationService.js';
-import { MCPResponse } from '../../../domain/mcp-types.js';
-import { ToolResultFormatter } from '../ToolResultFormatter.js';
+import { ToolDefinition, ToolSchema } from '../ToolValidator';
+import { PRDGenerationService } from '../../../services/PRDGenerationService';
+import { MCPResponse } from '../../../domain/mcp-types';
+import { ToolResultFormatter } from '../ToolResultFormatter';
 
 // Schema for generate_prd tool
 const generatePRDSchema = z.object({
