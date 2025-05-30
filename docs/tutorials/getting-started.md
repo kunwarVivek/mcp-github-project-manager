@@ -108,7 +108,7 @@ async function createProject() {
     
     return result;
   } catch (error) {
-    console.error('Error creating project:', error);
+    process.stderr.write('Error creating project:', error);
   }
 }
 
@@ -166,7 +166,7 @@ async function planSprint() {
     
     return sprint;
   } catch (error) {
-    console.error('Error planning sprint:', error);
+    process.stderr.write('Error planning sprint:', error);
   }
 }
 
@@ -220,7 +220,7 @@ async function trackProgress() {
     
     return metrics;
   } catch (error) {
-    console.error('Error tracking progress:', error);
+    process.stderr.write('Error tracking progress:', error);
   }
 }
 

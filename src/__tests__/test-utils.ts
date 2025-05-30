@@ -91,6 +91,7 @@ export class TestFactory {
   static completeProject(data: CreateProject = this.createProject()): Project {
     return {
       id: `proj-${Date.now()}`,
+      type: ResourceType.PROJECT,
       title: data.title,
       description: data.shortDescription || "",
       owner: data.owner,

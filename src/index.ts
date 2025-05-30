@@ -610,18 +610,18 @@ class GitHubProjectManagerServer {
 
       // Display configuration information if verbose mode is enabled
       if (CLI_OPTIONS.verbose) {
-        console.error("GitHub Project Manager MCP server configuration:");
-        console.error(`- Owner: ${GITHUB_OWNER}`);
-        console.error(`- Repository: ${GITHUB_REPO}`);
-        console.error(`- Token: ${GITHUB_TOKEN.substring(0, 4)}...${GITHUB_TOKEN.substring(GITHUB_TOKEN.length - 4)}`);
-        console.error(`- Environment file: ${CLI_OPTIONS.envFile || '.env (default)'}`);
-        console.error(`- Sync enabled: ${SYNC_ENABLED}`);
-        console.error(`- Cache directory: ${CACHE_DIRECTORY}`);
-        console.error(`- Webhook port: ${WEBHOOK_PORT}`);
-        console.error(`- SSE enabled: ${SSE_ENABLED}`);
+        process.stderr.write("GitHub Project Manager MCP server configuration:\n");
+        process.stderr.write(`- Owner: ${GITHUB_OWNER}\n`);
+        process.stderr.write(`- Repository: ${GITHUB_REPO}\n`);
+        process.stderr.write(`- Token: ${GITHUB_TOKEN.substring(0, 4)}...${GITHUB_TOKEN.substring(GITHUB_TOKEN.length - 4)}\n`);
+        process.stderr.write(`- Environment file: ${CLI_OPTIONS.envFile || '.env (default)'}\n`);
+        process.stderr.write(`- Sync enabled: ${SYNC_ENABLED}\n`);
+        process.stderr.write(`- Cache directory: ${CACHE_DIRECTORY}\n`);
+        process.stderr.write(`- Webhook port: ${WEBHOOK_PORT}\n`);
+        process.stderr.write(`- SSE enabled: ${SSE_ENABLED}\n`);
       }
 
-      console.error("GitHub Project Manager MCP server running on stdio");
+      process.stderr.write("GitHub Project Manager MCP server running on stdio\n");
     } catch (error) {
       this.logger.error("Failed to start server:", error);
       throw error;
@@ -629,32 +629,35 @@ class GitHubProjectManagerServer {
   }
 }
 
+// Export the server class for testing
+export { GitHubProjectManagerServer };
+
 try {
   const server = new GitHubProjectManagerServer();
   server.run().catch((error) => {
-    console.error("Failed to start server:", error);
+    process.stderr.write(`Failed to start server: ${error}\n`);
     process.exit(1);
   });
 } catch (error) {
   if (error instanceof Error) {
-    console.error("Error initializing server:", error.message);
+    process.stderr.write(`Error initializing server: ${error.message}\n`);
 
     // Provide helpful instructions for common errors
     if (error.message.includes("GITHUB_TOKEN")) {
-      console.error("\nPlease provide a GitHub token using one of these methods:");
-      console.error("  - Set the GITHUB_TOKEN environment variable");
-      console.error("  - Use the --token command line argument");
-      console.error("\nExample: mcp-github-project-manager --token=your_token");
+      process.stderr.write("\nPlease provide a GitHub token using one of these methods:\n");
+      process.stderr.write("  - Set the GITHUB_TOKEN environment variable\n");
+      process.stderr.write("  - Use the --token command line argument\n");
+      process.stderr.write("\nExample: mcp-github-project-manager --token=your_token\n");
     } else if (error.message.includes("GITHUB_OWNER") || error.message.includes("GITHUB_REPO")) {
-      console.error("\nPlease provide the required GitHub repository information:");
-      console.error("  - Set the GITHUB_OWNER and GITHUB_REPO environment variables");
-      console.error("  - Use the --owner and --repo command line arguments");
-      console.error("\nExample: mcp-github-project-manager --owner=your_username --repo=your_repo");
+      process.stderr.write("\nPlease provide the required GitHub repository information:\n");
+      process.stderr.write("  - Set the GITHUB_OWNER and GITHUB_REPO environment variables\n");
+      process.stderr.write("  - Use the --owner and --repo command line arguments\n");
+      process.stderr.write("\nExample: mcp-github-project-manager --owner=your_username --repo=your_repo\n");
     }
 
-    console.error("\nFor more information, run: mcp-github-project-manager --help");
+    process.stderr.write("\nFor more information, run: mcp-github-project-manager --help\n");
   } else {
-    console.error("Unknown error:", error);
+    process.stderr.write(`Unknown error: ${error}\n`);
   }
   process.exit(1);
 }

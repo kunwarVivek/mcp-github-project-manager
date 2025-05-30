@@ -76,7 +76,7 @@ try {
   if (issues.length !== issueIds.length) {
     const foundIds = issues.map(issue => issue.id);
     const missingIds = issueIds.filter(id => !foundIds.includes(id));
-    console.error(`Issues not found: ${missingIds.join(', ')}`);
+    process.stderr.write(`Issues not found: ${missingIds.join(', ')}`);
     return;
   }
   
@@ -109,7 +109,7 @@ try {
   
   return sprint;
 } catch (error) {
-  console.error("Failed to plan sprint:", error);
+  process.stderr.write("Failed to plan sprint:", error);
   throw error;
 }
 ```

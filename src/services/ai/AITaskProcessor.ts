@@ -92,7 +92,7 @@ export class AITaskProcessor {
 
       return prd;
     } catch (error) {
-      console.error('Error generating PRD from idea:', error);
+      process.stderr.write(`Error generating PRD from idea: ${error instanceof Error ? error.message : String(error)}\n`);
       throw new Error(`Failed to generate PRD: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
@@ -131,7 +131,7 @@ export class AITaskProcessor {
 
       return prd;
     } catch (error) {
-      console.error('Error enhancing PRD:', error);
+      process.stderr.write(`Error enhancing PRD: ${error}\n`);
       throw new Error(`Failed to enhance PRD: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
@@ -162,7 +162,7 @@ export class AITaskProcessor {
         id: feature.id || uuidv4()
       }));
     } catch (error) {
-      console.error('Error extracting features from PRD:', error);
+      process.stderr.write(`Error extracting features from PRD: ${error instanceof Error ? error.message : String(error)}\n`);
       throw new Error(`Failed to extract features: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
@@ -210,7 +210,7 @@ export class AITaskProcessor {
         tags: task.tags || []
       }));
     } catch (error) {
-      console.error('Error generating tasks from PRD:', error);
+      process.stderr.write(`Error generating tasks from PRD: ${error}\n`);
       throw new Error(`Failed to generate tasks: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
@@ -265,7 +265,7 @@ export class AITaskProcessor {
         recommendations: [] // Would extract from structured response
       };
     } catch (error) {
-      console.error('Error analyzing task complexity:', error);
+      process.stderr.write(`Error analyzing task complexity: ${error instanceof Error ? error.message : String(error)}\n`);
       throw new Error(`Failed to analyze complexity: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
@@ -324,7 +324,7 @@ export class AITaskProcessor {
         }
       ];
     } catch (error) {
-      console.error('Error expanding task into subtasks:', error);
+      process.stderr.write(`Error expanding task into subtasks: ${error}\n`);
       throw new Error(`Failed to expand task: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
@@ -367,7 +367,7 @@ export class AITaskProcessor {
 
       return prioritizedTasks;
     } catch (error) {
-      console.error('Error prioritizing tasks:', error);
+      process.stderr.write(`Error prioritizing tasks: ${error}\n`);
       throw new Error(`Failed to prioritize tasks: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
@@ -414,7 +414,7 @@ export class AITaskProcessor {
       });
       return true;
     } catch (error) {
-      console.error('AI connection test failed:', error);
+      process.stderr.write(`AI connection test failed: ${error}\n`);
       return false;
     }
   }

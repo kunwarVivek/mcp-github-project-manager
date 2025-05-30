@@ -1,14 +1,15 @@
-import { Server, McpError, ErrorCode, McpContext } from "@modelcontextprotocol/sdk";
-import { createStdioTransport } from "@modelcontextprotocol/sdk/src/transports/stdio";
+import { Server } from "@modelcontextprotocol/sdk/server/index.js";
+import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { McpError, ErrorCode } from "@modelcontextprotocol/sdk/types.js";
+import { ToolRegistry } from "../../infrastructure/tools/ToolRegistry";
 import { ProjectManagementService } from "../../services/ProjectManagementService";
 import { ResourceStatus } from "../../domain/resource-types";
 import { TestFactory } from "../test-utils";
-import { ToolRegistry } from "../../infrastructure/mcp/ToolRegistry";
 import { GitHubProjectManagerServer } from "../../index";
 
 describe("MCP Server E2E Tests", () => {
-  let service: ProjectManagementService;
-  let toolRegistry: ToolRegistry;
+  let service: any;
+  let toolRegistry: any;
 
   beforeAll(() => {
     const token = process.env.GITHUB_TOKEN || "test-token";
@@ -22,22 +23,18 @@ describe("MCP Server E2E Tests", () => {
   describe("Tool Registration", () => {
     it("should have all required tools registered", () => {
       const tools = toolRegistry.getToolsForMCP();
-      
-      // Verify core tools are registered
-      expect(tools.find(t => t.name === "create_roadmap")).toBeDefined();
-      expect(tools.find(t => t.name === "plan_sprint")).toBeDefined();
-      expect(tools.find(t => t.name === "get_milestone_metrics")).toBeDefined();
-      expect(tools.find(t => t.name === "get_sprint_metrics")).toBeDefined();
-      expect(tools.find(t => t.name === "get_overdue_milestones")).toBeDefined();
-      expect(tools.find(t => t.name === "get_upcoming_milestones")).toBeDefined();
+      expect(tools.find((t: any) => t.name === "create_roadmap")).toBeDefined();
+      expect(tools.find((t: any) => t.name === "plan_sprint")).toBeDefined();
+      expect(tools.find((t: any) => t.name === "get_milestone_metrics")).toBeDefined();
+      expect(tools.find((t: any) => t.name === "get_sprint_metrics")).toBeDefined();
+      expect(tools.find((t: any) => t.name === "get_overdue_milestones")).toBeDefined();
+      expect(tools.find((t: any) => t.name === "get_upcoming_milestones")).toBeDefined();
     });
 
     it("should validate tool parameters", () => {
       const createRoadmapTool = toolRegistry.getTool("create_roadmap");
       expect(createRoadmapTool).toBeDefined();
-      
       if (createRoadmapTool) {
-        // Verify the tool has parameter validation
         expect(createRoadmapTool.schema).toBeDefined();
       }
     });
@@ -50,7 +47,7 @@ describe("MCP Server E2E Tests", () => {
       const mcpError = convertToMcpError(notFoundError);
       
       expect(mcpError).toBeInstanceOf(McpError);
-      expect(mcpError.code).toBe(ErrorCode.NotFound);
+      expect(mcpError.code).toBe(ErrorCode.MethodNotFound);
       
       // Test validation error conversion
       const validationError = new Error("Invalid input parameter");
@@ -72,7 +69,7 @@ describe("MCP Server E2E Tests", () => {
         
         // Verify conversion
         expect(mcpError).toBeInstanceOf(McpError);
-        expect(mcpError.code).toBe(ErrorCode.TooManyRequests);
+        expect(mcpError.code).toBe(ErrorCode.ParseError);
       } catch (error) {
         fail("Should have converted the rate limit error to an MCP error");
       }
@@ -113,23 +110,23 @@ describe("MCP Server E2E Tests", () => {
 });
 
 // Helper functions that would typically be in your actual codebase
-function convertToMcpError(error: Error): McpError {
+function convertToMcpError(error: Error): InstanceType<typeof McpError> {
   if (error instanceof McpError) {
     return error;
   }
   
   // Rate limit error
   if (error.name === "HttpError" && (error as any).status === 403) {
-    return new McpError(ErrorCode.TooManyRequests, "GitHub API rate limit exceeded");
+    return new McpError(ErrorCode.ParseError, "GitHub API rate limit exceeded");
   }
   
   // Not found error
   if (error.message.includes("not found")) {
-    return new McpError(ErrorCode.NotFound, error.message);
+    return new McpError(ErrorCode.MethodNotFound, error.message);
   }
   
   // Validation error
-  if (error.message.includes("invalid") || error.message.includes("validation")) {
+  if (error.message.toLowerCase().includes("invalid") || error.message.toLowerCase().includes("validation")) {
     return new McpError(ErrorCode.InvalidParams, error.message);
   }
   
@@ -151,7 +148,7 @@ function formatErrorResponse(operation: string, error: Error) {
   return {
     error: {
       message: error.message,
-      code: error instanceof McpError ? error.code : ErrorCode.InternalError,
+      code: (error as any).code || ErrorCode.InternalError,
       operation
     }
   };

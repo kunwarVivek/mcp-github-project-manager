@@ -83,7 +83,7 @@ export class ToolResultFormatter {
           return `## ${formattedKey}\n${value.map(item => `- ${JSON.stringify(item)}`).join('\n')}`;
         } else if (value && typeof value === 'object') {
           // Format objects with nested details
-          return `## ${formattedKey}\n\`\`\`json\n${JSON.stringify(value, null, 2)}\n\`\`\``;
+          return `## ${formattedKey}\n\`\`\`json\n${JSON.stringify(value)}\n\`\`\``;
         } else {
           return `## ${formattedKey}\n${value}`;
         }
@@ -95,7 +95,7 @@ export class ToolResultFormatter {
 
     // Include raw JSON data if requested
     if (options.includeRawData) {
-      markdown += '\n\n## Raw Data\n\n```json\n' + JSON.stringify(result, null, 2) + '\n```';
+      markdown += '\n\n## Raw Data\n\n```json\n' + JSON.stringify(result) + '\n```';
     }
 
     // Create MCP response with markdown content
@@ -218,7 +218,7 @@ export class ToolResultFormatter {
     if (typeof result === 'string') {
       text += result;
     } else {
-      text += JSON.stringify(result, null, 2);
+      text += JSON.stringify(result);
     }
 
     return MCPResponseFormatter.format(

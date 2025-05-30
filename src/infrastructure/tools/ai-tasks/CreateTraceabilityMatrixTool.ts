@@ -106,7 +106,7 @@ async function executeCreateTraceabilityMatrix(args: CreateTraceabilityMatrixArg
     });
 
   } catch (error) {
-    console.error('Error in create_traceability_matrix tool:', error);
+    process.stderr.write(`Error in create_traceability_matrix tool: ${error}\n`);
     return ToolResultFormatter.formatSuccess('create_traceability_matrix', {
       error: `Failed to create traceability matrix: ${error instanceof Error ? error.message : 'Unknown error'}`,
       success: false

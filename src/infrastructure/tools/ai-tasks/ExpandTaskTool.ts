@@ -87,7 +87,7 @@ async function executeExpandTask(args: ExpandTaskArgs): Promise<MCPResponse> {
     });
 
   } catch (error) {
-    console.error('Error in expand_task tool:', error);
+    process.stderr.write(`Error in expand_task tool: ${error}\n`);
     return ToolResultFormatter.formatSuccess('expand_task', {
       error: `Failed to expand task: ${error instanceof Error ? error.message : 'Unknown error'}`,
       success: false

@@ -54,7 +54,7 @@ async function executeAddFeature(args: AddFeatureArgs): Promise<MCPResponse> {
     });
 
   } catch (error) {
-    console.error('Error in add_feature tool:', error);
+    process.stderr.write(`Error in add_feature tool: ${error}\n`);
     return ToolResultFormatter.formatSuccess('add_feature', {
       error: `Failed to add feature: ${error instanceof Error ? error.message : 'Unknown error'}`,
       success: false

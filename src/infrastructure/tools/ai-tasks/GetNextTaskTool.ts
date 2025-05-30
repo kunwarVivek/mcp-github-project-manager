@@ -118,7 +118,7 @@ async function executeGetNextTask(args: GetNextTaskArgs): Promise<MCPResponse> {
     });
 
   } catch (error) {
-    console.error('Error in get_next_task tool:', error);
+    process.stderr.write(`Error in get_next_task tool: ${error}\n`);
     return ToolResultFormatter.formatSuccess('get_next_task', {
       error: `Failed to get task recommendations: ${error instanceof Error ? error.message : 'Unknown error'}`,
       success: false

@@ -108,6 +108,7 @@ export class GitHubProjectRepository extends BaseGitHubRepository implements Pro
 
     return {
       id: project.id,
+      type: ResourceType.PROJECT,
       title: project.title,
       description: project.shortDescription || "",
       owner: this.owner,
@@ -151,6 +152,7 @@ export class GitHubProjectRepository extends BaseGitHubRepository implements Pro
 
     return {
       id: project.id,
+      type: ResourceType.PROJECT,
       title: project.title,
       description: project.shortDescription || "",
       owner: this.owner,
@@ -206,6 +208,7 @@ export class GitHubProjectRepository extends BaseGitHubRepository implements Pro
     const project = response.node;
     return {
       id: project.id,
+      type: ResourceType.PROJECT,
       title: project.title,
       description: project.shortDescription || "",
       owner: this.owner,
@@ -246,6 +249,7 @@ export class GitHubProjectRepository extends BaseGitHubRepository implements Pro
 
     return response.repository.projectsV2.nodes.map((project: GitHubProject) => ({
       id: project.id,
+      type: ResourceType.PROJECT,
       title: project.title,
       description: project.shortDescription || "",
       owner: this.owner,
@@ -300,6 +304,7 @@ export class GitHubProjectRepository extends BaseGitHubRepository implements Pro
       
       const projects = [...userProjects, ...orgProjects].map((project: GitHubProject) => ({
         id: project.id,
+        type: ResourceType.PROJECT,
         title: project.title,
         description: project.shortDescription || "",
         owner: owner,

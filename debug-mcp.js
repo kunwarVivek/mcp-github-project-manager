@@ -48,7 +48,7 @@ async function testMCPCommunication() {
   });
 
   serverProcess.on('error', (error) => {
-    console.error('Process error:', error);
+    process.stderr.write('Process error:', error);
   });
 
   serverProcess.on('exit', (code, signal) => {
@@ -90,4 +90,4 @@ async function testMCPCommunication() {
   serverProcess.kill('SIGTERM');
 }
 
-testMCPCommunication().catch(console.error);
+testMCPCommunication().catch(process.stderr.write);

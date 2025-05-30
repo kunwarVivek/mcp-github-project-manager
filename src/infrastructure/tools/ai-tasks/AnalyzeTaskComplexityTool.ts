@@ -78,7 +78,7 @@ async function executeAnalyzeTaskComplexity(args: AnalyzeTaskComplexityArgs): Pr
     });
 
   } catch (error) {
-    console.error('Error in analyze_task_complexity tool:', error);
+    process.stderr.write(`Error in analyze_task_complexity tool: ${error}\n`);
     return ToolResultFormatter.formatSuccess('analyze_task_complexity', {
       error: `Failed to analyze task complexity: ${error instanceof Error ? error.message : 'Unknown error'}`,
       success: false

@@ -25,7 +25,7 @@ dotenv.config();
 const requiredEnvVars = ['GITHUB_TOKEN', 'GITHUB_OWNER', 'GITHUB_REPO'];
 for (const envVar of requiredEnvVars) {
   if (!process.env[envVar]) {
-    console.error(`Error: ${envVar} environment variable is required`);
+    process.stderr.write(`Error: ${envVar} environment variable is required`);
     process.exit(1);
   }
 }
@@ -90,12 +90,12 @@ async function trackSprintProgress() {
     
     return metrics;
   } catch (error) {
-    console.error('Error tracking sprint progress:');
+    process.stderr.write('Error tracking sprint progress:');
     if (error instanceof Error) {
-      console.error(`${error.name}: ${error.message}`);
-      console.error(error.stack);
+      process.stderr.write(`${error.name}: ${error.message}`);
+      process.stderr.write(error.stack);
     } else {
-      console.error(error);
+      process.stderr.write(error);
     }
     process.exit(1);
   }

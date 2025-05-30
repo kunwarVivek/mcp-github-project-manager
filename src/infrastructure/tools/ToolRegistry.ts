@@ -223,8 +223,8 @@ export class ToolRegistry {
 
         // Extract properties and required fields
         for (const [key, zodType] of Object.entries(shape)) {
-          // Check if the type has an isOptional method before calling it
-          if (typeof (zodType as any).isOptional === 'function' && !(zodType as any).isOptional()) {
+          // Check if the field is required (not optional)
+          if ((zodType as any)._def.typeName !== "ZodOptional") {
             jsonSchema.required.push(key as string);
           }
 
@@ -235,7 +235,7 @@ export class ToolRegistry {
 
       return jsonSchema;
     } catch (error) {
-      console.error("Error converting Zod schema to JSON Schema:", error);
+      process.stderr.write(`Error converting Zod schema to JSON Schema: ${error instanceof Error ? error.message : String(error)}\n`);
       // Fallback to basic object schema
       return {
         type: "object",
@@ -249,6 +249,11 @@ export class ToolRegistry {
    */
   private zodTypeToJsonSchemaType(zodType: any): any {
     try {
+      // Handle optional types first
+      if (zodType._def.typeName === "ZodOptional") {
+        return this.zodTypeToJsonSchemaType(zodType._def.innerType);
+      }
+
       // String type
       if (zodType._def.typeName === "ZodString") {
         return { type: "string" };
@@ -281,8 +286,8 @@ export class ToolRegistry {
         for (const [key, fieldType] of Object.entries(shape)) {
           properties[key as string] = this.zodTypeToJsonSchemaType(fieldType);
 
-          // Check if the type has an isOptional method before calling it
-          if (typeof (fieldType as any).isOptional === 'function' && !(fieldType as any).isOptional()) {
+          // Check if the field is required (not optional)
+          if ((fieldType as any)._def.typeName !== "ZodOptional") {
             required.push(key as string);
           }
         }
@@ -304,7 +309,7 @@ export class ToolRegistry {
       // Default fallback
       return { type: "string" };
     } catch (error) {
-      console.error("Error mapping Zod type:", error);
+      process.stderr.write(`Error mapping Zod type: ${error instanceof Error ? error.message : String(error)}\n`);
       return { type: "string" };
     }
   }

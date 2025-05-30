@@ -52,7 +52,7 @@ export class GitHubApiUtil {
         return this.getDefaultRateLimitInfo();
       }
     } catch (error) {
-      console.error("Failed to get rate limit info:", error);
+      process.stderr.write(`Failed to get rate limit info: ${error instanceof Error ? error.message : String(error)}\n`);
       // Return default values if we can't get rate limit info
       return this.getDefaultRateLimitInfo();
     }

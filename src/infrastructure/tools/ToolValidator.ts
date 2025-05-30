@@ -52,7 +52,8 @@ export class ToolValidator {
    * Transform MCP SDK errors to our custom error format
    */
   static handleToolError(error: unknown, toolName: string): ReturnType<typeof MCPResponseFormatter.error> {
-    console.error(`[${toolName}] Error:`, error);
+    // Use stderr to avoid interfering with MCP protocol on stdout
+    process.stderr.write(`[${toolName}] Error: ${error}\n`);
     
     // Handle MCP SDK errors
     if (error instanceof McpError) {

@@ -48,14 +48,14 @@ export const planSprintSchema = z.object({
     endDate: z.string().datetime("End date must be a valid ISO date string"),
     goals: z.array(z.string()),
   }),
-  issueIds: z.array(z.number().int().positive("Issue IDs must be positive integers")),
+  issueIds: z.array(z.string()),
 });
 
 export type PlanSprintArgs = z.infer<typeof planSprintSchema>;
 
 // Schema for get_milestone_metrics tool
 export const getMilestoneMetricsSchema = z.object({
-  milestoneId: z.number().int().positive("Milestone ID must be a positive integer"),
+  milestoneId: z.string().min(1, "Milestone ID is required"),
   includeIssues: z.boolean(),
 });
 
@@ -133,7 +133,7 @@ export type ListMilestonesArgs = z.infer<typeof listMilestonesSchema>;
 export const createIssueSchema = z.object({
   title: z.string().min(1, "Issue title is required"),
   description: z.string().min(1, "Issue description is required"),
-  milestoneId: z.number().int().positive().optional(),
+  milestoneId: z.string().optional(),
   assignees: z.array(z.string()).default([]),
   labels: z.array(z.string()).default([]),
   priority: z.enum(["high", "medium", "low"]).default("medium").optional(),
@@ -145,7 +145,7 @@ export type CreateIssueArgs = z.infer<typeof createIssueSchema>;
 // Schema for list_issues tool
 export const listIssuesSchema = z.object({
   status: z.enum(["open", "closed", "all"]).default("open"),
-  milestone: z.number().int().positive().optional(),
+  milestone: z.string().optional(),
   labels: z.array(z.string()).optional(),
   assignee: z.string().optional(),
   sort: z.enum(["created", "updated", "comments"]).default("created").optional(),
@@ -157,18 +157,18 @@ export type ListIssuesArgs = z.infer<typeof listIssuesSchema>;
 
 // Schema for get_issue tool
 export const getIssueSchema = z.object({
-  issueId: z.number().int().positive("Issue ID must be a positive integer"),
+  issueId: z.string().min(1, "Issue ID is required"),
 });
 
 export type GetIssueArgs = z.infer<typeof getIssueSchema>;
 
 // Schema for update_issue tool
 export const updateIssueSchema = z.object({
-  issueId: z.number().int().positive("Issue ID must be a positive integer"),
+  issueId: z.string().min(1, "Issue ID is required"),
   title: z.string().optional(),
   description: z.string().optional(),
   status: z.enum(["open", "closed"]).optional(),
-  milestoneId: z.number().int().positive().optional().nullable(),
+  milestoneId: z.string().optional().nullable(),
   assignees: z.array(z.string()).optional(),
   labels: z.array(z.string()).optional(),
 });
@@ -181,7 +181,7 @@ export const createSprintSchema = z.object({
   description: z.string().min(1, "Sprint description is required"),
   startDate: z.string().datetime("Start date must be a valid ISO date string"),
   endDate: z.string().datetime("End date must be a valid ISO date string"),
-  issueIds: z.array(z.number().int().positive()).default([]),
+  issueIds: z.array(z.string()).default([]),
 });
 
 export type CreateSprintArgs = z.infer<typeof createSprintSchema>;
@@ -353,7 +353,7 @@ export const listIssuesTool: ToolDefinition<ListIssuesArgs> = {
       description: "List open issues assigned to a specific milestone",
       args: {
         status: "open",
-        milestone: 1,
+        milestone: "1",
         sort: "updated",
         direction: "desc",
         limit: 10
@@ -371,7 +371,7 @@ export const getIssueTool: ToolDefinition<GetIssueArgs> = {
       name: "Get issue details",
       description: "Get detailed information about an issue",
       args: {
-        issueId: 42
+        issueId: "42"
       }
     }
   ]
@@ -386,9 +386,9 @@ export const updateIssueTool: ToolDefinition<UpdateIssueArgs> = {
       name: "Update issue status and milestone",
       description: "Close an issue and assign it to a milestone",
       args: {
-        issueId: 42,
+        issueId: "42",
         status: "closed",
-        milestoneId: 3
+        milestoneId: "3"
       }
     }
   ]
@@ -408,7 +408,7 @@ export const createSprintTool: ToolDefinition<CreateSprintArgs> = {
         description: "First sprint focused on user authentication features",
         startDate: "2025-06-01T00:00:00Z",
         endDate: "2025-06-15T00:00:00Z",
-        issueIds: [101, 102, 103]
+        issueIds: ["101", "102", "103"]
       }
     }
   ]
@@ -569,7 +569,7 @@ export const planSprintTool: ToolDefinition<PlanSprintArgs> = {
             "Implement onboarding screens",
           ],
         },
-        issueIds: [1, 2, 3, 5],
+        issueIds: ["1", "2", "3", "5"],
       },
     },
   ],
@@ -584,7 +584,7 @@ export const getMilestoneMetricsTool: ToolDefinition<GetMilestoneMetricsArgs> = 
       name: "Get milestone progress",
       description: "Get progress metrics for milestone #2",
       args: {
-        milestoneId: 2,
+        milestoneId: "2",
         includeIssues: true,
       },
     },
@@ -747,7 +747,7 @@ export type UpdateProjectViewArgs = z.infer<typeof updateProjectViewSchema>;
 
 // Schema for update_milestone tool
 export const updateMilestoneSchema = z.object({
-  milestoneId: z.number().int().positive("Milestone ID must be a positive integer"),
+  milestoneId: z.string().min(1, "Milestone ID is required"),
   title: z.string().optional(),
   description: z.string().optional(),
   dueDate: z.string().datetime().optional().nullable(),
@@ -758,7 +758,7 @@ export type UpdateMilestoneArgs = z.infer<typeof updateMilestoneSchema>;
 
 // Schema for delete_milestone tool
 export const deleteMilestoneSchema = z.object({
-  milestoneId: z.number().int().positive("Milestone ID must be a positive integer"),
+  milestoneId: z.string().min(1, "Milestone ID is required"),
 });
 
 export type DeleteMilestoneArgs = z.infer<typeof deleteMilestoneSchema>;
@@ -778,7 +778,7 @@ export type UpdateSprintArgs = z.infer<typeof updateSprintSchema>;
 // Schema for add_issues_to_sprint tool
 export const addIssuesToSprintSchema = z.object({
   sprintId: z.string().min(1, "Sprint ID is required"),
-  issueIds: z.array(z.number().int().positive()).min(1, "At least one issue ID is required"),
+  issueIds: z.array(z.string()).min(1, "At least one issue ID is required"),
 });
 
 export type AddIssuesToSprintArgs = z.infer<typeof addIssuesToSprintSchema>;
@@ -786,7 +786,7 @@ export type AddIssuesToSprintArgs = z.infer<typeof addIssuesToSprintSchema>;
 // Schema for remove_issues_from_sprint tool
 export const removeIssuesFromSprintSchema = z.object({
   sprintId: z.string().min(1, "Sprint ID is required"),
-  issueIds: z.array(z.number().int().positive()).min(1, "At least one issue ID is required"),
+  issueIds: z.array(z.string()).min(1, "At least one issue ID is required"),
 });
 
 export type RemoveIssuesFromSprintArgs = z.infer<typeof removeIssuesFromSprintSchema>;
@@ -1147,7 +1147,7 @@ export const updateMilestoneTool: ToolDefinition<UpdateMilestoneArgs> = {
       name: "Update milestone due date",
       description: "Change a milestone's title and due date",
       args: {
-        milestoneId: 42,
+        milestoneId: "42",
         title: "Updated Release",
         dueDate: "2025-08-15T00:00:00Z"
       }
@@ -1156,7 +1156,7 @@ export const updateMilestoneTool: ToolDefinition<UpdateMilestoneArgs> = {
       name: "Close milestone",
       description: "Mark a milestone as closed",
       args: {
-        milestoneId: 42,
+        milestoneId: "42",
         state: "closed"
       }
     }
@@ -1172,7 +1172,7 @@ export const deleteMilestoneTool: ToolDefinition<DeleteMilestoneArgs> = {
       name: "Delete milestone",
       description: "Delete a milestone by ID",
       args: {
-        milestoneId: 42
+        milestoneId: "42"
       }
     }
   ]
@@ -1206,7 +1206,7 @@ export const addIssuesToSprintTool: ToolDefinition<AddIssuesToSprintArgs> = {
       description: "Add multiple issues to an existing sprint",
       args: {
         sprintId: "sprint_1",
-        issueIds: [123, 124, 125]
+        issueIds: ["123", "124", "125"]
       }
     }
   ]
@@ -1222,7 +1222,7 @@ export const removeIssuesFromSprintTool: ToolDefinition<RemoveIssuesFromSprintAr
       description: "Remove issues that are no longer in scope for the sprint",
       args: {
         sprintId: "sprint_1",
-        issueIds: [124, 125]
+        issueIds: ["124", "125"]
       }
     }
   ]

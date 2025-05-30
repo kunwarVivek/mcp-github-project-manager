@@ -29,8 +29,8 @@ export class ResourceRelationshipManager {
       type: ResourceType.RELATIONSHIP, // Using the RELATIONSHIP ResourceType
       version: 1,
       status: ResourceStatus.ACTIVE,
-      createdAt: now, // Use actual Date object instead of string
-      updatedAt: now, // Use actual Date object instead of string
+      createdAt: now.toISOString(), // Convert Date to string
+      updatedAt: now.toISOString(), // Convert Date to string
       sourceId,
       sourceType,
       targetId,

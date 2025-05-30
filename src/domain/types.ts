@@ -47,6 +47,9 @@ export interface CreateIssue {
   assignees?: string[];
   labels?: string[];
   milestoneId?: MilestoneId;
+  status?: ResourceStatus;
+  priority?: string;
+  issueType?: string;
 }
 
 export interface IssueRepository {
@@ -80,6 +83,8 @@ export interface CreateMilestone {
   title: string;
   description: string;
   dueDate?: string;
+  status?: ResourceStatus;
+  goals?: string[];
 }
 
 export interface MilestoneRepository {
@@ -111,6 +116,7 @@ export interface CreateSprint {
   endDate: string;
   status?: ResourceStatus;
   issues?: IssueId[];
+  goals?: string[];
 }
 
 export interface SprintRepository {
@@ -213,6 +219,7 @@ export interface ProjectItem {
 // Project interface
 export interface Project {
   id: ProjectId;
+  type: ResourceType;
   title: string;
   description: string;
   owner: string;
@@ -231,12 +238,15 @@ export interface Project {
 export interface CreateProject {
   title: string;
   shortDescription?: string; // Made optional since it's handled via update after creation
+  description?: string;
   owner: string;
   visibility?: 'private' | 'public';
   views?: ProjectView[];
   fields?: CustomField[];
   teamId?: string; // Add support for team association (GitHub schema optional field)
   clientMutationId?: string; // Add support for mutation tracking (GitHub schema optional field)
+  status?: ResourceStatus;
+  goals?: string[];
 }
 
 // Project repository interface

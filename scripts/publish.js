@@ -18,7 +18,7 @@ async function runPublish() {
     try {
       execSync('git diff-index --quiet HEAD --');
     } catch (error) {
-      console.error('❌ You have uncommitted changes. Please commit or stash them before publishing.');
+      process.stderr.write('❌ You have uncommitted changes. Please commit or stash them before publishing.');
       process.exit(1);
     }
 
@@ -36,7 +36,7 @@ async function runPublish() {
     const versionType = await prompt(`Select version type (patch/minor/major): `);
     
     if (!versionTypes.includes(versionType)) {
-      console.error('❌ Invalid version type. Must be patch, minor, or major');
+      process.stderr.write('❌ Invalid version type. Must be patch, minor, or major');
       process.exit(1);
     }
     
@@ -73,7 +73,7 @@ async function runPublish() {
     
     console.log(`✅ Successfully published version ${newVersion}!`);
   } catch (error) {
-    console.error('❌ Error during publishing:', error.message);
+    process.stderr.write('❌ Error during publishing:', error.message);
     process.exit(1);
   } finally {
     rl.close();

@@ -65,7 +65,7 @@ export class TaskContextGenerationService {
       return this.mergeContexts(traceabilityContext, aiEnhancedContext);
 
     } catch (error) {
-      console.error('Error generating task context:', error);
+      process.stderr.write(`Error generating task context: ${error instanceof Error ? error.message : String(error)}\n`);
       // Fallback to basic traceability context
       return this.generateTraceabilityContext(task, prd);
     }
@@ -110,7 +110,7 @@ export class TaskContextGenerationService {
         }
       };
     } catch (error) {
-      console.error('Error generating traceability context:', error);
+      process.stderr.write(`Error generating traceability context: ${error instanceof Error ? error.message : String(error)}\n`);
       return this.getMinimalContext(task);
     }
   }
@@ -149,7 +149,7 @@ export class TaskContextGenerationService {
 
       return enhancedContext;
     } catch (error) {
-      console.error('Error generating AI-enhanced context:', error);
+      process.stderr.write(`Error generating AI-enhanced context: ${error instanceof Error ? error.message : String(error)}\n`);
       return {};
     }
   }
@@ -181,7 +181,7 @@ export class TaskContextGenerationService {
 
       return result.object;
     } catch (error) {
-      console.error('Error generating business context:', error);
+      process.stderr.write(`Error generating business context: ${error instanceof Error ? error.message : String(error)}\n`);
       return null;
     }
   }
@@ -213,7 +213,7 @@ export class TaskContextGenerationService {
 
       return result.object;
     } catch (error) {
-      console.error('Error generating technical context:', error);
+      process.stderr.write(`Error generating technical context: ${error instanceof Error ? error.message : String(error)}\n`);
       return null;
     }
   }
@@ -251,7 +251,7 @@ export class TaskContextGenerationService {
 
       return this.transformImplementationGuidance(result.object);
     } catch (error) {
-      console.error('Error generating implementation guidance:', error);
+      process.stderr.write(`Error generating implementation guidance: ${error instanceof Error ? error.message : String(error)}\n`);
       return null;
     }
   }

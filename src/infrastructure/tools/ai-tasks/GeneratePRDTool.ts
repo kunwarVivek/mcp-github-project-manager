@@ -52,7 +52,7 @@ async function executeGeneratePRD(args: GeneratePRDArgs): Promise<MCPResponse> {
     });
 
   } catch (error) {
-    console.error('Error in generate_prd tool:', error);
+    process.stderr.write(`Error in generate_prd tool: ${error}\n`);
 
     // Check if this is an AI availability error
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';

@@ -15,6 +15,7 @@ export const mockToken = "test-token";
 
 export const mockProject: Project = {
   id: "test-project-id",
+  type: ResourceType.PROJECT,
   title: "Test Project",
   description: "Test Description",
   owner: "test-owner",

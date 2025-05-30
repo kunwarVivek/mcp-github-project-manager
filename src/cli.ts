@@ -13,7 +13,7 @@ try {
   }
 } catch (error) {
   // Fallback to default version if there's an error
-  console.error('Warning: Could not read version from package.json');
+  process.stderr.write('Warning: Could not read version from package.json');
 }
 
 export interface CliOptions {

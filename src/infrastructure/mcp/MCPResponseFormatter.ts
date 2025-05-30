@@ -192,7 +192,7 @@ export class MCPResponseFormatter {
       requestId: requestId,
       status: "success",
       output: {
-        content: JSON.stringify(update, null, 2),
+        content: JSON.stringify(update),
         format: {
           type: "json"
         },
@@ -286,7 +286,8 @@ export class MCPResponseFormatter {
   private static formatContent(data: unknown, contentType: MCPContentType): string {
     switch (contentType) {
       case MCPContentType.JSON:
-        return JSON.stringify(data, null, 2);
+        // Use compact JSON for MCP protocol compliance (single line)
+        return JSON.stringify(data);
 
       case MCPContentType.TEXT:
         return String(data);

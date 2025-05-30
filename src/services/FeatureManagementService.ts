@@ -101,7 +101,7 @@ export class FeatureManagementService {
         dependencies: this.extractDependencies(analysis)
       };
     } catch (error) {
-      console.error('Error analyzing feature request:', error);
+      process.stderr.write(`Error analyzing feature request: ${error instanceof Error ? error.message : String(error)}\n`);
       throw new Error(`Failed to analyze feature request: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
@@ -173,7 +173,7 @@ export class FeatureManagementService {
         impactAssessment
       };
     } catch (error) {
-      console.error('Error adding feature to PRD:', error);
+      process.stderr.write(`Error adding feature to PRD: ${error instanceof Error ? error.message : String(error)}\n`);
       throw new Error(`Failed to add feature to PRD: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
@@ -243,7 +243,7 @@ export class FeatureManagementService {
         riskAssessment
       };
     } catch (error) {
-      console.error('Error expanding feature to tasks:', error);
+      process.stderr.write(`Error expanding feature to tasks: ${error instanceof Error ? error.message : String(error)}\n`);
       throw new Error(`Failed to expand feature to tasks: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
@@ -345,7 +345,7 @@ export class FeatureManagementService {
         roadmapUpdate
       };
     } catch (error) {
-      console.error('Error creating complete feature lifecycle:', error);
+      process.stderr.write(`Error creating complete feature lifecycle: ${error instanceof Error ? error.message : String(error)}\n`);
       throw new Error(`Failed to create feature lifecycle: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
@@ -403,7 +403,7 @@ export class FeatureManagementService {
 
       return updatedState;
     } catch (error) {
-      console.error('Error updating task lifecycle:', error);
+      process.stderr.write(`Error updating task lifecycle: ${error instanceof Error ? error.message : String(error)}\n`);
       throw new Error(`Failed to update task lifecycle: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
@@ -451,7 +451,7 @@ export class FeatureManagementService {
         estimatedCompletion: this.calculateEstimatedCompletion(taskLifecycle)
       };
     } catch (error) {
-      console.error('Error getting next task actions:', error);
+      process.stderr.write(`Error getting next task actions: ${error instanceof Error ? error.message : String(error)}\n`);
       throw new Error(`Failed to get next actions: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }

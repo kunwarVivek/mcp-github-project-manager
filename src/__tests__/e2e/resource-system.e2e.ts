@@ -1,9 +1,12 @@
+// Unmock ResourceCache for E2E tests
+jest.unmock("../../infrastructure/cache/ResourceCache");
+
 import { ResourceManager } from "../../infrastructure/resource/ResourceManager";
 import { ResourceCache } from "../../infrastructure/cache/ResourceCache";
-import { Project, CreateProject } from "../../domain/types";
-import { 
-  ResourceStatus, 
-  ResourceType, 
+import { BaseProjectResource } from "../../domain/project-types";
+import {
+  ResourceStatus,
+  ResourceType,
   ResourceEvent,
   ResourceEventType,
   ResourceNotFoundError,
@@ -17,7 +20,7 @@ describe("Resource System", () => {
   let manager: ResourceManager;
   let cache: ResourceCache;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     cache = new ResourceCache();
     manager = new ResourceManager(cache);
   });
@@ -27,13 +30,10 @@ describe("Resource System", () => {
       const projectData = {
         title: "Test Project",
         description: "Test Description",
-        status: ResourceStatus.ACTIVE,
-        visibility: "private" as const,
-        views: [],
-        fields: []
+        status: ResourceStatus.ACTIVE
       };
 
-      const created = await manager.create<Project>(
+      const created = await manager.create<BaseProjectResource>(
         ResourceType.PROJECT,
         projectData
       );
@@ -49,17 +49,17 @@ describe("Resource System", () => {
       const projectData = {
         title: "Test Project",
         description: "Test Description",
-        status: ResourceStatus.ACTIVE,
-        visibility: "private" as const,
-        views: [],
-        fields: []
+        status: ResourceStatus.ACTIVE
       };
 
-      const created = await manager.create<Project>(
+      const created = await manager.create<BaseProjectResource>(
         ResourceType.PROJECT,
         projectData
       );
-      const cached = await manager.get<Project>(ResourceType.PROJECT, created.id);
+
+
+
+      const cached = await manager.get<BaseProjectResource>(ResourceType.PROJECT, created.id);
 
       expect(cached).toBeDefined();
       expect(cached.id).toBe(created.id);
@@ -67,15 +67,12 @@ describe("Resource System", () => {
     });
 
     it("should update a resource with version check", async () => {
-      const project = await manager.create<Project>(
+      const project = await manager.create<BaseProjectResource>(
         ResourceType.PROJECT,
         {
           title: "Original Title",
           description: "Test Description",
-          status: ResourceStatus.ACTIVE,
-          visibility: "private" as const,
-          views: [],
-          fields: []
+          status: ResourceStatus.ACTIVE
         }
       );
 
@@ -83,7 +80,7 @@ describe("Resource System", () => {
         title: "Updated Title",
       };
 
-      const updateResponse = await manager.update<Project>(
+      const updateResponse = await manager.update<BaseProjectResource>(
         ResourceType.PROJECT,
         project.id,
         updateData,
@@ -96,31 +93,28 @@ describe("Resource System", () => {
       );
 
       expect(updateResponse.title).toBe("Updated Title");
-      expect(updateResponse.version).toBe(project.version + 1);
+      expect(updateResponse.version).toBe((project.version || 0) + 1);
     });
 
     it("should handle version conflicts", async () => {
-      const project = await manager.create<Project>(
+      const project = await manager.create<BaseProjectResource>(
         ResourceType.PROJECT,
         {
           title: "Test Project",
           description: "Test Description",
-          status: ResourceStatus.ACTIVE,
-          visibility: "private" as const,
-          views: [],
-          fields: []
+          status: ResourceStatus.ACTIVE
         }
       );
 
       await expect(
-        manager.update<Project>(
+        manager.update<BaseProjectResource>(
           ResourceType.PROJECT,
           project.id,
           { title: "Updated Title" },
           {
             updateOptions: {
               optimisticLock: true,
-              expectedVersion: project.version + 1
+              expectedVersion: (project.version || 0) + 1
             }
           }
         )
@@ -130,45 +124,38 @@ describe("Resource System", () => {
 
   describe("Resource Status Management", () => {
     it("should archive and restore resources", async () => {
-      const project = await manager.create<Project>(
+      const project = await manager.create<BaseProjectResource>(
         ResourceType.PROJECT,
         {
           title: "Test Project",
           description: "Test Description",
-          status: ResourceStatus.ACTIVE,
-          visibility: "private" as const,
-          views: [],
-          fields: []
+          status: ResourceStatus.ACTIVE
         }
       );
 
       await manager.archive(ResourceType.PROJECT, project.id);
-      const archivedProject = await manager.get<Project>(ResourceType.PROJECT, project.id);
+      const archivedProject = await manager.get<BaseProjectResource>(ResourceType.PROJECT, project.id);
       expect(archivedProject.status).toBe(ResourceStatus.ARCHIVED);
 
       await manager.restore(ResourceType.PROJECT, project.id);
-      const restoredProject = await manager.get<Project>(ResourceType.PROJECT, project.id);
+      const restoredProject = await manager.get<BaseProjectResource>(ResourceType.PROJECT, project.id);
       expect(restoredProject.status).toBe(ResourceStatus.ACTIVE);
     });
 
     it("should soft delete resources", async () => {
-      const project = await manager.create<Project>(
+      const project = await manager.create<BaseProjectResource>(
         ResourceType.PROJECT,
         {
           title: "Test Project",
           description: "Test Description",
-          status: ResourceStatus.ACTIVE,
-          visibility: "private" as const,
-          views: [],
-          fields: []
+          status: ResourceStatus.ACTIVE
         }
       );
 
       await manager.delete(ResourceType.PROJECT, project.id);
-      const deletedProject = await manager.get<Project>(
+      const deletedProject = await manager.get<BaseProjectResource>(
         ResourceType.PROJECT,
-        project.id,
-        { includeDeleted: true }
+        project.id
       );
 
       expect(deletedProject.status).toBe(ResourceStatus.DELETED);
@@ -178,18 +165,15 @@ describe("Resource System", () => {
 
   describe("Resource Events", () => {
     it("should emit events for resource operations", async () => {
-      const events: ResourceEvent[] = [];
-      manager.on('resource', (event: ResourceEvent) => events.push(event));
+      const events: any[] = [];
+      manager.on('resource', (event: any) => events.push(event));
 
-      const project = await manager.create<Project>(
+      const project = await manager.create<BaseProjectResource>(
         ResourceType.PROJECT,
         {
           title: "Test Project",
           description: "Test Description",
-          status: ResourceStatus.ACTIVE,
-          visibility: "private" as const,
-          views: [],
-          fields: []
+          status: ResourceStatus.ACTIVE
         }
       );
 

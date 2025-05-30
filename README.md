@@ -504,6 +504,85 @@ npm test -- --testPathPattern="enhanced"
 npm test
 ```
 
+## 🧪 Comprehensive E2E Testing Suite
+
+The MCP GitHub Project Manager includes a comprehensive end-to-end testing suite that tests all MCP tools through the actual MCP interface with both mocked and real API calls.
+
+### **Test Coverage:**
+- ✅ **40+ GitHub Project Management Tools** - Complete CRUD operations for projects, milestones, issues, sprints, labels, and more
+- ✅ **8 AI Task Management Tools** - PRD generation, task parsing, complexity analysis, feature management, and traceability
+- ✅ **Complex Workflow Integration** - Multi-tool workflows and real-world project management scenarios
+- ✅ **Real API Testing** - Optional testing with actual GitHub and AI APIs
+- ✅ **Schema Validation** - Comprehensive argument validation for all tools
+- ✅ **Error Handling** - Graceful error handling and recovery testing
+
+### **Quick Start:**
+```bash
+# Run comprehensive E2E tests (mocked APIs)
+npm run test:e2e:tools
+
+# Run with real APIs (requires credentials)
+npm run test:e2e:tools:real
+
+# Use the interactive test runner
+npm run test:e2e:runner
+
+# Run specific test categories
+npm run test:e2e:tools:github     # GitHub tools only
+npm run test:e2e:tools:ai         # AI tools only
+npm run test:e2e:tools:workflows  # Integration workflows
+```
+
+### **Test Runner Options:**
+```bash
+# Interactive test runner with options
+node scripts/run-e2e-tests.js --help
+
+# Examples:
+node scripts/run-e2e-tests.js --real-api --github-only
+node scripts/run-e2e-tests.js --build --verbose --timeout 120
+node scripts/run-e2e-tests.js --ai-only --real-api
+```
+
+### **Environment Setup for Real API Testing:**
+
+**GitHub API (Required for GitHub tools):**
+```bash
+GITHUB_TOKEN=ghp_your_github_token
+GITHUB_OWNER=your-github-username
+GITHUB_REPO=your-test-repository
+```
+
+**AI APIs (Required for AI tools):**
+```bash
+# At least one AI API key required
+ANTHROPIC_API_KEY=sk-ant-your-anthropic-key
+OPENAI_API_KEY=sk-your-openai-key
+GOOGLE_API_KEY=your-google-ai-key
+PERPLEXITY_API_KEY=pplx-your-perplexity-key
+```
+
+**Enable Real API Testing:**
+```bash
+E2E_REAL_API=true npm run test:e2e:tools:real
+```
+
+### **Test Features:**
+- **Tool Registration Validation** - Verify all tools are properly registered with correct schemas
+- **MCP Protocol Compliance** - Ensure all tools follow MCP specification
+- **Response Format Validation** - Validate tool responses match expected formats
+- **Workflow Integration Testing** - Test complex multi-tool workflows
+- **Credential Management** - Graceful handling of missing credentials
+- **Performance Monitoring** - Track tool execution performance
+- **Comprehensive Error Testing** - Validate error handling and recovery
+
+### **Documentation:**
+- 📖 [Comprehensive E2E Testing Guide](docs/e2e-testing-guide.md) - Detailed testing documentation
+- 🔧 [Test Configuration](jest.e2e.tools.config.js) - Jest configuration for E2E tests
+- 🛠️ [Test Utilities](src/__tests__/e2e/utils/MCPToolTestUtils.ts) - Reusable test utilities
+
+The E2E test suite ensures that all MCP tools work correctly both individually and in complex workflows, providing confidence in the reliability and integration of the entire system.
+
 #### **Test Scenarios Covered:**
 - ✅ Default traceability-based context (no AI required)
 - ✅ AI-enhanced business context generation

@@ -25,6 +25,7 @@ export enum ResourceType {
 
 export enum ResourceStatus {
   ACTIVE = "active",
+  IN_PROGRESS = "in_progress",
   CLOSED = "closed",
   ARCHIVED = "archived",
   DELETED = "deleted",
@@ -43,9 +44,9 @@ export enum RelationshipType {
 export interface Resource {
   id: string;
   type: ResourceType;
-  createdAt: Date;
-  updatedAt?: Date;
-  deletedAt?: Date;
+  createdAt: string;
+  updatedAt?: string;
+  deletedAt?: string;
   version?: number;
   status?: ResourceStatus;
 }

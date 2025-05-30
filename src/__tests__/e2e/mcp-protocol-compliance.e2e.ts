@@ -448,18 +448,30 @@ describe('MCP Protocol Compliance E2E Tests', () => {
         stdio: ['pipe', 'pipe', 'pipe']
       });
 
+      let stdoutBuffer = '';
       serverProcess.stdout?.on('data', (data) => {
-        const lines = data.toString().split('\n').filter((line: string) => line.trim());
+        stdoutBuffer += data.toString();
+
+        // Try to extract complete JSON messages
+        const lines = stdoutBuffer.split('\n');
+        stdoutBuffer = lines.pop() || ''; // Keep the last incomplete line in buffer
+
         for (const line of lines) {
-          try {
-            const parsed = JSON.parse(line);
-            if (parsed.id === 1 && parsed.result) {
-              initializeResponse = parsed;
-            } else if (parsed.id === 2 && parsed.result) {
-              toolsListResponse = parsed;
+          const trimmed = line.trim();
+          if (trimmed) {
+            try {
+              const parsed = JSON.parse(trimmed);
+              if (parsed.id === 1 && parsed.result) {
+                initializeResponse = parsed;
+              } else if (parsed.id === 2 && parsed.result) {
+                toolsListResponse = parsed;
+              }
+            } catch (error) {
+              // For debugging: log parse errors for potential responses
+              if (trimmed.includes('"jsonrpc"') || trimmed.includes('"result"')) {
+                console.warn('JSON parse error for potential response:', trimmed.substring(0, 100) + '...');
+              }
             }
-          } catch (error) {
-            // Ignore parse errors
           }
         }
       });
@@ -487,11 +499,14 @@ describe('MCP Protocol Compliance E2E Tests', () => {
         }
       }) + '\n');
 
-      // Wait for initialize response
-      await new Promise(resolve => {
+      // Wait for initialize response with timeout
+      await new Promise((resolve, reject) => {
+        const startTime = Date.now();
         const checkResponse = () => {
           if (initializeResponse) {
             resolve(undefined);
+          } else if (Date.now() - startTime > 10000) {
+            reject(new Error('Timeout waiting for initialize response'));
           } else {
             setTimeout(checkResponse, 100);
           }
@@ -521,11 +536,27 @@ describe('MCP Protocol Compliance E2E Tests', () => {
         params: {}
       }) + '\n');
 
-      // Wait for tools response
-      await new Promise(resolve => {
+      // Wait for tools response with timeout
+      await new Promise((resolve, reject) => {
+        const startTime = Date.now();
         const checkResponse = () => {
           if (toolsListResponse) {
             resolve(undefined);
+          } else if (Date.now() - startTime > 10000) {
+            // Before timing out, try to process any remaining buffer content
+            if (stdoutBuffer.trim()) {
+              try {
+                const parsed = JSON.parse(stdoutBuffer.trim());
+                if (parsed.id === 2 && parsed.result) {
+                  toolsListResponse = parsed;
+                  resolve(undefined);
+                  return;
+                }
+              } catch (error) {
+                console.warn('Failed to parse remaining buffer as JSON:', stdoutBuffer.substring(0, 200) + '...');
+              }
+            }
+            reject(new Error('Timeout waiting for tools list response'));
           } else {
             setTimeout(checkResponse, 100);
           }
@@ -545,6 +576,6 @@ describe('MCP Protocol Compliance E2E Tests', () => {
       expect(firstTool.name).toBeDefined();
       expect(firstTool.description).toBeDefined();
       expect(firstTool.inputSchema).toBeDefined();
-    }, testTimeout);
+    }, 30000); // Increase timeout for MCP Inspector test
   });
 });

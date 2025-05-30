@@ -15,7 +15,7 @@ const envPath = cliOptions.envFile
 dotenv.config({ path: envPath });
 
 if (cliOptions.verbose) {
-  console.error(`Loading environment from: ${envPath}`);
+  process.stderr.write(`Loading environment from: ${envPath}\n`);
 }
 
 /**

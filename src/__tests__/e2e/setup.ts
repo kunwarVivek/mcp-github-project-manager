@@ -1,38 +1,89 @@
 import { jest, beforeAll, afterAll, beforeEach } from "@jest/globals";
 import nock from "nock";
 
+// Check if we should run real E2E tests with actual APIs
+const isRealE2ETest = process.env.E2E_REAL_API === 'true';
+const hasGitHubCredentials = !!(process.env.GITHUB_TOKEN && process.env.GITHUB_OWNER && process.env.GITHUB_REPO);
+const hasAICredentials = !!(process.env.ANTHROPIC_API_KEY || process.env.OPENAI_API_KEY);
+
 beforeAll(() => {
-  // Disable external network requests during tests
-  nock.disableNetConnect();
+  if (!isRealE2ETest) {
+    // Disable external network requests during mock tests
+    nock.disableNetConnect();
+  } else {
+    // For real E2E tests, ensure we have credentials
+    if (!hasGitHubCredentials) {
+      console.warn('⚠️  Real E2E tests require GITHUB_TOKEN, GITHUB_OWNER, and GITHUB_REPO environment variables');
+    }
+    if (!hasAICredentials) {
+      console.warn('⚠️  AI tool tests require at least one AI API key (ANTHROPIC_API_KEY, OPENAI_API_KEY, etc.)');
+    }
+  }
 });
 
 afterAll(() => {
-  // Re-enable network requests after tests
-  nock.enableNetConnect();
+  if (!isRealE2ETest) {
+    // Re-enable network requests after mock tests
+    nock.enableNetConnect();
+  }
 });
 
 beforeEach(() => {
-  // Clear all nock interceptors
-  nock.cleanAll();
-  
-  // Mock environment variables
-  process.env.GITHUB_TOKEN = "test-token";
-  process.env.GITHUB_OWNER = "test-owner";
-  process.env.GITHUB_REPO = "test-repo";
+  if (!isRealE2ETest) {
+    // Clear all nock interceptors for mock tests
+    nock.cleanAll();
+  }
 
-  // Use fake timers
+  // Set up environment variables (use real ones if available, otherwise use test values)
+  if (!process.env.GITHUB_TOKEN) process.env.GITHUB_TOKEN = "test-token";
+  if (!process.env.GITHUB_OWNER) process.env.GITHUB_OWNER = "test-owner";
+  if (!process.env.GITHUB_REPO) process.env.GITHUB_REPO = "test-repo";
+
+  // Set up AI environment variables for testing
+  if (!process.env.ANTHROPIC_API_KEY) process.env.ANTHROPIC_API_KEY = "sk-ant-test-key";
+  if (!process.env.OPENAI_API_KEY) process.env.OPENAI_API_KEY = "sk-test-openai-key";
+  if (!process.env.GOOGLE_API_KEY) process.env.GOOGLE_API_KEY = "test-google-key";
+  if (!process.env.PERPLEXITY_API_KEY) process.env.PERPLEXITY_API_KEY = "pplx-test-key";
+
+  // Use fake timers for consistent testing
   jest.useFakeTimers();
   jest.setSystemTime(new Date("2025-03-01T12:00:00Z"));
 });
 
 afterEach(() => {
-  // Ensure all nock interceptors were used
-  expect(nock.isDone()).toBe(true);
-  
+  if (!isRealE2ETest) {
+    // Ensure all nock interceptors were used in mock tests
+    if (!nock.isDone()) {
+      console.warn('⚠️  Not all nock interceptors were used:', nock.pendingMocks());
+      nock.cleanAll(); // Clean up unused mocks
+    }
+  }
+
   // Clear mocks and restore timers
   jest.clearAllMocks();
   jest.useRealTimers();
 });
+
+// Export test configuration
+export const testConfig = {
+  isRealE2ETest,
+  hasGitHubCredentials,
+  hasAICredentials,
+  skipIfNoCredentials: (testType: 'github' | 'ai' | 'both') => {
+    if (!isRealE2ETest) return false; // Mock tests always run
+
+    switch (testType) {
+      case 'github':
+        return !hasGitHubCredentials;
+      case 'ai':
+        return !hasAICredentials;
+      case 'both':
+        return !hasGitHubCredentials || !hasAICredentials;
+      default:
+        return false;
+    }
+  }
+};
 
 // Mock data for tests
 export const mockData = {

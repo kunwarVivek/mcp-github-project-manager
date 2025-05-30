@@ -23,7 +23,7 @@ dotenv.config();
 const requiredEnvVars = ['GITHUB_TOKEN', 'GITHUB_OWNER', 'GITHUB_REPO'];
 for (const envVar of requiredEnvVars) {
   if (!process.env[envVar]) {
-    console.error(`Error: ${envVar} environment variable is required`);
+    process.stderr.write(`Error: ${envVar} environment variable is required`);
     process.exit(1);
   }
 }
@@ -84,12 +84,12 @@ async function createSimpleProject() {
     
     return result;
   } catch (error) {
-    console.error('Error creating project:');
+    process.stderr.write('Error creating project:');
     if (error instanceof Error) {
-      console.error(`${error.name}: ${error.message}`);
-      console.error(error.stack);
+      process.stderr.write(`${error.name}: ${error.message}`);
+      process.stderr.write(error.stack);
     } else {
-      console.error(error);
+      process.stderr.write(error);
     }
     process.exit(1);
   }

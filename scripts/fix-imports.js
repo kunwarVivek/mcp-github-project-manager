@@ -66,7 +66,7 @@ function fixImports(filePath) {
     fs.writeFileSync(filePath, content);
     console.log(`Fixed imports in ${filePath}`);
   } catch (error) {
-    console.error(`Error processing ${filePath}:`, error);
+    process.stderr.write(`Error processing ${filePath}:`, error);
   }
 }
 

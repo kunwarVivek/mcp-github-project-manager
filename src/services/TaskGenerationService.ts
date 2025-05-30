@@ -127,7 +127,7 @@ export class TaskGenerationService {
 
       return enhancedTasks;
     } catch (error) {
-      console.error('Error generating enhanced tasks from PRD:', error);
+      process.stderr.write(`Error generating enhanced tasks from PRD: ${error instanceof Error ? error.message : String(error)}\n`);
       throw new Error(`Failed to generate enhanced tasks: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
@@ -195,7 +195,7 @@ export class TaskGenerationService {
       // Ensure all tasks have required metadata
       return tasks.map(task => this.enrichTaskMetadata(task, params.prd));
     } catch (error) {
-      console.error('Error generating basic tasks from PRD:', error);
+      process.stderr.write(`Error generating basic tasks from PRD: ${error instanceof Error ? error.message : String(error)}\n`);
       throw new Error(`Failed to generate basic tasks: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
@@ -247,7 +247,7 @@ export class TaskGenerationService {
 
         enhancedTasks.push(enhancedTask);
       } catch (error) {
-        console.error(`Error enhancing task ${task.id}:`, error);
+        process.stderr.write(`Error enhancing task ${task.id}: ${error instanceof Error ? error.message : String(error)}\n`);
         // Fallback to basic enhanced task
         enhancedTasks.push({ ...task } as EnhancedAITask);
       }
@@ -297,7 +297,7 @@ export class TaskGenerationService {
         autoPrioritize: true
       });
     } catch (error) {
-      console.error('Error generating tasks from description:', error);
+      process.stderr.write(`Error generating tasks from description: ${error instanceof Error ? error.message : String(error)}\n`);
       throw new Error(`Failed to generate tasks: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
@@ -334,7 +334,7 @@ export class TaskGenerationService {
         updatedAt: new Date().toISOString()
       }));
     } catch (error) {
-      console.error('Error expanding task into subtasks:', error);
+      process.stderr.write(`Error expanding task into subtasks: ${error instanceof Error ? error.message : String(error)}\n`);
       throw new Error(`Failed to expand task: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
@@ -364,7 +364,7 @@ export class TaskGenerationService {
         recommendations: analysis.recommendations
       };
     } catch (error) {
-      console.error('Error analyzing task complexity:', error);
+      process.stderr.write(`Error analyzing task complexity: ${error instanceof Error ? error.message : String(error)}\n`);
       throw new Error(`Failed to analyze complexity: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
@@ -386,7 +386,7 @@ export class TaskGenerationService {
         teamSize: params.teamSize
       });
     } catch (error) {
-      console.error('Error prioritizing tasks:', error);
+      process.stderr.write(`Error prioritizing tasks: ${error instanceof Error ? error.message : String(error)}\n`);
       throw new Error(`Failed to prioritize tasks: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
@@ -432,7 +432,7 @@ export class TaskGenerationService {
 
       return tasksWithDependencies;
     } catch (error) {
-      console.error('Error detecting task dependencies:', error);
+      process.stderr.write(`Error detecting task dependencies: ${error instanceof Error ? error.message : String(error)}\n`);
       return tasks; // Return original tasks if dependency detection fails
     }
   }
@@ -482,7 +482,7 @@ export class TaskGenerationService {
 
       return criteria;
     } catch (error) {
-      console.error('Error generating acceptance criteria:', error);
+      process.stderr.write(`Error generating acceptance criteria: ${error instanceof Error ? error.message : String(error)}\n`);
       throw new Error(`Failed to generate acceptance criteria: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
@@ -525,7 +525,7 @@ export class TaskGenerationService {
         ]
       };
     } catch (error) {
-      console.error('Error estimating task effort:', error);
+      process.stderr.write(`Error estimating task effort: ${error instanceof Error ? error.message : String(error)}\n`);
       throw new Error(`Failed to estimate effort: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
@@ -571,7 +571,7 @@ export class TaskGenerationService {
 
       return recommendedTasks;
     } catch (error) {
-      console.error('Error getting recommended next tasks:', error);
+      process.stderr.write(`Error getting recommended next tasks: ${error instanceof Error ? error.message : String(error)}\n`);
       throw new Error(`Failed to get recommendations: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }

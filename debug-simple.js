@@ -32,7 +32,7 @@ async function testServerBasic() {
   });
 
   serverProcess.on('error', (error) => {
-    console.error('Process error:', error);
+    process.stderr.write('Process error:', error);
   });
 
   serverProcess.on('exit', (code, signal) => {
@@ -85,6 +85,6 @@ testServerBasic()
     process.exit(result ? 0 : 1);
   })
   .catch(error => {
-    console.error('Test error:', error);
+    process.stderr.write('Test error:', error);
     process.exit(1);
   });

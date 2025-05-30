@@ -5,7 +5,7 @@ import { Resource, ResourceType } from '../../../../domain/resource-types';
 describe('ResourceCache', () => {
   let cache: any;
   // Use fixed dates for testing to avoid timestamp comparison issues
-  const fixedDate = new Date('2025-05-22T00:00:00Z');
+  const fixedDateString = '2025-05-22T00:00:00.000Z';
 
   beforeEach(() => {
     // Create a manual mock with the methods we need
@@ -16,8 +16,8 @@ describe('ResourceCache', () => {
           return {
             id: 'test-id-123',
             type: ResourceType.PROJECT,
-            createdAt: fixedDate,
-            updatedAt: fixedDate
+            createdAt: fixedDateString,
+            updatedAt: fixedDateString
           };
         }
         return null;
@@ -30,8 +30,8 @@ describe('ResourceCache', () => {
     const testResource: Resource = {
       id: 'test-id-123',
       type: ResourceType.PROJECT,
-      createdAt: fixedDate,
-      updatedAt: fixedDate
+      createdAt: fixedDateString,
+      updatedAt: fixedDateString
     };
 
     // Store the resource in the cache

@@ -276,8 +276,8 @@ describe("GitHubMilestoneRepository", () => {
       mockOctokit.graphql.mockResolvedValueOnce(mockResponse);
 
       // Act
-      const cutoffDate = new Date("2024-01-01");
-      const result = await repository.findByDueDate(cutoffDate);
+      const cutoffDate = '2024-01-01T00:00:00.000Z';
+      const result = await repository.findByDueDate(new Date(cutoffDate));
 
       // Assert
       expect(result).toHaveLength(1);

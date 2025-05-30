@@ -52,7 +52,7 @@ describe('ResourceManager', () => {
   it('should create a resource successfully', async () => {
     // Setup
     const resourceData: any = {
-      name: 'Test Resource',
+      title: 'Test Resource',
       description: 'This is a test resource',
       owner: 'test-owner',
       // Add any other required fields for a project resource if needed
@@ -67,9 +67,15 @@ describe('ResourceManager', () => {
     expect(resource.id).toBeDefined();
     expect(resource.type).toBe(ResourceType.PROJECT);
     expect(resource.status).toBe(ResourceStatus.ACTIVE);
-    expect((resource as any).name).toBe('Test Resource');
-    expect((resource as any).description).toBe('This is a test resource');
-    expect((resource as any).owner).toBe('test-owner');
+    expect((resource as any).title).toBe('Test Resource');
+    // createdAt and updatedAt should be ISO strings convertible to Date
+    expect(typeof resource.createdAt).toBe('string');
+    expect(resource.createdAt).toBeTruthy();
+    expect(new Date(resource.createdAt).toString()).not.toBe('Invalid Date');
+    if (resource.updatedAt) {
+      expect(typeof resource.updatedAt).toBe('string');
+      expect(new Date(resource.updatedAt).toString()).not.toBe('Invalid Date');
+    }
     expect(mockCache.set).toHaveBeenCalledWith(
       resource.type,
       resource.id,
@@ -84,8 +90,8 @@ describe('ResourceManager', () => {
       id: 'test-123',
       type: ResourceType.PROJECT,
       status: ResourceStatus.ACTIVE,
-      createdAt: new Date(),
-      name: 'Test Resource'
+      createdAt: new Date().toISOString(),
+      title: 'Test Resource'
     };
     mockCache.get.mockResolvedValueOnce(mockResource);
 

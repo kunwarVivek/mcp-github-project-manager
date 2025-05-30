@@ -64,7 +64,7 @@ export class PRDGenerationService {
 
       return validatedPRD;
     } catch (error) {
-      console.error('Error generating PRD from idea:', error);
+      process.stderr.write(`Error generating PRD from idea: ${error instanceof Error ? error.message : String(error)}\n`);
       throw new Error(`Failed to generate PRD: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
@@ -99,7 +99,7 @@ export class PRDGenerationService {
 
       return PRDDocumentSchema.parse(enhancedPRD);
     } catch (error) {
-      console.error('Error enhancing PRD:', error);
+      process.stderr.write(`Error enhancing PRD: ${error instanceof Error ? error.message : String(error)}\n`);
       throw new Error(`Failed to enhance PRD: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
@@ -121,7 +121,7 @@ export class PRDGenerationService {
         id: feature.id || uuidv4()
       }));
     } catch (error) {
-      console.error('Error extracting features from PRD:', error);
+      process.stderr.write(`Error extracting features from PRD: ${error instanceof Error ? error.message : String(error)}\n`);
       throw new Error(`Failed to extract features: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
@@ -163,7 +163,7 @@ export class PRDGenerationService {
         qualityIssues: this.identifyQualityIssues(prd)
       };
     } catch (error) {
-      console.error('Error validating PRD completeness:', error);
+      process.stderr.write(`Error validating PRD completeness: ${error instanceof Error ? error.message : String(error)}\n`);
       throw new Error(`Failed to validate PRD: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
@@ -191,7 +191,7 @@ export class PRDGenerationService {
 
       return userStoriesMap;
     } catch (error) {
-      console.error('Error generating user stories:', error);
+      process.stderr.write(`Error generating user stories: ${error instanceof Error ? error.message : String(error)}\n`);
       throw new Error(`Failed to generate user stories: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }

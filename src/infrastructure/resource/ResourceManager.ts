@@ -36,14 +36,14 @@ export class ResourceManager extends EventEmitter {
     }
   ): Promise<T> {
     // Create the resource
-    const now = new Date();
+    const now = new Date().toISOString();
     const resource: T = {
       id: uuidv4(),
       type,
       version: 1,
       status: ResourceStatus.ACTIVE,
-      createdAt: now,
-      updatedAt: now,
+      createdAt: now, // Use ISO string
+      updatedAt: now, // Use ISO string
       ...data,
     } as T;
 
@@ -156,7 +156,7 @@ export class ResourceManager extends EventEmitter {
       ...current,
       ...data,
       version: currentVersion + 1,
-      updatedAt: new Date(),
+      updatedAt: new Date().toISOString(), // Use ISO string
     };
 
     // Validate with Zod schema if available
@@ -204,7 +204,7 @@ export class ResourceManager extends EventEmitter {
 
   async delete(type: ResourceType, id: string): Promise<void> {
     const resource = await this.get(type, id);
-    const now = new Date();
+    const now = new Date().toISOString();
 
     // Handle the case where version might be undefined
     const currentVersion = resource.version ?? 0;
@@ -212,9 +212,9 @@ export class ResourceManager extends EventEmitter {
     const updated = {
       ...resource,
       status: ResourceStatus.DELETED,
-      deletedAt: now,
+      deletedAt: now, // Use ISO string
       version: currentVersion + 1,
-      updatedAt: now,
+      updatedAt: now, // Use ISO string
     };
 
     await this.cache.set(type, id, updated);
@@ -230,7 +230,7 @@ export class ResourceManager extends EventEmitter {
 
   async archive(type: ResourceType, id: string): Promise<void> {
     const resource = await this.get(type, id);
-    const now = new Date();
+    const now = new Date().toISOString();
 
     // Handle the case where version might be undefined
     const currentVersion = resource.version ?? 0;
@@ -239,7 +239,7 @@ export class ResourceManager extends EventEmitter {
       ...resource,
       status: ResourceStatus.ARCHIVED,
       version: currentVersion + 1,
-      updatedAt: now,
+      updatedAt: now, // Use ISO string
     };
 
     await this.cache.set(type, id, updated);
@@ -255,13 +255,13 @@ export class ResourceManager extends EventEmitter {
 
   async restore(type: ResourceType, id: string): Promise<void> {
     const resource = await this.get(type, id);
-    const now = new Date();
+    const now = new Date().toISOString();
 
     const updated = {
       ...resource,
       status: ResourceStatus.ACTIVE,
       version: resource.version ? resource.version + 1 : 1,
-      updatedAt: now,
+      updatedAt: now, // Use ISO string
       deletedAt: undefined, // Changed from null to undefined
     };
 

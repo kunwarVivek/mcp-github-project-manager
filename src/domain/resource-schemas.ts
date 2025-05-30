@@ -5,9 +5,9 @@ import { ResourceType, RelationshipType, ResourceStatus } from "./resource-types
 export const BaseResourceSchema = z.object({
   id: z.string().uuid(),
   type: z.nativeEnum(ResourceType),
-  createdAt: z.date(),
-  updatedAt: z.date().optional(),
-  deletedAt: z.date().optional(),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime().optional(),
+  deletedAt: z.string().datetime().optional(),
   version: z.number().optional(),
   status: z.nativeEnum(ResourceStatus).optional()
 });
@@ -15,10 +15,10 @@ export const BaseResourceSchema = z.object({
 // Schema for Project resources
 export const ProjectSchema = BaseResourceSchema.extend({
   type: z.literal(ResourceType.PROJECT),
-  name: z.string().min(1),
+  title: z.string().min(1),
   description: z.string().optional(),
   repositoryUrl: z.string().url().optional(),
-  owner: z.string(),
+  owner: z.string().optional(),
   settings: z.record(z.any()).optional()
 });
 
@@ -41,7 +41,7 @@ export const MilestoneSchema = BaseResourceSchema.extend({
   type: z.literal(ResourceType.MILESTONE),
   title: z.string().min(1),
   description: z.string().optional(),
-  dueDate: z.date().optional(),
+  dueDate: z.string().datetime().optional(),
   projectId: z.string().uuid(),
   externalId: z.string().optional(),
   externalUrl: z.string().url().optional()
@@ -52,8 +52,8 @@ export const SprintSchema = BaseResourceSchema.extend({
   type: z.literal(ResourceType.SPRINT),
   name: z.string().min(1),
   description: z.string().optional(),
-  startDate: z.date(),
-  endDate: z.date(),
+  startDate: z.string().datetime(),
+  endDate: z.string().datetime(),
   status: z.string(),
   projectId: z.string().uuid()
 });

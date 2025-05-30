@@ -61,7 +61,7 @@ function zodToOpenAPI(schema: any): any {
       properties: {}
     };
   } catch (error) {
-    console.error('Error converting Zod schema to OpenAPI:', error);
+    process.stderr.write('Error converting Zod schema to OpenAPI:', error);
     return {
       type: 'object',
       properties: {}
@@ -133,7 +133,7 @@ function zodTypeToJsonSchemaType(zodType: any): any {
     // Default to string type
     return { type: 'string' };
   } catch (error) {
-    console.error('Error converting Zod type to JSON Schema type:', error);
+    process.stderr.write('Error converting Zod type to JSON Schema type:', error);
     return { type: 'string' };
   }
 }
@@ -328,9 +328,9 @@ async function generateOpenAPI() {
     writeFileSync('./docs/api-reference/openapi.json', JSON.stringify(openApiDocument, null, 2));
     console.log('OpenAPI documentation generated successfully!');
   } catch (error) {
-    console.error('Error generating OpenAPI documentation:', error);
+    process.stderr.write('Error generating OpenAPI documentation:', error);
   }
 }
 
 // Run the script
-generateOpenAPI().catch(console.error);
+generateOpenAPI().catch(process.stderr.write);

@@ -79,85 +79,64 @@ export class GitHubMilestoneRepository extends BaseGitHubRepository implements M
     };
   }
 
-  async create(data: CreateMilestone): Promise<Milestone> {
-    const mutation = `
-      mutation($input: CreateMilestoneInput!) {
-        createMilestone(input: $input) {
-          milestone {
-            id
-            number
-            title
-            description
-            dueOn
-            state
-            createdAt
-            updatedAt
-          }
-        }
-      }
-    `;
+  private mapRestMilestoneToMilestone(restMilestone: any): Milestone {
+    return {
+      id: restMilestone.node_id,
+      number: restMilestone.number,
+      title: restMilestone.title,
+      description: restMilestone.description || "",
+      dueDate: restMilestone.due_on || undefined,
+      status: restMilestone.state === "open" ? ResourceStatus.ACTIVE : ResourceStatus.CLOSED,
+      progress: {
+        percent: 0, // REST API doesn't provide progress info
+        complete: restMilestone.closed_issues || 0,
+        total: (restMilestone.open_issues || 0) + (restMilestone.closed_issues || 0)
+      },
+      createdAt: restMilestone.created_at,
+      updatedAt: restMilestone.updated_at,
+      url: `https://github.com/${this.owner}/${this.repo}/milestone/${restMilestone.number}`
+    };
+  }
 
-    const response = await this.graphql<CreateMilestoneResponse>(mutation, {
-      input: {
-        repositoryId: this.repo,
+  async create(data: CreateMilestone): Promise<Milestone> {
+    // Use REST API for milestone creation since GraphQL doesn't support it
+    const response = await this.rest(
+      (params) => this.octokit.rest.issues.createMilestone(params),
+      {
         title: data.title,
         description: data.description,
-        dueOn: data.dueDate,
-        // Default to "open" since status is not available in CreateMilestone
-        state: "open",
-      },
-    });
+        due_on: data.dueDate,
+        state: 'open'
+      }
+    );
 
-    return this.mapGitHubMilestoneToMilestone(response.createMilestone.milestone);
+    return this.mapRestMilestoneToMilestone(response);
   }
 
   async update(id: MilestoneId, data: Partial<Milestone>): Promise<Milestone> {
-    const mutation = `
-      mutation($input: UpdateMilestoneInput!) {
-        updateMilestone(input: $input) {
-          milestone {
-            id
-            number
-            title
-            description
-            dueOn
-            state
-            updatedAt
-            createdAt
-          }
-        }
-      }
-    `;
-
-    const response = await this.graphql<UpdateMilestoneResponse>(mutation, {
-      input: {
-        milestoneId: id,
+    // Use REST API for milestone updates since GraphQL doesn't support it
+    const response = await this.rest(
+      (params) => this.octokit.rest.issues.updateMilestone(params),
+      {
+        milestone_number: parseInt(id),
         title: data.title,
         description: data.description,
-        dueOn: data.dueDate,
+        due_on: data.dueDate,
         state: data.status === ResourceStatus.CLOSED ? "closed" : "open",
-      },
-    });
+      }
+    );
 
-    return this.mapGitHubMilestoneToMilestone(response.updateMilestone.milestone);
+    return this.mapRestMilestoneToMilestone(response);
   }
 
   async delete(id: MilestoneId): Promise<void> {
-    const mutation = `
-      mutation($input: DeleteMilestoneInput!) {
-        deleteMilestone(input: $input) {
-          milestone {
-            id
-          }
-        }
+    // Use REST API for milestone deletion since GraphQL doesn't support it
+    await this.rest(
+      (params) => this.octokit.rest.issues.deleteMilestone(params),
+      {
+        milestone_number: parseInt(id)
       }
-    `;
-
-    await this.graphql(mutation, {
-      input: {
-        milestoneId: id,
-      },
-    });
+    );
   }
 
   async findById(id: MilestoneId): Promise<Milestone | null> {

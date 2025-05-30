@@ -52,8 +52,8 @@ describe("GitHubProjectRepository", () => {
         title: projectData.title,
         shortDescription: null, // No description on creation
         closed: false,
-        createdAt: "2023-01-01T00:00:00Z",
-        updatedAt: "2023-01-01T00:00:00Z",
+        createdAt: '2023-01-01T00:00:00Z',
+        updatedAt: '2023-01-01T00:00:00Z',
       };
 
       const mockUpdateResponse = {
@@ -61,8 +61,8 @@ describe("GitHubProjectRepository", () => {
         title: projectData.title,
         shortDescription: projectData.shortDescription,
         closed: false,
-        createdAt: "2023-01-01T00:00:00Z",
-        updatedAt: "2023-01-01T00:00:00Z",
+        createdAt: '2023-01-01T00:00:00Z',
+        updatedAt: '2023-01-01T00:00:00Z',
       };
 
       // Mock the create mutation (first call)
@@ -85,6 +85,7 @@ describe("GitHubProjectRepository", () => {
       // Assert
       expect(result).toEqual({
         id: mockUpdateResponse.id,
+        type: "project",
         title: mockUpdateResponse.title,
         description: mockUpdateResponse.shortDescription,
         owner: config.owner,
@@ -151,8 +152,8 @@ describe("GitHubProjectRepository", () => {
         title: projectData.title,
         shortDescription: null,
         closed: false,
-        createdAt: "2023-01-01T00:00:00Z",
-        updatedAt: "2023-01-01T00:00:00Z",
+        createdAt: '2023-01-01T00:00:00Z',
+        updatedAt: '2023-01-01T00:00:00Z',
       };
 
       mockOctokit.graphql.mockResolvedValueOnce({
@@ -167,6 +168,7 @@ describe("GitHubProjectRepository", () => {
       // Assert
       expect(result).toEqual({
         id: mockCreateResponse.id,
+        type: "project",
         title: mockCreateResponse.title,
         description: "", // Empty when no description provided
         owner: config.owner,
@@ -228,8 +230,8 @@ describe("GitHubProjectRepository", () => {
         title: projectData.title,
         shortDescription: null,
         closed: false,
-        createdAt: "2023-01-01T00:00:00Z",
-        updatedAt: "2023-01-01T00:00:00Z",
+        createdAt: '2023-01-01T00:00:00Z',
+        updatedAt: '2023-01-01T00:00:00Z',
       };
 
       // Mock successful creation but failed description update
@@ -255,8 +257,8 @@ describe("GitHubProjectRepository", () => {
         title: "Test Project",
         shortDescription: "Test Description",
         closed: false,
-        createdAt: "2023-01-01T00:00:00Z",
-        updatedAt: "2023-01-01T00:00:00Z",
+        createdAt: '2023-01-01T00:00:00Z',
+        updatedAt: '2023-01-01T00:00:00Z',
       };
 
       mockOctokit.graphql.mockResolvedValueOnce({
@@ -269,6 +271,7 @@ describe("GitHubProjectRepository", () => {
       // Assert
       expect(result).toEqual({
         id: projectId,
+        type: "project",
         title: mockProjectResponse.title,
         description: mockProjectResponse.shortDescription || "",
         owner: config.owner,
@@ -306,8 +309,8 @@ describe("GitHubProjectRepository", () => {
         title: "Test Project",
         shortDescription: "Test Description",
         closed: false,
-        createdAt: "2023-01-01T00:00:00Z",
-        updatedAt: "2023-01-01T00:00:00Z",
+        createdAt: '2023-01-01T00:00:00Z',
+        updatedAt: '2023-01-01T00:00:00Z',
       }];
 
       mockOctokit.graphql.mockResolvedValueOnce({
@@ -334,15 +337,15 @@ describe("GitHubProjectRepository", () => {
         title: "Active Project",
         shortDescription: "Should be included",
         closed: false,
-        createdAt: "2023-01-01T00:00:00Z",
-        updatedAt: "2023-01-01T00:00:00Z",
+        createdAt: '2023-01-01T00:00:00Z',
+        updatedAt: '2023-01-01T00:00:00Z',
       }, {
         id: "PVT_kwDOLhQ7gc4AOEbI",
         title: "Closed Project",
         shortDescription: "Should be excluded",
         closed: true,
-        createdAt: "2023-01-01T00:00:00Z", 
-        updatedAt: "2023-01-01T00:00:00Z",
+        createdAt: '2023-01-01T00:00:00Z', 
+        updatedAt: '2023-01-01T00:00:00Z',
       }];
 
       mockOctokit.graphql.mockResolvedValueOnce({

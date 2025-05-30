@@ -11,7 +11,7 @@ const CLIENT_ID = process.env.GITHUB_CLIENT_ID;
 const CLIENT_SECRET = process.env.GITHUB_CLIENT_SECRET;
 
 if (!CLIENT_ID || !CLIENT_SECRET) {
-  console.error(
+  process.stderr.write(
     "Please provide GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET environment variables"
   );
   process.exit(1);
@@ -55,7 +55,7 @@ app.get("/callback", async (req, res) => {
     // Give time for the message to be sent before closing
     setTimeout(() => process.exit(0), 1000);
   } catch (error) {
-    console.error("Error getting token:", error.message);
+    process.stderr.write("Error getting token:", error.message);
     res.status(500).send("Error getting token");
     process.exit(1);
   }

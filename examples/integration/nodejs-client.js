@@ -53,7 +53,7 @@ async function childProcessExample() {
   });
   
   serverProcess.stderr.on("data", (data) => {
-    console.error(`Server stderr: ${data}`);
+    process.stderr.write(`Server stderr: ${data}`);
   });
   
   // Wait for server to initialize
@@ -83,7 +83,7 @@ async function childProcessExample() {
     console.log(JSON.stringify(projectResult, null, 2));
     
   } catch (error) {
-    console.error("❌ Error:", error);
+    process.stderr.write("❌ Error:", error);
   } finally {
     // Terminate the server process
     serverProcess.kill();
@@ -103,7 +103,7 @@ async function main() {
   
   // Check for required environment variables
   if (!process.env.GITHUB_TOKEN) {
-    console.error("❌ Error: GITHUB_TOKEN environment variable is required");
+    process.stderr.write("❌ Error: GITHUB_TOKEN environment variable is required");
     process.exit(1);
   }
   
@@ -118,6 +118,6 @@ async function main() {
 }
 
 main().catch(error => {
-  console.error("❌ Unhandled error:", error);
+  process.stderr.write("❌ Unhandled error:", error);
   process.exit(1);
 });

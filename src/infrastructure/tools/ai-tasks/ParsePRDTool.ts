@@ -141,7 +141,7 @@ async function executeParsePRD(args: ParsePRDArgs): Promise<MCPResponse> {
     });
 
   } catch (error) {
-    console.error('Error in parse_prd tool:', error);
+    process.stderr.write(`Error in parse_prd tool: ${error}\n`);
     return ToolResultFormatter.formatSuccess('parse_prd', {
       error: `Failed to parse PRD: ${error instanceof Error ? error.message : 'Unknown error'}`,
       success: false

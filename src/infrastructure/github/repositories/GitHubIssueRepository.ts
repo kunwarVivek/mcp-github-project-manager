@@ -104,7 +104,7 @@ export class GitHubIssueRepository extends BaseGitHubRepository implements Issue
         repositoryId: this.repo,
         title: data.title,
         body: data.description,
-        assignees: data.assignees,
+        assigneeIds: data.assignees,
         labelIds: data.labels,
         milestoneId: data.milestoneId,
       },

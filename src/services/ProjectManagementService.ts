@@ -280,7 +280,7 @@ export class ProjectManagementService {
               try {
                 await this.issueRepo.update(issueId, { milestoneId: sprint.id });
               } catch (error) {
-                console.error(`Failed to associate issue ${issueId} with sprint: ${error}`);
+                process.stderr.write(`Failed to associate issue ${issueId} with sprint: ${error}`);
                 throw this.mapErrorToMCPError(error);
               }
             })
@@ -315,6 +315,7 @@ export class ProjectManagementService {
     startDate?: string;
     endDate?: string;
     status?: 'planned' | 'active' | 'completed';
+    issues?: string[];
   }): Promise<Sprint> {
     try {
       // Convert status string to ResourceStatus enum if provided
@@ -339,7 +340,8 @@ export class ProjectManagementService {
         description: data.description,
         startDate: data.startDate,
         endDate: data.endDate,
-        status: resourceStatus
+        status: resourceStatus,
+        issues: data.issues
       };
 
       // Clean up undefined values
@@ -357,7 +359,7 @@ export class ProjectManagementService {
 
   async addIssuesToSprint(data: {
     sprintId: string;
-    issueIds: number[];
+    issueIds: string[];
   }): Promise<{ success: boolean; addedIssues: number; message: string }> {
     try {
       let addedCount = 0;
@@ -366,11 +368,11 @@ export class ProjectManagementService {
       // Add each issue to the sprint
       for (const issueId of data.issueIds) {
         try {
-          await this.sprintRepo.addIssue(data.sprintId, issueId.toString());
+          await this.sprintRepo.addIssue(data.sprintId, issueId);
           addedCount++;
           issues.push(issueId);
         } catch (error) {
-          console.error(`Failed to add issue ${issueId} to sprint: ${error}`);
+          process.stderr.write(`Failed to add issue ${issueId} to sprint: ${error}`);
         }
       }
 
@@ -386,7 +388,7 @@ export class ProjectManagementService {
 
   async removeIssuesFromSprint(data: {
     sprintId: string;
-    issueIds: number[];
+    issueIds: string[];
   }): Promise<{ success: boolean; removedIssues: number; message: string }> {
     try {
       let removedCount = 0;
@@ -395,11 +397,11 @@ export class ProjectManagementService {
       // Remove each issue from the sprint
       for (const issueId of data.issueIds) {
         try {
-          await this.sprintRepo.removeIssue(data.sprintId, issueId.toString());
+          await this.sprintRepo.removeIssue(data.sprintId, issueId);
           removedCount++;
           issues.push(issueId);
         } catch (error) {
-          console.error(`Failed to remove issue ${issueId} from sprint: ${error}`);
+          process.stderr.write(`Failed to remove issue ${issueId} from sprint: ${error}`);
         }
       }
 
@@ -456,11 +458,11 @@ export class ProjectManagementService {
   }
 
   // Milestone Management
-  async getMilestoneMetrics(id: number, includeIssues: boolean = false): Promise<MilestoneMetrics> {
+  async getMilestoneMetrics(id: string, includeIssues: boolean = false): Promise<MilestoneMetrics> {
     try {
-      const milestone = await this.milestoneRepo.findById(id.toString());
+      const milestone = await this.milestoneRepo.findById(id);
       if (!milestone) {
-        throw new ResourceNotFoundError(ResourceType.MILESTONE, id.toString());
+        throw new ResourceNotFoundError(ResourceType.MILESTONE, id);
       }
 
       const allIssues = await this.issueRepo.findAll();
@@ -521,7 +523,7 @@ export class ProjectManagementService {
 
       const milestoneMetrics = await Promise.all(
         limitedMilestones.map(milestone =>
-          this.getMilestoneMetrics(parseInt(milestone.id), includeIssues)
+          this.getMilestoneMetrics(milestone.id, includeIssues)
         )
       );
 
@@ -555,7 +557,7 @@ export class ProjectManagementService {
 
       const milestoneMetrics = await Promise.all(
         limitedMilestones.map(milestone =>
-          this.getMilestoneMetrics(parseInt(milestone.id), includeIssues)
+          this.getMilestoneMetrics(milestone.id, includeIssues)
         )
       );
 
@@ -679,16 +681,13 @@ export class ProjectManagementService {
   async createIssue(data: {
     title: string;
     description: string;
-    milestoneId?: number;
+    milestoneId?: string;
     assignees?: string[];
     labels?: string[];
     priority?: string;
     type?: string;
   }): Promise<Issue> {
     try {
-      // Convert milestone ID from number to string if provided
-      const milestoneId = data.milestoneId ? data.milestoneId.toString() : undefined;
-
       // Create labels based on priority and type if provided
       const labels = data.labels || [];
       if (data.priority) {
@@ -703,7 +702,7 @@ export class ProjectManagementService {
         description: data.description,
         assignees: data.assignees || [],
         labels,
-        milestoneId,
+        milestoneId: data.milestoneId,
       };
 
       return await this.issueRepo.create(issueData);
@@ -714,7 +713,7 @@ export class ProjectManagementService {
 
   async listIssues(options: {
     status?: string;
-    milestone?: number;
+    milestone?: string;
     labels?: string[];
     assignee?: string;
     sort?: string;
@@ -737,7 +736,7 @@ export class ProjectManagementService {
 
       if (milestone) {
         // If milestone is specified, get issues for that milestone
-        issues = await this.issueRepo.findByMilestone(milestone.toString());
+        issues = await this.issueRepo.findByMilestone(milestone);
       } else {
         // Otherwise get all issues
         issues = await this.issueRepo.findAll();
@@ -791,21 +790,21 @@ export class ProjectManagementService {
     }
   }
 
-  async getIssue(issueId: number): Promise<Issue | null> {
+  async getIssue(issueId: string): Promise<Issue | null> {
     try {
-      return await this.issueRepo.findById(issueId.toString());
+      return await this.issueRepo.findById(issueId);
     } catch (error) {
       throw this.mapErrorToMCPError(error);
     }
   }
 
   async updateIssue(
-    issueId: number,
+    issueId: string,
     updates: {
       title?: string;
       description?: string;
       status?: string;
-      milestoneId?: number | null;
+      milestoneId?: string | null;
       assignees?: string[];
       labels?: string[];
     }
@@ -825,10 +824,10 @@ export class ProjectManagementService {
       if (updates.milestoneId === null) {
         data.milestoneId = undefined; // Remove milestone
       } else if (updates.milestoneId !== undefined) {
-        data.milestoneId = updates.milestoneId.toString();
+        data.milestoneId = updates.milestoneId;
       }
 
-      return await this.issueRepo.update(issueId.toString(), data);
+      return await this.issueRepo.update(issueId, data);
     } catch (error) {
       throw this.mapErrorToMCPError(error);
     }
@@ -840,7 +839,7 @@ export class ProjectManagementService {
     description: string;
     startDate: string;
     endDate: string;
-    issueIds?: number[];
+    issueIds?: string[];
   }): Promise<Sprint> {
     try {
       // Create data object that matches the expected type
@@ -1859,16 +1858,13 @@ export class ProjectManagementService {
 
   // Milestone Management
   async updateMilestone(data: {
-    milestoneId: number;
+    milestoneId: string;
     title?: string;
     description?: string;
     dueDate?: string | null;
     state?: 'open' | 'closed';
   }): Promise<Milestone> {
     try {
-      // Convert milestoneId from number to string
-      const milestoneId = data.milestoneId.toString();
-
       // Convert state to ResourceStatus if provided
       let status: ResourceStatus | undefined;
       if (data.state) {
@@ -1890,20 +1886,17 @@ export class ProjectManagementService {
         }
       });
 
-      return await this.milestoneRepo.update(milestoneId, milestoneData);
+      return await this.milestoneRepo.update(data.milestoneId, milestoneData);
     } catch (error) {
       throw this.mapErrorToMCPError(error);
     }
   }
 
   async deleteMilestone(data: {
-    milestoneId: number;
+    milestoneId: string;
   }): Promise<{ success: boolean; message: string }> {
     try {
-      // Convert milestoneId from number to string
-      const milestoneId = data.milestoneId.toString();
-
-      await this.milestoneRepo.delete(milestoneId);
+      await this.milestoneRepo.delete(data.milestoneId);
 
       return {
         success: true,
@@ -2005,6 +1998,119 @@ export class ProjectManagementService {
       }
 
       return response.repository.labels.nodes;
+    } catch (error) {
+      throw this.mapErrorToMCPError(error);
+    }
+  }
+
+  // Additional Issue Management Methods
+  async updateIssueStatus(issueId: string, status: ResourceStatus): Promise<Issue> {
+    try {
+      const issue = await this.issueRepo.findById(issueId);
+      if (!issue) {
+        throw new ResourceNotFoundError(ResourceType.ISSUE, issueId);
+      }
+
+      return await this.issueRepo.update(issueId, { status });
+    } catch (error) {
+      throw this.mapErrorToMCPError(error);
+    }
+  }
+
+  async addIssueDependency(issueId: string, dependsOnId: string): Promise<void> {
+    try {
+      // In a real implementation, this would store the dependency relationship
+      // For now, we'll use labels to track dependencies
+      const issue = await this.issueRepo.findById(issueId);
+      if (!issue) {
+        throw new ResourceNotFoundError(ResourceType.ISSUE, issueId);
+      }
+
+      const dependentIssue = await this.issueRepo.findById(dependsOnId);
+      if (!dependentIssue) {
+        throw new ResourceNotFoundError(ResourceType.ISSUE, dependsOnId);
+      }
+
+      // Add a label to track the dependency
+      const labels = [...issue.labels];
+      if (!labels.includes(`depends-on:${dependsOnId}`)) {
+        labels.push(`depends-on:${dependsOnId}`);
+        await this.issueRepo.update(issueId, { labels });
+      }
+    } catch (error) {
+      throw this.mapErrorToMCPError(error);
+    }
+  }
+
+  async getIssueDependencies(issueId: string): Promise<string[]> {
+    try {
+      const issue = await this.issueRepo.findById(issueId);
+      if (!issue) {
+        throw new ResourceNotFoundError(ResourceType.ISSUE, issueId);
+      }
+
+      // Extract dependency IDs from labels
+      const dependencies: string[] = [];
+      issue.labels.forEach(label => {
+        if (label.startsWith('depends-on:')) {
+          dependencies.push(label.replace('depends-on:', ''));
+        }
+      });
+
+      return dependencies;
+    } catch (error) {
+      throw this.mapErrorToMCPError(error);
+    }
+  }
+
+  async assignIssueToMilestone(issueId: string, milestoneId: string): Promise<Issue> {
+    try {
+      const issue = await this.issueRepo.findById(issueId);
+      if (!issue) {
+        throw new ResourceNotFoundError(ResourceType.ISSUE, issueId);
+      }
+
+      const milestone = await this.milestoneRepo.findById(milestoneId);
+      if (!milestone) {
+        throw new ResourceNotFoundError(ResourceType.MILESTONE, milestoneId);
+      }
+
+      return await this.issueRepo.update(issueId, { milestoneId });
+    } catch (error) {
+      throw this.mapErrorToMCPError(error);
+    }
+  }
+
+  async getIssueHistory(issueId: string): Promise<any[]> {
+    try {
+      const issue = await this.issueRepo.findById(issueId);
+      if (!issue) {
+        throw new ResourceNotFoundError(ResourceType.ISSUE, issueId);
+      }
+
+      // For now, return a basic history entry
+      // In a real implementation, this would query the GitHub timeline API
+      return [
+        {
+          id: `history-${issueId}-${Date.now()}`,
+          action: 'created',
+          timestamp: issue.createdAt,
+          actor: 'system',
+          changes: {
+            status: { from: null, to: issue.status },
+            title: issue.title
+          }
+        },
+        {
+          id: `history-${issueId}-${Date.now() + 1}`,
+          action: 'updated',
+          timestamp: issue.updatedAt,
+          actor: 'system',
+          changes: {
+            status: { from: ResourceStatus.ACTIVE, to: issue.status }
+          }
+        }
+      ];
     } catch (error) {
       throw this.mapErrorToMCPError(error);
     }

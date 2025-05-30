@@ -77,7 +77,7 @@ async function executeEnhancePRD(args: EnhancePRDArgs): Promise<MCPResponse> {
     });
 
   } catch (error) {
-    console.error('Error in enhance_prd tool:', error);
+    process.stderr.write(`Error in enhance_prd tool: ${error}\n`);
     return ToolResultFormatter.formatSuccess('enhance_prd', {
       error: `Failed to enhance PRD: ${error instanceof Error ? error.message : 'Unknown error'}`,
       success: false
