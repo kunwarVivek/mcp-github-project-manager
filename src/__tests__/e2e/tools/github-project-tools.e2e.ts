@@ -214,7 +214,7 @@ describe('GitHub Project Management Tools E2E', () => {
 
     it('should update an issue', async () => {
       if (!createdIssueId) {
-        pending('No issue created to test with');
+        test.skip('No issue created to test with');
         return;
       }
 
@@ -268,7 +268,7 @@ describe('GitHub Project Management Tools E2E', () => {
 
     it('should add issues to sprint', async () => {
       if (!createdSprintId || !createdIssueId) {
-        pending('No sprint or issue created to test with');
+        test.skip('No sprint or issue created to test with');
         return;
       }
 
@@ -297,14 +297,16 @@ describe('GitHub Project Management Tools E2E', () => {
 
     it('should create a roadmap', async () => {
       const roadmapData = {
-        project: MCPTestHelpers.createTestData.project(),
+        project: {
+          title: `Test Roadmap Project ${Date.now()}`,
+          shortDescription: "E2E test roadmap project",
+          owner: process.env.GITHUB_OWNER || "test-owner",
+          visibility: "private" as const
+        },
         milestones: [
           {
             milestone: MCPTestHelpers.createTestData.milestone(),
-            issues: [
-              MCPTestHelpers.createTestData.issue({ priority: 'high', type: 'feature' }),
-              MCPTestHelpers.createTestData.issue({ priority: 'medium', type: 'bug' })
-            ]
+            issues: "Create initial project structure and setup development environment"
           }
         ]
       };
@@ -319,7 +321,7 @@ describe('GitHub Project Management Tools E2E', () => {
 
     it('should get milestone metrics', async () => {
       if (!createdMilestoneId) {
-        pending('No milestone created to test with');
+        test.skip('No milestone created to test with');
         return;
       }
 

@@ -233,9 +233,37 @@ export class MCPToolTestUtils {
    * Extract content from MCP response
    */
   static extractContent(response: any): string {
-    if (response.output) {
-      return typeof response.output === 'string' ? response.output : JSON.stringify(response.output);
+    // Handle different response formats
+    if (typeof response === 'string') {
+      try {
+        const parsed = JSON.parse(response);
+        return MCPToolTestUtils.extractContent(parsed);
+      } catch {
+        return response;
+      }
     }
+
+    // Handle MCP tool response format
+    if (response.output) {
+      if (typeof response.output === 'string') {
+        try {
+          const parsed = JSON.parse(response.output);
+          if (parsed.content) {
+            return typeof parsed.content === 'string' ? parsed.content : JSON.stringify(parsed.content);
+          }
+          return response.output;
+        } catch {
+          return response.output;
+        }
+      }
+      return JSON.stringify(response.output);
+    }
+
+    // Handle direct content
+    if (response.content) {
+      return typeof response.content === 'string' ? response.content : JSON.stringify(response.content);
+    }
+
     return JSON.stringify(response);
   }
 
@@ -272,7 +300,7 @@ export class MCPToolTestUtils {
 
         beforeEach(() => {
           if (MCPToolTestUtils.shouldSkipTest(testType)) {
-            pending(`Skipping test - missing credentials for ${testType} tests`);
+            test.skip(`Skipping test - missing credentials for ${testType} tests`, () => {});
           }
         });
 
@@ -293,9 +321,23 @@ export const MCPTestHelpers = {
    */
   validateToolResponse(response: any, expectedFields: string[] = []): void {
     expect(response).toBeDefined();
-    
+
+    // Handle different response formats
+    let actualResponse = response;
+
+    // If response has output property, extract it
+    if (response.output && typeof response.output === 'string') {
+      try {
+        actualResponse = JSON.parse(response.output);
+      } catch {
+        // If parsing fails, use the output string directly
+        actualResponse = response.output;
+      }
+    }
+
+    // Validate expected fields
     for (const field of expectedFields) {
-      expect(response).toHaveProperty(field);
+      expect(actualResponse).toHaveProperty(field);
     }
   },
 
@@ -306,6 +348,7 @@ export const MCPTestHelpers = {
     project: (overrides: any = {}) => ({
       title: `Test Project ${Date.now()}`,
       shortDescription: "E2E test project",
+      owner: process.env.GITHUB_OWNER || "test-owner",
       visibility: "private" as const,
       ...overrides
     }),
@@ -340,14 +383,35 @@ export const MCPTestHelpers = {
    */
   async waitFor(condition: () => Promise<boolean>, timeout = 10000, interval = 1000): Promise<void> {
     const start = Date.now();
-    
+
     while (Date.now() - start < timeout) {
       if (await condition()) {
         return;
       }
       await new Promise(resolve => setTimeout(resolve, interval));
     }
-    
+
     throw new Error(`Condition not met within ${timeout}ms`);
+  },
+
+  /**
+   * Skip test if required credentials are missing
+   */
+  skipIfMissingCredentials(testType: 'github' | 'ai' | 'both', testName: string): void {
+    if (MCPToolTestUtils.shouldSkipTest(testType)) {
+      test.skip(`${testName} - missing credentials for ${testType} tests`, () => {});
+      return;
+    }
+  },
+
+  /**
+   * Check if a test should be skipped and return appropriate action
+   */
+  checkCredentials(testType: 'github' | 'ai' | 'both'): { shouldSkip: boolean; reason?: string } {
+    const shouldSkip = MCPToolTestUtils.shouldSkipTest(testType);
+    return {
+      shouldSkip,
+      reason: shouldSkip ? `Missing credentials for ${testType} tests` : undefined
+    };
   }
 };

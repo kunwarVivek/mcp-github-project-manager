@@ -62,6 +62,7 @@ describe('Tool Integration Workflows E2E', () => {
       const projectResponse = await utils.callTool('create_project', {
         title: 'ProjectHub Pro Development',
         shortDescription: 'Development project for ProjectHub Pro dashboard',
+        owner: process.env.GITHUB_OWNER || "test-owner",
         visibility: 'private'
       });
 
@@ -105,6 +106,7 @@ describe('Tool Integration Workflows E2E', () => {
         project: {
           title: 'ProjectHub Pro Roadmap',
           shortDescription: 'Complete development roadmap for ProjectHub Pro',
+          owner: process.env.GITHUB_OWNER || "test-owner",
           visibility: 'private'
         },
         milestones: [
@@ -386,7 +388,7 @@ describe('Tool Integration Workflows E2E', () => {
         taskTitle: 'Implement real-time analytics engine',
         taskDescription: 'Build a scalable real-time analytics engine that can process large volumes of data and provide instant insights through WebSocket connections',
         projectContext: 'Enterprise dashboard application with high performance requirements',
-        teamExperience: 'intermediate',
+        teamExperience: 'mid',
         includeRecommendations: true
       });
 

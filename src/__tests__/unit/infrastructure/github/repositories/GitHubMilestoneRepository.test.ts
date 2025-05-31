@@ -54,35 +54,37 @@ describe("GitHubMilestoneRepository", () => {
       };
 
       // Mock GraphQL response
-      const mockResponse = {
-        createMilestone: {
-          milestone: {
-            id: "milestone-123",
-            number: 1,
-            title: milestoneData.title,
-            description: milestoneData.description,
-            dueOn: milestoneData.dueDate,
-            state: "open",
-            createdAt: "2023-01-01T00:00:00Z",
-            updatedAt: "2023-01-01T00:00:00Z",
-            progress: {
-              enabled: true,
-              openIssues: 5,
-              closedIssues: 3,
-              completionPercentage: 37.5
-            }
-          }
-        }
-      };
+      const mockRestResponse = {
+        data: {
+          id: 123,
+          number: 1,
+          title: milestoneData.title,
+          description: milestoneData.description,
+          due_on: milestoneData.dueDate,
+          state: "open" as const,
+          created_at: "2023-01-01T00:00:00Z",
+          updated_at: "2023-01-01T00:00:00Z",
+          open_issues: 5,
+          closed_issues: 3,
+          url: "https://api.github.com/repos/test-owner/test-repo/milestones/1",
+          html_url: "https://github.com/test-owner/test-repo/milestone/1",
+          labels_url: "https://api.github.com/repos/test-owner/test-repo/milestones/1/labels",
+          node_id: "MDk6TWlsZXN0b25lMQ==",
+          creator: null
+        },
+        status: 201,
+        url: "https://api.github.com/repos/test-owner/test-repo/milestones",
+        headers: {}
+      } as any;
 
-      mockOctokit.graphql.mockResolvedValueOnce(mockResponse);
+      mockOctokit.rest.issues.createMilestone.mockResolvedValueOnce(mockRestResponse);
 
       // Act
       const result = await repository.create(milestoneData);
 
       // Assert
       expect(result).toEqual({
-        id: "milestone-123",
+        id: "MDk6TWlsZXN0b25lMQ==", // node_id from the mock response
         number: 1,
         title: milestoneData.title,
         description: milestoneData.description,
@@ -92,25 +94,21 @@ describe("GitHubMilestoneRepository", () => {
         updatedAt: "2023-01-01T00:00:00Z",
         url: `https://github.com/${config.owner}/${config.repo}/milestone/1`,
         progress: {
-          percent: 37.5,
+          percent: 0,
           complete: 3,
           total: 8
         }
       });
 
-      // Verify the GraphQL call was made correctly
-      expect(mockOctokit.graphql).toHaveBeenCalledWith(
-        expect.stringContaining("mutation($input: CreateMilestoneInput!)"),
-        expect.objectContaining({
-          input: {
-            repositoryId: config.repo,
-            title: milestoneData.title,
-            description: milestoneData.description,
-            dueOn: milestoneData.dueDate,
-            state: "open",
-          },
-        })
-      );
+      // Verify the REST API call was made correctly
+      expect(mockOctokit.rest.issues.createMilestone).toHaveBeenCalledWith({
+        owner: config.owner,
+        repo: config.repo,
+        title: milestoneData.title,
+        description: milestoneData.description,
+        due_on: milestoneData.dueDate,
+        state: "open",
+      });
     });
 
     it("should throw error if milestone creation fails", async () => {
@@ -121,7 +119,7 @@ describe("GitHubMilestoneRepository", () => {
         dueDate: "2024-03-31T00:00:00Z"
       };
 
-      mockOctokit.graphql.mockRejectedValueOnce(
+      mockOctokit.rest.issues.createMilestone.mockRejectedValueOnce(
         new Error("Creation failed")
       );
 

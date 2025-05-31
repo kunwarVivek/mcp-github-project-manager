@@ -74,7 +74,7 @@ MCPToolTestUtils.createTestSuite('AI Task Management Tools E2E', 'both')((utils:
 
     it('should enhance an existing PRD', async () => {
       if (!generatedPRDContent) {
-        pending('No PRD generated to enhance');
+        test.skip('No PRD generated to enhance');
         return;
       }
 
@@ -97,7 +97,7 @@ MCPToolTestUtils.createTestSuite('AI Task Management Tools E2E', 'both')((utils:
   describe('Task Generation and Parsing Tools', () => {
     it('should parse PRD and generate tasks', async () => {
       if (!generatedPRDContent) {
-        pending('No PRD generated to parse');
+        test.skip('No PRD generated to parse');
         return;
       }
 
@@ -142,7 +142,7 @@ MCPToolTestUtils.createTestSuite('AI Task Management Tools E2E', 'both')((utils:
 
     it('should get next task recommendations', async () => {
       if (!parsedTasks || parsedTasks.length === 0) {
-        pending('No tasks available for recommendations');
+        test.skip('No tasks available for recommendations');
         return;
       }
 
@@ -167,7 +167,7 @@ MCPToolTestUtils.createTestSuite('AI Task Management Tools E2E', 'both')((utils:
 
     it('should analyze task complexity', async () => {
       if (!parsedTasks || parsedTasks.length === 0) {
-        pending('No tasks available for complexity analysis');
+        test.skip('No tasks available for complexity analysis');
         return;
       }
 
@@ -176,7 +176,7 @@ MCPToolTestUtils.createTestSuite('AI Task Management Tools E2E', 'both')((utils:
         taskTitle: firstTask.title || 'Sample Task',
         taskDescription: firstTask.description || 'Sample task description',
         projectContext: 'Web application development',
-        teamExperience: 'intermediate' as const,
+        teamExperience: 'mid' as const, // Fixed: should be 'junior' | 'mid' | 'senior' | 'mixed'
         includeRecommendations: true
       };
 
@@ -191,7 +191,7 @@ MCPToolTestUtils.createTestSuite('AI Task Management Tools E2E', 'both')((utils:
 
     it('should expand a task into subtasks', async () => {
       if (!parsedTasks || parsedTasks.length === 0) {
-        pending('No tasks available for expansion');
+        test.skip('No tasks available for expansion');
         return;
       }
 
@@ -259,7 +259,7 @@ MCPToolTestUtils.createTestSuite('AI Task Management Tools E2E', 'both')((utils:
   describe('Traceability and Requirements Tools', () => {
     it('should create traceability matrix', async () => {
       if (!generatedPRDContent) {
-        pending('No PRD available for traceability matrix');
+        test.skip('No PRD available for traceability matrix');
         return;
       }
 
