@@ -2,6 +2,7 @@ import { z } from "zod";
 import { McpError, ErrorCode } from "@modelcontextprotocol/sdk/types.js";
 import { MCPResponseFormatter } from "../mcp/MCPResponseFormatter.js";
 import { MCPErrorCode } from "../../domain/mcp-types.js";
+import { ParameterCoercion } from "./ParameterCoercion.js";
 
 export type ToolSchema<T> = z.ZodType<T>;
 
@@ -22,7 +23,9 @@ export class ToolValidator {
    */
   static validate<T>(toolName: string, args: unknown, schema: ToolSchema<T>): T {
     try {
-      return schema.parse(args);
+      // Apply parameter coercion before validation
+      const coercedArgs = ParameterCoercion.coerceParameters(args as Record<string, any>, schema);
+      return schema.parse(coercedArgs);
     } catch (error) {
       if (error instanceof z.ZodError) {
         // Format Zod validation errors
