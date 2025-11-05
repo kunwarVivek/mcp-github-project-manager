@@ -1110,6 +1110,88 @@ export class ProjectManagementService {
     }
   }
 
+  async archiveProjectItem(data: {
+    projectId: string;
+    itemId: string;
+  }): Promise<{ success: boolean; message: string }> {
+    try {
+      const mutation = `
+        mutation($input: ArchiveProjectV2ItemInput!) {
+          archiveProjectV2Item(input: $input) {
+            item {
+              id
+              isArchived
+            }
+          }
+        }
+      `;
+
+      interface ArchiveProjectItemResponse {
+        archiveProjectV2Item: {
+          item: {
+            id: string;
+            isArchived: boolean;
+          };
+        };
+      }
+
+      await this.factory.graphql<ArchiveProjectItemResponse>(mutation, {
+        input: {
+          projectId: data.projectId,
+          itemId: data.itemId
+        }
+      });
+
+      return {
+        success: true,
+        message: `Item ${data.itemId} has been archived in project ${data.projectId}`
+      };
+    } catch (error) {
+      throw this.mapErrorToMCPError(error);
+    }
+  }
+
+  async unarchiveProjectItem(data: {
+    projectId: string;
+    itemId: string;
+  }): Promise<{ success: boolean; message: string }> {
+    try {
+      const mutation = `
+        mutation($input: UnarchiveProjectV2ItemInput!) {
+          unarchiveProjectV2Item(input: $input) {
+            item {
+              id
+              isArchived
+            }
+          }
+        }
+      `;
+
+      interface UnarchiveProjectItemResponse {
+        unarchiveProjectV2Item: {
+          item: {
+            id: string;
+            isArchived: boolean;
+          };
+        };
+      }
+
+      await this.factory.graphql<UnarchiveProjectItemResponse>(mutation, {
+        input: {
+          projectId: data.projectId,
+          itemId: data.itemId
+        }
+      });
+
+      return {
+        success: true,
+        message: `Item ${data.itemId} has been unarchived in project ${data.projectId}`
+      };
+    } catch (error) {
+      throw this.mapErrorToMCPError(error);
+    }
+  }
+
   async listProjectItems(data: {
     projectId: string;
     limit?: number;
@@ -1723,6 +1805,49 @@ export class ProjectManagementService {
     }
   }
 
+  async clearFieldValue(data: {
+    projectId: string;
+    itemId: string;
+    fieldId: string;
+  }): Promise<{ success: boolean; message: string }> {
+    try {
+      const mutation = `
+        mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!) {
+          clearProjectV2ItemFieldValue(input: {
+            projectId: $projectId
+            itemId: $itemId
+            fieldId: $fieldId
+          }) {
+            projectV2Item {
+              id
+            }
+          }
+        }
+      `;
+
+      interface ClearFieldValueResponse {
+        clearProjectV2ItemFieldValue: {
+          projectV2Item: {
+            id: string;
+          }
+        }
+      }
+
+      await this.factory.graphql<ClearFieldValueResponse>(mutation, {
+        projectId: data.projectId,
+        itemId: data.itemId,
+        fieldId: data.fieldId
+      });
+
+      return {
+        success: true,
+        message: `Field value cleared successfully for field ${data.fieldId}`
+      };
+    } catch (error) {
+      throw this.mapErrorToMCPError(error);
+    }
+  }
+
   // Project View Operations
   async createProjectView(data: {
     projectId: string;
@@ -1850,6 +1975,22 @@ export class ProjectManagementService {
         sortBy: [],
         groupBy: undefined,
         filters: []
+      };
+    } catch (error) {
+      throw this.mapErrorToMCPError(error);
+    }
+  }
+
+  async deleteProjectView(data: {
+    projectId: string;
+    viewId: string;
+  }): Promise<{ success: boolean; message: string }> {
+    try {
+      await this.projectRepo.deleteView(data.projectId, data.viewId);
+
+      return {
+        success: true,
+        message: `View ${data.viewId} deleted successfully from project ${data.projectId}`
       };
     } catch (error) {
       throw this.mapErrorToMCPError(error);

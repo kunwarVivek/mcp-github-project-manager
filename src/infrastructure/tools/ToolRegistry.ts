@@ -32,14 +32,18 @@ import {
   addProjectItemTool,
   removeProjectItemTool,
   listProjectItemsTool,
+  archiveProjectItemTool,
+  unarchiveProjectItemTool,
 
   // Field values tools
   setFieldValueTool,
   getFieldValueTool,
+  clearFieldValueTool,
 
   // View tools
   listProjectViewsTool,
   updateProjectViewTool,
+  deleteProjectViewTool,
 
   // Milestone tools
   updateMilestoneTool,
@@ -174,15 +178,19 @@ export class ToolRegistry {
     this.registerTool(createProjectViewTool);
     this.registerTool(listProjectViewsTool);
     this.registerTool(updateProjectViewTool);
+    this.registerTool(deleteProjectViewTool);
 
     // Register project item tools
     this.registerTool(addProjectItemTool);
     this.registerTool(removeProjectItemTool);
     this.registerTool(listProjectItemsTool);
+    this.registerTool(archiveProjectItemTool);
+    this.registerTool(unarchiveProjectItemTool);
 
     // Register field value tools
     this.registerTool(setFieldValueTool);
     this.registerTool(getFieldValueTool);
+    this.registerTool(clearFieldValueTool);
 
     // Register label tools
     this.registerTool(createLabelTool);

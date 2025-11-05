@@ -1,14 +1,19 @@
 import { BaseGitHubRepository } from "./BaseRepository";
-import { Project, CreateProject, ProjectRepository, ProjectId, ProjectView, CustomField } from "../../../domain/types";
+import { Project, CreateProject, ProjectRepository, ProjectId, ProjectView, CustomField, ViewLayout } from "../../../domain/types";
 import { ResourceType, ResourceStatus } from "../../../domain/resource-types";
 import { GitHubTypeConverter } from "../util/conversion";
-import { 
-  mapToGraphQLFieldType, 
+import {
+  mapToGraphQLFieldType,
   mapFromGraphQLFieldType,
-  CreateProjectV2FieldResponse, 
-  UpdateProjectV2FieldResponse 
+  CreateProjectV2FieldResponse,
+  UpdateProjectV2FieldResponse
 } from "../util/graphql-helpers";
-import { GraphQLFieldType } from "../graphql-types";
+import {
+  GraphQLFieldType,
+  CreateProjectV2ViewResponse,
+  UpdateProjectV2ViewResponse,
+  mapToGraphQLViewLayout
+} from "../graphql-types";
 
 interface GitHubProject {
   id: string;
@@ -327,32 +332,128 @@ export class GitHubProjectRepository extends BaseGitHubRepository implements Pro
   }
 
   async createView(projectId: ProjectId, name: string, layout: ProjectView["layout"]): Promise<ProjectView> {
-    // Convert parameters to match the implementation needs
-    const view: Omit<ProjectView, "id"> = {
-      name,
-      layout,
-      settings: { groupBy: "", sortBy: [] }
-    };
-    
-    // TODO: Implement project view creation using GitHub's API
-    return {
-      id: `view_${Date.now()}`,
-      ...view,
-    };
+    const mutation = `
+      mutation($input: CreateProjectV2ViewInput!) {
+        createProjectV2View(input: $input) {
+          projectV2View {
+            id
+            name
+            layout
+          }
+        }
+      }
+    `;
+
+    try {
+      const graphqlLayout = mapToGraphQLViewLayout(layout);
+
+      const variables = {
+        input: {
+          projectId,
+          name,
+          layout: graphqlLayout
+        }
+      };
+
+      const response = await this.graphql<CreateProjectV2ViewResponse>(mutation, variables);
+
+      if (!response.createProjectV2View?.projectV2View) {
+        throw new Error('Failed to create project view: Invalid response from GitHub API');
+      }
+
+      const view = response.createProjectV2View.projectV2View;
+
+      return {
+        id: view.id,
+        name: view.name,
+        layout: view.layout.toLowerCase() as ViewLayout,
+        fields: [],
+        sortBy: [],
+        groupBy: undefined,
+        filters: []
+      };
+    } catch (error) {
+      this.logger.error(`Failed to create project view for project ${projectId}`, error);
+      throw this.handleGraphQLError(error);
+    }
   }
 
   async updateView(projectId: ProjectId, viewId: string, data: Partial<ProjectView>): Promise<ProjectView> {
-    // TODO: Implement project view update using GitHub's API
-    return {
-      id: viewId,
-      name: data.name || "",
-      layout: data.layout || "board",
-      settings: data.settings || { groupBy: "", sortBy: [] },
-    };
+    const mutation = `
+      mutation($input: UpdateProjectV2ViewInput!) {
+        updateProjectV2View(input: $input) {
+          projectV2View {
+            id
+            name
+            layout
+          }
+        }
+      }
+    `;
+
+    try {
+      const input: Record<string, any> = {
+        projectId,
+        viewId
+      };
+
+      if (data.name !== undefined) {
+        input.name = data.name;
+      }
+
+      if (data.layout !== undefined) {
+        input.layout = mapToGraphQLViewLayout(data.layout);
+      }
+
+      const response = await this.graphql<UpdateProjectV2ViewResponse>(mutation, {
+        input
+      });
+
+      if (!response.updateProjectV2View?.projectV2View) {
+        throw new Error('Failed to update project view: Invalid response from GitHub API');
+      }
+
+      const view = response.updateProjectV2View.projectV2View;
+
+      return {
+        id: view.id,
+        name: view.name,
+        layout: view.layout.toLowerCase() as ViewLayout,
+        fields: [],
+        sortBy: [],
+        groupBy: undefined,
+        filters: []
+      };
+    } catch (error) {
+      this.logger.error(`Failed to update project view ${viewId}`, error);
+      throw this.handleGraphQLError(error);
+    }
   }
 
   async deleteView(projectId: ProjectId, viewId: string): Promise<void> {
-    // TODO: Implement project view deletion using GitHub's API
+    const mutation = `
+      mutation($input: DeleteProjectV2ViewInput!) {
+        deleteProjectV2View(input: $input) {
+          projectV2View {
+            id
+          }
+        }
+      }
+    `;
+
+    try {
+      await this.graphql(mutation, {
+        input: {
+          projectId,
+          viewId
+        }
+      });
+
+      this.logger.info(`Deleted project view ${viewId} from project ${projectId}`);
+    } catch (error) {
+      this.logger.error(`Failed to delete project view ${viewId}`, error);
+      throw this.handleGraphQLError(error);
+    }
   }
 
   async createField(projectId: ProjectId, field: Omit<CustomField, "id">): Promise<CustomField> {

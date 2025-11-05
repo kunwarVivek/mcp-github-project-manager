@@ -709,6 +709,22 @@ export const listProjectItemsSchema = z.object({
 
 export type ListProjectItemsArgs = z.infer<typeof listProjectItemsSchema>;
 
+// Schema for archive_project_item tool
+export const archiveProjectItemSchema = z.object({
+  projectId: z.string().min(1, "Project ID is required"),
+  itemId: z.string().min(1, "Item ID is required"),
+});
+
+export type ArchiveProjectItemArgs = z.infer<typeof archiveProjectItemSchema>;
+
+// Schema for unarchive_project_item tool
+export const unarchiveProjectItemSchema = z.object({
+  projectId: z.string().min(1, "Project ID is required"),
+  itemId: z.string().min(1, "Item ID is required"),
+});
+
+export type UnarchiveProjectItemArgs = z.infer<typeof unarchiveProjectItemSchema>;
+
 // Schema for set_field_value tool
 export const setFieldValueSchema = z.object({
   projectId: z.string().min(1, "Project ID is required"),
@@ -728,6 +744,15 @@ export const getFieldValueSchema = z.object({
 
 export type GetFieldValueArgs = z.infer<typeof getFieldValueSchema>;
 
+// Schema for clear_field_value tool
+export const clearFieldValueSchema = z.object({
+  projectId: z.string().min(1, "Project ID is required"),
+  itemId: z.string().min(1, "Item ID is required"),
+  fieldId: z.string().min(1, "Field ID is required"),
+});
+
+export type ClearFieldValueArgs = z.infer<typeof clearFieldValueSchema>;
+
 // Schema for list_project_views tool
 export const listProjectViewsSchema = z.object({
   projectId: z.string().min(1, "Project ID is required"),
@@ -744,6 +769,14 @@ export const updateProjectViewSchema = z.object({
 });
 
 export type UpdateProjectViewArgs = z.infer<typeof updateProjectViewSchema>;
+
+// Schema for delete_project_view tool
+export const deleteProjectViewSchema = z.object({
+  projectId: z.string().min(1, "Project ID is required"),
+  viewId: z.string().min(1, "View ID is required"),
+});
+
+export type DeleteProjectViewArgs = z.infer<typeof deleteProjectViewSchema>;
 
 // Schema for update_milestone tool
 export const updateMilestoneSchema = z.object({
@@ -935,6 +968,38 @@ export const listProjectItemsTool: ToolDefinition<ListProjectItemsArgs> = {
   ]
 };
 
+export const archiveProjectItemTool: ToolDefinition<ArchiveProjectItemArgs> = {
+  name: "archive_project_item",
+  description: "Archive an item in a GitHub project. Archived items are hidden from views but not deleted.",
+  schema: archiveProjectItemSchema as unknown as ToolSchema<ArchiveProjectItemArgs>,
+  examples: [
+    {
+      name: "Archive completed task",
+      description: "Archive a project item that is complete",
+      args: {
+        projectId: "PVT_kwDOLhQ7gc4AOEbH",
+        itemId: "PVTI_lADOLhQ7gc4AOEbHzM4AOAJ7"
+      }
+    }
+  ]
+};
+
+export const unarchiveProjectItemTool: ToolDefinition<UnarchiveProjectItemArgs> = {
+  name: "unarchive_project_item",
+  description: "Unarchive an item in a GitHub project. Brings back a previously archived item.",
+  schema: unarchiveProjectItemSchema as unknown as ToolSchema<UnarchiveProjectItemArgs>,
+  examples: [
+    {
+      name: "Unarchive task",
+      description: "Restore an archived project item",
+      args: {
+        projectId: "PVT_kwDOLhQ7gc4AOEbH",
+        itemId: "PVTI_lADOLhQ7gc4AOEbHzM4AOAJ7"
+      }
+    }
+  ]
+};
+
 export const setFieldValueTool: ToolDefinition<SetFieldValueArgs> = {
   name: "set_field_value",
   description: "Set a field value for a GitHub project item. Supports all field types: TEXT, NUMBER, DATE, SINGLE_SELECT, ITERATION, MILESTONE, ASSIGNEES, LABELS",
@@ -1105,6 +1170,32 @@ export const getFieldValueTool: ToolDefinition<GetFieldValueArgs> = {
   ]
 };
 
+export const clearFieldValueTool: ToolDefinition<ClearFieldValueArgs> = {
+  name: "clear_field_value",
+  description: "Clear a field value for a GitHub project item. This removes/clears the value for any field type.",
+  schema: clearFieldValueSchema as unknown as ToolSchema<ClearFieldValueArgs>,
+  examples: [
+    {
+      name: "Clear status field",
+      description: "Clear the status field for an item",
+      args: {
+        projectId: "PVT_kwDOLhQ7gc4AOEbH",
+        itemId: "PVTI_lADOLhQ7gc4AOEbHzM4AOAJ7",
+        fieldId: "PVTF_lADOLhQ7gc4AOEbHzM4AOAI1"
+      }
+    },
+    {
+      name: "Clear iteration assignment",
+      description: "Remove an item from its current iteration/sprint",
+      args: {
+        projectId: "PVT_kwDOLhQ7gc4AOEbH",
+        itemId: "PVTI_lADOLhQ7gc4AOEbHzM4AOAJ7",
+        fieldId: "PVTF_lADOLhQ7gc4AOEbHzM4AOAI2"
+      }
+    }
+  ]
+};
+
 export const listProjectViewsTool: ToolDefinition<ListProjectViewsArgs> = {
   name: "list_project_views",
   description: "List all views in a GitHub project",
@@ -1133,6 +1224,22 @@ export const updateProjectViewTool: ToolDefinition<UpdateProjectViewArgs> = {
         viewId: "PVV_lADOLhQ7gc4AOEbHzM4AOAL9",
         name: "Development Timeline",
         layout: "timeline"
+      }
+    }
+  ]
+};
+
+export const deleteProjectViewTool: ToolDefinition<DeleteProjectViewArgs> = {
+  name: "delete_project_view",
+  description: "Delete a view from a GitHub project",
+  schema: deleteProjectViewSchema as unknown as ToolSchema<DeleteProjectViewArgs>,
+  examples: [
+    {
+      name: "Delete project view",
+      description: "Delete a specific view from a project",
+      args: {
+        projectId: "PVT_kwDOLhQ7gc4AOEbH",
+        viewId: "PVV_lADOLhQ7gc4AOEbHzM4AOAL9"
       }
     }
   ]

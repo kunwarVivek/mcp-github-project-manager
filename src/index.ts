@@ -329,6 +329,9 @@ class GitHubProjectManagerServer {
       case "update_project_view":
         return await this.service.updateProjectView(args);
 
+      case "delete_project_view":
+        return await this.service.deleteProjectView(args);
+
       // Project item tools
       case "add_project_item":
         return await this.service.addProjectItem(args);
@@ -339,11 +342,20 @@ class GitHubProjectManagerServer {
       case "list_project_items":
         return await this.service.listProjectItems(args);
 
+      case "archive_project_item":
+        return await this.service.archiveProjectItem(args);
+
+      case "unarchive_project_item":
+        return await this.service.unarchiveProjectItem(args);
+
       case "set_field_value":
         return await this.service.setFieldValue(args);
 
       case "get_field_value":
         return await this.service.getFieldValue(args);
+
+      case "clear_field_value":
+        return await this.service.clearFieldValue(args);
 
       // Event management tools
       case "subscribe_to_events":
