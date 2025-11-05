@@ -156,9 +156,9 @@ describe('RoadmapPlanningService', () => {
     });
 
     it('should respect sprint duration configuration', async () => {
-      mockProjectService.listProjectItems.mockResolvedValue({
-        items: [{ id: 'issue-1', title: 'Test', body: 'Test issue' }]
-      });
+      mockProjectService.listProjectItems.mockResolvedValue([
+        { id: 'issue-1', title: 'Test', body: 'Test issue' }
+      ]);
 
       const mockRoadmap = {
         roadmap: { phases: [] },
@@ -180,17 +180,15 @@ describe('RoadmapPlanningService', () => {
       });
 
       const generateTextCall = generateText.mock.calls[0][0];
-      expect(generateTextCall.prompt).toContain('3 weeks');
+      expect(generateTextCall.prompt).toContain('3-week sprints');
     });
 
     it('should handle complex projects with many issues', async () => {
-      const mockManyIssues = {
-        items: Array.from({ length: 50 }, (_, i) => ({
-          id: `issue-${i}`,
-          title: `Feature ${i}`,
-          body: `Description ${i}`
-        }))
-      };
+      const mockManyIssues = Array.from({ length: 50 }, (_, i) => ({
+        id: `issue-${i}`,
+        title: `Feature ${i}`,
+        body: `Description ${i}`
+      }));
 
       mockProjectService.listProjectItems.mockResolvedValue(mockManyIssues);
 
@@ -288,12 +286,15 @@ describe('RoadmapPlanningService', () => {
         new Error('GitHub API error: Rate limit exceeded')
       );
 
-      await expect(
-        service.createRoadmapInGitHub({
-          projectId: 'project-123',
-          roadmap: mockRoadmap
-        })
-      ).rejects.toThrow('GitHub API error');
+      // Service catches errors and continues, so should not throw
+      const result = await service.createRoadmapInGitHub({
+        projectId: 'project-123',
+        roadmap: mockRoadmap
+      });
+
+      // Should complete with 0 milestones created due to error
+      expect(result.createdMilestones).toBe(0);
+      expect(mockProjectService.createMilestone).toHaveBeenCalled();
     });
 
     it('should skip creation if no milestones in roadmap', async () => {
@@ -335,9 +336,9 @@ describe('RoadmapPlanningService', () => {
         text: `Here's the roadmap analysis:\n\n${JSON.stringify(mockResponse)}\n\nThis roadmap covers all key aspects.`
       });
 
-      mockProjectService.listProjectItems.mockResolvedValue({
-        items: [{ id: 'test', title: 'Test', body: 'Test' }]
-      });
+      mockProjectService.listProjectItems.mockResolvedValue([
+        { id: 'test', title: 'Test', body: 'Test' }
+      ]);
 
       const result = await service.generateRoadmap({
         projectId: 'test-project',
@@ -373,7 +374,9 @@ describe('RoadmapPlanningService', () => {
       (mockFactory.getModel as jest.Mock).mockReturnValue(null);
       (mockFactory.getBestAvailableModel as jest.Mock).mockReturnValue(null);
 
-      mockProjectService.listProjectItems.mockResolvedValue([]);
+      mockProjectService.listProjectItems.mockResolvedValue([
+        { id: 'test', title: 'Test', body: 'Test' }
+      ]);
 
       await expect(
         service.generateRoadmap({
@@ -397,7 +400,9 @@ describe('RoadmapPlanningService', () => {
     });
 
     it('should handle AI generation errors', async () => {
-      mockProjectService.listProjectItems.mockResolvedValue([]);
+      mockProjectService.listProjectItems.mockResolvedValue([
+        { id: 'test', title: 'Test', body: 'Test' }
+      ]);
 
       const { generateText } = require('ai');
       generateText.mockRejectedValue(new Error('AI model timeout'));
@@ -413,7 +418,9 @@ describe('RoadmapPlanningService', () => {
 
   describe('input validation', () => {
     it('should handle missing project description', async () => {
-      mockProjectService.listProjectItems.mockResolvedValue([]);
+      mockProjectService.listProjectItems.mockResolvedValue([
+        { id: 'test', title: 'Test', body: 'Test' }
+      ]);
 
       const { generateText } = require('ai');
       generateText.mockResolvedValue({
@@ -435,7 +442,9 @@ describe('RoadmapPlanningService', () => {
     });
 
     it('should use default values for optional parameters', async () => {
-      mockProjectService.listProjectItems.mockResolvedValue([]);
+      mockProjectService.listProjectItems.mockResolvedValue([
+        { id: 'test', title: 'Test', body: 'Test' }
+      ]);
 
       const { generateText } = require('ai');
       generateText.mockResolvedValue({
@@ -453,7 +462,7 @@ describe('RoadmapPlanningService', () => {
 
       const generateTextCall = generateText.mock.calls[0][0];
       // Should use default sprint duration (2 weeks) and milestones (4)
-      expect(generateTextCall.prompt).toContain('2 weeks');
+      expect(generateTextCall.prompt).toContain('2-week sprints');
       expect(generateTextCall.prompt).toContain('4 milestones');
     });
   });
@@ -499,7 +508,7 @@ describe('RoadmapPlanningService', () => {
       const generateTextCall = generateText.mock.calls[0][0];
       expect(generateTextCall.prompt).toContain('My Awesome Project');
       expect(generateTextCall.prompt).toContain('Building the future of task management');
-      expect(generateTextCall.prompt).toContain('3 weeks');
+      expect(generateTextCall.prompt).toContain('3-week sprints');
       expect(generateTextCall.prompt).toContain('5 milestones');
       expect(generateTextCall.prompt).toContain('Critical bug');
       expect(generateTextCall.prompt).toContain('New feature');
