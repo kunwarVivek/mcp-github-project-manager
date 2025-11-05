@@ -28,6 +28,15 @@ import {
   updateDraftIssueTool,
   deleteDraftIssueTool,
 
+  // Pull Request tools
+  createPullRequestTool,
+  getPullRequestTool,
+  listPullRequestsTool,
+  updatePullRequestTool,
+  mergePullRequestTool,
+  listPullRequestReviewsTool,
+  createPullRequestReviewTool,
+
   createSprintTool,
   listSprintsTool,
   getCurrentSprintTool,
@@ -187,6 +196,15 @@ export class ToolRegistry {
     this.registerTool(createDraftIssueTool);
     this.registerTool(updateDraftIssueTool);
     this.registerTool(deleteDraftIssueTool);
+
+    // Register pull request tools
+    this.registerTool(createPullRequestTool);
+    this.registerTool(getPullRequestTool);
+    this.registerTool(listPullRequestsTool);
+    this.registerTool(updatePullRequestTool);
+    this.registerTool(mergePullRequestTool);
+    this.registerTool(listPullRequestReviewsTool);
+    this.registerTool(createPullRequestReviewTool);
 
     // Register sprint tools
     this.registerTool(createSprintTool);

@@ -542,11 +542,101 @@ export class GitHubProjectRepository extends BaseGitHubRepository implements Pro
         }
       };
 
+      // Handle single_select option updates
       if (updates.type === 'single_select' && updates.options && updates.options.length > 0) {
         const currentField = await this.getField(projectId, fieldId);
-        
+
         if (currentField && currentField.type === 'single_select') {
-          // TODO: Implement option diff and update operations
+          const currentOptions = currentField.options || [];
+          const newOptions = updates.options;
+
+          // Find options to add (in newOptions but not in currentOptions)
+          const optionsToAdd = newOptions.filter(
+            newOpt => !currentOptions.some(currOpt => currOpt.name === newOpt.name)
+          );
+
+          // Find options to delete (in currentOptions but not in newOptions)
+          const optionsToDelete = currentOptions.filter(
+            currOpt => !newOptions.some(newOpt => newOpt.name === currOpt.name)
+          );
+
+          // Find options to update (same name but different color)
+          const optionsToUpdate = newOptions.filter(newOpt => {
+            const currOpt = currentOptions.find(c => c.name === newOpt.name);
+            return currOpt && currOpt.color !== newOpt.color;
+          });
+
+          // Add new options
+          for (const option of optionsToAdd) {
+            const addMutation = `
+              mutation($input: AddProjectV2SingleSelectOptionInput!) {
+                addProjectV2SingleSelectOption(input: $input) {
+                  projectV2SingleSelectOption {
+                    id
+                    name
+                  }
+                }
+              }
+            `;
+
+            await this.graphql(addMutation, {
+              input: {
+                projectId,
+                fieldId,
+                name: option.name,
+                color: option.color || 'GRAY'
+              }
+            });
+          }
+
+          // Update existing options (color changes)
+          for (const option of optionsToUpdate) {
+            const currOpt = currentOptions.find(c => c.name === option.name);
+            if (currOpt && currOpt.id) {
+              const updateMutation = `
+                mutation($input: UpdateProjectV2SingleSelectOptionInput!) {
+                  updateProjectV2SingleSelectOption(input: $input) {
+                    projectV2SingleSelectOption {
+                      id
+                      name
+                      color
+                    }
+                  }
+                }
+              `;
+
+              await this.graphql(updateMutation, {
+                input: {
+                  projectId,
+                  fieldId,
+                  optionId: currOpt.id,
+                  name: option.name,
+                  color: option.color || 'GRAY'
+                }
+              });
+            }
+          }
+
+          // Delete removed options
+          for (const option of optionsToDelete) {
+            if (option.id) {
+              const deleteMutation = `
+                mutation($input: DeleteProjectV2SingleSelectOptionInput!) {
+                  deleteProjectV2SingleSelectOption(input: $input) {
+                    deletedOptionId
+                  }
+                }
+              `;
+
+              await this.graphql(deleteMutation, {
+                input: {
+                  projectId,
+                  fieldId,
+                  optionId: option.id
+                }
+              });
+            }
+          }
         }
       }
 

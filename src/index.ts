@@ -320,6 +320,28 @@ class GitHubProjectManagerServer {
       case "delete_draft_issue":
         return await this.service.deleteDraftIssue(args);
 
+      // Pull Request tools
+      case "create_pull_request":
+        return await this.service.createPullRequest(args);
+
+      case "get_pull_request":
+        return await this.service.getPullRequest(args);
+
+      case "list_pull_requests":
+        return await this.service.listPullRequests(args);
+
+      case "update_pull_request":
+        return await this.service.updatePullRequest(args);
+
+      case "merge_pull_request":
+        return await this.service.mergePullRequest(args);
+
+      case "list_pull_request_reviews":
+        return await this.service.listPullRequestReviews(args);
+
+      case "create_pull_request_review":
+        return await this.service.createPullRequestReview(args);
+
       // Sprint tools
       case "create_sprint":
         return await this.service.createSprint(args);
