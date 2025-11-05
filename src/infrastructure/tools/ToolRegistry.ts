@@ -16,6 +16,27 @@ import {
   listIssuesTool,
   getIssueTool,
   updateIssueTool,
+
+  // Issue comment tools
+  createIssueCommentTool,
+  updateIssueCommentTool,
+  deleteIssueCommentTool,
+  listIssueCommentsTool,
+
+  // Draft issue tools
+  createDraftIssueTool,
+  updateDraftIssueTool,
+  deleteDraftIssueTool,
+
+  // Pull Request tools
+  createPullRequestTool,
+  getPullRequestTool,
+  listPullRequestsTool,
+  updatePullRequestTool,
+  mergePullRequestTool,
+  listPullRequestReviewsTool,
+  createPullRequestReviewTool,
+
   createSprintTool,
   listSprintsTool,
   getCurrentSprintTool,
@@ -25,6 +46,8 @@ import {
   // New project tools
   updateProjectTool,
   deleteProjectTool,
+  getProjectReadmeTool,
+  updateProjectReadmeTool,
   listProjectFieldsTool,
   updateProjectFieldTool,
 
@@ -32,14 +55,18 @@ import {
   addProjectItemTool,
   removeProjectItemTool,
   listProjectItemsTool,
+  archiveProjectItemTool,
+  unarchiveProjectItemTool,
 
   // Field values tools
   setFieldValueTool,
   getFieldValueTool,
+  clearFieldValueTool,
 
   // View tools
   listProjectViewsTool,
   updateProjectViewTool,
+  deleteProjectViewTool,
 
   // Milestone tools
   updateMilestoneTool,
@@ -63,6 +90,30 @@ import {
   expandTaskTool,
   enhancePRDTool,
   createTraceabilityMatrixTool,
+
+  // Automation service tools
+  createAutomationRuleTool,
+  updateAutomationRuleTool,
+  deleteAutomationRuleTool,
+  getAutomationRuleTool,
+  listAutomationRulesTool,
+  enableAutomationRuleTool,
+  disableAutomationRuleTool,
+
+  // Iteration management tools
+  getIterationConfigurationTool,
+  getCurrentIterationTool,
+  getIterationItemsTool,
+  getIterationByDateTool,
+  assignItemsToIterationTool,
+
+  // AI-powered automation tools
+  generateRoadmapTool,
+  enrichIssueTool,
+  enrichIssuesBulkTool,
+  triageIssueTool,
+  triageAllIssuesTool,
+  scheduleTriagingTool,
 } from "./ToolSchemas.js";
 
 /**
@@ -144,6 +195,8 @@ export class ToolRegistry {
     this.registerTool(getProjectTool);
     this.registerTool(updateProjectTool);
     this.registerTool(deleteProjectTool);
+    this.registerTool(getProjectReadmeTool);
+    this.registerTool(updateProjectReadmeTool);
 
     // Register milestone tools
     this.registerTool(createMilestoneTool);
@@ -156,6 +209,26 @@ export class ToolRegistry {
     this.registerTool(listIssuesTool);
     this.registerTool(getIssueTool);
     this.registerTool(updateIssueTool);
+
+    // Register issue comment tools
+    this.registerTool(createIssueCommentTool);
+    this.registerTool(updateIssueCommentTool);
+    this.registerTool(deleteIssueCommentTool);
+    this.registerTool(listIssueCommentsTool);
+
+    // Register draft issue tools
+    this.registerTool(createDraftIssueTool);
+    this.registerTool(updateDraftIssueTool);
+    this.registerTool(deleteDraftIssueTool);
+
+    // Register pull request tools
+    this.registerTool(createPullRequestTool);
+    this.registerTool(getPullRequestTool);
+    this.registerTool(listPullRequestsTool);
+    this.registerTool(updatePullRequestTool);
+    this.registerTool(mergePullRequestTool);
+    this.registerTool(listPullRequestReviewsTool);
+    this.registerTool(createPullRequestReviewTool);
 
     // Register sprint tools
     this.registerTool(createSprintTool);
@@ -174,15 +247,19 @@ export class ToolRegistry {
     this.registerTool(createProjectViewTool);
     this.registerTool(listProjectViewsTool);
     this.registerTool(updateProjectViewTool);
+    this.registerTool(deleteProjectViewTool);
 
     // Register project item tools
     this.registerTool(addProjectItemTool);
     this.registerTool(removeProjectItemTool);
     this.registerTool(listProjectItemsTool);
+    this.registerTool(archiveProjectItemTool);
+    this.registerTool(unarchiveProjectItemTool);
 
     // Register field value tools
     this.registerTool(setFieldValueTool);
     this.registerTool(getFieldValueTool);
+    this.registerTool(clearFieldValueTool);
 
     // Register label tools
     this.registerTool(createLabelTool);
@@ -197,6 +274,30 @@ export class ToolRegistry {
     this.registerTool(expandTaskTool);
     this.registerTool(enhancePRDTool);
     this.registerTool(createTraceabilityMatrixTool);
+
+    // Register automation service tools
+    this.registerTool(createAutomationRuleTool);
+    this.registerTool(updateAutomationRuleTool);
+    this.registerTool(deleteAutomationRuleTool);
+    this.registerTool(getAutomationRuleTool);
+    this.registerTool(listAutomationRulesTool);
+    this.registerTool(enableAutomationRuleTool);
+    this.registerTool(disableAutomationRuleTool);
+
+    // Register iteration management tools
+    this.registerTool(getIterationConfigurationTool);
+    this.registerTool(getCurrentIterationTool);
+    this.registerTool(getIterationItemsTool);
+    this.registerTool(getIterationByDateTool);
+    this.registerTool(assignItemsToIterationTool);
+
+    // Register AI-powered automation tools
+    this.registerTool(generateRoadmapTool);
+    this.registerTool(enrichIssueTool);
+    this.registerTool(enrichIssuesBulkTool);
+    this.registerTool(triageIssueTool);
+    this.registerTool(triageAllIssuesTool);
+    this.registerTool(scheduleTriagingTool);
   }
 
   /**

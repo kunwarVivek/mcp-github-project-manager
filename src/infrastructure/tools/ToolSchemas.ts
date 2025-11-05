@@ -175,6 +175,131 @@ export const updateIssueSchema = z.object({
 
 export type UpdateIssueArgs = z.infer<typeof updateIssueSchema>;
 
+// Schema for create_issue_comment tool
+export const createIssueCommentSchema = z.object({
+  issueNumber: z.number().int().positive("Issue number must be a positive integer"),
+  body: z.string().min(1, "Comment body is required"),
+});
+
+export type CreateIssueCommentArgs = z.infer<typeof createIssueCommentSchema>;
+
+// Schema for update_issue_comment tool
+export const updateIssueCommentSchema = z.object({
+  commentId: z.number().int().positive("Comment ID must be a positive integer"),
+  body: z.string().min(1, "Comment body is required"),
+});
+
+export type UpdateIssueCommentArgs = z.infer<typeof updateIssueCommentSchema>;
+
+// Schema for delete_issue_comment tool
+export const deleteIssueCommentSchema = z.object({
+  commentId: z.number().int().positive("Comment ID must be a positive integer"),
+});
+
+export type DeleteIssueCommentArgs = z.infer<typeof deleteIssueCommentSchema>;
+
+// Schema for list_issue_comments tool
+export const listIssueCommentsSchema = z.object({
+  issueNumber: z.number().int().positive("Issue number must be a positive integer"),
+  perPage: z.number().int().positive().max(100).default(100).optional(),
+});
+
+export type ListIssueCommentsArgs = z.infer<typeof listIssueCommentsSchema>;
+
+// Schema for create_draft_issue tool
+export const createDraftIssueSchema = z.object({
+  projectId: z.string().min(1, "Project ID is required"),
+  title: z.string().min(1, "Draft issue title is required"),
+  body: z.string().optional(),
+  assigneeIds: z.array(z.string()).optional(),
+});
+
+export type CreateDraftIssueArgs = z.infer<typeof createDraftIssueSchema>;
+
+// Schema for update_draft_issue tool
+export const updateDraftIssueSchema = z.object({
+  draftIssueId: z.string().min(1, "Draft issue ID is required"),
+  title: z.string().optional(),
+  body: z.string().optional(),
+  assigneeIds: z.array(z.string()).optional(),
+});
+
+export type UpdateDraftIssueArgs = z.infer<typeof updateDraftIssueSchema>;
+
+// Schema for delete_draft_issue tool
+export const deleteDraftIssueSchema = z.object({
+  draftIssueId: z.string().min(1, "Draft issue ID is required"),
+});
+
+export type DeleteDraftIssueArgs = z.infer<typeof deleteDraftIssueSchema>;
+
+// Schema for create_pull_request tool
+export const createPullRequestSchema = z.object({
+  title: z.string().min(1, "Pull request title is required"),
+  body: z.string().optional(),
+  head: z.string().min(1, "Head branch is required"),
+  base: z.string().min(1, "Base branch is required"),
+  draft: z.boolean().optional(),
+});
+
+export type CreatePullRequestArgs = z.infer<typeof createPullRequestSchema>;
+
+// Schema for get_pull_request tool
+export const getPullRequestSchema = z.object({
+  pullNumber: z.number().int().positive("Pull request number must be a positive integer"),
+});
+
+export type GetPullRequestArgs = z.infer<typeof getPullRequestSchema>;
+
+// Schema for list_pull_requests tool
+export const listPullRequestsSchema = z.object({
+  state: z.enum(["open", "closed", "all"]).default("open").optional(),
+  perPage: z.number().int().positive().max(100).default(30).optional(),
+});
+
+export type ListPullRequestsArgs = z.infer<typeof listPullRequestsSchema>;
+
+// Schema for update_pull_request tool
+export const updatePullRequestSchema = z.object({
+  pullNumber: z.number().int().positive("Pull request number must be a positive integer"),
+  title: z.string().optional(),
+  body: z.string().optional(),
+  state: z.enum(["open", "closed"]).optional(),
+});
+
+export type UpdatePullRequestArgs = z.infer<typeof updatePullRequestSchema>;
+
+// Schema for merge_pull_request tool
+export const mergePullRequestSchema = z.object({
+  pullNumber: z.number().int().positive("Pull request number must be a positive integer"),
+  commitTitle: z.string().optional(),
+  commitMessage: z.string().optional(),
+  mergeMethod: z.enum(["merge", "squash", "rebase"]).default("merge").optional(),
+});
+
+export type MergePullRequestArgs = z.infer<typeof mergePullRequestSchema>;
+
+// Schema for list_pull_request_reviews tool
+export const listPullRequestReviewsSchema = z.object({
+  pullNumber: z.number().int().positive("Pull request number must be a positive integer"),
+});
+
+export type ListPullRequestReviewsArgs = z.infer<typeof listPullRequestReviewsSchema>;
+
+// Schema for create_pull_request_review tool
+export const createPullRequestReviewSchema = z.object({
+  pullNumber: z.number().int().positive("Pull request number must be a positive integer"),
+  body: z.string().optional(),
+  event: z.enum(["APPROVE", "REQUEST_CHANGES", "COMMENT"]),
+  comments: z.array(z.object({
+    path: z.string(),
+    position: z.number().int().optional(),
+    body: z.string(),
+  })).optional(),
+});
+
+export type CreatePullRequestReviewArgs = z.infer<typeof createPullRequestReviewSchema>;
+
 // Schema for create_sprint tool
 export const createSprintSchema = z.object({
   title: z.string().min(1, "Sprint title is required"),
@@ -389,6 +514,257 @@ export const updateIssueTool: ToolDefinition<UpdateIssueArgs> = {
         issueId: "42",
         status: "closed",
         milestoneId: "3"
+      }
+    }
+  ]
+};
+
+// Issue comment tools
+export const createIssueCommentTool: ToolDefinition<CreateIssueCommentArgs> = {
+  name: "create_issue_comment",
+  description: "Add a comment to a GitHub issue",
+  schema: createIssueCommentSchema as unknown as ToolSchema<CreateIssueCommentArgs>,
+  examples: [
+    {
+      name: "Add status update comment",
+      description: "Post a comment to update the team on progress",
+      args: {
+        issueNumber: 42,
+        body: "Working on this issue now. Should have a PR ready by EOD."
+      }
+    }
+  ]
+};
+
+export const updateIssueCommentTool: ToolDefinition<UpdateIssueCommentArgs> = {
+  name: "update_issue_comment",
+  description: "Update an existing comment on a GitHub issue",
+  schema: updateIssueCommentSchema as unknown as ToolSchema<UpdateIssueCommentArgs>,
+  examples: [
+    {
+      name: "Correct a comment",
+      description: "Edit a previously posted comment to fix information",
+      args: {
+        commentId: 123456,
+        body: "Updated: PR is ready for review at #45"
+      }
+    }
+  ]
+};
+
+export const deleteIssueCommentTool: ToolDefinition<DeleteIssueCommentArgs> = {
+  name: "delete_issue_comment",
+  description: "Delete a comment from a GitHub issue",
+  schema: deleteIssueCommentSchema as unknown as ToolSchema<DeleteIssueCommentArgs>,
+  examples: [
+    {
+      name: "Remove outdated comment",
+      description: "Delete a comment that is no longer relevant",
+      args: {
+        commentId: 123456
+      }
+    }
+  ]
+};
+
+export const listIssueCommentsTool: ToolDefinition<ListIssueCommentsArgs> = {
+  name: "list_issue_comments",
+  description: "List all comments on a GitHub issue",
+  schema: listIssueCommentsSchema as unknown as ToolSchema<ListIssueCommentsArgs>,
+  examples: [
+    {
+      name: "Get all comments",
+      description: "Retrieve all comments for an issue",
+      args: {
+        issueNumber: 42
+      }
+    },
+    {
+      name: "Get recent comments",
+      description: "Retrieve the 20 most recent comments",
+      args: {
+        issueNumber: 42,
+        perPage: 20
+      }
+    }
+  ]
+};
+
+// Draft issue tools
+export const createDraftIssueTool: ToolDefinition<CreateDraftIssueArgs> = {
+  name: "create_draft_issue",
+  description: "Create a draft issue in a GitHub project. Draft issues are native to Projects v2 and don't require creating a repository issue first.",
+  schema: createDraftIssueSchema as unknown as ToolSchema<CreateDraftIssueArgs>,
+  examples: [
+    {
+      name: "Create draft task",
+      description: "Create a draft issue for brainstorming without committing to the repository",
+      args: {
+        projectId: "PVT_kwDOLhQ7gc4AOEbH",
+        title: "Explore new authentication options",
+        body: "Research OAuth providers and compare features"
+      }
+    }
+  ]
+};
+
+export const updateDraftIssueTool: ToolDefinition<UpdateDraftIssueArgs> = {
+  name: "update_draft_issue",
+  description: "Update an existing draft issue in a GitHub project",
+  schema: updateDraftIssueSchema as unknown as ToolSchema<UpdateDraftIssueArgs>,
+  examples: [
+    {
+      name: "Update draft details",
+      description: "Refine a draft issue with more information",
+      args: {
+        draftIssueId: "DI_kwDOLhQ7gc4AABB",
+        title: "Implement OAuth 2.0 authentication",
+        body: "Use Auth0 as the provider. See research doc for details."
+      }
+    }
+  ]
+};
+
+export const deleteDraftIssueTool: ToolDefinition<DeleteDraftIssueArgs> = {
+  name: "delete_draft_issue",
+  description: "Delete a draft issue from a GitHub project",
+  schema: deleteDraftIssueSchema as unknown as ToolSchema<DeleteDraftIssueArgs>,
+  examples: [
+    {
+      name: "Remove draft",
+      description: "Delete a draft issue that's no longer needed",
+      args: {
+        draftIssueId: "DI_kwDOLhQ7gc4AABB"
+      }
+    }
+  ]
+};
+
+// Pull Request tools
+export const createPullRequestTool: ToolDefinition<CreatePullRequestArgs> = {
+  name: "create_pull_request",
+  description: "Create a new pull request in a GitHub repository",
+  schema: createPullRequestSchema as unknown as ToolSchema<CreatePullRequestArgs>,
+  examples: [
+    {
+      name: "Create feature PR",
+      description: "Create a pull request for a new feature",
+      args: {
+        title: "Add user authentication",
+        body: "Implements OAuth 2.0 authentication with Auth0",
+        head: "feature/auth",
+        base: "main"
+      }
+    }
+  ]
+};
+
+export const getPullRequestTool: ToolDefinition<GetPullRequestArgs> = {
+  name: "get_pull_request",
+  description: "Get details of a specific pull request",
+  schema: getPullRequestSchema as unknown as ToolSchema<GetPullRequestArgs>,
+  examples: [
+    {
+      name: "Get PR details",
+      description: "Retrieve information about PR #42",
+      args: {
+        pullNumber: 42
+      }
+    }
+  ]
+};
+
+export const listPullRequestsTool: ToolDefinition<ListPullRequestsArgs> = {
+  name: "list_pull_requests",
+  description: "List pull requests in a GitHub repository",
+  schema: listPullRequestsSchema as unknown as ToolSchema<ListPullRequestsArgs>,
+  examples: [
+    {
+      name: "List open PRs",
+      description: "Get all open pull requests",
+      args: {
+        state: "open"
+      }
+    }
+  ]
+};
+
+export const updatePullRequestTool: ToolDefinition<UpdatePullRequestArgs> = {
+  name: "update_pull_request",
+  description: "Update a pull request's title, body, or state",
+  schema: updatePullRequestSchema as unknown as ToolSchema<UpdatePullRequestArgs>,
+  examples: [
+    {
+      name: "Update PR title",
+      description: "Update the title of a pull request",
+      args: {
+        pullNumber: 42,
+        title: "feat: Add OAuth 2.0 authentication"
+      }
+    }
+  ]
+};
+
+export const mergePullRequestTool: ToolDefinition<MergePullRequestArgs> = {
+  name: "merge_pull_request",
+  description: "Merge a pull request using merge, squash, or rebase",
+  schema: mergePullRequestSchema as unknown as ToolSchema<MergePullRequestArgs>,
+  examples: [
+    {
+      name: "Squash and merge",
+      description: "Merge a PR with squash strategy",
+      args: {
+        pullNumber: 42,
+        mergeMethod: "squash",
+        commitTitle: "feat: Add authentication"
+      }
+    }
+  ]
+};
+
+export const listPullRequestReviewsTool: ToolDefinition<ListPullRequestReviewsArgs> = {
+  name: "list_pull_request_reviews",
+  description: "List all reviews on a pull request",
+  schema: listPullRequestReviewsSchema as unknown as ToolSchema<ListPullRequestReviewsArgs>,
+  examples: [
+    {
+      name: "Get PR reviews",
+      description: "List all reviews for PR #42",
+      args: {
+        pullNumber: 42
+      }
+    }
+  ]
+};
+
+export const createPullRequestReviewTool: ToolDefinition<CreatePullRequestReviewArgs> = {
+  name: "create_pull_request_review",
+  description: "Create a review on a pull request (approve, request changes, or comment)",
+  schema: createPullRequestReviewSchema as unknown as ToolSchema<CreatePullRequestReviewArgs>,
+  examples: [
+    {
+      name: "Approve PR",
+      description: "Approve a pull request",
+      args: {
+        pullNumber: 42,
+        event: "APPROVE",
+        body: "LGTM! Great work on the authentication implementation."
+      }
+    },
+    {
+      name: "Request changes",
+      description: "Request changes with inline comments",
+      args: {
+        pullNumber: 42,
+        event: "REQUEST_CHANGES",
+        body: "Please address the comments below",
+        comments: [
+          {
+            path: "src/auth.ts",
+            position: 15,
+            body: "Consider using bcrypt for password hashing"
+          }
+        ]
       }
     }
   ]
@@ -658,6 +1034,21 @@ export const deleteProjectSchema = z.object({
 
 export type DeleteProjectArgs = z.infer<typeof deleteProjectSchema>;
 
+// Schema for get_project_readme tool
+export const getProjectReadmeSchema = z.object({
+  projectId: z.string().min(1, "Project ID is required"),
+});
+
+export type GetProjectReadmeArgs = z.infer<typeof getProjectReadmeSchema>;
+
+// Schema for update_project_readme tool
+export const updateProjectReadmeSchema = z.object({
+  projectId: z.string().min(1, "Project ID is required"),
+  readme: z.string().min(1, "README content is required"),
+});
+
+export type UpdateProjectReadmeArgs = z.infer<typeof updateProjectReadmeSchema>;
+
 // Schema for list_project_fields tool
 export const listProjectFieldsSchema = z.object({
   projectId: z.string().min(1, "Project ID is required"),
@@ -709,6 +1100,22 @@ export const listProjectItemsSchema = z.object({
 
 export type ListProjectItemsArgs = z.infer<typeof listProjectItemsSchema>;
 
+// Schema for archive_project_item tool
+export const archiveProjectItemSchema = z.object({
+  projectId: z.string().min(1, "Project ID is required"),
+  itemId: z.string().min(1, "Item ID is required"),
+});
+
+export type ArchiveProjectItemArgs = z.infer<typeof archiveProjectItemSchema>;
+
+// Schema for unarchive_project_item tool
+export const unarchiveProjectItemSchema = z.object({
+  projectId: z.string().min(1, "Project ID is required"),
+  itemId: z.string().min(1, "Item ID is required"),
+});
+
+export type UnarchiveProjectItemArgs = z.infer<typeof unarchiveProjectItemSchema>;
+
 // Schema for set_field_value tool
 export const setFieldValueSchema = z.object({
   projectId: z.string().min(1, "Project ID is required"),
@@ -728,6 +1135,15 @@ export const getFieldValueSchema = z.object({
 
 export type GetFieldValueArgs = z.infer<typeof getFieldValueSchema>;
 
+// Schema for clear_field_value tool
+export const clearFieldValueSchema = z.object({
+  projectId: z.string().min(1, "Project ID is required"),
+  itemId: z.string().min(1, "Item ID is required"),
+  fieldId: z.string().min(1, "Field ID is required"),
+});
+
+export type ClearFieldValueArgs = z.infer<typeof clearFieldValueSchema>;
+
 // Schema for list_project_views tool
 export const listProjectViewsSchema = z.object({
   projectId: z.string().min(1, "Project ID is required"),
@@ -744,6 +1160,14 @@ export const updateProjectViewSchema = z.object({
 });
 
 export type UpdateProjectViewArgs = z.infer<typeof updateProjectViewSchema>;
+
+// Schema for delete_project_view tool
+export const deleteProjectViewSchema = z.object({
+  projectId: z.string().min(1, "Project ID is required"),
+  viewId: z.string().min(1, "View ID is required"),
+});
+
+export type DeleteProjectViewArgs = z.infer<typeof deleteProjectViewSchema>;
 
 // Schema for update_milestone tool
 export const updateMilestoneSchema = z.object({
@@ -807,6 +1231,228 @@ export const listLabelsSchema = z.object({
 
 export type ListLabelsArgs = z.infer<typeof listLabelsSchema>;
 
+// ============================================================================
+// Automation Service Tools
+// ============================================================================
+
+// Schema for create_automation_rule tool
+export const createAutomationRuleSchema = z.object({
+  name: z.string().min(1, "Rule name is required"),
+  description: z.string().optional(),
+  projectId: z.string().min(1, "Project ID is required"),
+  enabled: z.boolean().optional().default(true),
+  triggers: z.array(z.object({
+    type: z.enum([
+      "resource_created", "resource_updated", "resource_deleted",
+      "issue_opened", "issue_closed", "issue_labeled", "issue_assigned",
+      "pr_opened", "pr_closed", "pr_merged", "pr_approved",
+      "sprint_started", "sprint_ended", "milestone_reached", "schedule"
+    ]),
+    resourceType: z.string().optional(),
+    conditions: z.array(z.object({
+      field: z.string(),
+      operator: z.string(),
+      value: z.any()
+    })).optional()
+  })),
+  actions: z.array(z.object({
+    type: z.enum([
+      "update_resource", "create_resource", "delete_resource",
+      "add_label", "remove_label", "assign_user", "unassign_user",
+      "create_relationship", "delete_relationship", "notify", "webhook", "custom_script"
+    ]),
+    parameters: z.record(z.any())
+  }))
+});
+
+export type CreateAutomationRuleArgs = z.infer<typeof createAutomationRuleSchema>;
+
+// Schema for update_automation_rule tool
+export const updateAutomationRuleSchema = z.object({
+  ruleId: z.string().min(1, "Rule ID is required"),
+  name: z.string().optional(),
+  description: z.string().optional(),
+  enabled: z.boolean().optional(),
+  triggers: z.array(z.object({
+    type: z.enum([
+      "resource_created", "resource_updated", "resource_deleted",
+      "issue_opened", "issue_closed", "issue_labeled", "issue_assigned",
+      "pr_opened", "pr_closed", "pr_merged", "pr_approved",
+      "sprint_started", "sprint_ended", "milestone_reached", "schedule"
+    ]),
+    resourceType: z.string().optional(),
+    conditions: z.array(z.object({
+      field: z.string(),
+      operator: z.string(),
+      value: z.any()
+    })).optional()
+  })).optional(),
+  actions: z.array(z.object({
+    type: z.enum([
+      "update_resource", "create_resource", "delete_resource",
+      "add_label", "remove_label", "assign_user", "unassign_user",
+      "create_relationship", "delete_relationship", "notify", "webhook", "custom_script"
+    ]),
+    parameters: z.record(z.any())
+  })).optional()
+});
+
+export type UpdateAutomationRuleArgs = z.infer<typeof updateAutomationRuleSchema>;
+
+// Schema for delete_automation_rule tool
+export const deleteAutomationRuleSchema = z.object({
+  ruleId: z.string().min(1, "Rule ID is required")
+});
+
+export type DeleteAutomationRuleArgs = z.infer<typeof deleteAutomationRuleSchema>;
+
+// Schema for get_automation_rule tool
+export const getAutomationRuleSchema = z.object({
+  ruleId: z.string().min(1, "Rule ID is required")
+});
+
+export type GetAutomationRuleArgs = z.infer<typeof getAutomationRuleSchema>;
+
+// Schema for list_automation_rules tool
+export const listAutomationRulesSchema = z.object({
+  projectId: z.string().min(1, "Project ID is required")
+});
+
+export type ListAutomationRulesArgs = z.infer<typeof listAutomationRulesSchema>;
+
+// Schema for enable_automation_rule tool
+export const enableAutomationRuleSchema = z.object({
+  ruleId: z.string().min(1, "Rule ID is required")
+});
+
+export type EnableAutomationRuleArgs = z.infer<typeof enableAutomationRuleSchema>;
+
+// Schema for disable_automation_rule tool
+export const disableAutomationRuleSchema = z.object({
+  ruleId: z.string().min(1, "Rule ID is required")
+});
+
+export type DisableAutomationRuleArgs = z.infer<typeof disableAutomationRuleSchema>;
+
+// ============================================================================
+// Iteration Management Tools
+// ============================================================================
+
+// Schema for get_iteration_configuration tool
+export const getIterationConfigurationSchema = z.object({
+  projectId: z.string().min(1, "Project ID is required"),
+  fieldName: z.string().optional()
+});
+
+export type GetIterationConfigurationArgs = z.infer<typeof getIterationConfigurationSchema>;
+
+// Schema for get_current_iteration tool
+export const getCurrentIterationSchema = z.object({
+  projectId: z.string().min(1, "Project ID is required"),
+  fieldName: z.string().optional()
+});
+
+export type GetCurrentIterationArgs = z.infer<typeof getCurrentIterationSchema>;
+
+// Schema for get_iteration_items tool
+export const getIterationItemsSchema = z.object({
+  projectId: z.string().min(1, "Project ID is required"),
+  iterationId: z.string().min(1, "Iteration ID is required"),
+  limit: z.number().int().positive().default(50).optional()
+});
+
+export type GetIterationItemsArgs = z.infer<typeof getIterationItemsSchema>;
+
+// Schema for get_iteration_by_date tool
+export const getIterationByDateSchema = z.object({
+  projectId: z.string().min(1, "Project ID is required"),
+  date: z.string().datetime("Date must be a valid ISO date string"),
+  fieldName: z.string().optional()
+});
+
+export type GetIterationByDateArgs = z.infer<typeof getIterationByDateSchema>;
+
+// Schema for assign_items_to_iteration tool
+export const assignItemsToIterationSchema = z.object({
+  projectId: z.string().min(1, "Project ID is required"),
+  itemIds: z.array(z.string()).min(1, "At least one item ID is required"),
+  iterationId: z.string().min(1, "Iteration ID is required"),
+  fieldName: z.string().optional()
+});
+
+export type AssignItemsToIterationArgs = z.infer<typeof assignItemsToIterationSchema>;
+
+// ============================================================================
+// AI-Powered Automation Tools
+// ============================================================================
+
+// Schema for generate_roadmap tool
+export const generateRoadmapSchema = z.object({
+  projectId: z.string().min(1, "Project ID is required"),
+  projectTitle: z.string().min(1, "Project title is required"),
+  projectDescription: z.string().optional(),
+  sprintDurationWeeks: z.number().int().positive().default(2).optional(),
+  targetMilestones: z.number().int().positive().default(4).optional(),
+  autoCreate: z.boolean().default(false).optional()
+});
+
+export type GenerateRoadmapArgs = z.infer<typeof generateRoadmapSchema>;
+
+// Schema for enrich_issue tool
+export const enrichIssueSchema = z.object({
+  projectId: z.string().min(1, "Project ID is required"),
+  issueId: z.string().min(1, "Issue ID is required"),
+  issueNumber: z.number().int().positive(),
+  issueTitle: z.string().min(1, "Issue title is required"),
+  issueDescription: z.string().optional(),
+  projectContext: z.string().optional(),
+  autoApply: z.boolean().default(false).optional()
+});
+
+export type EnrichIssueArgs = z.infer<typeof enrichIssueSchema>;
+
+// Schema for enrich_issues_bulk tool
+export const enrichIssuesBulkSchema = z.object({
+  projectId: z.string().min(1, "Project ID is required"),
+  issueIds: z.array(z.string()).optional(),
+  projectContext: z.string().optional(),
+  autoApply: z.boolean().default(false).optional()
+});
+
+export type EnrichIssuesBulkArgs = z.infer<typeof enrichIssuesBulkSchema>;
+
+// Schema for triage_issue tool
+export const triageIssueSchema = z.object({
+  projectId: z.string().min(1, "Project ID is required"),
+  issueId: z.string().min(1, "Issue ID is required"),
+  issueNumber: z.number().int().positive(),
+  issueTitle: z.string().min(1, "Issue title is required"),
+  issueDescription: z.string().optional(),
+  projectContext: z.string().optional(),
+  autoApply: z.boolean().default(false).optional()
+});
+
+export type TriageIssueArgs = z.infer<typeof triageIssueSchema>;
+
+// Schema for triage_all_issues tool
+export const triageAllIssuesSchema = z.object({
+  projectId: z.string().min(1, "Project ID is required"),
+  onlyUntriaged: z.boolean().default(true).optional(),
+  autoApply: z.boolean().default(false).optional(),
+  projectContext: z.string().optional()
+});
+
+export type TriageAllIssuesArgs = z.infer<typeof triageAllIssuesSchema>;
+
+// Schema for schedule_triaging tool
+export const scheduleTriagingSchema = z.object({
+  projectId: z.string().min(1, "Project ID is required"),
+  schedule: z.enum(['hourly', 'daily', 'weekly']),
+  autoApply: z.boolean().default(false)
+});
+
+export type ScheduleTriagingArgs = z.infer<typeof scheduleTriagingSchema>;
+
 // Project tools
 export const updateProjectTool: ToolDefinition<UpdateProjectArgs> = {
   name: "update_project",
@@ -843,6 +1489,37 @@ export const deleteProjectTool: ToolDefinition<DeleteProjectArgs> = {
       description: "Delete a GitHub project by ID",
       args: {
         projectId: "PVT_kwDOLhQ7gc4AOEbH"
+      }
+    }
+  ]
+};
+
+export const getProjectReadmeTool: ToolDefinition<GetProjectReadmeArgs> = {
+  name: "get_project_readme",
+  description: "Get the README content of a GitHub project",
+  schema: getProjectReadmeSchema as unknown as ToolSchema<GetProjectReadmeArgs>,
+  examples: [
+    {
+      name: "Get project README",
+      description: "Retrieve the README for a project",
+      args: {
+        projectId: "PVT_kwDOLhQ7gc4AOEbH"
+      }
+    }
+  ]
+};
+
+export const updateProjectReadmeTool: ToolDefinition<UpdateProjectReadmeArgs> = {
+  name: "update_project_readme",
+  description: "Update the README content of a GitHub project",
+  schema: updateProjectReadmeSchema as unknown as ToolSchema<UpdateProjectReadmeArgs>,
+  examples: [
+    {
+      name: "Set project README",
+      description: "Update the project README with documentation",
+      args: {
+        projectId: "PVT_kwDOLhQ7gc4AOEbH",
+        readme: "# Project Overview\n\nThis project tracks our development roadmap..."
       }
     }
   ]
@@ -930,6 +1607,38 @@ export const listProjectItemsTool: ToolDefinition<ListProjectItemsArgs> = {
       args: {
         projectId: "PVT_kwDOLhQ7gc4AOEbH",
         limit: 20
+      }
+    }
+  ]
+};
+
+export const archiveProjectItemTool: ToolDefinition<ArchiveProjectItemArgs> = {
+  name: "archive_project_item",
+  description: "Archive an item in a GitHub project. Archived items are hidden from views but not deleted.",
+  schema: archiveProjectItemSchema as unknown as ToolSchema<ArchiveProjectItemArgs>,
+  examples: [
+    {
+      name: "Archive completed task",
+      description: "Archive a project item that is complete",
+      args: {
+        projectId: "PVT_kwDOLhQ7gc4AOEbH",
+        itemId: "PVTI_lADOLhQ7gc4AOEbHzM4AOAJ7"
+      }
+    }
+  ]
+};
+
+export const unarchiveProjectItemTool: ToolDefinition<UnarchiveProjectItemArgs> = {
+  name: "unarchive_project_item",
+  description: "Unarchive an item in a GitHub project. Brings back a previously archived item.",
+  schema: unarchiveProjectItemSchema as unknown as ToolSchema<UnarchiveProjectItemArgs>,
+  examples: [
+    {
+      name: "Unarchive task",
+      description: "Restore an archived project item",
+      args: {
+        projectId: "PVT_kwDOLhQ7gc4AOEbH",
+        itemId: "PVTI_lADOLhQ7gc4AOEbHzM4AOAJ7"
       }
     }
   ]
@@ -1105,6 +1814,32 @@ export const getFieldValueTool: ToolDefinition<GetFieldValueArgs> = {
   ]
 };
 
+export const clearFieldValueTool: ToolDefinition<ClearFieldValueArgs> = {
+  name: "clear_field_value",
+  description: "Clear a field value for a GitHub project item. This removes/clears the value for any field type.",
+  schema: clearFieldValueSchema as unknown as ToolSchema<ClearFieldValueArgs>,
+  examples: [
+    {
+      name: "Clear status field",
+      description: "Clear the status field for an item",
+      args: {
+        projectId: "PVT_kwDOLhQ7gc4AOEbH",
+        itemId: "PVTI_lADOLhQ7gc4AOEbHzM4AOAJ7",
+        fieldId: "PVTF_lADOLhQ7gc4AOEbHzM4AOAI1"
+      }
+    },
+    {
+      name: "Clear iteration assignment",
+      description: "Remove an item from its current iteration/sprint",
+      args: {
+        projectId: "PVT_kwDOLhQ7gc4AOEbH",
+        itemId: "PVTI_lADOLhQ7gc4AOEbHzM4AOAJ7",
+        fieldId: "PVTF_lADOLhQ7gc4AOEbHzM4AOAI2"
+      }
+    }
+  ]
+};
+
 export const listProjectViewsTool: ToolDefinition<ListProjectViewsArgs> = {
   name: "list_project_views",
   description: "List all views in a GitHub project",
@@ -1133,6 +1868,22 @@ export const updateProjectViewTool: ToolDefinition<UpdateProjectViewArgs> = {
         viewId: "PVV_lADOLhQ7gc4AOEbHzM4AOAL9",
         name: "Development Timeline",
         layout: "timeline"
+      }
+    }
+  ]
+};
+
+export const deleteProjectViewTool: ToolDefinition<DeleteProjectViewArgs> = {
+  name: "delete_project_view",
+  description: "Delete a view from a GitHub project",
+  schema: deleteProjectViewSchema as unknown as ToolSchema<DeleteProjectViewArgs>,
+  examples: [
+    {
+      name: "Delete project view",
+      description: "Delete a specific view from a project",
+      args: {
+        projectId: "PVT_kwDOLhQ7gc4AOEbH",
+        viewId: "PVV_lADOLhQ7gc4AOEbHzM4AOAL9"
       }
     }
   ]
@@ -1370,6 +2121,353 @@ export const replayEventsTool: ToolDefinition<ReplayEventsArgs> = {
         fromTimestamp: "2025-01-01T12:00:00Z",
         resourceType: "PROJECT",
         limit: 100
+      }
+    }
+  ]
+};
+
+// ============================================================================
+// Automation Service Tool Definitions
+// ============================================================================
+
+export const createAutomationRuleTool: ToolDefinition<CreateAutomationRuleArgs> = {
+  name: "create_automation_rule",
+  description: "Create a new automation rule for a GitHub project",
+  schema: createAutomationRuleSchema as unknown as ToolSchema<CreateAutomationRuleArgs>,
+  examples: [
+    {
+      name: "Auto-label PRs",
+      description: "Automatically add 'needs-review' label when PR is opened",
+      args: {
+        name: "Auto-label new PRs",
+        projectId: "PVT_kwDOLhQ7gc4AOEbH",
+        enabled: true,
+        triggers: [{
+          type: "pr_opened"
+        }],
+        actions: [{
+          type: "add_label",
+          parameters: { labelName: "needs-review" }
+        }]
+      }
+    },
+    {
+      name: "Auto-assign issues",
+      description: "Automatically assign issues with 'bug' label to maintainer",
+      args: {
+        name: "Auto-assign bugs",
+        projectId: "PVT_kwDOLhQ7gc4AOEbH",
+        enabled: true,
+        triggers: [{
+          type: "issue_labeled",
+          conditions: [{
+            field: "label",
+            operator: "equals",
+            value: "bug"
+          }]
+        }],
+        actions: [{
+          type: "assign_user",
+          parameters: { username: "maintainer" }
+        }]
+      }
+    }
+  ]
+};
+
+export const updateAutomationRuleTool: ToolDefinition<UpdateAutomationRuleArgs> = {
+  name: "update_automation_rule",
+  description: "Update an existing automation rule",
+  schema: updateAutomationRuleSchema as unknown as ToolSchema<UpdateAutomationRuleArgs>,
+  examples: [
+    {
+      name: "Update rule name",
+      description: "Change the name of an automation rule",
+      args: {
+        ruleId: "AR_kwDOLhQ7gc4AOEbH",
+        name: "Updated rule name"
+      }
+    },
+    {
+      name: "Disable rule temporarily",
+      description: "Disable an automation rule without deleting it",
+      args: {
+        ruleId: "AR_kwDOLhQ7gc4AOEbH",
+        enabled: false
+      }
+    }
+  ]
+};
+
+export const deleteAutomationRuleTool: ToolDefinition<DeleteAutomationRuleArgs> = {
+  name: "delete_automation_rule",
+  description: "Delete an automation rule from a project",
+  schema: deleteAutomationRuleSchema as unknown as ToolSchema<DeleteAutomationRuleArgs>,
+  examples: [
+    {
+      name: "Delete rule",
+      description: "Remove an automation rule from a project",
+      args: {
+        ruleId: "AR_kwDOLhQ7gc4AOEbH"
+      }
+    }
+  ]
+};
+
+export const getAutomationRuleTool: ToolDefinition<GetAutomationRuleArgs> = {
+  name: "get_automation_rule",
+  description: "Get details of a specific automation rule",
+  schema: getAutomationRuleSchema as unknown as ToolSchema<GetAutomationRuleArgs>,
+  examples: [
+    {
+      name: "Get rule details",
+      description: "Retrieve details of an automation rule",
+      args: {
+        ruleId: "AR_kwDOLhQ7gc4AOEbH"
+      }
+    }
+  ]
+};
+
+export const listAutomationRulesTool: ToolDefinition<ListAutomationRulesArgs> = {
+  name: "list_automation_rules",
+  description: "List all automation rules for a GitHub project",
+  schema: listAutomationRulesSchema as unknown as ToolSchema<ListAutomationRulesArgs>,
+  examples: [
+    {
+      name: "List project rules",
+      description: "Get all automation rules for a project",
+      args: {
+        projectId: "PVT_kwDOLhQ7gc4AOEbH"
+      }
+    }
+  ]
+};
+
+export const enableAutomationRuleTool: ToolDefinition<EnableAutomationRuleArgs> = {
+  name: "enable_automation_rule",
+  description: "Enable a disabled automation rule",
+  schema: enableAutomationRuleSchema as unknown as ToolSchema<EnableAutomationRuleArgs>,
+  examples: [
+    {
+      name: "Enable rule",
+      description: "Re-enable a disabled automation rule",
+      args: {
+        ruleId: "AR_kwDOLhQ7gc4AOEbH"
+      }
+    }
+  ]
+};
+
+export const disableAutomationRuleTool: ToolDefinition<DisableAutomationRuleArgs> = {
+  name: "disable_automation_rule",
+  description: "Disable an automation rule without deleting it",
+  schema: disableAutomationRuleSchema as unknown as ToolSchema<DisableAutomationRuleArgs>,
+  examples: [
+    {
+      name: "Disable rule",
+      description: "Temporarily disable an automation rule",
+      args: {
+        ruleId: "AR_kwDOLhQ7gc4AOEbH"
+      }
+    }
+  ]
+};
+
+// ============================================================================
+// Iteration Management Tool Definitions
+// ============================================================================
+
+export const getIterationConfigurationTool: ToolDefinition<GetIterationConfigurationArgs> = {
+  name: "get_iteration_configuration",
+  description: "Get iteration field configuration including duration, start date, and list of all iterations",
+  schema: getIterationConfigurationSchema as unknown as ToolSchema<GetIterationConfigurationArgs>,
+  examples: [
+    {
+      name: "Get iteration config",
+      description: "Get all iterations for a project",
+      args: {
+        projectId: "PVT_kwDOLhQ7gc4AOEbH"
+      }
+    }
+  ]
+};
+
+export const getCurrentIterationTool: ToolDefinition<GetCurrentIterationArgs> = {
+  name: "get_current_iteration",
+  description: "Get the currently active iteration based on today's date",
+  schema: getCurrentIterationSchema as unknown as ToolSchema<GetCurrentIterationArgs>,
+  examples: [
+    {
+      name: "Get current sprint",
+      description: "Find which iteration is currently active",
+      args: {
+        projectId: "PVT_kwDOLhQ7gc4AOEbH"
+      }
+    }
+  ]
+};
+
+export const getIterationItemsTool: ToolDefinition<GetIterationItemsArgs> = {
+  name: "get_iteration_items",
+  description: "Get all items assigned to a specific iteration",
+  schema: getIterationItemsSchema as unknown as ToolSchema<GetIterationItemsArgs>,
+  examples: [
+    {
+      name: "Get iteration items",
+      description: "Get all issues/PRs in an iteration",
+      args: {
+        projectId: "PVT_kwDOLhQ7gc4AOEbH",
+        iterationId: "PVTIF_lADOLhQ7gc4AOEbH"
+      }
+    }
+  ]
+};
+
+export const getIterationByDateTool: ToolDefinition<GetIterationByDateArgs> = {
+  name: "get_iteration_by_date",
+  description: "Find which iteration contains a specific date",
+  schema: getIterationByDateSchema as unknown as ToolSchema<GetIterationByDateArgs>,
+  examples: [
+    {
+      name: "Find iteration",
+      description: "Find which iteration contains a specific date",
+      args: {
+        projectId: "PVT_kwDOLhQ7gc4AOEbH",
+        date: "2025-01-15T00:00:00Z"
+      }
+    }
+  ]
+};
+
+export const assignItemsToIterationTool: ToolDefinition<AssignItemsToIterationArgs> = {
+  name: "assign_items_to_iteration",
+  description: "Bulk assign multiple items to a specific iteration",
+  schema: assignItemsToIterationSchema as unknown as ToolSchema<AssignItemsToIterationArgs>,
+  examples: [
+    {
+      name: "Assign to sprint",
+      description: "Add multiple issues to the current sprint",
+      args: {
+        projectId: "PVT_kwDOLhQ7gc4AOEbH",
+        itemIds: ["PVTI_lADOLhQ7gc4AOEbHzM4AOAJ7", "PVTI_lADOLhQ7gc4AOEbHzM4AOAJ8"],
+        iterationId: "PVTIF_lADOLhQ7gc4AOEbH"
+      }
+    }
+  ]
+};
+
+// ============================================================================
+// AI-Powered Automation Tool Definitions
+// ============================================================================
+
+export const generateRoadmapTool: ToolDefinition<GenerateRoadmapArgs> = {
+  name: "generate_roadmap",
+  description: "AI-powered roadmap generation from project issues. Creates milestones, sprints, and phases automatically.",
+  schema: generateRoadmapSchema as unknown as ToolSchema<GenerateRoadmapArgs>,
+  examples: [
+    {
+      name: "Generate roadmap",
+      description: "Create a comprehensive roadmap from existing issues",
+      args: {
+        projectId: "PVT_kwDOLhQ7gc4AOEbH",
+        projectTitle: "API Platform Development",
+        projectDescription: "Build a scalable REST API platform",
+        sprintDurationWeeks: 2,
+        targetMilestones: 4,
+        autoCreate: true
+      }
+    }
+  ]
+};
+
+export const enrichIssueTool: ToolDefinition<EnrichIssueArgs> = {
+  name: "enrich_issue",
+  description: "AI-powered issue enrichment. Automatically adds labels, priority, type, complexity, and effort estimates.",
+  schema: enrichIssueSchema as unknown as ToolSchema<EnrichIssueArgs>,
+  examples: [
+    {
+      name: "Enrich issue",
+      description: "Add tags and metadata to an issue",
+      args: {
+        projectId: "PVT_kwDOLhQ7gc4AOEbH",
+        issueId: "I_kwDOJrIzLs5eGXAT",
+        issueNumber: 42,
+        issueTitle: "Add user authentication",
+        issueDescription: "Implement OAuth 2.0 authentication",
+        autoApply: true
+      }
+    }
+  ]
+};
+
+export const enrichIssuesBulkTool: ToolDefinition<EnrichIssuesBulkArgs> = {
+  name: "enrich_issues_bulk",
+  description: "Bulk AI-powered issue enrichment for multiple issues at once.",
+  schema: enrichIssuesBulkSchema as unknown as ToolSchema<EnrichIssuesBulkArgs>,
+  examples: [
+    {
+      name: "Enrich all issues",
+      description: "Enrich all issues in a project",
+      args: {
+        projectId: "PVT_kwDOLhQ7gc4AOEbH",
+        projectContext: "E-commerce platform with React frontend and Node.js backend",
+        autoApply: false
+      }
+    }
+  ]
+};
+
+export const triageIssueTool: ToolDefinition<TriageIssueArgs> = {
+  name: "triage_issue",
+  description: "AI-powered issue triaging. Classifies issues, assigns priority, and recommends actions.",
+  schema: triageIssueSchema as unknown as ToolSchema<TriageIssueArgs>,
+  examples: [
+    {
+      name: "Triage issue",
+      description: "Classify and prioritize an issue",
+      args: {
+        projectId: "PVT_kwDOLhQ7gc4AOEbH",
+        issueId: "I_kwDOJrIzLs5eGXAT",
+        issueNumber: 42,
+        issueTitle: "Application crashes on startup",
+        issueDescription: "Users report app crashes immediately after launch",
+        autoApply: true
+      }
+    }
+  ]
+};
+
+export const triageAllIssuesTool: ToolDefinition<TriageAllIssuesArgs> = {
+  name: "triage_all_issues",
+  description: "Automatically triage all untriaged issues in a project.",
+  schema: triageAllIssuesSchema as unknown as ToolSchema<TriageAllIssuesArgs>,
+  examples: [
+    {
+      name: "Triage all issues",
+      description: "Triage all issues that don't have labels yet",
+      args: {
+        projectId: "PVT_kwDOLhQ7gc4AOEbH",
+        onlyUntriaged: true,
+        autoApply: false,
+        projectContext: "Mobile app for task management"
+      }
+    }
+  ]
+};
+
+export const scheduleTriagingTool: ToolDefinition<ScheduleTriagingArgs> = {
+  name: "schedule_triaging",
+  description: "Schedule automated issue triaging to run periodically.",
+  schema: scheduleTriagingSchema as unknown as ToolSchema<ScheduleTriagingArgs>,
+  examples: [
+    {
+      name: "Daily triage",
+      description: "Set up daily automated triaging",
+      args: {
+        projectId: "PVT_kwDOLhQ7gc4AOEbH",
+        schedule: "daily",
+        autoApply: true
       }
     }
   ]

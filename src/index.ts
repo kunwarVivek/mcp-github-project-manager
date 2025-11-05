@@ -43,12 +43,21 @@ import { EventStore } from "./infrastructure/events/EventStore";
 import { WebhookServer } from "./infrastructure/http/WebhookServer";
 import { Logger } from "./infrastructure/logger/index";
 import { AIServiceFactory } from "./services/ai/AIServiceFactory";
+import { RoadmapPlanningService } from "./services/RoadmapPlanningService";
+import { IssueEnrichmentService } from "./services/IssueEnrichmentService";
+import { IssueTriagingService } from "./services/IssueTriagingService";
 
 class GitHubProjectManagerServer {
   private server: Server;
   private service: ProjectManagementService;
   private toolRegistry: ToolRegistry;
   private logger: Logger;
+
+  // AI-powered automation services
+  private aiFactory: AIServiceFactory;
+  private roadmapService: RoadmapPlanningService;
+  private enrichmentService: IssueEnrichmentService;
+  private triagingService: IssueTriagingService;
 
   // Persistence and sync components
   private cache: ResourceCache;
@@ -98,6 +107,16 @@ class GitHubProjectManagerServer {
       GITHUB_OWNER,
       GITHUB_REPO,
       GITHUB_TOKEN
+    );
+
+    // Initialize AI-powered automation services
+    this.aiFactory = AIServiceFactory.getInstance();
+    this.roadmapService = new RoadmapPlanningService(this.aiFactory, this.service);
+    this.enrichmentService = new IssueEnrichmentService(this.aiFactory, this.service);
+    this.triagingService = new IssueTriagingService(
+      this.aiFactory,
+      this.service,
+      this.enrichmentService
     );
 
     // Get the tool registry instance
@@ -252,6 +271,12 @@ class GitHubProjectManagerServer {
       case "delete_project":
         return await this.service.deleteProject(args);
 
+      case "get_project_readme":
+        return await this.service.getProjectReadme(args);
+
+      case "update_project_readme":
+        return await this.service.updateProjectReadme(args);
+
       case "list_project_fields":
         return await this.service.listProjectFields(args);
 
@@ -291,6 +316,51 @@ class GitHubProjectManagerServer {
           labels: args.labels
         });
 
+      // Issue comment tools
+      case "create_issue_comment":
+        return await this.service.createIssueComment(args);
+
+      case "update_issue_comment":
+        return await this.service.updateIssueComment(args);
+
+      case "delete_issue_comment":
+        return await this.service.deleteIssueComment(args);
+
+      case "list_issue_comments":
+        return await this.service.listIssueComments(args);
+
+      // Draft issue tools
+      case "create_draft_issue":
+        return await this.service.createDraftIssue(args);
+
+      case "update_draft_issue":
+        return await this.service.updateDraftIssue(args);
+
+      case "delete_draft_issue":
+        return await this.service.deleteDraftIssue(args);
+
+      // Pull Request tools
+      case "create_pull_request":
+        return await this.service.createPullRequest(args);
+
+      case "get_pull_request":
+        return await this.service.getPullRequest(args);
+
+      case "list_pull_requests":
+        return await this.service.listPullRequests(args);
+
+      case "update_pull_request":
+        return await this.service.updatePullRequest(args);
+
+      case "merge_pull_request":
+        return await this.service.mergePullRequest(args);
+
+      case "list_pull_request_reviews":
+        return await this.service.listPullRequestReviews(args);
+
+      case "create_pull_request_review":
+        return await this.service.createPullRequestReview(args);
+
       // Sprint tools
       case "create_sprint":
         return await this.service.createSprint(args);
@@ -329,6 +399,9 @@ class GitHubProjectManagerServer {
       case "update_project_view":
         return await this.service.updateProjectView(args);
 
+      case "delete_project_view":
+        return await this.service.deleteProjectView(args);
+
       // Project item tools
       case "add_project_item":
         return await this.service.addProjectItem(args);
@@ -339,11 +412,20 @@ class GitHubProjectManagerServer {
       case "list_project_items":
         return await this.service.listProjectItems(args);
 
+      case "archive_project_item":
+        return await this.service.archiveProjectItem(args);
+
+      case "unarchive_project_item":
+        return await this.service.unarchiveProjectItem(args);
+
       case "set_field_value":
         return await this.service.setFieldValue(args);
 
       case "get_field_value":
         return await this.service.getFieldValue(args);
+
+      case "clear_field_value":
+        return await this.service.clearFieldValue(args);
 
       // Event management tools
       case "subscribe_to_events":
@@ -379,6 +461,63 @@ class GitHubProjectManagerServer {
 
       case "create_traceability_matrix":
         return await executeCreateTraceabilityMatrix(args);
+
+      // Automation service tools
+      case "create_automation_rule":
+        return await this.service.createAutomationRule(args);
+
+      case "update_automation_rule":
+        return await this.service.updateAutomationRule(args);
+
+      case "delete_automation_rule":
+        return await this.service.deleteAutomationRule(args);
+
+      case "get_automation_rule":
+        return await this.service.getAutomationRule(args);
+
+      case "list_automation_rules":
+        return await this.service.listAutomationRules(args);
+
+      case "enable_automation_rule":
+        return await this.service.enableAutomationRule(args);
+
+      case "disable_automation_rule":
+        return await this.service.disableAutomationRule(args);
+
+      // Iteration management tools
+      case "get_iteration_configuration":
+        return await this.service.getIterationConfiguration(args);
+
+      case "get_current_iteration":
+        return await this.service.getCurrentIteration(args);
+
+      case "get_iteration_items":
+        return await this.service.getIterationItems(args);
+
+      case "get_iteration_by_date":
+        return await this.service.getIterationByDate(args);
+
+      case "assign_items_to_iteration":
+        return await this.service.assignItemsToIteration(args);
+
+      // AI-powered automation tools
+      case "generate_roadmap":
+        return await this.handleGenerateRoadmap(args);
+
+      case "enrich_issue":
+        return await this.handleEnrichIssue(args);
+
+      case "enrich_issues_bulk":
+        return await this.handleEnrichIssuesBulk(args);
+
+      case "triage_issue":
+        return await this.handleTriageIssue(args);
+
+      case "triage_all_issues":
+        return await this.handleTriageAllIssues(args);
+
+      case "schedule_triaging":
+        return await this.handleScheduleTriaging(args);
 
       default:
         throw new McpError(
@@ -471,6 +610,191 @@ class GitHubProjectManagerServer {
       throw new McpError(
         ErrorCode.InternalError,
         `Failed to replay events: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
+    }
+  }
+
+  /**
+   * Handle generate roadmap tool
+   */
+  private async handleGenerateRoadmap(args: any): Promise<any> {
+    try {
+      const roadmap = await this.roadmapService.generateRoadmap({
+        projectId: args.projectId,
+        projectTitle: args.projectTitle,
+        projectDescription: args.projectDescription,
+        sprintDurationWeeks: args.sprintDurationWeeks,
+        targetMilestones: args.targetMilestones
+      });
+
+      if (args.autoCreate) {
+        const result = await this.roadmapService.createRoadmapInGitHub({
+          projectId: args.projectId,
+          roadmap
+        });
+
+        return {
+          success: true,
+          roadmap,
+          created: result
+        };
+      }
+
+      return {
+        success: true,
+        roadmap
+      };
+    } catch (error) {
+      this.logger.error("Failed to generate roadmap:", error);
+      throw new McpError(
+        ErrorCode.InternalError,
+        `Failed to generate roadmap: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
+    }
+  }
+
+  /**
+   * Handle enrich issue tool
+   */
+  private async handleEnrichIssue(args: any): Promise<any> {
+    try {
+      const enrichment = await this.enrichmentService.enrichIssue({
+        projectId: args.projectId,
+        issueId: args.issueId,
+        issueTitle: args.issueTitle,
+        issueDescription: args.issueDescription,
+        projectContext: args.projectContext
+      });
+
+      if (args.autoApply) {
+        await this.enrichmentService.applyEnrichment({
+          projectId: args.projectId,
+          issueNumber: args.issueNumber,
+          enrichment,
+          applyLabels: true
+        });
+      }
+
+      return {
+        success: true,
+        enrichment
+      };
+    } catch (error) {
+      this.logger.error("Failed to enrich issue:", error);
+      throw new McpError(
+        ErrorCode.InternalError,
+        `Failed to enrich issue: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
+    }
+  }
+
+  /**
+   * Handle enrich issues bulk tool
+   */
+  private async handleEnrichIssuesBulk(args: any): Promise<any> {
+    try {
+      const items = await this.service.listProjectItems({
+        projectId: args.projectId,
+        limit: 200
+      });
+
+      const issueIds = args.issueIds || items.map((item: any) => item.id);
+
+      const enrichments = await this.enrichmentService.enrichIssues({
+        projectId: args.projectId,
+        issueIds,
+        projectContext: args.projectContext
+      });
+
+      return {
+        success: true,
+        enriched: enrichments.length,
+        enrichments
+      };
+    } catch (error) {
+      this.logger.error("Failed to bulk enrich issues:", error);
+      throw new McpError(
+        ErrorCode.InternalError,
+        `Failed to bulk enrich issues: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
+    }
+  }
+
+  /**
+   * Handle triage issue tool
+   */
+  private async handleTriageIssue(args: any): Promise<any> {
+    try {
+      const triage = await this.triagingService.triageIssue({
+        projectId: args.projectId,
+        issueId: args.issueId,
+        issueNumber: args.issueNumber,
+        issueTitle: args.issueTitle,
+        issueDescription: args.issueDescription,
+        projectContext: args.projectContext,
+        autoApply: args.autoApply
+      });
+
+      return {
+        success: true,
+        triage
+      };
+    } catch (error) {
+      this.logger.error("Failed to triage issue:", error);
+      throw new McpError(
+        ErrorCode.InternalError,
+        `Failed to triage issue: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
+    }
+  }
+
+  /**
+   * Handle triage all issues tool
+   */
+  private async handleTriageAllIssues(args: any): Promise<any> {
+    try {
+      const result = await this.triagingService.triageAllIssues({
+        projectId: args.projectId,
+        onlyUntriaged: args.onlyUntriaged,
+        autoApply: args.autoApply,
+        projectContext: args.projectContext
+      });
+
+      return {
+        success: true,
+        triaged: result.triaged,
+        results: result.results
+      };
+    } catch (error) {
+      this.logger.error("Failed to triage all issues:", error);
+      throw new McpError(
+        ErrorCode.InternalError,
+        `Failed to triage all issues: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
+    }
+  }
+
+  /**
+   * Handle schedule triaging tool
+   */
+  private async handleScheduleTriaging(args: any): Promise<any> {
+    try {
+      const result = await this.triagingService.scheduleTriaging({
+        projectId: args.projectId,
+        schedule: args.schedule,
+        autoApply: args.autoApply
+      });
+
+      return {
+        success: true,
+        ruleId: result.ruleId,
+        schedule: args.schedule
+      };
+    } catch (error) {
+      this.logger.error("Failed to schedule triaging:", error);
+      throw new McpError(
+        ErrorCode.InternalError,
+        `Failed to schedule triaging: ${error instanceof Error ? error.message : 'Unknown error'}`
       );
     }
   }
