@@ -37,6 +37,8 @@ import {
   // New project tools
   updateProjectTool,
   deleteProjectTool,
+  getProjectReadmeTool,
+  updateProjectReadmeTool,
   listProjectFieldsTool,
   updateProjectFieldTool,
 
@@ -160,6 +162,8 @@ export class ToolRegistry {
     this.registerTool(getProjectTool);
     this.registerTool(updateProjectTool);
     this.registerTool(deleteProjectTool);
+    this.registerTool(getProjectReadmeTool);
+    this.registerTool(updateProjectReadmeTool);
 
     // Register milestone tools
     this.registerTool(createMilestoneTool);

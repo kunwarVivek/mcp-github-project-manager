@@ -837,6 +837,21 @@ export const deleteProjectSchema = z.object({
 
 export type DeleteProjectArgs = z.infer<typeof deleteProjectSchema>;
 
+// Schema for get_project_readme tool
+export const getProjectReadmeSchema = z.object({
+  projectId: z.string().min(1, "Project ID is required"),
+});
+
+export type GetProjectReadmeArgs = z.infer<typeof getProjectReadmeSchema>;
+
+// Schema for update_project_readme tool
+export const updateProjectReadmeSchema = z.object({
+  projectId: z.string().min(1, "Project ID is required"),
+  readme: z.string().min(1, "README content is required"),
+});
+
+export type UpdateProjectReadmeArgs = z.infer<typeof updateProjectReadmeSchema>;
+
 // Schema for list_project_fields tool
 export const listProjectFieldsSchema = z.object({
   projectId: z.string().min(1, "Project ID is required"),
@@ -1055,6 +1070,37 @@ export const deleteProjectTool: ToolDefinition<DeleteProjectArgs> = {
       description: "Delete a GitHub project by ID",
       args: {
         projectId: "PVT_kwDOLhQ7gc4AOEbH"
+      }
+    }
+  ]
+};
+
+export const getProjectReadmeTool: ToolDefinition<GetProjectReadmeArgs> = {
+  name: "get_project_readme",
+  description: "Get the README content of a GitHub project",
+  schema: getProjectReadmeSchema as unknown as ToolSchema<GetProjectReadmeArgs>,
+  examples: [
+    {
+      name: "Get project README",
+      description: "Retrieve the README for a project",
+      args: {
+        projectId: "PVT_kwDOLhQ7gc4AOEbH"
+      }
+    }
+  ]
+};
+
+export const updateProjectReadmeTool: ToolDefinition<UpdateProjectReadmeArgs> = {
+  name: "update_project_readme",
+  description: "Update the README content of a GitHub project",
+  schema: updateProjectReadmeSchema as unknown as ToolSchema<UpdateProjectReadmeArgs>,
+  examples: [
+    {
+      name: "Set project README",
+      description: "Update the project README with documentation",
+      args: {
+        projectId: "PVT_kwDOLhQ7gc4AOEbH",
+        readme: "# Project Overview\n\nThis project tracks our development roadmap..."
       }
     }
   ]

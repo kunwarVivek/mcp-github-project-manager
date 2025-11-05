@@ -1069,6 +1069,80 @@ export class ProjectManagementService {
     }
   }
 
+  // Project README Management
+  async getProjectReadme(data: {
+    projectId: string;
+  }): Promise<{ readme: string }> {
+    try {
+      const query = `
+        query($projectId: ID!) {
+          node(id: $projectId) {
+            ... on ProjectV2 {
+              readme
+            }
+          }
+        }
+      `;
+
+      interface GetReadmeResponse {
+        node: {
+          readme: string | null;
+        };
+      }
+
+      const response = await this.factory.graphql<GetReadmeResponse>(query, {
+        projectId: data.projectId
+      });
+
+      return {
+        readme: response.node?.readme || ''
+      };
+    } catch (error) {
+      throw this.mapErrorToMCPError(error);
+    }
+  }
+
+  async updateProjectReadme(data: {
+    projectId: string;
+    readme: string;
+  }): Promise<{ success: boolean; message: string }> {
+    try {
+      const mutation = `
+        mutation($input: UpdateProjectV2Input!) {
+          updateProjectV2(input: $input) {
+            projectV2 {
+              id
+              readme
+            }
+          }
+        }
+      `;
+
+      interface UpdateReadmeResponse {
+        updateProjectV2: {
+          projectV2: {
+            id: string;
+            readme: string;
+          };
+        };
+      }
+
+      await this.factory.graphql<UpdateReadmeResponse>(mutation, {
+        input: {
+          projectId: data.projectId,
+          readme: data.readme
+        }
+      });
+
+      return {
+        success: true,
+        message: `Project README updated successfully`
+      };
+    } catch (error) {
+      throw this.mapErrorToMCPError(error);
+    }
+  }
+
   async listProjectFields(data: {
     projectId: string;
   }): Promise<CustomField[]> {

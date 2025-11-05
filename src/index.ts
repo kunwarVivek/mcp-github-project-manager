@@ -252,6 +252,12 @@ class GitHubProjectManagerServer {
       case "delete_project":
         return await this.service.deleteProject(args);
 
+      case "get_project_readme":
+        return await this.service.getProjectReadme(args);
+
+      case "update_project_readme":
+        return await this.service.updateProjectReadme(args);
+
       case "list_project_fields":
         return await this.service.listProjectFields(args);
 
