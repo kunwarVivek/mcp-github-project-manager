@@ -175,6 +175,64 @@ export const updateIssueSchema = z.object({
 
 export type UpdateIssueArgs = z.infer<typeof updateIssueSchema>;
 
+// Schema for create_issue_comment tool
+export const createIssueCommentSchema = z.object({
+  issueNumber: z.number().int().positive("Issue number must be a positive integer"),
+  body: z.string().min(1, "Comment body is required"),
+});
+
+export type CreateIssueCommentArgs = z.infer<typeof createIssueCommentSchema>;
+
+// Schema for update_issue_comment tool
+export const updateIssueCommentSchema = z.object({
+  commentId: z.number().int().positive("Comment ID must be a positive integer"),
+  body: z.string().min(1, "Comment body is required"),
+});
+
+export type UpdateIssueCommentArgs = z.infer<typeof updateIssueCommentSchema>;
+
+// Schema for delete_issue_comment tool
+export const deleteIssueCommentSchema = z.object({
+  commentId: z.number().int().positive("Comment ID must be a positive integer"),
+});
+
+export type DeleteIssueCommentArgs = z.infer<typeof deleteIssueCommentSchema>;
+
+// Schema for list_issue_comments tool
+export const listIssueCommentsSchema = z.object({
+  issueNumber: z.number().int().positive("Issue number must be a positive integer"),
+  perPage: z.number().int().positive().max(100).default(100).optional(),
+});
+
+export type ListIssueCommentsArgs = z.infer<typeof listIssueCommentsSchema>;
+
+// Schema for create_draft_issue tool
+export const createDraftIssueSchema = z.object({
+  projectId: z.string().min(1, "Project ID is required"),
+  title: z.string().min(1, "Draft issue title is required"),
+  body: z.string().optional(),
+  assigneeIds: z.array(z.string()).optional(),
+});
+
+export type CreateDraftIssueArgs = z.infer<typeof createDraftIssueSchema>;
+
+// Schema for update_draft_issue tool
+export const updateDraftIssueSchema = z.object({
+  draftIssueId: z.string().min(1, "Draft issue ID is required"),
+  title: z.string().optional(),
+  body: z.string().optional(),
+  assigneeIds: z.array(z.string()).optional(),
+});
+
+export type UpdateDraftIssueArgs = z.infer<typeof updateDraftIssueSchema>;
+
+// Schema for delete_draft_issue tool
+export const deleteDraftIssueSchema = z.object({
+  draftIssueId: z.string().min(1, "Draft issue ID is required"),
+});
+
+export type DeleteDraftIssueArgs = z.infer<typeof deleteDraftIssueSchema>;
+
 // Schema for create_sprint tool
 export const createSprintSchema = z.object({
   title: z.string().min(1, "Sprint title is required"),
@@ -389,6 +447,127 @@ export const updateIssueTool: ToolDefinition<UpdateIssueArgs> = {
         issueId: "42",
         status: "closed",
         milestoneId: "3"
+      }
+    }
+  ]
+};
+
+// Issue comment tools
+export const createIssueCommentTool: ToolDefinition<CreateIssueCommentArgs> = {
+  name: "create_issue_comment",
+  description: "Add a comment to a GitHub issue",
+  schema: createIssueCommentSchema as unknown as ToolSchema<CreateIssueCommentArgs>,
+  examples: [
+    {
+      name: "Add status update comment",
+      description: "Post a comment to update the team on progress",
+      args: {
+        issueNumber: 42,
+        body: "Working on this issue now. Should have a PR ready by EOD."
+      }
+    }
+  ]
+};
+
+export const updateIssueCommentTool: ToolDefinition<UpdateIssueCommentArgs> = {
+  name: "update_issue_comment",
+  description: "Update an existing comment on a GitHub issue",
+  schema: updateIssueCommentSchema as unknown as ToolSchema<UpdateIssueCommentArgs>,
+  examples: [
+    {
+      name: "Correct a comment",
+      description: "Edit a previously posted comment to fix information",
+      args: {
+        commentId: 123456,
+        body: "Updated: PR is ready for review at #45"
+      }
+    }
+  ]
+};
+
+export const deleteIssueCommentTool: ToolDefinition<DeleteIssueCommentArgs> = {
+  name: "delete_issue_comment",
+  description: "Delete a comment from a GitHub issue",
+  schema: deleteIssueCommentSchema as unknown as ToolSchema<DeleteIssueCommentArgs>,
+  examples: [
+    {
+      name: "Remove outdated comment",
+      description: "Delete a comment that is no longer relevant",
+      args: {
+        commentId: 123456
+      }
+    }
+  ]
+};
+
+export const listIssueCommentsTool: ToolDefinition<ListIssueCommentsArgs> = {
+  name: "list_issue_comments",
+  description: "List all comments on a GitHub issue",
+  schema: listIssueCommentsSchema as unknown as ToolSchema<ListIssueCommentsArgs>,
+  examples: [
+    {
+      name: "Get all comments",
+      description: "Retrieve all comments for an issue",
+      args: {
+        issueNumber: 42
+      }
+    },
+    {
+      name: "Get recent comments",
+      description: "Retrieve the 20 most recent comments",
+      args: {
+        issueNumber: 42,
+        perPage: 20
+      }
+    }
+  ]
+};
+
+// Draft issue tools
+export const createDraftIssueTool: ToolDefinition<CreateDraftIssueArgs> = {
+  name: "create_draft_issue",
+  description: "Create a draft issue in a GitHub project. Draft issues are native to Projects v2 and don't require creating a repository issue first.",
+  schema: createDraftIssueSchema as unknown as ToolSchema<CreateDraftIssueArgs>,
+  examples: [
+    {
+      name: "Create draft task",
+      description: "Create a draft issue for brainstorming without committing to the repository",
+      args: {
+        projectId: "PVT_kwDOLhQ7gc4AOEbH",
+        title: "Explore new authentication options",
+        body: "Research OAuth providers and compare features"
+      }
+    }
+  ]
+};
+
+export const updateDraftIssueTool: ToolDefinition<UpdateDraftIssueArgs> = {
+  name: "update_draft_issue",
+  description: "Update an existing draft issue in a GitHub project",
+  schema: updateDraftIssueSchema as unknown as ToolSchema<UpdateDraftIssueArgs>,
+  examples: [
+    {
+      name: "Update draft details",
+      description: "Refine a draft issue with more information",
+      args: {
+        draftIssueId: "DI_kwDOLhQ7gc4AABB",
+        title: "Implement OAuth 2.0 authentication",
+        body: "Use Auth0 as the provider. See research doc for details."
+      }
+    }
+  ]
+};
+
+export const deleteDraftIssueTool: ToolDefinition<DeleteDraftIssueArgs> = {
+  name: "delete_draft_issue",
+  description: "Delete a draft issue from a GitHub project",
+  schema: deleteDraftIssueSchema as unknown as ToolSchema<DeleteDraftIssueArgs>,
+  examples: [
+    {
+      name: "Remove draft",
+      description: "Delete a draft issue that's no longer needed",
+      args: {
+        draftIssueId: "DI_kwDOLhQ7gc4AABB"
       }
     }
   ]

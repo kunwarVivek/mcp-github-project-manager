@@ -833,6 +833,110 @@ export class ProjectManagementService {
     }
   }
 
+  // Issue Comment Operations
+  async createIssueComment(data: {
+    issueNumber: number;
+    body: string;
+  }): Promise<{ id: number; body: string; user: string; createdAt: string; updatedAt: string }> {
+    try {
+      const octokit = this.factory.getOctokit();
+      const config = this.factory.getConfig();
+
+      const response = await octokit.rest.issues.createComment({
+        owner: config.owner,
+        repo: config.repo,
+        issue_number: data.issueNumber,
+        body: data.body
+      });
+
+      return {
+        id: response.data.id,
+        body: response.data.body || '',
+        user: response.data.user?.login || 'unknown',
+        createdAt: response.data.created_at,
+        updatedAt: response.data.updated_at
+      };
+    } catch (error) {
+      throw this.mapErrorToMCPError(error);
+    }
+  }
+
+  async updateIssueComment(data: {
+    commentId: number;
+    body: string;
+  }): Promise<{ id: number; body: string; user: string; createdAt: string; updatedAt: string }> {
+    try {
+      const octokit = this.factory.getOctokit();
+      const config = this.factory.getConfig();
+
+      const response = await octokit.rest.issues.updateComment({
+        owner: config.owner,
+        repo: config.repo,
+        comment_id: data.commentId,
+        body: data.body
+      });
+
+      return {
+        id: response.data.id,
+        body: response.data.body || '',
+        user: response.data.user?.login || 'unknown',
+        createdAt: response.data.created_at,
+        updatedAt: response.data.updated_at
+      };
+    } catch (error) {
+      throw this.mapErrorToMCPError(error);
+    }
+  }
+
+  async deleteIssueComment(data: {
+    commentId: number;
+  }): Promise<{ success: boolean; message: string }> {
+    try {
+      const octokit = this.factory.getOctokit();
+      const config = this.factory.getConfig();
+
+      await octokit.rest.issues.deleteComment({
+        owner: config.owner,
+        repo: config.repo,
+        comment_id: data.commentId
+      });
+
+      return {
+        success: true,
+        message: `Comment ${data.commentId} deleted successfully`
+      };
+    } catch (error) {
+      throw this.mapErrorToMCPError(error);
+    }
+  }
+
+  async listIssueComments(data: {
+    issueNumber: number;
+    perPage?: number;
+  }): Promise<Array<{ id: number; body: string; user: string; createdAt: string; updatedAt: string }>> {
+    try {
+      const octokit = this.factory.getOctokit();
+      const config = this.factory.getConfig();
+
+      const response = await octokit.rest.issues.listComments({
+        owner: config.owner,
+        repo: config.repo,
+        issue_number: data.issueNumber,
+        per_page: data.perPage || 100
+      });
+
+      return response.data.map(comment => ({
+        id: comment.id,
+        body: comment.body || '',
+        user: comment.user?.login || 'unknown',
+        createdAt: comment.created_at,
+        updatedAt: comment.updated_at
+      }));
+    } catch (error) {
+      throw this.mapErrorToMCPError(error);
+    }
+  }
+
   // Sprint Management
   async createSprint(data: {
     title: string;
@@ -1186,6 +1290,155 @@ export class ProjectManagementService {
       return {
         success: true,
         message: `Item ${data.itemId} has been unarchived in project ${data.projectId}`
+      };
+    } catch (error) {
+      throw this.mapErrorToMCPError(error);
+    }
+  }
+
+  // Draft Issue Operations
+  async createDraftIssue(data: {
+    projectId: string;
+    title: string;
+    body?: string;
+    assigneeIds?: string[];
+  }): Promise<{ id: string; title: string; body: string }> {
+    try {
+      const mutation = `
+        mutation($input: AddProjectV2DraftIssueInput!) {
+          addProjectV2DraftIssue(input: $input) {
+            projectV2Item {
+              id
+              content {
+                ... on DraftIssue {
+                  id
+                  title
+                  body
+                }
+              }
+            }
+          }
+        }
+      `;
+
+      interface AddDraftIssueResponse {
+        addProjectV2DraftIssue: {
+          projectV2Item: {
+            id: string;
+            content: {
+              id: string;
+              title: string;
+              body: string;
+            };
+          };
+        };
+      }
+
+      const response = await this.factory.graphql<AddDraftIssueResponse>(mutation, {
+        input: {
+          projectId: data.projectId,
+          title: data.title,
+          body: data.body || '',
+          assigneeIds: data.assigneeIds || []
+        }
+      });
+
+      const content = response.addProjectV2DraftIssue.projectV2Item.content;
+
+      return {
+        id: content.id,
+        title: content.title,
+        body: content.body
+      };
+    } catch (error) {
+      throw this.mapErrorToMCPError(error);
+    }
+  }
+
+  async updateDraftIssue(data: {
+    draftIssueId: string;
+    title?: string;
+    body?: string;
+    assigneeIds?: string[];
+  }): Promise<{ id: string; title: string; body: string }> {
+    try {
+      const mutation = `
+        mutation($input: UpdateProjectV2DraftIssueInput!) {
+          updateProjectV2DraftIssue(input: $input) {
+            draftIssue {
+              id
+              title
+              body
+            }
+          }
+        }
+      `;
+
+      interface UpdateDraftIssueResponse {
+        updateProjectV2DraftIssue: {
+          draftIssue: {
+            id: string;
+            title: string;
+            body: string;
+          };
+        };
+      }
+
+      const input: any = {
+        draftIssueId: data.draftIssueId
+      };
+
+      if (data.title !== undefined) input.title = data.title;
+      if (data.body !== undefined) input.body = data.body;
+      if (data.assigneeIds !== undefined) input.assigneeIds = data.assigneeIds;
+
+      const response = await this.factory.graphql<UpdateDraftIssueResponse>(mutation, {
+        input
+      });
+
+      const draftIssue = response.updateProjectV2DraftIssue.draftIssue;
+
+      return {
+        id: draftIssue.id,
+        title: draftIssue.title,
+        body: draftIssue.body
+      };
+    } catch (error) {
+      throw this.mapErrorToMCPError(error);
+    }
+  }
+
+  async deleteDraftIssue(data: {
+    draftIssueId: string;
+  }): Promise<{ success: boolean; message: string }> {
+    try {
+      const mutation = `
+        mutation($input: DeleteProjectV2DraftIssueInput!) {
+          deleteProjectV2DraftIssue(input: $input) {
+            draftIssue {
+              id
+            }
+          }
+        }
+      `;
+
+      interface DeleteDraftIssueResponse {
+        deleteProjectV2DraftIssue: {
+          draftIssue: {
+            id: string;
+          };
+        };
+      }
+
+      await this.factory.graphql<DeleteDraftIssueResponse>(mutation, {
+        input: {
+          draftIssueId: data.draftIssueId
+        }
+      });
+
+      return {
+        success: true,
+        message: `Draft issue ${data.draftIssueId} deleted successfully`
       };
     } catch (error) {
       throw this.mapErrorToMCPError(error);

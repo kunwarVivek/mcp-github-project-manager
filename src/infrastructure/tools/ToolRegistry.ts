@@ -16,6 +16,18 @@ import {
   listIssuesTool,
   getIssueTool,
   updateIssueTool,
+
+  // Issue comment tools
+  createIssueCommentTool,
+  updateIssueCommentTool,
+  deleteIssueCommentTool,
+  listIssueCommentsTool,
+
+  // Draft issue tools
+  createDraftIssueTool,
+  updateDraftIssueTool,
+  deleteDraftIssueTool,
+
   createSprintTool,
   listSprintsTool,
   getCurrentSprintTool,
@@ -160,6 +172,17 @@ export class ToolRegistry {
     this.registerTool(listIssuesTool);
     this.registerTool(getIssueTool);
     this.registerTool(updateIssueTool);
+
+    // Register issue comment tools
+    this.registerTool(createIssueCommentTool);
+    this.registerTool(updateIssueCommentTool);
+    this.registerTool(deleteIssueCommentTool);
+    this.registerTool(listIssueCommentsTool);
+
+    // Register draft issue tools
+    this.registerTool(createDraftIssueTool);
+    this.registerTool(updateDraftIssueTool);
+    this.registerTool(deleteDraftIssueTool);
 
     // Register sprint tools
     this.registerTool(createSprintTool);

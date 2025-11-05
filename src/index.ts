@@ -291,6 +291,29 @@ class GitHubProjectManagerServer {
           labels: args.labels
         });
 
+      // Issue comment tools
+      case "create_issue_comment":
+        return await this.service.createIssueComment(args);
+
+      case "update_issue_comment":
+        return await this.service.updateIssueComment(args);
+
+      case "delete_issue_comment":
+        return await this.service.deleteIssueComment(args);
+
+      case "list_issue_comments":
+        return await this.service.listIssueComments(args);
+
+      // Draft issue tools
+      case "create_draft_issue":
+        return await this.service.createDraftIssue(args);
+
+      case "update_draft_issue":
+        return await this.service.updateDraftIssue(args);
+
+      case "delete_draft_issue":
+        return await this.service.deleteDraftIssue(args);
+
       // Sprint tools
       case "create_sprint":
         return await this.service.createSprint(args);
