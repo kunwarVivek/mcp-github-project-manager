@@ -152,6 +152,10 @@ export class ProjectManagementService {
     return this.factory.createSprintRepository();
   }
 
+  private get automationRepo() {
+    return this.factory.createAutomationRuleRepository();
+  }
+
   // Helper method to map domain errors to MCP error codes
   private mapErrorToMCPError(error: unknown): Error {
     if (error instanceof ValidationError) {
@@ -2785,6 +2789,501 @@ export class ProjectManagementService {
           }
         }
       ];
+    } catch (error) {
+      throw this.mapErrorToMCPError(error);
+    }
+  }
+
+  // ============================================================================
+  // Automation Rule Management
+  // ============================================================================
+
+  /**
+   * Create a new automation rule for a project
+   */
+  async createAutomationRule(data: {
+    name: string;
+    description?: string;
+    projectId: string;
+    enabled?: boolean;
+    triggers: Array<{
+      type: string;
+      resourceType?: string;
+      conditions?: Array<{
+        field: string;
+        operator: string;
+        value: any;
+      }>;
+    }>;
+    actions: Array<{
+      type: string;
+      parameters: Record<string, any>;
+    }>;
+  }): Promise<{
+    id: string;
+    name: string;
+    description?: string;
+    projectId: string;
+    enabled: boolean;
+    triggers: any[];
+    actions: any[];
+  }> {
+    try {
+      // Verify project exists
+      const project = await this.projectRepo.findById(data.projectId);
+      if (!project) {
+        throw new ResourceNotFoundError(ResourceType.PROJECT, data.projectId);
+      }
+
+      const rule = await this.automationRepo.create({
+        name: data.name,
+        description: data.description,
+        projectId: data.projectId,
+        enabled: data.enabled ?? true,
+        triggers: data.triggers as any,
+        actions: data.actions as any
+      });
+
+      return {
+        id: rule.id,
+        name: rule.name,
+        description: rule.description,
+        projectId: rule.projectId,
+        enabled: rule.enabled,
+        triggers: rule.triggers,
+        actions: rule.actions
+      };
+    } catch (error) {
+      throw this.mapErrorToMCPError(error);
+    }
+  }
+
+  /**
+   * Update an existing automation rule
+   */
+  async updateAutomationRule(data: {
+    ruleId: string;
+    name?: string;
+    description?: string;
+    enabled?: boolean;
+    triggers?: Array<{
+      type: string;
+      resourceType?: string;
+      conditions?: Array<{
+        field: string;
+        operator: string;
+        value: any;
+      }>;
+    }>;
+    actions?: Array<{
+      type: string;
+      parameters: Record<string, any>;
+    }>;
+  }): Promise<{
+    id: string;
+    name: string;
+    description?: string;
+    projectId: string;
+    enabled: boolean;
+    triggers: any[];
+    actions: any[];
+  }> {
+    try {
+      // Verify rule exists
+      const rule = await this.automationRepo.findById(data.ruleId);
+      if (!rule) {
+        throw new ResourceNotFoundError(ResourceType.RELATIONSHIP, data.ruleId);
+      }
+
+      const updated = await this.automationRepo.update(data.ruleId, {
+        name: data.name,
+        description: data.description,
+        enabled: data.enabled,
+        triggers: data.triggers as any,
+        actions: data.actions as any
+      });
+
+      return {
+        id: updated.id,
+        name: updated.name,
+        description: updated.description,
+        projectId: updated.projectId,
+        enabled: updated.enabled,
+        triggers: updated.triggers,
+        actions: updated.actions
+      };
+    } catch (error) {
+      throw this.mapErrorToMCPError(error);
+    }
+  }
+
+  /**
+   * Delete an automation rule
+   */
+  async deleteAutomationRule(data: { ruleId: string }): Promise<{ success: boolean }> {
+    try {
+      // Verify rule exists
+      const rule = await this.automationRepo.findById(data.ruleId);
+      if (!rule) {
+        throw new ResourceNotFoundError(ResourceType.RELATIONSHIP, data.ruleId);
+      }
+
+      await this.automationRepo.delete(data.ruleId);
+
+      return { success: true };
+    } catch (error) {
+      throw this.mapErrorToMCPError(error);
+    }
+  }
+
+  /**
+   * Get details of a specific automation rule
+   */
+  async getAutomationRule(data: { ruleId: string }): Promise<{
+    id: string;
+    name: string;
+    description?: string;
+    projectId: string;
+    enabled: boolean;
+    triggers: any[];
+    actions: any[];
+    createdAt: string;
+    updatedAt?: string;
+  }> {
+    try {
+      const rule = await this.automationRepo.findById(data.ruleId);
+      if (!rule) {
+        throw new ResourceNotFoundError(ResourceType.RELATIONSHIP, data.ruleId);
+      }
+
+      return {
+        id: rule.id,
+        name: rule.name,
+        description: rule.description,
+        projectId: rule.projectId,
+        enabled: rule.enabled,
+        triggers: rule.triggers,
+        actions: rule.actions,
+        createdAt: rule.createdAt.toISOString(),
+        updatedAt: rule.updatedAt?.toISOString()
+      };
+    } catch (error) {
+      throw this.mapErrorToMCPError(error);
+    }
+  }
+
+  /**
+   * List all automation rules for a project
+   */
+  async listAutomationRules(data: { projectId: string }): Promise<{
+    rules: Array<{
+      id: string;
+      name: string;
+      description?: string;
+      enabled: boolean;
+      triggersCount: number;
+      actionsCount: number;
+    }>;
+  }> {
+    try {
+      // Verify project exists
+      const project = await this.projectRepo.findById(data.projectId);
+      if (!project) {
+        throw new ResourceNotFoundError(ResourceType.PROJECT, data.projectId);
+      }
+
+      const rules = await this.automationRepo.findByProject(data.projectId);
+
+      return {
+        rules: rules.map(rule => ({
+          id: rule.id,
+          name: rule.name,
+          description: rule.description,
+          enabled: rule.enabled,
+          triggersCount: rule.triggers.length,
+          actionsCount: rule.actions.length
+        }))
+      };
+    } catch (error) {
+      throw this.mapErrorToMCPError(error);
+    }
+  }
+
+  /**
+   * Enable an automation rule
+   */
+  async enableAutomationRule(data: { ruleId: string }): Promise<{
+    id: string;
+    name: string;
+    enabled: boolean;
+  }> {
+    try {
+      const rule = await this.automationRepo.findById(data.ruleId);
+      if (!rule) {
+        throw new ResourceNotFoundError(ResourceType.RELATIONSHIP, data.ruleId);
+      }
+
+      const updated = await this.automationRepo.enable(data.ruleId);
+
+      return {
+        id: updated.id,
+        name: updated.name,
+        enabled: updated.enabled
+      };
+    } catch (error) {
+      throw this.mapErrorToMCPError(error);
+    }
+  }
+
+  /**
+   * Disable an automation rule
+   */
+  async disableAutomationRule(data: { ruleId: string }): Promise<{
+    id: string;
+    name: string;
+    enabled: boolean;
+  }> {
+    try {
+      const rule = await this.automationRepo.findById(data.ruleId);
+      if (!rule) {
+        throw new ResourceNotFoundError(ResourceType.RELATIONSHIP, data.ruleId);
+      }
+
+      const updated = await this.automationRepo.disable(data.ruleId);
+
+      return {
+        id: updated.id,
+        name: updated.name,
+        enabled: updated.enabled
+      };
+    } catch (error) {
+      throw this.mapErrorToMCPError(error);
+    }
+  }
+
+  // ============================================================================
+  // Iteration Management
+  // ============================================================================
+
+  /**
+   * Get iteration field configuration including all iterations
+   */
+  async getIterationConfiguration(data: {
+    projectId: string;
+    fieldName?: string;
+  }): Promise<{
+    fieldId: string;
+    fieldName: string;
+    duration: number;
+    startDay: number;
+    iterations: Array<{
+      id: string;
+      title: string;
+      startDate: string;
+      duration: number;
+    }>;
+  }> {
+    try {
+      const fields = await this.listProjectFields({ projectId: data.projectId });
+
+      // Find iteration field
+      const iterationField = fields.find((f: CustomField) =>
+        f.type === 'iteration' && (!data.fieldName || f.name === data.fieldName)
+      );
+
+      if (!iterationField) {
+        throw new ResourceNotFoundError(
+          ResourceType.FIELD,
+          data.fieldName || 'iteration field'
+        );
+      }
+
+      if (!iterationField.config) {
+        throw new Error('Invalid iteration field configuration');
+      }
+
+      return {
+        fieldId: iterationField.id,
+        fieldName: iterationField.name,
+        duration: iterationField.config.iterationDuration || 14,
+        startDay: iterationField.config.iterationStart ? new Date(iterationField.config.iterationStart).getDay() : 1,
+        iterations: (iterationField.config.iterations || []).map((iter: any) => ({
+          id: iter.id,
+          title: iter.title,
+          startDate: iter.startDate,
+          duration: iter.duration
+        }))
+      };
+    } catch (error) {
+      throw this.mapErrorToMCPError(error);
+    }
+  }
+
+  /**
+   * Get the currently active iteration based on today's date
+   */
+  async getCurrentIteration(data: {
+    projectId: string;
+    fieldName?: string;
+  }): Promise<{
+    id: string;
+    title: string;
+    startDate: string;
+    endDate: string;
+    duration: number;
+  } | null> {
+    try {
+      const config = await this.getIterationConfiguration(data);
+      const now = new Date();
+
+      for (const iteration of config.iterations) {
+        const start = new Date(iteration.startDate);
+        const end = new Date(start);
+        end.setDate(end.getDate() + iteration.duration);
+
+        if (now >= start && now < end) {
+          return {
+            id: iteration.id,
+            title: iteration.title,
+            startDate: iteration.startDate,
+            endDate: end.toISOString(),
+            duration: iteration.duration
+          };
+        }
+      }
+
+      return null;
+    } catch (error) {
+      throw this.mapErrorToMCPError(error);
+    }
+  }
+
+  /**
+   * Get all items assigned to a specific iteration
+   */
+  async getIterationItems(data: {
+    projectId: string;
+    iterationId: string;
+    limit?: number;
+  }): Promise<{
+    items: Array<{
+      id: string;
+      title: string;
+      type: string;
+      status?: string;
+    }>;
+  }> {
+    try {
+      const items = await this.listProjectItems({
+        projectId: data.projectId,
+        limit: data.limit || 50
+      });
+
+      // Filter items that have the iteration field set to this iteration
+      const iterationItems = items.filter((item: any) => {
+        // Check if any field value matches the iteration ID
+        const fieldValues = item.fieldValues || [];
+        return fieldValues.some((fv: any) => fv.value === data.iterationId);
+      });
+
+      return {
+        items: iterationItems.map((item: any) => ({
+          id: item.id,
+          title: item.title || 'Untitled',
+          type: item.type,
+          status: item.status
+        }))
+      };
+    } catch (error) {
+      throw this.mapErrorToMCPError(error);
+    }
+  }
+
+  /**
+   * Find which iteration contains a specific date
+   */
+  async getIterationByDate(data: {
+    projectId: string;
+    date: string;
+    fieldName?: string;
+  }): Promise<{
+    id: string;
+    title: string;
+    startDate: string;
+    endDate: string;
+    duration: number;
+  } | null> {
+    try {
+      const config = await this.getIterationConfiguration(data);
+      const targetDate = new Date(data.date);
+
+      for (const iteration of config.iterations) {
+        const start = new Date(iteration.startDate);
+        const end = new Date(start);
+        end.setDate(end.getDate() + iteration.duration);
+
+        if (targetDate >= start && targetDate < end) {
+          return {
+            id: iteration.id,
+            title: iteration.title,
+            startDate: iteration.startDate,
+            endDate: end.toISOString(),
+            duration: iteration.duration
+          };
+        }
+      }
+
+      return null;
+    } catch (error) {
+      throw this.mapErrorToMCPError(error);
+    }
+  }
+
+  /**
+   * Bulk assign multiple items to a specific iteration
+   */
+  async assignItemsToIteration(data: {
+    projectId: string;
+    itemIds: string[];
+    iterationId: string;
+    fieldName?: string;
+  }): Promise<{ success: boolean; assignedCount: number }> {
+    try {
+      // Get iteration field
+      const fields = await this.listProjectFields({ projectId: data.projectId });
+      const iterationField = fields.find((f: CustomField) =>
+        f.type === 'iteration' && (!data.fieldName || f.name === data.fieldName)
+      );
+
+      if (!iterationField) {
+        throw new ResourceNotFoundError(
+          ResourceType.FIELD,
+          data.fieldName || 'iteration field'
+        );
+      }
+
+      let assignedCount = 0;
+
+      // Assign each item to the iteration
+      for (const itemId of data.itemIds) {
+        try {
+          await this.setFieldValue({
+            projectId: data.projectId,
+            itemId: itemId,
+            fieldId: iterationField.id,
+            value: { iterationId: data.iterationId }
+          });
+          assignedCount++;
+        } catch (error) {
+          // Log error but continue with other items
+          console.error(`Failed to assign item ${itemId}:`, error);
+        }
+      }
+
+      return {
+        success: assignedCount > 0,
+        assignedCount
+      };
     } catch (error) {
       throw this.mapErrorToMCPError(error);
     }

@@ -1231,6 +1231,157 @@ export const listLabelsSchema = z.object({
 
 export type ListLabelsArgs = z.infer<typeof listLabelsSchema>;
 
+// ============================================================================
+// Automation Service Tools
+// ============================================================================
+
+// Schema for create_automation_rule tool
+export const createAutomationRuleSchema = z.object({
+  name: z.string().min(1, "Rule name is required"),
+  description: z.string().optional(),
+  projectId: z.string().min(1, "Project ID is required"),
+  enabled: z.boolean().optional().default(true),
+  triggers: z.array(z.object({
+    type: z.enum([
+      "resource_created", "resource_updated", "resource_deleted",
+      "issue_opened", "issue_closed", "issue_labeled", "issue_assigned",
+      "pr_opened", "pr_closed", "pr_merged", "pr_approved",
+      "sprint_started", "sprint_ended", "milestone_reached", "schedule"
+    ]),
+    resourceType: z.string().optional(),
+    conditions: z.array(z.object({
+      field: z.string(),
+      operator: z.string(),
+      value: z.any()
+    })).optional()
+  })),
+  actions: z.array(z.object({
+    type: z.enum([
+      "update_resource", "create_resource", "delete_resource",
+      "add_label", "remove_label", "assign_user", "unassign_user",
+      "create_relationship", "delete_relationship", "notify", "webhook", "custom_script"
+    ]),
+    parameters: z.record(z.any())
+  }))
+});
+
+export type CreateAutomationRuleArgs = z.infer<typeof createAutomationRuleSchema>;
+
+// Schema for update_automation_rule tool
+export const updateAutomationRuleSchema = z.object({
+  ruleId: z.string().min(1, "Rule ID is required"),
+  name: z.string().optional(),
+  description: z.string().optional(),
+  enabled: z.boolean().optional(),
+  triggers: z.array(z.object({
+    type: z.enum([
+      "resource_created", "resource_updated", "resource_deleted",
+      "issue_opened", "issue_closed", "issue_labeled", "issue_assigned",
+      "pr_opened", "pr_closed", "pr_merged", "pr_approved",
+      "sprint_started", "sprint_ended", "milestone_reached", "schedule"
+    ]),
+    resourceType: z.string().optional(),
+    conditions: z.array(z.object({
+      field: z.string(),
+      operator: z.string(),
+      value: z.any()
+    })).optional()
+  })).optional(),
+  actions: z.array(z.object({
+    type: z.enum([
+      "update_resource", "create_resource", "delete_resource",
+      "add_label", "remove_label", "assign_user", "unassign_user",
+      "create_relationship", "delete_relationship", "notify", "webhook", "custom_script"
+    ]),
+    parameters: z.record(z.any())
+  })).optional()
+});
+
+export type UpdateAutomationRuleArgs = z.infer<typeof updateAutomationRuleSchema>;
+
+// Schema for delete_automation_rule tool
+export const deleteAutomationRuleSchema = z.object({
+  ruleId: z.string().min(1, "Rule ID is required")
+});
+
+export type DeleteAutomationRuleArgs = z.infer<typeof deleteAutomationRuleSchema>;
+
+// Schema for get_automation_rule tool
+export const getAutomationRuleSchema = z.object({
+  ruleId: z.string().min(1, "Rule ID is required")
+});
+
+export type GetAutomationRuleArgs = z.infer<typeof getAutomationRuleSchema>;
+
+// Schema for list_automation_rules tool
+export const listAutomationRulesSchema = z.object({
+  projectId: z.string().min(1, "Project ID is required")
+});
+
+export type ListAutomationRulesArgs = z.infer<typeof listAutomationRulesSchema>;
+
+// Schema for enable_automation_rule tool
+export const enableAutomationRuleSchema = z.object({
+  ruleId: z.string().min(1, "Rule ID is required")
+});
+
+export type EnableAutomationRuleArgs = z.infer<typeof enableAutomationRuleSchema>;
+
+// Schema for disable_automation_rule tool
+export const disableAutomationRuleSchema = z.object({
+  ruleId: z.string().min(1, "Rule ID is required")
+});
+
+export type DisableAutomationRuleArgs = z.infer<typeof disableAutomationRuleSchema>;
+
+// ============================================================================
+// Iteration Management Tools
+// ============================================================================
+
+// Schema for get_iteration_configuration tool
+export const getIterationConfigurationSchema = z.object({
+  projectId: z.string().min(1, "Project ID is required"),
+  fieldName: z.string().optional()
+});
+
+export type GetIterationConfigurationArgs = z.infer<typeof getIterationConfigurationSchema>;
+
+// Schema for get_current_iteration tool
+export const getCurrentIterationSchema = z.object({
+  projectId: z.string().min(1, "Project ID is required"),
+  fieldName: z.string().optional()
+});
+
+export type GetCurrentIterationArgs = z.infer<typeof getCurrentIterationSchema>;
+
+// Schema for get_iteration_items tool
+export const getIterationItemsSchema = z.object({
+  projectId: z.string().min(1, "Project ID is required"),
+  iterationId: z.string().min(1, "Iteration ID is required"),
+  limit: z.number().int().positive().default(50).optional()
+});
+
+export type GetIterationItemsArgs = z.infer<typeof getIterationItemsSchema>;
+
+// Schema for get_iteration_by_date tool
+export const getIterationByDateSchema = z.object({
+  projectId: z.string().min(1, "Project ID is required"),
+  date: z.string().datetime("Date must be a valid ISO date string"),
+  fieldName: z.string().optional()
+});
+
+export type GetIterationByDateArgs = z.infer<typeof getIterationByDateSchema>;
+
+// Schema for assign_items_to_iteration tool
+export const assignItemsToIterationSchema = z.object({
+  projectId: z.string().min(1, "Project ID is required"),
+  itemIds: z.array(z.string()).min(1, "At least one item ID is required"),
+  iterationId: z.string().min(1, "Iteration ID is required"),
+  fieldName: z.string().optional()
+});
+
+export type AssignItemsToIterationArgs = z.infer<typeof assignItemsToIterationSchema>;
+
 // Project tools
 export const updateProjectTool: ToolDefinition<UpdateProjectArgs> = {
   name: "update_project",
@@ -1899,6 +2050,237 @@ export const replayEventsTool: ToolDefinition<ReplayEventsArgs> = {
         fromTimestamp: "2025-01-01T12:00:00Z",
         resourceType: "PROJECT",
         limit: 100
+      }
+    }
+  ]
+};
+
+// ============================================================================
+// Automation Service Tool Definitions
+// ============================================================================
+
+export const createAutomationRuleTool: ToolDefinition<CreateAutomationRuleArgs> = {
+  name: "create_automation_rule",
+  description: "Create a new automation rule for a GitHub project",
+  schema: createAutomationRuleSchema as unknown as ToolSchema<CreateAutomationRuleArgs>,
+  examples: [
+    {
+      name: "Auto-label PRs",
+      description: "Automatically add 'needs-review' label when PR is opened",
+      args: {
+        name: "Auto-label new PRs",
+        projectId: "PVT_kwDOLhQ7gc4AOEbH",
+        enabled: true,
+        triggers: [{
+          type: "pr_opened"
+        }],
+        actions: [{
+          type: "add_label",
+          parameters: { labelName: "needs-review" }
+        }]
+      }
+    },
+    {
+      name: "Auto-assign issues",
+      description: "Automatically assign issues with 'bug' label to maintainer",
+      args: {
+        name: "Auto-assign bugs",
+        projectId: "PVT_kwDOLhQ7gc4AOEbH",
+        enabled: true,
+        triggers: [{
+          type: "issue_labeled",
+          conditions: [{
+            field: "label",
+            operator: "equals",
+            value: "bug"
+          }]
+        }],
+        actions: [{
+          type: "assign_user",
+          parameters: { username: "maintainer" }
+        }]
+      }
+    }
+  ]
+};
+
+export const updateAutomationRuleTool: ToolDefinition<UpdateAutomationRuleArgs> = {
+  name: "update_automation_rule",
+  description: "Update an existing automation rule",
+  schema: updateAutomationRuleSchema as unknown as ToolSchema<UpdateAutomationRuleArgs>,
+  examples: [
+    {
+      name: "Update rule name",
+      description: "Change the name of an automation rule",
+      args: {
+        ruleId: "AR_kwDOLhQ7gc4AOEbH",
+        name: "Updated rule name"
+      }
+    },
+    {
+      name: "Disable rule temporarily",
+      description: "Disable an automation rule without deleting it",
+      args: {
+        ruleId: "AR_kwDOLhQ7gc4AOEbH",
+        enabled: false
+      }
+    }
+  ]
+};
+
+export const deleteAutomationRuleTool: ToolDefinition<DeleteAutomationRuleArgs> = {
+  name: "delete_automation_rule",
+  description: "Delete an automation rule from a project",
+  schema: deleteAutomationRuleSchema as unknown as ToolSchema<DeleteAutomationRuleArgs>,
+  examples: [
+    {
+      name: "Delete rule",
+      description: "Remove an automation rule from a project",
+      args: {
+        ruleId: "AR_kwDOLhQ7gc4AOEbH"
+      }
+    }
+  ]
+};
+
+export const getAutomationRuleTool: ToolDefinition<GetAutomationRuleArgs> = {
+  name: "get_automation_rule",
+  description: "Get details of a specific automation rule",
+  schema: getAutomationRuleSchema as unknown as ToolSchema<GetAutomationRuleArgs>,
+  examples: [
+    {
+      name: "Get rule details",
+      description: "Retrieve details of an automation rule",
+      args: {
+        ruleId: "AR_kwDOLhQ7gc4AOEbH"
+      }
+    }
+  ]
+};
+
+export const listAutomationRulesTool: ToolDefinition<ListAutomationRulesArgs> = {
+  name: "list_automation_rules",
+  description: "List all automation rules for a GitHub project",
+  schema: listAutomationRulesSchema as unknown as ToolSchema<ListAutomationRulesArgs>,
+  examples: [
+    {
+      name: "List project rules",
+      description: "Get all automation rules for a project",
+      args: {
+        projectId: "PVT_kwDOLhQ7gc4AOEbH"
+      }
+    }
+  ]
+};
+
+export const enableAutomationRuleTool: ToolDefinition<EnableAutomationRuleArgs> = {
+  name: "enable_automation_rule",
+  description: "Enable a disabled automation rule",
+  schema: enableAutomationRuleSchema as unknown as ToolSchema<EnableAutomationRuleArgs>,
+  examples: [
+    {
+      name: "Enable rule",
+      description: "Re-enable a disabled automation rule",
+      args: {
+        ruleId: "AR_kwDOLhQ7gc4AOEbH"
+      }
+    }
+  ]
+};
+
+export const disableAutomationRuleTool: ToolDefinition<DisableAutomationRuleArgs> = {
+  name: "disable_automation_rule",
+  description: "Disable an automation rule without deleting it",
+  schema: disableAutomationRuleSchema as unknown as ToolSchema<DisableAutomationRuleArgs>,
+  examples: [
+    {
+      name: "Disable rule",
+      description: "Temporarily disable an automation rule",
+      args: {
+        ruleId: "AR_kwDOLhQ7gc4AOEbH"
+      }
+    }
+  ]
+};
+
+// ============================================================================
+// Iteration Management Tool Definitions
+// ============================================================================
+
+export const getIterationConfigurationTool: ToolDefinition<GetIterationConfigurationArgs> = {
+  name: "get_iteration_configuration",
+  description: "Get iteration field configuration including duration, start date, and list of all iterations",
+  schema: getIterationConfigurationSchema as unknown as ToolSchema<GetIterationConfigurationArgs>,
+  examples: [
+    {
+      name: "Get iteration config",
+      description: "Get all iterations for a project",
+      args: {
+        projectId: "PVT_kwDOLhQ7gc4AOEbH"
+      }
+    }
+  ]
+};
+
+export const getCurrentIterationTool: ToolDefinition<GetCurrentIterationArgs> = {
+  name: "get_current_iteration",
+  description: "Get the currently active iteration based on today's date",
+  schema: getCurrentIterationSchema as unknown as ToolSchema<GetCurrentIterationArgs>,
+  examples: [
+    {
+      name: "Get current sprint",
+      description: "Find which iteration is currently active",
+      args: {
+        projectId: "PVT_kwDOLhQ7gc4AOEbH"
+      }
+    }
+  ]
+};
+
+export const getIterationItemsTool: ToolDefinition<GetIterationItemsArgs> = {
+  name: "get_iteration_items",
+  description: "Get all items assigned to a specific iteration",
+  schema: getIterationItemsSchema as unknown as ToolSchema<GetIterationItemsArgs>,
+  examples: [
+    {
+      name: "Get iteration items",
+      description: "Get all issues/PRs in an iteration",
+      args: {
+        projectId: "PVT_kwDOLhQ7gc4AOEbH",
+        iterationId: "PVTIF_lADOLhQ7gc4AOEbH"
+      }
+    }
+  ]
+};
+
+export const getIterationByDateTool: ToolDefinition<GetIterationByDateArgs> = {
+  name: "get_iteration_by_date",
+  description: "Find which iteration contains a specific date",
+  schema: getIterationByDateSchema as unknown as ToolSchema<GetIterationByDateArgs>,
+  examples: [
+    {
+      name: "Find iteration",
+      description: "Find which iteration contains a specific date",
+      args: {
+        projectId: "PVT_kwDOLhQ7gc4AOEbH",
+        date: "2025-01-15T00:00:00Z"
+      }
+    }
+  ]
+};
+
+export const assignItemsToIterationTool: ToolDefinition<AssignItemsToIterationArgs> = {
+  name: "assign_items_to_iteration",
+  description: "Bulk assign multiple items to a specific iteration",
+  schema: assignItemsToIterationSchema as unknown as ToolSchema<AssignItemsToIterationArgs>,
+  examples: [
+    {
+      name: "Assign to sprint",
+      description: "Add multiple issues to the current sprint",
+      args: {
+        projectId: "PVT_kwDOLhQ7gc4AOEbH",
+        itemIds: ["PVTI_lADOLhQ7gc4AOEbHzM4AOAJ7", "PVTI_lADOLhQ7gc4AOEbHzM4AOAJ8"],
+        iterationId: "PVTIF_lADOLhQ7gc4AOEbH"
       }
     }
   ]

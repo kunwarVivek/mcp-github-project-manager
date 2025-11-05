@@ -90,6 +90,22 @@ import {
   expandTaskTool,
   enhancePRDTool,
   createTraceabilityMatrixTool,
+
+  // Automation service tools
+  createAutomationRuleTool,
+  updateAutomationRuleTool,
+  deleteAutomationRuleTool,
+  getAutomationRuleTool,
+  listAutomationRulesTool,
+  enableAutomationRuleTool,
+  disableAutomationRuleTool,
+
+  // Iteration management tools
+  getIterationConfigurationTool,
+  getCurrentIterationTool,
+  getIterationItemsTool,
+  getIterationByDateTool,
+  assignItemsToIterationTool,
 } from "./ToolSchemas.js";
 
 /**
@@ -250,6 +266,22 @@ export class ToolRegistry {
     this.registerTool(expandTaskTool);
     this.registerTool(enhancePRDTool);
     this.registerTool(createTraceabilityMatrixTool);
+
+    // Register automation service tools
+    this.registerTool(createAutomationRuleTool);
+    this.registerTool(updateAutomationRuleTool);
+    this.registerTool(deleteAutomationRuleTool);
+    this.registerTool(getAutomationRuleTool);
+    this.registerTool(listAutomationRulesTool);
+    this.registerTool(enableAutomationRuleTool);
+    this.registerTool(disableAutomationRuleTool);
+
+    // Register iteration management tools
+    this.registerTool(getIterationConfigurationTool);
+    this.registerTool(getCurrentIterationTool);
+    this.registerTool(getIterationItemsTool);
+    this.registerTool(getIterationByDateTool);
+    this.registerTool(assignItemsToIterationTool);
   }
 
   /**

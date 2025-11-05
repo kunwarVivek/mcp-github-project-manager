@@ -7,6 +7,7 @@ import { GitHubIssueRepository } from "./repositories/GitHubIssueRepository";
 import { GitHubMilestoneRepository } from "./repositories/GitHubMilestoneRepository";
 import { GitHubProjectRepository } from "./repositories/GitHubProjectRepository";
 import { GitHubSprintRepository } from "./repositories/GitHubSprintRepository";
+import { GitHubAutomationRuleRepository } from "./repositories/GitHubAutomationRuleRepository";
 
 export interface RepositoryFactoryOptions {
   baseUrl?: string;
@@ -93,6 +94,13 @@ export class GitHubRepositoryFactory {
    */
   createSprintRepository(): GitHubSprintRepository {
     return new GitHubSprintRepository(this.octokit, this.config);
+  }
+
+  /**
+   * Creates an instance of an Automation Rule Repository
+   */
+  createAutomationRuleRepository(): GitHubAutomationRuleRepository {
+    return new GitHubAutomationRuleRepository(this.octokit, this.config);
   }
 
   /**

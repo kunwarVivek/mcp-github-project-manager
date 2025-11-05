@@ -443,6 +443,44 @@ class GitHubProjectManagerServer {
       case "create_traceability_matrix":
         return await executeCreateTraceabilityMatrix(args);
 
+      // Automation service tools
+      case "create_automation_rule":
+        return await this.service.createAutomationRule(args);
+
+      case "update_automation_rule":
+        return await this.service.updateAutomationRule(args);
+
+      case "delete_automation_rule":
+        return await this.service.deleteAutomationRule(args);
+
+      case "get_automation_rule":
+        return await this.service.getAutomationRule(args);
+
+      case "list_automation_rules":
+        return await this.service.listAutomationRules(args);
+
+      case "enable_automation_rule":
+        return await this.service.enableAutomationRule(args);
+
+      case "disable_automation_rule":
+        return await this.service.disableAutomationRule(args);
+
+      // Iteration management tools
+      case "get_iteration_configuration":
+        return await this.service.getIterationConfiguration(args);
+
+      case "get_current_iteration":
+        return await this.service.getCurrentIteration(args);
+
+      case "get_iteration_items":
+        return await this.service.getIterationItems(args);
+
+      case "get_iteration_by_date":
+        return await this.service.getIterationByDate(args);
+
+      case "assign_items_to_iteration":
+        return await this.service.assignItemsToIteration(args);
+
       default:
         throw new McpError(
           ErrorCode.MethodNotFound,
