@@ -106,6 +106,14 @@ import {
   getIterationItemsTool,
   getIterationByDateTool,
   assignItemsToIterationTool,
+
+  // AI-powered automation tools
+  generateRoadmapTool,
+  enrichIssueTool,
+  enrichIssuesBulkTool,
+  triageIssueTool,
+  triageAllIssuesTool,
+  scheduleTriagingTool,
 } from "./ToolSchemas.js";
 
 /**
@@ -282,6 +290,14 @@ export class ToolRegistry {
     this.registerTool(getIterationItemsTool);
     this.registerTool(getIterationByDateTool);
     this.registerTool(assignItemsToIterationTool);
+
+    // Register AI-powered automation tools
+    this.registerTool(generateRoadmapTool);
+    this.registerTool(enrichIssueTool);
+    this.registerTool(enrichIssuesBulkTool);
+    this.registerTool(triageIssueTool);
+    this.registerTool(triageAllIssuesTool);
+    this.registerTool(scheduleTriagingTool);
   }
 
   /**
