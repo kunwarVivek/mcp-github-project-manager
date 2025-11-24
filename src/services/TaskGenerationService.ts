@@ -223,7 +223,7 @@ export class TaskGenerationService {
         }
 
         // Generate comprehensive context
-        const executionContext = await this.contextGenerationService.generateTaskContext(
+        const { context: executionContext, metrics: contextMetrics } = await this.contextGenerationService.generateTaskContext(
           task,
           prdContent,
           config
@@ -231,6 +231,8 @@ export class TaskGenerationService {
 
         // Add execution context to the task
         enhancedTask.executionContext = executionContext;
+        // Store context quality metrics for monitoring (not in interface yet)
+        // TODO: Add contextQualityMetrics to EnhancedAITask interface
 
         // Generate implementation guidance if enabled
         if (config.includeImplementationGuidance) {

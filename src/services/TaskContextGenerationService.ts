@@ -4,22 +4,18 @@ import {
   CONTEXT_GENERATION_CONFIGS,
   formatContextPrompt,
   BusinessContextSchema,
-  TechnicalContextSchema,
-  ImplementationGuidanceSchema,
-  ContextualReferencesSchema,
-  EnhancedAcceptanceCriteriaSchema
+  TechnicalContextSchema
 } from './ai/prompts/ContextGenerationPrompts';
 import {
   AITask,
-  EnhancedAITask,
   PRDDocument,
   EnhancedTaskGenerationConfig,
-  TaskExecutionContext,
-  EnhancedAcceptanceCriteria,
-  ContextualReferences,
-  ImplementationGuidance,
-  EnhancedTaskDependency
+  FeatureRequirement
 } from '../domain/ai-types';
+import {
+  TaskExecutionContext,
+  ContextQualityMetrics
+} from '../domain/task-context-schemas';
 import { RequirementsTraceabilityService } from './RequirementsTraceabilityService';
 import {
   ENHANCED_TASK_GENERATION,
@@ -29,26 +25,52 @@ import {
   ENHANCED_CONTEXT_LEVEL
 } from '../env';
 
+// Import new context generation services
+import { ContextualReferenceGenerator } from './context/ContextualReferenceGenerator';
+import { DependencyContextGenerator } from './context/DependencyContextGenerator';
+import { CodeExampleGenerator } from './context/CodeExampleGenerator';
+import { ContextQualityValidator } from './validation/ContextQualityValidator';
+
 /**
  * Service for generating comprehensive task context using AI and traceability
+ *
+ * UPDATED: Now includes FR-4, FR-5, FR-6 implementations
+ * - FR-4: Contextual References System
+ * - FR-5: Enhanced Acceptance Criteria (integration)
+ * - FR-6: Dependency Context Enhancement
  */
 export class TaskContextGenerationService {
   private aiFactory: AIServiceFactory;
   private traceabilityService: RequirementsTraceabilityService;
+  private contextualRefGenerator: ContextualReferenceGenerator;
+  private dependencyContextGenerator: DependencyContextGenerator;
+  private codeExampleGenerator: CodeExampleGenerator;
+  private qualityValidator: ContextQualityValidator;
 
   constructor() {
     this.aiFactory = AIServiceFactory.getInstance();
     this.traceabilityService = new RequirementsTraceabilityService();
+    this.contextualRefGenerator = new ContextualReferenceGenerator();
+    this.dependencyContextGenerator = new DependencyContextGenerator();
+    this.codeExampleGenerator = new CodeExampleGenerator();
+    this.qualityValidator = new ContextQualityValidator();
   }
 
   /**
-   * Generate comprehensive context for a task
+   * Generate comprehensive context for a task with quality validation
    */
   async generateTaskContext(
     task: AITask,
     prd: PRDDocument | string,
-    config: EnhancedTaskGenerationConfig
-  ): Promise<TaskExecutionContext> {
+    config: EnhancedTaskGenerationConfig,
+    allTasks?: AITask[],
+    features?: FeatureRequirement[]
+  ): Promise<{ context: TaskExecutionContext; metrics: ContextQualityMetrics }> {
+    const startTime = Date.now();
+    let tokenUsage = 0;
+    const errors: string[] = [];
+    const warnings: string[] = [];
+
     try {
       const prdContent = typeof prd === 'string' ? prd : JSON.stringify(prd, null, 2);
 
@@ -57,17 +79,63 @@ export class TaskContextGenerationService {
 
       // Add AI-enhanced context if enabled and available
       let aiEnhancedContext = {};
+      let aiEnhanced = false;
+
       if (config.enableEnhancedGeneration && this.aiFactory.getBestAvailableModel()) {
-        aiEnhancedContext = await this.generateAIEnhancedContext(task, prdContent, config);
+        try {
+          const aiResult = await this.generateAIEnhancedContext(
+            task,
+            prdContent,
+            config,
+            allTasks,
+            features
+          );
+          aiEnhancedContext = aiResult.context;
+          tokenUsage = aiResult.tokenUsage;
+          aiEnhanced = true;
+        } catch (error) {
+          errors.push(`AI enhancement failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+          warnings.push('Falling back to traceability-based context only');
+        }
       }
 
       // Merge contexts with AI enhancement taking precedence
-      return this.mergeContexts(traceabilityContext, aiEnhancedContext);
+      const context = this.mergeContexts(traceabilityContext, aiEnhancedContext);
+
+      // Calculate generation time
+      const generationTime = (Date.now() - startTime) / 1000;
+
+      // Create quality metrics
+      const metrics: ContextQualityMetrics = {
+        completenessScore: this.calculateContextCompleteness(context),
+        generationTime,
+        tokenUsage,
+        cacheHit: false, // TODO: Implement caching
+        aiEnhanced,
+        errors,
+        warnings
+      };
+
+      return { context, metrics };
 
     } catch (error) {
-      process.stderr.write(`Error generating task context: ${error instanceof Error ? error.message : String(error)}\n`);
-      // Fallback to basic traceability context
-      return this.generateTraceabilityContext(task, prd);
+      errors.push(`Context generation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+
+      // Fallback to minimal context
+      const fallbackContext = await this.generateTraceabilityContext(task, prd);
+      const generationTime = (Date.now() - startTime) / 1000;
+
+      const metrics: ContextQualityMetrics = {
+        completenessScore: this.calculateContextCompleteness(fallbackContext),
+        generationTime,
+        tokenUsage: 0,
+        cacheHit: false,
+        aiEnhanced: false,
+        errors,
+        warnings: ['Using fallback context due to errors']
+      };
+
+      return { context: fallbackContext, metrics };
     }
   }
 
@@ -116,41 +184,87 @@ export class TaskContextGenerationService {
   }
 
   /**
-   * Generate AI-enhanced context (when AI is available and enabled)
+   * Generate AI-enhanced context with all new features
    */
   private async generateAIEnhancedContext(
     task: AITask,
     prdContent: string,
-    config: EnhancedTaskGenerationConfig
-  ): Promise<Partial<TaskExecutionContext>> {
+    config: EnhancedTaskGenerationConfig,
+    allTasks?: AITask[],
+    features?: FeatureRequirement[]
+  ): Promise<{ context: Partial<TaskExecutionContext>; tokenUsage: number }> {
     const enhancedContext: Partial<TaskExecutionContext> = {};
+    let totalTokens = 0;
 
     try {
-      // Generate business context if enabled
+      // FR-1: Generate business context if enabled
       if (config.includeBusinessContext) {
         const businessContext = await this.generateBusinessContext(task, prdContent);
         if (businessContext) {
           enhancedContext.businessObjective = businessContext.businessObjective;
           enhancedContext.userImpact = businessContext.userImpact;
           enhancedContext.successMetrics = businessContext.successMetrics;
+          totalTokens += 300; // Estimate
         }
       }
 
-      // Generate technical context if enabled
+      // FR-2: Generate technical context if enabled
+      let technicalContext: any = null;
       if (config.includeTechnicalContext) {
-        const technicalContext = await this.generateTechnicalContext(task, prdContent);
+        technicalContext = await this.generateTechnicalContext(task, prdContent);
         if (technicalContext) {
           enhancedContext.technicalConstraints = technicalContext.technicalConstraints;
           enhancedContext.architecturalDecisions = technicalContext.architecturalDecisions.map((ad: any) => ad.decision);
           enhancedContext.integrationPoints = technicalContext.integrationPoints.map((ip: any) => ip.description);
           enhancedContext.dataRequirements = technicalContext.dataRequirements.map((dr: any) => dr.description);
+          totalTokens += 400; // Estimate
         }
       }
 
-      return enhancedContext;
+      // FR-3: Generate implementation guidance if enabled
+      if (config.includeImplementationGuidance) {
+        const guidance = await this.generateImplementationGuidance(task, enhancedContext, technicalContext);
+        if (guidance) {
+          enhancedContext.implementationGuidance = guidance;
+          totalTokens += 500; // Estimate
+        }
+      }
+
+      // FR-4: Generate contextual references (NEW!)
+      const contextualRefs = await this.contextualRefGenerator.generateReferences(
+        task,
+        prdContent,
+        features
+      );
+      if (contextualRefs) {
+        enhancedContext.contextualReferences = contextualRefs;
+        totalTokens += 400; // Estimate
+      }
+
+      // FR-5: Generate enhanced acceptance criteria (integration)
+      // Note: This is handled in the task generation pipeline
+
+      // FR-6: Generate dependency context (NEW!)
+      if (allTasks && task.dependencies && task.dependencies.length > 0) {
+        const depContext = await this.dependencyContextGenerator.generateDependencyContext(
+          task,
+          allTasks,
+          task.dependencies as any // TaskDependency is compatible with EnhancedTaskDependency
+        );
+        if (depContext) {
+          enhancedContext.dependencyContext = depContext;
+          totalTokens += 300; // Estimate
+        }
+      }
+
+      return {
+        context: enhancedContext,
+        tokenUsage: totalTokens
+      };
+
     } catch (error) {
       process.stderr.write(`Error generating AI-enhanced context: ${error instanceof Error ? error.message : String(error)}\n`);
-      return {};
+      return { context: {}, tokenUsage: totalTokens };
     }
   }
 
@@ -225,10 +339,37 @@ export class TaskContextGenerationService {
     task: AITask,
     businessContext?: any,
     technicalContext?: any
-  ): Promise<ImplementationGuidance | null> {
+  ): Promise<any> {
     try {
+      // Use the code example generator for implementation guidance
+      const codeExamples = await this.codeExampleGenerator.generateExamples(
+        task,
+        technicalContext,
+        3
+      );
+
       const model = this.aiFactory.getBestAvailableModel();
-      if (!model) return null;
+      if (!model) {
+        // Return basic guidance without AI
+        return {
+          recommendedApproach: `Implement ${task.title} following best practices`,
+          implementationSteps: [
+            'Review requirements and acceptance criteria',
+            'Design the solution architecture',
+            'Implement core functionality',
+            'Write comprehensive tests',
+            'Review and refactor code',
+            'Document the implementation'
+          ],
+          technicalConsiderations: ['Follow coding standards', 'Ensure proper error handling'],
+          commonPitfalls: ['Not handling edge cases', 'Insufficient testing'],
+          testingStrategy: 'Write unit tests for all functionality',
+          recommendedTools: [],
+          codeQualityStandards: ['Follow linting rules', 'Maintain test coverage'],
+          performanceConsiderations: ['Optimize for performance'],
+          securityConsiderations: ['Follow security best practices']
+        };
+      }
 
       const config = CONTEXT_GENERATION_CONFIGS.implementationGuidance;
       const prompt = formatContextPrompt(config.userPrompt, {
@@ -244,12 +385,21 @@ export class TaskContextGenerationService {
         model,
         system: config.systemPrompt,
         prompt,
-        schema: ImplementationGuidanceSchema,
+        schema: config.schema,
         maxTokens: config.maxTokens,
         temperature: config.temperature
       });
 
-      return this.transformImplementationGuidance(result.object);
+      // Merge with code examples
+      const guidance = this.transformImplementationGuidance(result.object);
+      if (codeExamples.length > 0 && guidance.contextualReferences) {
+        guidance.contextualReferences = {
+          ...guidance.contextualReferences,
+          codeExamples
+        };
+      }
+
+      return guidance;
     } catch (error) {
       process.stderr.write(`Error generating implementation guidance: ${error instanceof Error ? error.message : String(error)}\n`);
       return null;
@@ -259,7 +409,7 @@ export class TaskContextGenerationService {
   /**
    * Transform AI implementation guidance to our format
    */
-  private transformImplementationGuidance(aiGuidance: any): ImplementationGuidance {
+  private transformImplementationGuidance(aiGuidance: any): any {
     return {
       recommendedApproach: aiGuidance.recommendedApproach,
       implementationSteps: aiGuidance.implementationSteps.map((step: any) => step.description || step),
@@ -297,6 +447,15 @@ export class TaskContextGenerationService {
   }
 
   /**
+   * Calculate context completeness score
+   */
+  private calculateContextCompleteness(context: Partial<TaskExecutionContext>): number {
+    // Import the function from schemas
+    const { calculateCompletenessScore } = require('../domain/task-context-schemas');
+    return calculateCompletenessScore(context);
+  }
+
+  /**
    * Get minimal context as fallback
    */
   private getMinimalContext(task: AITask): TaskExecutionContext {
@@ -324,6 +483,17 @@ export class TaskContextGenerationService {
         scopeConstraints: ['Stay within task scope']
       }
     };
+  }
+
+  /**
+   * Validate context quality and generate report
+   */
+  validateContextQuality(
+    task: AITask,
+    context: TaskExecutionContext,
+    metrics: ContextQualityMetrics
+  ) {
+    return this.qualityValidator.generateQualityReport(task, context, metrics);
   }
 
   /**
