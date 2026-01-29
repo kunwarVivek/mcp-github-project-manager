@@ -32,6 +32,13 @@ This roadmap delivers comprehensive AI-enabled GitHub project management from 0-
 4. No circular dependencies between extracted services
 5. DI container correctly wires all new services
 
+**Plans:** 4 plans
+Plans:
+- [ ] 01-01-PLAN.md - Extract SubIssueService and MilestoneService
+- [ ] 01-02-PLAN.md - Extract SprintPlanningService and ProjectStatusService
+- [ ] 01-03-PLAN.md - Extract ProjectTemplateService and ProjectLinkingService
+- [ ] 01-04-PLAN.md - Refactor to facade and wire DI container
+
 ---
 
 ### Phase 2: MCP Protocol Compliance
@@ -316,7 +323,7 @@ This roadmap delivers comprehensive AI-enabled GitHub project management from 0-
 
 | Phase | Name | Requirements | Status |
 |-------|------|--------------|--------|
-| 1 | Service Decomposition | 7 | Pending |
+| 1 | Service Decomposition | 7 | Planned |
 | 2 | MCP Protocol Compliance | 15 | Pending |
 | 3 | Type Safety | 6 | Pending |
 | 4 | Test Stabilization | 7 | Pending |
