@@ -1,8 +1,6 @@
 handoffs
 .clinerules*
 .roomodes*
-ROADMAP.*
-STATUS.*
 # Dependencies
 node_modules/
 npm-debug.log*

@@ -198,21 +198,115 @@ Explicitly excluded. Documented to prevent scope creep.
 
 ## Traceability
 
-Which phases cover which requirements. Updated during roadmap creation.
+Which phases cover which requirements.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| GHAPI-01 to GHAPI-24 | TBD | Pending |
-| MCP-01 to MCP-15 | TBD | Pending |
-| DEBT-01 to DEBT-28 | TBD | Pending |
-| AI-01 to AI-20 | TBD | Pending |
-| PROD-01 to PROD-12 | TBD | Pending |
+| DEBT-01 | Phase 1 | Pending |
+| DEBT-02 | Phase 1 | Pending |
+| DEBT-03 | Phase 1 | Pending |
+| DEBT-04 | Phase 1 | Pending |
+| DEBT-05 | Phase 1 | Pending |
+| DEBT-06 | Phase 1 | Pending |
+| DEBT-07 | Phase 1 | Pending |
+| MCP-01 | Phase 2 | Pending |
+| MCP-02 | Phase 2 | Pending |
+| MCP-03 | Phase 2 | Pending |
+| MCP-04 | Phase 2 | Pending |
+| MCP-05 | Phase 2 | Pending |
+| MCP-06 | Phase 2 | Pending |
+| MCP-07 | Phase 2 | Pending |
+| MCP-08 | Phase 2 | Pending |
+| MCP-09 | Phase 2 | Pending |
+| MCP-10 | Phase 2 | Pending |
+| MCP-11 | Phase 2 | Pending |
+| MCP-12 | Phase 2 | Pending |
+| MCP-13 | Phase 2 | Pending |
+| MCP-14 | Phase 2 | Pending |
+| MCP-15 | Phase 2 | Pending |
+| DEBT-08 | Phase 3 | Pending |
+| DEBT-09 | Phase 3 | Pending |
+| DEBT-10 | Phase 3 | Pending |
+| DEBT-11 | Phase 3 | Pending |
+| DEBT-12 | Phase 3 | Pending |
+| DEBT-13 | Phase 3 | Pending |
+| DEBT-14 | Phase 4 | Pending |
+| DEBT-15 | Phase 4 | Pending |
+| DEBT-16 | Phase 4 | Pending |
+| DEBT-17 | Phase 4 | Pending |
+| DEBT-18 | Phase 4 | Pending |
+| DEBT-19 | Phase 4 | Pending |
+| DEBT-20 | Phase 4 | Pending |
+| DEBT-21 | Phase 5 | Pending |
+| DEBT-22 | Phase 5 | Pending |
+| DEBT-23 | Phase 5 | Pending |
+| DEBT-24 | Phase 5 | Pending |
+| DEBT-25 | Phase 5 | Pending |
+| DEBT-26 | Phase 5 | Pending |
+| DEBT-27 | Phase 5 | Pending |
+| DEBT-28 | Phase 5 | Pending |
+| GHAPI-01 | Phase 6 | Pending |
+| GHAPI-02 | Phase 6 | Pending |
+| GHAPI-03 | Phase 6 | Pending |
+| GHAPI-04 | Phase 6 | Pending |
+| GHAPI-05 | Phase 6 | Pending |
+| GHAPI-06 | Phase 6 | Pending |
+| GHAPI-07 | Phase 6 | Pending |
+| GHAPI-08 | Phase 6 | Pending |
+| GHAPI-09 | Phase 7 | Pending |
+| GHAPI-10 | Phase 7 | Pending |
+| GHAPI-11 | Phase 7 | Pending |
+| GHAPI-12 | Phase 7 | Pending |
+| GHAPI-13 | Phase 7 | Pending |
+| GHAPI-14 | Phase 7 | Pending |
+| GHAPI-15 | Phase 7 | Pending |
+| GHAPI-16 | Phase 7 | Pending |
+| GHAPI-17 | Phase 7 | Pending |
+| GHAPI-18 | Phase 7 | Pending |
+| GHAPI-19 | Phase 8 | Pending |
+| GHAPI-20 | Phase 8 | Pending |
+| GHAPI-21 | Phase 8 | Pending |
+| GHAPI-22 | Phase 8 | Pending |
+| GHAPI-23 | Phase 8 | Pending |
+| GHAPI-24 | Phase 8 | Pending |
+| AI-01 | Phase 9 | Pending |
+| AI-02 | Phase 9 | Pending |
+| AI-03 | Phase 9 | Pending |
+| AI-04 | Phase 9 | Pending |
+| AI-05 | Phase 9 | Pending |
+| AI-06 | Phase 9 | Pending |
+| AI-07 | Phase 9 | Pending |
+| AI-08 | Phase 9 | Pending |
+| AI-09 | Phase 10 | Pending |
+| AI-10 | Phase 10 | Pending |
+| AI-11 | Phase 10 | Pending |
+| AI-12 | Phase 10 | Pending |
+| AI-13 | Phase 10 | Pending |
+| AI-14 | Phase 10 | Pending |
+| AI-15 | Phase 10 | Pending |
+| AI-16 | Phase 10 | Pending |
+| AI-17 | Phase 11 | Pending |
+| AI-18 | Phase 11 | Pending |
+| AI-19 | Phase 11 | Pending |
+| AI-20 | Phase 11 | Pending |
+| PROD-01 | Phase 12 | Pending |
+| PROD-02 | Phase 12 | Pending |
+| PROD-03 | Phase 12 | Pending |
+| PROD-04 | Phase 12 | Pending |
+| PROD-05 | Phase 12 | Pending |
+| PROD-06 | Phase 12 | Pending |
+| PROD-07 | Phase 12 | Pending |
+| PROD-08 | Phase 12 | Pending |
+| PROD-09 | Phase 12 | Pending |
+| PROD-10 | Phase 12 | Pending |
+| PROD-11 | Phase 12 | Pending |
+| PROD-12 | Phase 12 | Pending |
 
 **Coverage:**
 - v1 requirements: 99 total
-- Mapped to phases: 0
-- Unmapped: 99 ⚠️
+- Mapped to phases: 99
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-01-30*
-*Last updated: 2026-01-30 after initial definition*
+*Last updated: 2026-01-30 with phase traceability*
