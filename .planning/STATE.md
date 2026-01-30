@@ -6,11 +6,11 @@
 ## Current Position
 
 **Phase:** 2 of 12 (MCP Protocol Compliance)
-**Plan:** 3 of 7 complete
+**Plan:** 4 of 7 complete
 **Status:** In progress
-**Last activity:** 2026-01-30 - Completed 02-03-PLAN.md (Error Handling)
+**Last activity:** 2026-01-30 - Completed 02-04-PLAN.md (Project Tool Annotations)
 
-**Progress:** [███.......] 17% (Phase 1 complete + Phase 2 plan 2/7)
+**Progress:** [████......] 20% (Phase 1 complete + Phase 2 plan 4/7)
 
 ## Project Progress
 
@@ -18,13 +18,13 @@
 |--------|-------|
 | Phases Complete | 1/12 |
 | Requirements Done | 7/99 |
-| Current Phase Progress | Phase 2: 3/7 plans complete |
+| Current Phase Progress | Phase 2: 4/7 plans complete |
 
 ## Performance Metrics
 
 | Metric | Value | Notes |
 |--------|-------|-------|
-| Plans Executed | 8 | Phase 1: 01-01 through 01-05, Phase 2: 02-01, 02-02, 02-03 |
+| Plans Executed | 9 | Phase 1: 01-01 through 01-05, Phase 2: 02-01 through 02-04 |
 | Requirements Completed | 7 | DEBT-01 through DEBT-07 |
 | Iterations | 1 | Gap closure cycle for test regressions |
 | Blockers Resolved | 3 | tsyringe decorators, reflect-metadata, MCP SDK type instantiation |
@@ -49,6 +49,8 @@
 | TOutput generic defaults to unknown | Backward compatibility for existing ToolDefinition<T> usages | 2026-01-30 |
 | Mark deprecated vs remove | Keep old schema methods deprecated rather than removing | 2026-01-30 |
 | $refStrategy: none | Inline JSON Schema definitions for simpler MCP client consumption | 2026-01-30 |
+| Output schemas per tool | Comprehensive Zod schemas for type-safe output validation | 2026-01-30 |
+| 79 tools annotated | 6 behavior patterns applied consistently across all tools | 2026-01-30 |
 
 ### Learnings
 
@@ -70,7 +72,9 @@
 - [x] Plan Phase 2 MCP Protocol Compliance
 - [x] Execute 02-01: MCP SDK Upgrade
 - [x] Execute 02-02: Tool Annotations Infrastructure
-- [ ] Execute 02-03 through 02-07: Output schemas, error handling, protocol version
+- [x] Execute 02-03: Error Handling
+- [x] Execute 02-04: Project Tool Annotations (79 tools)
+- [ ] Execute 02-05 through 02-07: Protocol version, response format, verification
 - [ ] Consider future extraction: IssueService, PullRequestService, AutomationService
 
 ### Active Blockers
@@ -107,7 +111,7 @@
 | 02-01 | MCP SDK Upgrade | Complete | 326d501, 33b9cd2 |
 | 02-02 | Tool Annotations | Complete | 372cd21, 36b0297, c3cc0ff |
 | 02-03 | Error Handling | Complete | 0775048, c3cc0ff, 03f735c |
-| 02-04 | Error Handling | Pending | - |
+| 02-04 | Project Tool Annotations | Complete | 57e7fa8, 0a46202, a64bc65 |
 | 02-05 | Protocol Version | Pending | - |
 | 02-06 | Tool Response Format | Pending | - |
 | 02-07 | Final Verification | Pending | - |
@@ -119,28 +123,31 @@
 - ToolDefinition: Extended with title, outputSchema, annotations
 - ANNOTATION_PATTERNS: 6 behavior patterns for tool classification
 - getToolsForMCP: Uses zod-to-json-schema, emits annotations
+- 79 tools with annotations and output schemas
+- 45 Zod output schemas in project-schemas.ts
 
 ## Session Continuity
 
-**Last Session:** 2026-01-30 - Completed 02-02-PLAN.md
+**Last Session:** 2026-01-30 - Completed 02-04-PLAN.md
 
 **Context for Next Session:**
-- Tool annotation infrastructure complete
-- Next: 02-03 will apply annotations to all 71 tools
-- ToolDefinition has annotations?, outputSchema?, title? fields
-- ANNOTATION_PATTERNS has 6 ready patterns (readOnly, create, updateIdempotent, updateNonIdempotent, delete, aiOperation)
-- getToolsForMCP uses zod-to-json-schema with $refStrategy: none
+- All 79 tools now have annotations and output schemas
+- Output schemas defined in src/infrastructure/tools/schemas/project-schemas.ts (45 schemas)
+- Next: 02-05 will add protocol version negotiation
+- Annotation breakdown: 29 readOnly, 15 create, 21 updateIdempotent, 2 updateNonIdempotent, 7 delete, 5 aiOperation
 
 **Architecture Context:**
 - DI container (src/container.ts) wires all 6 extracted services
 - ProjectManagementService facade: 34 methods delegated, ~25 direct implementations
 - Test suite: 341 passing (unit), pre-existing AI service test failures unchanged
 - CallToolResult uses { content: [{ type: 'text', text }] } format
+- All tools export title, outputSchema, annotations properties
 
 ---
 
 *State initialized: 2026-01-30*
 *Last updated: 2026-01-30*
 *Phase 1 completed: 2026-01-30*
+*Plan 02-04 completed: 2026-01-30*
 *Plan 02-03 completed: 2026-01-30*
 *Plan 02-02 completed: 2026-01-30*
