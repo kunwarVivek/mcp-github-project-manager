@@ -2193,10 +2193,13 @@ export const removeIssuesFromSprintTool: ToolDefinition<RemoveIssuesFromSprintAr
   ]
 };
 
-export const createLabelTool: ToolDefinition<CreateLabelArgs> = {
+export const createLabelTool: ToolDefinition<CreateLabelArgs, z.infer<typeof LabelOutputSchema>> = {
   name: "create_label",
+  title: "Create Label",
   description: "Create a new GitHub label",
   schema: createLabelSchema as unknown as ToolSchema<CreateLabelArgs>,
+  outputSchema: LabelOutputSchema,
+  annotations: ANNOTATION_PATTERNS.create,
   examples: [
     {
       name: "Create bug label",
@@ -2210,10 +2213,13 @@ export const createLabelTool: ToolDefinition<CreateLabelArgs> = {
   ]
 };
 
-export const listLabelsTool: ToolDefinition<ListLabelsArgs> = {
+export const listLabelsTool: ToolDefinition<ListLabelsArgs, z.infer<typeof LabelListOutputSchema>> = {
   name: "list_labels",
+  title: "List Labels",
   description: "List all GitHub labels",
   schema: listLabelsSchema as unknown as ToolSchema<ListLabelsArgs>,
+  outputSchema: LabelListOutputSchema,
+  annotations: ANNOTATION_PATTERNS.readOnly,
   examples: [
     {
       name: "List all labels",
@@ -2264,10 +2270,13 @@ export const replayEventsSchema = z.object({
 export type ReplayEventsArgs = z.infer<typeof replayEventsSchema>;
 
 // Event management tool definitions
-export const subscribeToEventsTool: ToolDefinition<SubscribeToEventsArgs> = {
+export const subscribeToEventsTool: ToolDefinition<SubscribeToEventsArgs, z.infer<typeof SubscriptionOutputSchema>> = {
   name: "subscribe_to_events",
+  title: "Subscribe to Events",
   description: "Subscribe to real-time events for GitHub resources",
   schema: subscribeToEventsSchema as unknown as ToolSchema<SubscribeToEventsArgs>,
+  outputSchema: SubscriptionOutputSchema,
+  annotations: ANNOTATION_PATTERNS.create,
   examples: [
     {
       name: "Subscribe to all project events",
@@ -2290,10 +2299,13 @@ export const subscribeToEventsTool: ToolDefinition<SubscribeToEventsArgs> = {
   ]
 };
 
-export const getRecentEventsTool: ToolDefinition<GetRecentEventsArgs> = {
+export const getRecentEventsTool: ToolDefinition<GetRecentEventsArgs, z.infer<typeof EventListOutputSchema>> = {
   name: "get_recent_events",
+  title: "Get Recent Events",
   description: "Get recent events for GitHub resources",
   schema: getRecentEventsSchema as unknown as ToolSchema<GetRecentEventsArgs>,
+  outputSchema: EventListOutputSchema,
+  annotations: ANNOTATION_PATTERNS.readOnly,
   examples: [
     {
       name: "Get recent project events",
@@ -2315,10 +2327,13 @@ export const getRecentEventsTool: ToolDefinition<GetRecentEventsArgs> = {
   ]
 };
 
-export const replayEventsTool: ToolDefinition<ReplayEventsArgs> = {
+export const replayEventsTool: ToolDefinition<ReplayEventsArgs, z.infer<typeof EventListOutputSchema>> = {
   name: "replay_events",
+  title: "Replay Events",
   description: "Replay events from a specific timestamp",
   schema: replayEventsSchema as unknown as ToolSchema<ReplayEventsArgs>,
+  outputSchema: EventListOutputSchema,
+  annotations: ANNOTATION_PATTERNS.readOnly,
   examples: [
     {
       name: "Replay events from yesterday",
@@ -2344,10 +2359,13 @@ export const replayEventsTool: ToolDefinition<ReplayEventsArgs> = {
 // Automation Service Tool Definitions
 // ============================================================================
 
-export const createAutomationRuleTool: ToolDefinition<CreateAutomationRuleArgs> = {
+export const createAutomationRuleTool: ToolDefinition<CreateAutomationRuleArgs, z.infer<typeof AutomationRuleOutputSchema>> = {
   name: "create_automation_rule",
+  title: "Create Automation Rule",
   description: "Create a new automation rule for a GitHub project",
   schema: createAutomationRuleSchema as unknown as ToolSchema<CreateAutomationRuleArgs>,
+  outputSchema: AutomationRuleOutputSchema,
+  annotations: ANNOTATION_PATTERNS.create,
   examples: [
     {
       name: "Auto-label PRs",
@@ -2389,10 +2407,13 @@ export const createAutomationRuleTool: ToolDefinition<CreateAutomationRuleArgs> 
   ]
 };
 
-export const updateAutomationRuleTool: ToolDefinition<UpdateAutomationRuleArgs> = {
+export const updateAutomationRuleTool: ToolDefinition<UpdateAutomationRuleArgs, z.infer<typeof AutomationRuleOutputSchema>> = {
   name: "update_automation_rule",
+  title: "Update Automation Rule",
   description: "Update an existing automation rule",
   schema: updateAutomationRuleSchema as unknown as ToolSchema<UpdateAutomationRuleArgs>,
+  outputSchema: AutomationRuleOutputSchema,
+  annotations: ANNOTATION_PATTERNS.updateIdempotent,
   examples: [
     {
       name: "Update rule name",
@@ -2413,10 +2434,13 @@ export const updateAutomationRuleTool: ToolDefinition<UpdateAutomationRuleArgs> 
   ]
 };
 
-export const deleteAutomationRuleTool: ToolDefinition<DeleteAutomationRuleArgs> = {
+export const deleteAutomationRuleTool: ToolDefinition<DeleteAutomationRuleArgs, z.infer<typeof DeleteOutputSchema>> = {
   name: "delete_automation_rule",
+  title: "Delete Automation Rule",
   description: "Delete an automation rule from a project",
   schema: deleteAutomationRuleSchema as unknown as ToolSchema<DeleteAutomationRuleArgs>,
+  outputSchema: DeleteOutputSchema,
+  annotations: ANNOTATION_PATTERNS.delete,
   examples: [
     {
       name: "Delete rule",
@@ -2428,10 +2452,13 @@ export const deleteAutomationRuleTool: ToolDefinition<DeleteAutomationRuleArgs> 
   ]
 };
 
-export const getAutomationRuleTool: ToolDefinition<GetAutomationRuleArgs> = {
+export const getAutomationRuleTool: ToolDefinition<GetAutomationRuleArgs, z.infer<typeof AutomationRuleOutputSchema>> = {
   name: "get_automation_rule",
+  title: "Get Automation Rule",
   description: "Get details of a specific automation rule",
   schema: getAutomationRuleSchema as unknown as ToolSchema<GetAutomationRuleArgs>,
+  outputSchema: AutomationRuleOutputSchema,
+  annotations: ANNOTATION_PATTERNS.readOnly,
   examples: [
     {
       name: "Get rule details",
@@ -2443,10 +2470,13 @@ export const getAutomationRuleTool: ToolDefinition<GetAutomationRuleArgs> = {
   ]
 };
 
-export const listAutomationRulesTool: ToolDefinition<ListAutomationRulesArgs> = {
+export const listAutomationRulesTool: ToolDefinition<ListAutomationRulesArgs, z.infer<typeof AutomationRuleListOutputSchema>> = {
   name: "list_automation_rules",
+  title: "List Automation Rules",
   description: "List all automation rules for a GitHub project",
   schema: listAutomationRulesSchema as unknown as ToolSchema<ListAutomationRulesArgs>,
+  outputSchema: AutomationRuleListOutputSchema,
+  annotations: ANNOTATION_PATTERNS.readOnly,
   examples: [
     {
       name: "List project rules",
@@ -2458,10 +2488,13 @@ export const listAutomationRulesTool: ToolDefinition<ListAutomationRulesArgs> = 
   ]
 };
 
-export const enableAutomationRuleTool: ToolDefinition<EnableAutomationRuleArgs> = {
+export const enableAutomationRuleTool: ToolDefinition<EnableAutomationRuleArgs, z.infer<typeof AutomationRuleOutputSchema>> = {
   name: "enable_automation_rule",
+  title: "Enable Automation Rule",
   description: "Enable a disabled automation rule",
   schema: enableAutomationRuleSchema as unknown as ToolSchema<EnableAutomationRuleArgs>,
+  outputSchema: AutomationRuleOutputSchema,
+  annotations: ANNOTATION_PATTERNS.updateIdempotent,
   examples: [
     {
       name: "Enable rule",
@@ -2473,10 +2506,13 @@ export const enableAutomationRuleTool: ToolDefinition<EnableAutomationRuleArgs> 
   ]
 };
 
-export const disableAutomationRuleTool: ToolDefinition<DisableAutomationRuleArgs> = {
+export const disableAutomationRuleTool: ToolDefinition<DisableAutomationRuleArgs, z.infer<typeof AutomationRuleOutputSchema>> = {
   name: "disable_automation_rule",
+  title: "Disable Automation Rule",
   description: "Disable an automation rule without deleting it",
   schema: disableAutomationRuleSchema as unknown as ToolSchema<DisableAutomationRuleArgs>,
+  outputSchema: AutomationRuleOutputSchema,
+  annotations: ANNOTATION_PATTERNS.updateIdempotent,
   examples: [
     {
       name: "Disable rule",
@@ -2492,10 +2528,13 @@ export const disableAutomationRuleTool: ToolDefinition<DisableAutomationRuleArgs
 // Iteration Management Tool Definitions
 // ============================================================================
 
-export const getIterationConfigurationTool: ToolDefinition<GetIterationConfigurationArgs> = {
+export const getIterationConfigurationTool: ToolDefinition<GetIterationConfigurationArgs, z.infer<typeof IterationConfigOutputSchema>> = {
   name: "get_iteration_configuration",
+  title: "Get Iteration Configuration",
   description: "Get iteration field configuration including duration, start date, and list of all iterations",
   schema: getIterationConfigurationSchema as unknown as ToolSchema<GetIterationConfigurationArgs>,
+  outputSchema: IterationConfigOutputSchema,
+  annotations: ANNOTATION_PATTERNS.readOnly,
   examples: [
     {
       name: "Get iteration config",
@@ -2507,10 +2546,13 @@ export const getIterationConfigurationTool: ToolDefinition<GetIterationConfigura
   ]
 };
 
-export const getCurrentIterationTool: ToolDefinition<GetCurrentIterationArgs> = {
+export const getCurrentIterationTool: ToolDefinition<GetCurrentIterationArgs, z.infer<typeof IterationOutputSchema>> = {
   name: "get_current_iteration",
+  title: "Get Current Iteration",
   description: "Get the currently active iteration based on today's date",
   schema: getCurrentIterationSchema as unknown as ToolSchema<GetCurrentIterationArgs>,
+  outputSchema: IterationOutputSchema,
+  annotations: ANNOTATION_PATTERNS.readOnly,
   examples: [
     {
       name: "Get current sprint",
@@ -2522,10 +2564,13 @@ export const getCurrentIterationTool: ToolDefinition<GetCurrentIterationArgs> = 
   ]
 };
 
-export const getIterationItemsTool: ToolDefinition<GetIterationItemsArgs> = {
+export const getIterationItemsTool: ToolDefinition<GetIterationItemsArgs, z.infer<typeof IterationItemsOutputSchema>> = {
   name: "get_iteration_items",
+  title: "Get Iteration Items",
   description: "Get all items assigned to a specific iteration",
   schema: getIterationItemsSchema as unknown as ToolSchema<GetIterationItemsArgs>,
+  outputSchema: IterationItemsOutputSchema,
+  annotations: ANNOTATION_PATTERNS.readOnly,
   examples: [
     {
       name: "Get iteration items",
@@ -2538,10 +2583,13 @@ export const getIterationItemsTool: ToolDefinition<GetIterationItemsArgs> = {
   ]
 };
 
-export const getIterationByDateTool: ToolDefinition<GetIterationByDateArgs> = {
+export const getIterationByDateTool: ToolDefinition<GetIterationByDateArgs, z.infer<typeof IterationOutputSchema>> = {
   name: "get_iteration_by_date",
+  title: "Get Iteration by Date",
   description: "Find which iteration contains a specific date",
   schema: getIterationByDateSchema as unknown as ToolSchema<GetIterationByDateArgs>,
+  outputSchema: IterationOutputSchema,
+  annotations: ANNOTATION_PATTERNS.readOnly,
   examples: [
     {
       name: "Find iteration",
@@ -2554,10 +2602,13 @@ export const getIterationByDateTool: ToolDefinition<GetIterationByDateArgs> = {
   ]
 };
 
-export const assignItemsToIterationTool: ToolDefinition<AssignItemsToIterationArgs> = {
+export const assignItemsToIterationTool: ToolDefinition<AssignItemsToIterationArgs, z.infer<typeof BulkOperationResultSchema>> = {
   name: "assign_items_to_iteration",
+  title: "Assign Items to Iteration",
   description: "Bulk assign multiple items to a specific iteration",
   schema: assignItemsToIterationSchema as unknown as ToolSchema<AssignItemsToIterationArgs>,
+  outputSchema: BulkOperationResultSchema,
+  annotations: ANNOTATION_PATTERNS.updateIdempotent,
   examples: [
     {
       name: "Assign to sprint",
@@ -2575,10 +2626,13 @@ export const assignItemsToIterationTool: ToolDefinition<AssignItemsToIterationAr
 // AI-Powered Automation Tool Definitions
 // ============================================================================
 
-export const generateRoadmapTool: ToolDefinition<GenerateRoadmapArgs> = {
+export const generateRoadmapTool: ToolDefinition<GenerateRoadmapArgs, z.infer<typeof AIRoadmapOutputSchema>> = {
   name: "generate_roadmap",
+  title: "Generate Roadmap",
   description: "AI-powered roadmap generation from project issues. Creates milestones, sprints, and phases automatically.",
   schema: generateRoadmapSchema as unknown as ToolSchema<GenerateRoadmapArgs>,
+  outputSchema: AIRoadmapOutputSchema,
+  annotations: ANNOTATION_PATTERNS.aiOperation,
   examples: [
     {
       name: "Generate roadmap",
@@ -2595,10 +2649,13 @@ export const generateRoadmapTool: ToolDefinition<GenerateRoadmapArgs> = {
   ]
 };
 
-export const enrichIssueTool: ToolDefinition<EnrichIssueArgs> = {
+export const enrichIssueTool: ToolDefinition<EnrichIssueArgs, z.infer<typeof AIEnrichmentOutputSchema>> = {
   name: "enrich_issue",
+  title: "Enrich Issue",
   description: "AI-powered issue enrichment. Automatically adds labels, priority, type, complexity, and effort estimates.",
   schema: enrichIssueSchema as unknown as ToolSchema<EnrichIssueArgs>,
+  outputSchema: AIEnrichmentOutputSchema,
+  annotations: ANNOTATION_PATTERNS.aiOperation,
   examples: [
     {
       name: "Enrich issue",
@@ -2615,10 +2672,13 @@ export const enrichIssueTool: ToolDefinition<EnrichIssueArgs> = {
   ]
 };
 
-export const enrichIssuesBulkTool: ToolDefinition<EnrichIssuesBulkArgs> = {
+export const enrichIssuesBulkTool: ToolDefinition<EnrichIssuesBulkArgs, z.infer<typeof BulkOperationResultSchema>> = {
   name: "enrich_issues_bulk",
+  title: "Enrich Issues Bulk",
   description: "Bulk AI-powered issue enrichment for multiple issues at once.",
   schema: enrichIssuesBulkSchema as unknown as ToolSchema<EnrichIssuesBulkArgs>,
+  outputSchema: BulkOperationResultSchema,
+  annotations: ANNOTATION_PATTERNS.aiOperation,
   examples: [
     {
       name: "Enrich all issues",
@@ -2632,10 +2692,13 @@ export const enrichIssuesBulkTool: ToolDefinition<EnrichIssuesBulkArgs> = {
   ]
 };
 
-export const triageIssueTool: ToolDefinition<TriageIssueArgs> = {
+export const triageIssueTool: ToolDefinition<TriageIssueArgs, z.infer<typeof AITriageOutputSchema>> = {
   name: "triage_issue",
+  title: "Triage Issue",
   description: "AI-powered issue triaging. Classifies issues, assigns priority, and recommends actions.",
   schema: triageIssueSchema as unknown as ToolSchema<TriageIssueArgs>,
+  outputSchema: AITriageOutputSchema,
+  annotations: ANNOTATION_PATTERNS.aiOperation,
   examples: [
     {
       name: "Triage issue",
@@ -2652,10 +2715,13 @@ export const triageIssueTool: ToolDefinition<TriageIssueArgs> = {
   ]
 };
 
-export const triageAllIssuesTool: ToolDefinition<TriageAllIssuesArgs> = {
+export const triageAllIssuesTool: ToolDefinition<TriageAllIssuesArgs, z.infer<typeof BulkOperationResultSchema>> = {
   name: "triage_all_issues",
+  title: "Triage All Issues",
   description: "Automatically triage all untriaged issues in a project.",
   schema: triageAllIssuesSchema as unknown as ToolSchema<TriageAllIssuesArgs>,
+  outputSchema: BulkOperationResultSchema,
+  annotations: ANNOTATION_PATTERNS.aiOperation,
   examples: [
     {
       name: "Triage all issues",
@@ -2670,10 +2736,13 @@ export const triageAllIssuesTool: ToolDefinition<TriageAllIssuesArgs> = {
   ]
 };
 
-export const scheduleTriagingTool: ToolDefinition<ScheduleTriagingArgs> = {
+export const scheduleTriagingTool: ToolDefinition<ScheduleTriagingArgs, z.infer<typeof SuccessOutputSchema>> = {
   name: "schedule_triaging",
+  title: "Schedule Triaging",
   description: "Schedule automated issue triaging to run periodically.",
   schema: scheduleTriagingSchema as unknown as ToolSchema<ScheduleTriagingArgs>,
+  outputSchema: SuccessOutputSchema,
+  annotations: ANNOTATION_PATTERNS.create,
   examples: [
     {
       name: "Daily triage",
