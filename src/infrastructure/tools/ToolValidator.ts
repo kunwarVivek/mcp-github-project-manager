@@ -6,14 +6,42 @@ import { ParameterCoercion } from "./ParameterCoercion.js";
 
 export type ToolSchema<T> = z.ZodType<T>;
 
-export interface ToolDefinition<T> {
+/**
+ * Tool behavior annotations per MCP specification 2025-11-25.
+ * These hints help clients understand tool behavior and make informed decisions.
+ */
+export interface ToolAnnotations {
+  /** Human-readable title for the tool */
+  title?: string;
+  /** If true, tool only reads data (default: false) */
+  readOnlyHint?: boolean;
+  /** If true, tool may delete or modify data (default: true when readOnly=false) */
+  destructiveHint?: boolean;
+  /** If true, repeated calls with same args have same effect (default: false) */
+  idempotentHint?: boolean;
+  /** If true, tool interacts with external world (default: true) */
+  openWorldHint?: boolean;
+}
+
+/**
+ * Definition of a tool with its schema, metadata, and behavior annotations.
+ * @template TInput - The input type validated by the schema
+ * @template TOutput - The output type (defaults to unknown for backward compatibility)
+ */
+export interface ToolDefinition<TInput, TOutput = unknown> {
   name: string;
+  /** Human-readable title for display */
+  title?: string;
   description: string;
-  schema: ToolSchema<T>;
+  schema: ToolSchema<TInput>;
+  /** Zod schema for the tool's output (optional) */
+  outputSchema?: z.ZodType<TOutput>;
+  /** Behavior annotations per MCP specification */
+  annotations?: ToolAnnotations;
   examples?: Array<{
     name: string;
     description: string;
-    args: T;
+    args: TInput;
   }>;
 }
 
