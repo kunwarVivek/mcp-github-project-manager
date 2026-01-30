@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { McpError, ErrorCode } from "@modelcontextprotocol/sdk/types.js";
 import { MCPResponseFormatter } from "../mcp/MCPResponseFormatter.js";
-import { MCPErrorCode } from "../../domain/mcp-types.js";
+import { MCPErrorCode, MCPErrorData } from "../../domain/mcp-types.js";
 import { ParameterCoercion } from "./ParameterCoercion.js";
 
 export type ToolSchema<T> = z.ZodType<T>;
@@ -45,6 +45,27 @@ export interface ToolDefinition<TInput, TOutput = unknown> {
   }>;
 }
 
+/**
+ * Interface representing an Octokit RequestError
+ */
+interface OctokitRequestError {
+  status: number;
+  message?: string;
+  response?: {
+    headers?: Record<string, string>;
+    data?: {
+      message?: string;
+      documentation_url?: string;
+      errors?: Array<{
+        resource?: string;
+        field?: string;
+        code?: string;
+        message?: string;
+      }>;
+    };
+  };
+}
+
 export class ToolValidator {
   /**
    * Validate tool arguments against the schema
@@ -62,14 +83,14 @@ export class ToolValidator {
           message: err.message,
           code: err.code
         }));
-        
+
         throw new McpError(
           ErrorCode.InvalidParams,
           `Invalid parameters for tool ${toolName}: ${error.errors.map(e => e.message).join(", ")}`,
           { details }
         );
       }
-      
+
       // Generic validation error
       throw new McpError(
         ErrorCode.InvalidParams,
@@ -80,12 +101,146 @@ export class ToolValidator {
   }
 
   /**
+   * Map GitHub API errors to MCP error codes with rich context.
+   * Handles Octokit RequestError and extracts rate limit info, validation errors, etc.
+   */
+  static mapGitHubError(error: unknown, toolName: string): McpError {
+    const data: MCPErrorData = { tool: toolName };
+
+    // Handle Octokit RequestError
+    if (error && typeof error === "object" && "status" in error) {
+      const octokitError = error as OctokitRequestError;
+      const status = octokitError.status;
+      const message = octokitError.message || octokitError.response?.data?.message || "GitHub API error";
+
+      data.github = {
+        status,
+        message,
+        documentation_url: octokitError.response?.data?.documentation_url,
+      };
+
+      // Handle rate limiting
+      if (status === 403 && message.toLowerCase().includes("rate limit")) {
+        const headers = octokitError.response?.headers;
+        if (headers) {
+          data.rateLimit = {
+            limit: parseInt(headers["x-ratelimit-limit"] || "0", 10),
+            remaining: parseInt(headers["x-ratelimit-remaining"] || "0", 10),
+            reset: parseInt(headers["x-ratelimit-reset"] || "0", 10),
+            retryAfter: parseInt(headers["retry-after"] || "0", 10) || undefined,
+          };
+        }
+        return new McpError(
+          MCPErrorCode.GITHUB_RATE_LIMITED,
+          `GitHub API rate limit exceeded for ${toolName}`,
+          data
+        );
+      }
+
+      // Handle secondary rate limiting (abuse detection)
+      if (status === 403 && (message.toLowerCase().includes("abuse") || message.toLowerCase().includes("secondary"))) {
+        const headers = octokitError.response?.headers;
+        const retryAfter = headers?.["retry-after"];
+        if (retryAfter) {
+          data.rateLimit = {
+            limit: 0,
+            remaining: 0,
+            reset: 0,
+            retryAfter: parseInt(retryAfter, 10),
+          };
+        }
+        return new McpError(
+          MCPErrorCode.GITHUB_RATE_LIMITED,
+          `GitHub API secondary rate limit hit for ${toolName}: ${message}`,
+          data
+        );
+      }
+
+      // Handle validation errors (422)
+      if (status === 422 && octokitError.response?.data?.errors) {
+        data.validation = octokitError.response.data.errors.map(e => ({
+          path: e.field || e.resource || "unknown",
+          message: e.message || e.code || "Validation error",
+          code: e.code || "validation_failed",
+        }));
+      }
+
+      // Map HTTP status to error code
+      switch (status) {
+        case 401:
+          return new McpError(
+            MCPErrorCode.GITHUB_UNAUTHORIZED,
+            `GitHub API unauthorized: ${message}`,
+            data
+          );
+        case 403:
+          return new McpError(
+            MCPErrorCode.GITHUB_FORBIDDEN,
+            `GitHub API forbidden: ${message}`,
+            data
+          );
+        case 404:
+          return new McpError(
+            MCPErrorCode.GITHUB_NOT_FOUND,
+            `GitHub resource not found: ${message}`,
+            data
+          );
+        case 422:
+          return new McpError(
+            MCPErrorCode.GITHUB_VALIDATION_ERROR,
+            `GitHub validation failed: ${message}`,
+            data
+          );
+        default:
+          if (status >= 500) {
+            return new McpError(
+              MCPErrorCode.GITHUB_SERVER_ERROR,
+              `GitHub server error (${status}): ${message}`,
+              data
+            );
+          }
+          return new McpError(
+            MCPErrorCode.TOOL_EXECUTION_FAILED,
+            `GitHub API error (${status}): ${message}`,
+            data
+          );
+      }
+    }
+
+    // Handle generic errors
+    if (error instanceof Error) {
+      data.stack = process.env.NODE_ENV === "development" ? error.stack : undefined;
+      return new McpError(
+        MCPErrorCode.TOOL_EXECUTION_FAILED,
+        `${toolName} failed: ${error.message}`,
+        data
+      );
+    }
+
+    return new McpError(
+      MCPErrorCode.INTERNAL_ERROR,
+      `Unknown error in ${toolName}`,
+      { tool: toolName, error: String(error) }
+    );
+  }
+
+  /**
    * Transform MCP SDK errors to our custom error format
    */
   static handleToolError(error: unknown, toolName: string): ReturnType<typeof MCPResponseFormatter.error> {
     // Use stderr to avoid interfering with MCP protocol on stdout
     process.stderr.write(`[${toolName}] Error: ${error}\n`);
-    
+
+    // Check if this is a GitHub API error (has status property)
+    if (error && typeof error === "object" && "status" in error && typeof (error as { status: unknown }).status === "number") {
+      const mcpError = this.mapGitHubError(error, toolName);
+      return MCPResponseFormatter.error(
+        mcpError.code as MCPErrorCode,
+        mcpError.message,
+        mcpError.data as Record<string, unknown> | undefined
+      );
+    }
+
     // Handle MCP SDK errors
     if (error instanceof McpError) {
       return MCPResponseFormatter.error(
@@ -95,7 +250,7 @@ export class ToolValidator {
         error.data && typeof error.data === 'object' ? error.data as Record<string, unknown> : undefined
       );
     }
-    
+
     // Handle regular errors
     if (error instanceof Error) {
       return MCPResponseFormatter.error(
@@ -104,7 +259,7 @@ export class ToolValidator {
         { stack: error.stack }
       );
     }
-    
+
     // Handle unknown errors
     return MCPResponseFormatter.error(
       MCPErrorCode.INTERNAL_ERROR,
@@ -112,7 +267,7 @@ export class ToolValidator {
       { error: String(error) }
     );
   }
-  
+
   /**
    * Map MCP SDK error codes to our custom error codes
    */
