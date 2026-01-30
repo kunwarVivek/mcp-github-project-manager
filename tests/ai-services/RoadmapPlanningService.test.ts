@@ -50,7 +50,9 @@ describe('RoadmapPlanningService', () => {
 
     (ProjectManagementService as jest.Mock).mockImplementation(() => mockProjectService);
 
-    service = new RoadmapPlanningService(AIServiceFactory.getInstance(), new ProjectManagementService('test-owner', 'test-repo', 'test-token'));
+    // Use mockProjectService directly since ProjectManagementService is mocked
+    // This avoids TypeScript errors from the new 7-argument constructor signature
+    service = new RoadmapPlanningService(AIServiceFactory.getInstance(), mockProjectService as unknown as ProjectManagementService);
   });
 
   describe('generateRoadmap', () => {

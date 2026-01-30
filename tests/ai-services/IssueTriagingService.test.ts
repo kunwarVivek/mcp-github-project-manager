@@ -62,10 +62,12 @@ describe('IssueTriagingService', () => {
 
     (IssueEnrichmentService as jest.Mock).mockImplementation(() => mockEnrichmentService);
 
+    // Use mock services directly since both ProjectManagementService and IssueEnrichmentService are mocked
+    // This avoids TypeScript errors from the new 7-argument constructor signature
     service = new IssueTriagingService(
       AIServiceFactory.getInstance(),
-      new ProjectManagementService('test-owner', 'test-repo', 'test-token'),
-      new IssueEnrichmentService(AIServiceFactory.getInstance(), new ProjectManagementService('test-owner', 'test-repo', 'test-token'))
+      mockProjectService as unknown as ProjectManagementService,
+      mockEnrichmentService as unknown as IssueEnrichmentService
     );
   });
 
