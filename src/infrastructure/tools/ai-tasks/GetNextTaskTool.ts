@@ -3,6 +3,8 @@ import { ToolDefinition, ToolSchema } from '../ToolValidator.js';
 import { TaskGenerationService } from '../../../services/TaskGenerationService.js';
 import { MCPResponse } from '../../../domain/mcp-types.js';
 import { ToolResultFormatter } from '../ToolResultFormatter.js';
+import { ANNOTATION_PATTERNS } from '../annotations/tool-annotations.js';
+import { NextTaskOutputSchema } from '../schemas/ai-schemas.js';
 
 // Schema for get_next_task tool
 const getNextTaskSchema = z.object({
@@ -284,10 +286,16 @@ function formatNextTaskRecommendations(
 }
 
 // Tool definition
-export const getNextTaskTool: ToolDefinition<GetNextTaskArgs> = {
+export const getNextTaskTool: ToolDefinition<GetNextTaskArgs, z.infer<typeof NextTaskOutputSchema>> = {
   name: "get_next_task",
+  title: "Get Next Task",
   description: "Get AI-powered recommendations for the next task to work on based on priorities, dependencies, team capacity, and current project state",
   schema: getNextTaskSchema as unknown as ToolSchema<GetNextTaskArgs>,
+  outputSchema: NextTaskOutputSchema,
+  annotations: {
+    ...ANNOTATION_PATTERNS.aiOperation,
+    readOnlyHint: true,  // Recommends but doesn't modify
+  },
   examples: [
     {
       name: "Get next task for development",

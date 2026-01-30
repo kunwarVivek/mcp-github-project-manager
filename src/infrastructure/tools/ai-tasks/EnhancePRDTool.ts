@@ -3,6 +3,8 @@ import { ToolDefinition, ToolSchema } from '../ToolValidator.js';
 import { PRDGenerationService } from '../../../services/PRDGenerationService.js';
 import { MCPResponse } from '../../../domain/mcp-types.js';
 import { ToolResultFormatter } from '../ToolResultFormatter.js';
+import { ANNOTATION_PATTERNS } from '../annotations/tool-annotations.js';
+import { PRDEnhanceOutputSchema } from '../schemas/ai-schemas.js';
 
 // Schema for enhance_prd tool
 const enhancePRDSchema = z.object({
@@ -363,10 +365,13 @@ function formatPRDEnhancement(
 }
 
 // Tool definition
-export const enhancePRDTool: ToolDefinition<EnhancePRDArgs> = {
+export const enhancePRDTool: ToolDefinition<EnhancePRDArgs, z.infer<typeof PRDEnhanceOutputSchema>> = {
   name: "enhance_prd",
+  title: "Enhance PRD",
   description: "Enhance an existing PRD with AI-powered improvements, adding missing elements, improving clarity, and providing comprehensive analysis",
   schema: enhancePRDSchema as unknown as ToolSchema<EnhancePRDArgs>,
+  outputSchema: PRDEnhanceOutputSchema,
+  annotations: ANNOTATION_PATTERNS.aiOperation,
   examples: [
     {
       name: "Enhance PRD with technical focus",

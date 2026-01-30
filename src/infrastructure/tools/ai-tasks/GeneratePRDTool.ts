@@ -1,8 +1,10 @@
 import { z } from 'zod';
-import { ToolDefinition, ToolSchema } from '../ToolValidator';
-import { PRDGenerationService } from '../../../services/PRDGenerationService';
-import { MCPResponse } from '../../../domain/mcp-types';
-import { ToolResultFormatter } from '../ToolResultFormatter';
+import { ToolDefinition, ToolSchema } from '../ToolValidator.js';
+import { PRDGenerationService } from '../../../services/PRDGenerationService.js';
+import { MCPResponse } from '../../../domain/mcp-types.js';
+import { ToolResultFormatter } from '../ToolResultFormatter.js';
+import { ANNOTATION_PATTERNS } from '../annotations/tool-annotations.js';
+import { PRDOutputSchema } from '../schemas/ai-schemas.js';
 
 // Schema for generate_prd tool
 const generatePRDSchema = z.object({
@@ -321,10 +323,13 @@ function formatPRDGenerationSummary(prd: any, validation: any): string {
 }
 
 // Tool definition
-export const generatePRDTool: ToolDefinition<GeneratePRDArgs> = {
+export const generatePRDTool: ToolDefinition<GeneratePRDArgs, z.infer<typeof PRDOutputSchema>> = {
   name: "generate_prd",
+  title: "Generate PRD",
   description: "Generate a comprehensive Product Requirements Document (PRD) from a project idea using AI analysis and industry best practices",
   schema: generatePRDSchema as unknown as ToolSchema<GeneratePRDArgs>,
+  outputSchema: PRDOutputSchema,
+  annotations: ANNOTATION_PATTERNS.aiOperation,
   examples: [
     {
       name: "Generate PRD for task management app",

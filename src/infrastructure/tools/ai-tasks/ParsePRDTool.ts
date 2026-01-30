@@ -1,10 +1,12 @@
 import { z } from 'zod';
-import { ToolDefinition, ToolSchema } from '../ToolValidator';
-import { TaskGenerationService } from '../../../services/TaskGenerationService';
-import { PRDGenerationService } from '../../../services/PRDGenerationService';
-import { RequirementsTraceabilityService } from '../../../services/RequirementsTraceabilityService';
-import { MCPResponse } from '../../../domain/mcp-types';
-import { ToolResultFormatter } from '../ToolResultFormatter';
+import { ToolDefinition, ToolSchema } from '../ToolValidator.js';
+import { TaskGenerationService } from '../../../services/TaskGenerationService.js';
+import { PRDGenerationService } from '../../../services/PRDGenerationService.js';
+import { RequirementsTraceabilityService } from '../../../services/RequirementsTraceabilityService.js';
+import { MCPResponse } from '../../../domain/mcp-types.js';
+import { ToolResultFormatter } from '../ToolResultFormatter.js';
+import { ANNOTATION_PATTERNS } from '../annotations/tool-annotations.js';
+import { PRDParseOutputSchema } from '../schemas/ai-schemas.js';
 
 // Schema for parse_prd tool
 const parsePRDSchema = z.object({
@@ -407,10 +409,13 @@ function formatPRDParsingResult(
 }
 
 // Tool definition
-export const parsePRDTool: ToolDefinition<ParsePRDArgs> = {
+export const parsePRDTool: ToolDefinition<ParsePRDArgs, z.infer<typeof PRDParseOutputSchema>> = {
   name: "parse_prd",
+  title: "Parse PRD",
   description: "Parse a Product Requirements Document (PRD) and generate a comprehensive list of actionable development tasks with AI-powered analysis, similar to claude-task-master functionality",
   schema: parsePRDSchema as unknown as ToolSchema<ParsePRDArgs>,
+  outputSchema: PRDParseOutputSchema,
+  annotations: ANNOTATION_PATTERNS.aiOperation,
   examples: [
     {
       name: "Parse PRD for task generation",

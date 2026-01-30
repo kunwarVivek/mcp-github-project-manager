@@ -4,6 +4,8 @@ import { TaskGenerationService } from '../../../services/TaskGenerationService.j
 import { TaskStatus, TaskPriority, TaskComplexity } from '../../../domain/ai-types.js';
 import { MCPResponse } from '../../../domain/mcp-types.js';
 import { ToolResultFormatter } from '../ToolResultFormatter.js';
+import { ANNOTATION_PATTERNS } from '../annotations/tool-annotations.js';
+import { TaskComplexityOutputSchema } from '../schemas/ai-schemas.js';
 
 // Schema for analyze_task_complexity tool
 const analyzeTaskComplexitySchema = z.object({
@@ -395,10 +397,16 @@ function formatComplexityAnalysis(
 }
 
 // Tool definition
-export const analyzeTaskComplexityTool: ToolDefinition<AnalyzeTaskComplexityArgs> = {
+export const analyzeTaskComplexityTool: ToolDefinition<AnalyzeTaskComplexityArgs, z.infer<typeof TaskComplexityOutputSchema>> = {
   name: "analyze_task_complexity",
+  title: "Analyze Task Complexity",
   description: "Perform detailed AI-powered analysis of task complexity, effort estimation, risk assessment, and provide actionable recommendations",
   schema: analyzeTaskComplexitySchema as unknown as ToolSchema<AnalyzeTaskComplexityArgs>,
+  outputSchema: TaskComplexityOutputSchema,
+  annotations: {
+    ...ANNOTATION_PATTERNS.aiOperation,
+    readOnlyHint: true,  // Analysis doesn't modify data
+  },
   examples: [
     {
       name: "Analyze complex feature task",

@@ -4,6 +4,8 @@ import { RequirementsTraceabilityService } from '../../../services/RequirementsT
 import { MCPResponse } from '../../../domain/mcp-types.js';
 import { ToolResultFormatter } from '../ToolResultFormatter.js';
 import { TaskStatus, TaskPriority, TaskComplexity } from '../../../domain/ai-types.js';
+import { ANNOTATION_PATTERNS } from '../annotations/tool-annotations.js';
+import { TraceabilityMatrixOutputSchema } from '../schemas/ai-schemas.js';
 
 // Schema for create_traceability_matrix tool
 const createTraceabilityMatrixSchema = z.object({
@@ -364,10 +366,16 @@ function formatTraceabilityMatrixSummary(
 }
 
 // Tool definition
-export const createTraceabilityMatrixTool: ToolDefinition<CreateTraceabilityMatrixArgs> = {
+export const createTraceabilityMatrixTool: ToolDefinition<CreateTraceabilityMatrixArgs, z.infer<typeof TraceabilityMatrixOutputSchema>> = {
   name: "create_traceability_matrix",
+  title: "Create Traceability Matrix",
   description: "Create a comprehensive requirements traceability matrix linking PRD business requirements → features → use cases → tasks with full bidirectional traceability",
   schema: createTraceabilityMatrixSchema as unknown as ToolSchema<CreateTraceabilityMatrixArgs>,
+  outputSchema: TraceabilityMatrixOutputSchema,
+  annotations: {
+    ...ANNOTATION_PATTERNS.aiOperation,
+    readOnlyHint: true,  // Generates report, doesn't modify
+  },
   examples: [
     {
       name: "Create traceability matrix for project",

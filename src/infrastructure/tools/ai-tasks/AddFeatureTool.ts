@@ -5,6 +5,8 @@ import { ResourceManager } from '../../resource/ResourceManager.js';
 import { ResourceType } from '../../../domain/resource-types.js';
 import { MCPResponse } from '../../../domain/mcp-types.js';
 import { ToolResultFormatter } from '../ToolResultFormatter.js';
+import { ANNOTATION_PATTERNS } from '../annotations/tool-annotations.js';
+import { AddFeatureOutputSchema } from '../schemas/ai-schemas.js';
 
 // Schema for add_feature tool
 const addFeatureSchema = z.object({
@@ -193,10 +195,13 @@ function formatFeatureAdditionSummary(result: any): string {
 }
 
 // Tool definition
-export const addFeatureTool: ToolDefinition<AddFeatureArgs> = {
+export const addFeatureTool: ToolDefinition<AddFeatureArgs, z.infer<typeof AddFeatureOutputSchema>> = {
   name: "add_feature",
+  title: "Add Feature",
   description: "Add a new feature to an existing PRD or project, analyze its impact, and expand it into actionable tasks with complete lifecycle management",
   schema: addFeatureSchema as unknown as ToolSchema<AddFeatureArgs>,
+  outputSchema: AddFeatureOutputSchema,
+  annotations: ANNOTATION_PATTERNS.aiOperation,
   examples: [
     {
       name: "Add user authentication feature",

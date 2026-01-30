@@ -4,6 +4,8 @@ import { TaskGenerationService } from '../../../services/TaskGenerationService.j
 import { TaskStatus, TaskPriority, TaskComplexity } from '../../../domain/ai-types.js';
 import { MCPResponse } from '../../../domain/mcp-types.js';
 import { ToolResultFormatter } from '../ToolResultFormatter.js';
+import { ANNOTATION_PATTERNS } from '../annotations/tool-annotations.js';
+import { TaskExpandOutputSchema } from '../schemas/ai-schemas.js';
 
 // Schema for expand_task tool
 const expandTaskSchema = z.object({
@@ -449,10 +451,13 @@ function formatTaskExpansion(
 }
 
 // Tool definition
-export const expandTaskTool: ToolDefinition<ExpandTaskArgs> = {
+export const expandTaskTool: ToolDefinition<ExpandTaskArgs, z.infer<typeof TaskExpandOutputSchema>> = {
   name: "expand_task",
+  title: "Expand Task",
   description: "Break down a complex task into smaller, manageable subtasks with AI-powered analysis, dependency detection, and implementation recommendations",
   schema: expandTaskSchema as unknown as ToolSchema<ExpandTaskArgs>,
+  outputSchema: TaskExpandOutputSchema,
+  annotations: ANNOTATION_PATTERNS.aiOperation,
   examples: [
     {
       name: "Expand complex feature task",
