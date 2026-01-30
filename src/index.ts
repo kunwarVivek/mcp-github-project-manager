@@ -3,6 +3,8 @@ import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import {
   CallToolRequestSchema,
+  CallToolRequest,
+  CallToolResult,
   ErrorCode,
   ListToolsRequestSchema,
   McpError,
@@ -180,57 +182,65 @@ class GitHubProjectManagerServer {
     }));
 
     // Handle call_tool requests with validation and proper response formatting
-    this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
-      try {
-        const { name: toolName, arguments: args } = request.params;
-        const tool = this.toolRegistry.getTool(toolName);
+    // Use type assertion to work around deep type instantiation error with MCP SDK 1.25+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (this.server.setRequestHandler as any)(
+      CallToolRequestSchema,
+      async (request: CallToolRequest): Promise<CallToolResult> => {
+        try {
+          const { name: toolName, arguments: args } = request.params;
+          const tool = this.toolRegistry.getTool(toolName);
 
-        if (!tool) {
-          throw new McpError(
-            ErrorCode.MethodNotFound,
-            `Unknown tool: ${toolName}`
-          );
+          if (!tool) {
+            throw new McpError(
+              ErrorCode.MethodNotFound,
+              `Unknown tool: ${toolName}`
+            );
+          }
+
+          // Validate tool arguments against the schema
+          const validatedArgs = ToolValidator.validate(toolName, args, tool.schema);
+
+          // Execute the tool based on its name
+          const result = await this.executeToolHandler(toolName, validatedArgs);
+
+          // Format the result as an MCP response
+          const mcpResponse = ToolResultFormatter.formatSuccess(toolName, result, {
+            contentType: MCPContentType.JSON,
+          });
+
+          // Convert our custom MCPResponse to the format expected by the SDK
+          // SDK 1.25+ expects { content: [...], isError?: boolean }
+          if (mcpResponse.status === "success") {
+            return {
+              content: [
+                {
+                  type: "text" as const,
+                  text: mcpResponse.output.content ?? JSON.stringify(result)
+                }
+              ]
+            };
+          } else {
+            // Handle error case (though this shouldn't happen in the success formatter)
+            throw new McpError(
+              ErrorCode.InternalError,
+              "Unexpected response format from tool execution"
+            );
+          }
+
+        } catch (error) {
+          if (error instanceof McpError) {
+            throw error; // Re-throw MCP errors directly
+          }
+
+          // Log and convert other errors to MCP errors
+          this.logger.error("Tool execution error:", error);
+          const message =
+            error instanceof Error ? error.message : "An unknown error occurred";
+          throw new McpError(ErrorCode.InternalError, message);
         }
-
-        // Validate tool arguments against the schema
-        const validatedArgs = ToolValidator.validate(toolName, args, tool.schema);
-
-        // Execute the tool based on its name
-        const result = await this.executeToolHandler(toolName, validatedArgs);
-
-        // Format the result as an MCP response
-        const mcpResponse = ToolResultFormatter.formatSuccess(toolName, result, {
-          contentType: MCPContentType.JSON,
-        });
-
-        // Convert our custom MCPResponse to the format expected by the SDK
-        // Only success responses have the output property
-        if (mcpResponse.status === "success") {
-          return {
-            tools: this.toolRegistry.getToolsForMCP(),
-            output: mcpResponse.output.content,
-            _meta: mcpResponse.output.context
-          };
-        } else {
-          // Handle error case (though this shouldn't happen in the success formatter)
-          throw new McpError(
-            ErrorCode.InternalError,
-            "Unexpected response format from tool execution"
-          );
-        }
-
-      } catch (error) {
-        if (error instanceof McpError) {
-          throw error; // Re-throw MCP errors directly
-        }
-
-        // Log and convert other errors to MCP errors
-        this.logger.error("Tool execution error:", error);
-        const message =
-          error instanceof Error ? error.message : "An unknown error occurred";
-        throw new McpError(ErrorCode.InternalError, message);
       }
-    });
+    );
   }
 
   /**
