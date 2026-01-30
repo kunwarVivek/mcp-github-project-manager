@@ -1,4 +1,5 @@
-import { ToolDefinition } from "./ToolValidator.js";
+import zodToJsonSchema from "zod-to-json-schema";
+import { ToolDefinition, ToolAnnotations } from "./ToolValidator.js";
 import {
   // Original tools
   createRoadmapTool,
@@ -163,17 +164,27 @@ export class ToolRegistry {
   }
 
   /**
-   * Convert tools to MCP format for list_tools response
+   * Convert tools to MCP format for list_tools response.
+   * Uses zod-to-json-schema for proper JSON Schema conversion.
+   * Includes annotations and outputSchema per MCP specification 2025-11-25.
    */
   public getToolsForMCP(): Array<{
     name: string;
+    title?: string;
     description: string;
-    inputSchema: any;
+    inputSchema: Record<string, unknown>;
+    outputSchema?: Record<string, unknown>;
+    annotations?: ToolAnnotations;
   }> {
     return this.getAllTools().map(tool => ({
       name: tool.name,
+      title: tool.title,
       description: tool.description,
-      inputSchema: this.convertZodToJsonSchema(tool.schema),
+      inputSchema: zodToJsonSchema(tool.schema, { $refStrategy: "none" }) as Record<string, unknown>,
+      outputSchema: tool.outputSchema
+        ? zodToJsonSchema(tool.outputSchema, { $refStrategy: "none" }) as Record<string, unknown>
+        : undefined,
+      annotations: tool.annotations,
     }));
   }
 
@@ -302,7 +313,8 @@ export class ToolRegistry {
 
   /**
    * Convert Zod schema to JSON Schema (simplified version)
-   * This is a basic conversion - for production use, consider a library like zod-to-json-schema
+   * @deprecated Use zodToJsonSchema from zod-to-json-schema library instead.
+   * This method is kept for backward compatibility but is no longer used.
    */
   private convertZodToJsonSchema(schema: any): any {
     try {
@@ -346,7 +358,9 @@ export class ToolRegistry {
   }
 
   /**
-   * Simplified conversion of Zod type to JSON Schema type
+   * Simplified conversion of Zod type to JSON Schema type.
+   * @deprecated Use zodToJsonSchema from zod-to-json-schema library instead.
+   * This method is kept for backward compatibility but is no longer used.
    */
   private zodTypeToJsonSchemaType(zodType: any): any {
     try {
