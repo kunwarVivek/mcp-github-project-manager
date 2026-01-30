@@ -6,11 +6,11 @@
 ## Current Position
 
 **Phase:** 2 of 12 (MCP Protocol Compliance)
-**Plan:** 1 of 7 complete
+**Plan:** 2 of 7 complete
 **Status:** In progress
-**Last activity:** 2026-01-30 - Completed 02-01-PLAN.md (MCP SDK Upgrade)
+**Last activity:** 2026-01-30 - Completed 02-02-PLAN.md (Tool Annotations)
 
-**Progress:** [██........] 13% (Phase 1 complete + Phase 2 plan 1/7)
+**Progress:** [██........] 15% (Phase 1 complete + Phase 2 plan 2/7)
 
 ## Project Progress
 
@@ -18,13 +18,13 @@
 |--------|-------|
 | Phases Complete | 1/12 |
 | Requirements Done | 7/99 |
-| Current Phase Progress | Phase 2: 1/7 plans complete |
+| Current Phase Progress | Phase 2: 2/7 plans complete |
 
 ## Performance Metrics
 
 | Metric | Value | Notes |
 |--------|-------|-------|
-| Plans Executed | 6 | Phase 1: 01-01 through 01-05, Phase 2: 02-01 |
+| Plans Executed | 7 | Phase 1: 01-01 through 01-05, Phase 2: 02-01, 02-02 |
 | Requirements Completed | 7 | DEBT-01 through DEBT-07 |
 | Iterations | 1 | Gap closure cycle for test regressions |
 | Blockers Resolved | 3 | tsyringe decorators, reflect-metadata, MCP SDK type instantiation |
@@ -46,6 +46,9 @@
 | Direct mock injection for tests | Create mock factory BEFORE service instantiation; pass mockService directly | 2026-01-30 |
 | Type assertion for SDK generics | MCP SDK 1.25+ has deep type issues; use `as any` with explicit types | 2026-01-30 |
 | CallToolResult content format | SDK 1.25+ requires { content: [...] } not { output, tools, _meta } | 2026-01-30 |
+| TOutput generic defaults to unknown | Backward compatibility for existing ToolDefinition<T> usages | 2026-01-30 |
+| Mark deprecated vs remove | Keep old schema methods deprecated rather than removing | 2026-01-30 |
+| $refStrategy: none | Inline JSON Schema definitions for simpler MCP client consumption | 2026-01-30 |
 
 ### Learnings
 
@@ -66,7 +69,8 @@
 - [x] Complete Phase 1 Service Decomposition
 - [x] Plan Phase 2 MCP Protocol Compliance
 - [x] Execute 02-01: MCP SDK Upgrade
-- [ ] Execute 02-02 through 02-07: Tool annotations, output schemas, error handling
+- [x] Execute 02-02: Tool Annotations Infrastructure
+- [ ] Execute 02-03 through 02-07: Output schemas, error handling, protocol version
 - [ ] Consider future extraction: IssueService, PullRequestService, AutomationService
 
 ### Active Blockers
@@ -101,7 +105,7 @@
 | Plan | Name | Status | Commits |
 |------|------|--------|---------|
 | 02-01 | MCP SDK Upgrade | Complete | 326d501, 33b9cd2 |
-| 02-02 | Tool Annotations | Pending | - |
+| 02-02 | Tool Annotations | Complete | 372cd21, 36b0297, c3cc0ff |
 | 02-03 | Output Schemas | Pending | - |
 | 02-04 | Error Handling | Pending | - |
 | 02-05 | Protocol Version | Pending | - |
@@ -112,16 +116,20 @@
 - MCP SDK: 1.12.0 to 1.25.3 (upgraded)
 - zod-to-json-schema: Added (3.25.1)
 - CallToolResult format: Fixed for SDK 1.25+
+- ToolDefinition: Extended with title, outputSchema, annotations
+- ANNOTATION_PATTERNS: 6 behavior patterns for tool classification
+- getToolsForMCP: Uses zod-to-json-schema, emits annotations
 
 ## Session Continuity
 
-**Last Session:** 2026-01-30 - Completed 02-01-PLAN.md
+**Last Session:** 2026-01-30 - Completed 02-02-PLAN.md
 
 **Context for Next Session:**
-- MCP SDK 1.25.3 installed and working
-- Next: 02-02 Tool Annotations (readOnlyHint, destructiveHint, etc.)
-- 15 requirements to address (MCP-01 through MCP-15)
-- All 71 tools need annotations and output schemas
+- Tool annotation infrastructure complete
+- Next: 02-03 will apply annotations to all 71 tools
+- ToolDefinition has annotations?, outputSchema?, title? fields
+- ANNOTATION_PATTERNS has 6 ready patterns (readOnly, create, updateIdempotent, updateNonIdempotent, delete, aiOperation)
+- getToolsForMCP uses zod-to-json-schema with $refStrategy: none
 
 **Architecture Context:**
 - DI container (src/container.ts) wires all 6 extracted services
@@ -135,3 +143,4 @@
 *Last updated: 2026-01-30*
 *Phase 1 completed: 2026-01-30*
 *Plan 02-01 completed: 2026-01-30*
+*Plan 02-02 completed: 2026-01-30*
