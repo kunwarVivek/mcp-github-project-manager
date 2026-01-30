@@ -37,8 +37,16 @@ import {
   executeCreateTraceabilityMatrix
 } from "./infrastructure/tools/ToolSchemas";
 import { ToolResultFormatter } from "./infrastructure/tools/ToolResultFormatter";
-import { MCPContentType } from "./domain/mcp-types";
+import { MCPContentType, MCPErrorCode } from "./domain/mcp-types";
 import { ResourceCache } from "./infrastructure/cache/ResourceCache";
+
+/**
+ * Supported MCP protocol versions.
+ * The MCP SDK handles version negotiation, but we track supported versions
+ * for error messaging and compatibility checks.
+ */
+const SUPPORTED_PROTOCOL_VERSIONS = ["2024-11-05"];
+const PREFERRED_PROTOCOL_VERSION = "2024-11-05";
 import { FilePersistenceAdapter } from "./infrastructure/persistence/FilePersistenceAdapter";
 import { GitHubWebhookHandler } from "./infrastructure/events/GitHubWebhookHandler";
 import { EventSubscriptionManager } from "./infrastructure/events/EventSubscriptionManager";
@@ -940,13 +948,35 @@ class GitHubProjectManagerServer {
       // Initialize webhook server
       await this.initializeWebhookServer();
 
-      // Connect MCP server
+      // Connect MCP server with protocol version handling
       const transport = new StdioServerTransport();
-      await this.server.connect(transport);
+      try {
+        await this.server.connect(transport);
+        this.logger.info(`MCP server connected (protocol version: ${PREFERRED_PROTOCOL_VERSION})`);
+      } catch (connectError) {
+        // Check if this is a version mismatch error
+        if (connectError instanceof McpError &&
+            connectError.message &&
+            (connectError.message.includes("version") || connectError.message.includes("protocol"))) {
+          throw new McpError(
+            MCPErrorCode.PROTOCOL_VERSION_MISMATCH,
+            `Protocol version mismatch. Supported versions: ${SUPPORTED_PROTOCOL_VERSIONS.join(", ")}`,
+            {
+              protocol: {
+                supported: SUPPORTED_PROTOCOL_VERSIONS,
+                preferred: PREFERRED_PROTOCOL_VERSION,
+                requested: "unknown", // Would be extracted from error if available
+              }
+            }
+          );
+        }
+        throw connectError;
+      }
 
       // Display configuration information if verbose mode is enabled
       if (CLI_OPTIONS.verbose) {
         process.stderr.write("GitHub Project Manager MCP server configuration:\n");
+        process.stderr.write(`- Protocol version: ${PREFERRED_PROTOCOL_VERSION}\n`);
         process.stderr.write(`- Owner: ${GITHUB_OWNER}\n`);
         process.stderr.write(`- Repository: ${GITHUB_REPO}\n`);
         process.stderr.write(`- Token: ${GITHUB_TOKEN.substring(0, 4)}...${GITHUB_TOKEN.substring(GITHUB_TOKEN.length - 4)}\n`);
