@@ -8,6 +8,7 @@ import {
   McpError,
 } from "@modelcontextprotocol/sdk/types.js";
 import { ProjectManagementService } from "./services/ProjectManagementService";
+import { createProjectManagementService } from "./container";
 import { GitHubStateSyncService } from "./services/GitHubStateSyncService";
 import {
   GITHUB_TOKEN,
@@ -102,8 +103,9 @@ class GitHubProjectManagerServer {
       enableCompression: true
     });
 
-    // Initialize main service
-    this.service = new ProjectManagementService(
+    // Initialize main service via DI container helper
+    // This wires up all extracted services (SubIssue, Milestone, Sprint, etc.)
+    this.service = createProjectManagementService(
       GITHUB_OWNER,
       GITHUB_REPO,
       GITHUB_TOKEN
