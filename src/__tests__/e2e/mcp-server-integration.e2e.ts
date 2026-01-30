@@ -3,6 +3,7 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { McpError, ErrorCode } from "@modelcontextprotocol/sdk/types.js";
 import { ToolRegistry } from "../../infrastructure/tools/ToolRegistry";
 import { ProjectManagementService } from "../../services/ProjectManagementService";
+import { createProjectManagementService } from "../../container";
 import { ResourceStatus } from "../../domain/resource-types";
 import { TestFactory } from "../test-utils";
 import { GitHubProjectManagerServer } from "../../index";
@@ -16,7 +17,7 @@ describe("MCP Server E2E Tests", () => {
     const owner = process.env.GITHUB_OWNER || "test-owner";
     const repo = process.env.GITHUB_REPO || "test-repo";
 
-    service = new ProjectManagementService(owner, repo, token);
+    service = createProjectManagementService(owner, repo, token);
     toolRegistry = ToolRegistry.getInstance();
   });
 

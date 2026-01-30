@@ -1,4 +1,5 @@
 import { ProjectManagementService } from "../../services/ProjectManagementService";
+import { createProjectManagementService } from "../../container";
 import { ResourceStatus } from "../../domain/resource-types";
 import { TestFactory } from "../test-utils";
 import { Issue, Milestone } from "../../domain/types";
@@ -18,7 +19,7 @@ describe.skip("Resource Management E2E Tests", () => {
     const owner = process.env.GITHUB_OWNER!;
     const repo = process.env.GITHUB_REPO!;
 
-    service = new ProjectManagementService(owner, repo, token);
+    service = createProjectManagementService(owner, repo, token);
   });
 
   describe("Issue Relationship Management", () => {

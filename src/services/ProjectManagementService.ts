@@ -1,9 +1,30 @@
+/**
+ * ProjectManagementService - Facade Pattern
+ *
+ * This service acts as a facade coordinating multiple specialized services:
+ * - SubIssueService: Issue dependencies, status, milestone assignment
+ * - MilestoneService: Milestone CRUD and metrics
+ * - SprintPlanningService: Sprint lifecycle and planning
+ * - ProjectStatusService: Project CRUD operations
+ * - ProjectTemplateService: Project customization (README, fields, views)
+ * - ProjectLinkingService: Project item operations
+ *
+ * Direct implementations remain for:
+ * - Roadmap creation (orchestration)
+ * - Issue CRUD, comments
+ * - Draft issues
+ * - Pull requests
+ * - Field value operations
+ * - Labels
+ * - Automation rules
+ * - Iteration management
+ */
 import { GitHubRepositoryFactory } from "../infrastructure/github/GitHubRepositoryFactory";
 import { GitHubIssueRepository } from "../infrastructure/github/repositories/GitHubIssueRepository";
 import { GitHubMilestoneRepository } from "../infrastructure/github/repositories/GitHubMilestoneRepository";
 import { GitHubProjectRepository } from "../infrastructure/github/repositories/GitHubProjectRepository";
 import { GitHubSprintRepository } from "../infrastructure/github/repositories/GitHubSprintRepository";
-import { ResourceStatus, ResourceType, RelationshipType } from "../domain/resource-types";
+import { ResourceStatus, ResourceType } from "../domain/resource-types";
 import {
   Issue,
   CreateIssue,
@@ -16,12 +37,8 @@ import {
   CustomField,
   ProjectView,
   createResource,
-  CreateField,
-  UpdateField,
-  FieldType,
   ProjectItem
 } from "../domain/types";
-import { GitHubTypeConverter } from "../infrastructure/github/util/conversion";
 import { z } from "zod";
 import { MCPErrorCode } from "../domain/mcp-types";
 import {
@@ -33,14 +50,27 @@ import {
   GitHubAPIError
 } from "../domain/errors";
 import {
-  ProjectSchema,
-  IssueSchema,
-  MilestoneSchema,
-  SprintSchema,
-  RelationshipSchema
-} from "../domain/resource-schemas";
+  AutomationTrigger,
+  AutomationAction,
+  AutomationTriggerType,
+  AutomationActionType,
+  CreateAutomationRule
+} from "../domain/automation-types";
 
-// Define validation schemas for service inputs
+// Import extracted services
+import { SubIssueService, IssueDependency, IssueHistoryEntry } from "./SubIssueService";
+import { MilestoneService, MilestoneMetrics } from "./MilestoneService";
+import { SprintPlanningService, SprintMetrics } from "./SprintPlanningService";
+import { ProjectStatusService } from "./ProjectStatusService";
+import { ProjectTemplateService } from "./ProjectTemplateService";
+import { ProjectLinkingService } from "./ProjectLinkingService";
+
+// Re-export interfaces for backward compatibility
+export { MilestoneMetrics } from "./MilestoneService";
+export { SprintMetrics } from "./SprintPlanningService";
+export { IssueDependency, IssueHistoryEntry } from "./SubIssueService";
+
+// Validation schema for roadmap creation
 const CreateRoadmapSchema = z.object({
   project: z.object({
     title: z.string().min(1, "Project title is required"),
@@ -70,68 +100,56 @@ const CreateRoadmapSchema = z.object({
   )
 });
 
-const PlanSprintSchema = z.object({
-  sprint: z.object({
-    title: z.string().min(1, "Sprint title is required"),
-    description: z.string(),
-    startDate: z.string().refine(val => !isNaN(Date.parse(val)), {
-      message: "Start date must be a valid date string"
-    }),
-    endDate: z.string().refine(val => !isNaN(Date.parse(val)), {
-      message: "End date must be a valid date string"
-    }),
-    status: z.nativeEnum(ResourceStatus).optional(),
-    issues: z.array(z.string()).optional()
-  }),
-  issueIds: z.array(z.number())
-});
-
-// Add interface to represent issue dependency relationship
-interface IssueDependency {
-  issueId: string;
-  dependsOnId: string;
-  createdAt: string;
-}
-
-export interface MilestoneMetrics {
-  id: string;
-  title: string;
-  dueDate?: string | null;
-  openIssues: number;
-  closedIssues: number;
-  totalIssues: number;
-  completionPercentage: number;
-  status: ResourceStatus;
-  issues?: Issue[];
-  isOverdue: boolean;
-  daysRemaining?: number;
-}
-
-export interface SprintMetrics {
-  id: string;
-  title: string;
-  startDate: string;
-  endDate: string;
-  totalIssues: number;
-  completedIssues: number;
-  remainingIssues: number;
-  completionPercentage: number;
-  status: ResourceStatus;
-  issues?: Issue[];
-  daysRemaining?: number;
-  isActive: boolean;
-}
-
+/**
+ * ProjectManagementService - Facade for GitHub project management
+ *
+ * Coordinates multiple specialized services while providing a unified API
+ * for project management operations.
+ */
 export class ProjectManagementService {
   private readonly factory: GitHubRepositoryFactory;
 
-  constructor(owner: string, repo: string, token: string) {
-    this.factory = new GitHubRepositoryFactory(token, owner, repo);
-  }
+  // Injected services for delegation
+  private readonly subIssueService: SubIssueService;
+  private readonly milestoneService: MilestoneService;
+  private readonly sprintPlanningService: SprintPlanningService;
+  private readonly projectStatusService: ProjectStatusService;
+  private readonly templateService: ProjectTemplateService;
+  private readonly linkingService: ProjectLinkingService;
 
   /**
-   * Get the repository factory instance for sync service
+   * Create a new ProjectManagementService with all dependencies injected.
+   *
+   * @param factory - GitHub repository factory for direct operations
+   * @param subIssueService - Service for issue dependencies and status
+   * @param milestoneService - Service for milestone operations
+   * @param sprintPlanningService - Service for sprint planning
+   * @param projectStatusService - Service for project CRUD
+   * @param templateService - Service for project customization
+   * @param linkingService - Service for project item operations
    */
+  constructor(
+    factory: GitHubRepositoryFactory,
+    subIssueService: SubIssueService,
+    milestoneService: MilestoneService,
+    sprintPlanningService: SprintPlanningService,
+    projectStatusService: ProjectStatusService,
+    templateService: ProjectTemplateService,
+    linkingService: ProjectLinkingService
+  ) {
+    this.factory = factory;
+    this.subIssueService = subIssueService;
+    this.milestoneService = milestoneService;
+    this.sprintPlanningService = sprintPlanningService;
+    this.projectStatusService = projectStatusService;
+    this.templateService = templateService;
+    this.linkingService = linkingService;
+  }
+
+  // ============================================================================
+  // Repository Accessors (for internal use)
+  // ============================================================================
+
   getRepositoryFactory(): GitHubRepositoryFactory {
     return this.factory;
   }
@@ -156,33 +174,231 @@ export class ProjectManagementService {
     return this.factory.createAutomationRuleRepository();
   }
 
-  // Helper method to map domain errors to MCP error codes
   private mapErrorToMCPError(error: unknown): Error {
     if (error instanceof ValidationError) {
       return new DomainError(`${MCPErrorCode.VALIDATION_ERROR}: ${error.message}`);
     }
-
     if (error instanceof ResourceNotFoundError) {
       return new DomainError(`${MCPErrorCode.RESOURCE_NOT_FOUND}: ${error.message}`);
     }
-
     if (error instanceof RateLimitError) {
       return new DomainError(`${MCPErrorCode.RATE_LIMITED}: ${error.message}`);
     }
-
     if (error instanceof UnauthorizedError) {
       return new DomainError(`${MCPErrorCode.UNAUTHORIZED}: ${error.message}`);
     }
-
     if (error instanceof GitHubAPIError) {
       return new DomainError(`${MCPErrorCode.INTERNAL_ERROR}: GitHub API Error - ${error.message}`);
     }
-
-    // Default to internal error
     return new DomainError(`${MCPErrorCode.INTERNAL_ERROR}: ${error instanceof Error ? error.message : String(error)}`);
   }
 
-  // Roadmap Management
+  // ============================================================================
+  // SubIssueService Delegation
+  // ============================================================================
+
+  async updateIssueStatus(issueId: string, status: ResourceStatus): Promise<Issue> {
+    return this.subIssueService.updateIssueStatus(issueId, status);
+  }
+
+  async addIssueDependency(issueId: string, dependsOnId: string): Promise<void> {
+    return this.subIssueService.addIssueDependency(issueId, dependsOnId);
+  }
+
+  async getIssueDependencies(issueId: string): Promise<string[]> {
+    return this.subIssueService.getIssueDependencies(issueId);
+  }
+
+  async assignIssueToMilestone(issueId: string, milestoneId: string): Promise<Issue> {
+    return this.subIssueService.assignIssueToMilestone(issueId, milestoneId);
+  }
+
+  async getIssueHistory(issueId: string): Promise<IssueHistoryEntry[]> {
+    return this.subIssueService.getIssueHistory(issueId);
+  }
+
+  // ============================================================================
+  // MilestoneService Delegation
+  // ============================================================================
+
+  async getMilestoneMetrics(id: string, includeIssues: boolean = false): Promise<MilestoneMetrics> {
+    return this.milestoneService.getMilestoneMetrics(id, includeIssues);
+  }
+
+  async getOverdueMilestones(limit: number = 10, includeIssues: boolean = false): Promise<MilestoneMetrics[]> {
+    return this.milestoneService.getOverdueMilestones(limit, includeIssues);
+  }
+
+  async getUpcomingMilestones(daysAhead: number = 30, limit: number = 10, includeIssues: boolean = false): Promise<MilestoneMetrics[]> {
+    return this.milestoneService.getUpcomingMilestones(daysAhead, limit, includeIssues);
+  }
+
+  async createMilestone(data: { title: string; description?: string; dueDate?: string }): Promise<Milestone> {
+    return this.milestoneService.createMilestone({
+      title: data.title,
+      description: data.description || '',
+      dueDate: data.dueDate
+    });
+  }
+
+  async listMilestones(state: string = 'open', sort: string = 'due_on', direction: string = 'asc'): Promise<Milestone[]> {
+    return this.milestoneService.listMilestones(state, sort, direction);
+  }
+
+  async updateMilestone(data: { milestoneId: string; title?: string; description?: string; dueDate?: string; state?: 'open' | 'closed' }): Promise<Milestone> {
+    return this.milestoneService.updateMilestone(data);
+  }
+
+  async deleteMilestone(data: { milestoneId: string }): Promise<{ success: boolean; message: string }> {
+    return this.milestoneService.deleteMilestone(data);
+  }
+
+  // ============================================================================
+  // SprintPlanningService Delegation
+  // ============================================================================
+
+  async planSprint(data: { sprint: CreateSprint; issueIds: number[] }): Promise<Sprint> {
+    return this.sprintPlanningService.planSprint(data);
+  }
+
+  async findSprints(filters?: { status?: ResourceStatus }): Promise<Sprint[]> {
+    return this.sprintPlanningService.findSprints(filters);
+  }
+
+  async updateSprint(data: {
+    sprintId: string;
+    title?: string;
+    description?: string;
+    startDate?: string;
+    endDate?: string;
+    status?: 'planned' | 'active' | 'completed';
+    issues?: string[];
+  }): Promise<Sprint> {
+    return this.sprintPlanningService.updateSprint(data);
+  }
+
+  async addIssuesToSprint(data: { sprintId: string; issueIds: string[] }): Promise<{ success: boolean; addedIssues: number; message: string }> {
+    return this.sprintPlanningService.addIssuesToSprint(data);
+  }
+
+  async removeIssuesFromSprint(data: { sprintId: string; issueIds: string[] }): Promise<{ success: boolean; removedIssues: number; message: string }> {
+    return this.sprintPlanningService.removeIssuesFromSprint(data);
+  }
+
+  async getSprintMetrics(id: string, includeIssues: boolean = false): Promise<SprintMetrics> {
+    return this.sprintPlanningService.getSprintMetrics(id, includeIssues);
+  }
+
+  async createSprint(data: { title: string; description?: string; startDate: string; endDate: string; issues?: string[] }): Promise<Sprint> {
+    return this.sprintPlanningService.createSprint({
+      title: data.title,
+      description: data.description || '',
+      startDate: data.startDate,
+      endDate: data.endDate,
+      issueIds: data.issues
+    });
+  }
+
+  async listSprints(status: string = 'all'): Promise<Sprint[]> {
+    return this.sprintPlanningService.listSprints(status);
+  }
+
+  async getCurrentSprint(includeIssues: boolean = true): Promise<Sprint | null> {
+    return this.sprintPlanningService.getCurrentSprint(includeIssues);
+  }
+
+  // ============================================================================
+  // ProjectStatusService Delegation
+  // ============================================================================
+
+  async createProject(data: { title: string; shortDescription?: string; visibility?: 'private' | 'public' }): Promise<Project> {
+    return this.projectStatusService.createProject(data);
+  }
+
+  async listProjects(status: string = 'active', limit: number = 10): Promise<Project[]> {
+    return this.projectStatusService.listProjects(status, limit);
+  }
+
+  async getProject(projectId: string): Promise<Project | null> {
+    return this.projectStatusService.getProject(projectId);
+  }
+
+  async updateProject(data: { projectId: string; title?: string; shortDescription?: string; closed?: boolean }): Promise<Project> {
+    return this.projectStatusService.updateProject(data);
+  }
+
+  async deleteProject(data: { projectId: string }): Promise<{ success: boolean; message: string }> {
+    return this.projectStatusService.deleteProject(data);
+  }
+
+  // ============================================================================
+  // ProjectTemplateService Delegation
+  // ============================================================================
+
+  async getProjectReadme(data: { projectId: string }): Promise<{ readme: string }> {
+    return this.templateService.getProjectReadme(data);
+  }
+
+  async updateProjectReadme(data: { projectId: string; readme: string }): Promise<{ success: boolean; message: string }> {
+    return this.templateService.updateProjectReadme(data);
+  }
+
+  async listProjectFields(data: { projectId: string }): Promise<CustomField[]> {
+    return this.templateService.listProjectFields(data);
+  }
+
+  async updateProjectField(data: { projectId: string; fieldId: string; name?: string; options?: Array<{ id?: string; name: string; color?: string; description?: string }> }): Promise<CustomField> {
+    return this.templateService.updateProjectField(data);
+  }
+
+  async createProjectView(data: { projectId: string; name: string; layout?: 'table' | 'board' | 'roadmap' }): Promise<ProjectView> {
+    return this.templateService.createProjectView({
+      projectId: data.projectId,
+      name: data.name,
+      layout: data.layout || 'table'
+    });
+  }
+
+  async listProjectViews(data: { projectId: string }): Promise<ProjectView[]> {
+    return this.templateService.listProjectViews(data);
+  }
+
+  async updateProjectView(data: { projectId: string; viewId: string; name?: string; layout?: 'table' | 'board' | 'roadmap'; filter?: string; sortBy?: Array<{ field: string; direction: 'asc' | 'desc' }> }): Promise<ProjectView> {
+    return this.templateService.updateProjectView(data);
+  }
+
+  async deleteProjectView(data: { projectId: string; viewId: string }): Promise<{ success: boolean; message: string }> {
+    return this.templateService.deleteProjectView(data);
+  }
+
+  // ============================================================================
+  // ProjectLinkingService Delegation
+  // ============================================================================
+
+  async addProjectItem(data: { projectId: string; contentId: string; contentType: 'issue' | 'pull_request' }): Promise<ProjectItem> {
+    return this.linkingService.addProjectItem(data);
+  }
+
+  async removeProjectItem(data: { projectId: string; itemId: string }): Promise<{ success: boolean; message: string }> {
+    return this.linkingService.removeProjectItem(data);
+  }
+
+  async archiveProjectItem(data: { projectId: string; itemId: string }): Promise<{ success: boolean; message: string }> {
+    return this.linkingService.archiveProjectItem(data);
+  }
+
+  async unarchiveProjectItem(data: { projectId: string; itemId: string }): Promise<{ success: boolean; message: string }> {
+    return this.linkingService.unarchiveProjectItem(data);
+  }
+
+  async listProjectItems(data: { projectId: string; limit?: number }): Promise<ProjectItem[]> {
+    return this.linkingService.listProjectItems(data);
+  }
+
+  // ============================================================================
+  // Roadmap Management (Orchestration - kept in facade)
+  // ============================================================================
+
   async createRoadmap(data: {
     project: CreateProject;
     milestones: Array<{
@@ -194,10 +410,8 @@ export class ProjectManagementService {
     milestones: Array<Milestone & { issues: Issue[] }>;
   }> {
     try {
-      // Validate input with Zod schema
       const validatedData = CreateRoadmapSchema.parse(data);
 
-      // Create properly typed project without using 'any'
       const projectData = {
         ...validatedData.project,
         type: ResourceType.PROJECT,
@@ -205,7 +419,6 @@ export class ProjectManagementService {
         visibility: validatedData.project.visibility || 'private',
         views: [] as ProjectView[],
         fields: [] as CustomField[],
-        // Ensure shortDescription is used (description is handled via separate update)
         shortDescription: validatedData.project.shortDescription,
       };
 
@@ -215,10 +428,8 @@ export class ProjectManagementService {
 
       const milestones = [];
 
-      // Create milestones and issues with proper error handling
       for (const { milestone, issues } of validatedData.milestones) {
         try {
-          // Ensure milestone description is not undefined
           const milestoneWithRequiredFields = {
             ...milestone,
             description: milestone.description || ''
@@ -253,435 +464,14 @@ export class ProjectManagementService {
       if (error instanceof z.ZodError) {
         throw new ValidationError(`Invalid roadmap data: ${error.message}`);
       }
-
       throw this.mapErrorToMCPError(error);
     }
   }
 
-  // Sprint Management
-  async planSprint(data: {
-    sprint: CreateSprint;
-    issueIds: number[];
-  }): Promise<Sprint> {
-    try {
-      // Validate input with Zod schema
-      const validatedData = PlanSprintSchema.parse(data);
+  // ============================================================================
+  // Issue Management (Direct implementation)
+  // ============================================================================
 
-      const stringIssueIds = validatedData.issueIds.map(id => id.toString());
-
-      // Create sprint with proper error handling
-      const sprint = await this.sprintRepo.create({
-        ...validatedData.sprint,
-        issues: stringIssueIds,
-        status: validatedData.sprint.status || ResourceStatus.PLANNED
-      });
-
-      // Create relationship between issues and sprint
-      if (stringIssueIds.length > 0) {
-        try {
-          await Promise.all(
-            stringIssueIds.map(async (issueId) => {
-              try {
-                await this.issueRepo.update(issueId, { milestoneId: sprint.id });
-              } catch (error) {
-                process.stderr.write(`Failed to associate issue ${issueId} with sprint: ${error}`);
-                throw this.mapErrorToMCPError(error);
-              }
-            })
-          );
-        } catch (error) {
-          throw this.mapErrorToMCPError(error);
-        }
-      }
-
-      return sprint;
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        throw new ValidationError(`Invalid sprint data: ${error.message}`);
-      }
-
-      throw this.mapErrorToMCPError(error);
-    }
-  }
-
-  async findSprints(filters?: { status?: ResourceStatus }): Promise<Sprint[]> {
-    try {
-      return await this.sprintRepo.findAll(filters);
-    } catch (error) {
-      throw this.mapErrorToMCPError(error);
-    }
-  }
-
-  async updateSprint(data: {
-    sprintId: string;
-    title?: string;
-    description?: string;
-    startDate?: string;
-    endDate?: string;
-    status?: 'planned' | 'active' | 'completed';
-    issues?: string[];
-  }): Promise<Sprint> {
-    try {
-      // Convert status string to ResourceStatus enum if provided
-      let resourceStatus: ResourceStatus | undefined;
-      if (data.status) {
-        switch (data.status) {
-          case 'planned':
-            resourceStatus = ResourceStatus.PLANNED;
-            break;
-          case 'active':
-            resourceStatus = ResourceStatus.ACTIVE;
-            break;
-          case 'completed':
-            resourceStatus = ResourceStatus.CLOSED;
-            break;
-        }
-      }
-
-      // Map input data to domain model
-      const sprintData: Partial<Sprint> = {
-        title: data.title,
-        description: data.description,
-        startDate: data.startDate,
-        endDate: data.endDate,
-        status: resourceStatus,
-        issues: data.issues
-      };
-
-      // Clean up undefined values
-      Object.keys(sprintData).forEach(key => {
-        if (sprintData[key as keyof Partial<Sprint>] === undefined) {
-          delete sprintData[key as keyof Partial<Sprint>];
-        }
-      });
-
-      return await this.sprintRepo.update(data.sprintId, sprintData);
-    } catch (error) {
-      throw this.mapErrorToMCPError(error);
-    }
-  }
-
-  async addIssuesToSprint(data: {
-    sprintId: string;
-    issueIds: string[];
-  }): Promise<{ success: boolean; addedIssues: number; message: string }> {
-    try {
-      let addedCount = 0;
-      const issues = [];
-
-      // Add each issue to the sprint
-      for (const issueId of data.issueIds) {
-        try {
-          await this.sprintRepo.addIssue(data.sprintId, issueId);
-          addedCount++;
-          issues.push(issueId);
-        } catch (error) {
-          process.stderr.write(`Failed to add issue ${issueId} to sprint: ${error}`);
-        }
-      }
-
-      return {
-        success: addedCount > 0,
-        addedIssues: addedCount,
-        message: `Added ${addedCount} issue(s) to sprint ${data.sprintId}`
-      };
-    } catch (error) {
-      throw this.mapErrorToMCPError(error);
-    }
-  }
-
-  async removeIssuesFromSprint(data: {
-    sprintId: string;
-    issueIds: string[];
-  }): Promise<{ success: boolean; removedIssues: number; message: string }> {
-    try {
-      let removedCount = 0;
-      const issues = [];
-
-      // Remove each issue from the sprint
-      for (const issueId of data.issueIds) {
-        try {
-          await this.sprintRepo.removeIssue(data.sprintId, issueId);
-          removedCount++;
-          issues.push(issueId);
-        } catch (error) {
-          process.stderr.write(`Failed to remove issue ${issueId} from sprint: ${error}`);
-        }
-      }
-
-      return {
-        success: removedCount > 0,
-        removedIssues: removedCount,
-        message: `Removed ${removedCount} issue(s) from sprint ${data.sprintId}`
-      };
-    } catch (error) {
-      throw this.mapErrorToMCPError(error);
-    }
-  }
-
-  async getSprintMetrics(id: string, includeIssues: boolean = false): Promise<SprintMetrics> {
-    try {
-      const sprint = await this.sprintRepo.findById(id);
-      if (!sprint) {
-        throw new ResourceNotFoundError(ResourceType.SPRINT, id);
-      }
-
-      const issuePromises = sprint.issues.map((issueId: string) => this.issueRepo.findById(issueId));
-      const issuesResult = await Promise.all(issuePromises);
-      const issues = issuesResult.filter((issue: Issue | null) => issue !== null) as Issue[];
-
-      const totalIssues = issues.length;
-      const completedIssues = issues.filter(
-        issue => issue.status === ResourceStatus.CLOSED || issue.status === ResourceStatus.COMPLETED
-      ).length;
-      const remainingIssues = totalIssues - completedIssues;
-      const completionPercentage = totalIssues > 0 ? Math.round((completedIssues / totalIssues) * 100) : 0;
-
-      const now = new Date();
-      const endDate = new Date(sprint.endDate);
-      const daysRemaining = Math.ceil((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-      const isActive = now >= new Date(sprint.startDate) && now <= endDate;
-
-      return {
-        id: sprint.id,
-        title: sprint.title,
-        startDate: sprint.startDate,
-        endDate: sprint.endDate,
-        totalIssues,
-        completedIssues,
-        remainingIssues,
-        completionPercentage,
-        status: sprint.status,
-        issues: includeIssues ? issues : undefined,
-        daysRemaining,
-        isActive
-      };
-    } catch (error) {
-      throw this.mapErrorToMCPError(error);
-    }
-  }
-
-  // Milestone Management
-  async getMilestoneMetrics(id: string, includeIssues: boolean = false): Promise<MilestoneMetrics> {
-    try {
-      const milestone = await this.milestoneRepo.findById(id);
-      if (!milestone) {
-        throw new ResourceNotFoundError(ResourceType.MILESTONE, id);
-      }
-
-      const allIssues = await this.issueRepo.findAll();
-      const issues = allIssues.filter(issue => issue.milestoneId === milestone.id);
-
-      const totalIssues = issues.length;
-      const closedIssues = issues.filter(
-        issue => issue.status === ResourceStatus.CLOSED || issue.status === ResourceStatus.COMPLETED
-      ).length;
-      const openIssues = totalIssues - closedIssues;
-      const completionPercentage = totalIssues > 0 ? Math.round((closedIssues / totalIssues) * 100) : 0;
-
-      const now = new Date();
-      let isOverdue = false;
-      let daysRemaining: number | undefined = undefined;
-
-      if (milestone.dueDate) {
-        const dueDate = new Date(milestone.dueDate);
-        isOverdue = now > dueDate;
-        daysRemaining = Math.ceil((dueDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-      }
-
-      return {
-        id: milestone.id,
-        title: milestone.title,
-        dueDate: milestone.dueDate,
-        openIssues,
-        closedIssues,
-        totalIssues,
-        completionPercentage,
-        status: milestone.status,
-        issues: includeIssues ? issues : undefined,
-        isOverdue,
-        daysRemaining: daysRemaining && daysRemaining > 0 ? daysRemaining : undefined
-      };
-    } catch (error) {
-      throw this.mapErrorToMCPError(error);
-    }
-  }
-
-  async getOverdueMilestones(limit: number = 10, includeIssues: boolean = false): Promise<MilestoneMetrics[]> {
-    try {
-      const milestones = await this.milestoneRepo.findAll();
-      const now = new Date();
-
-      const overdueMilestones = milestones.filter(milestone => {
-        if (!milestone.dueDate) return false;
-        const dueDate = new Date(milestone.dueDate);
-        return now > dueDate && milestone.status !== ResourceStatus.COMPLETED && milestone.status !== ResourceStatus.CLOSED;
-      });
-
-      overdueMilestones.sort((a, b) => {
-        if (!a.dueDate || !b.dueDate) return 0;
-        return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
-      });
-
-      const limitedMilestones = overdueMilestones.slice(0, limit);
-
-      const milestoneMetrics = await Promise.all(
-        limitedMilestones.map(milestone =>
-          this.getMilestoneMetrics(milestone.id, includeIssues)
-        )
-      );
-
-      return milestoneMetrics;
-    } catch (error) {
-      throw this.mapErrorToMCPError(error);
-    }
-  }
-
-  async getUpcomingMilestones(daysAhead: number = 30, limit: number = 10, includeIssues: boolean = false): Promise<MilestoneMetrics[]> {
-    try {
-      const milestones = await this.milestoneRepo.findAll();
-      const now = new Date();
-      const futureDate = new Date(now);
-      futureDate.setDate(now.getDate() + daysAhead);
-
-      const upcomingMilestones = milestones.filter(milestone => {
-        if (!milestone.dueDate) return false;
-        const dueDate = new Date(milestone.dueDate);
-        return dueDate > now && dueDate <= futureDate &&
-               milestone.status !== ResourceStatus.COMPLETED &&
-               milestone.status !== ResourceStatus.CLOSED;
-      });
-
-      upcomingMilestones.sort((a, b) => {
-        if (!a.dueDate || !b.dueDate) return 0;
-        return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
-      });
-
-      const limitedMilestones = upcomingMilestones.slice(0, limit);
-
-      const milestoneMetrics = await Promise.all(
-        limitedMilestones.map(milestone =>
-          this.getMilestoneMetrics(milestone.id, includeIssues)
-        )
-      );
-
-      return milestoneMetrics;
-    } catch (error) {
-      throw this.mapErrorToMCPError(error);
-    }
-  }
-
-  // Project Management
-  async createProject(data: {
-    title: string;
-    shortDescription?: string;
-    visibility?: 'private' | 'public';
-  }): Promise<Project> {
-    try {
-      const projectData: CreateProject = {
-        title: data.title,
-        shortDescription: data.shortDescription,
-        owner: this.factory.getConfig().owner,
-        visibility: data.visibility || 'private',
-      };
-
-      return await this.projectRepo.create(projectData);
-    } catch (error) {
-      throw this.mapErrorToMCPError(error);
-    }
-  }
-
-  async listProjects(status: string = 'active', limit: number = 10): Promise<Project[]> {
-    try {
-      const projects = await this.projectRepo.findAll();
-
-      // Filter by status if needed
-      let filteredProjects = projects;
-      if (status !== 'all') {
-        const resourceStatus = status === 'active' ? ResourceStatus.ACTIVE : ResourceStatus.CLOSED;
-        filteredProjects = projects.filter(project => project.status === resourceStatus);
-      }
-
-      // Apply limit
-      return filteredProjects.slice(0, limit);
-    } catch (error) {
-      throw this.mapErrorToMCPError(error);
-    }
-  }
-
-  async getProject(projectId: string): Promise<Project | null> {
-    try {
-      return await this.projectRepo.findById(projectId);
-    } catch (error) {
-      throw this.mapErrorToMCPError(error);
-    }
-  }
-
-  // Milestone Management
-  async createMilestone(data: {
-    title: string;
-    description: string;
-    dueDate?: string;
-  }): Promise<Milestone> {
-    try {
-      const milestoneData: CreateMilestone = {
-        title: data.title,
-        description: data.description,
-        dueDate: data.dueDate,
-      };
-
-      return await this.milestoneRepo.create(milestoneData);
-    } catch (error) {
-      throw this.mapErrorToMCPError(error);
-    }
-  }
-
-  async listMilestones(
-    status: string = 'open',
-    sort: string = 'created_at',
-    direction: string = 'asc'
-  ): Promise<Milestone[]> {
-    try {
-      // Get all milestones
-      const milestones = await this.milestoneRepo.findAll();
-
-      // Filter by status if needed
-      let filteredMilestones = milestones;
-      if (status !== 'all') {
-        const resourceStatus = status === 'open' ? ResourceStatus.ACTIVE : ResourceStatus.CLOSED;
-        filteredMilestones = milestones.filter(milestone => milestone.status === resourceStatus);
-      }
-
-      // Sort the milestones
-      filteredMilestones.sort((a, b) => {
-        let valueA, valueB;
-
-        switch(sort) {
-          case 'due_date':
-            valueA = a.dueDate || '';
-            valueB = b.dueDate || '';
-            break;
-          case 'title':
-            valueA = a.title;
-            valueB = b.title;
-            break;
-          case 'created_at':
-          default:
-            valueA = a.createdAt;
-            valueB = b.createdAt;
-        }
-
-        const comparison = valueA.localeCompare(valueB);
-        return direction === 'asc' ? comparison : -comparison;
-      });
-
-      return filteredMilestones;
-    } catch (error) {
-      throw this.mapErrorToMCPError(error);
-    }
-  }
-
-  // Issue Management
   async createIssue(data: {
     title: string;
     description: string;
@@ -692,14 +482,9 @@ export class ProjectManagementService {
     type?: string;
   }): Promise<Issue> {
     try {
-      // Create labels based on priority and type if provided
       const labels = data.labels || [];
-      if (data.priority) {
-        labels.push(`priority:${data.priority}`);
-      }
-      if (data.type) {
-        labels.push(`type:${data.type}`);
-      }
+      if (data.priority) labels.push(`priority:${data.priority}`);
+      if (data.type) labels.push(`type:${data.type}`);
 
       const issueData: CreateIssue = {
         title: data.title,
@@ -725,7 +510,6 @@ export class ProjectManagementService {
     limit?: number;
   } = {}): Promise<Issue[]> {
     try {
-      // Set default values
       const {
         status = 'open',
         milestone,
@@ -737,57 +521,41 @@ export class ProjectManagementService {
       } = options;
 
       let issues: Issue[];
-
       if (milestone) {
-        // If milestone is specified, get issues for that milestone
         issues = await this.issueRepo.findByMilestone(milestone);
       } else {
-        // Otherwise get all issues
         issues = await this.issueRepo.findAll();
       }
 
-      // Filter by status
       if (status !== 'all') {
         const resourceStatus = status === 'open' ? ResourceStatus.ACTIVE : ResourceStatus.CLOSED;
         issues = issues.filter(issue => issue.status === resourceStatus);
       }
 
-      // Filter by labels if provided
       if (labels.length > 0) {
-        issues = issues.filter(issue =>
-          labels.every(label => issue.labels.includes(label))
-        );
+        issues = issues.filter(issue => labels.every(label => issue.labels.includes(label)));
       }
 
-      // Filter by assignee if provided
       if (assignee) {
-        issues = issues.filter(issue =>
-          issue.assignees.includes(assignee)
-        );
+        issues = issues.filter(issue => issue.assignees.includes(assignee));
       }
 
-      // Sort the issues
       issues.sort((a, b) => {
         let valueA, valueB;
-
         switch(sort) {
           case 'updated':
             valueA = a.updatedAt;
             valueB = b.updatedAt;
             break;
-          case 'comments':
-            // Since we don't have comment count in our model, default to created
           case 'created':
           default:
             valueA = a.createdAt;
             valueB = b.createdAt;
         }
-
         const comparison = valueA.localeCompare(valueB);
         return direction === 'desc' ? -comparison : comparison;
       });
 
-      // Apply limit
       return issues.slice(0, limit);
     } catch (error) {
       throw this.mapErrorToMCPError(error);
@@ -815,7 +583,6 @@ export class ProjectManagementService {
   ): Promise<Issue> {
     try {
       const data: Partial<Issue> = {};
-
       if (updates.title) data.title = updates.title;
       if (updates.description) data.description = updates.description;
       if (updates.status) {
@@ -823,10 +590,8 @@ export class ProjectManagementService {
       }
       if (updates.assignees) data.assignees = updates.assignees;
       if (updates.labels) data.labels = updates.labels;
-
-      // Handle milestoneId explicitly
       if (updates.milestoneId === null) {
-        data.milestoneId = undefined; // Remove milestone
+        data.milestoneId = undefined;
       } else if (updates.milestoneId !== undefined) {
         data.milestoneId = updates.milestoneId;
       }
@@ -837,7 +602,10 @@ export class ProjectManagementService {
     }
   }
 
-  // Issue Comment Operations
+  // ============================================================================
+  // Issue Comment Operations (Direct implementation)
+  // ============================================================================
+
   async createIssueComment(data: {
     issueNumber: number;
     body: string;
@@ -892,9 +660,7 @@ export class ProjectManagementService {
     }
   }
 
-  async deleteIssueComment(data: {
-    commentId: number;
-  }): Promise<{ success: boolean; message: string }> {
+  async deleteIssueComment(data: { commentId: number }): Promise<{ success: boolean; message: string }> {
     try {
       const octokit = this.factory.getOctokit();
       const config = this.factory.getConfig();
@@ -905,10 +671,7 @@ export class ProjectManagementService {
         comment_id: data.commentId
       });
 
-      return {
-        success: true,
-        message: `Comment ${data.commentId} deleted successfully`
-      };
+      return { success: true, message: `Comment ${data.commentId} deleted successfully` };
     } catch (error) {
       throw this.mapErrorToMCPError(error);
     }
@@ -916,7 +679,7 @@ export class ProjectManagementService {
 
   async listIssueComments(data: {
     issueNumber: number;
-    perPage?: number;
+    limit?: number;
   }): Promise<Array<{ id: number; body: string; user: string; createdAt: string; updatedAt: string }>> {
     try {
       const octokit = this.factory.getOctokit();
@@ -926,7 +689,7 @@ export class ProjectManagementService {
         owner: config.owner,
         repo: config.repo,
         issue_number: data.issueNumber,
-        per_page: data.perPage || 100
+        per_page: data.limit || 30
       });
 
       return response.data.map(comment => ({
@@ -941,440 +704,10 @@ export class ProjectManagementService {
     }
   }
 
-  // Sprint Management
-  async createSprint(data: {
-    title: string;
-    description: string;
-    startDate: string;
-    endDate: string;
-    issueIds?: string[];
-  }): Promise<Sprint> {
-    try {
-      // Create data object that matches the expected type
-      const sprintData: Omit<Sprint, "id" | "createdAt" | "updatedAt"> = {
-        title: data.title,
-        description: data.description,
-        startDate: data.startDate,
-        endDate: data.endDate,
-        status: ResourceStatus.PLANNED,
-        issues: data.issueIds?.map(id => id.toString()) || []
-      };
+  // ============================================================================
+  // Draft Issue Operations (Direct implementation)
+  // ============================================================================
 
-      return await this.sprintRepo.create(sprintData);
-    } catch (error) {
-      throw this.mapErrorToMCPError(error);
-    }
-  }
-
-  async listSprints(status: string = 'all'): Promise<Sprint[]> {
-    try {
-      const sprints = await this.sprintRepo.findAll();
-
-      // Filter by status if needed
-      if (status !== 'all') {
-        let resourceStatus;
-        switch(status) {
-          case 'planned':
-            resourceStatus = ResourceStatus.PLANNED;
-            break;
-          case 'active':
-            resourceStatus = ResourceStatus.ACTIVE;
-            break;
-          case 'completed':
-            resourceStatus = ResourceStatus.COMPLETED;
-            break;
-          default:
-            return sprints;
-        }
-
-        return sprints.filter(sprint => sprint.status === resourceStatus);
-      }
-
-      return sprints;
-    } catch (error) {
-      throw this.mapErrorToMCPError(error);
-    }
-  }
-
-  async getCurrentSprint(includeIssues: boolean = true): Promise<Sprint | null> {
-    try {
-      const currentSprint = await this.sprintRepo.findCurrent();
-
-      if (!currentSprint) {
-        return null;
-      }
-
-      if (includeIssues) {
-        // Add issues data to sprint
-        const issues = await this.sprintRepo.getIssues(currentSprint.id);
-
-        // We can't modify the sprint directly, so we create a new object
-        return {
-          ...currentSprint,
-          // We're adding this property outside the type definition for convenience
-          // in the response; it won't affect the actual sprint object
-          issueDetails: issues
-        } as Sprint & { issueDetails?: Issue[] };
-      }
-
-      return currentSprint;
-    } catch (error) {
-      throw this.mapErrorToMCPError(error);
-    }
-  }
-
-  // Project Update and Delete Operations
-  async updateProject(data: {
-    projectId: string;
-    title?: string;
-    description?: string;
-    visibility?: 'private' | 'public';
-    status?: 'active' | 'closed';
-  }): Promise<Project> {
-    try {
-      // Convert the status string to ResourceStatus enum
-      let resourceStatus: ResourceStatus | undefined;
-      if (data.status) {
-        resourceStatus = data.status === 'active' ? ResourceStatus.ACTIVE : ResourceStatus.CLOSED;
-      }
-
-      // Map the data to the domain model
-      const projectData: Partial<Project> = {
-        title: data.title,
-        description: data.description,
-        visibility: data.visibility,
-        status: resourceStatus,
-      };
-
-      // Clean up undefined values
-      Object.keys(projectData).forEach((key) => {
-        if (projectData[key as keyof Partial<Project>] === undefined) {
-          delete projectData[key as keyof Partial<Project>];
-        }
-      });
-
-      return await this.projectRepo.update(data.projectId, projectData);
-    } catch (error) {
-      throw this.mapErrorToMCPError(error);
-    }
-  }
-
-  async deleteProject(data: {
-    projectId: string;
-  }): Promise<{ success: boolean; message: string }> {
-    try {
-      await this.projectRepo.delete(data.projectId);
-      return {
-        success: true,
-        message: `Project ${data.projectId} has been deleted`,
-      };
-    } catch (error) {
-      throw this.mapErrorToMCPError(error);
-    }
-  }
-
-  // Project README Management
-  async getProjectReadme(data: {
-    projectId: string;
-  }): Promise<{ readme: string }> {
-    try {
-      const query = `
-        query($projectId: ID!) {
-          node(id: $projectId) {
-            ... on ProjectV2 {
-              readme
-            }
-          }
-        }
-      `;
-
-      interface GetReadmeResponse {
-        node: {
-          readme: string | null;
-        };
-      }
-
-      const response = await this.factory.graphql<GetReadmeResponse>(query, {
-        projectId: data.projectId
-      });
-
-      return {
-        readme: response.node?.readme || ''
-      };
-    } catch (error) {
-      throw this.mapErrorToMCPError(error);
-    }
-  }
-
-  async updateProjectReadme(data: {
-    projectId: string;
-    readme: string;
-  }): Promise<{ success: boolean; message: string }> {
-    try {
-      const mutation = `
-        mutation($input: UpdateProjectV2Input!) {
-          updateProjectV2(input: $input) {
-            projectV2 {
-              id
-              readme
-            }
-          }
-        }
-      `;
-
-      interface UpdateReadmeResponse {
-        updateProjectV2: {
-          projectV2: {
-            id: string;
-            readme: string;
-          };
-        };
-      }
-
-      await this.factory.graphql<UpdateReadmeResponse>(mutation, {
-        input: {
-          projectId: data.projectId,
-          readme: data.readme
-        }
-      });
-
-      return {
-        success: true,
-        message: `Project README updated successfully`
-      };
-    } catch (error) {
-      throw this.mapErrorToMCPError(error);
-    }
-  }
-
-  async listProjectFields(data: {
-    projectId: string;
-  }): Promise<CustomField[]> {
-    try {
-      const project = await this.projectRepo.findById(data.projectId);
-      if (!project) {
-        throw new ResourceNotFoundError(ResourceType.PROJECT, data.projectId);
-      }
-      return project.fields || [];
-    } catch (error) {
-      throw this.mapErrorToMCPError(error);
-    }
-  }
-
-  async updateProjectField(data: {
-    projectId: string;
-    fieldId: string;
-    name?: string;
-    options?: Array<{
-      name: string;
-      color?: string;
-    }>;
-  }): Promise<CustomField> {
-    try {
-      const updateData: Partial<CustomField> = {};
-
-      if (data.name !== undefined) {
-        updateData.name = data.name;
-      }
-
-      if (data.options !== undefined) {
-        updateData.options = data.options.map(option => ({
-          id: '', // This will be assigned by GitHub
-          name: option.name,
-          color: option.color
-        }));
-      }
-
-      return await this.projectRepo.updateField(data.projectId, data.fieldId, updateData);
-    } catch (error) {
-      throw this.mapErrorToMCPError(error);
-    }
-  }
-
-  // Project Item Operations
-  async addProjectItem(data: {
-    projectId: string;
-    contentId: string;
-    contentType: 'issue' | 'pull_request';
-  }): Promise<ProjectItem> {
-    try {
-      // GraphQL mutation to add an item to a project
-      const mutation = `
-        mutation($input: AddProjectV2ItemByIdInput!) {
-          addProjectV2ItemById(input: $input) {
-            item {
-              id
-              content {
-                ... on Issue {
-                  id
-                  title
-                }
-                ... on PullRequest {
-                  id
-                  title
-                }
-              }
-            }
-          }
-        }
-      `;
-
-      interface AddProjectItemResponse {
-        addProjectV2ItemById: {
-          item: {
-            id: string;
-            content: {
-              id: string;
-              title: string;
-            };
-          };
-        };
-      }
-
-      const response = await this.factory.graphql<AddProjectItemResponse>(mutation, {
-        input: {
-          projectId: data.projectId,
-          contentId: data.contentId
-        }
-      });
-
-      const itemId = response.addProjectV2ItemById.item.id;
-      const contentId = response.addProjectV2ItemById.item.content.id;
-
-      const resourceType = data.contentType === 'issue' ? ResourceType.ISSUE : ResourceType.PULL_REQUEST;
-
-      return {
-        id: itemId,
-        contentId,
-        contentType: resourceType,
-        projectId: data.projectId,
-        fieldValues: {},
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      };
-    } catch (error) {
-      throw this.mapErrorToMCPError(error);
-    }
-  }
-
-  async removeProjectItem(data: {
-    projectId: string;
-    itemId: string;
-  }): Promise<{ success: boolean; message: string }> {
-    try {
-      const mutation = `
-        mutation($input: DeleteProjectV2ItemInput!) {
-          deleteProjectV2Item(input: $input) {
-            deletedItemId
-          }
-        }
-      `;
-
-      interface DeleteProjectItemResponse {
-        deleteProjectV2Item: {
-          deletedItemId: string;
-        };
-      }
-
-      await this.factory.graphql<DeleteProjectItemResponse>(mutation, {
-        input: {
-          projectId: data.projectId,
-          itemId: data.itemId
-        }
-      });
-
-      return {
-        success: true,
-        message: `Item ${data.itemId} has been removed from project ${data.projectId}`
-      };
-    } catch (error) {
-      throw this.mapErrorToMCPError(error);
-    }
-  }
-
-  async archiveProjectItem(data: {
-    projectId: string;
-    itemId: string;
-  }): Promise<{ success: boolean; message: string }> {
-    try {
-      const mutation = `
-        mutation($input: ArchiveProjectV2ItemInput!) {
-          archiveProjectV2Item(input: $input) {
-            item {
-              id
-              isArchived
-            }
-          }
-        }
-      `;
-
-      interface ArchiveProjectItemResponse {
-        archiveProjectV2Item: {
-          item: {
-            id: string;
-            isArchived: boolean;
-          };
-        };
-      }
-
-      await this.factory.graphql<ArchiveProjectItemResponse>(mutation, {
-        input: {
-          projectId: data.projectId,
-          itemId: data.itemId
-        }
-      });
-
-      return {
-        success: true,
-        message: `Item ${data.itemId} has been archived in project ${data.projectId}`
-      };
-    } catch (error) {
-      throw this.mapErrorToMCPError(error);
-    }
-  }
-
-  async unarchiveProjectItem(data: {
-    projectId: string;
-    itemId: string;
-  }): Promise<{ success: boolean; message: string }> {
-    try {
-      const mutation = `
-        mutation($input: UnarchiveProjectV2ItemInput!) {
-          unarchiveProjectV2Item(input: $input) {
-            item {
-              id
-              isArchived
-            }
-          }
-        }
-      `;
-
-      interface UnarchiveProjectItemResponse {
-        unarchiveProjectV2Item: {
-          item: {
-            id: string;
-            isArchived: boolean;
-          };
-        };
-      }
-
-      await this.factory.graphql<UnarchiveProjectItemResponse>(mutation, {
-        input: {
-          projectId: data.projectId,
-          itemId: data.itemId
-        }
-      });
-
-      return {
-        success: true,
-        message: `Item ${data.itemId} has been unarchived in project ${data.projectId}`
-      };
-    } catch (error) {
-      throw this.mapErrorToMCPError(error);
-    }
-  }
-
-  // Draft Issue Operations
   async createDraftIssue(data: {
     projectId: string;
     title: string;
@@ -1403,11 +736,7 @@ export class ProjectManagementService {
         addProjectV2DraftIssue: {
           projectV2Item: {
             id: string;
-            content: {
-              id: string;
-              title: string;
-              body: string;
-            };
+            content: { id: string; title: string; body: string };
           };
         };
       }
@@ -1422,12 +751,7 @@ export class ProjectManagementService {
       });
 
       const content = response.addProjectV2DraftIssue.projectV2Item.content;
-
-      return {
-        id: content.id,
-        title: content.title,
-        body: content.body
-      };
+      return { id: content.id, title: content.title, body: content.body };
     } catch (error) {
       throw this.mapErrorToMCPError(error);
     }
@@ -1454,76 +778,44 @@ export class ProjectManagementService {
 
       interface UpdateDraftIssueResponse {
         updateProjectV2DraftIssue: {
-          draftIssue: {
-            id: string;
-            title: string;
-            body: string;
-          };
+          draftIssue: { id: string; title: string; body: string };
         };
       }
 
-      const input: any = {
-        draftIssueId: data.draftIssueId
-      };
-
+      const input: Record<string, unknown> = { draftIssueId: data.draftIssueId };
       if (data.title !== undefined) input.title = data.title;
       if (data.body !== undefined) input.body = data.body;
       if (data.assigneeIds !== undefined) input.assigneeIds = data.assigneeIds;
 
-      const response = await this.factory.graphql<UpdateDraftIssueResponse>(mutation, {
-        input
-      });
-
+      const response = await this.factory.graphql<UpdateDraftIssueResponse>(mutation, { input });
       const draftIssue = response.updateProjectV2DraftIssue.draftIssue;
-
-      return {
-        id: draftIssue.id,
-        title: draftIssue.title,
-        body: draftIssue.body
-      };
+      return { id: draftIssue.id, title: draftIssue.title, body: draftIssue.body };
     } catch (error) {
       throw this.mapErrorToMCPError(error);
     }
   }
 
-  async deleteDraftIssue(data: {
-    draftIssueId: string;
-  }): Promise<{ success: boolean; message: string }> {
+  async deleteDraftIssue(data: { draftIssueId: string }): Promise<{ success: boolean; message: string }> {
     try {
       const mutation = `
         mutation($input: DeleteProjectV2DraftIssueInput!) {
           deleteProjectV2DraftIssue(input: $input) {
-            draftIssue {
-              id
-            }
+            draftIssue { id }
           }
         }
       `;
 
-      interface DeleteDraftIssueResponse {
-        deleteProjectV2DraftIssue: {
-          draftIssue: {
-            id: string;
-          };
-        };
-      }
-
-      await this.factory.graphql<DeleteDraftIssueResponse>(mutation, {
-        input: {
-          draftIssueId: data.draftIssueId
-        }
-      });
-
-      return {
-        success: true,
-        message: `Draft issue ${data.draftIssueId} deleted successfully`
-      };
+      await this.factory.graphql(mutation, { input: { draftIssueId: data.draftIssueId } });
+      return { success: true, message: `Draft issue ${data.draftIssueId} deleted successfully` };
     } catch (error) {
       throw this.mapErrorToMCPError(error);
     }
   }
 
-  // Pull Request Operations
+  // ============================================================================
+  // Pull Request Operations (Direct implementation)
+  // ============================================================================
+
   async createPullRequest(data: {
     title: string;
     body?: string;
@@ -1557,9 +849,17 @@ export class ProjectManagementService {
     }
   }
 
-  async getPullRequest(data: {
-    pullNumber: number;
-  }): Promise<{ number: number; title: string; body: string; state: string; user: string; createdAt: string; updatedAt: string; mergeable: boolean | null }> {
+  async getPullRequest(data: { pullNumber: number }): Promise<{
+    number: number;
+    title: string;
+    state: string;
+    body: string;
+    head: string;
+    base: string;
+    user: string;
+    merged: boolean;
+    url: string;
+  }> {
     try {
       const octokit = this.factory.getOctokit();
       const config = this.factory.getConfig();
@@ -1573,12 +873,13 @@ export class ProjectManagementService {
       return {
         number: response.data.number,
         title: response.data.title,
-        body: response.data.body || '',
         state: response.data.state,
+        body: response.data.body || '',
+        head: response.data.head.ref,
+        base: response.data.base.ref,
         user: response.data.user?.login || 'unknown',
-        createdAt: response.data.created_at,
-        updatedAt: response.data.updated_at,
-        mergeable: response.data.mergeable
+        merged: response.data.merged,
+        url: response.data.html_url
       };
     } catch (error) {
       throw this.mapErrorToMCPError(error);
@@ -1587,8 +888,8 @@ export class ProjectManagementService {
 
   async listPullRequests(data: {
     state?: 'open' | 'closed' | 'all';
-    perPage?: number;
-  }): Promise<Array<{ number: number; title: string; state: string; user: string; createdAt: string }>> {
+    limit?: number;
+  }): Promise<Array<{ number: number; title: string; state: string; user: string; url: string }>> {
     try {
       const octokit = this.factory.getOctokit();
       const config = this.factory.getConfig();
@@ -1597,7 +898,7 @@ export class ProjectManagementService {
         owner: config.owner,
         repo: config.repo,
         state: data.state || 'open',
-        per_page: data.perPage || 30
+        per_page: data.limit || 30
       });
 
       return response.data.map(pr => ({
@@ -1605,7 +906,7 @@ export class ProjectManagementService {
         title: pr.title,
         state: pr.state,
         user: pr.user?.login || 'unknown',
-        createdAt: pr.created_at
+        url: pr.html_url
       }));
     } catch (error) {
       throw this.mapErrorToMCPError(error);
@@ -1617,7 +918,7 @@ export class ProjectManagementService {
     title?: string;
     body?: string;
     state?: 'open' | 'closed';
-  }): Promise<{ number: number; title: string; state: string }> {
+  }): Promise<{ number: number; title: string; state: string; url: string }> {
     try {
       const octokit = this.factory.getOctokit();
       const config = this.factory.getConfig();
@@ -1634,7 +935,8 @@ export class ProjectManagementService {
       return {
         number: response.data.number,
         title: response.data.title,
-        state: response.data.state
+        state: response.data.state,
+        url: response.data.html_url
       };
     } catch (error) {
       throw this.mapErrorToMCPError(error);
@@ -1643,10 +945,10 @@ export class ProjectManagementService {
 
   async mergePullRequest(data: {
     pullNumber: number;
+    mergeMethod?: 'merge' | 'squash' | 'rebase';
     commitTitle?: string;
     commitMessage?: string;
-    mergeMethod?: 'merge' | 'squash' | 'rebase';
-  }): Promise<{ success: boolean; message: string; sha: string }> {
+  }): Promise<{ merged: boolean; message: string; sha: string }> {
     try {
       const octokit = this.factory.getOctokit();
       const config = this.factory.getConfig();
@@ -1655,13 +957,13 @@ export class ProjectManagementService {
         owner: config.owner,
         repo: config.repo,
         pull_number: data.pullNumber,
+        merge_method: data.mergeMethod || 'merge',
         commit_title: data.commitTitle,
-        commit_message: data.commitMessage,
-        merge_method: data.mergeMethod || 'merge'
+        commit_message: data.commitMessage
       });
 
       return {
-        success: response.data.merged,
+        merged: response.data.merged,
         message: response.data.message,
         sha: response.data.sha
       };
@@ -1670,9 +972,12 @@ export class ProjectManagementService {
     }
   }
 
-  async listPullRequestReviews(data: {
-    pullNumber: number;
-  }): Promise<Array<{ id: number; user: string; state: string; body: string; submittedAt: string }>> {
+  async listPullRequestReviews(data: { pullNumber: number }): Promise<Array<{
+    id: number;
+    user: string;
+    state: string;
+    body: string;
+  }>> {
     try {
       const octokit = this.factory.getOctokit();
       const config = this.factory.getConfig();
@@ -1687,8 +992,7 @@ export class ProjectManagementService {
         id: review.id,
         user: review.user?.login || 'unknown',
         state: review.state,
-        body: review.body || '',
-        submittedAt: review.submitted_at || ''
+        body: review.body || ''
       }));
     } catch (error) {
       throw this.mapErrorToMCPError(error);
@@ -1699,11 +1003,7 @@ export class ProjectManagementService {
     pullNumber: number;
     body?: string;
     event: 'APPROVE' | 'REQUEST_CHANGES' | 'COMMENT';
-    comments?: Array<{
-      path: string;
-      position?: number;
-      body: string;
-    }>;
+    comments?: Array<{ path: string; position?: number; body: string }>;
   }): Promise<{ id: number; user: string; state: string; body: string }> {
     try {
       const octokit = this.factory.getOctokit();
@@ -1729,196 +1029,26 @@ export class ProjectManagementService {
     }
   }
 
-  async listProjectItems(data: {
-    projectId: string;
-    limit?: number;
-  }): Promise<ProjectItem[]> {
-    try {
-      const limit = data.limit || 50;
-      const query = `
-        query($projectId: ID!, $limit: Int!) {
-          node(id: $projectId) {
-            ... on ProjectV2 {
-              items(first: $limit) {
-                nodes {
-                  id
-                  content {
-                    ... on Issue {
-                      id
-                      title
-                      __typename
-                    }
-                    ... on PullRequest {
-                      id
-                      title
-                      __typename
-                    }
-                  }
-                  fieldValues(first: 20) {
-                    nodes {
-                      ... on ProjectV2ItemFieldTextValue {
-                        text
-                        field {
-                          ... on ProjectV2Field {
-                            id
-                            name
-                          }
-                        }
-                      }
-                      ... on ProjectV2ItemFieldDateValue {
-                        date
-                        field {
-                          ... on ProjectV2Field {
-                            id
-                            name
-                          }
-                        }
-                      }
-                      ... on ProjectV2ItemFieldSingleSelectValue {
-                        name
-                        field {
-                          ... on ProjectV2SingleSelectField {
-                            id
-                            name
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      `;
+  // ============================================================================
+  // Field Value Operations (Direct implementation)
+  // ============================================================================
 
-      interface ListProjectItemsResponse {
-        node: {
-          items: {
-            nodes: Array<{
-              id: string;
-              content?: {
-                id: string;
-                title: string;
-                __typename: string;
-              };
-              fieldValues: {
-                nodes: Array<{
-                  text?: string;
-                  date?: string;
-                  name?: string;
-                  field: {
-                    id: string;
-                    name: string;
-                  }
-                }>
-              }
-            }>
-          }
-        }
-      }
-
-      const response = await this.factory.graphql<ListProjectItemsResponse>(query, {
-        projectId: data.projectId,
-        limit
-      });
-
-      // If project doesn't exist or has no items
-      if (!response.node || !response.node.items || !response.node.items.nodes) {
-        return [];
-      }
-
-      return response.node.items.nodes.map((item) => {
-        // Build field values map
-        const fieldValues: Record<string, any> = {};
-        if (item.fieldValues && item.fieldValues.nodes) {
-          item.fieldValues.nodes.forEach((fieldValue: any) => {
-            if (!fieldValue || !fieldValue.field) return;
-
-            const fieldId = fieldValue.field.id;
-            const fieldName = fieldValue.field.name;
-
-            if ('text' in fieldValue) {
-              fieldValues[fieldId] = fieldValue.text;
-            } else if ('date' in fieldValue) {
-              fieldValues[fieldId] = fieldValue.date;
-            } else if ('name' in fieldValue) {
-              fieldValues[fieldId] = fieldValue.name;
-            }
-          });
-        }
-
-        // Determine content type
-        let contentType = ResourceType.ISSUE; // Default
-        if (item.content && item.content.__typename) {
-          contentType = item.content.__typename === 'Issue'
-            ? ResourceType.ISSUE
-            : ResourceType.PULL_REQUEST;
-        }
-
-        return {
-          id: item.id,
-          contentId: item.content?.id || '',
-          contentType,
-          projectId: data.projectId,
-          fieldValues,
-          createdAt: new Date().toISOString(), // GitHub API doesn't provide creation date for items
-          updatedAt: new Date().toISOString()
-        };
-      });
-    } catch (error) {
-      throw this.mapErrorToMCPError(error);
-    }
-  }
-
-  // Field Value Operations
   async setFieldValue(data: {
     projectId: string;
     itemId: string;
     fieldId: string;
-    value: any;
+    value: unknown;
   }): Promise<{ success: boolean; message: string }> {
     try {
-      // First, get the field details to determine its type
+      // Get field details to determine type
       const fieldQuery = `
         query($projectId: ID!, $fieldId: ID!) {
           node(id: $projectId) {
             ... on ProjectV2 {
               field(id: $fieldId) {
-                ... on ProjectV2Field {
-                  id
-                  name
-                  dataType
-                }
-                ... on ProjectV2IterationField {
-                  id
-                  name
-                  dataType
-                }
-                ... on ProjectV2SingleSelectField {
-                  id
-                  name
-                  dataType
-                  options {
-                    id
-                    name
-                  }
-                }
-                ... on ProjectV2MilestoneField {
-                  id
-                  name
-                  dataType
-                }
-                ... on ProjectV2AssigneesField {
-                  id
-                  name
-                  dataType
-                }
-                ... on ProjectV2LabelsField {
-                  id
-                  name
-                  dataType
-                }
+                ... on ProjectV2Field { id name dataType }
+                ... on ProjectV2IterationField { id name dataType }
+                ... on ProjectV2SingleSelectField { id name dataType options { id name } }
               }
             }
           }
@@ -1932,8 +1062,8 @@ export class ProjectManagementService {
             name: string;
             dataType: string;
             options?: Array<{ id: string; name: string }>;
-          }
-        }
+          };
+        };
       }
 
       const fieldResponse = await this.factory.graphql<FieldQueryResponse>(fieldQuery, {
@@ -1947,206 +1077,61 @@ export class ProjectManagementService {
 
       const field = fieldResponse.node.field;
       let mutation = '';
-      let variables: Record<string, any> = {
-        projectId: data.projectId,
-        itemId: data.itemId,
-        fieldId: data.fieldId,
-      };
+      let variables: Record<string, unknown> = {};
 
-      // Determine the correct mutation based on field type
       switch (field.dataType) {
         case 'TEXT':
-          mutation = `
-            mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $text: String!) {
-              updateProjectV2ItemFieldValue(input: {
-                projectId: $projectId
-                itemId: $itemId
-                fieldId: $fieldId
-                value: { text: $text }
-              }) {
-                projectV2Item {
-                  id
-                }
-              }
+          mutation = `mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $value: String!) {
+            updateProjectV2ItemFieldValue(input: { projectId: $projectId, itemId: $itemId, fieldId: $fieldId, value: { text: $value } }) {
+              projectV2Item { id }
             }
-          `;
-          variables.text = String(data.value);
+          }`;
+          variables = { projectId: data.projectId, itemId: data.itemId, fieldId: data.fieldId, value: String(data.value) };
           break;
-
         case 'NUMBER':
-          mutation = `
-            mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $number: Float!) {
-              updateProjectV2ItemFieldValue(input: {
-                projectId: $projectId
-                itemId: $itemId
-                fieldId: $fieldId
-                value: { number: $number }
-              }) {
-                projectV2Item {
-                  id
-                }
-              }
+          mutation = `mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $value: Float!) {
+            updateProjectV2ItemFieldValue(input: { projectId: $projectId, itemId: $itemId, fieldId: $fieldId, value: { number: $value } }) {
+              projectV2Item { id }
             }
-          `;
-          variables.number = Number(data.value);
+          }`;
+          variables = { projectId: data.projectId, itemId: data.itemId, fieldId: data.fieldId, value: Number(data.value) };
           break;
-
         case 'DATE':
-          mutation = `
-            mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $date: Date!) {
-              updateProjectV2ItemFieldValue(input: {
-                projectId: $projectId
-                itemId: $itemId
-                fieldId: $fieldId
-                value: { date: $date }
-              }) {
-                projectV2Item {
-                  id
-                }
-              }
+          mutation = `mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $value: Date!) {
+            updateProjectV2ItemFieldValue(input: { projectId: $projectId, itemId: $itemId, fieldId: $fieldId, value: { date: $value } }) {
+              projectV2Item { id }
             }
-          `;
-          variables.date = String(data.value);
+          }`;
+          variables = { projectId: data.projectId, itemId: data.itemId, fieldId: data.fieldId, value: String(data.value) };
           break;
-
         case 'SINGLE_SELECT':
-          // For single select, we need to find the option ID that matches the provided value
-          const optionId = field.options?.find(opt => opt.name === data.value)?.id;
-          if (!optionId) {
-            throw new ValidationError(`Invalid option value '${data.value}' for field '${field.name}'`);
+          let optionId = String(data.value);
+          if (field.options) {
+            const option = field.options.find(o => o.name === data.value || o.id === data.value);
+            if (option) optionId = option.id;
           }
-
-          mutation = `
-            mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $optionId: String!) {
-              updateProjectV2ItemFieldValue(input: {
-                projectId: $projectId
-                itemId: $itemId
-                fieldId: $fieldId
-                value: { singleSelectOptionId: $optionId }
-              }) {
-                projectV2Item {
-                  id
-                }
-              }
+          mutation = `mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $value: String!) {
+            updateProjectV2ItemFieldValue(input: { projectId: $projectId, itemId: $itemId, fieldId: $fieldId, value: { singleSelectOptionId: $value } }) {
+              projectV2Item { id }
             }
-          `;
-          variables.optionId = optionId;
+          }`;
+          variables = { projectId: data.projectId, itemId: data.itemId, fieldId: data.fieldId, value: optionId };
           break;
-
         case 'ITERATION':
-          // For iteration fields, the value should be an iteration ID
-          if (!data.value || typeof data.value !== 'string') {
-            throw new ValidationError(`Iteration field '${field.name}' requires a valid iteration ID string`);
-          }
-          mutation = `
-            mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $iterationId: ID!) {
-              updateProjectV2ItemFieldValue(input: {
-                projectId: $projectId
-                itemId: $itemId
-                fieldId: $fieldId
-                value: { iterationId: $iterationId }
-              }) {
-                projectV2Item {
-                  id
-                }
-              }
+          const iterationValue = data.value as { iterationId?: string };
+          mutation = `mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $value: String!) {
+            updateProjectV2ItemFieldValue(input: { projectId: $projectId, itemId: $itemId, fieldId: $fieldId, value: { iterationId: $value } }) {
+              projectV2Item { id }
             }
-          `;
-          variables.iterationId = String(data.value);
+          }`;
+          variables = { projectId: data.projectId, itemId: data.itemId, fieldId: data.fieldId, value: iterationValue.iterationId || String(data.value) };
           break;
-
-        case 'MILESTONE':
-          // For milestone fields, the value should be a milestone ID
-          if (!data.value || typeof data.value !== 'string') {
-            throw new ValidationError(`Milestone field '${field.name}' requires a valid milestone ID string`);
-          }
-          mutation = `
-            mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $milestoneId: ID!) {
-              updateProjectV2ItemFieldValue(input: {
-                projectId: $projectId
-                itemId: $itemId
-                fieldId: $fieldId
-                value: { milestoneId: $milestoneId }
-              }) {
-                projectV2Item {
-                  id
-                }
-              }
-            }
-          `;
-          variables.milestoneId = String(data.value);
-          break;
-
-        case 'ASSIGNEES':
-          // For user fields, the value should be an array of user IDs
-          if (!data.value) {
-            throw new ValidationError(`Assignees field '${field.name}' requires at least one user ID`);
-          }
-          const userIds = Array.isArray(data.value) ? data.value : [data.value];
-          if (userIds.length === 0 || userIds.some(id => !id || typeof id !== 'string')) {
-            throw new ValidationError(`Assignees field '${field.name}' requires valid user ID strings`);
-          }
-          mutation = `
-            mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $userIds: [ID!]!) {
-              updateProjectV2ItemFieldValue(input: {
-                projectId: $projectId
-                itemId: $itemId
-                fieldId: $fieldId
-                value: { userIds: $userIds }
-              }) {
-                projectV2Item {
-                  id
-                }
-              }
-            }
-          `;
-          variables.userIds = userIds.map((id: any) => String(id));
-          break;
-
-        case 'LABELS':
-          // For label fields, the value should be an array of label IDs
-          if (!data.value) {
-            throw new ValidationError(`Labels field '${field.name}' requires at least one label ID`);
-          }
-          const labelIds = Array.isArray(data.value) ? data.value : [data.value];
-          if (labelIds.length === 0 || labelIds.some(id => !id || typeof id !== 'string')) {
-            throw new ValidationError(`Labels field '${field.name}' requires valid label ID strings`);
-          }
-          mutation = `
-            mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $labelIds: [ID!]!) {
-              updateProjectV2ItemFieldValue(input: {
-                projectId: $projectId
-                itemId: $itemId
-                fieldId: $fieldId
-                value: { labelIds: $labelIds }
-              }) {
-                projectV2Item {
-                  id
-                }
-              }
-            }
-          `;
-          variables.labelIds = labelIds.map((id: any) => String(id));
-          break;
-
         default:
-          throw new ValidationError(`Unsupported field type: ${field.dataType}. Supported types: TEXT, NUMBER, DATE, SINGLE_SELECT, ITERATION, MILESTONE, ASSIGNEES, LABELS`);
+          throw new ValidationError(`Unsupported field type: ${field.dataType}`);
       }
 
-      interface UpdateFieldValueResponse {
-        updateProjectV2ItemFieldValue: {
-          projectV2Item: {
-            id: string;
-          }
-        }
-      }
-
-      await this.factory.graphql<UpdateFieldValueResponse>(mutation, variables);
-
-      return {
-        success: true,
-        message: `Field value updated successfully for field '${field.name}'`
-      };
+      await this.factory.graphql(mutation, variables);
+      return { success: true, message: `Field ${field.name} updated successfully` };
     } catch (error) {
       throw this.mapErrorToMCPError(error);
     }
@@ -2156,98 +1141,19 @@ export class ProjectManagementService {
     projectId: string;
     itemId: string;
     fieldId: string;
-  }): Promise<{ fieldName: string; value: any; fieldType: string }> {
+  }): Promise<{ fieldId: string; fieldName: string; value: unknown; type: string }> {
     try {
       const query = `
-        query($projectId: ID!, $itemId: ID!, $fieldId: ID!) {
-          node(id: $projectId) {
-            ... on ProjectV2 {
-              item(id: $itemId) {
-                fieldValueByName(name: $fieldId) {
-                  ... on ProjectV2ItemFieldTextValue {
-                    text
-                    field {
-                      ... on ProjectV2Field {
-                        name
-                        dataType
-                      }
-                    }
-                  }
-                  ... on ProjectV2ItemFieldNumberValue {
-                    number
-                    field {
-                      ... on ProjectV2Field {
-                        name
-                        dataType
-                      }
-                    }
-                  }
-                  ... on ProjectV2ItemFieldDateValue {
-                    date
-                    field {
-                      ... on ProjectV2Field {
-                        name
-                        dataType
-                      }
-                    }
-                  }
-                  ... on ProjectV2ItemFieldSingleSelectValue {
-                    name
-                    field {
-                      ... on ProjectV2SingleSelectField {
-                        name
-                        dataType
-                      }
-                    }
-                  }
-                  ... on ProjectV2ItemFieldIterationValue {
-                    iterationId
-                    title
-                    field {
-                      ... on ProjectV2IterationField {
-                        name
-                        dataType
-                      }
-                    }
-                  }
-                  ... on ProjectV2ItemFieldMilestoneValue {
-                    milestoneId
-                    title
-                    field {
-                      ... on ProjectV2MilestoneField {
-                        name
-                        dataType
-                      }
-                    }
-                  }
-                  ... on ProjectV2ItemFieldUserValue {
-                    users {
-                      nodes {
-                        id
-                        login
-                      }
-                    }
-                    field {
-                      ... on ProjectV2AssigneesField {
-                        name
-                        dataType
-                      }
-                    }
-                  }
-                  ... on ProjectV2ItemFieldLabelValue {
-                    labels {
-                      nodes {
-                        id
-                        name
-                      }
-                    }
-                    field {
-                      ... on ProjectV2LabelsField {
-                        name
-                        dataType
-                      }
-                    }
-                  }
+        query($itemId: ID!) {
+          node(id: $itemId) {
+            ... on ProjectV2Item {
+              fieldValues(first: 50) {
+                nodes {
+                  ... on ProjectV2ItemFieldTextValue { text field { ... on ProjectV2Field { id name } } }
+                  ... on ProjectV2ItemFieldNumberValue { number field { ... on ProjectV2Field { id name } } }
+                  ... on ProjectV2ItemFieldDateValue { date field { ... on ProjectV2Field { id name } } }
+                  ... on ProjectV2ItemFieldSingleSelectValue { name optionId field { ... on ProjectV2SingleSelectField { id name } } }
+                  ... on ProjectV2ItemFieldIterationValue { title iterationId field { ... on ProjectV2IterationField { id name } } }
                 }
               }
             }
@@ -2257,86 +1163,53 @@ export class ProjectManagementService {
 
       interface FieldValueResponse {
         node: {
-          item: {
-            fieldValueByName: {
+          fieldValues: {
+            nodes: Array<{
+              field: { id: string; name: string };
               text?: string;
               number?: number;
               date?: string;
               name?: string;
-              iterationId?: string;
+              optionId?: string;
               title?: string;
-              milestoneId?: string;
-              users?: {
-                nodes: Array<{
-                  id: string;
-                  login: string;
-                }>;
-              };
-              labels?: {
-                nodes: Array<{
-                  id: string;
-                  name: string;
-                }>;
-              };
-              field: {
-                name: string;
-                dataType: string;
-              }
-            }
-          }
-        }
+              iterationId?: string;
+            }>;
+          };
+        };
       }
 
-      const response = await this.factory.graphql<FieldValueResponse>(query, {
-        projectId: data.projectId,
-        itemId: data.itemId,
-        fieldId: data.fieldId
-      });
+      const response = await this.factory.graphql<FieldValueResponse>(query, { itemId: data.itemId });
 
-      if (!response.node?.item?.fieldValueByName) {
-        throw new ResourceNotFoundError(ResourceType.FIELD, data.fieldId);
+      if (!response.node?.fieldValues?.nodes) {
+        throw new ResourceNotFoundError(ResourceType.FIELD, data.itemId);
       }
 
-      const fieldValue = response.node.item.fieldValueByName;
-      const field = fieldValue.field;
-      let value = null;
+      const fieldValue = response.node.fieldValues.nodes.find(fv => fv.field?.id === data.fieldId);
+      if (!fieldValue) {
+        return { fieldId: data.fieldId, fieldName: 'unknown', value: null, type: 'unknown' };
+      }
 
-      // Extract the value based on the field type
+      let value: unknown = null;
+      let type = 'unknown';
+
       if ('text' in fieldValue && fieldValue.text !== undefined) {
         value = fieldValue.text;
+        type = 'TEXT';
       } else if ('number' in fieldValue && fieldValue.number !== undefined) {
         value = fieldValue.number;
+        type = 'NUMBER';
       } else if ('date' in fieldValue && fieldValue.date !== undefined) {
         value = fieldValue.date;
-      } else if ('name' in fieldValue && fieldValue.name !== undefined) {
-        value = fieldValue.name;
-      } else if ('iterationId' in fieldValue && fieldValue.iterationId !== undefined) {
-        value = {
-          iterationId: fieldValue.iterationId,
-          title: fieldValue.title
-        };
-      } else if ('milestoneId' in fieldValue && fieldValue.milestoneId !== undefined) {
-        value = {
-          milestoneId: fieldValue.milestoneId,
-          title: fieldValue.title
-        };
-      } else if ('users' in fieldValue && fieldValue.users?.nodes) {
-        value = fieldValue.users.nodes.map(user => ({
-          id: user.id,
-          login: user.login
-        }));
-      } else if ('labels' in fieldValue && fieldValue.labels?.nodes) {
-        value = fieldValue.labels.nodes.map(label => ({
-          id: label.id,
-          name: label.name
-        }));
+        type = 'DATE';
+      } else if ('optionId' in fieldValue) {
+        value = { optionId: fieldValue.optionId, name: fieldValue.name };
+        type = 'SINGLE_SELECT';
+      } else if ('iterationId' in fieldValue) {
+        value = { iterationId: fieldValue.iterationId, title: fieldValue.title };
+        type = 'ITERATION';
       }
 
-      return {
-        fieldName: field.name,
-        value,
-        fieldType: field.dataType
-      };
+      return { fieldId: data.fieldId, fieldName: fieldValue.field?.name || 'unknown', value, type };
     } catch (error) {
       throw this.mapErrorToMCPError(error);
     }
@@ -2350,457 +1223,87 @@ export class ProjectManagementService {
     try {
       const mutation = `
         mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!) {
-          clearProjectV2ItemFieldValue(input: {
-            projectId: $projectId
-            itemId: $itemId
-            fieldId: $fieldId
-          }) {
-            projectV2Item {
-              id
-            }
+          clearProjectV2ItemFieldValue(input: { projectId: $projectId, itemId: $itemId, fieldId: $fieldId }) {
+            projectV2Item { id }
           }
         }
       `;
 
-      interface ClearFieldValueResponse {
-        clearProjectV2ItemFieldValue: {
-          projectV2Item: {
-            id: string;
-          }
-        }
-      }
-
-      await this.factory.graphql<ClearFieldValueResponse>(mutation, {
+      await this.factory.graphql(mutation, {
         projectId: data.projectId,
         itemId: data.itemId,
         fieldId: data.fieldId
       });
 
+      return { success: true, message: `Field ${data.fieldId} cleared successfully` };
+    } catch (error) {
+      throw this.mapErrorToMCPError(error);
+    }
+  }
+
+  // ============================================================================
+  // Label Operations (Direct implementation)
+  // ============================================================================
+
+  async createLabel(data: {
+    name: string;
+    color?: string;
+    description?: string;
+  }): Promise<{ id: number; name: string; color: string; description: string }> {
+    try {
+      const octokit = this.factory.getOctokit();
+      const config = this.factory.getConfig();
+
+      const response = await octokit.rest.issues.createLabel({
+        owner: config.owner,
+        repo: config.repo,
+        name: data.name,
+        color: data.color?.replace('#', '') || 'ededed',
+        description: data.description || ''
+      });
+
       return {
-        success: true,
-        message: `Field value cleared successfully for field ${data.fieldId}`
+        id: response.data.id,
+        name: response.data.name,
+        color: response.data.color,
+        description: response.data.description || ''
       };
     } catch (error) {
       throw this.mapErrorToMCPError(error);
     }
   }
 
-  // Project View Operations
-  async createProjectView(data: {
-    projectId: string;
+  async listLabels(data: { limit?: number } = {}): Promise<Array<{
+    id: number;
     name: string;
-    layout: 'board' | 'table' | 'timeline' | 'roadmap';
-  }): Promise<ProjectView> {
+    color: string;
+    description: string;
+  }>> {
     try {
-      return await this.projectRepo.createView(
-        data.projectId,
-        data.name,
-        data.layout
-      );
-    } catch (error) {
-      throw this.mapErrorToMCPError(error);
-    }
-  }
+      const octokit = this.factory.getOctokit();
+      const config = this.factory.getConfig();
 
-  async listProjectViews(data: {
-    projectId: string;
-  }): Promise<ProjectView[]> {
-    try {
-      const query = `
-        query($projectId: ID!) {
-          node(id: $projectId) {
-            ... on ProjectV2 {
-              views(first: 20) {
-                nodes {
-                  id
-                  name
-                  layout
-                }
-              }
-            }
-          }
-        }
-      `;
-
-      interface ListViewsResponse {
-        node: {
-          views: {
-            nodes: Array<{
-              id: string;
-              name: string;
-              layout: string;
-            }>
-          }
-        }
-      }
-
-      const response = await this.factory.graphql<ListViewsResponse>(query, {
-        projectId: data.projectId
+      const response = await octokit.rest.issues.listLabelsForRepo({
+        owner: config.owner,
+        repo: config.repo,
+        per_page: data.limit || 100
       });
 
-      if (!response.node?.views?.nodes) {
-        return [];
-      }
-
-      return response.node.views.nodes.map(view => ({
-        id: view.id,
-        name: view.name,
-        layout: view.layout.toLowerCase() as 'board' | 'table' | 'timeline' | 'roadmap',
-        fields: [], // These would need to be fetched separately if needed
-        sortBy: [],
-        groupBy: undefined,
-        filters: []
+      return response.data.map(label => ({
+        id: label.id,
+        name: label.name,
+        color: label.color,
+        description: label.description || ''
       }));
     } catch (error) {
       throw this.mapErrorToMCPError(error);
     }
   }
 
-  async updateProjectView(data: {
-    projectId: string;
-    viewId: string;
-    name?: string;
-    layout?: 'board' | 'table' | 'timeline' | 'roadmap';
-  }): Promise<ProjectView> {
-    try {
-      const mutation = `
-        mutation($input: UpdateProjectV2ViewInput!) {
-          updateProjectV2View(input: $input) {
-            projectV2View {
-              id
-              name
-              layout
-            }
-          }
-        }
-      `;
-
-      interface UpdateViewResponse {
-        updateProjectV2View: {
-          projectV2View: {
-            id: string;
-            name: string;
-            layout: string;
-          }
-        }
-      }
-
-      const input: Record<string, any> = {
-        projectId: data.projectId,
-        id: data.viewId
-      };
-
-      if (data.name) {
-        input.name = data.name;
-      }
-
-      if (data.layout) {
-        input.layout = data.layout.toUpperCase();
-      }
-
-      const response = await this.factory.graphql<UpdateViewResponse>(mutation, {
-        input
-      });
-
-      const view = response.updateProjectV2View.projectV2View;
-
-      return {
-        id: view.id,
-        name: view.name,
-        layout: view.layout.toLowerCase() as 'board' | 'table' | 'timeline' | 'roadmap',
-        fields: [],
-        sortBy: [],
-        groupBy: undefined,
-        filters: []
-      };
-    } catch (error) {
-      throw this.mapErrorToMCPError(error);
-    }
-  }
-
-  async deleteProjectView(data: {
-    projectId: string;
-    viewId: string;
-  }): Promise<{ success: boolean; message: string }> {
-    try {
-      await this.projectRepo.deleteView(data.projectId, data.viewId);
-
-      return {
-        success: true,
-        message: `View ${data.viewId} deleted successfully from project ${data.projectId}`
-      };
-    } catch (error) {
-      throw this.mapErrorToMCPError(error);
-    }
-  }
-
-  // Milestone Management
-  async updateMilestone(data: {
-    milestoneId: string;
-    title?: string;
-    description?: string;
-    dueDate?: string | null;
-    state?: 'open' | 'closed';
-  }): Promise<Milestone> {
-    try {
-      // Convert state to ResourceStatus if provided
-      let status: ResourceStatus | undefined;
-      if (data.state) {
-        status = data.state === 'open' ? ResourceStatus.ACTIVE : ResourceStatus.CLOSED;
-      }
-
-      // Map input data to domain model
-      const milestoneData: Partial<Milestone> = {
-        title: data.title,
-        description: data.description,
-        dueDate: data.dueDate === null ? undefined : data.dueDate,
-        status
-      };
-
-      // Clean up undefined values
-      Object.keys(milestoneData).forEach(key => {
-        if (milestoneData[key as keyof Partial<Milestone>] === undefined) {
-          delete milestoneData[key as keyof Partial<Milestone>];
-        }
-      });
-
-      return await this.milestoneRepo.update(data.milestoneId, milestoneData);
-    } catch (error) {
-      throw this.mapErrorToMCPError(error);
-    }
-  }
-
-  async deleteMilestone(data: {
-    milestoneId: string;
-  }): Promise<{ success: boolean; message: string }> {
-    try {
-      await this.milestoneRepo.delete(data.milestoneId);
-
-      return {
-        success: true,
-        message: `Milestone ${data.milestoneId} has been deleted`
-      };
-    } catch (error) {
-      throw this.mapErrorToMCPError(error);
-    }
-  }
-
-  // Label Management
-  async createLabel(data: {
-    name: string;
-    color: string;
-    description?: string;
-  }): Promise<{ id: string; name: string; color: string; description: string }> {
-    try {
-      const mutation = `
-        mutation($input: CreateLabelInput!) {
-          createLabel(input: $input) {
-            label {
-              id
-              name
-              color
-              description
-            }
-          }
-        }
-      `;
-
-      interface CreateLabelResponse {
-        createLabel: {
-          label: {
-            id: string;
-            name: string;
-            color: string;
-            description: string;
-          }
-        }
-      }
-
-      const response = await this.factory.graphql<CreateLabelResponse>(mutation, {
-        input: {
-          repositoryId: this.factory.getConfig().repo,
-          name: data.name,
-          color: data.color,
-          description: data.description || ''
-        }
-      });
-
-      return response.createLabel.label;
-    } catch (error) {
-      throw this.mapErrorToMCPError(error);
-    }
-  }
-
-  async listLabels(data: {
-    limit?: number;
-  }): Promise<Array<{ id: string; name: string; color: string; description: string }>> {
-    try {
-      const limit = data.limit || 100;
-
-      const query = `
-        query($owner: String!, $repo: String!, $limit: Int!) {
-          repository(owner: $owner, name: $repo) {
-            labels(first: $limit) {
-              nodes {
-                id
-                name
-                color
-                description
-              }
-            }
-          }
-        }
-      `;
-
-      interface ListLabelsResponse {
-        repository: {
-          labels: {
-            nodes: Array<{
-              id: string;
-              name: string;
-              color: string;
-              description: string;
-            }>
-          }
-        }
-      }
-
-      const response = await this.factory.graphql<ListLabelsResponse>(query, {
-        owner: this.factory.getConfig().owner,
-        repo: this.factory.getConfig().repo,
-        limit
-      });
-
-      if (!response.repository?.labels?.nodes) {
-        return [];
-      }
-
-      return response.repository.labels.nodes;
-    } catch (error) {
-      throw this.mapErrorToMCPError(error);
-    }
-  }
-
-  // Additional Issue Management Methods
-  async updateIssueStatus(issueId: string, status: ResourceStatus): Promise<Issue> {
-    try {
-      const issue = await this.issueRepo.findById(issueId);
-      if (!issue) {
-        throw new ResourceNotFoundError(ResourceType.ISSUE, issueId);
-      }
-
-      return await this.issueRepo.update(issueId, { status });
-    } catch (error) {
-      throw this.mapErrorToMCPError(error);
-    }
-  }
-
-  async addIssueDependency(issueId: string, dependsOnId: string): Promise<void> {
-    try {
-      // In a real implementation, this would store the dependency relationship
-      // For now, we'll use labels to track dependencies
-      const issue = await this.issueRepo.findById(issueId);
-      if (!issue) {
-        throw new ResourceNotFoundError(ResourceType.ISSUE, issueId);
-      }
-
-      const dependentIssue = await this.issueRepo.findById(dependsOnId);
-      if (!dependentIssue) {
-        throw new ResourceNotFoundError(ResourceType.ISSUE, dependsOnId);
-      }
-
-      // Add a label to track the dependency
-      const labels = [...issue.labels];
-      if (!labels.includes(`depends-on:${dependsOnId}`)) {
-        labels.push(`depends-on:${dependsOnId}`);
-        await this.issueRepo.update(issueId, { labels });
-      }
-    } catch (error) {
-      throw this.mapErrorToMCPError(error);
-    }
-  }
-
-  async getIssueDependencies(issueId: string): Promise<string[]> {
-    try {
-      const issue = await this.issueRepo.findById(issueId);
-      if (!issue) {
-        throw new ResourceNotFoundError(ResourceType.ISSUE, issueId);
-      }
-
-      // Extract dependency IDs from labels
-      const dependencies: string[] = [];
-      issue.labels.forEach(label => {
-        if (label.startsWith('depends-on:')) {
-          dependencies.push(label.replace('depends-on:', ''));
-        }
-      });
-
-      return dependencies;
-    } catch (error) {
-      throw this.mapErrorToMCPError(error);
-    }
-  }
-
-  async assignIssueToMilestone(issueId: string, milestoneId: string): Promise<Issue> {
-    try {
-      const issue = await this.issueRepo.findById(issueId);
-      if (!issue) {
-        throw new ResourceNotFoundError(ResourceType.ISSUE, issueId);
-      }
-
-      const milestone = await this.milestoneRepo.findById(milestoneId);
-      if (!milestone) {
-        throw new ResourceNotFoundError(ResourceType.MILESTONE, milestoneId);
-      }
-
-      return await this.issueRepo.update(issueId, { milestoneId });
-    } catch (error) {
-      throw this.mapErrorToMCPError(error);
-    }
-  }
-
-  async getIssueHistory(issueId: string): Promise<any[]> {
-    try {
-      const issue = await this.issueRepo.findById(issueId);
-      if (!issue) {
-        throw new ResourceNotFoundError(ResourceType.ISSUE, issueId);
-      }
-
-      // For now, return a basic history entry
-      // In a real implementation, this would query the GitHub timeline API
-      return [
-        {
-          id: `history-${issueId}-${Date.now()}`,
-          action: 'created',
-          timestamp: issue.createdAt,
-          actor: 'system',
-          changes: {
-            status: { from: null, to: issue.status },
-            title: issue.title
-          }
-        },
-        {
-          id: `history-${issueId}-${Date.now() + 1}`,
-          action: 'updated',
-          timestamp: issue.updatedAt,
-          actor: 'system',
-          changes: {
-            status: { from: ResourceStatus.ACTIVE, to: issue.status }
-          }
-        }
-      ];
-    } catch (error) {
-      throw this.mapErrorToMCPError(error);
-    }
-  }
-
   // ============================================================================
-  // Automation Rule Management
+  // Automation Rule Management (Direct implementation)
   // ============================================================================
 
-  /**
-   * Create a new automation rule for a project
-   */
   async createAutomationRule(data: {
     name: string;
     description?: string;
@@ -2809,40 +1312,38 @@ export class ProjectManagementService {
     triggers: Array<{
       type: string;
       resourceType?: string;
-      conditions?: Array<{
-        field: string;
-        operator: string;
-        value: any;
-      }>;
+      conditions?: Array<{ field: string; operator: string; value: unknown }>;
     }>;
-    actions: Array<{
-      type: string;
-      parameters: Record<string, any>;
-    }>;
+    actions: Array<{ type: string; parameters: Record<string, unknown> }>;
   }): Promise<{
     id: string;
     name: string;
     description?: string;
     projectId: string;
     enabled: boolean;
-    triggers: any[];
-    actions: any[];
+    triggers: unknown[];
+    actions: unknown[];
   }> {
     try {
-      // Verify project exists
-      const project = await this.projectRepo.findById(data.projectId);
-      if (!project) {
-        throw new ResourceNotFoundError(ResourceType.PROJECT, data.projectId);
-      }
+      // Map string types to enum types for the repository
+      const mappedTriggers = data.triggers.map(t => ({
+        type: t.type as AutomationTriggerType,
+        resourceType: t.resourceType as ResourceType | undefined,
+        conditions: t.conditions?.map(c => ({ id: '', field: c.field, operator: c.operator, value: c.value }))
+      }));
+      const mappedActions = data.actions.map(a => ({
+        type: a.type as AutomationActionType,
+        parameters: a.parameters
+      }));
 
       const rule = await this.automationRepo.create({
         name: data.name,
         description: data.description,
         projectId: data.projectId,
-        enabled: data.enabled ?? true,
-        triggers: data.triggers as any,
-        actions: data.actions as any
-      });
+        enabled: data.enabled !== false,
+        triggers: mappedTriggers,
+        actions: mappedActions
+      } as CreateAutomationRule);
 
       return {
         id: rule.id,
@@ -2858,9 +1359,6 @@ export class ProjectManagementService {
     }
   }
 
-  /**
-   * Update an existing automation rule
-   */
   async updateAutomationRule(data: {
     ruleId: string;
     name?: string;
@@ -2869,45 +1367,48 @@ export class ProjectManagementService {
     triggers?: Array<{
       type: string;
       resourceType?: string;
-      conditions?: Array<{
-        field: string;
-        operator: string;
-        value: any;
-      }>;
+      conditions?: Array<{ field: string; operator: string; value: unknown }>;
     }>;
-    actions?: Array<{
-      type: string;
-      parameters: Record<string, any>;
-    }>;
+    actions?: Array<{ type: string; parameters: Record<string, unknown> }>;
   }): Promise<{
     id: string;
     name: string;
     description?: string;
-    projectId: string;
     enabled: boolean;
-    triggers: any[];
-    actions: any[];
+    triggers: unknown[];
+    actions: unknown[];
   }> {
     try {
-      // Verify rule exists
       const rule = await this.automationRepo.findById(data.ruleId);
       if (!rule) {
         throw new ResourceNotFoundError(ResourceType.RELATIONSHIP, data.ruleId);
       }
 
+      // Map string types to enum types for the repository
+      const mappedTriggers = data.triggers?.map(t => ({
+        id: '',
+        type: t.type as AutomationTriggerType,
+        resourceType: t.resourceType as ResourceType | undefined,
+        conditions: t.conditions?.map(c => ({ id: '', field: c.field, operator: c.operator, value: c.value }))
+      })) as AutomationTrigger[] | undefined;
+      const mappedActions = data.actions?.map(a => ({
+        id: '',
+        type: a.type as AutomationActionType,
+        parameters: a.parameters
+      })) as AutomationAction[] | undefined;
+
       const updated = await this.automationRepo.update(data.ruleId, {
         name: data.name,
         description: data.description,
         enabled: data.enabled,
-        triggers: data.triggers as any,
-        actions: data.actions as any
+        triggers: mappedTriggers,
+        actions: mappedActions
       });
 
       return {
         id: updated.id,
         name: updated.name,
         description: updated.description,
-        projectId: updated.projectId,
         enabled: updated.enabled,
         triggers: updated.triggers,
         actions: updated.actions
@@ -2917,38 +1418,28 @@ export class ProjectManagementService {
     }
   }
 
-  /**
-   * Delete an automation rule
-   */
   async deleteAutomationRule(data: { ruleId: string }): Promise<{ success: boolean }> {
     try {
-      // Verify rule exists
       const rule = await this.automationRepo.findById(data.ruleId);
       if (!rule) {
         throw new ResourceNotFoundError(ResourceType.RELATIONSHIP, data.ruleId);
       }
 
       await this.automationRepo.delete(data.ruleId);
-
       return { success: true };
     } catch (error) {
       throw this.mapErrorToMCPError(error);
     }
   }
 
-  /**
-   * Get details of a specific automation rule
-   */
   async getAutomationRule(data: { ruleId: string }): Promise<{
     id: string;
     name: string;
     description?: string;
     projectId: string;
     enabled: boolean;
-    triggers: any[];
-    actions: any[];
-    createdAt: string;
-    updatedAt?: string;
+    triggers: unknown[];
+    actions: unknown[];
   }> {
     try {
       const rule = await this.automationRepo.findById(data.ruleId);
@@ -2963,18 +1454,13 @@ export class ProjectManagementService {
         projectId: rule.projectId,
         enabled: rule.enabled,
         triggers: rule.triggers,
-        actions: rule.actions,
-        createdAt: rule.createdAt.toISOString(),
-        updatedAt: rule.updatedAt?.toISOString()
+        actions: rule.actions
       };
     } catch (error) {
       throw this.mapErrorToMCPError(error);
     }
   }
 
-  /**
-   * List all automation rules for a project
-   */
   async listAutomationRules(data: { projectId: string }): Promise<{
     rules: Array<{
       id: string;
@@ -2986,14 +1472,7 @@ export class ProjectManagementService {
     }>;
   }> {
     try {
-      // Verify project exists
-      const project = await this.projectRepo.findById(data.projectId);
-      if (!project) {
-        throw new ResourceNotFoundError(ResourceType.PROJECT, data.projectId);
-      }
-
       const rules = await this.automationRepo.findByProject(data.projectId);
-
       return {
         rules: rules.map(rule => ({
           id: rule.id,
@@ -3009,14 +1488,7 @@ export class ProjectManagementService {
     }
   }
 
-  /**
-   * Enable an automation rule
-   */
-  async enableAutomationRule(data: { ruleId: string }): Promise<{
-    id: string;
-    name: string;
-    enabled: boolean;
-  }> {
+  async enableAutomationRule(data: { ruleId: string }): Promise<{ id: string; name: string; enabled: boolean }> {
     try {
       const rule = await this.automationRepo.findById(data.ruleId);
       if (!rule) {
@@ -3024,25 +1496,13 @@ export class ProjectManagementService {
       }
 
       const updated = await this.automationRepo.enable(data.ruleId);
-
-      return {
-        id: updated.id,
-        name: updated.name,
-        enabled: updated.enabled
-      };
+      return { id: updated.id, name: updated.name, enabled: updated.enabled };
     } catch (error) {
       throw this.mapErrorToMCPError(error);
     }
   }
 
-  /**
-   * Disable an automation rule
-   */
-  async disableAutomationRule(data: { ruleId: string }): Promise<{
-    id: string;
-    name: string;
-    enabled: boolean;
-  }> {
+  async disableAutomationRule(data: { ruleId: string }): Promise<{ id: string; name: string; enabled: boolean }> {
     try {
       const rule = await this.automationRepo.findById(data.ruleId);
       if (!rule) {
@@ -3050,24 +1510,16 @@ export class ProjectManagementService {
       }
 
       const updated = await this.automationRepo.disable(data.ruleId);
-
-      return {
-        id: updated.id,
-        name: updated.name,
-        enabled: updated.enabled
-      };
+      return { id: updated.id, name: updated.name, enabled: updated.enabled };
     } catch (error) {
       throw this.mapErrorToMCPError(error);
     }
   }
 
   // ============================================================================
-  // Iteration Management
+  // Iteration Management (Direct implementation)
   // ============================================================================
 
-  /**
-   * Get iteration field configuration including all iterations
-   */
   async getIterationConfiguration(data: {
     projectId: string;
     fieldName?: string;
@@ -3076,26 +1528,16 @@ export class ProjectManagementService {
     fieldName: string;
     duration: number;
     startDay: number;
-    iterations: Array<{
-      id: string;
-      title: string;
-      startDate: string;
-      duration: number;
-    }>;
+    iterations: Array<{ id: string; title: string; startDate: string; duration: number }>;
   }> {
     try {
       const fields = await this.listProjectFields({ projectId: data.projectId });
-
-      // Find iteration field
       const iterationField = fields.find((f: CustomField) =>
         f.type === 'iteration' && (!data.fieldName || f.name === data.fieldName)
       );
 
       if (!iterationField) {
-        throw new ResourceNotFoundError(
-          ResourceType.FIELD,
-          data.fieldName || 'iteration field'
-        );
+        throw new ResourceNotFoundError(ResourceType.FIELD, data.fieldName || 'iteration field');
       }
 
       if (!iterationField.config) {
@@ -3107,7 +1549,7 @@ export class ProjectManagementService {
         fieldName: iterationField.name,
         duration: iterationField.config.iterationDuration || 14,
         startDay: iterationField.config.iterationStart ? new Date(iterationField.config.iterationStart).getDay() : 1,
-        iterations: (iterationField.config.iterations || []).map((iter: any) => ({
+        iterations: (iterationField.config.iterations || []).map((iter: { id: string; title: string; startDate: string; duration: number }) => ({
           id: iter.id,
           title: iter.title,
           startDate: iter.startDate,
@@ -3119,19 +1561,10 @@ export class ProjectManagementService {
     }
   }
 
-  /**
-   * Get the currently active iteration based on today's date
-   */
   async getCurrentIteration(data: {
     projectId: string;
     fieldName?: string;
-  }): Promise<{
-    id: string;
-    title: string;
-    startDate: string;
-    endDate: string;
-    duration: number;
-  } | null> {
+  }): Promise<{ id: string; title: string; startDate: string; endDate: string; duration: number } | null> {
     try {
       const config = await this.getIterationConfiguration(data);
       const now = new Date();
@@ -3158,40 +1591,28 @@ export class ProjectManagementService {
     }
   }
 
-  /**
-   * Get all items assigned to a specific iteration
-   */
   async getIterationItems(data: {
     projectId: string;
     iterationId: string;
     limit?: number;
-  }): Promise<{
-    items: Array<{
-      id: string;
-      title: string;
-      type: string;
-      status?: string;
-    }>;
-  }> {
+  }): Promise<{ items: Array<{ id: string; title: string; type: string; status?: string }> }> {
     try {
       const items = await this.listProjectItems({
         projectId: data.projectId,
         limit: data.limit || 50
       });
 
-      // Filter items that have the iteration field set to this iteration
-      const iterationItems = items.filter((item: any) => {
-        // Check if any field value matches the iteration ID
-        const fieldValues = item.fieldValues || [];
-        return fieldValues.some((fv: any) => fv.value === data.iterationId);
+      const iterationItems = items.filter((item: ProjectItem) => {
+        const fieldValues = item.fieldValues || {};
+        return Object.values(fieldValues).some(v => v === data.iterationId);
       });
 
       return {
-        items: iterationItems.map((item: any) => ({
+        items: iterationItems.map((item: ProjectItem) => ({
           id: item.id,
-          title: item.title || 'Untitled',
-          type: item.type,
-          status: item.status
+          title: 'Untitled',
+          type: item.contentType,
+          status: undefined
         }))
       };
     } catch (error) {
@@ -3199,20 +1620,11 @@ export class ProjectManagementService {
     }
   }
 
-  /**
-   * Find which iteration contains a specific date
-   */
   async getIterationByDate(data: {
     projectId: string;
     date: string;
     fieldName?: string;
-  }): Promise<{
-    id: string;
-    title: string;
-    startDate: string;
-    endDate: string;
-    duration: number;
-  } | null> {
+  }): Promise<{ id: string; title: string; startDate: string; endDate: string; duration: number } | null> {
     try {
       const config = await this.getIterationConfiguration(data);
       const targetDate = new Date(data.date);
@@ -3239,9 +1651,6 @@ export class ProjectManagementService {
     }
   }
 
-  /**
-   * Bulk assign multiple items to a specific iteration
-   */
   async assignItemsToIteration(data: {
     projectId: string;
     itemIds: string[];
@@ -3249,22 +1658,17 @@ export class ProjectManagementService {
     fieldName?: string;
   }): Promise<{ success: boolean; assignedCount: number }> {
     try {
-      // Get iteration field
       const fields = await this.listProjectFields({ projectId: data.projectId });
       const iterationField = fields.find((f: CustomField) =>
         f.type === 'iteration' && (!data.fieldName || f.name === data.fieldName)
       );
 
       if (!iterationField) {
-        throw new ResourceNotFoundError(
-          ResourceType.FIELD,
-          data.fieldName || 'iteration field'
-        );
+        throw new ResourceNotFoundError(ResourceType.FIELD, data.fieldName || 'iteration field');
       }
 
       let assignedCount = 0;
 
-      // Assign each item to the iteration
       for (const itemId of data.itemIds) {
         try {
           await this.setFieldValue({
@@ -3274,16 +1678,12 @@ export class ProjectManagementService {
             value: { iterationId: data.iterationId }
           });
           assignedCount++;
-        } catch (error) {
-          // Log error but continue with other items
-          console.error(`Failed to assign item ${itemId}:`, error);
+        } catch {
+          // Continue with other items on failure
         }
       }
 
-      return {
-        success: assignedCount > 0,
-        assignedCount
-      };
+      return { success: assignedCount > 0, assignedCount };
     } catch (error) {
       throw this.mapErrorToMCPError(error);
     }

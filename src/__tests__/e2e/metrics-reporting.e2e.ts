@@ -1,4 +1,5 @@
 import { ProjectManagementService } from "../../services/ProjectManagementService";
+import { createProjectManagementService } from "../../container";
 import { ResourceStatus } from "../../domain/resource-types";
 import { TestFactory } from "../test-utils";
 import { GitHubTypeConverter } from "../../infrastructure/github/util/conversion";
@@ -13,7 +14,7 @@ describe.skip("Metrics and Reporting E2E Tests", () => {
     const owner = process.env.GITHUB_OWNER || "test-owner";
     const repo = process.env.GITHUB_REPO || "test-repo";
 
-    service = new ProjectManagementService(owner, repo, token);
+    service = createProjectManagementService(owner, repo, token);
 
     // Create a test milestone with issues for metrics testing
     const milestone = await service.createMilestone(

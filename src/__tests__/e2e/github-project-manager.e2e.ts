@@ -1,4 +1,5 @@
 import { ProjectManagementService } from "../../services/ProjectManagementService";
+import { createProjectManagementService } from "../../container";
 import { ResourceStatus } from "../../domain/resource-types";
 import { Sprint } from "../../domain/types";
 import { TestFactory } from "../test-utils";
@@ -12,7 +13,7 @@ describe.skip("GitHub Project Manager E2E Tests", () => {
     const owner = process.env.GITHUB_OWNER || "test-owner";
     const repo = process.env.GITHUB_REPO || "test-repo";
 
-    service = new ProjectManagementService(owner, repo, token);
+    service = createProjectManagementService(owner, repo, token);
   });
 
   describe("Roadmap Creation", () => {
