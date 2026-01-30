@@ -9,14 +9,97 @@ export enum MCPContentType {
   HTML = "text/html",
 }
 
-// MCP Error Codes
+/**
+ * MCP Error Codes following JSON-RPC 2.0 standard.
+ *
+ * Standard JSON-RPC 2.0 codes: -32700 to -32600
+ * MCP-specific codes: -32000 to -32099
+ * Application-specific codes: -31000 to -31999 (custom GitHub errors)
+ *
+ * Legacy string codes (MCP-001, etc.) are preserved for backward compatibility.
+ */
 export enum MCPErrorCode {
-  INTERNAL_ERROR = "MCP-001",
-  VALIDATION_ERROR = "MCP-002",
-  RESOURCE_NOT_FOUND = "MCP-003",
-  INVALID_REQUEST = "MCP-004",
-  UNAUTHORIZED = "MCP-005",
-  RATE_LIMITED = "MCP-006",
+  // JSON-RPC 2.0 Standard Errors (numeric)
+  PARSE_ERROR = -32700,          // Invalid JSON
+  INVALID_REQUEST = -32600,      // Malformed JSON-RPC
+  METHOD_NOT_FOUND = -32601,     // Unknown method/tool
+  INVALID_PARAMS = -32602,       // Parameter validation failed
+  INTERNAL_ERROR = -32603,       // Server-side error
+
+  // MCP-Specific Errors (-32000 to -32099)
+  TOOL_EXECUTION_FAILED = -32000,
+  RESOURCE_NOT_FOUND = -32001,
+  PERMISSION_DENIED = -32002,
+
+  // GitHub API Errors (Application-specific: -31000 to -31999)
+  GITHUB_RATE_LIMITED = -31001,
+  GITHUB_NOT_FOUND = -31002,
+  GITHUB_UNAUTHORIZED = -31003,
+  GITHUB_FORBIDDEN = -31004,
+  GITHUB_VALIDATION_ERROR = -31005,
+  GITHUB_SERVER_ERROR = -31006,
+
+  // Protocol Errors
+  PROTOCOL_VERSION_MISMATCH = -31100,
+
+  // Legacy aliases for backward compatibility
+  VALIDATION_ERROR = -32602,     // Alias for INVALID_PARAMS
+  UNAUTHORIZED = -31003,         // Alias for GITHUB_UNAUTHORIZED
+  RATE_LIMITED = -31001,         // Alias for GITHUB_RATE_LIMITED
+}
+
+/**
+ * Legacy string error codes mapping.
+ * Maps old string codes to new numeric codes.
+ */
+export const LegacyErrorCodeMap: Record<string, MCPErrorCode> = {
+  "MCP-001": MCPErrorCode.INTERNAL_ERROR,
+  "MCP-002": MCPErrorCode.VALIDATION_ERROR,
+  "MCP-003": MCPErrorCode.RESOURCE_NOT_FOUND,
+  "MCP-004": MCPErrorCode.INVALID_REQUEST,
+  "MCP-005": MCPErrorCode.UNAUTHORIZED,
+  "MCP-006": MCPErrorCode.RATE_LIMITED,
+};
+
+/**
+ * Error data payload structure for rich error context.
+ */
+export interface MCPErrorData {
+  /** Tool name that caused the error, if applicable */
+  tool?: string;
+  /** Affected resource type and ID */
+  resource?: {
+    type: "project" | "issue" | "milestone" | "sprint" | "field" | "view" | "item" | "pr";
+    id?: string;
+  };
+  /** GitHub-specific error details */
+  github?: {
+    status?: number;
+    message?: string;
+    documentation_url?: string;
+  };
+  /** Rate limit information if applicable */
+  rateLimit?: {
+    limit: number;
+    remaining: number;
+    reset: number;  // Unix timestamp
+    retryAfter?: number;  // Seconds until retry
+  };
+  /** Validation error details */
+  validation?: Array<{
+    path: string;
+    message: string;
+    code: string;
+  }>;
+  /** Protocol version information for version mismatch errors */
+  protocol?: {
+    requested: string;
+    supported: string[];
+  };
+  /** Stack trace for debugging (only in development) */
+  stack?: string;
+  /** Additional context */
+  [key: string]: unknown;
 }
 
 // Response Content Interface
@@ -26,11 +109,12 @@ export interface MCPContent {
   contentType: MCPContentType;
 }
 
-// Base MCP Error Schema
+// Base MCP Error Schema (supports both numeric codes and legacy string codes)
 export const MCPErrorSchema = z.object({
-  code: z.nativeEnum(MCPErrorCode),
+  code: z.union([z.number(), z.string()]),
   message: z.string(),
   details: z.record(z.unknown()).optional(),
+  data: z.record(z.unknown()).optional(),
 });
 
 // Base MCP Response Schema
@@ -93,11 +177,12 @@ export interface MCPSuccessResponse {
 }
 
 export interface MCPErrorDetail {
-  code: string;
+  code: string | number;
   message: string;
   target?: string;
   details?: MCPErrorDetail[];
   innerError?: Record<string, any>;
+  data?: MCPErrorData;
 }
 
 export interface MCPErrorResponse {
@@ -145,11 +230,12 @@ export function createSuccessResponse(
 
 export function createErrorResponse(
   requestId: string,
-  code: string,
+  code: string | number,
   message: string,
   correlationId?: string,
   details?: MCPErrorDetail[],
-  version: string = "1.0"
+  version: string = "1.0",
+  data?: MCPErrorData
 ): MCPErrorResponse {
   return {
     version,
@@ -160,6 +246,7 @@ export function createErrorResponse(
       code,
       message,
       details,
+      data,
     },
   };
 }
