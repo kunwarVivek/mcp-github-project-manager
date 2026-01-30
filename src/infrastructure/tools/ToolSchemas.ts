@@ -1,5 +1,51 @@
 import { z } from "zod";
 import { ToolDefinition, ToolSchema } from "./ToolValidator.js";
+import { ANNOTATION_PATTERNS } from "./annotations/tool-annotations.js";
+import {
+  ProjectOutputSchema,
+  ProjectListOutputSchema,
+  ProjectReadmeOutputSchema,
+  ProjectFieldOutputSchema,
+  ProjectFieldListOutputSchema,
+  ProjectViewOutputSchema,
+  ProjectViewListOutputSchema,
+  ProjectItemListOutputSchema,
+  ProjectItemAddOutputSchema,
+  FieldValueOutputSchema,
+  MilestoneOutputSchema,
+  MilestoneListOutputSchema,
+  MilestoneMetricsOutputSchema,
+  SprintOutputSchema,
+  SprintListOutputSchema,
+  SprintMetricsOutputSchema,
+  RoadmapOutputSchema,
+  LabelOutputSchema,
+  LabelListOutputSchema,
+  IterationConfigOutputSchema,
+  IterationOutputSchema,
+  IterationItemsOutputSchema,
+  AutomationRuleOutputSchema,
+  AutomationRuleListOutputSchema,
+  EventListOutputSchema,
+  SubscriptionOutputSchema,
+  IssueOutputSchema,
+  IssueListOutputSchema,
+  IssueCommentOutputSchema,
+  IssueCommentListOutputSchema,
+  DraftIssueOutputSchema,
+  PullRequestOutputSchema,
+  PullRequestListOutputSchema,
+  PullRequestReviewOutputSchema,
+  PullRequestReviewListOutputSchema,
+  MergeResultOutputSchema,
+  SuccessOutputSchema,
+  DeleteOutputSchema,
+  AIEnrichmentOutputSchema,
+  AITriageOutputSchema,
+  AIRoadmapOutputSchema,
+  BulkOperationResultSchema,
+} from "./schemas/project-schemas.js";
+
 // Import AI tools
 import { addFeatureTool, executeAddFeature } from "./ai-tasks/AddFeatureTool.js";
 import { generatePRDTool, executeGeneratePRD } from "./ai-tasks/GeneratePRDTool.js";
@@ -363,10 +409,13 @@ export type CreateProjectViewArgs = z.infer<typeof createProjectViewSchema>;
 
 // Tool definitions with schemas, descriptions, and examples
 // Project tools
-export const createProjectTool: ToolDefinition<CreateProjectArgs> = {
+export const createProjectTool: ToolDefinition<CreateProjectArgs, z.infer<typeof ProjectOutputSchema>> = {
   name: "create_project",
+  title: "Create Project",
   description: "Create a new GitHub project",
   schema: createProjectSchema as unknown as ToolSchema<CreateProjectArgs>,
+  outputSchema: ProjectOutputSchema,
+  annotations: ANNOTATION_PATTERNS.create,
   examples: [
     {
       name: "Create private project",
@@ -381,10 +430,13 @@ export const createProjectTool: ToolDefinition<CreateProjectArgs> = {
   ]
 };
 
-export const listProjectsTool: ToolDefinition<ListProjectsArgs> = {
+export const listProjectsTool: ToolDefinition<ListProjectsArgs, z.infer<typeof ProjectListOutputSchema>> = {
   name: "list_projects",
+  title: "List Projects",
   description: "List GitHub projects",
   schema: listProjectsSchema as unknown as ToolSchema<ListProjectsArgs>,
+  outputSchema: ProjectListOutputSchema,
+  annotations: ANNOTATION_PATTERNS.readOnly,
   examples: [
     {
       name: "List active projects",
@@ -397,10 +449,13 @@ export const listProjectsTool: ToolDefinition<ListProjectsArgs> = {
   ]
 };
 
-export const getProjectTool: ToolDefinition<GetProjectArgs> = {
+export const getProjectTool: ToolDefinition<GetProjectArgs, z.infer<typeof ProjectOutputSchema>> = {
   name: "get_project",
+  title: "Get Project",
   description: "Get details of a specific GitHub project",
   schema: getProjectSchema as unknown as ToolSchema<GetProjectArgs>,
+  outputSchema: ProjectOutputSchema,
+  annotations: ANNOTATION_PATTERNS.readOnly,
   examples: [
     {
       name: "Get project details",
@@ -413,10 +468,13 @@ export const getProjectTool: ToolDefinition<GetProjectArgs> = {
 };
 
 // Milestone tools
-export const createMilestoneTool: ToolDefinition<CreateMilestoneArgs> = {
+export const createMilestoneTool: ToolDefinition<CreateMilestoneArgs, z.infer<typeof MilestoneOutputSchema>> = {
   name: "create_milestone",
+  title: "Create Milestone",
   description: "Create a new milestone",
   schema: createMilestoneSchema as unknown as ToolSchema<CreateMilestoneArgs>,
+  outputSchema: MilestoneOutputSchema,
+  annotations: ANNOTATION_PATTERNS.create,
   examples: [
     {
       name: "Create milestone with due date",
@@ -430,10 +488,13 @@ export const createMilestoneTool: ToolDefinition<CreateMilestoneArgs> = {
   ]
 };
 
-export const listMilestonesTool: ToolDefinition<ListMilestonesArgs> = {
+export const listMilestonesTool: ToolDefinition<ListMilestonesArgs, z.infer<typeof MilestoneListOutputSchema>> = {
   name: "list_milestones",
+  title: "List Milestones",
   description: "List milestones",
   schema: listMilestonesSchema as unknown as ToolSchema<ListMilestonesArgs>,
+  outputSchema: MilestoneListOutputSchema,
+  annotations: ANNOTATION_PATTERNS.readOnly,
   examples: [
     {
       name: "List open milestones",
@@ -448,10 +509,13 @@ export const listMilestonesTool: ToolDefinition<ListMilestonesArgs> = {
 };
 
 // Issue tools
-export const createIssueTool: ToolDefinition<CreateIssueArgs> = {
+export const createIssueTool: ToolDefinition<CreateIssueArgs, z.infer<typeof IssueOutputSchema>> = {
   name: "create_issue",
+  title: "Create Issue",
   description: "Create a new GitHub issue",
   schema: createIssueSchema as unknown as ToolSchema<CreateIssueArgs>,
+  outputSchema: IssueOutputSchema,
+  annotations: ANNOTATION_PATTERNS.create,
   examples: [
     {
       name: "Create bug issue",
@@ -468,10 +532,13 @@ export const createIssueTool: ToolDefinition<CreateIssueArgs> = {
   ]
 };
 
-export const listIssuesTool: ToolDefinition<ListIssuesArgs> = {
+export const listIssuesTool: ToolDefinition<ListIssuesArgs, z.infer<typeof IssueListOutputSchema>> = {
   name: "list_issues",
+  title: "List Issues",
   description: "List GitHub issues",
   schema: listIssuesSchema as unknown as ToolSchema<ListIssuesArgs>,
+  outputSchema: IssueListOutputSchema,
+  annotations: ANNOTATION_PATTERNS.readOnly,
   examples: [
     {
       name: "List open issues for milestone",
@@ -487,10 +554,13 @@ export const listIssuesTool: ToolDefinition<ListIssuesArgs> = {
   ]
 };
 
-export const getIssueTool: ToolDefinition<GetIssueArgs> = {
+export const getIssueTool: ToolDefinition<GetIssueArgs, z.infer<typeof IssueOutputSchema>> = {
   name: "get_issue",
+  title: "Get Issue",
   description: "Get details of a specific GitHub issue",
   schema: getIssueSchema as unknown as ToolSchema<GetIssueArgs>,
+  outputSchema: IssueOutputSchema,
+  annotations: ANNOTATION_PATTERNS.readOnly,
   examples: [
     {
       name: "Get issue details",
@@ -502,10 +572,13 @@ export const getIssueTool: ToolDefinition<GetIssueArgs> = {
   ]
 };
 
-export const updateIssueTool: ToolDefinition<UpdateIssueArgs> = {
+export const updateIssueTool: ToolDefinition<UpdateIssueArgs, z.infer<typeof IssueOutputSchema>> = {
   name: "update_issue",
+  title: "Update Issue",
   description: "Update a GitHub issue",
   schema: updateIssueSchema as unknown as ToolSchema<UpdateIssueArgs>,
+  outputSchema: IssueOutputSchema,
+  annotations: ANNOTATION_PATTERNS.updateIdempotent,
   examples: [
     {
       name: "Update issue status and milestone",
@@ -520,10 +593,13 @@ export const updateIssueTool: ToolDefinition<UpdateIssueArgs> = {
 };
 
 // Issue comment tools
-export const createIssueCommentTool: ToolDefinition<CreateIssueCommentArgs> = {
+export const createIssueCommentTool: ToolDefinition<CreateIssueCommentArgs, z.infer<typeof IssueCommentOutputSchema>> = {
   name: "create_issue_comment",
+  title: "Create Issue Comment",
   description: "Add a comment to a GitHub issue",
   schema: createIssueCommentSchema as unknown as ToolSchema<CreateIssueCommentArgs>,
+  outputSchema: IssueCommentOutputSchema,
+  annotations: ANNOTATION_PATTERNS.updateNonIdempotent,
   examples: [
     {
       name: "Add status update comment",
@@ -536,10 +612,13 @@ export const createIssueCommentTool: ToolDefinition<CreateIssueCommentArgs> = {
   ]
 };
 
-export const updateIssueCommentTool: ToolDefinition<UpdateIssueCommentArgs> = {
+export const updateIssueCommentTool: ToolDefinition<UpdateIssueCommentArgs, z.infer<typeof IssueCommentOutputSchema>> = {
   name: "update_issue_comment",
+  title: "Update Issue Comment",
   description: "Update an existing comment on a GitHub issue",
   schema: updateIssueCommentSchema as unknown as ToolSchema<UpdateIssueCommentArgs>,
+  outputSchema: IssueCommentOutputSchema,
+  annotations: ANNOTATION_PATTERNS.updateIdempotent,
   examples: [
     {
       name: "Correct a comment",
@@ -552,10 +631,13 @@ export const updateIssueCommentTool: ToolDefinition<UpdateIssueCommentArgs> = {
   ]
 };
 
-export const deleteIssueCommentTool: ToolDefinition<DeleteIssueCommentArgs> = {
+export const deleteIssueCommentTool: ToolDefinition<DeleteIssueCommentArgs, z.infer<typeof DeleteOutputSchema>> = {
   name: "delete_issue_comment",
+  title: "Delete Issue Comment",
   description: "Delete a comment from a GitHub issue",
   schema: deleteIssueCommentSchema as unknown as ToolSchema<DeleteIssueCommentArgs>,
+  outputSchema: DeleteOutputSchema,
+  annotations: ANNOTATION_PATTERNS.delete,
   examples: [
     {
       name: "Remove outdated comment",
@@ -567,10 +649,13 @@ export const deleteIssueCommentTool: ToolDefinition<DeleteIssueCommentArgs> = {
   ]
 };
 
-export const listIssueCommentsTool: ToolDefinition<ListIssueCommentsArgs> = {
+export const listIssueCommentsTool: ToolDefinition<ListIssueCommentsArgs, z.infer<typeof IssueCommentListOutputSchema>> = {
   name: "list_issue_comments",
+  title: "List Issue Comments",
   description: "List all comments on a GitHub issue",
   schema: listIssueCommentsSchema as unknown as ToolSchema<ListIssueCommentsArgs>,
+  outputSchema: IssueCommentListOutputSchema,
+  annotations: ANNOTATION_PATTERNS.readOnly,
   examples: [
     {
       name: "Get all comments",
@@ -591,10 +676,13 @@ export const listIssueCommentsTool: ToolDefinition<ListIssueCommentsArgs> = {
 };
 
 // Draft issue tools
-export const createDraftIssueTool: ToolDefinition<CreateDraftIssueArgs> = {
+export const createDraftIssueTool: ToolDefinition<CreateDraftIssueArgs, z.infer<typeof DraftIssueOutputSchema>> = {
   name: "create_draft_issue",
+  title: "Create Draft Issue",
   description: "Create a draft issue in a GitHub project. Draft issues are native to Projects v2 and don't require creating a repository issue first.",
   schema: createDraftIssueSchema as unknown as ToolSchema<CreateDraftIssueArgs>,
+  outputSchema: DraftIssueOutputSchema,
+  annotations: ANNOTATION_PATTERNS.create,
   examples: [
     {
       name: "Create draft task",
@@ -608,10 +696,13 @@ export const createDraftIssueTool: ToolDefinition<CreateDraftIssueArgs> = {
   ]
 };
 
-export const updateDraftIssueTool: ToolDefinition<UpdateDraftIssueArgs> = {
+export const updateDraftIssueTool: ToolDefinition<UpdateDraftIssueArgs, z.infer<typeof DraftIssueOutputSchema>> = {
   name: "update_draft_issue",
+  title: "Update Draft Issue",
   description: "Update an existing draft issue in a GitHub project",
   schema: updateDraftIssueSchema as unknown as ToolSchema<UpdateDraftIssueArgs>,
+  outputSchema: DraftIssueOutputSchema,
+  annotations: ANNOTATION_PATTERNS.updateIdempotent,
   examples: [
     {
       name: "Update draft details",
@@ -625,10 +716,13 @@ export const updateDraftIssueTool: ToolDefinition<UpdateDraftIssueArgs> = {
   ]
 };
 
-export const deleteDraftIssueTool: ToolDefinition<DeleteDraftIssueArgs> = {
+export const deleteDraftIssueTool: ToolDefinition<DeleteDraftIssueArgs, z.infer<typeof DeleteOutputSchema>> = {
   name: "delete_draft_issue",
+  title: "Delete Draft Issue",
   description: "Delete a draft issue from a GitHub project",
   schema: deleteDraftIssueSchema as unknown as ToolSchema<DeleteDraftIssueArgs>,
+  outputSchema: DeleteOutputSchema,
+  annotations: ANNOTATION_PATTERNS.delete,
   examples: [
     {
       name: "Remove draft",
@@ -641,10 +735,13 @@ export const deleteDraftIssueTool: ToolDefinition<DeleteDraftIssueArgs> = {
 };
 
 // Pull Request tools
-export const createPullRequestTool: ToolDefinition<CreatePullRequestArgs> = {
+export const createPullRequestTool: ToolDefinition<CreatePullRequestArgs, z.infer<typeof PullRequestOutputSchema>> = {
   name: "create_pull_request",
+  title: "Create Pull Request",
   description: "Create a new pull request in a GitHub repository",
   schema: createPullRequestSchema as unknown as ToolSchema<CreatePullRequestArgs>,
+  outputSchema: PullRequestOutputSchema,
+  annotations: ANNOTATION_PATTERNS.create,
   examples: [
     {
       name: "Create feature PR",
@@ -659,10 +756,13 @@ export const createPullRequestTool: ToolDefinition<CreatePullRequestArgs> = {
   ]
 };
 
-export const getPullRequestTool: ToolDefinition<GetPullRequestArgs> = {
+export const getPullRequestTool: ToolDefinition<GetPullRequestArgs, z.infer<typeof PullRequestOutputSchema>> = {
   name: "get_pull_request",
+  title: "Get Pull Request",
   description: "Get details of a specific pull request",
   schema: getPullRequestSchema as unknown as ToolSchema<GetPullRequestArgs>,
+  outputSchema: PullRequestOutputSchema,
+  annotations: ANNOTATION_PATTERNS.readOnly,
   examples: [
     {
       name: "Get PR details",
@@ -674,10 +774,13 @@ export const getPullRequestTool: ToolDefinition<GetPullRequestArgs> = {
   ]
 };
 
-export const listPullRequestsTool: ToolDefinition<ListPullRequestsArgs> = {
+export const listPullRequestsTool: ToolDefinition<ListPullRequestsArgs, z.infer<typeof PullRequestListOutputSchema>> = {
   name: "list_pull_requests",
+  title: "List Pull Requests",
   description: "List pull requests in a GitHub repository",
   schema: listPullRequestsSchema as unknown as ToolSchema<ListPullRequestsArgs>,
+  outputSchema: PullRequestListOutputSchema,
+  annotations: ANNOTATION_PATTERNS.readOnly,
   examples: [
     {
       name: "List open PRs",
@@ -689,10 +792,13 @@ export const listPullRequestsTool: ToolDefinition<ListPullRequestsArgs> = {
   ]
 };
 
-export const updatePullRequestTool: ToolDefinition<UpdatePullRequestArgs> = {
+export const updatePullRequestTool: ToolDefinition<UpdatePullRequestArgs, z.infer<typeof PullRequestOutputSchema>> = {
   name: "update_pull_request",
+  title: "Update Pull Request",
   description: "Update a pull request's title, body, or state",
   schema: updatePullRequestSchema as unknown as ToolSchema<UpdatePullRequestArgs>,
+  outputSchema: PullRequestOutputSchema,
+  annotations: ANNOTATION_PATTERNS.updateIdempotent,
   examples: [
     {
       name: "Update PR title",
@@ -705,10 +811,13 @@ export const updatePullRequestTool: ToolDefinition<UpdatePullRequestArgs> = {
   ]
 };
 
-export const mergePullRequestTool: ToolDefinition<MergePullRequestArgs> = {
+export const mergePullRequestTool: ToolDefinition<MergePullRequestArgs, z.infer<typeof MergeResultOutputSchema>> = {
   name: "merge_pull_request",
+  title: "Merge Pull Request",
   description: "Merge a pull request using merge, squash, or rebase",
   schema: mergePullRequestSchema as unknown as ToolSchema<MergePullRequestArgs>,
+  outputSchema: MergeResultOutputSchema,
+  annotations: ANNOTATION_PATTERNS.updateNonIdempotent,
   examples: [
     {
       name: "Squash and merge",
@@ -722,10 +831,13 @@ export const mergePullRequestTool: ToolDefinition<MergePullRequestArgs> = {
   ]
 };
 
-export const listPullRequestReviewsTool: ToolDefinition<ListPullRequestReviewsArgs> = {
+export const listPullRequestReviewsTool: ToolDefinition<ListPullRequestReviewsArgs, z.infer<typeof PullRequestReviewListOutputSchema>> = {
   name: "list_pull_request_reviews",
+  title: "List Pull Request Reviews",
   description: "List all reviews on a pull request",
   schema: listPullRequestReviewsSchema as unknown as ToolSchema<ListPullRequestReviewsArgs>,
+  outputSchema: PullRequestReviewListOutputSchema,
+  annotations: ANNOTATION_PATTERNS.readOnly,
   examples: [
     {
       name: "Get PR reviews",
@@ -737,10 +849,13 @@ export const listPullRequestReviewsTool: ToolDefinition<ListPullRequestReviewsAr
   ]
 };
 
-export const createPullRequestReviewTool: ToolDefinition<CreatePullRequestReviewArgs> = {
+export const createPullRequestReviewTool: ToolDefinition<CreatePullRequestReviewArgs, z.infer<typeof PullRequestReviewOutputSchema>> = {
   name: "create_pull_request_review",
+  title: "Create Pull Request Review",
   description: "Create a review on a pull request (approve, request changes, or comment)",
   schema: createPullRequestReviewSchema as unknown as ToolSchema<CreatePullRequestReviewArgs>,
+  outputSchema: PullRequestReviewOutputSchema,
+  annotations: ANNOTATION_PATTERNS.create,
   examples: [
     {
       name: "Approve PR",
@@ -771,10 +886,13 @@ export const createPullRequestReviewTool: ToolDefinition<CreatePullRequestReview
 };
 
 // Sprint tools
-export const createSprintTool: ToolDefinition<CreateSprintArgs> = {
+export const createSprintTool: ToolDefinition<CreateSprintArgs, z.infer<typeof SprintOutputSchema>> = {
   name: "create_sprint",
+  title: "Create Sprint",
   description: "Create a new development sprint",
   schema: createSprintSchema as unknown as ToolSchema<CreateSprintArgs>,
+  outputSchema: SprintOutputSchema,
+  annotations: ANNOTATION_PATTERNS.create,
   examples: [
     {
       name: "Create two-week sprint",
@@ -790,10 +908,13 @@ export const createSprintTool: ToolDefinition<CreateSprintArgs> = {
   ]
 };
 
-export const listSprintsTool: ToolDefinition<ListSprintsArgs> = {
+export const listSprintsTool: ToolDefinition<ListSprintsArgs, z.infer<typeof SprintListOutputSchema>> = {
   name: "list_sprints",
+  title: "List Sprints",
   description: "List all sprints",
   schema: listSprintsSchema as unknown as ToolSchema<ListSprintsArgs>,
+  outputSchema: SprintListOutputSchema,
+  annotations: ANNOTATION_PATTERNS.readOnly,
   examples: [
     {
       name: "List active sprints",
@@ -805,10 +926,13 @@ export const listSprintsTool: ToolDefinition<ListSprintsArgs> = {
   ]
 };
 
-export const getCurrentSprintTool: ToolDefinition<GetCurrentSprintArgs> = {
+export const getCurrentSprintTool: ToolDefinition<GetCurrentSprintArgs, z.infer<typeof SprintOutputSchema>> = {
   name: "get_current_sprint",
+  title: "Get Current Sprint",
   description: "Get the currently active sprint",
   schema: getCurrentSprintSchema as unknown as ToolSchema<GetCurrentSprintArgs>,
+  outputSchema: SprintOutputSchema,
+  annotations: ANNOTATION_PATTERNS.readOnly,
   examples: [
     {
       name: "Get current sprint with issues",
@@ -821,10 +945,13 @@ export const getCurrentSprintTool: ToolDefinition<GetCurrentSprintArgs> = {
 };
 
 // Project field tools
-export const createProjectFieldTool: ToolDefinition<CreateProjectFieldArgs> = {
+export const createProjectFieldTool: ToolDefinition<CreateProjectFieldArgs, z.infer<typeof ProjectFieldOutputSchema>> = {
   name: "create_project_field",
+  title: "Create Project Field",
   description: "Create a custom field for a GitHub project",
   schema: createProjectFieldSchema as unknown as ToolSchema<CreateProjectFieldArgs>,
+  outputSchema: ProjectFieldOutputSchema,
+  annotations: ANNOTATION_PATTERNS.create,
   examples: [
     {
       name: "Create status field",
@@ -846,10 +973,13 @@ export const createProjectFieldTool: ToolDefinition<CreateProjectFieldArgs> = {
 };
 
 // Project view tools
-export const createProjectViewTool: ToolDefinition<CreateProjectViewArgs> = {
+export const createProjectViewTool: ToolDefinition<CreateProjectViewArgs, z.infer<typeof ProjectViewOutputSchema>> = {
   name: "create_project_view",
+  title: "Create Project View",
   description: "Create a new view for a GitHub project",
   schema: createProjectViewSchema as unknown as ToolSchema<CreateProjectViewArgs>,
+  outputSchema: ProjectViewOutputSchema,
+  annotations: ANNOTATION_PATTERNS.create,
   examples: [
     {
       name: "Create kanban board view",
@@ -864,10 +994,13 @@ export const createProjectViewTool: ToolDefinition<CreateProjectViewArgs> = {
 };
 
 // Tool definitions with schemas, descriptions, and examples
-export const createRoadmapTool: ToolDefinition<CreateRoadmapArgs> = {
+export const createRoadmapTool: ToolDefinition<CreateRoadmapArgs, z.infer<typeof RoadmapOutputSchema>> = {
   name: "create_roadmap",
+  title: "Create Roadmap",
   description: "Create a project roadmap with milestones and tasks",
   schema: createRoadmapSchema as unknown as ToolSchema<CreateRoadmapArgs>,
+  outputSchema: RoadmapOutputSchema,
+  annotations: ANNOTATION_PATTERNS.create,
   examples: [
     {
       name: "Simple project roadmap",
@@ -927,10 +1060,13 @@ export const createRoadmapTool: ToolDefinition<CreateRoadmapArgs> = {
   ],
 };
 
-export const planSprintTool: ToolDefinition<PlanSprintArgs> = {
+export const planSprintTool: ToolDefinition<PlanSprintArgs, z.infer<typeof SprintOutputSchema>> = {
   name: "plan_sprint",
+  title: "Plan Sprint",
   description: "Plan a new sprint with selected issues",
   schema: planSprintSchema as unknown as ToolSchema<PlanSprintArgs>,
+  outputSchema: SprintOutputSchema,
+  annotations: ANNOTATION_PATTERNS.create,
   examples: [
     {
       name: "Two-week sprint",
@@ -951,10 +1087,13 @@ export const planSprintTool: ToolDefinition<PlanSprintArgs> = {
   ],
 };
 
-export const getMilestoneMetricsTool: ToolDefinition<GetMilestoneMetricsArgs> = {
+export const getMilestoneMetricsTool: ToolDefinition<GetMilestoneMetricsArgs, z.infer<typeof MilestoneMetricsOutputSchema>> = {
   name: "get_milestone_metrics",
+  title: "Get Milestone Metrics",
   description: "Get progress metrics for a specific milestone",
   schema: getMilestoneMetricsSchema as unknown as ToolSchema<GetMilestoneMetricsArgs>,
+  outputSchema: MilestoneMetricsOutputSchema,
+  annotations: ANNOTATION_PATTERNS.readOnly,
   examples: [
     {
       name: "Get milestone progress",
@@ -967,10 +1106,13 @@ export const getMilestoneMetricsTool: ToolDefinition<GetMilestoneMetricsArgs> = 
   ],
 };
 
-export const getSprintMetricsTool: ToolDefinition<GetSprintMetricsArgs> = {
+export const getSprintMetricsTool: ToolDefinition<GetSprintMetricsArgs, z.infer<typeof SprintMetricsOutputSchema>> = {
   name: "get_sprint_metrics",
+  title: "Get Sprint Metrics",
   description: "Get progress metrics for a specific sprint",
   schema: getSprintMetricsSchema as unknown as ToolSchema<GetSprintMetricsArgs>,
+  outputSchema: SprintMetricsOutputSchema,
+  annotations: ANNOTATION_PATTERNS.readOnly,
   examples: [
     {
       name: "Get sprint progress",
@@ -983,10 +1125,13 @@ export const getSprintMetricsTool: ToolDefinition<GetSprintMetricsArgs> = {
   ],
 };
 
-export const getOverdueMilestonesTool: ToolDefinition<GetOverdueMilestonesArgs> = {
+export const getOverdueMilestonesTool: ToolDefinition<GetOverdueMilestonesArgs, z.infer<typeof MilestoneListOutputSchema>> = {
   name: "get_overdue_milestones",
+  title: "Get Overdue Milestones",
   description: "Get a list of overdue milestones",
   schema: getOverdueMilestonesSchema as unknown as ToolSchema<GetOverdueMilestonesArgs>,
+  outputSchema: MilestoneListOutputSchema,
+  annotations: ANNOTATION_PATTERNS.readOnly,
   examples: [
     {
       name: "List overdue milestones",
@@ -999,10 +1144,13 @@ export const getOverdueMilestonesTool: ToolDefinition<GetOverdueMilestonesArgs> 
   ],
 };
 
-export const getUpcomingMilestonesTool: ToolDefinition<GetUpcomingMilestonesArgs> = {
+export const getUpcomingMilestonesTool: ToolDefinition<GetUpcomingMilestonesArgs, z.infer<typeof MilestoneListOutputSchema>> = {
   name: "get_upcoming_milestones",
+  title: "Get Upcoming Milestones",
   description: "Get a list of upcoming milestones within a time frame",
   schema: getUpcomingMilestonesSchema as unknown as ToolSchema<GetUpcomingMilestonesArgs>,
+  outputSchema: MilestoneListOutputSchema,
+  annotations: ANNOTATION_PATTERNS.readOnly,
   examples: [
     {
       name: "List upcoming milestones",
@@ -1454,10 +1602,13 @@ export const scheduleTriagingSchema = z.object({
 export type ScheduleTriagingArgs = z.infer<typeof scheduleTriagingSchema>;
 
 // Project tools
-export const updateProjectTool: ToolDefinition<UpdateProjectArgs> = {
+export const updateProjectTool: ToolDefinition<UpdateProjectArgs, z.infer<typeof ProjectOutputSchema>> = {
   name: "update_project",
+  title: "Update Project",
   description: "Update an existing GitHub project",
   schema: updateProjectSchema as unknown as ToolSchema<UpdateProjectArgs>,
+  outputSchema: ProjectOutputSchema,
+  annotations: ANNOTATION_PATTERNS.updateIdempotent,
   examples: [
     {
       name: "Update project title and visibility",
@@ -1479,10 +1630,13 @@ export const updateProjectTool: ToolDefinition<UpdateProjectArgs> = {
   ]
 };
 
-export const deleteProjectTool: ToolDefinition<DeleteProjectArgs> = {
+export const deleteProjectTool: ToolDefinition<DeleteProjectArgs, z.infer<typeof DeleteOutputSchema>> = {
   name: "delete_project",
+  title: "Delete Project",
   description: "Delete a GitHub project",
   schema: deleteProjectSchema as unknown as ToolSchema<DeleteProjectArgs>,
+  outputSchema: DeleteOutputSchema,
+  annotations: ANNOTATION_PATTERNS.delete,
   examples: [
     {
       name: "Delete project",
@@ -1494,10 +1648,13 @@ export const deleteProjectTool: ToolDefinition<DeleteProjectArgs> = {
   ]
 };
 
-export const getProjectReadmeTool: ToolDefinition<GetProjectReadmeArgs> = {
+export const getProjectReadmeTool: ToolDefinition<GetProjectReadmeArgs, z.infer<typeof ProjectReadmeOutputSchema>> = {
   name: "get_project_readme",
+  title: "Get Project README",
   description: "Get the README content of a GitHub project",
   schema: getProjectReadmeSchema as unknown as ToolSchema<GetProjectReadmeArgs>,
+  outputSchema: ProjectReadmeOutputSchema,
+  annotations: ANNOTATION_PATTERNS.readOnly,
   examples: [
     {
       name: "Get project README",
@@ -1509,10 +1666,13 @@ export const getProjectReadmeTool: ToolDefinition<GetProjectReadmeArgs> = {
   ]
 };
 
-export const updateProjectReadmeTool: ToolDefinition<UpdateProjectReadmeArgs> = {
+export const updateProjectReadmeTool: ToolDefinition<UpdateProjectReadmeArgs, z.infer<typeof ProjectReadmeOutputSchema>> = {
   name: "update_project_readme",
+  title: "Update Project README",
   description: "Update the README content of a GitHub project",
   schema: updateProjectReadmeSchema as unknown as ToolSchema<UpdateProjectReadmeArgs>,
+  outputSchema: ProjectReadmeOutputSchema,
+  annotations: ANNOTATION_PATTERNS.updateIdempotent,
   examples: [
     {
       name: "Set project README",
@@ -1525,10 +1685,13 @@ export const updateProjectReadmeTool: ToolDefinition<UpdateProjectReadmeArgs> = 
   ]
 };
 
-export const listProjectFieldsTool: ToolDefinition<ListProjectFieldsArgs> = {
+export const listProjectFieldsTool: ToolDefinition<ListProjectFieldsArgs, z.infer<typeof ProjectFieldListOutputSchema>> = {
   name: "list_project_fields",
+  title: "List Project Fields",
   description: "List all fields in a GitHub project",
   schema: listProjectFieldsSchema as unknown as ToolSchema<ListProjectFieldsArgs>,
+  outputSchema: ProjectFieldListOutputSchema,
+  annotations: ANNOTATION_PATTERNS.readOnly,
   examples: [
     {
       name: "List project fields",
@@ -1540,10 +1703,13 @@ export const listProjectFieldsTool: ToolDefinition<ListProjectFieldsArgs> = {
   ]
 };
 
-export const updateProjectFieldTool: ToolDefinition<UpdateProjectFieldArgs> = {
+export const updateProjectFieldTool: ToolDefinition<UpdateProjectFieldArgs, z.infer<typeof ProjectFieldOutputSchema>> = {
   name: "update_project_field",
+  title: "Update Project Field",
   description: "Update a custom field in a GitHub project",
   schema: updateProjectFieldSchema as unknown as ToolSchema<UpdateProjectFieldArgs>,
+  outputSchema: ProjectFieldOutputSchema,
+  annotations: ANNOTATION_PATTERNS.updateIdempotent,
   examples: [
     {
       name: "Update field options",
@@ -1563,10 +1729,13 @@ export const updateProjectFieldTool: ToolDefinition<UpdateProjectFieldArgs> = {
   ]
 };
 
-export const addProjectItemTool: ToolDefinition<AddProjectItemArgs> = {
+export const addProjectItemTool: ToolDefinition<AddProjectItemArgs, z.infer<typeof ProjectItemAddOutputSchema>> = {
   name: "add_project_item",
+  title: "Add Project Item",
   description: "Add an item to a GitHub project",
   schema: addProjectItemSchema as unknown as ToolSchema<AddProjectItemArgs>,
+  outputSchema: ProjectItemAddOutputSchema,
+  annotations: ANNOTATION_PATTERNS.updateIdempotent,
   examples: [
     {
       name: "Add issue to project",
@@ -1580,10 +1749,13 @@ export const addProjectItemTool: ToolDefinition<AddProjectItemArgs> = {
   ]
 };
 
-export const removeProjectItemTool: ToolDefinition<RemoveProjectItemArgs> = {
+export const removeProjectItemTool: ToolDefinition<RemoveProjectItemArgs, z.infer<typeof DeleteOutputSchema>> = {
   name: "remove_project_item",
+  title: "Remove Project Item",
   description: "Remove an item from a GitHub project",
   schema: removeProjectItemSchema as unknown as ToolSchema<RemoveProjectItemArgs>,
+  outputSchema: DeleteOutputSchema,
+  annotations: ANNOTATION_PATTERNS.delete,
   examples: [
     {
       name: "Remove item from project",
@@ -1596,10 +1768,13 @@ export const removeProjectItemTool: ToolDefinition<RemoveProjectItemArgs> = {
   ]
 };
 
-export const listProjectItemsTool: ToolDefinition<ListProjectItemsArgs> = {
+export const listProjectItemsTool: ToolDefinition<ListProjectItemsArgs, z.infer<typeof ProjectItemListOutputSchema>> = {
   name: "list_project_items",
+  title: "List Project Items",
   description: "List all items in a GitHub project",
   schema: listProjectItemsSchema as unknown as ToolSchema<ListProjectItemsArgs>,
+  outputSchema: ProjectItemListOutputSchema,
+  annotations: ANNOTATION_PATTERNS.readOnly,
   examples: [
     {
       name: "List project items",
@@ -1612,10 +1787,13 @@ export const listProjectItemsTool: ToolDefinition<ListProjectItemsArgs> = {
   ]
 };
 
-export const archiveProjectItemTool: ToolDefinition<ArchiveProjectItemArgs> = {
+export const archiveProjectItemTool: ToolDefinition<ArchiveProjectItemArgs, z.infer<typeof SuccessOutputSchema>> = {
   name: "archive_project_item",
+  title: "Archive Project Item",
   description: "Archive an item in a GitHub project. Archived items are hidden from views but not deleted.",
   schema: archiveProjectItemSchema as unknown as ToolSchema<ArchiveProjectItemArgs>,
+  outputSchema: SuccessOutputSchema,
+  annotations: ANNOTATION_PATTERNS.updateIdempotent,
   examples: [
     {
       name: "Archive completed task",
@@ -1628,10 +1806,13 @@ export const archiveProjectItemTool: ToolDefinition<ArchiveProjectItemArgs> = {
   ]
 };
 
-export const unarchiveProjectItemTool: ToolDefinition<UnarchiveProjectItemArgs> = {
+export const unarchiveProjectItemTool: ToolDefinition<UnarchiveProjectItemArgs, z.infer<typeof SuccessOutputSchema>> = {
   name: "unarchive_project_item",
+  title: "Unarchive Project Item",
   description: "Unarchive an item in a GitHub project. Brings back a previously archived item.",
   schema: unarchiveProjectItemSchema as unknown as ToolSchema<UnarchiveProjectItemArgs>,
+  outputSchema: SuccessOutputSchema,
+  annotations: ANNOTATION_PATTERNS.updateIdempotent,
   examples: [
     {
       name: "Unarchive task",
@@ -1644,10 +1825,13 @@ export const unarchiveProjectItemTool: ToolDefinition<UnarchiveProjectItemArgs> 
   ]
 };
 
-export const setFieldValueTool: ToolDefinition<SetFieldValueArgs> = {
+export const setFieldValueTool: ToolDefinition<SetFieldValueArgs, z.infer<typeof FieldValueOutputSchema>> = {
   name: "set_field_value",
+  title: "Set Field Value",
   description: "Set a field value for a GitHub project item. Supports all field types: TEXT, NUMBER, DATE, SINGLE_SELECT, ITERATION, MILESTONE, ASSIGNEES, LABELS",
   schema: setFieldValueSchema as unknown as ToolSchema<SetFieldValueArgs>,
+  outputSchema: FieldValueOutputSchema,
+  annotations: ANNOTATION_PATTERNS.updateIdempotent,
   examples: [
     {
       name: "Set text field value",
@@ -1752,10 +1936,13 @@ export const setFieldValueTool: ToolDefinition<SetFieldValueArgs> = {
   ]
 };
 
-export const getFieldValueTool: ToolDefinition<GetFieldValueArgs> = {
+export const getFieldValueTool: ToolDefinition<GetFieldValueArgs, z.infer<typeof FieldValueOutputSchema>> = {
   name: "get_field_value",
+  title: "Get Field Value",
   description: "Get a field value for a GitHub project item. Supports reading all field types: TEXT, NUMBER, DATE, SINGLE_SELECT, ITERATION, MILESTONE, ASSIGNEES, LABELS",
   schema: getFieldValueSchema as unknown as ToolSchema<GetFieldValueArgs>,
+  outputSchema: FieldValueOutputSchema,
+  annotations: ANNOTATION_PATTERNS.readOnly,
   examples: [
     {
       name: "Get text field value",
@@ -1814,10 +2001,13 @@ export const getFieldValueTool: ToolDefinition<GetFieldValueArgs> = {
   ]
 };
 
-export const clearFieldValueTool: ToolDefinition<ClearFieldValueArgs> = {
+export const clearFieldValueTool: ToolDefinition<ClearFieldValueArgs, z.infer<typeof SuccessOutputSchema>> = {
   name: "clear_field_value",
+  title: "Clear Field Value",
   description: "Clear a field value for a GitHub project item. This removes/clears the value for any field type.",
   schema: clearFieldValueSchema as unknown as ToolSchema<ClearFieldValueArgs>,
+  outputSchema: SuccessOutputSchema,
+  annotations: ANNOTATION_PATTERNS.updateIdempotent,
   examples: [
     {
       name: "Clear status field",
@@ -1840,10 +2030,13 @@ export const clearFieldValueTool: ToolDefinition<ClearFieldValueArgs> = {
   ]
 };
 
-export const listProjectViewsTool: ToolDefinition<ListProjectViewsArgs> = {
+export const listProjectViewsTool: ToolDefinition<ListProjectViewsArgs, z.infer<typeof ProjectViewListOutputSchema>> = {
   name: "list_project_views",
+  title: "List Project Views",
   description: "List all views in a GitHub project",
   schema: listProjectViewsSchema as unknown as ToolSchema<ListProjectViewsArgs>,
+  outputSchema: ProjectViewListOutputSchema,
+  annotations: ANNOTATION_PATTERNS.readOnly,
   examples: [
     {
       name: "List project views",
@@ -1855,10 +2048,13 @@ export const listProjectViewsTool: ToolDefinition<ListProjectViewsArgs> = {
   ]
 };
 
-export const updateProjectViewTool: ToolDefinition<UpdateProjectViewArgs> = {
+export const updateProjectViewTool: ToolDefinition<UpdateProjectViewArgs, z.infer<typeof ProjectViewOutputSchema>> = {
   name: "update_project_view",
+  title: "Update Project View",
   description: "Update a view in a GitHub project",
   schema: updateProjectViewSchema as unknown as ToolSchema<UpdateProjectViewArgs>,
+  outputSchema: ProjectViewOutputSchema,
+  annotations: ANNOTATION_PATTERNS.updateIdempotent,
   examples: [
     {
       name: "Update view to timeline",
@@ -1873,10 +2069,13 @@ export const updateProjectViewTool: ToolDefinition<UpdateProjectViewArgs> = {
   ]
 };
 
-export const deleteProjectViewTool: ToolDefinition<DeleteProjectViewArgs> = {
+export const deleteProjectViewTool: ToolDefinition<DeleteProjectViewArgs, z.infer<typeof DeleteOutputSchema>> = {
   name: "delete_project_view",
+  title: "Delete Project View",
   description: "Delete a view from a GitHub project",
   schema: deleteProjectViewSchema as unknown as ToolSchema<DeleteProjectViewArgs>,
+  outputSchema: DeleteOutputSchema,
+  annotations: ANNOTATION_PATTERNS.delete,
   examples: [
     {
       name: "Delete project view",
@@ -1889,10 +2088,13 @@ export const deleteProjectViewTool: ToolDefinition<DeleteProjectViewArgs> = {
   ]
 };
 
-export const updateMilestoneTool: ToolDefinition<UpdateMilestoneArgs> = {
+export const updateMilestoneTool: ToolDefinition<UpdateMilestoneArgs, z.infer<typeof MilestoneOutputSchema>> = {
   name: "update_milestone",
+  title: "Update Milestone",
   description: "Update a GitHub milestone",
   schema: updateMilestoneSchema as unknown as ToolSchema<UpdateMilestoneArgs>,
+  outputSchema: MilestoneOutputSchema,
+  annotations: ANNOTATION_PATTERNS.updateIdempotent,
   examples: [
     {
       name: "Update milestone due date",
@@ -1914,10 +2116,13 @@ export const updateMilestoneTool: ToolDefinition<UpdateMilestoneArgs> = {
   ]
 };
 
-export const deleteMilestoneTool: ToolDefinition<DeleteMilestoneArgs> = {
+export const deleteMilestoneTool: ToolDefinition<DeleteMilestoneArgs, z.infer<typeof DeleteOutputSchema>> = {
   name: "delete_milestone",
+  title: "Delete Milestone",
   description: "Delete a GitHub milestone",
   schema: deleteMilestoneSchema as unknown as ToolSchema<DeleteMilestoneArgs>,
+  outputSchema: DeleteOutputSchema,
+  annotations: ANNOTATION_PATTERNS.delete,
   examples: [
     {
       name: "Delete milestone",
@@ -1929,10 +2134,13 @@ export const deleteMilestoneTool: ToolDefinition<DeleteMilestoneArgs> = {
   ]
 };
 
-export const updateSprintTool: ToolDefinition<UpdateSprintArgs> = {
+export const updateSprintTool: ToolDefinition<UpdateSprintArgs, z.infer<typeof SprintOutputSchema>> = {
   name: "update_sprint",
+  title: "Update Sprint",
   description: "Update a development sprint",
   schema: updateSprintSchema as unknown as ToolSchema<UpdateSprintArgs>,
+  outputSchema: SprintOutputSchema,
+  annotations: ANNOTATION_PATTERNS.updateIdempotent,
   examples: [
     {
       name: "Update sprint dates",
@@ -1947,10 +2155,13 @@ export const updateSprintTool: ToolDefinition<UpdateSprintArgs> = {
   ]
 };
 
-export const addIssuesToSprintTool: ToolDefinition<AddIssuesToSprintArgs> = {
+export const addIssuesToSprintTool: ToolDefinition<AddIssuesToSprintArgs, z.infer<typeof SprintOutputSchema>> = {
   name: "add_issues_to_sprint",
+  title: "Add Issues to Sprint",
   description: "Add issues to an existing sprint",
   schema: addIssuesToSprintSchema as unknown as ToolSchema<AddIssuesToSprintArgs>,
+  outputSchema: SprintOutputSchema,
+  annotations: ANNOTATION_PATTERNS.updateIdempotent,
   examples: [
     {
       name: "Add issues to sprint",
@@ -1963,10 +2174,13 @@ export const addIssuesToSprintTool: ToolDefinition<AddIssuesToSprintArgs> = {
   ]
 };
 
-export const removeIssuesFromSprintTool: ToolDefinition<RemoveIssuesFromSprintArgs> = {
+export const removeIssuesFromSprintTool: ToolDefinition<RemoveIssuesFromSprintArgs, z.infer<typeof SprintOutputSchema>> = {
   name: "remove_issues_from_sprint",
+  title: "Remove Issues from Sprint",
   description: "Remove issues from a sprint",
   schema: removeIssuesFromSprintSchema as unknown as ToolSchema<RemoveIssuesFromSprintArgs>,
+  outputSchema: SprintOutputSchema,
+  annotations: ANNOTATION_PATTERNS.updateIdempotent,
   examples: [
     {
       name: "Remove issues from sprint",
