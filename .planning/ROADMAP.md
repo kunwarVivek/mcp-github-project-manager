@@ -54,7 +54,7 @@ Plans:
 **Requirements:**
 - MCP-01: Upgrade SDK from 1.12.0 to 1.25.2
 - MCP-02: Update all imports for new SDK structure
-- MCP-03: Verify all 71 tools work after upgrade
+- MCP-03: Verify all 84 tools work after upgrade
 - MCP-04: Update protocol version negotiation
 - MCP-05: Add behavior annotations to all destructive tools
 - MCP-06: Add read-only annotations to all query tools
@@ -70,10 +70,20 @@ Plans:
 
 **Success Criteria:**
 1. MCP SDK version is 1.25.2 in package.json
-2. All 71 tools execute successfully with new SDK
+2. All 84 tools execute successfully with new SDK
 3. Every destructive tool has behavior annotation visible to clients
 4. Every tool has output schema that matches actual return type
 5. Error responses include proper MCP error codes and data payloads
+
+**Plans:** 7 plans
+Plans:
+- [ ] 02-01-PLAN.md - SDK upgrade and import fixes
+- [ ] 02-02-PLAN.md - Tool infrastructure extension (annotations, outputSchema)
+- [ ] 02-03-PLAN.md - Error handling enhancement (MCP error codes)
+- [ ] 02-04-PLAN.md - Project tools annotations and schemas
+- [ ] 02-05-PLAN.md - Issue and PR tools annotations and schemas
+- [ ] 02-06-PLAN.md - AI and automation tools annotations and schemas
+- [ ] 02-07-PLAN.md - Final verification
 
 ---
 
