@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { ProjectManagementService } from '../../../services/ProjectManagementService';
+import { createProjectManagementService } from '../../../container';
 import { GitHubProjectRepository } from '../../../infrastructure/github/repositories/GitHubProjectRepository';
 import { GitHubMilestoneRepository } from '../../../infrastructure/github/repositories/GitHubMilestoneRepository';
 import { GitHubIssueRepository } from '../../../infrastructure/github/repositories/GitHubIssueRepository';
@@ -17,25 +18,27 @@ describe('ProjectManagementService', () => {
   let milestoneRepo: jest.Mocked<GitHubMilestoneRepository>;
   let issueRepo: jest.Mocked<GitHubIssueRepository>;
   let mockGraphql: jest.MockedFunction<any>;
-  
+
   beforeEach(() => {
     // Clear all mocks
     jest.clearAllMocks();
-    
-    // Create mock service with mock factories
+
+    // Create mock service with mock factories using the DI helper
     const owner = "test-owner";
     const repo = "test-repo";
     const token = "test-token";
-    
-    // Create service with proper constructor parameters
-    service = new ProjectManagementService(owner, repo, token);
-    
-    // Mock the GraphQL factory method
+
+    // Create service using the DI helper function
+    service = createProjectManagementService(owner, repo, token);
+
+    // Mock the GraphQL factory method by accessing the factory directly
     mockGraphql = jest.fn() as jest.MockedFunction<any>;
-    Object.defineProperty(service, 'factory', {
-      value: { graphql: mockGraphql }
+    const factory = service.getRepositoryFactory();
+    Object.defineProperty(factory, 'graphql', {
+      value: mockGraphql,
+      writable: true
     });
-    
+
     // Mock the implementation of the getter methods to return our mocks
     const mockProjectRepo = {
       findAll: jest.fn(),
@@ -44,7 +47,7 @@ describe('ProjectManagementService', () => {
       update: jest.fn(),
       delete: jest.fn()
     };
-    
+
     const mockMilestoneRepo = {
       findAll: jest.fn(),
       findById: jest.fn(),
@@ -53,7 +56,7 @@ describe('ProjectManagementService', () => {
       delete: jest.fn(),
       getIssues: jest.fn()
     };
-    
+
     const mockIssueRepo = {
       findAll: jest.fn(),
       findById: jest.fn(),
@@ -62,18 +65,21 @@ describe('ProjectManagementService', () => {
       delete: jest.fn(),
       findByMilestone: jest.fn()
     };
-    
-    // Create spy objects to replace getters
-    Object.defineProperty(service, 'projectRepo', { 
-      get: jest.fn().mockReturnValue(mockProjectRepo) 
+
+    // Mock the factory's create methods
+    Object.defineProperty(factory, 'createProjectRepository', {
+      value: jest.fn().mockReturnValue(mockProjectRepo),
+      writable: true
     });
-    Object.defineProperty(service, 'milestoneRepo', { 
-      get: jest.fn().mockReturnValue(mockMilestoneRepo) 
+    Object.defineProperty(factory, 'createMilestoneRepository', {
+      value: jest.fn().mockReturnValue(mockMilestoneRepo),
+      writable: true
     });
-    Object.defineProperty(service, 'issueRepo', { 
-      get: jest.fn().mockReturnValue(mockIssueRepo) 
+    Object.defineProperty(factory, 'createIssueRepository', {
+      value: jest.fn().mockReturnValue(mockIssueRepo),
+      writable: true
     });
-    
+
     // Store the mocks for later assertions
     projectRepo = mockProjectRepo as unknown as jest.Mocked<GitHubProjectRepository>;
     milestoneRepo = mockMilestoneRepo as unknown as jest.Mocked<GitHubMilestoneRepository>;
