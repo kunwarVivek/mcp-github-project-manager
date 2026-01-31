@@ -88,20 +88,20 @@ describe('TaskContextGenerationService', () => {
 
       // Assert
       expect(result).toBeDefined();
-      expect(result.businessObjective).toBeDefined();
-      expect(result.businessObjective).toContain('Improve team productivity by 30%');
-      expect(result.userImpact).toBeDefined();
-      expect(result.successMetrics).toBeDefined();
-      expect(Array.isArray(result.successMetrics)).toBe(true);
-      expect(result.successMetrics.length).toBeGreaterThan(0);
-      expect(result.parentFeature).toBeDefined();
-      expect(result.parentFeature.title).toBeDefined();
-      expect(result.technicalConstraints).toBeDefined();
-      expect(result.architecturalDecisions).toBeDefined();
-      expect(result.integrationPoints).toBeDefined();
-      expect(result.dataRequirements).toBeDefined();
-      expect(result.prdContextSummary).toBeDefined();
-      expect(result.prdContextSummary.relevantObjectives).toContain('Improve team productivity by 30%');
+      expect(result.context.businessObjective).toBeDefined();
+      expect(result.context.businessObjective).toContain('Improve team productivity by 30%');
+      expect(result.context.userImpact).toBeDefined();
+      expect(result.context.successMetrics).toBeDefined();
+      expect(Array.isArray(result.context.successMetrics)).toBe(true);
+      expect(result.context.successMetrics.length).toBeGreaterThan(0);
+      expect(result.context.parentFeature).toBeDefined();
+      expect(result.context.parentFeature.title).toBeDefined();
+      expect(result.context.technicalConstraints).toBeDefined();
+      expect(result.context.architecturalDecisions).toBeDefined();
+      expect(result.context.integrationPoints).toBeDefined();
+      expect(result.context.dataRequirements).toBeDefined();
+      expect(result.context.prdContextSummary).toBeDefined();
+      expect(result.context.prdContextSummary.relevantObjectives).toContain('Improve team productivity by 30%');
     });
 
     it('should handle string PRD input correctly', async () => {
@@ -126,10 +126,10 @@ describe('TaskContextGenerationService', () => {
 
       // Assert
       expect(result).toBeDefined();
-      expect(result.businessObjective).toBeDefined();
-      expect(result.userImpact).toBeDefined();
-      expect(result.successMetrics).toBeDefined();
-      expect(result.parentFeature).toBeDefined();
+      expect(result.context.businessObjective).toBeDefined();
+      expect(result.context.userImpact).toBeDefined();
+      expect(result.context.successMetrics).toBeDefined();
+      expect(result.context.parentFeature).toBeDefined();
     });
 
     it('should provide minimal context as fallback for invalid PRD', async () => {
@@ -154,14 +154,14 @@ describe('TaskContextGenerationService', () => {
 
       // Assert
       expect(result).toBeDefined();
-      expect(result.businessObjective).toBeDefined();
-      expect(result.businessObjective.length).toBeGreaterThan(0);
-      expect(result.userImpact).toBeDefined();
-      expect(result.userImpact.length).toBeGreaterThan(0);
-      expect(result.successMetrics).toBeDefined();
-      expect(Array.isArray(result.successMetrics)).toBe(true);
-      expect(result.parentFeature).toBeDefined();
-      expect(result.parentFeature.title).toBeDefined();
+      expect(result.context.businessObjective).toBeDefined();
+      expect(result.context.businessObjective.length).toBeGreaterThan(0);
+      expect(result.context.userImpact).toBeDefined();
+      expect(result.context.userImpact.length).toBeGreaterThan(0);
+      expect(result.context.successMetrics).toBeDefined();
+      expect(Array.isArray(result.context.successMetrics)).toBe(true);
+      expect(result.context.parentFeature).toBeDefined();
+      expect(result.context.parentFeature.title).toBeDefined();
     });
   });
 
@@ -226,10 +226,10 @@ describe('TaskContextGenerationService', () => {
 
       // Assert
       expect(result).toBeDefined();
-      expect(result.businessObjective).toBeDefined();
-      expect(result.userImpact).toBeDefined();
-      expect(result.successMetrics).toBeDefined();
-      expect(result.parentFeature).toBeDefined();
+      expect(result.context.businessObjective).toBeDefined();
+      expect(result.context.userImpact).toBeDefined();
+      expect(result.context.successMetrics).toBeDefined();
+      expect(result.context.parentFeature).toBeDefined();
     });
 
     it('should handle different context levels', async () => {
@@ -253,8 +253,8 @@ describe('TaskContextGenerationService', () => {
         const result = await service.generateTaskContext(mockTask, mockPRD, config);
 
         expect(result).toBeDefined();
-        expect(result.businessObjective).toBeDefined();
-        expect(result.parentFeature).toBeDefined();
+        expect(result.context.businessObjective).toBeDefined();
+        expect(result.context.parentFeature).toBeDefined();
       }
     });
   });
