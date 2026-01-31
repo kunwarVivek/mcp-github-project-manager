@@ -2,6 +2,7 @@ import { GitHubError } from './types';
 import { ResourceNotFoundError } from '../../domain/errors';
 import { MCPErrorCode } from '../../domain/mcp-types';
 import { ResourceType } from '../../domain/resource-types';
+import { isGitHubErrorWithCode } from '../../domain/type-guards';
 
 export class GitHubApiError extends Error {
   constructor(
@@ -74,7 +75,7 @@ export class GitHubErrorHandler {
     if (status && this.retryableStatusCodes.has(status)) return true;
 
     // Check error codes
-    const code = (error as any).code;
+    const code = isGitHubErrorWithCode(error) ? error.code : undefined;
     if (code && this.retryableErrorCodes.has(code)) return true;
 
     // Check rate limit

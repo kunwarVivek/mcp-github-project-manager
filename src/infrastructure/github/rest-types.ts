@@ -1,5 +1,6 @@
 import { Octokit } from "@octokit/rest";
 import { components } from "@octokit/openapi-types";
+import { hasRestUserProperties } from "../../domain/type-guards";
 
 type OctokitIssue = components["schemas"]["issue"];
 
@@ -241,9 +242,9 @@ export function mapOctokitResponseToRestIssue(response: OctokitIssue): RestIssue
     user: {
       login: user.login,
       id: user.id,
-      avatar_url: (user as any).avatar_url,
-      gravatar_id: (user as any).gravatar_id ?? null,
-      url: (user as any).url,
+      avatar_url: hasRestUserProperties(user) ? user.avatar_url : undefined,
+      gravatar_id: hasRestUserProperties(user) ? (user.gravatar_id ?? null) : null,
+      url: hasRestUserProperties(user) ? user.url : undefined,
     },
   };
 }

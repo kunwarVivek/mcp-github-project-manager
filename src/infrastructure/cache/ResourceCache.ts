@@ -1,5 +1,6 @@
 import { Resource, ResourceCacheOptions, ResourceType } from "../../domain/resource-types";
 import { SyncMetadata } from "../../services/GitHubStateSyncService";
+import { isCacheableResource } from "../../domain/type-guards";
 
 interface CacheEntry<T> {
   value: T;
@@ -56,8 +57,8 @@ export class ResourceCache {
       value,
       expiresAt,
       tags,
-      lastModified: (value as any).updatedAt || new Date().toISOString(),
-      version: (value as any).version || 1,
+      lastModified: isCacheableResource(value) && value.updatedAt ? value.updatedAt : new Date().toISOString(),
+      version: isCacheableResource(value) && value.version ? value.version : 1,
     };
 
     const cacheKey = this.getCacheKey(type, id);
