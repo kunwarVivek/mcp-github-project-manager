@@ -146,6 +146,14 @@ Plans:
 4. ContextualReferenceGenerator has 90%+ coverage
 5. All AI fallback paths have test coverage
 
+**Plans:** 5 plans
+Plans:
+- [ ] 04-01-PLAN.md - Fix test syntax errors (type access, test.skip, regex)
+- [ ] 04-02-PLAN.md - Add credential guards to E2E tests
+- [ ] 04-03-PLAN.md - Add unit tests for ContextualReferenceGenerator
+- [ ] 04-04-PLAN.md - Add unit tests for DependencyContextGenerator and ContextQualityValidator
+- [ ] 04-05-PLAN.md - Coverage verification and phase completion
+
 ---
 
 ### Phase 5: Resilience and Observability
