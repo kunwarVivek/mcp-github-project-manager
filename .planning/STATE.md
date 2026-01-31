@@ -6,11 +6,11 @@
 ## Current Position
 
 **Phase:** 4 of 12 (Test Stabilization)
-**Plan:** 2 of X in progress
+**Plan:** 3 of X complete
 **Status:** In progress
-**Last activity:** 2026-01-31 - Completed 04-02-PLAN.md (E2E Credential Guards)
+**Last activity:** 2026-01-31 - Completed 04-03-PLAN.md (ContextualReferenceGenerator Tests)
 
-**Progress:** [████████░░] 45% (Phase 1-3 complete, Phase 4 in progress)
+**Progress:** [████████░░] 47% (Phase 1-3 complete, Phase 4 in progress)
 
 ## Project Progress
 
@@ -18,13 +18,13 @@
 |--------|-------|
 | Phases Complete | 3/12 |
 | Requirements Done | 22/99 |
-| Current Phase Progress | Phase 4: 2/X plans complete |
+| Current Phase Progress | Phase 4: 3/X plans complete |
 
 ## Performance Metrics
 
 | Metric | Value | Notes |
 |--------|-------|-------|
-| Plans Executed | 19 | Phase 1-3 complete (17), Phase 4: 2 in progress |
+| Plans Executed | 20 | Phase 1-3 complete (17), Phase 4: 3 in progress |
 | Requirements Completed | 22 | DEBT-01 through DEBT-07, MCP-01 through MCP-15 |
 | Iterations | 1 | Gap closure cycle for test regressions |
 | Blockers Resolved | 3 | tsyringe decorators, reflect-metadata, MCP SDK type instantiation |
@@ -63,6 +63,8 @@
 | as any audit classification | documented exception vs out-of-scope vs unexpected | 2026-01-31 |
 | Credential guard pattern | if (!utils) { console.log('Skipping...'); return; } | 2026-01-31 |
 | Real credential detection | hasRealCredentials() to detect fake test tokens | 2026-01-31 |
+| AI service mocking pattern | Mock AIServiceFactory and 'ai' package; set up before service instantiation | 2026-01-31 |
+| Fallback-first testing | Use fallback mode for most edge case tests; more deterministic | 2026-01-31 |
 
 ### Learnings
 
@@ -84,6 +86,9 @@
 - Type guards that narrow types also serve as runtime validators for external input
 - E2E tests need credential guards to skip gracefully when credentials are missing
 - createTestSuite must always register tests (skip inside) to avoid "no tests" Jest error
+- AI service mocking: mock factory BEFORE service instantiation; mock 'ai' package's generateObject
+- Fallback path testing is more deterministic than AI path testing (no mock response shaping needed)
+- For 100% branch coverage, test edge cases like missing IDs, non-Error thrown objects
 
 ### Open Todos
 
@@ -104,6 +109,7 @@
 - [x] Execute 03-05: Final Type Safety Verification (16+ total `as any` removed)
 - [x] Execute 04-01: Test Foundation Fixes
 - [x] Execute 04-02: E2E Credential Guards
+- [x] Execute 04-03: ContextualReferenceGenerator Tests (100% coverage)
 - [ ] Continue Phase 4 Test Stabilization
 - [ ] Consider future extraction: IssueService, PullRequestService, AutomationService
 
@@ -209,6 +215,7 @@
 |------|------|--------|-------------|
 | 04-01 | Test Foundation Fixes | Complete | Fixed 3 test files |
 | 04-02 | E2E Credential Guards | Complete | 41 tests with credential guards |
+| 04-03 | ContextualReferenceGenerator Tests | Complete | 45 tests, 100% coverage |
 
 **Test Stabilization Progress:**
 
@@ -217,17 +224,19 @@
 | E2E tests skip gracefully without credentials | PASS |
 | No "Bad credentials" errors | PASS |
 | No TypeError about undefined utils | PASS |
+| ContextualReferenceGenerator coverage | 100% |
 
 ## Session Continuity
 
-**Last Session:** 2026-01-31 - Completed 04-02-PLAN.md
+**Last Session:** 2026-01-31 - Completed 04-03-PLAN.md
 
 **Context for Next Session:**
-- Phase 4 (Test Stabilization) in progress - 2 plans complete
-- 41 E2E tests now skip gracefully when credentials missing
+- Phase 4 (Test Stabilization) in progress - 3 plans complete
+- ContextualReferenceGenerator now has 100% test coverage (45 tests)
+- AI mocking pattern: mock AIServiceFactory and 'ai' package before service instantiation
 - Pattern: if (!utils) { console.log('Skipping...'); return; }
 - Pattern: hasRealCredentials() to detect fake test tokens
-- Next: Continue Phase 4 plans
+- Next: Continue Phase 4 plans (likely DependencyContextGenerator or ContextQualityValidator tests)
 
 **Architecture Context:**
 - DI container (src/container.ts) wires all 6 extracted services
