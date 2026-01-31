@@ -427,12 +427,14 @@ export const MCPTestHelpers = {
 
   /**
    * Skip test if required credentials are missing
+   * Note: Returns a boolean - caller should use console.log + return pattern
    */
-  skipIfMissingCredentials(testType: 'github' | 'ai' | 'both', testName: string): void {
+  skipIfMissingCredentials(testType: 'github' | 'ai' | 'both', testName: string): boolean {
     if (MCPToolTestUtils.shouldSkipTest(testType)) {
-      test.skip(`${testName} - missing credentials for ${testType} tests`, () => {});
-      return;
+      console.log(`Skipping: ${testName} - missing credentials for ${testType} tests`);
+      return true;
     }
+    return false;
   },
 
   /**

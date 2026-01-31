@@ -6,7 +6,7 @@ import { MCPToolTestUtils, MCPTestHelpers } from '../utils/MCPToolTestUtils';
  */
 
 describe('Tool Integration Workflows E2E', () => {
-  let utils: MCPToolTestUtils;
+  let utils: MCPToolTestUtils | undefined;
   let workflowProjectId: string;
   let workflowMilestoneId: string;
   let workflowIssueIds: string[] = [];
@@ -15,7 +15,7 @@ describe('Tool Integration Workflows E2E', () => {
 
   beforeAll(async () => {
     if (MCPToolTestUtils.shouldSkipTest('both')) {
-      console.log('⏭️  Skipping Tool Integration Workflows E2E - missing credentials for both tests');
+      console.log('Skipping Tool Integration Workflows E2E - missing credentials for both tests');
       return;
     }
 
@@ -29,16 +29,13 @@ describe('Tool Integration Workflows E2E', () => {
     }
   }, 10000);
 
-  beforeEach(() => {
-    if (MCPToolTestUtils.shouldSkipTest('both')) {
-      test.skip('Skipping test - missing credentials for both tests');
-    }
-  });
+  // Note: Tests have individual guards for when utils is undefined
+  // because beforeAll may skip initialization when credentials are missing
 
   describe('Complete Project Setup Workflow', () => {
     it('should execute complete project creation workflow', async () => {
-      if (MCPToolTestUtils.shouldSkipTest('both')) {
-        test.skip('Skipping test - missing credentials for both tests');
+      if (!utils) {
+        console.log('Skipping: utils not initialized (missing credentials)');
         return;
       }
 
@@ -102,6 +99,11 @@ describe('Tool Integration Workflows E2E', () => {
 
   describe('Roadmap Creation and Sprint Planning Workflow', () => {
     it('should create comprehensive roadmap with multiple milestones', async () => {
+      if (!utils) {
+        console.log('Skipping: utils not initialized (missing credentials)');
+        return;
+      }
+
       const roadmapData = {
         project: {
           title: 'ProjectHub Pro Roadmap',
@@ -181,8 +183,12 @@ describe('Tool Integration Workflows E2E', () => {
     });
 
     it('should plan sprint with selected issues', async () => {
+      if (!utils) {
+        console.log('Skipping: utils not initialized (missing credentials)');
+        return;
+      }
       if (workflowIssueIds.length === 0) {
-        test.skip('No issues available for sprint planning');
+        console.log('Skipping: No issues available for sprint planning');
         return;
       }
 
@@ -214,8 +220,12 @@ describe('Tool Integration Workflows E2E', () => {
 
   describe('AI-Enhanced Project Management Workflow', () => {
     it('should enhance PRD with technical details', async () => {
+      if (!utils) {
+        console.log('Skipping: utils not initialized (missing credentials)');
+        return;
+      }
       if (!workflowPRDContent) {
-        test.skip('No PRD available for enhancement');
+        console.log('Skipping: No PRD available for enhancement');
         return;
       }
 
@@ -240,6 +250,11 @@ describe('Tool Integration Workflows E2E', () => {
     });
 
     it('should add new feature and generate tasks', async () => {
+      if (!utils) {
+        console.log('Skipping: utils not initialized (missing credentials)');
+        return;
+      }
+
       const featureResponse = await utils.callTool('add_feature', {
         featureIdea: 'Advanced Analytics Dashboard',
         description: 'Add comprehensive analytics with custom reports, data visualization, and export capabilities',
@@ -260,8 +275,12 @@ describe('Tool Integration Workflows E2E', () => {
     });
 
     it('should create traceability matrix for complete project', async () => {
+      if (!utils) {
+        console.log('Skipping: utils not initialized (missing credentials)');
+        return;
+      }
       if (!workflowPRDContent) {
-        test.skip('No PRD available for traceability matrix');
+        console.log('Skipping: No PRD available for traceability matrix');
         return;
       }
 
@@ -305,8 +324,12 @@ describe('Tool Integration Workflows E2E', () => {
 
   describe('Metrics and Monitoring Workflow', () => {
     it('should get comprehensive milestone metrics', async () => {
+      if (!utils) {
+        console.log('Skipping: utils not initialized (missing credentials)');
+        return;
+      }
       if (!workflowMilestoneId) {
-        test.skip('No milestone available for metrics');
+        console.log('Skipping: No milestone available for metrics');
         return;
       }
 
@@ -324,8 +347,12 @@ describe('Tool Integration Workflows E2E', () => {
     });
 
     it('should get sprint metrics with detailed analysis', async () => {
+      if (!utils) {
+        console.log('Skipping: utils not initialized (missing credentials)');
+        return;
+      }
       if (!workflowSprintId) {
-        test.skip('No sprint available for metrics');
+        console.log('Skipping: No sprint available for metrics');
         return;
       }
 
@@ -343,6 +370,11 @@ describe('Tool Integration Workflows E2E', () => {
     });
 
     it('should get upcoming milestones for planning', async () => {
+      if (!utils) {
+        console.log('Skipping: utils not initialized (missing credentials)');
+        return;
+      }
+
       const upcomingResponse = await utils.callTool('get_upcoming_milestones', {
         daysAhead: 30,
         limit: 10,
@@ -354,6 +386,11 @@ describe('Tool Integration Workflows E2E', () => {
     });
 
     it('should identify overdue milestones', async () => {
+      if (!utils) {
+        console.log('Skipping: utils not initialized (missing credentials)');
+        return;
+      }
+
       const overdueResponse = await utils.callTool('get_overdue_milestones', {
         limit: 5,
         includeIssues: true
@@ -366,6 +403,11 @@ describe('Tool Integration Workflows E2E', () => {
 
   describe('Task Management and Optimization Workflow', () => {
     it('should get next task recommendations for team', async () => {
+      if (!utils) {
+        console.log('Skipping: utils not initialized (missing credentials)');
+        return;
+      }
+
       const nextTaskResponse = await utils.callTool('get_next_task', {
         projectId: workflowProjectId || 'workflow-test',
         teamCapacity: 80,
@@ -384,6 +426,11 @@ describe('Tool Integration Workflows E2E', () => {
     });
 
     it('should analyze task complexity for planning', async () => {
+      if (!utils) {
+        console.log('Skipping: utils not initialized (missing credentials)');
+        return;
+      }
+
       const complexityResponse = await utils.callTool('analyze_task_complexity', {
         taskTitle: 'Implement real-time analytics engine',
         taskDescription: 'Build a scalable real-time analytics engine that can process large volumes of data and provide instant insights through WebSocket connections',
@@ -400,6 +447,11 @@ describe('Tool Integration Workflows E2E', () => {
     });
 
     it('should expand complex task into subtasks', async () => {
+      if (!utils) {
+        console.log('Skipping: utils not initialized (missing credentials)');
+        return;
+      }
+
       const expandResponse = await utils.callTool('expand_task', {
         taskTitle: 'Build comprehensive user management system',
         taskDescription: 'Create a complete user management system with authentication, authorization, profile management, and admin controls',
@@ -424,6 +476,11 @@ describe('Tool Integration Workflows E2E', () => {
 
   describe('End-to-End Workflow Validation', () => {
     it('should validate complete project lifecycle', async () => {
+      if (!utils) {
+        console.log('Skipping: utils not initialized (missing credentials)');
+        return;
+      }
+
       // Verify all created resources exist and are properly linked
       if (workflowProjectId) {
         const project = await utils.callTool('get_project', { projectId: workflowProjectId });
@@ -450,6 +507,11 @@ describe('Tool Integration Workflows E2E', () => {
     });
 
     it('should demonstrate tool interoperability', async () => {
+      if (!utils) {
+        console.log('Skipping: utils not initialized (missing credentials)');
+        return;
+      }
+
       // Test that tools work together seamlessly
       const tools = await utils.listTools();
       
