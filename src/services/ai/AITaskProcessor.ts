@@ -10,7 +10,10 @@ import {
   FeatureRequirement,
   TaskPriority,
   TaskStatus,
-  AIGenerationMetadata
+  AIGenerationMetadata,
+  SectionConfidence,
+  ConfidenceConfig,
+  DEFAULT_CONFIDENCE_CONFIG
 } from '../../domain/ai-types';
 import {
   PRD_PROMPT_CONFIGS,
@@ -20,6 +23,15 @@ import {
   TASK_PROMPT_CONFIGS,
   formatTaskPrompt
 } from './prompts/TaskGenerationPrompts';
+import {
+  CONFIDENCE_PROMPT_CONFIGS,
+  AIConfidenceAssessmentSchema,
+  withConfidenceAssessment
+} from './prompts/ConfidencePrompts';
+import {
+  ConfidenceScorer,
+  calculateInputCompleteness
+} from './ConfidenceScorer';
 import { v4 as uuidv4 } from 'uuid';
 
 /**
@@ -27,9 +39,11 @@ import { v4 as uuidv4 } from 'uuid';
  */
 export class AITaskProcessor {
   private aiFactory: AIServiceFactory;
+  private confidenceScorer: ConfidenceScorer;
 
   constructor() {
     this.aiFactory = AIServiceFactory.getInstance();
+    this.confidenceScorer = new ConfidenceScorer();
   }
 
   /**
@@ -93,6 +107,126 @@ export class AITaskProcessor {
       return prd;
     } catch (error) {
       process.stderr.write(`Error generating PRD from idea: ${error instanceof Error ? error.message : String(error)}\n`);
+      throw new Error(`Failed to generate PRD: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Generate PRD with per-section confidence scoring
+   */
+  async generatePRDWithConfidence(params: {
+    projectIdea: string;
+    targetUsers?: string;
+    timeline?: string;
+    complexity?: string;
+    confidenceConfig?: Partial<ConfidenceConfig>;
+  }): Promise<{
+    prd: PRDDocument;
+    sectionConfidence: SectionConfidence[];
+    overallConfidence: { score: number; tier: 'high' | 'medium' | 'low' };
+    lowConfidenceSections: SectionConfidence[];
+  }> {
+    const config = { ...DEFAULT_CONFIDENCE_CONFIG, ...params.confidenceConfig };
+
+    // Calculate input completeness
+    const inputCompleteness = calculateInputCompleteness({
+      description: params.projectIdea,
+      context: params.targetUsers,
+      constraints: params.timeline ? [params.timeline] : []
+    });
+
+    // Generate PRD with confidence request
+    const prdConfig = PRD_PROMPT_CONFIGS.generateFromIdea;
+    const model = this.getModelWithFallback('prd');
+
+    const prompt = formatPrompt(prdConfig.userPrompt, {
+      projectIdea: params.projectIdea,
+      targetUsers: params.targetUsers || 'General users',
+      timeline: params.timeline || '3-6 months',
+      complexity: params.complexity || 'medium'
+    }) + CONFIDENCE_PROMPT_CONFIGS.selfAssessmentSuffix;
+
+    // Use schema with confidence assessment
+    const PRDWithConfidenceSchema = withConfidenceAssessment(PRDDocumentSchema);
+
+    try {
+      const result = await generateObject({
+        model,
+        system: prdConfig.systemPrompt,
+        prompt,
+        schema: PRDWithConfidenceSchema,
+        maxTokens: prdConfig.maxTokens + 500, // Extra tokens for confidence
+        temperature: prdConfig.temperature
+      });
+
+      const generated = result.object;
+      const aiAssessment = generated.confidenceAssessment;
+
+      // Calculate per-section confidence
+      const sectionConfidence: SectionConfidence[] = [];
+
+      // Overview section
+      sectionConfidence.push(this.confidenceScorer.calculateSectionConfidence({
+        sectionId: 'overview',
+        sectionName: 'Overview',
+        inputData: { description: params.projectIdea },
+        aiSelfAssessment: aiAssessment.score / 100,
+        aiReasoning: aiAssessment.reasoning,
+        uncertainAreas: aiAssessment.uncertainAreas
+      }));
+
+      // Features section
+      sectionConfidence.push(this.confidenceScorer.calculateSectionConfidence({
+        sectionId: 'features',
+        sectionName: 'Features',
+        inputData: {
+          description: params.projectIdea,
+          context: params.targetUsers
+        },
+        aiSelfAssessment: Math.max(0, (aiAssessment.score - 10)) / 100, // Features often less certain
+        aiReasoning: aiAssessment.reasoning,
+        uncertainAreas: aiAssessment.uncertainAreas.filter(a =>
+          a.toLowerCase().includes('feature')
+        )
+      }));
+
+      // Technical requirements section
+      sectionConfidence.push(this.confidenceScorer.calculateSectionConfidence({
+        sectionId: 'technicalRequirements',
+        sectionName: 'Technical Requirements',
+        inputData: {
+          description: params.projectIdea,
+          constraints: params.complexity ? [`Complexity: ${params.complexity}`] : []
+        },
+        aiSelfAssessment: Math.max(0, (aiAssessment.score - 15)) / 100, // Tech reqs often assumed
+        aiReasoning: aiAssessment.reasoning
+      }));
+
+      // Aggregate confidence
+      const aggregated = this.confidenceScorer.aggregateConfidence(sectionConfidence);
+
+      // Build PRD without confidence field
+      const prd: PRDDocument = {
+        ...generated,
+        id: uuidv4(),
+        aiGenerated: true,
+        aiMetadata: this.createAIMetadata(model.modelId, prompt),
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+      delete (prd as unknown as Record<string, unknown>).confidenceAssessment;
+
+      return {
+        prd,
+        sectionConfidence,
+        overallConfidence: {
+          score: aggregated.overallScore,
+          tier: aggregated.overallTier
+        },
+        lowConfidenceSections: aggregated.lowConfidenceSections
+      };
+    } catch (error) {
+      process.stderr.write(`Error generating PRD with confidence: ${error instanceof Error ? error.message : String(error)}\n`);
       throw new Error(`Failed to generate PRD: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }

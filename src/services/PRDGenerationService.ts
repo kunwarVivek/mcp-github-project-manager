@@ -6,7 +6,9 @@ import {
   ProjectScope,
   TechnicalRequirement,
   PRDDocumentSchema,
-  TaskPriority
+  TaskPriority,
+  SectionConfidence,
+  ConfidenceConfig
 } from '../domain/ai-types';
 import { v4 as uuidv4 } from 'uuid';
 import { z } from 'zod';
@@ -66,6 +68,65 @@ export class PRDGenerationService {
       return validatedPRD;
     } catch (error) {
       process.stderr.write(`Error generating PRD from idea: ${error instanceof Error ? error.message : String(error)}\n`);
+      throw new Error(`Failed to generate PRD: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Generate PRD with confidence scoring per section
+   */
+  async generatePRDWithConfidence(params: {
+    projectIdea: string;
+    projectName: string;
+    targetUsers?: string[];
+    timeline?: string;
+    complexity?: 'low' | 'medium' | 'high';
+    author: string;
+    stakeholders?: string[];
+    confidenceConfig?: Partial<ConfidenceConfig>;
+  }): Promise<{
+    prd: PRDDocument;
+    sectionConfidence: SectionConfidence[];
+    overallConfidence: { score: number; tier: 'high' | 'medium' | 'low' };
+    lowConfidenceSections: SectionConfidence[];
+  }> {
+    try {
+      if (!params.projectIdea.trim()) {
+        throw new Error('Project idea is required');
+      }
+
+      if (!params.projectName.trim()) {
+        throw new Error('Project name is required');
+      }
+
+      const result = await this.aiProcessor.generatePRDWithConfidence({
+        projectIdea: params.projectIdea,
+        targetUsers: params.targetUsers?.join(', '),
+        timeline: params.timeline,
+        complexity: params.complexity,
+        confidenceConfig: params.confidenceConfig
+      });
+
+      // Enhance PRD with provided metadata
+      const enhancedPRD: PRDDocument = {
+        ...result.prd,
+        title: params.projectName,
+        author: params.author,
+        stakeholders: params.stakeholders || [],
+        version: '1.0.0'
+      };
+
+      // Validate
+      const validatedPRD = PRDDocumentSchema.parse(enhancedPRD);
+
+      return {
+        prd: validatedPRD,
+        sectionConfidence: result.sectionConfidence,
+        overallConfidence: result.overallConfidence,
+        lowConfidenceSections: result.lowConfidenceSections
+      };
+    } catch (error) {
+      process.stderr.write(`Error generating PRD with confidence: ${error instanceof Error ? error.message : String(error)}\n`);
       throw new Error(`Failed to generate PRD: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
