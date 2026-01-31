@@ -2,6 +2,7 @@ import { generateText } from 'ai';
 import { AIServiceFactory } from "./ai/AIServiceFactory";
 import { ProjectManagementService } from "./ProjectManagementService";
 import { Logger } from "../infrastructure/logger";
+import { isProjectItem } from "../domain/type-guards";
 
 export interface IssueEnrichmentResult {
   issueId: string;
@@ -79,8 +80,8 @@ export class IssueEnrichmentService {
         const enrichment = await this.enrichIssue({
           projectId: params.projectId,
           issueId: issueId,
-          issueTitle: (item as any).title || 'Untitled',
-          issueDescription: (item as any).content?.body
+          issueTitle: isProjectItem(item) && item.title ? item.title : 'Untitled',
+          issueDescription: isProjectItem(item) ? item.content?.body : undefined
         });
         results.push(enrichment);
       }
