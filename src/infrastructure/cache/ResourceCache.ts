@@ -1,6 +1,7 @@
 import { Resource, ResourceCacheOptions, ResourceType } from "../../domain/resource-types";
 import { SyncMetadata } from "../../services/GitHubStateSyncService";
 import { isCacheableResource } from "../../domain/type-guards";
+import { CachePersistence, type CacheEntry as PersistenceCacheEntry } from "./CachePersistence.js";
 
 interface CacheEntry<T> {
   value: T;
@@ -11,6 +12,18 @@ interface CacheEntry<T> {
   version?: number;
 }
 
+/**
+ * Cache statistics including persistence status
+ */
+export interface CacheStats {
+  size: number;
+  tagCount: number;
+  typeCount: number;
+  namespaceCount: number;
+  persistenceEnabled: boolean;
+  lastPersist?: string;
+}
+
 export class ResourceCache {
   private cache: Map<string, CacheEntry<any>>;
   private defaultTTL: number = 3600000; // 1 hour in milliseconds
@@ -18,6 +31,12 @@ export class ResourceCache {
   private typeIndex: Map<ResourceType, Set<string>>;
   private namespaceIndex: Map<string, Set<string>>;
   private static instance: ResourceCache;
+
+  // Persistence fields
+  private persistence?: CachePersistence;
+  private persistInterval?: ReturnType<typeof setInterval>;
+  private readonly PERSIST_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
+  private lastPersistTime?: string;
 
   constructor() {
     this.cache = new Map();
@@ -440,18 +459,190 @@ export class ResourceCache {
     return this.cache.get(id)?.tags;
   }
 
-  getStats(): {
-    size: number;
-    tagCount: number;
-    typeCount: number;
-    namespaceCount: number;
-  } {
+  getStats(): CacheStats {
     return {
       size: this.cache.size,
       tagCount: this.tagIndex.size,
       typeCount: this.typeIndex.size,
       namespaceCount: this.namespaceIndex.size,
+      persistenceEnabled: this.persistence !== undefined,
+      lastPersist: this.lastPersistTime,
     };
+  }
+
+  // ==========================================
+  // Persistence Methods
+  // ==========================================
+
+  /**
+   * Enable cache persistence to disk.
+   *
+   * Starts periodic saves every 5 minutes.
+   * Persistence is OPT-IN - call this to enable.
+   *
+   * @param cacheDirectory - Directory for cache file (default: '.cache')
+   */
+  enablePersistence(cacheDirectory?: string): void {
+    if (this.persistence) {
+      process.stderr.write('[ResourceCache] Persistence already enabled\n');
+      return;
+    }
+
+    this.persistence = new CachePersistence(cacheDirectory);
+
+    // Start periodic persistence
+    this.persistInterval = setInterval(async () => {
+      try {
+        await this.persist();
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        process.stderr.write(`[ResourceCache] Periodic persist failed: ${message}\n`);
+      }
+    }, this.PERSIST_INTERVAL_MS);
+
+    process.stderr.write(
+      `[ResourceCache] Persistence enabled (interval: ${this.PERSIST_INTERVAL_MS}ms)\n`
+    );
+  }
+
+  /**
+   * Disable cache persistence.
+   *
+   * Stops periodic saves. Does NOT delete existing cache file.
+   */
+  disablePersistence(): void {
+    if (this.persistInterval) {
+      clearInterval(this.persistInterval);
+      this.persistInterval = undefined;
+    }
+    this.persistence = undefined;
+    process.stderr.write('[ResourceCache] Persistence disabled\n');
+  }
+
+  /**
+   * Persist cache to disk immediately.
+   *
+   * Only works if persistence is enabled via enablePersistence().
+   */
+  async persist(): Promise<void> {
+    if (!this.persistence) {
+      process.stderr.write('[ResourceCache] Persistence not enabled\n');
+      return;
+    }
+
+    try {
+      // Convert cache to persistence format
+      const entries = new Map<string, PersistenceCacheEntry<unknown>>();
+      for (const [key, entry] of this.cache.entries()) {
+        entries.set(key, {
+          value: entry.value,
+          expiresAt: entry.expiresAt,
+          tags: entry.tags,
+        });
+      }
+
+      await this.persistence.save(entries);
+      this.lastPersistTime = new Date().toISOString();
+      process.stderr.write(`[ResourceCache] Persisted ${entries.size} entries\n`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      process.stderr.write(`[ResourceCache] Persist failed: ${message}\n`);
+      throw error;
+    }
+  }
+
+  /**
+   * Restore cache from disk.
+   *
+   * Merges restored entries into current cache, skipping expired entries.
+   * Only works if persistence is enabled via enablePersistence().
+   *
+   * @returns Number of entries restored
+   */
+  async restore(): Promise<number> {
+    if (!this.persistence) {
+      process.stderr.write('[ResourceCache] Persistence not enabled\n');
+      return 0;
+    }
+
+    try {
+      const restored = await this.persistence.restore();
+      let count = 0;
+
+      for (const [key, entry] of restored.entries()) {
+        // Skip if already in cache (current cache takes precedence)
+        if (this.cache.has(key)) {
+          continue;
+        }
+
+        // Skip expired entries
+        if (entry.expiresAt && entry.expiresAt < Date.now()) {
+          continue;
+        }
+
+        // Merge into cache
+        this.cache.set(key, {
+          value: entry.value,
+          expiresAt: entry.expiresAt,
+          tags: entry.tags,
+        });
+
+        // Rebuild indices for restored entry
+        if (entry.tags && entry.tags.length > 0) {
+          this.addToTagIndex(key, entry.tags);
+        }
+
+        // Try to parse key for type index
+        const parsed = this.parseCacheKey(key);
+        if (parsed) {
+          this.addToTypeIndex(parsed.type, key);
+        }
+
+        count++;
+      }
+
+      process.stderr.write(`[ResourceCache] Restored ${count} entries from disk\n`);
+      return count;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      process.stderr.write(`[ResourceCache] Restore failed: ${message}\n`);
+      return 0;
+    }
+  }
+
+  /**
+   * Shutdown the cache gracefully.
+   *
+   * Stops periodic persistence and performs final persist.
+   */
+  async shutdown(): Promise<void> {
+    process.stderr.write('[ResourceCache] Shutting down...\n');
+
+    // Stop periodic persistence
+    if (this.persistInterval) {
+      clearInterval(this.persistInterval);
+      this.persistInterval = undefined;
+    }
+
+    // Final persist if enabled
+    if (this.persistence) {
+      try {
+        await this.persist();
+        process.stderr.write('[ResourceCache] Final persist complete\n');
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        process.stderr.write(`[ResourceCache] Final persist failed: ${message}\n`);
+      }
+    }
+
+    process.stderr.write('[ResourceCache] Shutdown complete\n');
+  }
+
+  /**
+   * Check if persistence is enabled.
+   */
+  isPersistenceEnabled(): boolean {
+    return this.persistence !== undefined;
   }
 
   /**
