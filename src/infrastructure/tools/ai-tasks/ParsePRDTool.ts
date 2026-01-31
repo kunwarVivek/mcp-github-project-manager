@@ -7,6 +7,7 @@ import { MCPResponse } from '../../../domain/mcp-types.js';
 import { ToolResultFormatter } from '../ToolResultFormatter.js';
 import { ANNOTATION_PATTERNS } from '../annotations/tool-annotations.js';
 import { PRDParseOutputSchema } from '../schemas/ai-schemas.js';
+import { MockPRD } from '../../../domain/ai-types.js';
 
 // Schema for parse_prd tool
 const parsePRDSchema = z.object({
@@ -85,7 +86,7 @@ async function executeParsePRD(args: ParsePRDArgs): Promise<MCPResponse> {
     let traceabilityMatrix;
     if (args.createTraceabilityMatrix) {
       // Create mock PRD for traceability
-      const mockPRD = {
+      const mockPRD: MockPRD = {
         id: args.projectId || `prd-${Date.now()}`,
         title: 'Parsed PRD',
         overview: args.prdContent.substring(0, 500),
@@ -107,7 +108,7 @@ async function executeParsePRD(args: ParsePRDArgs): Promise<MCPResponse> {
 
       traceabilityMatrix = traceabilityService.createTraceabilityMatrix(
         args.projectId || 'parsed-project',
-        mockPRD as any,
+        mockPRD,
         features,
         filteredTasks
       );

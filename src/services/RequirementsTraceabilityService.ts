@@ -9,6 +9,7 @@ import {
   EnhancedAITask,
   TraceabilityMatrix,
   PRDDocument,
+  MockPRD,
   FeatureRequirement,
   AITask,
   TaskPriority,
@@ -27,7 +28,7 @@ export class RequirementsTraceabilityService {
   /**
    * Extract business requirements from PRD
    */
-  extractBusinessRequirementsFromPRD(prd: PRDDocument): Requirement[] {
+  extractBusinessRequirementsFromPRD(prd: PRDDocument | MockPRD): Requirement[] {
     const requirements: Requirement[] = [];
 
     // Extract from objectives
@@ -282,7 +283,7 @@ export class RequirementsTraceabilityService {
    */
   createTraceabilityMatrix(
     projectId: string,
-    prd: PRDDocument,
+    prd: PRDDocument | MockPRD,
     features: FeatureRequirement[],
     tasks: AITask[]
   ): TraceabilityMatrix {

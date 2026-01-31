@@ -167,6 +167,24 @@ export interface ProjectScope {
 }
 
 /**
+ * Minimal PRD structure for mock/test purposes in tools.
+ * Contains only the fields required by RequirementsTraceabilityService.extractBusinessRequirementsFromPRD()
+ */
+export interface MockPRD {
+  id: string;
+  title: string;
+  overview: string;
+  objectives: string[];
+  successMetrics: string[];
+  features: FeatureRequirement[];
+  author: string;
+  createdAt: string;
+  updatedAt: string;
+  aiGenerated: boolean;
+  aiMetadata?: AIGenerationMetadata;
+}
+
+/**
  * PRD Document
  */
 export interface PRDDocument {

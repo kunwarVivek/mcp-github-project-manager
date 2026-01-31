@@ -3,7 +3,7 @@ import { ToolDefinition, ToolSchema } from '../ToolValidator.js';
 import { RequirementsTraceabilityService } from '../../../services/RequirementsTraceabilityService.js';
 import { MCPResponse } from '../../../domain/mcp-types.js';
 import { ToolResultFormatter } from '../ToolResultFormatter.js';
-import { TaskStatus, TaskPriority, TaskComplexity } from '../../../domain/ai-types.js';
+import { TaskStatus, TaskPriority, TaskComplexity, MockPRD, FeatureRequirement } from '../../../domain/ai-types.js';
 import { ANNOTATION_PATTERNS } from '../annotations/tool-annotations.js';
 import { TraceabilityMatrixOutputSchema } from '../schemas/ai-schemas.js';
 
@@ -43,14 +43,22 @@ async function executeCreateTraceabilityMatrix(args: CreateTraceabilityMatrixArg
   const traceabilityService = new RequirementsTraceabilityService();
 
   try {
+    // Convert input features to FeatureRequirement format
+    const features: FeatureRequirement[] = args.features.map(f => ({
+      ...f,
+      priority: f.priority as TaskPriority,
+      estimatedComplexity: f.estimatedComplexity as TaskComplexity,
+      dependencies: [] // Default empty dependencies
+    }));
+
     // Create mock PRD from content
-    const mockPRD = {
+    const mockPRD: MockPRD = {
       id: `prd-${args.projectId}`,
       title: `PRD for ${args.projectId}`,
       overview: args.prdContent.substring(0, 500),
       objectives: extractObjectivesFromContent(args.prdContent),
       successMetrics: extractSuccessMetricsFromContent(args.prdContent),
-      features: args.features,
+      features,
       author: 'system',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -82,8 +90,8 @@ async function executeCreateTraceabilityMatrix(args: CreateTraceabilityMatrixArg
     // Create comprehensive traceability matrix
     const traceabilityMatrix = traceabilityService.createTraceabilityMatrix(
       args.projectId,
-      mockPRD as any,
-      args.features as any,
+      mockPRD,
+      features,
       aiTasks
     );
 
