@@ -5,12 +5,12 @@
 
 ## Current Position
 
-**Phase:** 6 of 12 (Sub-issues and Status Updates) - Complete
-**Plan:** 4 of 4 complete
-**Status:** Phase complete
-**Last activity:** 2026-01-31 - Completed 06-04-PLAN.md (Testing and Verification)
+**Phase:** 7 of 12 (Project Templates and Linking)
+**Plan:** 1 of 4 complete
+**Status:** In progress
+**Last activity:** 2026-01-31 - Completed 07-01-PLAN.md (Schema Definitions)
 
-**Progress:** [██████████] 75% (Phase 1-6 complete)
+**Progress:** [██████████░░] 77% (Phase 1-6 complete, Phase 7 in progress)
 
 ## Project Progress
 
@@ -18,13 +18,13 @@
 |--------|-------|
 | Phases Complete | 6/12 |
 | Requirements Done | 53/99 |
-| Current Phase Progress | Phase 6: 4/4 plans complete |
+| Current Phase Progress | Phase 7: 1/4 plans complete |
 
 ## Performance Metrics
 
 | Metric | Value | Notes |
 |--------|-------|-------|
-| Plans Executed | 31 | Phase 1-4 complete (22), Phase 5 complete (5), Phase 6 complete (4) |
+| Plans Executed | 32 | Phase 1-4 complete (22), Phase 5 complete (5), Phase 6 complete (4), Phase 7: 1/4 |
 | Requirements Completed | 53 | DEBT-01 through DEBT-28, MCP-01 through MCP-15, GHAPI-01 to GHAPI-08 |
 | Iterations | 1 | Gap closure cycle for test regressions |
 | Blockers Resolved | 4 | tsyringe decorators, reflect-metadata, MCP SDK type instantiation, test isolation |
@@ -89,6 +89,10 @@
 | GitHubConfig.create() for tests | Use factory method instead of object literal due to private fields | 2026-01-31 |
 | Zod safeParse vs parse | safeParse doesn't apply defaults for optional fields; use .parse() in executors | 2026-01-31 |
 | 11 tool categories | Added Sub-issue (5) and Status Update (3) tool categories for 93 total | 2026-01-31 |
+| Reuse PageInfo schema pattern | PageInfo schema matches status-update-schemas for consistency | 2026-01-31 |
+| TemplateListItem extends output | TemplateListItemSchema extends TemplateProjectOutputSchema for list results | 2026-01-31 |
+| LinkOperationOutput for all ops | Single schema for all link/unlink success responses | 2026-01-31 |
+| nullable() for optional strings | Use z.string().nullable() for optional fields that can be null from GraphQL | 2026-01-31 |
 
 ### Learnings
 
@@ -137,6 +141,9 @@
 - Sub-issue tools resolve issue numbers to node IDs internally in executors
 - Parallel Promise.all for resolving multiple issue numbers (e.g., parent + sub-issue)
 - State normalization: OPEN/CLOSED to open/closed in MCP output
+- Template schemas: 4 input (mark/unmark/copy/list) + 4 output (project/copied/listItem/list) schemas
+- Linking schemas: 6 input (link/unlink repo/team + list repo/team) + 6 output schemas
+- Schema pattern: PageInfo schema reusable for all paginated responses
 
 ### Open Todos
 
@@ -170,7 +177,12 @@
 - [x] Execute 06-01: Repository Infrastructure (GitHubSubIssueRepository, GitHubStatusUpdateRepository)
 - [ ] Execute 06-02: Sub-issue MCP Tools (5 tools)
 - [x] Execute 06-03: Status Update MCP Tools (3 tools)
-- [ ] Execute 06-04: Testing and Verification
+- [x] Execute 06-04: Testing and Verification
+- [x] Plan Phase 7
+- [x] Execute 07-01: Schema Definitions (20 Zod schemas + 7 TypeScript interfaces)
+- [ ] Execute 07-02: Repository and Tool Implementation
+- [ ] Execute 07-03: Testing and Integration
+- [ ] Execute 07-04: Documentation and Verification
 - [ ] Consider future extraction: IssueService, PullRequestService, AutomationService
 
 ### Active Blockers
@@ -342,13 +354,14 @@
 
 ## Session Continuity
 
-**Last Session:** 2026-01-31 - Completed 06-04-PLAN.md (Testing and Verification)
+**Last Session:** 2026-01-31 - Completed 07-01-PLAN.md (Schema Definitions)
 
 **Context for Next Session:**
-- Phase 6 (Sub-issues and Status Updates) complete: 4/4 plans done
-- Total MCP tools: 93 (85 original + 5 sub-issue + 3 status update)
-- Test suite: 677+ passing tests
-- Ready for Phase 7: Webhooks and Automation
+- Phase 7 (Project Templates and Linking) in progress: 1/4 plans done
+- Schema definitions complete: 20 Zod schemas + 7 TypeScript interfaces
+- Total MCP tools: 93 (ready for 10 more in Phase 7)
+- Test suite: 678 passing tests
+- Next: 07-02 Repository and Tool Implementation
 
 **Architecture Context:**
 - DI container (src/container.ts) wires all 6 extracted services
@@ -356,12 +369,10 @@
 - ToolRegistry uses proper ZodTypeAny typing with instanceof checks
 - 11 tool categories organized in docs/TOOLS.md
 - Test isolation: jest.resetAllMocks() in beforeEach for proper mock reset
-- src/infrastructure/tools/sub-issue-tools.ts - 5 sub-issue MCP tools
-- src/infrastructure/tools/status-update-tools.ts - 3 status update MCP tools
-- src/infrastructure/github/repositories/GitHubSubIssueRepository.ts - Sub-issue GraphQL operations
-- src/infrastructure/github/repositories/GitHubStatusUpdateRepository.ts - Status update GraphQL operations
-- tests/infrastructure/github/repositories/ - Repository unit tests (32 tests)
-- tests/infrastructure/tools/ - Tool tests (56 tests for Phase 6)
+- src/infrastructure/tools/schemas/project-template-linking-schemas.ts - 20 Zod schemas for Phase 7 tools
+- src/infrastructure/github/repositories/types.ts - 7 new TypeScript interfaces for template/linking
+- Follows existing patterns from sub-issue-schemas.ts and status-update-schemas.ts
+- PageInfo schema reusable across all paginated responses
 
 ## Phase 6 Completion Summary
 
