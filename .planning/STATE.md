@@ -6,11 +6,11 @@
 ## Current Position
 
 **Phase:** 4 of 12 (Test Stabilization)
-**Plan:** 3 of X complete
+**Plan:** 4 of X complete
 **Status:** In progress
-**Last activity:** 2026-01-31 - Completed 04-03-PLAN.md (ContextualReferenceGenerator Tests)
+**Last activity:** 2026-01-31 - Completed 04-04-PLAN.md (Context and Validation Service Tests)
 
-**Progress:** [████████░░] 47% (Phase 1-3 complete, Phase 4 in progress)
+**Progress:** [████████░░] 48% (Phase 1-3 complete, Phase 4 in progress)
 
 ## Project Progress
 
@@ -18,13 +18,13 @@
 |--------|-------|
 | Phases Complete | 3/12 |
 | Requirements Done | 22/99 |
-| Current Phase Progress | Phase 4: 3/X plans complete |
+| Current Phase Progress | Phase 4: 4/X plans complete |
 
 ## Performance Metrics
 
 | Metric | Value | Notes |
 |--------|-------|-------|
-| Plans Executed | 20 | Phase 1-3 complete (17), Phase 4: 3 in progress |
+| Plans Executed | 21 | Phase 1-3 complete (17), Phase 4: 4 in progress |
 | Requirements Completed | 22 | DEBT-01 through DEBT-07, MCP-01 through MCP-15 |
 | Iterations | 1 | Gap closure cycle for test regressions |
 | Blockers Resolved | 3 | tsyringe decorators, reflect-metadata, MCP SDK type instantiation |
@@ -65,6 +65,8 @@
 | Real credential detection | hasRealCredentials() to detect fake test tokens | 2026-01-31 |
 | AI service mocking pattern | Mock AIServiceFactory and 'ai' package; set up before service instantiation | 2026-01-31 |
 | Fallback-first testing | Use fallback mode for most edge case tests; more deterministic | 2026-01-31 |
+| Test helper pattern | Create comprehensive helpers for complex nested test data | 2026-01-31 |
+| Keyword overlap validation | Ensure test data has keyword overlap to pass relevance validation | 2026-01-31 |
 
 ### Learnings
 
@@ -89,6 +91,8 @@
 - AI service mocking: mock factory BEFORE service instantiation; mock 'ai' package's generateObject
 - Fallback path testing is more deterministic than AI path testing (no mock response shaping needed)
 - For 100% branch coverage, test edge cases like missing IDs, non-Error thrown objects
+- Validation tests: ensure test data has keyword overlap with task for relevance validation to pass
+- Completeness score: all 4 optional fields needed for 100% (including dependencyContext)
 
 ### Open Todos
 
@@ -110,6 +114,7 @@
 - [x] Execute 04-01: Test Foundation Fixes
 - [x] Execute 04-02: E2E Credential Guards
 - [x] Execute 04-03: ContextualReferenceGenerator Tests (100% coverage)
+- [x] Execute 04-04: DependencyContextGenerator and ContextQualityValidator Tests (92%+ and 99%+ coverage)
 - [ ] Continue Phase 4 Test Stabilization
 - [ ] Consider future extraction: IssueService, PullRequestService, AutomationService
 
@@ -216,6 +221,7 @@
 | 04-01 | Test Foundation Fixes | Complete | Fixed 3 test files |
 | 04-02 | E2E Credential Guards | Complete | 41 tests with credential guards |
 | 04-03 | ContextualReferenceGenerator Tests | Complete | 45 tests, 100% coverage |
+| 04-04 | Context and Validation Service Tests | Complete | 77 tests (34+43), 92%+ and 99%+ coverage |
 
 **Test Stabilization Progress:**
 
@@ -225,18 +231,20 @@
 | No "Bad credentials" errors | PASS |
 | No TypeError about undefined utils | PASS |
 | ContextualReferenceGenerator coverage | 100% |
+| DependencyContextGenerator coverage | 92%+ |
+| ContextQualityValidator coverage | 99%+ |
 
 ## Session Continuity
 
-**Last Session:** 2026-01-31 - Completed 04-03-PLAN.md
+**Last Session:** 2026-01-31 - Completed 04-04-PLAN.md
 
 **Context for Next Session:**
-- Phase 4 (Test Stabilization) in progress - 3 plans complete
-- ContextualReferenceGenerator now has 100% test coverage (45 tests)
+- Phase 4 (Test Stabilization) in progress - 4 plans complete
+- DependencyContextGenerator: 34 tests, 92%+ coverage
+- ContextQualityValidator: 43 tests, 99%+ coverage
 - AI mocking pattern: mock AIServiceFactory and 'ai' package before service instantiation
-- Pattern: if (!utils) { console.log('Skipping...'); return; }
-- Pattern: hasRealCredentials() to detect fake test tokens
-- Next: Continue Phase 4 plans (likely DependencyContextGenerator or ContextQualityValidator tests)
+- Test helper pattern: create comprehensive helpers for complex test data
+- Next: Continue Phase 4 plans
 
 **Architecture Context:**
 - DI container (src/container.ts) wires all 6 extracted services
