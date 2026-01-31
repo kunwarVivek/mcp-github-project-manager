@@ -106,6 +106,10 @@
 | Template format auto-detection | Check JSON schema indicators first, then placeholders, default to example | 2026-01-31 |
 | Layered validation architecture | builtin always enabled, standard/custom layers togglable | 2026-01-31 |
 | 13 built-in PRD rules | 8 completeness + 5 clarity rules for comprehensive validation | 2026-01-31 |
+| graphlib for graph operations | Provides alg.topsort, alg.findCycles for dependency analysis | 2026-01-31 |
+| Keyword-based dependency patterns | 8 predefined patterns (setup->db->api->ui) for implicit detection | 2026-01-31 |
+| Fibonacci estimation mapping | Complexity 1-10 maps to story points 1,2,3,5,8,13 | 2026-01-31 |
+| Calibration requires 3+ data points | Prevents over-fitting to small samples in estimation | 2026-01-31 |
 
 ### Learnings
 
