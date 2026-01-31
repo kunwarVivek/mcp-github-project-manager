@@ -6,26 +6,26 @@
 ## Current Position
 
 **Phase:** 5 of 12 (Resilience and Observability)
-**Plan:** 4 of 5 complete
-**Status:** In progress
-**Last activity:** 2026-01-31 - Completed 05-04-PLAN.md (Documentation)
+**Plan:** 5 of 5 complete
+**Status:** Phase complete
+**Last activity:** 2026-01-31 - Completed 05-05-PLAN.md (Integration and Testing)
 
-**Progress:** [████████░░] 60% (Phase 1-4 complete, Phase 5: 4/5 plans)
+**Progress:** [████████░░] 66% (Phase 1-5 complete)
 
 ## Project Progress
 
 | Metric | Value |
 |--------|-------|
-| Phases Complete | 4/12 |
-| Requirements Done | 29/99 |
-| Current Phase Progress | Phase 5: 4/5 plans complete |
+| Phases Complete | 5/12 |
+| Requirements Done | 37/99 |
+| Current Phase Progress | Phase 5: 5/5 plans complete |
 
 ## Performance Metrics
 
 | Metric | Value | Notes |
 |--------|-------|-------|
-| Plans Executed | 26 | Phase 1-4 complete (22), Phase 5 in progress (4) |
-| Requirements Completed | 29 | DEBT-01 through DEBT-20, MCP-01 through MCP-15 |
+| Plans Executed | 27 | Phase 1-4 complete (22), Phase 5 complete (5) |
+| Requirements Completed | 37 | DEBT-01 through DEBT-28, MCP-01 through MCP-15 |
 | Iterations | 1 | Gap closure cycle for test regressions |
 | Blockers Resolved | 4 | tsyringe decorators, reflect-metadata, MCP SDK type instantiation, test isolation |
 
@@ -78,6 +78,9 @@
 | health_check tool readOnlyHint=true | Safe to call repeatedly, no external calls (placeholder) | 2026-01-31 |
 | 9 tool categories | Organize 85 tools logically (Project, Issue, PR, Sprint, Field, Automation, Events, AI, Health) | 2026-01-31 |
 | API doc scope | Focus on public APIs, not internal implementation | 2026-01-31 |
+| Mock factory pattern for tests | Create typed mocks for HealthService testing to avoid complex dependency setup | 2026-01-31 |
+| Temp directory pattern | fs.mkdtempSync/fs.rm for CachePersistence tests to avoid polluting workspace | 2026-01-31 |
+| stderr spy pattern | jest.spyOn(process.stderr, 'write').mockImplementation(() => true) for clean test output | 2026-01-31 |
 
 ### Learnings
 
@@ -115,6 +118,8 @@
 - HealthService: aggregates GitHub/AI/cache health into overall status (healthy/degraded/unhealthy)
 - health_check MCP tool: returns structured HealthStatus with readOnly annotation
 - AIServiceFactory resilience: opt-in via enableResilience(), executeWithResilience() wraps AI calls
+- Infrastructure test location: tests/infrastructure/{domain}/ for resilience, observability, cache, health
+- TypeScript mock typing: Use `c[0] as string` cast when mapping mock call arrays to avoid type errors
 
 ### Open Todos
 
@@ -143,7 +148,8 @@
 - [x] Execute 05-02: Integration Services (AIResiliencePolicy, TracingLogger, ResourceCache persistence)
 - [x] Execute 05-03: Health Check Service (HealthService, health_check tool, AIServiceFactory resilience)
 - [x] Execute 05-04: Documentation (STATUS.md, TOOLS.md, API.md)
-- [ ] Execute 05-05: Integration and Testing
+- [x] Execute 05-05: Integration and Testing (75 new tests, phase verified)
+- [ ] Plan Phase 6
 - [ ] Consider future extraction: IssueService, PullRequestService, AutomationService
 
 ### Active Blockers
@@ -272,9 +278,9 @@
 - Credential guards: All E2E tests skip gracefully
 - Verification report: 04-VERIFICATION.md confirms phase complete
 
-## Phase 5 Progress
+## Phase 5 Completion Summary
 
-**Phase 5: Resilience and Observability** - In Progress
+**Phase 5: Resilience and Observability** - Complete
 
 | Plan | Name | Status | Key Results |
 |------|------|--------|-------------|
@@ -282,31 +288,45 @@
 | 05-02 | Integration Services | Complete | AIResiliencePolicy, TracingLogger, ResourceCache persistence |
 | 05-03 | Health Check Service | Complete | HealthService, health_check tool, AIServiceFactory resilience |
 | 05-04 | Documentation | Complete | STATUS.md, docs/TOOLS.md, docs/API.md |
-| 05-05 | Integration and Testing | Pending | - |
+| 05-05 | Integration and Testing | Complete | 75 tests, phase verification |
 
-**Key deliverables so far:**
+**Phase 5 Verified:**
+
+| Requirement | Status |
+|-------------|--------|
+| DEBT-21: Circuit breaker for AI | PASS |
+| DEBT-22: Health check endpoint | PASS |
+| DEBT-23: Correlation ID tracing | PASS |
+| DEBT-24: Cache persistence | PASS |
+| DEBT-25: Graceful degradation | PASS |
+| DEBT-26: Update STATUS.md | PASS |
+| DEBT-27: Document MCP tools | PASS |
+| DEBT-28: API reference | PASS |
+
+**Key deliverables:**
 - cockatiel ^3.2.1 installed for circuit breaker patterns
-- CircuitBreakerService: Cockatiel wrapper with state tracking
-- CorrelationContext: AsyncLocalStorage-based request tracing
-- CachePersistence: JSON file persistence with atomic writes
-- AIResiliencePolicy: composed fallback/retry/circuit-breaker/timeout
+- CircuitBreakerService: Cockatiel wrapper with state tracking (12 tests)
+- CorrelationContext: AsyncLocalStorage-based request tracing (16 tests)
+- CachePersistence: JSON file persistence with atomic writes (18 tests)
+- AIResiliencePolicy: composed fallback/retry/circuit-breaker/timeout (14 tests)
 - TracingLogger: ILogger with correlationId in JSON output
 - ResourceCache: opt-in persistence with enablePersistence()
-- HealthService: check() returns HealthStatus with overall status
+- HealthService: check() returns HealthStatus with overall status (15 tests)
 - health_check MCP tool: registered in ToolRegistry (tool #85)
 - AIServiceFactory: enableResilience(), getCircuitState(), executeWithResilience()
-- STATUS.md: updated with Phase 5 status, 85 tools, 515+ tests
+- STATUS.md: updated with Phase 5 status, 85 tools
 - docs/TOOLS.md: comprehensive documentation for all 85 MCP tools (1810 lines)
 - docs/API.md: API reference for services and infrastructure (894 lines)
+- Test suite: 590 passed (up from 515), 20 skipped, 0 failed
 
 ## Session Continuity
 
-**Last Session:** 2026-01-31 - Completed 05-04-PLAN.md (Documentation)
+**Last Session:** 2026-01-31 - Completed 05-05-PLAN.md (Integration and Testing)
 
 **Context for Next Session:**
-- Phase 5 (Resilience and Observability) in progress: 4/5 plans complete
-- Documentation complete: STATUS.md, TOOLS.md, API.md
-- Ready for 05-05: Integration and Testing
+- Phase 5 (Resilience and Observability) complete: 5/5 plans
+- All 8 requirements verified (DEBT-21 through DEBT-28)
+- Ready for Phase 6 planning
 
 **Architecture Context:**
 - DI container (src/container.ts) wires all 6 extracted services
@@ -321,6 +341,7 @@
 - src/infrastructure/health/ - HealthService.ts, index.ts
 - src/infrastructure/tools/health-tools.ts - health_check MCP tool
 - src/services/ai/AIServiceFactory.ts - resilience methods added
+- tests/infrastructure/ - 75 tests for Phase 5 components
 
 ---
 
@@ -330,7 +351,4 @@
 *Phase 2 completed: 2026-01-31*
 *Phase 3 completed: 2026-01-31*
 *Phase 4 completed: 2026-01-31*
-*Phase 5 plan 1 completed: 2026-01-31*
-*Phase 5 plan 2 completed: 2026-01-31*
-*Phase 5 plan 3 completed: 2026-01-31*
-*Phase 5 plan 4 completed: 2026-01-31*
+*Phase 5 completed: 2026-01-31*
