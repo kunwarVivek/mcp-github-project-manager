@@ -141,3 +141,102 @@ export interface StatusUpdateListResult {
   };
   totalCount: number;
 }
+
+// ============================================================================
+// Template Operation Types
+// ============================================================================
+
+/**
+ * A project marked as a template.
+ *
+ * Template projects can be copied to create new projects with the same
+ * structure, fields, and optionally draft issues.
+ */
+export interface TemplateProject {
+  id: string;
+  title: string;
+  isTemplate: boolean;
+  url: string;
+  number?: number;
+  shortDescription?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+/**
+ * A project created by copying from a template.
+ */
+export interface CopiedProject {
+  id: string;
+  title: string;
+  number: number;
+  url: string;
+  createdAt: string;
+  shortDescription?: string;
+}
+
+// ============================================================================
+// Linking Operation Types
+// ============================================================================
+
+/**
+ * A repository linked to a project.
+ *
+ * Linking repositories to projects allows issues and PRs from those
+ * repositories to be added to the project.
+ */
+export interface LinkedRepository {
+  id: string;
+  name: string;
+  nameWithOwner: string;
+  url: string;
+  description?: string;
+}
+
+/**
+ * A team linked to a project.
+ *
+ * Linking teams to projects grants team members access to the project.
+ */
+export interface LinkedTeam {
+  id: string;
+  name: string;
+  slug: string;
+  description?: string;
+}
+
+/**
+ * Result of linked repositories list operation with pagination.
+ */
+export interface LinkedRepositoriesResult {
+  repositories: LinkedRepository[];
+  pageInfo: {
+    hasNextPage: boolean;
+    endCursor: string | null;
+  };
+  totalCount: number;
+}
+
+/**
+ * Result of linked teams list operation with pagination.
+ */
+export interface LinkedTeamsResult {
+  teams: LinkedTeam[];
+  pageInfo: {
+    hasNextPage: boolean;
+    endCursor: string | null;
+  };
+  totalCount: number;
+}
+
+/**
+ * Result of template list operation with pagination.
+ */
+export interface TemplateListResult {
+  templates: TemplateProject[];
+  pageInfo: {
+    hasNextPage: boolean;
+    endCursor: string | null;
+  };
+  totalCount: number;
+}
