@@ -6,11 +6,11 @@
 ## Current Position
 
 **Phase:** 5 of 12 (Resilience and Observability)
-**Plan:** 2 of 5 complete
+**Plan:** 3 of 5 complete
 **Status:** In progress
-**Last activity:** 2026-01-31 - Completed 05-02-PLAN.md (Integration Services)
+**Last activity:** 2026-01-31 - Completed 05-03-PLAN.md (Health Check Service)
 
-**Progress:** [████████░░] 56% (Phase 1-4 complete, Phase 5: 2/5 plans)
+**Progress:** [████████░░] 58% (Phase 1-4 complete, Phase 5: 3/5 plans)
 
 ## Project Progress
 
@@ -18,13 +18,13 @@
 |--------|-------|
 | Phases Complete | 4/12 |
 | Requirements Done | 29/99 |
-| Current Phase Progress | Phase 5: 2/5 plans complete |
+| Current Phase Progress | Phase 5: 3/5 plans complete |
 
 ## Performance Metrics
 
 | Metric | Value | Notes |
 |--------|-------|-------|
-| Plans Executed | 24 | Phase 1-4 complete (22), Phase 5 in progress (2) |
+| Plans Executed | 25 | Phase 1-4 complete (22), Phase 5 in progress (3) |
 | Requirements Completed | 29 | DEBT-01 through DEBT-20, MCP-01 through MCP-15 |
 | Iterations | 1 | Gap closure cycle for test regressions |
 | Blockers Resolved | 4 | tsyringe decorators, reflect-metadata, MCP SDK type instantiation, test isolation |
@@ -73,6 +73,9 @@
 | Composed resilience policy order | fallback(retry(circuitBreaker(timeout(op)))) - outer to inner | 2026-01-31 |
 | Cooperative timeout strategy | Graceful cancellation vs aggressive abort | 2026-01-31 |
 | Opt-in cache persistence | enablePersistence() call required; does not change existing behavior | 2026-01-31 |
+| GitHub health check placeholder | Structure in place, wiring to GitHubRepositoryFactory deferred | 2026-01-31 |
+| Opt-in AI resilience | enableResilience() required before executeWithResilience() works | 2026-01-31 |
+| health_check tool readOnlyHint=true | Safe to call repeatedly, no external calls (placeholder) | 2026-01-31 |
 
 ### Learnings
 
@@ -107,6 +110,9 @@
 - AIResiliencePolicy: composes fallback, retry, circuit breaker, timeout with Cockatiel
 - TracingLogger: ILogger with correlationId in every JSON log entry
 - ResourceCache persistence: opt-in with enablePersistence(), periodic saves every 5 minutes
+- HealthService: aggregates GitHub/AI/cache health into overall status (healthy/degraded/unhealthy)
+- health_check MCP tool: returns structured HealthStatus with readOnly annotation
+- AIServiceFactory resilience: opt-in via enableResilience(), executeWithResilience() wraps AI calls
 
 ### Open Todos
 
@@ -133,7 +139,7 @@
 - [x] Plan Phase 5
 - [x] Execute 05-01: Infrastructure Foundation (CircuitBreakerService, CorrelationContext, CachePersistence)
 - [x] Execute 05-02: Integration Services (AIResiliencePolicy, TracingLogger, ResourceCache persistence)
-- [ ] Execute 05-03: Health Check Service
+- [x] Execute 05-03: Health Check Service (HealthService, health_check tool, AIServiceFactory resilience)
 - [ ] Execute 05-04: (merged into 05-02)
 - [ ] Execute 05-05: Integration and Testing
 - [ ] Consider future extraction: IssueService, PullRequestService, AutomationService
@@ -272,7 +278,7 @@
 |------|------|--------|-------------|
 | 05-01 | Infrastructure Foundation | Complete | CircuitBreakerService, CorrelationContext, CachePersistence |
 | 05-02 | Integration Services | Complete | AIResiliencePolicy, TracingLogger, ResourceCache persistence |
-| 05-03 | Health Check Service | Pending | - |
+| 05-03 | Health Check Service | Complete | HealthService, health_check tool, AIServiceFactory resilience |
 | 05-04 | (merged into 05-02) | - | - |
 | 05-05 | Integration and Testing | Pending | - |
 
@@ -284,15 +290,18 @@
 - AIResiliencePolicy: composed fallback/retry/circuit-breaker/timeout
 - TracingLogger: ILogger with correlationId in JSON output
 - ResourceCache: opt-in persistence with enablePersistence()
+- HealthService: check() returns HealthStatus with overall status
+- health_check MCP tool: registered in ToolRegistry (tool #85)
+- AIServiceFactory: enableResilience(), getCircuitState(), executeWithResilience()
 
 ## Session Continuity
 
-**Last Session:** 2026-01-31 - Completed 05-02-PLAN.md (Integration Services)
+**Last Session:** 2026-01-31 - Completed 05-03-PLAN.md (Health Check Service)
 
 **Context for Next Session:**
-- Phase 5 (Resilience and Observability) in progress: 2/5 plans complete
-- Integration services complete: AIResiliencePolicy, TracingLogger, ResourceCache persistence
-- Ready for 05-03: Health Check Service
+- Phase 5 (Resilience and Observability) in progress: 3/5 plans complete
+- Health check infrastructure complete: HealthService, health_check tool, AIServiceFactory resilience
+- Ready for 05-05: Integration and Testing
 
 **Architecture Context:**
 - DI container (src/container.ts) wires all 6 extracted services
@@ -304,6 +313,9 @@
 - src/infrastructure/resilience/ - CircuitBreakerService, AIResiliencePolicy, index.ts
 - src/infrastructure/observability/ - CorrelationContext, TracingLogger, index.ts
 - src/infrastructure/cache/ - CachePersistence.ts, ResourceCache.ts (with persistence)
+- src/infrastructure/health/ - HealthService.ts, index.ts
+- src/infrastructure/tools/health-tools.ts - health_check MCP tool
+- src/services/ai/AIServiceFactory.ts - resilience methods added
 
 ---
 
@@ -315,3 +327,4 @@
 *Phase 4 completed: 2026-01-31*
 *Phase 5 plan 1 completed: 2026-01-31*
 *Phase 5 plan 2 completed: 2026-01-31*
+*Phase 5 plan 3 completed: 2026-01-31*
