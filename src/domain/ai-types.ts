@@ -800,10 +800,27 @@ export interface TaskLifecycleState {
 }
 
 /**
+ * Valid status values for a task phase
+ */
+export type TaskPhaseStatus = 'not_started' | 'in_progress' | 'completed' | 'blocked';
+
+/**
+ * All valid task phase status values
+ */
+export const TASK_PHASE_STATUSES: readonly TaskPhaseStatus[] = ['not_started', 'in_progress', 'completed', 'blocked'] as const;
+
+/**
+ * Type guard to check if a string is a valid TaskPhaseStatus
+ */
+export function isTaskPhaseStatus(value: string): value is TaskPhaseStatus {
+  return TASK_PHASE_STATUSES.includes(value as TaskPhaseStatus);
+}
+
+/**
  * Task Phase Information
  */
 export interface TaskPhaseInfo {
-  status: 'not_started' | 'in_progress' | 'completed' | 'blocked';
+  status: TaskPhaseStatus;
   startedAt?: string;
   completedAt?: string;
   assignee?: string;

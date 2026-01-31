@@ -14,7 +14,8 @@ import {
   TaskComplexity,
   AITaskSchema,
   FeatureRequirementSchema,
-  FeatureAdditionRequestSchema
+  FeatureAdditionRequestSchema,
+  isTaskPhaseStatus
 } from '../domain/ai-types.js';
 import {
   FEATURE_PROMPT_CONFIGS,
@@ -370,21 +371,27 @@ export class FeatureManagementService {
 
       // Update the specific phase if provided
       if (params.updateData.phase && params.updateData.status) {
+        // Validate status is a valid TaskPhaseStatus
+        if (!isTaskPhaseStatus(params.updateData.status)) {
+          throw new Error(`Invalid status: ${params.updateData.status}. Valid values are: not_started, in_progress, completed, blocked`);
+        }
+        const validStatus = params.updateData.status;
+
         const phase = params.updateData.phase as keyof typeof updatedState.phases;
         if (updatedState.phases[phase]) {
           updatedState.phases[phase] = {
             ...updatedState.phases[phase],
-            status: params.updateData.status as any,
+            status: validStatus,
             assignee: params.updateData.assignee,
             notes: params.updateData.notes,
             artifacts: params.updateData.artifacts || updatedState.phases[phase].artifacts
           };
 
           // Update timestamps
-          if (params.updateData.status === 'in_progress' && !updatedState.phases[phase].startedAt) {
+          if (validStatus === 'in_progress' && !updatedState.phases[phase].startedAt) {
             updatedState.phases[phase].startedAt = new Date().toISOString();
           }
-          if (params.updateData.status === 'completed') {
+          if (validStatus === 'completed') {
             updatedState.phases[phase].completedAt = new Date().toISOString();
           }
         }
