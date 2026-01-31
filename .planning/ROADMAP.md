@@ -255,6 +255,13 @@ Plans:
 4. User can link project to team and team members have access
 5. User can list all linked repos/teams for a project
 
+**Plans:** 4 plans
+Plans:
+- [ ] 07-01-PLAN.md — Zod schemas for all 10 template and linking tools
+- [ ] 07-02-PLAN.md — Template MCP tools (4 tools: GHAPI-09 to GHAPI-12)
+- [ ] 07-03-PLAN.md — Linking MCP tools (6 tools: GHAPI-13 to GHAPI-18)
+- [ ] 07-04-PLAN.md — Testing and documentation (~60 tests, TOOLS.md update)
+
 ---
 
 ### Phase 8: Project Lifecycle and Advanced Operations
