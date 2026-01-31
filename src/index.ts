@@ -231,8 +231,29 @@ class GitHubProjectManagerServer {
       tools: this.toolRegistry.getToolsForMCP(),
     }));
 
-    // Handle call_tool requests with validation and proper response formatting
-    // Use type assertion to work around deep type instantiation error with MCP SDK 1.25+
+    /**
+     * SDK LIMITATION: MCP SDK 1.25+ Type Instantiation Depth Error
+     *
+     * The MCP SDK's generic types cause TypeScript error TS2589:
+     * "Type instantiation is excessively deep and possibly infinite"
+     *
+     * This occurs because:
+     * 1. CallToolRequestSchema has deeply nested ZodObject types
+     * 2. Combined with our complex inputSchema definitions (84 tools)
+     * 3. TypeScript's type instantiation limit (50 levels) is exceeded
+     *
+     * Workaround: Use type assertion with explicit request/result types.
+     * The handler still receives properly typed CallToolRequest and
+     * returns properly typed CallToolResult - only the generic binding
+     * is bypassed, not the runtime type safety.
+     *
+     * Tracked: This is a known SDK limitation, not a codebase type safety gap.
+     * The SDK's RequestHandlerExtra type creates exponential type expansion
+     * when combined with complex Zod schemas.
+     *
+     * Review: Check if future SDK versions (>1.25.3) resolve this.
+     * @see https://github.com/modelcontextprotocol/typescript-sdk
+     */
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (this.server.setRequestHandler as any)(
       CallToolRequestSchema,
