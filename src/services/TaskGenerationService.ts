@@ -8,7 +8,10 @@ import {
   TaskStatus,
   TaskComplexity,
   TaskDependency,
-  AcceptanceCriteria
+  AcceptanceCriteria,
+  SectionConfidence,
+  ConfidenceConfig,
+  DEFAULT_CONFIDENCE_CONFIG
 } from '../domain/ai-types';
 import {
   MAX_TASKS_PER_PRD,
@@ -32,6 +35,33 @@ import {
 import { RequirementsTraceabilityService } from './RequirementsTraceabilityService';
 import { TaskContextGenerationService } from './TaskContextGenerationService';
 import { v4 as uuidv4 } from 'uuid';
+import { DependencyGraph, DetectedDependency, GraphAnalysisResult } from '../analysis/DependencyGraph';
+import { EstimationCalibrator, EffortEstimate } from '../analysis/EstimationCalibrator';
+import { ConfidenceScorer } from './ai/ConfidenceScorer';
+
+/**
+ * Task with effort estimate and dependency analysis
+ */
+export interface EnhancedTaskWithEstimate extends EnhancedAITask {
+  effortEstimate: EffortEstimate;
+  detectedDependencies: DetectedDependency[];
+  taskConfidence: SectionConfidence;
+}
+
+/**
+ * Task generation result with analysis
+ */
+export interface TaskGenerationResult {
+  tasks: EnhancedTaskWithEstimate[];
+  graphAnalysis: GraphAnalysisResult;
+  overallConfidence: { score: number; tier: 'high' | 'medium' | 'low' };
+  lowConfidenceTasks: EnhancedTaskWithEstimate[];
+  estimationStats: {
+    totalPoints: number;
+    averageConfidence: number;
+    calibrated: boolean;
+  };
+}
 
 /**
  * Service for generating and managing AI-powered tasks
@@ -40,11 +70,17 @@ export class TaskGenerationService {
   private aiProcessor: AITaskProcessor;
   private traceabilityService: RequirementsTraceabilityService;
   private contextGenerationService: TaskContextGenerationService;
+  private dependencyGraph: DependencyGraph;
+  private estimationCalibrator: EstimationCalibrator;
+  private confidenceScorer: ConfidenceScorer;
 
   constructor() {
     this.aiProcessor = new AITaskProcessor();
     this.traceabilityService = new RequirementsTraceabilityService();
     this.contextGenerationService = new TaskContextGenerationService();
+    this.dependencyGraph = new DependencyGraph();
+    this.estimationCalibrator = new EstimationCalibrator();
+    this.confidenceScorer = new ConfidenceScorer();
   }
 
   /**
@@ -620,5 +656,177 @@ export class TaskGenerationService {
     if (title.includes('documentation') || title.includes('docs')) return 'documentation';
 
     return 'feature';
+  }
+
+  /**
+   * Generate tasks with effort estimation and dependency analysis
+   */
+  async generateTasksWithAnalysis(params: {
+    prd: PRDDocument | string;
+    projectId?: string;
+    maxTasks?: number;
+    businessObjectives?: string[];
+    confidenceConfig?: Partial<ConfidenceConfig>;
+  }): Promise<TaskGenerationResult> {
+    const config = { ...DEFAULT_CONFIDENCE_CONFIG, ...params.confidenceConfig };
+
+    // Generate enhanced tasks using existing method
+    const enhancedTasks = await this.generateEnhancedTasksFromPRD({
+      prd: params.prd,
+      projectId: params.projectId,
+      maxTasks: params.maxTasks || MAX_TASKS_PER_PRD,
+      businessObjectives: params.businessObjectives
+    });
+
+    // Reset graph for new analysis
+    this.dependencyGraph = new DependencyGraph();
+
+    // Process each task with effort estimation and confidence
+    const tasksWithEstimates: EnhancedTaskWithEstimate[] = [];
+
+    for (const task of enhancedTasks) {
+      // Add to dependency graph
+      this.dependencyGraph.addTask(task);
+
+      // Generate effort estimate
+      const effortEstimate = this.estimationCalibrator.estimate({
+        complexity: task.complexity,
+        title: task.title,
+        description: task.description,
+        tags: task.tags
+      });
+
+      // Record for future calibration
+      this.estimationCalibrator.recordEstimate({
+        taskId: task.id,
+        title: task.title,
+        estimatedPoints: effortEstimate.points,
+        complexity: task.complexity,
+        tags: task.tags
+      });
+
+      // Calculate task confidence
+      const prdContent = typeof params.prd === 'string'
+        ? params.prd
+        : JSON.stringify(params.prd);
+
+      const taskConfidence = this.confidenceScorer.calculateSectionConfidence({
+        sectionId: task.id,
+        sectionName: task.title,
+        inputData: {
+          description: task.description,
+          context: prdContent.substring(0, 500),
+          requirements: task.acceptanceCriteria.map(ac => ac.description)
+        },
+        aiSelfAssessment: 0.7, // Default - could be enhanced with AI assessment
+        patternMatchScore: this.calculateTaskPatternMatch(task)
+      });
+
+      tasksWithEstimates.push({
+        ...task,
+        effortEstimate,
+        detectedDependencies: [],
+        taskConfidence
+      });
+    }
+
+    // Detect implicit dependencies
+    const implicitDeps = this.dependencyGraph.detectImplicitDependencies(0.5);
+
+    // Assign detected dependencies to tasks
+    for (const task of tasksWithEstimates) {
+      task.detectedDependencies = implicitDeps.filter(d => d.toTaskId === task.id);
+    }
+
+    // Run graph analysis
+    const graphAnalysis = this.dependencyGraph.analyze();
+
+    // Calculate overall confidence
+    const confidenceScores = tasksWithEstimates.map(t => t.taskConfidence);
+    const aggregated = this.confidenceScorer.aggregateConfidence(confidenceScores);
+
+    // Find low confidence tasks
+    const lowConfidenceTasks = tasksWithEstimates.filter(
+      t => t.taskConfidence.tier === 'low'
+    );
+
+    // Calculate estimation stats
+    const totalPoints = tasksWithEstimates.reduce(
+      (sum, t) => sum + t.effortEstimate.points,
+      0
+    );
+    const averageConfidence = tasksWithEstimates.length > 0
+      ? Math.round(
+          tasksWithEstimates.reduce((sum, t) => sum + t.effortEstimate.confidence, 0) /
+          tasksWithEstimates.length
+        )
+      : 0;
+    const calibrated = tasksWithEstimates.some(t => t.effortEstimate.calibrated);
+
+    return {
+      tasks: tasksWithEstimates,
+      graphAnalysis,
+      overallConfidence: {
+        score: aggregated.overallScore,
+        tier: aggregated.overallTier
+      },
+      lowConfidenceTasks,
+      estimationStats: {
+        totalPoints,
+        averageConfidence,
+        calibrated
+      }
+    };
+  }
+
+  /**
+   * Calculate pattern match score for a task based on common patterns
+   */
+  private calculateTaskPatternMatch(task: AITask): number {
+    let score = 0.5;
+
+    // Tasks with clear acceptance criteria score higher
+    if (task.acceptanceCriteria.length >= 3) score += 0.15;
+    else if (task.acceptanceCriteria.length >= 1) score += 0.08;
+
+    // Tasks with explicit dependencies score higher
+    if (task.dependencies.length > 0) score += 0.1;
+
+    // Tasks with reasonable description length
+    if (task.description.length >= 100) score += 0.1;
+    else if (task.description.length >= 50) score += 0.05;
+
+    // Tasks with tags for categorization
+    if (task.tags.length > 0) score += 0.05;
+
+    return Math.min(1, score);
+  }
+
+  /**
+   * Record actual effort for a completed task (for calibration)
+   */
+  recordActualEffort(taskId: string, actualPoints: number): boolean {
+    return this.estimationCalibrator.recordActual(taskId, actualPoints);
+  }
+
+  /**
+   * Get estimation accuracy statistics
+   */
+  getEstimationStats(): ReturnType<typeof EstimationCalibrator.prototype.getAccuracyStats> {
+    return this.estimationCalibrator.getAccuracyStats();
+  }
+
+  /**
+   * Export estimation records for persistence
+   */
+  exportEstimationRecords(): ReturnType<typeof EstimationCalibrator.prototype.exportRecords> {
+    return this.estimationCalibrator.exportRecords();
+  }
+
+  /**
+   * Import estimation records from persistence
+   */
+  importEstimationRecords(records: Parameters<typeof EstimationCalibrator.prototype.importRecords>[0]): void {
+    this.estimationCalibrator.importRecords(records);
   }
 }
