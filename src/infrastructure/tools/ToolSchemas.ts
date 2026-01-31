@@ -2841,3 +2841,17 @@ export {
   executeListLinkedRepositories,
   executeListLinkedTeams,
 } from "./project-linking-tools.js";
+
+// ============================================================================
+// Project Lifecycle Tools
+// ============================================================================
+
+// Re-export project lifecycle tools
+export {
+  closeProjectTool,
+  reopenProjectTool,
+  convertDraftIssueTool,
+  executeCloseProject,
+  executeReopenProject,
+  executeConvertDraftIssue,
+} from "./project-lifecycle-tools.js";

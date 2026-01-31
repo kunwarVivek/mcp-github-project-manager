@@ -173,6 +173,13 @@ import {
   executeListLinkedTeams,
 } from "./project-linking-tools.js";
 
+// Project lifecycle tools
+import {
+  closeProjectTool,
+  reopenProjectTool,
+  convertDraftIssueTool,
+} from "./project-lifecycle-tools.js";
+
 /**
  * Central registry of all available tools
  */
@@ -394,6 +401,11 @@ export class ToolRegistry {
     this.registerTool(unlinkProjectFromTeamTool);
     this.registerTool(listLinkedRepositoriesTool);
     this.registerTool(listLinkedTeamsTool);
+
+    // Register project lifecycle tools (Phase 8)
+    this.registerTool(closeProjectTool);
+    this.registerTool(reopenProjectTool);
+    this.registerTool(convertDraftIssueTool);
   }
 
   /**
