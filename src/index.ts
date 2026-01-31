@@ -43,6 +43,10 @@ import {
   executeCreateStatusUpdate,
   executeListStatusUpdates,
   executeGetStatusUpdate,
+  executeMarkProjectAsTemplate,
+  executeUnmarkProjectAsTemplate,
+  executeCopyProjectFromTemplate,
+  executeListOrganizationTemplates,
 } from "./infrastructure/tools/ToolSchemas";
 import { ToolResultFormatter } from "./infrastructure/tools/ToolResultFormatter";
 import { MCPContentType, MCPErrorCode } from "./domain/mcp-types";
@@ -643,6 +647,19 @@ class GitHubProjectManagerServer {
 
       case "get_status_update":
         return await executeGetStatusUpdate(args);
+
+      // Project template tools
+      case "mark_project_as_template":
+        return await executeMarkProjectAsTemplate(args);
+
+      case "unmark_project_as_template":
+        return await executeUnmarkProjectAsTemplate(args);
+
+      case "copy_project_from_template":
+        return await executeCopyProjectFromTemplate(args);
+
+      case "list_organization_templates":
+        return await executeListOrganizationTemplates(args);
 
       default:
         throw new McpError(

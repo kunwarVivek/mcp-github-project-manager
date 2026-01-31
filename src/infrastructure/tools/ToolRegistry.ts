@@ -143,14 +143,6 @@ import {
   unmarkProjectAsTemplateTool,
   copyProjectFromTemplateTool,
   listOrganizationTemplatesTool,
-
-  // Project linking tools
-  linkProjectToRepositoryTool,
-  unlinkProjectFromRepositoryTool,
-  linkProjectToTeamTool,
-  unlinkProjectFromTeamTool,
-  listLinkedRepositoriesTool,
-  listLinkedTeamsTool,
 } from "./ToolSchemas.js";
 
 // Sub-issue tool executors
@@ -161,16 +153,6 @@ import {
   executeReprioritizeSubIssue,
   executeRemoveSubIssue,
 } from "./sub-issue-tools.js";
-
-// Project linking tool executors
-import {
-  executeLinkProjectToRepository,
-  executeUnlinkProjectFromRepository,
-  executeLinkProjectToTeam,
-  executeUnlinkProjectFromTeam,
-  executeListLinkedRepositories,
-  executeListLinkedTeams,
-} from "./project-linking-tools.js";
 
 // Health check tool
 import { healthCheckTool } from "./health-tools.js";
@@ -388,14 +370,6 @@ export class ToolRegistry {
     this.registerTool(unmarkProjectAsTemplateTool);
     this.registerTool(copyProjectFromTemplateTool);
     this.registerTool(listOrganizationTemplatesTool);
-
-    // Register project linking tools
-    this.registerTool(linkProjectToRepositoryTool);
-    this.registerTool(unlinkProjectFromRepositoryTool);
-    this.registerTool(linkProjectToTeamTool);
-    this.registerTool(unlinkProjectFromTeamTool);
-    this.registerTool(listLinkedRepositoriesTool);
-    this.registerTool(listLinkedTeamsTool);
   }
 
   /**
