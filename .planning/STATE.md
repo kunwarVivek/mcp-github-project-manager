@@ -6,26 +6,26 @@
 ## Current Position
 
 **Phase:** 6 of 12 (Sub-issues and Status Updates)
-**Plan:** 1 of 3 complete
+**Plan:** 2 of 4 complete
 **Status:** In progress
-**Last activity:** 2026-01-31 - Completed 06-01-PLAN.md (Repository Infrastructure)
+**Last activity:** 2026-01-31 - Completed 06-03-PLAN.md (Status Update MCP Tools)
 
-**Progress:** [████████░░] 67% (Phase 1-5 complete, Phase 6: 1/3)
+**Progress:** [████████░░] 69% (Phase 1-5 complete, Phase 6: 2/4)
 
 ## Project Progress
 
 | Metric | Value |
 |--------|-------|
 | Phases Complete | 5/12 |
-| Requirements Done | 37/99 |
-| Current Phase Progress | Phase 6: 1/3 plans complete |
+| Requirements Done | 40/99 |
+| Current Phase Progress | Phase 6: 2/4 plans complete |
 
 ## Performance Metrics
 
 | Metric | Value | Notes |
 |--------|-------|-------|
-| Plans Executed | 28 | Phase 1-4 complete (22), Phase 5 complete (5), Phase 6 in progress (1) |
-| Requirements Completed | 37 | DEBT-01 through DEBT-28, MCP-01 through MCP-15 |
+| Plans Executed | 29 | Phase 1-4 complete (22), Phase 5 complete (5), Phase 6 in progress (2) |
+| Requirements Completed | 40 | DEBT-01 through DEBT-28, MCP-01 through MCP-15, GHAPI-06 to GHAPI-08 |
 | Iterations | 1 | Gap closure cycle for test regressions |
 | Blockers Resolved | 4 | tsyringe decorators, reflect-metadata, MCP SDK type instantiation, test isolation |
 
@@ -84,6 +84,8 @@
 | graphqlWithFeatures method | Add to BaseGitHubRepository for preview header injection (sub_issues) | 2026-01-31 |
 | Node ID resolution helper | Add resolveIssueNodeId() to convert issue numbers to node IDs | 2026-01-31 |
 | Sub-issues feature constant | Use static readonly SUB_ISSUES_FEATURE = ['sub_issues'] | 2026-01-31 |
+| createRepositoryFactory helper | Status update tools use standalone factory; owner/repo are placeholders | 2026-01-31 |
+| Standalone executor pattern for status tools | Follow AI task tool pattern for consistency | 2026-01-31 |
 
 ### Learnings
 
@@ -127,6 +129,8 @@
 - resolveIssueNodeId helper converts issue numbers to node IDs for GraphQL mutations
 - Sub-issues require 'sub_issues' feature flag in GraphQL-Features header
 - Status updates use 5-value enum: ON_TRACK, AT_RISK, OFF_TRACK, COMPLETE, INACTIVE
+- Status update tools follow AI task pattern: standalone executors creating their own factory
+- Status update output schemas use nullable() for optional status field
 
 ### Open Todos
 
@@ -158,8 +162,9 @@
 - [x] Execute 05-05: Integration and Testing (75 new tests, phase verified)
 - [x] Plan Phase 6
 - [x] Execute 06-01: Repository Infrastructure (GitHubSubIssueRepository, GitHubStatusUpdateRepository)
-- [ ] Execute 06-02: MCP Tools
-- [ ] Execute 06-03: Testing and Verification
+- [ ] Execute 06-02: Sub-issue MCP Tools (5 tools)
+- [x] Execute 06-03: Status Update MCP Tools (3 tools)
+- [ ] Execute 06-04: Testing and Verification
 - [ ] Consider future extraction: IssueService, PullRequestService, AutomationService
 
 ### Active Blockers
@@ -331,13 +336,14 @@
 
 ## Session Continuity
 
-**Last Session:** 2026-01-31 - Completed 06-01-PLAN.md (Repository Infrastructure)
+**Last Session:** 2026-01-31 - Completed 06-03-PLAN.md (Status Update MCP Tools)
 
 **Context for Next Session:**
-- Phase 6 (Sub-issues and Status Updates) in progress: 1/3 plans complete
-- Repository infrastructure complete, ready for MCP tools
-- GitHubSubIssueRepository: 5 methods (addSubIssue, listSubIssues, getParentIssue, reprioritizeSubIssue, removeSubIssue)
-- GitHubStatusUpdateRepository: 3 methods (createStatusUpdate, listStatusUpdates, getStatusUpdate)
+- Phase 6 (Sub-issues and Status Updates) in progress: 2/4 plans complete
+- Status update tools complete: create_status_update, list_status_updates, get_status_update
+- Sub-issue tools still needed (06-02)
+- Testing and verification needed (06-04)
+- Total MCP tools: 88 (85 + 3 status update)
 
 **Architecture Context:**
 - DI container (src/container.ts) wires all 6 extracted services
@@ -364,8 +370,9 @@
 | Plan | Name | Status | Key Results |
 |------|------|--------|-------------|
 | 06-01 | Repository Infrastructure | Complete | GitHubSubIssueRepository (5 methods), GitHubStatusUpdateRepository (3 methods), graphqlWithFeatures |
-| 06-02 | MCP Tools | Pending | - |
-| 06-03 | Testing and Verification | Pending | - |
+| 06-02 | Sub-issue MCP Tools | Pending | 5 tools needed |
+| 06-03 | Status Update MCP Tools | Complete | 3 tools (create_status_update, list_status_updates, get_status_update) |
+| 06-04 | Testing and Verification | Pending | - |
 
 ---
 
