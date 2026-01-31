@@ -249,7 +249,7 @@ export class TaskContextGenerationService {
         const depContext = await this.dependencyContextGenerator.generateDependencyContext(
           task,
           allTasks,
-          task.dependencies as any // TaskDependency is compatible with EnhancedTaskDependency
+          task.dependencies
         );
         if (depContext) {
           enhancedContext.dependencyContext = depContext;

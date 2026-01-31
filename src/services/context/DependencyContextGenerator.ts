@@ -4,7 +4,7 @@ import {
   DependencyContext,
   Dependency
 } from '../../domain/task-context-schemas';
-import { AITask, EnhancedTaskDependency } from '../../domain/ai-types';
+import { AITask, TaskDependency, EnhancedTaskDependency } from '../../domain/ai-types';
 import { z } from 'zod';
 
 /**
@@ -48,11 +48,14 @@ export class DependencyContextGenerator {
 
   /**
    * Generate complete dependency context for a task
+   * @param task - The task to generate context for
+   * @param allTasks - All tasks in the project
+   * @param dependencies - Optional dependencies (can be TaskDependency or EnhancedTaskDependency)
    */
   async generateDependencyContext(
     task: AITask,
     allTasks: AITask[],
-    dependencies?: EnhancedTaskDependency[]
+    dependencies?: TaskDependency[] | EnhancedTaskDependency[]
   ): Promise<DependencyContext | null> {
     try {
       const model = this.aiFactory.getBestAvailableModel();
@@ -87,7 +90,7 @@ export class DependencyContextGenerator {
   private generateBasicDependencyContext(
     task: AITask,
     allTasks: AITask[],
-    dependencies?: EnhancedTaskDependency[]
+    dependencies?: TaskDependency[] | EnhancedTaskDependency[]
   ): DependencyContext {
     const deps: Dependency[] = [];
     const taskDeps = dependencies || task.dependencies || [];
@@ -420,7 +423,7 @@ export class DependencyContextGenerator {
   private buildDependencyPrompt(
     task: AITask,
     allTasks: AITask[],
-    dependencies?: EnhancedTaskDependency[]
+    dependencies?: TaskDependency[] | EnhancedTaskDependency[]
   ): string {
     const taskDeps = dependencies || task.dependencies || [];
     const depTasks = taskDeps.map(dep => {

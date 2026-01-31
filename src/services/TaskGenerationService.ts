@@ -3,6 +3,7 @@ import {
   AITask,
   SubTask,
   PRDDocument,
+  MockPRD,
   TaskPriority,
   TaskStatus,
   TaskComplexity,
@@ -89,7 +90,7 @@ export class TaskGenerationService {
       let traceabilityMatrix;
       if (config.createTraceabilityMatrix) {
         // Create mock PRD for traceability
-        const mockPRD = {
+        const mockPRD: MockPRD = {
           id: params.projectId || `prd-${Date.now()}`,
           title: 'Generated PRD',
           overview: prdContent.substring(0, 500),
@@ -111,7 +112,7 @@ export class TaskGenerationService {
 
         traceabilityMatrix = this.traceabilityService.createTraceabilityMatrix(
           params.projectId || 'enhanced-project',
-          mockPRD as any,
+          mockPRD,
           [], // Features will be extracted
           basicTasks
         );
