@@ -56,6 +56,16 @@ import { expandTaskTool, executeExpandTask } from "./ai-tasks/ExpandTaskTool.js"
 import { enhancePRDTool, executeEnhancePRD } from "./ai-tasks/EnhancePRDTool.js";
 import { createTraceabilityMatrixTool, executeCreateTraceabilityMatrix } from "./ai-tasks/CreateTraceabilityMatrixTool.js";
 
+// Import status update tools
+import {
+  createStatusUpdateTool,
+  listStatusUpdatesTool,
+  getStatusUpdateTool,
+  executeCreateStatusUpdate,
+  executeListStatusUpdates,
+  executeGetStatusUpdate,
+} from "./status-update-tools.js";
+
 // Schema for create_roadmap tool
 export const createRoadmapSchema = z.object({
   project: z.object({
@@ -2769,3 +2779,29 @@ export { analyzeTaskComplexityTool, executeAnalyzeTaskComplexity };
 export { expandTaskTool, executeExpandTask };
 export { enhancePRDTool, executeEnhancePRD };
 export { createTraceabilityMatrixTool, executeCreateTraceabilityMatrix };
+
+// ============================================================================
+// Status Update Tools
+// ============================================================================
+
+// Re-export status update tools
+export { createStatusUpdateTool, executeCreateStatusUpdate };
+export { listStatusUpdatesTool, executeListStatusUpdates };
+export { getStatusUpdateTool, executeGetStatusUpdate };
+// ============================================================================
+// Sub-Issue Management Tools
+// ============================================================================
+
+// Re-export sub-issue tools
+export {
+  addSubIssueTool,
+  listSubIssuesTool,
+  getParentIssueTool,
+  reprioritizeSubIssueTool,
+  removeSubIssueTool,
+  executeAddSubIssue,
+  executeListSubIssues,
+  executeGetParentIssue,
+  executeReprioritizeSubIssue,
+  executeRemoveSubIssue,
+} from "./sub-issue-tools.js";

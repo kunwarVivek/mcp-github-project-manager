@@ -125,7 +125,28 @@ import {
   triageIssueTool,
   triageAllIssuesTool,
   scheduleTriagingTool,
+
+  // Status update tools
+  createStatusUpdateTool,
+  listStatusUpdatesTool,
+  getStatusUpdateTool,
+
+  // Sub-issue management tools
+  addSubIssueTool,
+  listSubIssuesTool,
+  getParentIssueTool,
+  reprioritizeSubIssueTool,
+  removeSubIssueTool,
 } from "./ToolSchemas.js";
+
+// Sub-issue tool executors
+import {
+  executeAddSubIssue,
+  executeListSubIssues,
+  executeGetParentIssue,
+  executeReprioritizeSubIssue,
+  executeRemoveSubIssue,
+} from "./sub-issue-tools.js";
 
 // Health check tool
 import { healthCheckTool } from "./health-tools.js";
@@ -325,6 +346,11 @@ export class ToolRegistry {
 
     // Register health check tool
     this.registerTool(healthCheckTool);
+
+    // Register status update tools
+    this.registerTool(createStatusUpdateTool);
+    this.registerTool(listStatusUpdatesTool);
+    this.registerTool(getStatusUpdateTool);
   }
 
   /**
