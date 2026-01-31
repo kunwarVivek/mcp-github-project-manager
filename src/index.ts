@@ -40,6 +40,9 @@ import {
   executeGetParentIssue,
   executeReprioritizeSubIssue,
   executeRemoveSubIssue,
+  executeCreateStatusUpdate,
+  executeListStatusUpdates,
+  executeGetStatusUpdate,
 } from "./infrastructure/tools/ToolSchemas";
 import { ToolResultFormatter } from "./infrastructure/tools/ToolResultFormatter";
 import { MCPContentType, MCPErrorCode } from "./domain/mcp-types";
@@ -631,6 +634,15 @@ class GitHubProjectManagerServer {
 
       case "remove_sub_issue":
         return await executeRemoveSubIssue(args);
+
+      case "create_status_update":
+        return await executeCreateStatusUpdate(args);
+
+      case "list_status_updates":
+        return await executeListStatusUpdates(args);
+
+      case "get_status_update":
+        return await executeGetStatusUpdate(args);
 
       default:
         throw new McpError(
