@@ -34,7 +34,12 @@ import {
   executeAnalyzeTaskComplexity,
   executeExpandTask,
   executeEnhancePRD,
-  executeCreateTraceabilityMatrix
+  executeCreateTraceabilityMatrix,
+  executeAddSubIssue,
+  executeListSubIssues,
+  executeGetParentIssue,
+  executeReprioritizeSubIssue,
+  executeRemoveSubIssue,
 } from "./infrastructure/tools/ToolSchemas";
 import { ToolResultFormatter } from "./infrastructure/tools/ToolResultFormatter";
 import { MCPContentType, MCPErrorCode } from "./domain/mcp-types";
@@ -610,6 +615,22 @@ class GitHubProjectManagerServer {
 
       case "schedule_triaging":
         return await this.handleScheduleTriaging(args);
+
+      // Sub-issue management tools
+      case "add_sub_issue":
+        return await executeAddSubIssue(args);
+
+      case "list_sub_issues":
+        return await executeListSubIssues(args);
+
+      case "get_parent_issue":
+        return await executeGetParentIssue(args);
+
+      case "reprioritize_sub_issue":
+        return await executeReprioritizeSubIssue(args);
+
+      case "remove_sub_issue":
+        return await executeRemoveSubIssue(args);
 
       default:
         throw new McpError(

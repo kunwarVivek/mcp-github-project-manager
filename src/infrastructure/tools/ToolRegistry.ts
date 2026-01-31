@@ -351,6 +351,13 @@ export class ToolRegistry {
     this.registerTool(createStatusUpdateTool);
     this.registerTool(listStatusUpdatesTool);
     this.registerTool(getStatusUpdateTool);
+
+    // Register sub-issue management tools
+    this.registerTool(addSubIssueTool);
+    this.registerTool(listSubIssuesTool);
+    this.registerTool(getParentIssueTool);
+    this.registerTool(reprioritizeSubIssueTool);
+    this.registerTool(removeSubIssueTool);
   }
 
   /**
