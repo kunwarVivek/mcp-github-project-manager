@@ -1,126 +1,125 @@
 # MCP GitHub Project Manager - Status
 
-## Implementation Status
+## Project Overview
 
-### MCP Core Components
-| Component | Status | Notes |
-|-----------|--------|-------|
-| Server Setup | ✅ Complete | Using @modelcontextprotocol/sdk |
-| StdioTransport | ✅ Complete | Full stdio transport implementation |
-| HttpTransport | ✅ Complete | HTTP server for web clients |
-| Tool Registration | ✅ Complete | 6 tools implemented |
-| Tool Validation | ✅ Complete | Using Zod schemas |
-| Request Handling | ✅ Complete | With progressive responses |
-| Error Handling | ✅ Complete | Per MCP specifications |
-| Resource System | ✅ Complete | Versioned resources with CRUD |
-| Response Formatting | ✅ Complete | Structured content implementation |
-| Field Value Operations | ✅ Complete | Full GitHub Project v2 field support |
+MCP GitHub Project Manager is an AI-enabled project management system that integrates GitHub Projects v2 with the Model Context Protocol (MCP). It provides 85 MCP tools for comprehensive project management, issue tracking, sprint planning, and AI-assisted task generation.
 
-### GitHub Project Tools
-| Tool | Status | Notes |
-|------|--------|-------|
-| create_roadmap | ✅ Complete | Creates projects and milestones |
-| plan_sprint | ✅ Complete | Sprint planning functionality |
-| get_milestone_metrics | ✅ Complete | Progress tracking |
-| get_sprint_metrics | ✅ Complete | Sprint monitoring |
-| get_overdue_milestones | ✅ Complete | Overdue tracking |
-| get_upcoming_milestones | ✅ Complete | Future planning |
+## Architecture Summary
 
-### Enhanced Features
-| Feature | Status | Notes |
-|---------|--------|-------|
-| Field Value Updates | ✅ Complete | 100% GitHub Project v2 field type coverage |
-| Field Value Reading | ✅ Complete | Enhanced GraphQL fragments for all field types |
-| Error Handling | ✅ Complete | Comprehensive validation for all field types |
-| Type Safety | ✅ Complete | Full TypeScript interface coverage |
+**Service Decomposition (Phase 1):**
+- ProjectManagementService facade: Central orchestrator for all project operations
+- 6 extracted services: SubIssue, Milestone, SprintPlanning, ProjectStatus, ProjectTemplate, ProjectLinking
+- DI Container: `src/container.ts` wires all services with proper dependency injection
 
-### Infrastructure
-| Component | Status | Notes |
-|-----------|--------|-------|
-| GitHub API Integration | ✅ Complete | Full GitHub Project v2 API support |
-| Service Layer | ✅ Complete | Core services implemented |
-| Type Definitions | ✅ Complete | Complete type coverage |
-| Test Framework | ✅ Complete | All tests passing |
-| Documentation | ✅ Complete | Enhanced API documentation |
+**MCP Protocol Compliance (Phase 2):**
+- MCP SDK 1.25.3 with full protocol support
+- 85 registered tools with behavior annotations and output schemas
+- Proper CallToolResult format with structuredContent
 
-## Recent Achievements
+**Resilience Infrastructure (Phase 5):**
+- Circuit breaker for AI service protection (cockatiel ^3.2.1)
+- Correlation ID tracing via AsyncLocalStorage
+- Resource cache with optional persistence
+- HealthService for system monitoring
 
-### Field Value Enhancement (Completed)
-- ✅ Added support for ITERATION field type with `iterationId` mutations
-- ✅ Added support for MILESTONE field type with `milestoneId` mutations  
-- ✅ Added support for ASSIGNEES field type with `userIds` array mutations
-- ✅ Added support for LABELS field type with `labelIds` array mutations
-- ✅ Enhanced GraphQL queries with proper field value reading fragments
-- ✅ Implemented comprehensive error handling and validation
-- ✅ Updated TypeScript interfaces for all field types
-- ✅ Added complete API documentation and examples
-- ✅ Achieved 100% GitHub Project v2 field type coverage
+## Current Phase
 
-## Current Priorities
+**Phase 5 of 12: Resilience and Observability** - Complete
 
-### High Priority
-1. Implement MCP Resources
-   - Define resource schemas
-   - Add lifecycle management
-   - Implement caching
+| Plan | Name | Status |
+|------|------|--------|
+| 05-01 | Infrastructure Foundation | Complete |
+| 05-02 | Integration Services | Complete |
+| 05-03 | Health Check Service | Complete |
+| 05-04 | Documentation | Complete |
+| 05-05 | Integration and Testing | Pending |
 
-2. Improve Response Formatting
-   - Add structured content
-   - Implement proper MCP format
-   - Add content validation
+## Completed Phases
 
-### Medium Priority
-1. Enhance Error Handling
-   - Add specific MCP error codes
-   - Improve error messages
-   - Add recovery mechanisms
+| Phase | Name | Key Deliverables |
+|-------|------|------------------|
+| 1 | Service Decomposition | 6 extracted services, DI container, 48% facade reduction |
+| 2 | MCP Protocol Compliance | SDK 1.25.3, 85 annotated tools, output schemas |
+| 3 | Type Safety | 16+ `as any` eliminated, type guards, SDK workaround documented |
+| 4 | Test Stabilization | 515 passing tests, credential guards, 94%+ context coverage |
+| 5 | Resilience & Observability | Circuit breaker, correlation tracing, cache persistence, health check |
 
-2. Complete Documentation
-   - Add tool documentation
-   - Update architecture docs
-   - Add usage examples
+## MCP Compliance
 
-### Low Priority
-1. Add Security Features
-   - Transport security
-   - Authentication
-   - Rate limiting
+| Metric | Value |
+|--------|-------|
+| SDK Version | 1.25.3 |
+| Registered Tools | 85 |
+| Tools with Annotations | 85 (100%) |
+| Tools with Output Schemas | 85 (100%) |
+| Behavior Pattern Types | 6 (readOnly, destructive, idempotent, openWorld, etc.) |
 
-2. Performance Optimization
-   - Add caching
-   - Optimize requests
-   - Add monitoring
+**Tool Categories:**
+- Project Management: 18 tools
+- Issue Operations: 18 tools
+- Pull Request: 8 tools
+- Sprint/Iteration: 14 tools
+- Automation: 7 tools
+- AI Tasks: 8 tools
+- Field Operations: 6 tools
+- Events/Triaging: 5 tools
+- Health: 1 tool
 
-## Known Issues
+## AI Services
 
-1. Response Formatting
-   - Currently using simple JSON.stringify
-   - Needs proper MCP content structure
-   - Missing content type handling
+**Factory Pattern:**
+- `AIServiceFactory` singleton provides model instances
+- Supports 4 providers: Anthropic, OpenAI, Google, Perplexity
+- Model types: main, research, fallback, prd
 
-2. Error Handling
-   - Basic error handling only
-   - Missing specific MCP error codes
-   - Limited error recovery
+**Resilience:**
+- `enableResilience()` enables protection for AI calls
+- Circuit breaker prevents cascading failures
+- Retry with exponential backoff
+- Timeout protection (30s default)
+- Fallback for graceful degradation
 
-3. Testing
-   - Limited test coverage
-   - Missing E2E tests
-   - Need more integration tests
+**Graceful Degradation:**
+- `executeWithResilience()` wraps AI operations
+- Returns `DegradedResult` when AI unavailable
+- Circuit state exposed via `getCircuitState()`
 
-## Next Steps
+## Testing
 
-1. Begin Resource Implementation
-   - Define resource types
-   - Create base classes
-   - Add validation
+| Metric | Value |
+|--------|-------|
+| Passing Tests | 515+ |
+| Skipped Tests | 20 (justified) |
+| Failed Tests | 0 |
+| Context Services Coverage | 94%+ |
+| E2E Tests | Credential guards for graceful skip |
 
-2. Enhance Response System
-   - Implement formatters
-   - Add content types
-   - Improve validation
+## Known Limitations
 
-3. Update Documentation
-   - Add MCP specifics
-   - Update examples
-   - Complete guides
+1. **GitHub Health Check:** Placeholder implementation - actual GitHub API rate limit checking deferred
+2. **SDK Type Workaround:** MCP SDK 1.25+ has TS2589 deep type instantiation issue; documented `as any` workaround
+3. **AI Service Mocking:** Complex mock setup required for AI service tests; documented patterns in test files
+
+## Next Steps (Phase 6 Preview)
+
+**Phase 6: AI Service Enhancement**
+- Structured AI response validation
+- PRD generation improvements
+- Task dependency analysis
+- AI-assisted issue enrichment
+
+## Key Files
+
+| File | Purpose |
+|------|---------|
+| `src/container.ts` | DI container configuration |
+| `src/infrastructure/tools/ToolRegistry.ts` | MCP tool registration |
+| `src/infrastructure/resilience/` | Circuit breaker, resilience policy |
+| `src/infrastructure/observability/` | Correlation context, tracing logger |
+| `src/infrastructure/health/` | Health service, health check tool |
+| `src/services/ai/AIServiceFactory.ts` | AI provider factory with resilience |
+
+---
+
+*Last updated: 2026-01-31*
+*Phase 5 completed*
