@@ -6,26 +6,26 @@
 ## Current Position
 
 **Phase:** 8 of 12 (Project Lifecycle and Advanced Operations) - IN PROGRESS
-**Plan:** 1 of 4 complete
+**Plan:** 2 of 4 complete
 **Status:** In progress
-**Last activity:** 2026-01-31 - Completed 08-01-PLAN.md (Schema Definitions)
+**Last activity:** 2026-01-31 - Completed 08-02-PLAN.md (Project Lifecycle Tools)
 
-**Progress:** [████████████░░] 85% (Phase 1-7 complete, Phase 8: 1/4)
+**Progress:** [████████████░░] 87% (Phase 1-7 complete, Phase 8: 2/4)
 
 ## Project Progress
 
 | Metric | Value |
 |--------|-------|
 | Phases Complete | 7/12 |
-| Requirements Done | 69/99 |
-| Current Phase Progress | Phase 8: 1/4 plans complete |
+| Requirements Done | 72/99 |
+| Current Phase Progress | Phase 8: 2/4 plans complete |
 
 ## Performance Metrics
 
 | Metric | Value | Notes |
 |--------|-------|-------|
-| Plans Executed | 36 | Phase 1-4 complete (22), Phase 5 complete (5), Phase 6 complete (4), Phase 7 complete (4), Phase 8: 1 |
-| Requirements Completed | 69 | DEBT-01 through DEBT-28, MCP-01 through MCP-15, GHAPI-01 to GHAPI-18 |
+| Plans Executed | 37 | Phase 1-4 complete (22), Phase 5 complete (5), Phase 6 complete (4), Phase 7 complete (4), Phase 8: 2 |
+| Requirements Completed | 72 | DEBT-01 through DEBT-28, MCP-01 through MCP-15, GHAPI-01 to GHAPI-21 |
 | Iterations | 1 | Gap closure cycle for test regressions |
 | Blockers Resolved | 4 | tsyringe decorators, reflect-metadata, MCP SDK type instantiation, test isolation |
 
@@ -96,6 +96,9 @@
 | 13 tool categories | Added Template (4) and Linking (6) for 103 total tools | 2026-01-31 |
 | Jest mock pattern for tools | Mock GitHubRepositoryFactory with graphql mock returning structured responses | 2026-01-31 |
 | Phase 8 schema pattern | 15 Zod schemas (6 input + 1 filter helper + 8 output) for lifecycle/advanced tools | 2026-01-31 |
+| updateIdempotent for close/reopen | Close/reopen project are idempotent (same result if repeated) | 2026-01-31 |
+| Single mutation for close/reopen | Both close and reopen use updateProjectV2 with closed=true/false | 2026-01-31 |
+| resolveRepositoryId helper | Draft conversion needs repository node ID resolved from owner/name | 2026-01-31 |
 
 ### Learnings
 
@@ -156,6 +159,9 @@
 - Item position mutation: afterId optional (omit to move to first position)
 - Search uses ISSUE_ADVANCED type for AND/OR query support
 - Filter tool requires client-side filtering (GitHub API has no server-side filter)
+- Project lifecycle tools: close/reopen use same updateProjectV2 mutation with closed boolean
+- convertDraftIssueTool needs repository node ID (resolveRepositoryId helper)
+- Annotation pattern naming: updateIdempotent not update
 
 ### Open Todos
 
@@ -196,8 +202,8 @@
 - [x] Execute 07-03: Linking Tools (6 MCP tools for project linking)
 - [x] Execute 07-04: Testing and Verification
 - [x] Execute 08-01: Schema Definitions (15 Zod schemas + 5 TypeScript interfaces)
-- [ ] Execute 08-02: Project Lifecycle Tools (close/reopen project)
-- [ ] Execute 08-03: Advanced Operations Tools (convert draft, reorder items, search/filter)
+- [x] Execute 08-02: Project Lifecycle Tools (3 tools: close/reopen/convert)
+- [ ] Execute 08-03: Advanced Operations Tools (reorder items, search/filter)
 - [ ] Execute 08-04: Testing and Verification
 - [ ] Consider future extraction: IssueService, PullRequestService, AutomationService
 
@@ -466,14 +472,14 @@
 
 ## Session Continuity
 
-**Last Session:** 2026-01-31 - Completed 08-01-PLAN.md (Schema Definitions)
+**Last Session:** 2026-01-31 - Completed 08-02-PLAN.md (Project Lifecycle Tools)
 
 **Context for Next Session:**
-- Phase 8 (Project Lifecycle and Advanced Operations) in progress: 1/4 plans done
-- Schema definitions complete: 15 Zod schemas + 5 TypeScript interfaces
-- Total MCP tools: 103 (no new tools in 08-01, schemas only)
-- Test suite: 774 passing tests
-- Next: 08-02 Project Lifecycle Tools (close/reopen)
+- Phase 8 (Project Lifecycle and Advanced Operations) in progress: 2/4 plans done
+- Lifecycle tools complete: close_project, reopen_project, convert_draft_issue (GHAPI-19 to GHAPI-21)
+- Total MCP tools: 106 (103 + 3 lifecycle tools)
+- Test suite: 774 passing tests (no new tests in 08-02, testing in 08-04)
+- Next: 08-03 Advanced Operations Tools (update_item_position, search_issues_advanced, filter_project_items)
 
 **Architecture Context:**
 - DI container (src/container.ts) wires all 6 extracted services
@@ -482,8 +488,9 @@
 - 13 tool categories organized in docs/TOOLS.md (added Template and Linking)
 - Test isolation: jest.resetAllMocks() in beforeEach for proper mock reset
 - src/infrastructure/tools/schemas/project-lifecycle-schemas.ts - 15 Zod schemas for Phase 8 tools
-- Schemas ready for: close_project, reopen_project, convert_draft_issue, update_item_position, search_issues_advanced, filter_project_items
-- Repository types ready: ProjectLifecycleResult, ConvertedDraftIssueResult, ItemPositionResult, SearchIssueResult, FilteredProjectItem
+- src/infrastructure/tools/project-lifecycle-tools.ts - 3 lifecycle tools with executors
+- Schemas remaining for 08-03: update_item_position, search_issues_advanced, filter_project_items
+- Repository types ready: ItemPositionResult, SearchIssueResult, FilteredProjectItem
 
 ---
 
