@@ -10,16 +10,16 @@ Requirements for this milestone. Each maps to roadmap phases.
 ### GitHub Projects v2 API Coverage (GHAPI)
 
 **Sub-issues:**
-- [ ] **GHAPI-01**: Add sub-issue to parent issue
-- [ ] **GHAPI-02**: List sub-issues for a parent issue
-- [ ] **GHAPI-03**: Get parent issue for a sub-issue
-- [ ] **GHAPI-04**: Reprioritize sub-issue within parent
-- [ ] **GHAPI-05**: Remove sub-issue from parent
+- [x] **GHAPI-01**: Add sub-issue to parent issue
+- [x] **GHAPI-02**: List sub-issues for a parent issue
+- [x] **GHAPI-03**: Get parent issue for a sub-issue
+- [x] **GHAPI-04**: Reprioritize sub-issue within parent
+- [x] **GHAPI-05**: Remove sub-issue from parent
 
 **Project Status Updates:**
-- [ ] **GHAPI-06**: Create project status update
-- [ ] **GHAPI-07**: List project status updates
-- [ ] **GHAPI-08**: Get project status update by ID
+- [x] **GHAPI-06**: Create project status update
+- [x] **GHAPI-07**: List project status updates
+- [x] **GHAPI-08**: Get project status update by ID
 
 **Project Templates:**
 - [ ] **GHAPI-09**: Mark project as template
