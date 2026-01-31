@@ -2855,3 +2855,17 @@ export {
   executeReopenProject,
   executeConvertDraftIssue,
 } from "./project-lifecycle-tools.js";
+
+// ============================================================================
+// Advanced Operations Tools
+// ============================================================================
+
+// Re-export advanced operations tools
+export {
+  updateItemPositionTool,
+  searchIssuesAdvancedTool,
+  filterProjectItemsTool,
+  executeUpdateItemPosition,
+  executeSearchIssuesAdvanced,
+  executeFilterProjectItems,
+} from "./project-advanced-tools.js";

@@ -180,6 +180,13 @@ import {
   convertDraftIssueTool,
 } from "./project-lifecycle-tools.js";
 
+// Advanced operations tools
+import {
+  updateItemPositionTool,
+  searchIssuesAdvancedTool,
+  filterProjectItemsTool,
+} from "./project-advanced-tools.js";
+
 /**
  * Central registry of all available tools
  */
@@ -406,6 +413,11 @@ export class ToolRegistry {
     this.registerTool(closeProjectTool);
     this.registerTool(reopenProjectTool);
     this.registerTool(convertDraftIssueTool);
+
+    // Register advanced operations tools (Phase 8)
+    this.registerTool(updateItemPositionTool);
+    this.registerTool(searchIssuesAdvancedTool);
+    this.registerTool(filterProjectItemsTool);
   }
 
   /**
