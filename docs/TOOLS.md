@@ -1,13 +1,13 @@
 # MCP Tools Reference
 
-This document provides comprehensive documentation for all 93 MCP tools available in the MCP GitHub Project Manager.
+This document provides comprehensive documentation for all 103 MCP tools available in the MCP GitHub Project Manager.
 
 ## Overview
 
 | Metric | Value |
 |--------|-------|
-| Total Tools | 93 |
-| Categories | 11 |
+| Total Tools | 103 |
+| Categories | 13 |
 | SDK Version | 1.25.3 |
 | All tools have | Behavior annotations, Output schemas |
 
@@ -37,6 +37,8 @@ All tools are annotated with behavior hints that help MCP clients understand the
 9. [AI Task Tools](#ai-task-tools) (8 tools)
 10. [Health & Observability Tools](#health--observability-tools) (1 tool)
 11. [Status Update Tools](#status-update-tools) (3 tools)
+12. [Project Template Tools](#project-template-tools) (4 tools)
+13. [Project Linking Tools](#project-linking-tools) (6 tools)
 
 ---
 
@@ -2012,9 +2014,268 @@ Gets a single status update by its node ID.
 
 ---
 
+## Project Template Tools
+
+Project templates allow organizations to create reusable project structures with views, custom fields, draft issues, workflows, and insights.
+
+### mark_project_as_template
+
+Marks an organization project as a template that can be copied by other users.
+
+**Input Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| projectId | string | Yes | Project node ID (PVT_...) |
+
+**Output:** TemplateProjectOutput with id, title, isTemplate, url
+
+**Behavior:** Idempotent update operation
+
+**Example:**
+```json
+{
+  "projectId": "PVT_kwDOLhQ7gc4AOEbH"
+}
+```
+
+---
+
+### unmark_project_as_template
+
+Removes template status from a project.
+
+**Input Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| projectId | string | Yes | Project node ID (PVT_...) |
+
+**Output:** TemplateProjectOutput with id, title, isTemplate=false, url
+
+**Behavior:** Idempotent update operation
+
+**Example:**
+```json
+{
+  "projectId": "PVT_kwDOLhQ7gc4AOEbH"
+}
+```
+
+---
+
+### copy_project_from_template
+
+Creates a new project by copying from a template. Copies views, custom fields, draft issues (optional), workflows, and insights.
+
+**Input Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| projectId | string | Yes | Source template project node ID |
+| targetOwner | string | Yes | Organization login for the new project |
+| title | string | Yes | Title for the new project |
+| includeDraftIssues | boolean | No | Include draft issues from template (default: false) |
+
+**Output:** CopiedProjectOutput with id, title, number, url, createdAt
+
+**Behavior:** Creates new resource (not idempotent)
+
+**Example:**
+```json
+{
+  "projectId": "PVT_kwDOLhQ7gc4AOEbH",
+  "targetOwner": "my-organization",
+  "title": "Q1 2025 Sprint Board",
+  "includeDraftIssues": true
+}
+```
+
+---
+
+### list_organization_templates
+
+Lists all project templates in an organization.
+
+**Input Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| org | string | Yes | Organization login |
+| first | number | No | Number of templates to return (default: 20, max: 100) |
+| after | string | No | Pagination cursor |
+
+**Output:** TemplateListOutput with templates array, pageInfo, totalCount
+
+**Behavior:** Read-only, idempotent
+
+**Example:**
+```json
+{
+  "org": "my-organization",
+  "first": 20
+}
+```
+
+---
+
+## Project Linking Tools
+
+Project linking allows connecting GitHub projects to repositories and teams for better organization and access control.
+
+### link_project_to_repository
+
+Links a GitHub project to a repository. Items from the repository can be added to the project.
+
+**Input Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| projectId | string | Yes | Project node ID (PVT_...) |
+| owner | string | Yes | Repository owner (username or organization) |
+| repo | string | Yes | Repository name |
+
+**Output:** LinkedRepositoryOutput with id, name, nameWithOwner, url, description
+
+**Behavior:** Idempotent update operation
+
+**Example:**
+```json
+{
+  "projectId": "PVT_kwDOLhQ7gc4AOEbH",
+  "owner": "octocat",
+  "repo": "hello-world"
+}
+```
+
+---
+
+### unlink_project_from_repository
+
+Removes a repository linkage from a project.
+
+**Input Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| projectId | string | Yes | Project node ID (PVT_...) |
+| owner | string | Yes | Repository owner |
+| repo | string | Yes | Repository name |
+
+**Output:** LinkOperationOutput with success, message
+
+**Behavior:** Destructive (removes linkage), idempotent
+
+**Example:**
+```json
+{
+  "projectId": "PVT_kwDOLhQ7gc4AOEbH",
+  "owner": "octocat",
+  "repo": "hello-world"
+}
+```
+
+---
+
+### link_project_to_team
+
+Links a GitHub project to a team. Team members will have access to the project.
+
+**Input Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| projectId | string | Yes | Project node ID (PVT_...) |
+| org | string | Yes | Organization login |
+| teamSlug | string | Yes | Team slug (URL-friendly identifier) |
+
+**Output:** LinkedTeamOutput with id, name, slug, description
+
+**Behavior:** Idempotent update operation
+
+**Example:**
+```json
+{
+  "projectId": "PVT_kwDOLhQ7gc4AOEbH",
+  "org": "octocat-org",
+  "teamSlug": "engineering"
+}
+```
+
+---
+
+### unlink_project_from_team
+
+Removes a team linkage from a project.
+
+**Input Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| projectId | string | Yes | Project node ID (PVT_...) |
+| org | string | Yes | Organization login |
+| teamSlug | string | Yes | Team slug |
+
+**Output:** LinkOperationOutput with success, message
+
+**Behavior:** Destructive (removes linkage), idempotent
+
+**Example:**
+```json
+{
+  "projectId": "PVT_kwDOLhQ7gc4AOEbH",
+  "org": "octocat-org",
+  "teamSlug": "engineering"
+}
+```
+
+---
+
+### list_linked_repositories
+
+Lists all repositories linked to a project.
+
+**Input Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| projectId | string | Yes | Project node ID (PVT_...) |
+| first | number | No | Number of repositories to return (default: 20, max: 100) |
+| after | string | No | Pagination cursor |
+
+**Output:** LinkedRepositoriesListOutput with repositories array, pageInfo, totalCount
+
+**Behavior:** Read-only, idempotent
+
+**Example:**
+```json
+{
+  "projectId": "PVT_kwDOLhQ7gc4AOEbH",
+  "first": 20
+}
+```
+
+---
+
+### list_linked_teams
+
+Lists all teams linked to a project.
+
+**Input Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| projectId | string | Yes | Project node ID (PVT_...) |
+| first | number | No | Number of teams to return (default: 20, max: 100) |
+| after | string | No | Pagination cursor |
+
+**Output:** LinkedTeamsListOutput with teams array, pageInfo, totalCount
+
+**Behavior:** Read-only, idempotent
+
+**Example:**
+```json
+{
+  "projectId": "PVT_kwDOLhQ7gc4AOEbH",
+  "first": 20
+}
+```
+
+---
+
 ## Tool Registration
 
-All 93 tools are registered in `src/infrastructure/tools/ToolRegistry.ts`. The registry:
+All 103 tools are registered in `src/infrastructure/tools/ToolRegistry.ts`. The registry:
 
 1. Validates tool definitions at registration time
 2. Generates MCP-compliant tool descriptors with annotations
@@ -2028,6 +2289,8 @@ All 93 tools are registered in `src/infrastructure/tools/ToolRegistry.ts`. The r
 | Project/Issue/PR/Sprint tools | `src/infrastructure/tools/ToolSchemas.ts` |
 | Sub-issue tools | `src/infrastructure/tools/sub-issue-tools.ts` |
 | Status update tools | `src/infrastructure/tools/status-update-tools.ts` |
+| Template tools | `src/infrastructure/tools/project-template-tools.ts` |
+| Linking tools | `src/infrastructure/tools/project-linking-tools.ts` |
 | AI Task tools | `src/infrastructure/tools/ai-tasks/*.ts` |
 | Health tools | `src/infrastructure/tools/health-tools.ts` |
 | Tool Registry | `src/infrastructure/tools/ToolRegistry.ts` |
@@ -2037,5 +2300,5 @@ All 93 tools are registered in `src/infrastructure/tools/ToolRegistry.ts`. The r
 ---
 
 *Generated: 2026-01-31*
-*Tool count: 93*
+*Tool count: 103*
 *MCP SDK: 1.25.3*

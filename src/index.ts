@@ -47,6 +47,12 @@ import {
   executeUnmarkProjectAsTemplate,
   executeCopyProjectFromTemplate,
   executeListOrganizationTemplates,
+  executeLinkProjectToRepository,
+  executeUnlinkProjectFromRepository,
+  executeLinkProjectToTeam,
+  executeUnlinkProjectFromTeam,
+  executeListLinkedRepositories,
+  executeListLinkedTeams,
 } from "./infrastructure/tools/ToolSchemas";
 import { ToolResultFormatter } from "./infrastructure/tools/ToolResultFormatter";
 import { MCPContentType, MCPErrorCode } from "./domain/mcp-types";
@@ -660,6 +666,25 @@ class GitHubProjectManagerServer {
 
       case "list_organization_templates":
         return await executeListOrganizationTemplates(args);
+
+      // Project linking tools
+      case "link_project_to_repository":
+        return await executeLinkProjectToRepository(args);
+
+      case "unlink_project_from_repository":
+        return await executeUnlinkProjectFromRepository(args);
+
+      case "link_project_to_team":
+        return await executeLinkProjectToTeam(args);
+
+      case "unlink_project_from_team":
+        return await executeUnlinkProjectFromTeam(args);
+
+      case "list_linked_repositories":
+        return await executeListLinkedRepositories(args);
+
+      case "list_linked_teams":
+        return await executeListLinkedTeams(args);
 
       default:
         throw new McpError(

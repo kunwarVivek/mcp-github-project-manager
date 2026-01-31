@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-MCP GitHub Project Manager is an AI-enabled project management system that integrates GitHub Projects v2 with the Model Context Protocol (MCP). It provides 93 MCP tools for comprehensive project management, issue tracking, sprint planning, sub-issue hierarchies, and AI-assisted task generation.
+MCP GitHub Project Manager is an AI-enabled project management system that integrates GitHub Projects v2 with the Model Context Protocol (MCP). It provides 103 MCP tools for comprehensive project management, issue tracking, sprint planning, sub-issue hierarchies, project templates, project linking, and AI-assisted task generation.
 
 ## Architecture Summary
 
@@ -13,8 +13,13 @@ MCP GitHub Project Manager is an AI-enabled project management system that integ
 
 **MCP Protocol Compliance (Phase 2):**
 - MCP SDK 1.25.3 with full protocol support
-- 93 registered tools with behavior annotations and output schemas
+- 103 registered tools with behavior annotations and output schemas
 - Proper CallToolResult format with structuredContent
+
+**Project Templates and Linking (Phase 7):**
+- 4 template tools: mark/unmark/copy/list templates
+- 6 linking tools: link/unlink repo/team + list linked
+- Full test coverage for all Phase 7 tools
 
 **Sub-issues and Status Updates (Phase 6):**
 - GitHubSubIssueRepository for parent-child issue hierarchies
@@ -30,14 +35,14 @@ MCP GitHub Project Manager is an AI-enabled project management system that integ
 
 ## Current Phase
 
-**Phase 6 of 12: Sub-issues and Status Updates** - Complete
+**Phase 7 of 12: Project Templates and Linking** - Complete
 
 | Plan | Name | Status |
 |------|------|--------|
-| 06-01 | Repository Infrastructure | Complete |
-| 06-02 | Sub-issue MCP Tools | Complete |
-| 06-03 | Status Update MCP Tools | Complete |
-| 06-04 | Testing and Verification | Complete |
+| 07-01 | Schema Definitions | Complete |
+| 07-02 | Template Tools | Complete |
+| 07-03 | Linking Tools | Complete |
+| 07-04 | Testing and Verification | Complete |
 
 ## Completed Phases
 
@@ -49,15 +54,16 @@ MCP GitHub Project Manager is an AI-enabled project management system that integ
 | 4 | Test Stabilization | 515 passing tests, credential guards, 94%+ context coverage |
 | 5 | Resilience & Observability | Circuit breaker, correlation tracing, cache persistence, health check |
 | 6 | Sub-issues & Status Updates | 8 new MCP tools, 2 repositories, 88 new tests |
+| 7 | Project Templates & Linking | 10 new MCP tools, 97 new tests, full documentation |
 
 ## MCP Compliance
 
 | Metric | Value |
 |--------|-------|
 | SDK Version | 1.25.3 |
-| Registered Tools | 93 |
-| Tools with Annotations | 93 (100%) |
-| Tools with Output Schemas | 93 (100%) |
+| Registered Tools | 103 |
+| Tools with Annotations | 103 (100%) |
+| Tools with Output Schemas | 103 (100%) |
 | Behavior Pattern Types | 6 (readOnly, destructive, idempotent, openWorld, etc.) |
 
 **Tool Categories:**
@@ -72,6 +78,8 @@ MCP GitHub Project Manager is an AI-enabled project management system that integ
 - Events/Triaging: 5 tools
 - Health: 1 tool
 - Status Update: 3 tools
+- Template: 4 tools
+- Linking: 6 tools
 
 ## AI Services
 
@@ -96,7 +104,7 @@ MCP GitHub Project Manager is an AI-enabled project management system that integ
 
 | Metric | Value |
 |--------|-------|
-| Passing Tests | 678+ |
+| Passing Tests | 775+ |
 | Skipped Tests | 20 (justified) |
 | Failed Tests | 0 |
 | Context Services Coverage | 94%+ |
@@ -108,9 +116,9 @@ MCP GitHub Project Manager is an AI-enabled project management system that integ
 2. **SDK Type Workaround:** MCP SDK 1.25+ has TS2589 deep type instantiation issue; documented `as any` workaround
 3. **AI Service Mocking:** Complex mock setup required for AI service tests; documented patterns in test files
 
-## Next Steps (Phase 7 Preview)
+## Next Steps (Phase 8 Preview)
 
-**Phase 7: Webhooks and Automation**
+**Phase 8: Webhooks and Automation**
 - GitHub webhook event handling
 - Automation rule execution
 - Event-driven issue management
@@ -124,6 +132,9 @@ MCP GitHub Project Manager is an AI-enabled project management system that integ
 | `src/infrastructure/tools/ToolRegistry.ts` | MCP tool registration |
 | `src/infrastructure/tools/sub-issue-tools.ts` | Sub-issue MCP tools |
 | `src/infrastructure/tools/status-update-tools.ts` | Status update MCP tools |
+| `src/infrastructure/tools/project-template-tools.ts` | Template MCP tools |
+| `src/infrastructure/tools/project-linking-tools.ts` | Linking MCP tools |
+| `src/infrastructure/tools/schemas/project-template-linking-schemas.ts` | Template/Linking Zod schemas |
 | `src/infrastructure/github/repositories/GitHubSubIssueRepository.ts` | Sub-issue GraphQL operations |
 | `src/infrastructure/github/repositories/GitHubStatusUpdateRepository.ts` | Status update GraphQL operations |
 | `src/infrastructure/resilience/` | Circuit breaker, resilience policy |
@@ -134,4 +145,4 @@ MCP GitHub Project Manager is an AI-enabled project management system that integ
 ---
 
 *Last updated: 2026-01-31*
-*Phase 6 completed*
+*Phase 7 completed*
