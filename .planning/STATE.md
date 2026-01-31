@@ -5,12 +5,12 @@
 
 ## Current Position
 
-**Phase:** 3 of 12 (Type Safety) - COMPLETE
-**Plan:** 5 of 5 complete
-**Status:** Phase complete
-**Last activity:** 2026-01-31 - Completed 03-05-PLAN.md (Final Type Safety Verification)
+**Phase:** 4 of 12 (Test Stabilization)
+**Plan:** 2 of X in progress
+**Status:** In progress
+**Last activity:** 2026-01-31 - Completed 04-02-PLAN.md (E2E Credential Guards)
 
-**Progress:** [████████░░] 42% (Phase 1 + Phase 2 + Phase 3 complete)
+**Progress:** [████████░░] 45% (Phase 1-3 complete, Phase 4 in progress)
 
 ## Project Progress
 
@@ -18,13 +18,13 @@
 |--------|-------|
 | Phases Complete | 3/12 |
 | Requirements Done | 22/99 |
-| Current Phase Progress | Phase 3: 5/5 plans complete |
+| Current Phase Progress | Phase 4: 2/X plans complete |
 
 ## Performance Metrics
 
 | Metric | Value | Notes |
 |--------|-------|-------|
-| Plans Executed | 17 | Phase 1: 01-01 through 01-05, Phase 2: 02-01 through 02-07, Phase 3: 03-01 through 03-05 |
+| Plans Executed | 19 | Phase 1-3 complete (17), Phase 4: 2 in progress |
 | Requirements Completed | 22 | DEBT-01 through DEBT-07, MCP-01 through MCP-15 |
 | Iterations | 1 | Gap closure cycle for test regressions |
 | Blockers Resolved | 3 | tsyringe decorators, reflect-metadata, MCP SDK type instantiation |
@@ -61,6 +61,8 @@
 | TaskPhaseStatus type guard | Runtime validation with isTaskPhaseStatus() | 2026-01-31 |
 | SDK workaround documented | Comprehensive JSDoc for MCP SDK TS2589 limitation | 2026-01-31 |
 | as any audit classification | documented exception vs out-of-scope vs unexpected | 2026-01-31 |
+| Credential guard pattern | if (!utils) { console.log('Skipping...'); return; } | 2026-01-31 |
+| Real credential detection | hasRealCredentials() to detect fake test tokens | 2026-01-31 |
 
 ### Learnings
 
@@ -80,6 +82,8 @@
 - MockPRD interface allows tools to create typed mock objects without full PRDDocument
 - Union types (BaseType | ExtendedType) provide flexibility when a function can accept either
 - Type guards that narrow types also serve as runtime validators for external input
+- E2E tests need credential guards to skip gracefully when credentials are missing
+- createTestSuite must always register tests (skip inside) to avoid "no tests" Jest error
 
 ### Open Todos
 
@@ -98,7 +102,9 @@
 - [x] Execute 03-03: Zod and Type Guard Fixes (5 `as any` removed)
 - [x] Execute 03-04: AI Types and Mock Object Typing (7 `as any` removed)
 - [x] Execute 03-05: Final Type Safety Verification (16+ total `as any` removed)
-- [ ] Plan Phase 4
+- [x] Execute 04-01: Test Foundation Fixes
+- [x] Execute 04-02: E2E Credential Guards
+- [ ] Continue Phase 4 Test Stabilization
 - [ ] Consider future extraction: IssueService, PullRequestService, AutomationService
 
 ### Active Blockers
@@ -195,22 +201,40 @@
 - MockPRD interface for typed mock objects
 - Comprehensive JSDoc for SDK limitation
 
+## Phase 4 Progress Summary
+
+**Phase 4: Test Stabilization** - In Progress
+
+| Plan | Name | Status | Key Results |
+|------|------|--------|-------------|
+| 04-01 | Test Foundation Fixes | Complete | Fixed 3 test files |
+| 04-02 | E2E Credential Guards | Complete | 41 tests with credential guards |
+
+**Test Stabilization Progress:**
+
+| Criterion | Status |
+|-----------|--------|
+| E2E tests skip gracefully without credentials | PASS |
+| No "Bad credentials" errors | PASS |
+| No TypeError about undefined utils | PASS |
+
 ## Session Continuity
 
-**Last Session:** 2026-01-31 - Completed 03-05-PLAN.md
+**Last Session:** 2026-01-31 - Completed 04-02-PLAN.md
 
 **Context for Next Session:**
-- Phase 3 (Type Safety) complete - all 5 plans executed
-- Total: 16+ `as any` removed, 1 documented SDK exception remains
-- Pattern: SDK limitation documentation with error code, root cause, workaround
-- Pattern: Type audit classification (documented vs out-of-scope vs unexpected)
-- Next: Plan Phase 4
+- Phase 4 (Test Stabilization) in progress - 2 plans complete
+- 41 E2E tests now skip gracefully when credentials missing
+- Pattern: if (!utils) { console.log('Skipping...'); return; }
+- Pattern: hasRealCredentials() to detect fake test tokens
+- Next: Continue Phase 4 plans
 
 **Architecture Context:**
 - DI container (src/container.ts) wires all 6 extracted services
 - ProjectManagementService facade: 34 methods delegated, ~25 direct implementations
 - ToolRegistry uses proper ZodTypeAny typing with instanceof checks
 - types.ts uses helper type guards for proper narrowing
+- MCPToolTestUtils: hasRealCredentials() for proper credential detection
 
 ---
 
