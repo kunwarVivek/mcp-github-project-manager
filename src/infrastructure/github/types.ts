@@ -176,13 +176,23 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
 }
 
+function hasErrorsArray(obj: unknown): obj is { errors: unknown[] } {
+  return isRecord(obj) &&
+    'errors' in obj &&
+    Array.isArray(obj.errors);
+}
+
+function isErrorWithMessage(e: unknown): e is { message: string } {
+  return isRecord(e) && 'message' in e && typeof e.message === 'string';
+}
+
 export function isGitHubError(error: unknown): error is GitHubError {
-  return error instanceof Error && 
+  return error instanceof Error &&
     ('status' in error || 'response' in error);
 }
 
 export function isRequestError(error: unknown): error is RequestError {
-  return isGitHubError(error) && 
+  return isGitHubError(error) &&
     'status' in error &&
     'headers' in error &&
     error.name === 'HttpError';
@@ -196,9 +206,6 @@ export function isRateLimitError(error: unknown): error is RateLimitError {
 }
 
 export function isGraphQLErrorResponse(error: unknown): error is GraphQLErrorResponse {
-  return isRecord(error) &&
-    Array.isArray((error as any).errors) &&
-    (error as any).errors.every((e: unknown) => 
-      isRecord(e) && typeof (e as any).message === 'string'
-    );
+  return hasErrorsArray(error) &&
+    error.errors.every(isErrorWithMessage);
 }
