@@ -167,7 +167,7 @@ export class ProjectAutomationService {
     // Use the repository method to update the field
     // This assumes an updateField method has been added to ProjectRepository
     try {
-      return await (this.projectRepo as any).updateField(projectId, fieldId, data);
+      return await this.projectRepo.updateField(projectId, fieldId, data);
     } catch (error) {
       this.logger.error(`Failed to update field ${fieldId} for project ${projectId}`, error);
       throw error;
@@ -193,7 +193,7 @@ export class ProjectAutomationService {
     // Use the repository method to delete the field
     // This assumes a deleteField method has been added to ProjectRepository
     try {
-      await (this.projectRepo as any).deleteField(projectId, fieldId);
+      await this.projectRepo.deleteField(projectId, fieldId);
     } catch (error) {
       this.logger.error(`Failed to delete field ${fieldId} from project ${projectId}`, error);
       throw error;
