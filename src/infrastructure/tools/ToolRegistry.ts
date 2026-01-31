@@ -127,6 +127,9 @@ import {
   scheduleTriagingTool,
 } from "./ToolSchemas.js";
 
+// Health check tool
+import { healthCheckTool } from "./health-tools.js";
+
 /**
  * Central registry of all available tools
  */
@@ -319,6 +322,9 @@ export class ToolRegistry {
     this.registerTool(triageIssueTool);
     this.registerTool(triageAllIssuesTool);
     this.registerTool(scheduleTriagingTool);
+
+    // Register health check tool
+    this.registerTool(healthCheckTool);
   }
 
   /**
