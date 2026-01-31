@@ -1,4 +1,14 @@
 import zodToJsonSchema from "zod-to-json-schema";
+import {
+  ZodOptional,
+  ZodString,
+  ZodNumber,
+  ZodBoolean,
+  ZodArray,
+  ZodObject,
+  ZodEnum,
+  type ZodTypeAny,
+} from "zod";
 import { ToolDefinition, ToolAnnotations } from "./ToolValidator.js";
 import {
   // Original tools
@@ -122,7 +132,7 @@ import {
  */
 export class ToolRegistry {
   private static _instance: ToolRegistry;
-  private _tools: Map<string, ToolDefinition<any>>;
+  private _tools: Map<string, ToolDefinition<unknown>>;
 
   private constructor() {
     this._tools = new Map();
@@ -146,7 +156,7 @@ export class ToolRegistry {
     if (this._tools.has(tool.name)) {
       process.stderr.write(`Tool '${tool.name}' is already registered and will be overwritten.\n`);
     }
-    this._tools.set(tool.name, tool);
+    this._tools.set(tool.name, tool as ToolDefinition<unknown>);
   }
 
   /**
@@ -159,7 +169,7 @@ export class ToolRegistry {
   /**
    * Get all registered tools
    */
-  public getAllTools(): ToolDefinition<any>[] {
+  public getAllTools(): ToolDefinition<unknown>[] {
     return Array.from(this._tools.values());
   }
 
@@ -316,13 +326,13 @@ export class ToolRegistry {
    * @deprecated Use zodToJsonSchema from zod-to-json-schema library instead.
    * This method is kept for backward compatibility but is no longer used.
    */
-  private convertZodToJsonSchema(schema: any): any {
+  private convertZodToJsonSchema(schema: ZodTypeAny): Record<string, unknown> {
     try {
       // Access the internal representation of the schema
       // This is a simplified approach - in a real app, use a proper library
       const jsonSchema: {
         type: string;
-        properties: Record<string, any>;
+        properties: Record<string, unknown>;
         required: string[];
       } = {
         type: "object",
@@ -331,18 +341,18 @@ export class ToolRegistry {
       };
 
       // Attempt to extract shape from the schema
-      if (schema._def && schema._def.shape) {
+      if (schema instanceof ZodObject) {
         const shape = schema._def.shape();
 
         // Extract properties and required fields
-        for (const [key, zodType] of Object.entries(shape)) {
+        for (const [key, zodType] of Object.entries(shape) as [string, ZodTypeAny][]) {
           // Check if the field is required (not optional)
-          if ((zodType as any)._def.typeName !== "ZodOptional") {
-            jsonSchema.required.push(key as string);
+          if (!(zodType instanceof ZodOptional)) {
+            jsonSchema.required.push(key);
           }
 
           // Map Zod types to JSON Schema types (simplified)
-          jsonSchema.properties[key as string] = this.zodTypeToJsonSchemaType(zodType);
+          jsonSchema.properties[key] = this.zodTypeToJsonSchemaType(zodType);
         }
       }
 
@@ -362,30 +372,30 @@ export class ToolRegistry {
    * @deprecated Use zodToJsonSchema from zod-to-json-schema library instead.
    * This method is kept for backward compatibility but is no longer used.
    */
-  private zodTypeToJsonSchemaType(zodType: any): any {
+  private zodTypeToJsonSchemaType(zodType: ZodTypeAny): Record<string, unknown> {
     try {
       // Handle optional types first
-      if (zodType._def.typeName === "ZodOptional") {
+      if (zodType instanceof ZodOptional) {
         return this.zodTypeToJsonSchemaType(zodType._def.innerType);
       }
 
       // String type
-      if (zodType._def.typeName === "ZodString") {
+      if (zodType instanceof ZodString) {
         return { type: "string" };
       }
 
       // Number type
-      if (zodType._def.typeName === "ZodNumber") {
+      if (zodType instanceof ZodNumber) {
         return { type: "number" };
       }
 
       // Boolean type
-      if (zodType._def.typeName === "ZodBoolean") {
+      if (zodType instanceof ZodBoolean) {
         return { type: "boolean" };
       }
 
       // Array type
-      if (zodType._def.typeName === "ZodArray") {
+      if (zodType instanceof ZodArray) {
         return {
           type: "array",
           items: this.zodTypeToJsonSchemaType(zodType._def.type),
@@ -393,17 +403,17 @@ export class ToolRegistry {
       }
 
       // Object type
-      if (zodType._def.typeName === "ZodObject") {
-        const properties: Record<string, any> = {};
+      if (zodType instanceof ZodObject) {
+        const properties: Record<string, unknown> = {};
         const required: string[] = [];
 
         const shape = zodType._def.shape();
-        for (const [key, fieldType] of Object.entries(shape)) {
-          properties[key as string] = this.zodTypeToJsonSchemaType(fieldType);
+        for (const [key, fieldType] of Object.entries(shape) as [string, ZodTypeAny][]) {
+          properties[key] = this.zodTypeToJsonSchemaType(fieldType);
 
           // Check if the field is required (not optional)
-          if ((fieldType as any)._def.typeName !== "ZodOptional") {
-            required.push(key as string);
+          if (!(fieldType instanceof ZodOptional)) {
+            required.push(key);
           }
         }
 
@@ -415,7 +425,7 @@ export class ToolRegistry {
       }
 
       // Enum type
-      if (zodType._def.typeName === "ZodEnum") {
+      if (zodType instanceof ZodEnum) {
         return {
           enum: zodType._def.values,
         };
