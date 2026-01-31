@@ -6,11 +6,11 @@
 ## Current Position
 
 **Phase:** 5 of 12 (Resilience and Observability)
-**Plan:** 3 of 5 complete
+**Plan:** 4 of 5 complete
 **Status:** In progress
-**Last activity:** 2026-01-31 - Completed 05-03-PLAN.md (Health Check Service)
+**Last activity:** 2026-01-31 - Completed 05-04-PLAN.md (Documentation)
 
-**Progress:** [████████░░] 58% (Phase 1-4 complete, Phase 5: 3/5 plans)
+**Progress:** [████████░░] 60% (Phase 1-4 complete, Phase 5: 4/5 plans)
 
 ## Project Progress
 
@@ -18,13 +18,13 @@
 |--------|-------|
 | Phases Complete | 4/12 |
 | Requirements Done | 29/99 |
-| Current Phase Progress | Phase 5: 3/5 plans complete |
+| Current Phase Progress | Phase 5: 4/5 plans complete |
 
 ## Performance Metrics
 
 | Metric | Value | Notes |
 |--------|-------|-------|
-| Plans Executed | 25 | Phase 1-4 complete (22), Phase 5 in progress (3) |
+| Plans Executed | 26 | Phase 1-4 complete (22), Phase 5 in progress (4) |
 | Requirements Completed | 29 | DEBT-01 through DEBT-20, MCP-01 through MCP-15 |
 | Iterations | 1 | Gap closure cycle for test regressions |
 | Blockers Resolved | 4 | tsyringe decorators, reflect-metadata, MCP SDK type instantiation, test isolation |
@@ -76,6 +76,8 @@
 | GitHub health check placeholder | Structure in place, wiring to GitHubRepositoryFactory deferred | 2026-01-31 |
 | Opt-in AI resilience | enableResilience() required before executeWithResilience() works | 2026-01-31 |
 | health_check tool readOnlyHint=true | Safe to call repeatedly, no external calls (placeholder) | 2026-01-31 |
+| 9 tool categories | Organize 85 tools logically (Project, Issue, PR, Sprint, Field, Automation, Events, AI, Health) | 2026-01-31 |
+| API doc scope | Focus on public APIs, not internal implementation | 2026-01-31 |
 
 ### Learnings
 
@@ -140,7 +142,7 @@
 - [x] Execute 05-01: Infrastructure Foundation (CircuitBreakerService, CorrelationContext, CachePersistence)
 - [x] Execute 05-02: Integration Services (AIResiliencePolicy, TracingLogger, ResourceCache persistence)
 - [x] Execute 05-03: Health Check Service (HealthService, health_check tool, AIServiceFactory resilience)
-- [ ] Execute 05-04: (merged into 05-02)
+- [x] Execute 05-04: Documentation (STATUS.md, TOOLS.md, API.md)
 - [ ] Execute 05-05: Integration and Testing
 - [ ] Consider future extraction: IssueService, PullRequestService, AutomationService
 
@@ -279,7 +281,7 @@
 | 05-01 | Infrastructure Foundation | Complete | CircuitBreakerService, CorrelationContext, CachePersistence |
 | 05-02 | Integration Services | Complete | AIResiliencePolicy, TracingLogger, ResourceCache persistence |
 | 05-03 | Health Check Service | Complete | HealthService, health_check tool, AIServiceFactory resilience |
-| 05-04 | (merged into 05-02) | - | - |
+| 05-04 | Documentation | Complete | STATUS.md, docs/TOOLS.md, docs/API.md |
 | 05-05 | Integration and Testing | Pending | - |
 
 **Key deliverables so far:**
@@ -293,14 +295,17 @@
 - HealthService: check() returns HealthStatus with overall status
 - health_check MCP tool: registered in ToolRegistry (tool #85)
 - AIServiceFactory: enableResilience(), getCircuitState(), executeWithResilience()
+- STATUS.md: updated with Phase 5 status, 85 tools, 515+ tests
+- docs/TOOLS.md: comprehensive documentation for all 85 MCP tools (1810 lines)
+- docs/API.md: API reference for services and infrastructure (894 lines)
 
 ## Session Continuity
 
-**Last Session:** 2026-01-31 - Completed 05-03-PLAN.md (Health Check Service)
+**Last Session:** 2026-01-31 - Completed 05-04-PLAN.md (Documentation)
 
 **Context for Next Session:**
-- Phase 5 (Resilience and Observability) in progress: 3/5 plans complete
-- Health check infrastructure complete: HealthService, health_check tool, AIServiceFactory resilience
+- Phase 5 (Resilience and Observability) in progress: 4/5 plans complete
+- Documentation complete: STATUS.md, TOOLS.md, API.md
 - Ready for 05-05: Integration and Testing
 
 **Architecture Context:**
@@ -328,3 +333,4 @@
 *Phase 5 plan 1 completed: 2026-01-31*
 *Phase 5 plan 2 completed: 2026-01-31*
 *Phase 5 plan 3 completed: 2026-01-31*
+*Phase 5 plan 4 completed: 2026-01-31*
