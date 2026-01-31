@@ -137,6 +137,7 @@ class GitHubProjectManagerServer {
     this.setupToolHandlers();
     this.setupEventHandlers();
     this.logAIServiceStatus();
+    this.logToolRegistrationStatus();
 
     this.server.onerror = (error) => this.logger.error("[MCP Error]", error);
     process.on("SIGINT", async () => {
@@ -180,6 +181,47 @@ class GitHubProjectManagerServer {
     } catch (error) {
       this.logger.error("Failed to check AI service status:", error);
       this.logger.warn("⚠️  AI service status unknown - continuing with startup");
+    }
+  }
+
+  /**
+   * Log tool registration status and verify MCP compliance
+   */
+  private logToolRegistrationStatus(): void {
+    try {
+      const tools = this.toolRegistry.getToolsForMCP();
+      const toolCount = tools.length;
+
+      // Count tools with various MCP compliance features
+      const toolsWithAnnotations = tools.filter(t => t.annotations !== undefined);
+      const toolsWithOutputSchema = tools.filter(t => t.outputSchema !== undefined);
+      const toolsWithTitle = tools.filter(t => t.title !== undefined);
+
+      this.logger.info(`📦 Tool Registration Status: ${toolCount} tools registered`);
+
+      // Annotation breakdown by behavior type
+      const readOnly = toolsWithAnnotations.filter(t => t.annotations?.readOnlyHint === true);
+      const destructive = toolsWithAnnotations.filter(t => t.annotations?.destructiveHint === true);
+      const idempotent = toolsWithAnnotations.filter(t => t.annotations?.idempotentHint === true);
+
+      this.logger.info(`   Annotations: ${toolsWithAnnotations.length}/${toolCount} (readOnly: ${readOnly.length}, destructive: ${destructive.length}, idempotent: ${idempotent.length})`);
+      this.logger.info(`   Output Schemas: ${toolsWithOutputSchema.length}/${toolCount}`);
+      this.logger.info(`   Titles: ${toolsWithTitle.length}/${toolCount}`);
+
+      // Warn if any tools are missing compliance features
+      if (toolsWithAnnotations.length < toolCount) {
+        const missing = tools.filter(t => !t.annotations).map(t => t.name);
+        this.logger.warn(`⚠️  Tools missing annotations: ${missing.join(', ')}`);
+      }
+
+      if (toolsWithOutputSchema.length < toolCount) {
+        const missing = tools.filter(t => !t.outputSchema).map(t => t.name);
+        if (missing.length <= 5) {
+          this.logger.debug(`Tools without outputSchema: ${missing.join(', ')}`);
+        }
+      }
+    } catch (error) {
+      this.logger.error("Failed to check tool registration status:", error);
     }
   }
 
