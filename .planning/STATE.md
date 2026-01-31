@@ -5,12 +5,12 @@
 
 ## Current Position
 
-**Phase:** 5 of 12 (Resilience and Observability)
-**Plan:** 5 of 5 complete
-**Status:** Phase complete
-**Last activity:** 2026-01-31 - Completed 05-05-PLAN.md (Integration and Testing)
+**Phase:** 6 of 12 (Sub-issues and Status Updates)
+**Plan:** 1 of 3 complete
+**Status:** In progress
+**Last activity:** 2026-01-31 - Completed 06-01-PLAN.md (Repository Infrastructure)
 
-**Progress:** [████████░░] 66% (Phase 1-5 complete)
+**Progress:** [████████░░] 67% (Phase 1-5 complete, Phase 6: 1/3)
 
 ## Project Progress
 
@@ -18,13 +18,13 @@
 |--------|-------|
 | Phases Complete | 5/12 |
 | Requirements Done | 37/99 |
-| Current Phase Progress | Phase 5: 5/5 plans complete |
+| Current Phase Progress | Phase 6: 1/3 plans complete |
 
 ## Performance Metrics
 
 | Metric | Value | Notes |
 |--------|-------|-------|
-| Plans Executed | 27 | Phase 1-4 complete (22), Phase 5 complete (5) |
+| Plans Executed | 28 | Phase 1-4 complete (22), Phase 5 complete (5), Phase 6 in progress (1) |
 | Requirements Completed | 37 | DEBT-01 through DEBT-28, MCP-01 through MCP-15 |
 | Iterations | 1 | Gap closure cycle for test regressions |
 | Blockers Resolved | 4 | tsyringe decorators, reflect-metadata, MCP SDK type instantiation, test isolation |
@@ -81,6 +81,9 @@
 | Mock factory pattern for tests | Create typed mocks for HealthService testing to avoid complex dependency setup | 2026-01-31 |
 | Temp directory pattern | fs.mkdtempSync/fs.rm for CachePersistence tests to avoid polluting workspace | 2026-01-31 |
 | stderr spy pattern | jest.spyOn(process.stderr, 'write').mockImplementation(() => true) for clean test output | 2026-01-31 |
+| graphqlWithFeatures method | Add to BaseGitHubRepository for preview header injection (sub_issues) | 2026-01-31 |
+| Node ID resolution helper | Add resolveIssueNodeId() to convert issue numbers to node IDs | 2026-01-31 |
+| Sub-issues feature constant | Use static readonly SUB_ISSUES_FEATURE = ['sub_issues'] | 2026-01-31 |
 
 ### Learnings
 
@@ -120,6 +123,10 @@
 - AIServiceFactory resilience: opt-in via enableResilience(), executeWithResilience() wraps AI calls
 - Infrastructure test location: tests/infrastructure/{domain}/ for resilience, observability, cache, health
 - TypeScript mock typing: Use `c[0] as string` cast when mapping mock call arrays to avoid type errors
+- graphqlWithFeatures enables preview header injection for sub-issues API
+- resolveIssueNodeId helper converts issue numbers to node IDs for GraphQL mutations
+- Sub-issues require 'sub_issues' feature flag in GraphQL-Features header
+- Status updates use 5-value enum: ON_TRACK, AT_RISK, OFF_TRACK, COMPLETE, INACTIVE
 
 ### Open Todos
 
@@ -149,7 +156,10 @@
 - [x] Execute 05-03: Health Check Service (HealthService, health_check tool, AIServiceFactory resilience)
 - [x] Execute 05-04: Documentation (STATUS.md, TOOLS.md, API.md)
 - [x] Execute 05-05: Integration and Testing (75 new tests, phase verified)
-- [ ] Plan Phase 6
+- [x] Plan Phase 6
+- [x] Execute 06-01: Repository Infrastructure (GitHubSubIssueRepository, GitHubStatusUpdateRepository)
+- [ ] Execute 06-02: MCP Tools
+- [ ] Execute 06-03: Testing and Verification
 - [ ] Consider future extraction: IssueService, PullRequestService, AutomationService
 
 ### Active Blockers
@@ -321,12 +331,13 @@
 
 ## Session Continuity
 
-**Last Session:** 2026-01-31 - Completed 05-05-PLAN.md (Integration and Testing)
+**Last Session:** 2026-01-31 - Completed 06-01-PLAN.md (Repository Infrastructure)
 
 **Context for Next Session:**
-- Phase 5 (Resilience and Observability) complete: 5/5 plans
-- All 8 requirements verified (DEBT-21 through DEBT-28)
-- Ready for Phase 6 planning
+- Phase 6 (Sub-issues and Status Updates) in progress: 1/3 plans complete
+- Repository infrastructure complete, ready for MCP tools
+- GitHubSubIssueRepository: 5 methods (addSubIssue, listSubIssues, getParentIssue, reprioritizeSubIssue, removeSubIssue)
+- GitHubStatusUpdateRepository: 3 methods (createStatusUpdate, listStatusUpdates, getStatusUpdate)
 
 **Architecture Context:**
 - DI container (src/container.ts) wires all 6 extracted services
@@ -342,6 +353,19 @@
 - src/infrastructure/tools/health-tools.ts - health_check MCP tool
 - src/services/ai/AIServiceFactory.ts - resilience methods added
 - tests/infrastructure/ - 75 tests for Phase 5 components
+- src/infrastructure/github/repositories/GitHubSubIssueRepository.ts - NEW: Sub-issue GraphQL operations
+- src/infrastructure/github/repositories/GitHubStatusUpdateRepository.ts - NEW: Status update GraphQL operations
+- BaseGitHubRepository.graphqlWithFeatures() - NEW: GraphQL with preview headers
+
+## Phase 6 Progress
+
+**Phase 6: Sub-issues and Status Updates** - In Progress
+
+| Plan | Name | Status | Key Results |
+|------|------|--------|-------------|
+| 06-01 | Repository Infrastructure | Complete | GitHubSubIssueRepository (5 methods), GitHubStatusUpdateRepository (3 methods), graphqlWithFeatures |
+| 06-02 | MCP Tools | Pending | - |
+| 06-03 | Testing and Verification | Pending | - |
 
 ---
 
@@ -352,3 +376,4 @@
 *Phase 3 completed: 2026-01-31*
 *Phase 4 completed: 2026-01-31*
 *Phase 5 completed: 2026-01-31*
+*Phase 6 started: 2026-01-31*
