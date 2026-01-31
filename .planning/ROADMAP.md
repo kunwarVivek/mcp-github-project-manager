@@ -288,6 +288,16 @@ Plans:
 4. User can reorder items in project and see new order persist
 5. User can search with complex queries (title:bug AND label:critical)
 
+**Plans:** 4 plans
+Plans:
+- [x] 08-01-PLAN.md — Zod schemas for all 6 lifecycle and advanced tools
+- [x] 08-02-PLAN.md — Project lifecycle tools (close/reopen/convert draft - 3 tools)
+- [x] 08-03-PLAN.md — Advanced operations tools (position/search/filter - 3 tools)
+- [x] 08-04-PLAN.md — Testing and documentation (~109 tests, TOOLS.md update)
+
+**Status:** Complete ✓
+**Completed:** 2026-01-31
+
 ---
 
 ### Phase 9: AI PRD and Task Enhancement
@@ -400,7 +410,7 @@ Plans:
 | 5 | Resilience and Observability | 8 | Complete ✓ |
 | 6 | Sub-issues and Status Updates | 8 | Complete ✓ |
 | 7 | Project Templates and Linking | 10 | Complete ✓ |
-| 8 | Project Lifecycle and Advanced Operations | 6 | Pending |
+| 8 | Project Lifecycle and Advanced Operations | 6 | Complete ✓ |
 | 9 | AI PRD and Task Enhancement | 8 | Pending |
 | 10 | AI Sprint and Roadmap Planning | 8 | Pending |
 | 11 | AI Issue Intelligence | 4 | Pending |
@@ -433,3 +443,4 @@ Plans:
 *Phase 5 completed: 2026-01-31*
 *Phase 6 completed: 2026-01-31*
 *Phase 7 completed: 2026-01-31*
+*Phase 8 completed: 2026-01-31*
