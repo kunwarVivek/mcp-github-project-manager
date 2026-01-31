@@ -5,12 +5,12 @@
 
 ## Current Position
 
-**Phase:** 7 of 12 (Project Templates and Linking) - COMPLETE
-**Plan:** 4 of 4 complete
-**Status:** Phase complete
-**Last activity:** 2026-01-31 - Completed 07-04-PLAN.md (Testing and Verification)
+**Phase:** 8 of 12 (Project Lifecycle and Advanced Operations) - IN PROGRESS
+**Plan:** 1 of 4 complete
+**Status:** In progress
+**Last activity:** 2026-01-31 - Completed 08-01-PLAN.md (Schema Definitions)
 
-**Progress:** [████████████░░] 83% (Phase 1-7 complete)
+**Progress:** [████████████░░] 85% (Phase 1-7 complete, Phase 8: 1/4)
 
 ## Project Progress
 
@@ -18,13 +18,13 @@
 |--------|-------|
 | Phases Complete | 7/12 |
 | Requirements Done | 69/99 |
-| Current Phase Progress | Phase 7: 4/4 plans complete |
+| Current Phase Progress | Phase 8: 1/4 plans complete |
 
 ## Performance Metrics
 
 | Metric | Value | Notes |
 |--------|-------|-------|
-| Plans Executed | 35 | Phase 1-4 complete (22), Phase 5 complete (5), Phase 6 complete (4), Phase 7 complete (4) |
+| Plans Executed | 36 | Phase 1-4 complete (22), Phase 5 complete (5), Phase 6 complete (4), Phase 7 complete (4), Phase 8: 1 |
 | Requirements Completed | 69 | DEBT-01 through DEBT-28, MCP-01 through MCP-15, GHAPI-01 to GHAPI-18 |
 | Iterations | 1 | Gap closure cycle for test regressions |
 | Blockers Resolved | 4 | tsyringe decorators, reflect-metadata, MCP SDK type instantiation, test isolation |
@@ -95,6 +95,7 @@
 | nullable() for optional strings | Use z.string().nullable() for optional fields that can be null from GraphQL | 2026-01-31 |
 | 13 tool categories | Added Template (4) and Linking (6) for 103 total tools | 2026-01-31 |
 | Jest mock pattern for tools | Mock GitHubRepositoryFactory with graphql mock returning structured responses | 2026-01-31 |
+| Phase 8 schema pattern | 15 Zod schemas (6 input + 1 filter helper + 8 output) for lifecycle/advanced tools | 2026-01-31 |
 
 ### Learnings
 
@@ -150,6 +151,11 @@
 - Mock GraphQL responses with mockResolvedValue/mockResolvedValueOnce for sequential calls
 - Test error handling: missing GITHUB_TOKEN, org/repo/team not found, project not found
 - Pagination tests: verify first, after, hasNextPage, endCursor handling
+- Phase 8 lifecycle schemas: close/reopen use single ProjectLifecycleOutputSchema
+- Draft conversion needs itemId (PVTI_) not content ID, plus repository resolution
+- Item position mutation: afterId optional (omit to move to first position)
+- Search uses ISSUE_ADVANCED type for AND/OR query support
+- Filter tool requires client-side filtering (GitHub API has no server-side filter)
 
 ### Open Todos
 
@@ -189,6 +195,10 @@
 - [x] Execute 07-02: Template Tools (4 MCP tools for project templates)
 - [x] Execute 07-03: Linking Tools (6 MCP tools for project linking)
 - [x] Execute 07-04: Testing and Verification
+- [x] Execute 08-01: Schema Definitions (15 Zod schemas + 5 TypeScript interfaces)
+- [ ] Execute 08-02: Project Lifecycle Tools (close/reopen project)
+- [ ] Execute 08-03: Advanced Operations Tools (convert draft, reorder items, search/filter)
+- [ ] Execute 08-04: Testing and Verification
 - [ ] Consider future extraction: IssueService, PullRequestService, AutomationService
 
 ### Active Blockers
@@ -456,14 +466,14 @@
 
 ## Session Continuity
 
-**Last Session:** 2026-01-31 - Completed 07-04-PLAN.md (Testing and Verification)
+**Last Session:** 2026-01-31 - Completed 08-01-PLAN.md (Schema Definitions)
 
 **Context for Next Session:**
-- Phase 7 (Project Templates and Linking) complete: 4/4 plans done
-- All 10 Phase 7 tools tested and documented
-- Total MCP tools: 103 (was 93)
+- Phase 8 (Project Lifecycle and Advanced Operations) in progress: 1/4 plans done
+- Schema definitions complete: 15 Zod schemas + 5 TypeScript interfaces
+- Total MCP tools: 103 (no new tools in 08-01, schemas only)
 - Test suite: 774 passing tests
-- Next: Phase 8 (Webhooks and Automation)
+- Next: 08-02 Project Lifecycle Tools (close/reopen)
 
 **Architecture Context:**
 - DI container (src/container.ts) wires all 6 extracted services
@@ -471,12 +481,9 @@
 - ToolRegistry uses proper ZodTypeAny typing with instanceof checks
 - 13 tool categories organized in docs/TOOLS.md (added Template and Linking)
 - Test isolation: jest.resetAllMocks() in beforeEach for proper mock reset
-- src/infrastructure/tools/schemas/project-template-linking-schemas.ts - 20 Zod schemas for Phase 7 tools
-- src/infrastructure/tools/project-template-tools.ts - 4 template tools with executors
-- src/infrastructure/tools/project-linking-tools.ts - 6 linking tools with executors
-- Template tools use createFactory helper with placeholder owner/repo
-- Linking tools use factory.graphql() for direct GraphQL operations
-- resolveOrganizationId and resolveRepositoryId helpers for ID resolution
+- src/infrastructure/tools/schemas/project-lifecycle-schemas.ts - 15 Zod schemas for Phase 8 tools
+- Schemas ready for: close_project, reopen_project, convert_draft_issue, update_item_position, search_issues_advanced, filter_project_items
+- Repository types ready: ProjectLifecycleResult, ConvertedDraftIssueResult, ItemPositionResult, SearchIssueResult, FilteredProjectItem
 
 ---
 
