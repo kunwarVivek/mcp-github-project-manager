@@ -13,6 +13,10 @@ import {
   AI_FALLBACK_MODEL,
   AI_PRD_MODEL
 } from '../../env';
+import {
+  AIResiliencePolicy,
+  type DegradedResult,
+} from '../../infrastructure/resilience/AIResiliencePolicy.js';
 
 /**
  * AI Provider Types
@@ -44,6 +48,7 @@ export interface AIServiceConfig {
 export class AIServiceFactory {
   private static instance: AIServiceFactory;
   private config: AIServiceConfig;
+  private resiliencePolicy?: AIResiliencePolicy;
 
   private constructor() {
     this.config = this.buildConfiguration();
@@ -260,6 +265,94 @@ export class AIServiceFactory {
       availableModels,
       unavailableModels
     };
+  }
+
+  // ==========================================
+  // Resilience Methods
+  // ==========================================
+
+  /**
+   * Enable resilience for AI operations.
+   *
+   * This is OPT-IN - existing behavior is unchanged until this is called.
+   * Services that want resilience can use executeWithResilience() after enabling.
+   *
+   * @param policy - Optional custom resilience policy. If not provided, creates default.
+   */
+  public enableResilience(policy?: AIResiliencePolicy): void {
+    this.resiliencePolicy = policy ?? new AIResiliencePolicy();
+    process.stderr.write('[AIServiceFactory] Resilience enabled\n');
+  }
+
+  /**
+   * Get the current resilience policy, if enabled.
+   *
+   * @returns The resilience policy or undefined if not enabled
+   */
+  public getResiliencePolicy(): AIResiliencePolicy | undefined {
+    return this.resiliencePolicy;
+  }
+
+  /**
+   * Check if resilience is currently enabled.
+   *
+   * @returns true if resilience is enabled
+   */
+  public isResilienceEnabled(): boolean {
+    return this.resiliencePolicy !== undefined;
+  }
+
+  /**
+   * Get the current circuit breaker state.
+   *
+   * @returns Circuit state: 'closed', 'open', 'half-open', or 'disabled' if resilience not enabled
+   */
+  public getCircuitState(): 'closed' | 'open' | 'half-open' | 'disabled' {
+    if (!this.resiliencePolicy) {
+      return 'disabled';
+    }
+    return this.resiliencePolicy.getCircuitState();
+  }
+
+  /**
+   * Execute an AI operation with resilience protection.
+   *
+   * Wraps the operation with:
+   * - Timeout protection
+   * - Circuit breaker (prevents cascading failures)
+   * - Retry with exponential backoff
+   * - Fallback for graceful degradation
+   *
+   * If resilience is not enabled, executes the operation directly.
+   *
+   * @example
+   * ```typescript
+   * const factory = AIServiceFactory.getInstance();
+   * factory.enableResilience();
+   *
+   * const result = await factory.executeWithResilience(
+   *   () => generateText({ model, prompt: 'Hello' }),
+   *   () => ({ degraded: true, message: 'Using cached response' })
+   * );
+   *
+   * if ('degraded' in result) {
+   *   console.log('AI unavailable:', result.message);
+   * }
+   * ```
+   *
+   * @param operation - The async AI operation to execute
+   * @param fallback - Optional fallback function for graceful degradation
+   * @returns The operation result, or a DegradedResult if fallback is used
+   */
+  public async executeWithResilience<T>(
+    operation: () => Promise<T>,
+    fallback?: () => T | DegradedResult
+  ): Promise<T | DegradedResult> {
+    if (!this.resiliencePolicy) {
+      // No resilience enabled, execute directly
+      return operation();
+    }
+    return this.resiliencePolicy.execute(operation, fallback);
   }
 
   /**
