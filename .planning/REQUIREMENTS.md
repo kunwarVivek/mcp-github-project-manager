@@ -52,46 +52,46 @@ Requirements for this milestone. Each maps to roadmap phases.
 ### MCP Protocol Compliance (MCP)
 
 **SDK Upgrade:**
-- [ ] **MCP-01**: Upgrade SDK from 1.12.0 to 1.25.2
-- [ ] **MCP-02**: Update all imports for new SDK structure
-- [ ] **MCP-03**: Verify all 71 tools work after upgrade
-- [ ] **MCP-04**: Update protocol version negotiation
+- [x] **MCP-01**: Upgrade SDK from 1.12.0 to 1.25.2
+- [x] **MCP-02**: Update all imports for new SDK structure
+- [x] **MCP-03**: Verify all 71 tools work after upgrade
+- [x] **MCP-04**: Update protocol version negotiation
 
 **Tool Annotations:**
-- [ ] **MCP-05**: Add behavior annotations to all destructive tools (create, update, delete)
-- [ ] **MCP-06**: Add read-only annotations to all query tools (get, list)
-- [ ] **MCP-07**: Add idempotent annotations where applicable
+- [x] **MCP-05**: Add behavior annotations to all destructive tools (create, update, delete)
+- [x] **MCP-06**: Add read-only annotations to all query tools (get, list)
+- [x] **MCP-07**: Add idempotent annotations where applicable
 
 **Tool Output Schemas:**
-- [ ] **MCP-08**: Define output schemas for all project tools
-- [ ] **MCP-09**: Define output schemas for all issue tools
-- [ ] **MCP-10**: Define output schemas for all PR tools
-- [ ] **MCP-11**: Define output schemas for all AI tools
-- [ ] **MCP-12**: Define output schemas for all automation tools
+- [x] **MCP-08**: Define output schemas for all project tools
+- [x] **MCP-09**: Define output schemas for all issue tools
+- [x] **MCP-10**: Define output schemas for all PR tools
+- [x] **MCP-11**: Define output schemas for all AI tools
+- [x] **MCP-12**: Define output schemas for all automation tools
 
 **Error Handling:**
-- [ ] **MCP-13**: Implement MCP-compliant error codes
-- [ ] **MCP-14**: Add proper error data payloads
-- [ ] **MCP-15**: Handle protocol version mismatches gracefully
+- [x] **MCP-13**: Implement MCP-compliant error codes
+- [x] **MCP-14**: Add proper error data payloads
+- [x] **MCP-15**: Handle protocol version mismatches gracefully
 
 ### Tech Debt Resolution (DEBT)
 
 **Service Decomposition:**
-- [ ] **DEBT-01**: Extract SubIssueService from ProjectManagementService
-- [ ] **DEBT-02**: Extract ProjectStatusService from ProjectManagementService
-- [ ] **DEBT-03**: Extract ProjectTemplateService from ProjectManagementService
-- [ ] **DEBT-04**: Extract ProjectLinkingService from ProjectManagementService
-- [ ] **DEBT-05**: Extract SprintPlanningService from ProjectManagementService
-- [ ] **DEBT-06**: Extract MilestoneService from ProjectManagementService
-- [ ] **DEBT-07**: Reduce ProjectManagementService to coordination only
+- [x] **DEBT-01**: Extract SubIssueService from ProjectManagementService
+- [x] **DEBT-02**: Extract ProjectStatusService from ProjectManagementService
+- [x] **DEBT-03**: Extract ProjectTemplateService from ProjectManagementService
+- [x] **DEBT-04**: Extract ProjectLinkingService from ProjectManagementService
+- [x] **DEBT-05**: Extract SprintPlanningService from ProjectManagementService
+- [x] **DEBT-06**: Extract MilestoneService from ProjectManagementService
+- [x] **DEBT-07**: Reduce ProjectManagementService to coordination only
 
 **Type Safety:**
-- [ ] **DEBT-08**: Define interfaces for all AI response objects
-- [ ] **DEBT-09**: Replace `as any` in TaskContextGenerationService
-- [ ] **DEBT-10**: Replace `as any` in PRDGenerationService
-- [ ] **DEBT-11**: Replace `as any` in ProjectAutomationService
-- [ ] **DEBT-12**: Replace `as any` in TaskGenerationService
-- [ ] **DEBT-13**: Add type guards for unknown data validation
+- [x] **DEBT-08**: Define interfaces for all AI response objects
+- [x] **DEBT-09**: Replace `as any` in TaskContextGenerationService
+- [x] **DEBT-10**: Replace `as any` in PRDGenerationService
+- [x] **DEBT-11**: Replace `as any` in ProjectAutomationService
+- [x] **DEBT-12**: Replace `as any` in TaskGenerationService
+- [x] **DEBT-13**: Add type guards for unknown data validation
 
 **Test Coverage:**
 - [ ] **DEBT-14**: Fix 74 failing tests
@@ -202,34 +202,34 @@ Which phases cover which requirements.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| DEBT-01 | Phase 1 | Pending |
-| DEBT-02 | Phase 1 | Pending |
-| DEBT-03 | Phase 1 | Pending |
-| DEBT-04 | Phase 1 | Pending |
-| DEBT-05 | Phase 1 | Pending |
-| DEBT-06 | Phase 1 | Pending |
-| DEBT-07 | Phase 1 | Pending |
-| MCP-01 | Phase 2 | Pending |
-| MCP-02 | Phase 2 | Pending |
-| MCP-03 | Phase 2 | Pending |
-| MCP-04 | Phase 2 | Pending |
-| MCP-05 | Phase 2 | Pending |
-| MCP-06 | Phase 2 | Pending |
-| MCP-07 | Phase 2 | Pending |
-| MCP-08 | Phase 2 | Pending |
-| MCP-09 | Phase 2 | Pending |
-| MCP-10 | Phase 2 | Pending |
-| MCP-11 | Phase 2 | Pending |
-| MCP-12 | Phase 2 | Pending |
-| MCP-13 | Phase 2 | Pending |
-| MCP-14 | Phase 2 | Pending |
-| MCP-15 | Phase 2 | Pending |
-| DEBT-08 | Phase 3 | Pending |
-| DEBT-09 | Phase 3 | Pending |
-| DEBT-10 | Phase 3 | Pending |
-| DEBT-11 | Phase 3 | Pending |
-| DEBT-12 | Phase 3 | Pending |
-| DEBT-13 | Phase 3 | Pending |
+| DEBT-01 | Phase 1 | Complete |
+| DEBT-02 | Phase 1 | Complete |
+| DEBT-03 | Phase 1 | Complete |
+| DEBT-04 | Phase 1 | Complete |
+| DEBT-05 | Phase 1 | Complete |
+| DEBT-06 | Phase 1 | Complete |
+| DEBT-07 | Phase 1 | Complete |
+| MCP-01 | Phase 2 | Complete |
+| MCP-02 | Phase 2 | Complete |
+| MCP-03 | Phase 2 | Complete |
+| MCP-04 | Phase 2 | Complete |
+| MCP-05 | Phase 2 | Complete |
+| MCP-06 | Phase 2 | Complete |
+| MCP-07 | Phase 2 | Complete |
+| MCP-08 | Phase 2 | Complete |
+| MCP-09 | Phase 2 | Complete |
+| MCP-10 | Phase 2 | Complete |
+| MCP-11 | Phase 2 | Complete |
+| MCP-12 | Phase 2 | Complete |
+| MCP-13 | Phase 2 | Complete |
+| MCP-14 | Phase 2 | Complete |
+| MCP-15 | Phase 2 | Complete |
+| DEBT-08 | Phase 3 | Complete |
+| DEBT-09 | Phase 3 | Complete |
+| DEBT-10 | Phase 3 | Complete |
+| DEBT-11 | Phase 3 | Complete |
+| DEBT-12 | Phase 3 | Complete |
+| DEBT-13 | Phase 3 | Complete |
 | DEBT-14 | Phase 4 | Pending |
 | DEBT-15 | Phase 4 | Pending |
 | DEBT-16 | Phase 4 | Pending |
