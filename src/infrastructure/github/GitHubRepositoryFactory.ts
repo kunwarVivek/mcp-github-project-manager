@@ -8,6 +8,8 @@ import { GitHubMilestoneRepository } from "./repositories/GitHubMilestoneReposit
 import { GitHubProjectRepository } from "./repositories/GitHubProjectRepository";
 import { GitHubSprintRepository } from "./repositories/GitHubSprintRepository";
 import { GitHubAutomationRuleRepository } from "./repositories/GitHubAutomationRuleRepository";
+import { GitHubSubIssueRepository } from "./repositories/GitHubSubIssueRepository";
+import { GitHubStatusUpdateRepository } from "./repositories/GitHubStatusUpdateRepository";
 
 export interface RepositoryFactoryOptions {
   baseUrl?: string;
@@ -101,6 +103,27 @@ export class GitHubRepositoryFactory {
    */
   createAutomationRuleRepository(): GitHubAutomationRuleRepository {
     return new GitHubAutomationRuleRepository(this.octokit, this.config);
+  }
+
+  /**
+   * Creates an instance of a Sub-Issue Repository
+   *
+   * Sub-issues allow creating parent-child hierarchies between issues.
+   * Note: Sub-issue operations require the 'sub_issues' GraphQL feature flag,
+   * which is handled automatically by the repository.
+   */
+  createSubIssueRepository(): GitHubSubIssueRepository {
+    return new GitHubSubIssueRepository(this.octokit, this.config);
+  }
+
+  /**
+   * Creates an instance of a Status Update Repository
+   *
+   * Status updates allow project managers to communicate project progress
+   * with predefined status values (ON_TRACK, AT_RISK, OFF_TRACK, COMPLETE, INACTIVE).
+   */
+  createStatusUpdateRepository(): GitHubStatusUpdateRepository {
+    return new GitHubStatusUpdateRepository(this.octokit, this.config);
   }
 
   /**
