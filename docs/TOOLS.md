@@ -2478,6 +2478,177 @@ Filters items in a GitHub ProjectV2 by status, labels, assignee, or type. Multip
 
 ---
 
+## AI Enhancement Services (Phase 9)
+
+Phase 9 added advanced AI capabilities for PRD and task generation, including confidence scoring, template customization, validation rules, dependency analysis, and effort estimation.
+
+### Confidence Scoring
+
+The AI generation services now include per-section confidence scoring:
+
+- **ConfidenceScorer**: Calculates multi-factor confidence (0-100) for AI-generated content
+  - Input completeness (description length, examples, constraints)
+  - AI self-assessment (model's own certainty)
+  - Pattern matching (similarity to known successful patterns)
+
+- **Confidence Tiers**:
+  - High (70-100): Content is reliable
+  - Medium (50-69): Review recommended
+  - Low (0-49): Clarifying questions generated
+
+#### Example Usage
+
+```typescript
+import { ConfidenceScorer } from './services/ai/ConfidenceScorer';
+
+const scorer = new ConfidenceScorer();
+const result = scorer.calculateSectionConfidence({
+  sectionId: 'overview',
+  sectionName: 'Overview',
+  inputData: { description: 'Project description...' },
+  aiSelfAssessment: 0.75
+});
+
+console.log(`Score: ${result.score}% (${result.tier})`);
+if (result.clarifyingQuestions) {
+  console.log('Questions:', result.clarifyingQuestions);
+}
+```
+
+### Template Customization
+
+PRD and task templates support multiple formats:
+
+- **Markdown**: `{{placeholder}}` syntax with sections
+- **JSON Schema**: Structured field definitions
+- **Example-based**: Learn from sample documents
+
+```typescript
+import { TemplateEngine } from './services/templates/TemplateEngine';
+import { TemplateParser } from './services/templates/TemplateParser';
+
+const engine = new TemplateEngine();
+const template = '# {{title}}\n\n{{list features}}';
+const output = engine.render(template, {
+  title: 'My Project',
+  features: ['Feature 1', 'Feature 2']
+});
+```
+
+**Custom Helpers:**
+- `{{list items}}` - Bullet list
+- `{{numbered_list items}}` - Numbered list
+- `{{join items ", "}}` - Join with separator
+- `{{default value "fallback"}}` - Default value
+
+### PRD Validation
+
+Built-in validation rules check PRD quality against best practices:
+
+- **Completeness Rules** (8 rules):
+  - BR-001: Overview required (100+ chars)
+  - BR-002: At least 2 objectives
+  - BR-003: At least 1 feature
+  - BR-004: Success metrics defined
+  - BR-005: Target users identified
+  - BR-006: Scope defined
+  - BR-007: Technical requirements listed
+  - BR-008: Timeline provided
+
+- **Clarity Rules** (5 rules):
+  - CL-001: Feature descriptions (50+ chars)
+  - CL-002: Acceptance criteria present
+  - CL-003: No vague language in objectives
+  - CL-004: User stories follow format
+  - CL-005: Success metrics are measurable
+
+```typescript
+import { PRDValidator } from './infrastructure/validation/PRDValidator';
+
+const validator = new PRDValidator();
+const results = validator.validate(prd);
+
+console.log(`Score: ${results.score}/100`);
+console.log(validator.getValidationSummary(results));
+```
+
+### Task Dependency Analysis
+
+Graph-based dependency detection and analysis:
+
+- **Explicit dependencies**: Defined in task relationships
+- **Implicit dependencies**: Auto-detected via keyword analysis
+- **Analysis outputs**: Execution order, critical path, parallel groups
+
+```typescript
+import { DependencyGraph } from './analysis/DependencyGraph';
+
+const graph = new DependencyGraph();
+graph.addTasks(tasks);
+
+// Detect implicit dependencies
+const implicit = graph.detectImplicitDependencies(0.5);
+
+// Get analysis
+const analysis = graph.analyze();
+console.log('Execution order:', analysis.executionOrder);
+console.log('Critical path:', analysis.criticalPath);
+console.log('Parallel groups:', analysis.parallelGroups);
+```
+
+**Keyword patterns detected:**
+- Infrastructure -> Database -> API -> Frontend -> Integration
+- Implementation -> Testing -> Documentation -> Deployment
+
+### Effort Estimation
+
+Calibrated story point estimation with historical learning:
+
+- **Base estimation**: Complexity (1-10) maps to Fibonacci points
+- **Calibration**: Learns from actual vs estimated effort
+- **Range**: Optimistic/pessimistic estimates with confidence
+
+```typescript
+import { EstimationCalibrator } from './analysis/EstimationCalibrator';
+
+const calibrator = new EstimationCalibrator(historicalRecords);
+
+// Get estimate
+const estimate = calibrator.estimate({ complexity: 5 });
+console.log(`${estimate.points} points (${estimate.confidence}% confident)`);
+console.log(`Range: ${estimate.range.low}-${estimate.range.high}`);
+
+// Record actual for future calibration
+calibrator.recordActual('task-123', actualPoints);
+```
+
+### Integrated Task Generation
+
+The `TaskGenerationService.generateTasksWithAnalysis()` method combines all Phase 9 features:
+
+```typescript
+import { TaskGenerationService } from './services/TaskGenerationService';
+
+const service = new TaskGenerationService();
+const result = await service.generateTasksWithAnalysis({
+  prd: prdDocument,
+  projectId: 'my-project',
+  confidenceConfig: { warningThreshold: 75 }
+});
+
+// Access results
+result.tasks.forEach(task => {
+  console.log(`${task.title}: ${task.effortEstimate.points} pts`);
+  console.log(`  Confidence: ${task.taskConfidence.score}%`);
+  console.log(`  Dependencies: ${task.detectedDependencies.length}`);
+});
+
+console.log(`Total points: ${result.estimationStats.totalPoints}`);
+console.log(`Overall confidence: ${result.overallConfidence.score}%`);
+```
+
+---
+
 ## Tool Registration
 
 All 109 tools are registered in `src/infrastructure/tools/ToolRegistry.ts`. The registry:
