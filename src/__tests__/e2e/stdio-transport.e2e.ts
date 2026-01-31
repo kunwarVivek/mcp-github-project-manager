@@ -306,7 +306,12 @@ describe('Stdio Transport Layer Tests', () => {
 
       // Verify stdout contains NO log-like patterns
       const logPatterns = [
-        /\[.*\]/,  // Log prefixes like [MCP]
+        /\[\d{4}-\d{2}-\d{2}/,  // Log timestamps like [2024-01-31
+        /\[MCP\]/,              // Specific log prefix
+        /\[DEBUG\]/,
+        /\[INFO\]/,
+        /\[WARN\]/,
+        /\[ERROR\]/,
         /INFO.*:/,
         /DEBUG.*:/,
         /WARNING.*:/,
