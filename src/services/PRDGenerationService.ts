@@ -5,7 +5,8 @@ import {
   UserPersona,
   ProjectScope,
   TechnicalRequirement,
-  PRDDocumentSchema
+  PRDDocumentSchema,
+  TaskPriority
 } from '../domain/ai-types';
 import { v4 as uuidv4 } from 'uuid';
 import { z } from 'zod';
@@ -230,14 +231,14 @@ export class PRDGenerationService {
               category: 'performance',
               requirement: 'Page load time under 3 seconds',
               rationale: 'User experience and SEO requirements',
-              priority: 'high' as any
+              priority: TaskPriority.HIGH
             },
             {
               id: uuidv4(),
               category: 'security',
               requirement: 'HTTPS encryption for all communications',
               rationale: 'Data security and privacy compliance',
-              priority: 'critical' as any
+              priority: TaskPriority.CRITICAL
             }
           ]
         };
