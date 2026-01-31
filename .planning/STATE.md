@@ -5,27 +5,27 @@
 
 ## Current Position
 
-**Phase:** 2 of 12 (MCP Protocol Compliance)
-**Plan:** 5 of 7 complete
-**Status:** In progress
-**Last activity:** 2026-01-30 - Completed 02-05-PLAN.md (Issue/PR Tool Verification)
+**Phase:** 2 of 12 (MCP Protocol Compliance) - COMPLETE
+**Plan:** 7 of 7 complete
+**Status:** Phase Complete
+**Last activity:** 2026-01-31 - Completed 02-07-PLAN.md (Final MCP Verification)
 
-**Progress:** [████......] 22% (Phase 1 complete + Phase 2 plan 5/7)
+**Progress:** [██████....] 29% (Phase 1 + Phase 2 complete)
 
 ## Project Progress
 
 | Metric | Value |
 |--------|-------|
-| Phases Complete | 1/12 |
-| Requirements Done | 7/99 |
-| Current Phase Progress | Phase 2: 5/7 plans complete |
+| Phases Complete | 2/12 |
+| Requirements Done | 22/99 |
+| Current Phase Progress | Phase 2: 7/7 plans complete (DONE) |
 
 ## Performance Metrics
 
 | Metric | Value | Notes |
 |--------|-------|-------|
-| Plans Executed | 10 | Phase 1: 01-01 through 01-05, Phase 2: 02-01 through 02-05 |
-| Requirements Completed | 7 | DEBT-01 through DEBT-07 |
+| Plans Executed | 12 | Phase 1: 01-01 through 01-05, Phase 2: 02-01 through 02-07 |
+| Requirements Completed | 22 | DEBT-01 through DEBT-07, MCP-01 through MCP-15 |
 | Iterations | 1 | Gap closure cycle for test regressions |
 | Blockers Resolved | 3 | tsyringe decorators, reflect-metadata, MCP SDK type instantiation |
 
@@ -50,8 +50,10 @@
 | Mark deprecated vs remove | Keep old schema methods deprecated rather than removing | 2026-01-30 |
 | $refStrategy: none | Inline JSON Schema definitions for simpler MCP client consumption | 2026-01-30 |
 | Output schemas per tool | Comprehensive Zod schemas for type-safe output validation | 2026-01-30 |
-| 79 tools annotated | 6 behavior patterns applied consistently across all tools | 2026-01-30 |
+| 84 tools annotated | 6 behavior patterns applied consistently across all tools | 2026-01-31 |
 | Consolidated schemas | Issue/PR schemas in project-schemas.ts rather than separate files | 2026-01-30 |
+| structuredContent for objects | Only include structuredContent for object results, not primitives | 2026-01-31 |
+| Tool registration logging | Log MCP compliance metrics on startup for debugging | 2026-01-31 |
 
 ### Learnings
 
@@ -65,7 +67,7 @@
 - For mocked classes: pass mockService directly instead of calling `new MockedClass()`
 - MCP SDK 1.25+ has "Type instantiation is excessively deep" errors with complex schemas
 - Use type assertion `(server.setRequestHandler as any)` with explicit CallToolRequest/CallToolResult types
-- CallToolResult format: `{ content: [{ type: 'text', text: string }] }`
+- CallToolResult format: `{ content: [{ type: 'text', text: string }], structuredContent?: {...} }`
 
 ### Open Todos
 
@@ -76,7 +78,9 @@
 - [x] Execute 02-03: Error Handling
 - [x] Execute 02-04: Project Tool Annotations (79 tools)
 - [x] Execute 02-05: Issue/PR Tool Verification (verified 18 tools)
-- [ ] Execute 02-06 through 02-07: Response format, verification
+- [x] Execute 02-06: AI Task Tool Annotations (8 tools)
+- [x] Execute 02-07: Final MCP Verification
+- [ ] Plan Phase 3
 - [ ] Consider future extraction: IssueService, PullRequestService, AutomationService
 
 ### Active Blockers
@@ -104,9 +108,9 @@
 - Extracted service tests: 114/114 passing
 - Total passing tests: 342 (up from 286)
 
-## Phase 2 Progress
+## Phase 2 Completion Summary
 
-**Phase 2: MCP Protocol Compliance** — In Progress (1/7 plans)
+**Phase 2: MCP Protocol Compliance** — Complete
 
 | Plan | Name | Status | Commits |
 |------|------|--------|---------|
@@ -115,8 +119,23 @@
 | 02-03 | Error Handling | Complete | 0775048, c3cc0ff, 03f735c |
 | 02-04 | Project Tool Annotations | Complete | 57e7fa8, 0a46202, a64bc65 |
 | 02-05 | Issue/PR Tool Verification | Complete | (verification only) |
-| 02-06 | Tool Response Format | Pending | - |
-| 02-07 | Final Verification | Pending | - |
+| 02-06 | AI Task Tool Annotations | Complete | 952828f |
+| 02-07 | Final Verification | Complete | aade26f, d3f1d6b |
+
+**MCP Compliance Verified:**
+
+| Requirement | Status |
+|-------------|--------|
+| MCP-01: SDK 1.25.x | PASS |
+| MCP-02: Imports updated | PASS |
+| MCP-03: All tools work | PASS |
+| MCP-04: Protocol version negotiation | PASS |
+| MCP-05 to MCP-07: Behavior annotations | PASS (84/84) |
+| MCP-08 to MCP-12: Output schemas | PASS (84/84) |
+| MCP-13: MCP error codes | PASS |
+| MCP-14: Error data payloads | PASS |
+| MCP-15: Protocol version handling | PASS |
+| structuredContent in results | PASS |
 
 **Key deliverables:**
 - MCP SDK: 1.12.0 to 1.25.3 (upgraded)
@@ -125,33 +144,32 @@
 - ToolDefinition: Extended with title, outputSchema, annotations
 - ANNOTATION_PATTERNS: 6 behavior patterns for tool classification
 - getToolsForMCP: Uses zod-to-json-schema, emits annotations
-- 79 tools with annotations and output schemas
-- 45 Zod output schemas in project-schemas.ts
+- 84 tools with annotations, output schemas, and titles
+- 53 Zod output schemas (45 project + 8 AI)
+- structuredContent in CallToolResult responses
 
 ## Session Continuity
 
-**Last Session:** 2026-01-30 - Completed 02-05-PLAN.md
+**Last Session:** 2026-01-31 - Completed Phase 2
 
 **Context for Next Session:**
-- All 79 tools now have annotations and output schemas
-- Issue tools (11) and PR tools (7) verified in 02-05
-- Output schemas defined in src/infrastructure/tools/schemas/project-schemas.ts (45 schemas)
-- Next: 02-06 tool response format, 02-07 final verification
-- Annotation breakdown: 29 readOnly, 15 create, 21 updateIdempotent, 2 updateNonIdempotent, 7 delete, 5 aiOperation
+- Phase 2 complete, all MCP protocol compliance requirements verified
+- 84 tools with full MCP compliance (annotations, outputSchema, title)
+- Tool breakdown: 29 readOnly, 12 destructive, 35 idempotent, 8 AI
+- structuredContent enabled for typed tool results
+- Next: Plan Phase 3
 
 **Architecture Context:**
 - DI container (src/container.ts) wires all 6 extracted services
 - ProjectManagementService facade: 34 methods delegated, ~25 direct implementations
-- Test suite: 341 passing (unit), pre-existing AI service test failures unchanged
-- CallToolResult uses { content: [{ type: 'text', text }] } format
-- All tools export title, outputSchema, annotations properties
+- Test suite: 166 unit tests passing
+- CallToolResult uses { content: [...], structuredContent?: {...} } format
+- All 84 tools export title, outputSchema, annotations properties
+- Tool registration status logged on startup
 
 ---
 
 *State initialized: 2026-01-30*
-*Last updated: 2026-01-30*
+*Last updated: 2026-01-31*
 *Phase 1 completed: 2026-01-30*
-*Plan 02-05 completed: 2026-01-30*
-*Plan 02-04 completed: 2026-01-30*
-*Plan 02-03 completed: 2026-01-30*
-*Plan 02-02 completed: 2026-01-30*
+*Phase 2 completed: 2026-01-31*
