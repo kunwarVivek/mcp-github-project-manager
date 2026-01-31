@@ -240,3 +240,72 @@ export interface TemplateListResult {
   };
   totalCount: number;
 }
+
+// ============================================================================
+// Project Lifecycle Types (Phase 8)
+// ============================================================================
+
+/**
+ * Result of close/reopen project operations.
+ *
+ * Returns the updated project state after the lifecycle change.
+ */
+export interface ProjectLifecycleResult {
+  id: string;
+  title: string;
+  closed: boolean;
+  url: string;
+}
+
+/**
+ * Result of converting a draft issue to a real GitHub issue.
+ *
+ * Contains information about both the updated project item and the
+ * newly created issue.
+ */
+export interface ConvertedDraftIssueResult {
+  itemId: string;
+  issueId: string;
+  issueNumber: number;
+  title: string;
+  url: string;
+  repository: string;
+}
+
+/**
+ * Result of updating an item's position within a project.
+ */
+export interface ItemPositionResult {
+  success: boolean;
+  itemId: string;
+  position: string;
+}
+
+/**
+ * An issue from search results.
+ */
+export interface SearchIssueResult {
+  id: string;
+  number: number;
+  title: string;
+  state: 'OPEN' | 'CLOSED';
+  url: string;
+  labels: string[];
+  assignees: string[];
+  repository: string;
+}
+
+/**
+ * A project item returned from filter operations.
+ *
+ * Contains item metadata, content information, and field values.
+ */
+export interface FilteredProjectItem {
+  id: string;
+  type: 'Issue' | 'PullRequest' | 'DraftIssue';
+  contentId: string | null;
+  title: string;
+  state: string | null;
+  labels: string[];
+  fieldValues: Record<string, string | null>;
+}
