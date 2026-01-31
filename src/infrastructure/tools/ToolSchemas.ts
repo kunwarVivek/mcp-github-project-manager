@@ -2805,3 +2805,39 @@ export {
   executeReprioritizeSubIssue,
   executeRemoveSubIssue,
 } from "./sub-issue-tools.js";
+
+// ============================================================================
+// Project Template Tools
+// ============================================================================
+
+// Re-export project template tools
+export {
+  markProjectAsTemplateTool,
+  unmarkProjectAsTemplateTool,
+  copyProjectFromTemplateTool,
+  listOrganizationTemplatesTool,
+  executeMarkProjectAsTemplate,
+  executeUnmarkProjectAsTemplate,
+  executeCopyProjectFromTemplate,
+  executeListOrganizationTemplates,
+} from "./project-template-tools.js";
+
+// ============================================================================
+// Project Linking Tools
+// ============================================================================
+
+// Re-export project linking tools
+export {
+  linkProjectToRepositoryTool,
+  unlinkProjectFromRepositoryTool,
+  linkProjectToTeamTool,
+  unlinkProjectFromTeamTool,
+  listLinkedRepositoriesTool,
+  listLinkedTeamsTool,
+  executeLinkProjectToRepository,
+  executeUnlinkProjectFromRepository,
+  executeLinkProjectToTeam,
+  executeUnlinkProjectFromTeam,
+  executeListLinkedRepositories,
+  executeListLinkedTeams,
+} from "./project-linking-tools.js";
