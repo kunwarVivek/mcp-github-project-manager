@@ -6,26 +6,26 @@
 ## Current Position
 
 **Phase:** 8 of 12 (Project Lifecycle and Advanced Operations) - IN PROGRESS
-**Plan:** 2 of 4 complete
+**Plan:** 3 of 4 complete
 **Status:** In progress
-**Last activity:** 2026-01-31 - Completed 08-02-PLAN.md (Project Lifecycle Tools)
+**Last activity:** 2026-01-31 - Completed 08-03-PLAN.md (Advanced Operations Tools)
 
-**Progress:** [████████████░░] 87% (Phase 1-7 complete, Phase 8: 2/4)
+**Progress:** [████████████░░] 88% (Phase 1-7 complete, Phase 8: 3/4)
 
 ## Project Progress
 
 | Metric | Value |
 |--------|-------|
 | Phases Complete | 7/12 |
-| Requirements Done | 72/99 |
-| Current Phase Progress | Phase 8: 2/4 plans complete |
+| Requirements Done | 75/99 |
+| Current Phase Progress | Phase 8: 3/4 plans complete |
 
 ## Performance Metrics
 
 | Metric | Value | Notes |
 |--------|-------|-------|
-| Plans Executed | 37 | Phase 1-4 complete (22), Phase 5 complete (5), Phase 6 complete (4), Phase 7 complete (4), Phase 8: 2 |
-| Requirements Completed | 72 | DEBT-01 through DEBT-28, MCP-01 through MCP-15, GHAPI-01 to GHAPI-21 |
+| Plans Executed | 38 | Phase 1-4 complete (22), Phase 5 complete (5), Phase 6 complete (4), Phase 7 complete (4), Phase 8: 3 |
+| Requirements Completed | 75 | DEBT-01 through DEBT-28, MCP-01 through MCP-15, GHAPI-01 to GHAPI-24 |
 | Iterations | 1 | Gap closure cycle for test regressions |
 | Blockers Resolved | 4 | tsyringe decorators, reflect-metadata, MCP SDK type instantiation, test isolation |
 
@@ -472,14 +472,14 @@
 
 ## Session Continuity
 
-**Last Session:** 2026-01-31 - Completed 08-02-PLAN.md (Project Lifecycle Tools)
+**Last Session:** 2026-01-31 - Completed 08-03-PLAN.md (Advanced Operations Tools)
 
 **Context for Next Session:**
-- Phase 8 (Project Lifecycle and Advanced Operations) in progress: 2/4 plans done
-- Lifecycle tools complete: close_project, reopen_project, convert_draft_issue (GHAPI-19 to GHAPI-21)
-- Total MCP tools: 106 (103 + 3 lifecycle tools)
-- Test suite: 774 passing tests (no new tests in 08-02, testing in 08-04)
-- Next: 08-03 Advanced Operations Tools (update_item_position, search_issues_advanced, filter_project_items)
+- Phase 8 (Project Lifecycle and Advanced Operations) in progress: 3/4 plans done
+- Advanced operations tools complete: update_item_position, search_issues_advanced, filter_project_items (GHAPI-22 to GHAPI-24)
+- Total MCP tools: 109 (106 + 3 advanced operations tools)
+- Test suite: 774 passing tests (no new tests in 08-02/08-03, testing in 08-04)
+- Next: 08-04 Testing and Verification
 
 **Architecture Context:**
 - DI container (src/container.ts) wires all 6 extracted services
@@ -489,8 +489,8 @@
 - Test isolation: jest.resetAllMocks() in beforeEach for proper mock reset
 - src/infrastructure/tools/schemas/project-lifecycle-schemas.ts - 15 Zod schemas for Phase 8 tools
 - src/infrastructure/tools/project-lifecycle-tools.ts - 3 lifecycle tools with executors
-- Schemas remaining for 08-03: update_item_position, search_issues_advanced, filter_project_items
-- Repository types ready: ItemPositionResult, SearchIssueResult, FilteredProjectItem
+- src/infrastructure/tools/project-advanced-tools.ts - 3 advanced operations tools with executors
+- matchesFilter helper for client-side filtering (GitHub API limitation)
 
 ---
 
