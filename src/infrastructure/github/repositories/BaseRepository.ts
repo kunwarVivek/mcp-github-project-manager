@@ -99,6 +99,81 @@ export abstract class BaseGitHubRepository implements IGitHubRepository {
   }
 
   /**
+   * Execute GraphQL query with preview feature headers
+   *
+   * Some GitHub GraphQL APIs require preview headers to be enabled.
+   * For example, sub-issues require the 'sub_issues' feature flag.
+   *
+   * @param query - The GraphQL query string
+   * @param variables - Variables for the query
+   * @param features - Array of feature flags (e.g., ['sub_issues'])
+   * @returns The query result
+   */
+  protected async graphqlWithFeatures<T>(
+    query: string,
+    variables: Record<string, unknown> = {},
+    features: string[] = []
+  ): Promise<T> {
+    const headers: Record<string, string> = {};
+    if (features.length > 0) {
+      headers['GraphQL-Features'] = features.join(',');
+    }
+
+    return this.withRetry(
+      () =>
+        this.octokit.graphql<T>(query, {
+          ...variables,
+          owner: this.owner,
+          repo: this.repo,
+          headers,
+        }),
+      `executing GraphQL query with features: ${features.join(',')}`
+    );
+  }
+
+  /**
+   * Resolve an issue number to its GitHub node ID
+   *
+   * GraphQL mutations require node IDs (e.g., 'I_kwDO...'), not issue numbers.
+   * This method queries the issue by number and returns its node ID.
+   *
+   * @param issueNumber - The issue number
+   * @returns The node ID of the issue
+   * @throws Error if the issue is not found
+   */
+  protected async resolveIssueNodeId(issueNumber: number): Promise<string> {
+    const query = `
+      query GetIssueNodeId($owner: String!, $repo: String!, $number: Int!) {
+        repository(owner: $owner, name: $repo) {
+          issue(number: $number) {
+            id
+          }
+        }
+      }
+    `;
+
+    interface IssueNodeIdResponse {
+      repository: {
+        issue: {
+          id: string;
+        } | null;
+      };
+    }
+
+    const response = await this.graphql<IssueNodeIdResponse>(query, {
+      owner: this.owner,
+      repo: this.repo,
+      number: issueNumber,
+    });
+
+    if (!response.repository.issue) {
+      throw new Error(`Issue #${issueNumber} not found in ${this.owner}/${this.repo}`);
+    }
+
+    return response.repository.issue.id;
+  }
+
+  /**
    * Handle GraphQL errors consistently
    */
   protected handleGraphQLError(error: unknown): Error {
