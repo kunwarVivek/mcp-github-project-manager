@@ -6,11 +6,11 @@
 ## Current Position
 
 **Phase:** 3 of 12 (Type Safety)
-**Plan:** 2 of 5 complete
+**Plan:** 3 of 5 complete
 **Status:** In progress
-**Last activity:** 2026-01-31 - Completed 03-02-PLAN.md (Type Guards for External Data)
+**Last activity:** 2026-01-31 - Completed 03-03-PLAN.md (Zod and Type Guard Fixes)
 
-**Progress:** [██████░...] 33% (Phase 1 + Phase 2 + 03-01, 03-02 complete)
+**Progress:** [███████░..] 35% (Phase 1 + Phase 2 + 03-01, 03-02, 03-03 complete)
 
 ## Project Progress
 
@@ -18,13 +18,13 @@
 |--------|-------|
 | Phases Complete | 2/12 |
 | Requirements Done | 22/99 |
-| Current Phase Progress | Phase 3: 2/5 plans complete |
+| Current Phase Progress | Phase 3: 3/5 plans complete |
 
 ## Performance Metrics
 
 | Metric | Value | Notes |
 |--------|-------|-------|
-| Plans Executed | 14 | Phase 1: 01-01 through 01-05, Phase 2: 02-01 through 02-07, Phase 3: 03-01 |
+| Plans Executed | 15 | Phase 1: 01-01 through 01-05, Phase 2: 02-01 through 02-07, Phase 3: 03-01 through 03-03 |
 | Requirements Completed | 22 | DEBT-01 through DEBT-07, MCP-01 through MCP-15 |
 | Iterations | 1 | Gap closure cycle for test regressions |
 | Blockers Resolved | 3 | tsyringe decorators, reflect-metadata, MCP SDK type instantiation |
@@ -54,6 +54,8 @@
 | Consolidated schemas | Issue/PR schemas in project-schemas.ts rather than separate files | 2026-01-30 |
 | structuredContent for objects | Only include structuredContent for object results, not primitives | 2026-01-31 |
 | Tool registration logging | Log MCP compliance metrics on startup for debugging | 2026-01-31 |
+| Zod instanceof checks | Use instanceof ZodOptional/ZodString etc. instead of _def.typeName | 2026-01-31 |
+| Helper type guards | Create hasErrorsArray, isErrorWithMessage for complex narrowing | 2026-01-31 |
 
 ### Learnings
 
@@ -68,6 +70,8 @@
 - MCP SDK 1.25+ has "Type instantiation is excessively deep" errors with complex schemas
 - Use type assertion `(server.setRequestHandler as any)` with explicit CallToolRequest/CallToolResult types
 - CallToolResult format: `{ content: [{ type: 'text', text: string }], structuredContent?: {...} }`
+- Zod exports class constructors that work with instanceof (ZodOptional, ZodString, etc.)
+- Helper type guards improve readability and enable proper type narrowing without `as any`
 
 ### Open Todos
 
@@ -82,8 +86,8 @@
 - [x] Execute 02-07: Final MCP Verification
 - [x] Plan Phase 3
 - [x] Execute 03-01: Trivial Type Assertion Fixes (4 `as any` removed)
-- [ ] Execute 03-02: Type Guards
-- [ ] Execute 03-03: Runtime Type Refinements
+- [x] Execute 03-02: Type Guards (type guards for external data)
+- [x] Execute 03-03: Zod and Type Guard Fixes (5 `as any` removed)
 - [ ] Execute 03-04: Unknown Type Elimination
 - [ ] Execute 03-05: Final Type Safety Verification
 - [ ] Consider future extraction: IssueService, PullRequestService, AutomationService
@@ -155,20 +159,22 @@
 
 ## Session Continuity
 
-**Last Session:** 2026-01-31 - Completed 03-01-PLAN.md
+**Last Session:** 2026-01-31 - Completed 03-03-PLAN.md
 
 **Context for Next Session:**
-- Phase 3 (Type Safety) in progress
+- Phase 3 (Type Safety) in progress - 3 of 5 plans complete
 - 03-01: Removed 4 trivial `as any` assertions (enum literals, interface casts)
-- Pattern: Use enum values instead of string literals with `as any`
-- Pattern: Remove casts when interface methods exist
-- Next: 03-02-PLAN.md (Type Guards)
+- 03-02: Added type guards for external data handling
+- 03-03: Replaced Zod internal API with instanceof, fixed type guard narrowing
+- Pattern: Use Zod instanceof checks instead of _def.typeName
+- Pattern: Helper type guards for complex narrowing (hasErrorsArray, isErrorWithMessage)
+- Next: 03-04-PLAN.md (Unknown Type Elimination)
 
 **Architecture Context:**
 - DI container (src/container.ts) wires all 6 extracted services
 - ProjectManagementService facade: 34 methods delegated, ~25 direct implementations
-- Test suite: Related tests passing (12/12 for modified files)
-- PRDGenerationService/ProjectAutomationService now have zero `as any`
+- ToolRegistry uses proper ZodTypeAny typing with instanceof checks
+- types.ts uses helper type guards for proper narrowing
 
 ---
 
