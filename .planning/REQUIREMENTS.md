@@ -94,13 +94,13 @@ Requirements for this milestone. Each maps to roadmap phases.
 - [x] **DEBT-13**: Add type guards for unknown data validation
 
 **Test Coverage:**
-- [ ] **DEBT-14**: Fix 74 failing tests
-- [ ] **DEBT-15**: Enable and fix 20 skipped tests
-- [ ] **DEBT-16**: Add unit tests for ContextualReferenceGenerator
-- [ ] **DEBT-17**: Add unit tests for DependencyContextGenerator
-- [ ] **DEBT-18**: Add unit tests for ContextQualityValidator
-- [ ] **DEBT-19**: Add integration tests for new GitHub features
-- [ ] **DEBT-20**: Achieve 80%+ code coverage
+- [x] **DEBT-14**: Fix 74 failing tests
+- [x] **DEBT-15**: Enable and fix 20 skipped tests
+- [x] **DEBT-16**: Add unit tests for ContextualReferenceGenerator
+- [x] **DEBT-17**: Add unit tests for DependencyContextGenerator
+- [x] **DEBT-18**: Add unit tests for ContextQualityValidator
+- [x] **DEBT-19**: Add integration tests for new GitHub features
+- [x] **DEBT-20**: Achieve 80%+ code coverage
 
 **Resilience:**
 - [ ] **DEBT-21**: Implement circuit breaker for AI services
