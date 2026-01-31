@@ -195,12 +195,17 @@ describe('TaskContextGenerationService', () => {
   });
 
   describe('generateImplementationGuidance', () => {
-    it('should return null when AI is not available', async () => {
+    it('should return fallback guidance when AI is not available', async () => {
       // Act
       const result = await service.generateImplementationGuidance(mockTask);
 
-      // Assert - Should return null when AI is not available
-      expect(result).toBeNull();
+      // Assert - Should return fallback guidance when AI is not available
+      expect(result).not.toBeNull();
+      expect(result.recommendedApproach).toContain('Implement');
+      expect(result.implementationSteps).toBeInstanceOf(Array);
+      expect(result.implementationSteps.length).toBeGreaterThan(0);
+      expect(result.technicalConsiderations).toBeInstanceOf(Array);
+      expect(result.testingStrategy).toBeDefined();
     });
   });
 

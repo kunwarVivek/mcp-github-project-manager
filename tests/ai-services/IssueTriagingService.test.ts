@@ -27,6 +27,7 @@ describe('IssueTriagingService', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    jest.resetAllMocks();
 
     // Mock AI service - just needs to be a valid model object
     mockAIService = {
