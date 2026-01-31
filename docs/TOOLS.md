@@ -1,0 +1,1810 @@
+# MCP Tools Reference
+
+This document provides comprehensive documentation for all 85 MCP tools available in the MCP GitHub Project Manager.
+
+## Overview
+
+| Metric | Value |
+|--------|-------|
+| Total Tools | 85 |
+| Categories | 9 |
+| SDK Version | 1.25.3 |
+| All tools have | Behavior annotations, Output schemas |
+
+### Behavior Annotations
+
+All tools are annotated with behavior hints that help MCP clients understand their impact:
+
+| Annotation | Meaning | Example Tools |
+|------------|---------|---------------|
+| `readOnlyHint: true` | Does not modify data | `get_project`, `list_issues`, `health_check` |
+| `destructiveHint: true` | Permanently deletes data | `delete_project`, `delete_issue_comment` |
+| `idempotentHint: true` | Safe to retry | `update_project`, `set_field_value` |
+| `openWorldHint: true` | Makes external calls | `generate_prd`, `enrich_issue` |
+
+---
+
+## Tool Categories
+
+1. [Project Management Tools](#project-management-tools) (18 tools)
+2. [Issue Tools](#issue-tools) (18 tools)
+3. [Pull Request Tools](#pull-request-tools) (8 tools)
+4. [Sprint & Iteration Tools](#sprint--iteration-tools) (14 tools)
+5. [Field Operations Tools](#field-operations-tools) (6 tools)
+6. [Automation Tools](#automation-tools) (7 tools)
+7. [Events & Triaging Tools](#events--triaging-tools) (5 tools)
+8. [AI Task Tools](#ai-task-tools) (8 tools)
+9. [Health & Observability Tools](#health--observability-tools) (1 tool)
+
+---
+
+## Project Management Tools
+
+### create_project
+
+Create a new GitHub project.
+
+**Input Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| title | string | Yes | Project title |
+| shortDescription | string | No | Brief description |
+| owner | string | Yes | Owner username or org |
+| visibility | "private" \| "public" | No | Default: "private" |
+
+**Output:** Project object with id, title, url, fields
+
+**Behavior:** Creates new project (not read-only, not destructive, not idempotent)
+
+**Example:**
+```json
+{
+  "title": "Backend API Development",
+  "owner": "myorg",
+  "visibility": "public",
+  "shortDescription": "REST API for mobile app"
+}
+```
+
+---
+
+### list_projects
+
+List GitHub projects.
+
+**Input Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| status | "active" \| "closed" \| "all" | No | Default: "active" |
+| limit | number | No | Default: 10 |
+
+**Output:** Array of Project objects
+
+**Behavior:** Read-only, idempotent
+
+**Example:**
+```json
+{
+  "status": "active",
+  "limit": 20
+}
+```
+
+---
+
+### get_project
+
+Get details of a specific GitHub project.
+
+**Input Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| projectId | string | Yes | Project ID |
+
+**Output:** Project object with full details
+
+**Behavior:** Read-only, idempotent
+
+**Example:**
+```json
+{
+  "projectId": "PVT_kwDOAB..."
+}
+```
+
+---
+
+### update_project
+
+Update an existing GitHub project.
+
+**Input Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| projectId | string | Yes | Project ID |
+| title | string | No | New title |
+| shortDescription | string | No | New description |
+| visibility | "private" \| "public" | No | New visibility |
+| closed | boolean | No | Close the project |
+
+**Output:** Updated Project object
+
+**Behavior:** Idempotent (same input produces same result)
+
+**Example:**
+```json
+{
+  "projectId": "PVT_kwDOAB...",
+  "title": "Updated API Development",
+  "visibility": "public"
+}
+```
+
+---
+
+### delete_project
+
+Delete a GitHub project.
+
+**Input Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| projectId | string | Yes | Project ID to delete |
+
+**Output:** Success confirmation
+
+**Behavior:** Destructive (permanent deletion)
+
+**Example:**
+```json
+{
+  "projectId": "PVT_kwDOAB..."
+}
+```
+
+---
+
+### get_project_readme
+
+Get the README content of a GitHub project.
+
+**Input Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| projectId | string | Yes | Project ID |
+
+**Output:** README content object
+
+**Behavior:** Read-only, idempotent
+
+---
+
+### update_project_readme
+
+Update the README content of a GitHub project.
+
+**Input Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| projectId | string | Yes | Project ID |
+| readme | string | Yes | New README content |
+
+**Output:** Updated README object
+
+**Behavior:** Idempotent
+
+---
+
+### create_project_field
+
+Create a custom field for a GitHub project.
+
+**Input Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| projectId | string | Yes | Project ID |
+| name | string | Yes | Field name |
+| description | string | No | Field description |
+| dataType | string | Yes | Field type (TEXT, NUMBER, DATE, SINGLE_SELECT, ITERATION) |
+| options | array | No | Options for SINGLE_SELECT fields |
+
+**Output:** Created field object
+
+**Example:**
+```json
+{
+  "projectId": "PVT_kwDOAB...",
+  "name": "Status",
+  "description": "Current status of the task",
+  "dataType": "SINGLE_SELECT",
+  "options": [
+    { "name": "To Do", "color": "red" },
+    { "name": "In Progress", "color": "yellow" },
+    { "name": "Done", "color": "green" }
+  ]
+}
+```
+
+---
+
+### list_project_fields
+
+List all fields in a GitHub project.
+
+**Input Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| projectId | string | Yes | Project ID |
+
+**Output:** Array of field objects
+
+**Behavior:** Read-only, idempotent
+
+---
+
+### update_project_field
+
+Update a custom field in a GitHub project.
+
+**Input Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| projectId | string | Yes | Project ID |
+| fieldId | string | Yes | Field ID |
+| name | string | No | New field name |
+| options | array | No | Updated options |
+
+**Output:** Updated field object
+
+**Behavior:** Idempotent
+
+---
+
+### create_project_view
+
+Create a new view for a GitHub project.
+
+**Input Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| projectId | string | Yes | Project ID |
+| name | string | Yes | View name |
+| layout | "TABLE" \| "BOARD" \| "ROADMAP" | Yes | View layout |
+| groupByField | string | No | Field to group by |
+| sortByField | string | No | Field to sort by |
+| filterQuery | string | No | Filter expression |
+
+**Output:** Created view object
+
+**Example:**
+```json
+{
+  "projectId": "PVT_kwDOAB...",
+  "name": "Development Board",
+  "layout": "BOARD",
+  "groupByField": "Status"
+}
+```
+
+---
+
+### list_project_views
+
+List all views in a GitHub project.
+
+**Input Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| projectId | string | Yes | Project ID |
+
+**Output:** Array of view objects
+
+**Behavior:** Read-only, idempotent
+
+---
+
+### delete_project_view
+
+Delete a view from a GitHub project.
+
+**Input Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| projectId | string | Yes | Project ID |
+| viewId | string | Yes | View ID |
+
+**Output:** Success confirmation
+
+**Behavior:** Destructive
+
+---
+
+### add_project_item
+
+Add an item (issue or PR) to a GitHub project.
+
+**Input Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| projectId | string | Yes | Project ID |
+| contentId | string | Yes | Issue or PR node ID |
+
+**Output:** Created item object
+
+---
+
+### remove_project_item
+
+Remove an item from a GitHub project.
+
+**Input Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| projectId | string | Yes | Project ID |
+| itemId | string | Yes | Project item ID |
+
+**Output:** Success confirmation
+
+---
+
+### list_project_items
+
+List all items in a GitHub project.
+
+**Input Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| projectId | string | Yes | Project ID |
+| limit | number | No | Max items to return |
+
+**Output:** Array of project items
+
+**Behavior:** Read-only, idempotent
+
+---
+
+### archive_project_item
+
+Archive an item in a GitHub project.
+
+**Input Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| projectId | string | Yes | Project ID |
+| itemId | string | Yes | Item ID |
+
+**Output:** Updated item object
+
+---
+
+### unarchive_project_item
+
+Unarchive an item in a GitHub project.
+
+**Input Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| projectId | string | Yes | Project ID |
+| itemId | string | Yes | Item ID |
+
+**Output:** Updated item object
+
+---
+
+## Issue Tools
+
+### create_issue
+
+Create a new GitHub issue.
+
+**Input Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| owner | string | Yes | Repository owner |
+| repo | string | Yes | Repository name |
+| title | string | Yes | Issue title |
+| body | string | No | Issue description |
+| labels | string[] | No | Labels to add |
+| assignees | string[] | No | Usernames to assign |
+| milestone | number | No | Milestone number |
+
+**Output:** Created issue object
+
+**Example:**
+```json
+{
+  "owner": "myorg",
+  "repo": "myrepo",
+  "title": "Fix authentication bug",
+  "body": "Users cannot log in with social media accounts",
+  "labels": ["bug", "high-priority"],
+  "assignees": ["developer1"]
+}
+```
+
+---
+
+### list_issues
+
+List GitHub issues.
+
+**Input Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| owner | string | Yes | Repository owner |
+| repo | string | Yes | Repository name |
+| state | "open" \| "closed" \| "all" | No | Issue state filter |
+| labels | string[] | No | Filter by labels |
+| milestone | string | No | Filter by milestone |
+| assignee | string | No | Filter by assignee |
+| limit | number | No | Max issues to return |
+
+**Output:** Array of issue objects
+
+**Behavior:** Read-only, idempotent
+
+---
+
+### get_issue
+
+Get details of a specific GitHub issue.
+
+**Input Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| owner | string | Yes | Repository owner |
+| repo | string | Yes | Repository name |
+| issueNumber | number | Yes | Issue number |
+
+**Output:** Issue object with full details
+
+**Behavior:** Read-only, idempotent
+
+---
+
+### update_issue
+
+Update a GitHub issue.
+
+**Input Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| owner | string | Yes | Repository owner |
+| repo | string | Yes | Repository name |
+| issueNumber | number | Yes | Issue number |
+| title | string | No | New title |
+| body | string | No | New body |
+| state | "open" \| "closed" | No | New state |
+| labels | string[] | No | New labels |
+| assignees | string[] | No | New assignees |
+| milestone | number | No | New milestone |
+
+**Output:** Updated issue object
+
+**Behavior:** Idempotent
+
+---
+
+### create_issue_comment
+
+Add a comment to a GitHub issue.
+
+**Input Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| owner | string | Yes | Repository owner |
+| repo | string | Yes | Repository name |
+| issueNumber | number | Yes | Issue number |
+| body | string | Yes | Comment content |
+
+**Output:** Created comment object
+
+---
+
+### update_issue_comment
+
+Update an existing comment on a GitHub issue.
+
+**Input Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| owner | string | Yes | Repository owner |
+| repo | string | Yes | Repository name |
+| commentId | number | Yes | Comment ID |
+| body | string | Yes | New content |
+
+**Output:** Updated comment object
+
+**Behavior:** Idempotent
+
+---
+
+### delete_issue_comment
+
+Delete a comment from a GitHub issue.
+
+**Input Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| owner | string | Yes | Repository owner |
+| repo | string | Yes | Repository name |
+| commentId | number | Yes | Comment ID |
+
+**Output:** Success confirmation
+
+**Behavior:** Destructive
+
+---
+
+### list_issue_comments
+
+List all comments on a GitHub issue.
+
+**Input Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| owner | string | Yes | Repository owner |
+| repo | string | Yes | Repository name |
+| issueNumber | number | Yes | Issue number |
+| limit | number | No | Max comments to return |
+
+**Output:** Array of comment objects
+
+**Behavior:** Read-only, idempotent
+
+---
+
+### create_draft_issue
+
+Create a draft issue in a GitHub project.
+
+**Input Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| projectId | string | Yes | Project ID |
+| title | string | Yes | Draft title |
+| body | string | No | Draft body |
+
+**Output:** Created draft issue object
+
+**Example:**
+```json
+{
+  "projectId": "PVT_kwDOAB...",
+  "title": "Explore new authentication options",
+  "body": "Research OAuth providers and SSO solutions"
+}
+```
+
+---
+
+### update_draft_issue
+
+Update an existing draft issue in a GitHub project.
+
+**Input Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| projectId | string | Yes | Project ID |
+| draftIssueId | string | Yes | Draft issue ID |
+| title | string | No | New title |
+| body | string | No | New body |
+
+**Output:** Updated draft issue object
+
+**Behavior:** Idempotent
+
+---
+
+### delete_draft_issue
+
+Delete a draft issue from a GitHub project.
+
+**Input Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| projectId | string | Yes | Project ID |
+| draftIssueId | string | Yes | Draft issue ID |
+
+**Output:** Success confirmation
+
+**Behavior:** Destructive
+
+---
+
+### create_milestone
+
+Create a new milestone.
+
+**Input Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| owner | string | Yes | Repository owner |
+| repo | string | Yes | Repository name |
+| title | string | Yes | Milestone title |
+| description | string | No | Milestone description |
+| dueDate | string | No | ISO date string |
+| state | "open" \| "closed" | No | Default: "open" |
+
+**Output:** Created milestone object
+
+**Example:**
+```json
+{
+  "owner": "myorg",
+  "repo": "myrepo",
+  "title": "Beta Release",
+  "description": "Complete all features for beta release",
+  "dueDate": "2024-03-31T00:00:00Z"
+}
+```
+
+---
+
+### list_milestones
+
+List milestones.
+
+**Input Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| owner | string | Yes | Repository owner |
+| repo | string | Yes | Repository name |
+| state | "open" \| "closed" \| "all" | No | State filter |
+| sort | "due_on" \| "completeness" | No | Sort field |
+| direction | "asc" \| "desc" | No | Sort direction |
+
+**Output:** Array of milestone objects
+
+**Behavior:** Read-only, idempotent
+
+---
+
+### update_milestone
+
+Update a GitHub milestone.
+
+**Input Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| owner | string | Yes | Repository owner |
+| repo | string | Yes | Repository name |
+| milestoneNumber | number | Yes | Milestone number |
+| title | string | No | New title |
+| description | string | No | New description |
+| dueDate | string | No | New due date |
+| state | "open" \| "closed" | No | New state |
+
+**Output:** Updated milestone object
+
+**Behavior:** Idempotent
+
+---
+
+### delete_milestone
+
+Delete a GitHub milestone.
+
+**Input Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| owner | string | Yes | Repository owner |
+| repo | string | Yes | Repository name |
+| milestoneNumber | number | Yes | Milestone number |
+
+**Output:** Success confirmation
+
+**Behavior:** Destructive
+
+---
+
+### create_label
+
+Create a new GitHub label.
+
+**Input Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| owner | string | Yes | Repository owner |
+| repo | string | Yes | Repository name |
+| name | string | Yes | Label name |
+| color | string | Yes | Hex color (without #) |
+| description | string | No | Label description |
+
+**Output:** Created label object
+
+**Example:**
+```json
+{
+  "owner": "myorg",
+  "repo": "myrepo",
+  "name": "bug",
+  "color": "d73a4a",
+  "description": "Something isn't working"
+}
+```
+
+---
+
+### list_labels
+
+List all GitHub labels.
+
+**Input Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| owner | string | Yes | Repository owner |
+| repo | string | Yes | Repository name |
+
+**Output:** Array of label objects
+
+**Behavior:** Read-only, idempotent
+
+---
+
+## Pull Request Tools
+
+### create_pull_request
+
+Create a new pull request in a GitHub repository.
+
+**Input Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| owner | string | Yes | Repository owner |
+| repo | string | Yes | Repository name |
+| title | string | Yes | PR title |
+| body | string | No | PR description |
+| head | string | Yes | Source branch |
+| base | string | Yes | Target branch |
+| draft | boolean | No | Create as draft |
+
+**Output:** Created PR object
+
+**Example:**
+```json
+{
+  "owner": "myorg",
+  "repo": "myrepo",
+  "title": "Add user authentication",
+  "body": "Implements OAuth 2.0 authentication",
+  "head": "feature/auth",
+  "base": "main"
+}
+```
+
+---
+
+### get_pull_request
+
+Get details of a specific pull request.
+
+**Input Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| owner | string | Yes | Repository owner |
+| repo | string | Yes | Repository name |
+| pullNumber | number | Yes | PR number |
+
+**Output:** PR object with full details
+
+**Behavior:** Read-only, idempotent
+
+---
+
+### list_pull_requests
+
+List pull requests in a GitHub repository.
+
+**Input Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| owner | string | Yes | Repository owner |
+| repo | string | Yes | Repository name |
+| state | "open" \| "closed" \| "all" | No | State filter |
+| head | string | No | Filter by head branch |
+| base | string | No | Filter by base branch |
+| sort | string | No | Sort field |
+| direction | "asc" \| "desc" | No | Sort direction |
+| limit | number | No | Max PRs to return |
+
+**Output:** Array of PR objects
+
+**Behavior:** Read-only, idempotent
+
+---
+
+### update_pull_request
+
+Update a pull request's title, body, or state.
+
+**Input Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| owner | string | Yes | Repository owner |
+| repo | string | Yes | Repository name |
+| pullNumber | number | Yes | PR number |
+| title | string | No | New title |
+| body | string | No | New body |
+| state | "open" \| "closed" | No | New state |
+| base | string | No | New base branch |
+
+**Output:** Updated PR object
+
+**Behavior:** Idempotent
+
+---
+
+### merge_pull_request
+
+Merge a pull request using merge, squash, or rebase.
+
+**Input Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| owner | string | Yes | Repository owner |
+| repo | string | Yes | Repository name |
+| pullNumber | number | Yes | PR number |
+| mergeMethod | "merge" \| "squash" \| "rebase" | No | Default: "merge" |
+| commitTitle | string | No | Merge commit title |
+| commitMessage | string | No | Merge commit message |
+
+**Output:** Merge result object
+
+**Example:**
+```json
+{
+  "owner": "myorg",
+  "repo": "myrepo",
+  "pullNumber": 42,
+  "mergeMethod": "squash"
+}
+```
+
+---
+
+### list_pull_request_reviews
+
+List all reviews on a pull request.
+
+**Input Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| owner | string | Yes | Repository owner |
+| repo | string | Yes | Repository name |
+| pullNumber | number | Yes | PR number |
+
+**Output:** Array of review objects
+
+**Behavior:** Read-only, idempotent
+
+---
+
+### create_pull_request_review
+
+Create a review on a pull request (approve, request changes, or comment).
+
+**Input Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| owner | string | Yes | Repository owner |
+| repo | string | Yes | Repository name |
+| pullNumber | number | Yes | PR number |
+| event | "APPROVE" \| "REQUEST_CHANGES" \| "COMMENT" | Yes | Review event |
+| body | string | No | Review comment |
+| comments | array | No | Line comments |
+
+**Output:** Created review object
+
+**Example:**
+```json
+{
+  "owner": "myorg",
+  "repo": "myrepo",
+  "pullNumber": 42,
+  "event": "APPROVE",
+  "body": "LGTM! Great work on the authentication implementation."
+}
+```
+
+---
+
+## Sprint & Iteration Tools
+
+### create_sprint
+
+Create a new development sprint.
+
+**Input Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| title | string | Yes | Sprint title |
+| description | string | No | Sprint description |
+| startDate | string | Yes | ISO date string |
+| endDate | string | Yes | ISO date string |
+| goals | string[] | No | Sprint goals |
+| issueIds | string[] | No | Initial issues |
+
+**Output:** Created sprint object
+
+**Example:**
+```json
+{
+  "title": "Sprint 1: User Authentication",
+  "description": "First sprint focused on user authentication features",
+  "startDate": "2024-01-01T00:00:00Z",
+  "endDate": "2024-01-14T00:00:00Z",
+  "goals": ["Complete login flow", "Add OAuth support"]
+}
+```
+
+---
+
+### list_sprints
+
+List all sprints.
+
+**Input Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| status | "active" \| "completed" \| "all" | No | Status filter |
+| limit | number | No | Max sprints to return |
+
+**Output:** Array of sprint objects
+
+**Behavior:** Read-only, idempotent
+
+---
+
+### get_current_sprint
+
+Get the currently active sprint.
+
+**Input Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| includeIssues | boolean | No | Include assigned issues |
+
+**Output:** Current sprint object
+
+**Behavior:** Read-only, idempotent
+
+---
+
+### update_sprint
+
+Update a development sprint.
+
+**Input Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| sprintId | string | Yes | Sprint ID |
+| title | string | No | New title |
+| description | string | No | New description |
+| startDate | string | No | New start date |
+| endDate | string | No | New end date |
+| status | string | No | New status |
+| goals | string[] | No | New goals |
+
+**Output:** Updated sprint object
+
+**Behavior:** Idempotent
+
+---
+
+### add_issues_to_sprint
+
+Add issues to an existing sprint.
+
+**Input Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| sprintId | string | Yes | Sprint ID |
+| issueIds | string[] | Yes | Issue IDs to add |
+
+**Output:** Updated sprint object
+
+---
+
+### remove_issues_from_sprint
+
+Remove issues from a sprint.
+
+**Input Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| sprintId | string | Yes | Sprint ID |
+| issueIds | string[] | Yes | Issue IDs to remove |
+
+**Output:** Updated sprint object
+
+---
+
+### create_roadmap
+
+Create a project roadmap with milestones and tasks.
+
+**Input Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| project | object | Yes | Project configuration |
+| milestones | array | Yes | Array of milestone objects |
+
+**Output:** Created roadmap object
+
+**Example:**
+```json
+{
+  "project": {
+    "title": "New Mobile App",
+    "shortDescription": "Mobile app development project",
+    "visibility": "private"
+  },
+  "milestones": [
+    {
+      "milestone": {
+        "title": "Design Phase",
+        "description": "Complete all design work",
+        "dueDate": "2024-02-01T00:00:00Z"
+      },
+      "issues": [
+        {
+          "title": "Create wireframes",
+          "description": "Create wireframes for all screens",
+          "priority": "high",
+          "type": "feature"
+        }
+      ]
+    }
+  ]
+}
+```
+
+---
+
+### plan_sprint
+
+Plan a new sprint with selected issues.
+
+**Input Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| sprint | object | Yes | Sprint configuration |
+| issueIds | string[] | Yes | Issue IDs to include |
+
+**Output:** Planned sprint object
+
+---
+
+### get_milestone_metrics
+
+Get progress metrics for a specific milestone.
+
+**Input Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| milestoneId | string | Yes | Milestone ID |
+| includeIssues | boolean | No | Include issue details |
+
+**Output:** Milestone metrics object
+
+**Behavior:** Read-only, idempotent
+
+---
+
+### get_sprint_metrics
+
+Get progress metrics for a specific sprint.
+
+**Input Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| sprintId | string | Yes | Sprint ID |
+| includeIssues | boolean | No | Include issue details |
+
+**Output:** Sprint metrics object
+
+**Behavior:** Read-only, idempotent
+
+---
+
+### get_overdue_milestones
+
+Get a list of overdue milestones.
+
+**Input Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| limit | number | No | Max milestones to return |
+| includeIssues | boolean | No | Include issue details |
+
+**Output:** Array of overdue milestone objects
+
+**Behavior:** Read-only, idempotent
+
+---
+
+### get_upcoming_milestones
+
+Get a list of upcoming milestones within a time frame.
+
+**Input Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| daysAhead | number | Yes | Days to look ahead |
+| limit | number | No | Max milestones to return |
+| includeIssues | boolean | No | Include issue details |
+
+**Output:** Array of upcoming milestone objects
+
+**Behavior:** Read-only, idempotent
+
+---
+
+### get_iteration_configuration
+
+Get iteration field configuration including duration, start date, and list of all iterations.
+
+**Input Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| projectId | string | Yes | Project ID |
+| fieldId | string | Yes | Iteration field ID |
+
+**Output:** Iteration configuration object
+
+**Behavior:** Read-only, idempotent
+
+---
+
+### get_current_iteration
+
+Get the currently active iteration based on today's date.
+
+**Input Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| projectId | string | Yes | Project ID |
+| fieldId | string | Yes | Iteration field ID |
+
+**Output:** Current iteration object
+
+**Behavior:** Read-only, idempotent
+
+---
+
+### get_iteration_items
+
+Get all items assigned to a specific iteration.
+
+**Input Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| projectId | string | Yes | Project ID |
+| fieldId | string | Yes | Iteration field ID |
+| iterationId | string | Yes | Iteration ID |
+
+**Output:** Array of items in iteration
+
+**Behavior:** Read-only, idempotent
+
+---
+
+### get_iteration_by_date
+
+Find which iteration contains a specific date.
+
+**Input Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| projectId | string | Yes | Project ID |
+| fieldId | string | Yes | Iteration field ID |
+| date | string | Yes | ISO date string |
+
+**Output:** Matching iteration object
+
+**Behavior:** Read-only, idempotent
+
+---
+
+### assign_items_to_iteration
+
+Bulk assign multiple items to a specific iteration.
+
+**Input Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| projectId | string | Yes | Project ID |
+| fieldId | string | Yes | Iteration field ID |
+| iterationId | string | Yes | Target iteration ID |
+| itemIds | string[] | Yes | Item IDs to assign |
+
+**Output:** Assignment results
+
+---
+
+## Field Operations Tools
+
+### set_field_value
+
+Set a field value for a project item.
+
+**Input Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| projectId | string | Yes | Project ID |
+| itemId | string | Yes | Item ID |
+| fieldId | string | Yes | Field ID |
+| value | any | Yes | Field value (type depends on field) |
+
+**Output:** Updated field value
+
+**Behavior:** Idempotent
+
+---
+
+### get_field_value
+
+Get a field value for a project item.
+
+**Input Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| projectId | string | Yes | Project ID |
+| itemId | string | Yes | Item ID |
+| fieldId | string | Yes | Field ID |
+
+**Output:** Field value object
+
+**Behavior:** Read-only, idempotent
+
+---
+
+### clear_field_value
+
+Clear a field value for a project item.
+
+**Input Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| projectId | string | Yes | Project ID |
+| itemId | string | Yes | Item ID |
+| fieldId | string | Yes | Field ID |
+
+**Output:** Success confirmation
+
+---
+
+---
+
+## Automation Tools
+
+### create_automation_rule
+
+Create a new automation rule for a GitHub project.
+
+**Input Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| projectId | string | Yes | Project ID |
+| name | string | Yes | Rule name |
+| description | string | No | Rule description |
+| trigger | object | Yes | Trigger configuration |
+| action | object | Yes | Action configuration |
+
+**Output:** Created rule object
+
+**Example:**
+```json
+{
+  "projectId": "PVT_kwDOAB...",
+  "name": "Auto-label new PRs",
+  "description": "Automatically add 'needs-review' label when PR is opened",
+  "trigger": {
+    "type": "pull_request.opened"
+  },
+  "action": {
+    "type": "add_label",
+    "label": "needs-review"
+  }
+}
+```
+
+---
+
+### update_automation_rule
+
+Update an existing automation rule.
+
+**Input Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| projectId | string | Yes | Project ID |
+| ruleId | string | Yes | Rule ID |
+| name | string | No | New name |
+| description | string | No | New description |
+| trigger | object | No | New trigger |
+| action | object | No | New action |
+| enabled | boolean | No | Enable/disable |
+
+**Output:** Updated rule object
+
+**Behavior:** Idempotent
+
+---
+
+### delete_automation_rule
+
+Delete an automation rule from a project.
+
+**Input Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| projectId | string | Yes | Project ID |
+| ruleId | string | Yes | Rule ID |
+
+**Output:** Success confirmation
+
+**Behavior:** Destructive
+
+---
+
+### get_automation_rule
+
+Get details of a specific automation rule.
+
+**Input Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| projectId | string | Yes | Project ID |
+| ruleId | string | Yes | Rule ID |
+
+**Output:** Rule object with full details
+
+**Behavior:** Read-only, idempotent
+
+---
+
+### list_automation_rules
+
+List all automation rules for a GitHub project.
+
+**Input Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| projectId | string | Yes | Project ID |
+
+**Output:** Array of rule objects
+
+**Behavior:** Read-only, idempotent
+
+---
+
+### enable_automation_rule
+
+Enable a disabled automation rule.
+
+**Input Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| projectId | string | Yes | Project ID |
+| ruleId | string | Yes | Rule ID |
+
+**Output:** Enabled rule object
+
+**Behavior:** Idempotent
+
+---
+
+### disable_automation_rule
+
+Disable an automation rule without deleting it.
+
+**Input Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| projectId | string | Yes | Project ID |
+| ruleId | string | Yes | Rule ID |
+
+**Output:** Disabled rule object
+
+**Behavior:** Idempotent
+
+---
+
+## Events & Triaging Tools
+
+### subscribe_to_events
+
+Subscribe to real-time events for GitHub resources.
+
+**Input Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| resourceType | string | Yes | Resource type (project, issue, pr) |
+| resourceId | string | No | Specific resource ID |
+| eventTypes | string[] | No | Event type filter |
+
+**Output:** Subscription object
+
+---
+
+### get_recent_events
+
+Get recent events for GitHub resources.
+
+**Input Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| resourceType | string | Yes | Resource type |
+| resourceId | string | No | Specific resource ID |
+| limit | number | No | Max events to return |
+
+**Output:** Array of event objects
+
+**Behavior:** Read-only, idempotent
+
+---
+
+### replay_events
+
+Replay events from a specific timestamp.
+
+**Input Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| resourceType | string | Yes | Resource type |
+| resourceId | string | No | Specific resource ID |
+| since | string | Yes | ISO timestamp |
+
+**Output:** Array of replayed events
+
+**Behavior:** Read-only, idempotent
+
+---
+
+### triage_issue
+
+AI-powered issue triaging. Classifies issues, assigns priority, and recommends actions.
+
+**Input Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| owner | string | Yes | Repository owner |
+| repo | string | Yes | Repository name |
+| issueNumber | number | Yes | Issue number |
+
+**Output:** Triage result object
+
+**Behavior:** Open-world (makes AI calls)
+
+---
+
+### triage_all_issues
+
+Automatically triage all untriaged issues in a project.
+
+**Input Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| owner | string | Yes | Repository owner |
+| repo | string | Yes | Repository name |
+| filter | object | No | Filter criteria |
+
+**Output:** Bulk triage results
+
+**Behavior:** Open-world (makes AI calls)
+
+---
+
+### schedule_triaging
+
+Schedule automated issue triaging to run periodically.
+
+**Input Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| owner | string | Yes | Repository owner |
+| repo | string | Yes | Repository name |
+| schedule | string | Yes | Cron expression |
+
+**Output:** Scheduled job object
+
+---
+
+## AI Task Tools
+
+These tools use AI for intelligent project management and task generation. They make external API calls to AI providers.
+
+### generate_prd
+
+Generate a comprehensive Product Requirements Document (PRD) from a project idea using AI analysis and industry best practices.
+
+**Input Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| projectIdea | string | Yes | Description of the project |
+| targetAudience | string | No | Who the product is for |
+| constraints | string[] | No | Technical or business constraints |
+| preferences | object | No | Generation preferences |
+
+**Output:** Generated PRD document
+
+**Behavior:** Open-world (makes AI calls)
+
+**Example:**
+```json
+{
+  "projectIdea": "A task management application for small teams",
+  "targetAudience": "Startups and small businesses",
+  "constraints": ["Must work offline", "Mobile-first design"]
+}
+```
+
+---
+
+### parse_prd
+
+Parse a Product Requirements Document (PRD) and generate a comprehensive list of actionable development tasks with AI-powered analysis.
+
+**Input Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| prdContent | string | Yes | PRD document content |
+| options | object | No | Parsing options |
+
+**Output:** Array of generated tasks with dependencies
+
+**Behavior:** Open-world (makes AI calls)
+
+---
+
+### enhance_prd
+
+Enhance an existing PRD with AI-powered improvements, adding missing elements, improving clarity, and providing comprehensive analysis.
+
+**Input Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| prdContent | string | Yes | Existing PRD content |
+| focusAreas | string[] | No | Areas to focus on |
+| enhancementLevel | string | No | Level of enhancement |
+
+**Output:** Enhanced PRD document
+
+**Behavior:** Open-world (makes AI calls)
+
+---
+
+### add_feature
+
+Add a new feature to an existing PRD or project, analyze its impact, and expand it into actionable tasks with complete lifecycle management.
+
+**Input Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| projectId | string | Yes | Project ID |
+| featureDescription | string | Yes | Feature description |
+| priority | string | No | Feature priority |
+
+**Output:** Feature addition result with tasks
+
+**Behavior:** Open-world (makes AI calls)
+
+---
+
+### expand_task
+
+Break down a complex task into smaller, manageable subtasks with AI-powered analysis, dependency detection, and implementation recommendations.
+
+**Input Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| taskId | string | Yes | Task ID to expand |
+| depth | number | No | Expansion depth |
+| context | string | No | Additional context |
+
+**Output:** Expanded task with subtasks
+
+**Behavior:** Open-world (makes AI calls)
+
+---
+
+### analyze_task_complexity
+
+Perform detailed AI-powered analysis of task complexity, effort estimation, risk assessment, and provide actionable recommendations.
+
+**Input Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| taskId | string | Yes | Task ID to analyze |
+| includeRisks | boolean | No | Include risk analysis |
+| includeRecommendations | boolean | No | Include recommendations |
+
+**Output:** Complexity analysis result
+
+**Behavior:** Open-world (makes AI calls)
+
+---
+
+### get_next_task
+
+Get AI-powered recommendations for the next task to work on based on priorities, dependencies, team capacity, and current project state.
+
+**Input Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| projectId | string | Yes | Project ID |
+| userId | string | No | User ID for personalization |
+| skills | string[] | No | User skills |
+| availability | number | No | Hours available |
+
+**Output:** Recommended next task
+
+**Behavior:** Open-world (makes AI calls)
+
+---
+
+### create_traceability_matrix
+
+Create a comprehensive requirements traceability matrix linking PRD business requirements to features to use cases to tasks with full bidirectional traceability.
+
+**Input Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| projectId | string | Yes | Project ID |
+| prdContent | string | No | PRD content if not linked |
+| includeTestCases | boolean | No | Include test case links |
+
+**Output:** Traceability matrix object
+
+**Behavior:** Open-world (makes AI calls)
+
+---
+
+### generate_roadmap
+
+AI-powered roadmap generation from project issues. Creates milestones, sprints, and phases automatically.
+
+**Input Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| projectId | string | Yes | Project ID |
+| timeframe | string | No | Roadmap timeframe |
+| options | object | No | Generation options |
+
+**Output:** Generated roadmap
+
+**Behavior:** Open-world (makes AI calls)
+
+---
+
+### enrich_issue
+
+AI-powered issue enrichment. Automatically adds labels, priority, type, complexity, and effort estimates.
+
+**Input Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| owner | string | Yes | Repository owner |
+| repo | string | Yes | Repository name |
+| issueNumber | number | Yes | Issue number |
+
+**Output:** Enriched issue object
+
+**Behavior:** Open-world (makes AI calls)
+
+---
+
+### enrich_issues_bulk
+
+Bulk AI-powered issue enrichment for multiple issues at once.
+
+**Input Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| owner | string | Yes | Repository owner |
+| repo | string | Yes | Repository name |
+| issueNumbers | number[] | No | Issue numbers (all if omitted) |
+
+**Output:** Bulk enrichment results
+
+**Behavior:** Open-world (makes AI calls)
+
+---
+
+## Health & Observability Tools
+
+### health_check
+
+Check system health and service availability. Returns status of GitHub connection, AI services, and cache.
+
+**Input Parameters:** None required
+
+**Output:**
+```typescript
+{
+  status: 'healthy' | 'degraded' | 'unhealthy';
+  timestamp: string;
+  uptime: number;
+  services: {
+    github: {
+      connected: boolean;
+      rateLimit?: { remaining: number; limit: number; };
+    };
+    ai: {
+      available: boolean;
+      circuitState: 'closed' | 'open' | 'half-open' | 'disabled';
+      models: {
+        available: string[];
+        unavailable: string[];
+      };
+    };
+    cache: {
+      entries: number;
+      persistenceEnabled: boolean;
+      lastPersist?: string;
+    };
+  };
+}
+```
+
+**Behavior:** Read-only, idempotent (safe to call frequently)
+
+**Example:**
+```json
+{}
+```
+
+**Response Example:**
+```json
+{
+  "status": "healthy",
+  "timestamp": "2024-01-31T12:00:00Z",
+  "uptime": 3600.5,
+  "services": {
+    "github": { "connected": true },
+    "ai": {
+      "available": true,
+      "circuitState": "closed",
+      "models": {
+        "available": ["main", "fallback"],
+        "unavailable": []
+      }
+    },
+    "cache": {
+      "entries": 150,
+      "persistenceEnabled": true,
+      "lastPersist": "2024-01-31T11:55:00Z"
+    }
+  }
+}
+```
+
+---
+
+## Tool Registration
+
+All 85 tools are registered in `src/infrastructure/tools/ToolRegistry.ts`. The registry:
+
+1. Validates tool definitions at registration time
+2. Generates MCP-compliant tool descriptors with annotations
+3. Converts Zod schemas to JSON Schema for MCP protocol
+4. Provides execution handlers for each tool
+
+## Source Files
+
+| Category | Source File |
+|----------|-------------|
+| Project/Issue/PR/Sprint tools | `src/infrastructure/tools/ToolSchemas.ts` |
+| AI Task tools | `src/infrastructure/tools/ai-tasks/*.ts` |
+| Health tools | `src/infrastructure/tools/health-tools.ts` |
+| Tool Registry | `src/infrastructure/tools/ToolRegistry.ts` |
+| Output schemas | `src/infrastructure/tools/schemas/project-schemas.ts` |
+| Behavior annotations | `src/infrastructure/tools/annotations/tool-annotations.ts` |
+
+---
+
+*Generated: 2026-01-31*
+*Tool count: 85*
+*MCP SDK: 1.25.3*
