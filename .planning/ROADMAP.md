@@ -218,6 +218,13 @@ Plans:
 4. User can create status update and see it appear in GitHub project
 5. User can retrieve status update history for a project
 
+**Plans:** 4 plans
+Plans:
+- [ ] 06-01-PLAN.md — Repository infrastructure (GraphQL with preview headers, 2 new repositories)
+- [ ] 06-02-PLAN.md — Sub-issue MCP tools (5 tools: GHAPI-01 to GHAPI-05)
+- [ ] 06-03-PLAN.md — Status update MCP tools (3 tools: GHAPI-06 to GHAPI-08)
+- [ ] 06-04-PLAN.md — Integration and testing (~40 tests, documentation)
+
 ---
 
 ### Phase 7: Project Templates and Linking
