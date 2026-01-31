@@ -368,12 +368,14 @@
 - DI container (src/container.ts) wires all 6 extracted services
 - ProjectManagementService facade: 34 methods delegated, ~25 direct implementations
 - ToolRegistry uses proper ZodTypeAny typing with instanceof checks
-- 11 tool categories organized in docs/TOOLS.md
+- 13 tool categories organized in docs/TOOLS.md (added Template and Linking)
 - Test isolation: jest.resetAllMocks() in beforeEach for proper mock reset
 - src/infrastructure/tools/schemas/project-template-linking-schemas.ts - 20 Zod schemas for Phase 7 tools
-- src/infrastructure/github/repositories/types.ts - 7 new TypeScript interfaces for template/linking
-- Follows existing patterns from sub-issue-schemas.ts and status-update-schemas.ts
-- PageInfo schema reusable across all paginated responses
+- src/infrastructure/tools/project-template-tools.ts - 4 template tools with executors
+- src/infrastructure/tools/project-linking-tools.ts - 6 linking tools with executors
+- Template tools use createFactory helper with placeholder owner/repo
+- Linking tools use factory.graphql() for direct GraphQL operations
+- resolveOrganizationId and resolveRepositoryId helpers for ID resolution
 
 ## Phase 6 Completion Summary
 
