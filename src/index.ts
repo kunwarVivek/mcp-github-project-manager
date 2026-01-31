@@ -218,15 +218,24 @@ class GitHubProjectManagerServer {
           });
 
           // Convert our custom MCPResponse to the format expected by the SDK
-          // SDK 1.25+ expects { content: [...], isError?: boolean }
+          // SDK 1.25+ expects { content: [...], structuredContent?: {...}, isError?: boolean }
           if (mcpResponse.status === "success") {
+            // Prepare structuredContent if result is an object
+            // structuredContent provides typed data matching the tool's outputSchema
+            const structuredContent = (result !== null && typeof result === 'object')
+              ? result as Record<string, unknown>
+              : undefined;
+
             return {
               content: [
                 {
                   type: "text" as const,
                   text: mcpResponse.output.content ?? JSON.stringify(result)
                 }
-              ]
+              ],
+              // Include structuredContent for MCP 2025-11-25 compliance
+              // This allows clients to access typed data matching the tool's outputSchema
+              structuredContent,
             };
           } else {
             // Handle error case (though this shouldn't happen in the success formatter)
