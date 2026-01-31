@@ -5,6 +5,8 @@ import { Sprint } from "../../domain/types";
 import { TestFactory } from "../test-utils";
 import { GitHubTypeConverter } from "../../infrastructure/github/util/conversion";
 
+// SKIPPED: These E2E tests require real GitHub API credentials (GITHUB_TOKEN, GITHUB_OWNER, GITHUB_REPO)
+// They make actual API calls to create roadmaps, milestones, issues, and sprints
 describe.skip("GitHub Project Manager E2E Tests", () => {
   let service: ProjectManagementService;
 

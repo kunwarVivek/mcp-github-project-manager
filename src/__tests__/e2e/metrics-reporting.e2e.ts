@@ -4,6 +4,8 @@ import { ResourceStatus } from "../../domain/resource-types";
 import { TestFactory } from "../test-utils";
 import { GitHubTypeConverter } from "../../infrastructure/github/util/conversion";
 
+// SKIPPED: These E2E tests require real GitHub API credentials (GITHUB_TOKEN, GITHUB_OWNER, GITHUB_REPO)
+// They make actual API calls to create milestones, issues, and sprints for metrics testing
 describe.skip("Metrics and Reporting E2E Tests", () => {
   let service: ProjectManagementService;
   let testMilestoneId: number;
