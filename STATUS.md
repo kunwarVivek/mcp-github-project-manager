@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-MCP GitHub Project Manager is an AI-enabled project management system that integrates GitHub Projects v2 with the Model Context Protocol (MCP). It provides 85 MCP tools for comprehensive project management, issue tracking, sprint planning, and AI-assisted task generation.
+MCP GitHub Project Manager is an AI-enabled project management system that integrates GitHub Projects v2 with the Model Context Protocol (MCP). It provides 93 MCP tools for comprehensive project management, issue tracking, sprint planning, sub-issue hierarchies, and AI-assisted task generation.
 
 ## Architecture Summary
 
@@ -13,8 +13,14 @@ MCP GitHub Project Manager is an AI-enabled project management system that integ
 
 **MCP Protocol Compliance (Phase 2):**
 - MCP SDK 1.25.3 with full protocol support
-- 85 registered tools with behavior annotations and output schemas
+- 93 registered tools with behavior annotations and output schemas
 - Proper CallToolResult format with structuredContent
+
+**Sub-issues and Status Updates (Phase 6):**
+- GitHubSubIssueRepository for parent-child issue hierarchies
+- GitHubStatusUpdateRepository for project status updates
+- 5 sub-issue tools + 3 status update tools
+- graphqlWithFeatures() for preview header injection
 
 **Resilience Infrastructure (Phase 5):**
 - Circuit breaker for AI service protection (cockatiel ^3.2.1)
@@ -24,15 +30,14 @@ MCP GitHub Project Manager is an AI-enabled project management system that integ
 
 ## Current Phase
 
-**Phase 5 of 12: Resilience and Observability** - Complete
+**Phase 6 of 12: Sub-issues and Status Updates** - Complete
 
 | Plan | Name | Status |
 |------|------|--------|
-| 05-01 | Infrastructure Foundation | Complete |
-| 05-02 | Integration Services | Complete |
-| 05-03 | Health Check Service | Complete |
-| 05-04 | Documentation | Complete |
-| 05-05 | Integration and Testing | Pending |
+| 06-01 | Repository Infrastructure | Complete |
+| 06-02 | Sub-issue MCP Tools | Complete |
+| 06-03 | Status Update MCP Tools | Complete |
+| 06-04 | Testing and Verification | Complete |
 
 ## Completed Phases
 
@@ -43,20 +48,22 @@ MCP GitHub Project Manager is an AI-enabled project management system that integ
 | 3 | Type Safety | 16+ `as any` eliminated, type guards, SDK workaround documented |
 | 4 | Test Stabilization | 515 passing tests, credential guards, 94%+ context coverage |
 | 5 | Resilience & Observability | Circuit breaker, correlation tracing, cache persistence, health check |
+| 6 | Sub-issues & Status Updates | 8 new MCP tools, 2 repositories, 88 new tests |
 
 ## MCP Compliance
 
 | Metric | Value |
 |--------|-------|
 | SDK Version | 1.25.3 |
-| Registered Tools | 85 |
-| Tools with Annotations | 85 (100%) |
-| Tools with Output Schemas | 85 (100%) |
+| Registered Tools | 93 |
+| Tools with Annotations | 93 (100%) |
+| Tools with Output Schemas | 93 (100%) |
 | Behavior Pattern Types | 6 (readOnly, destructive, idempotent, openWorld, etc.) |
 
 **Tool Categories:**
 - Project Management: 18 tools
 - Issue Operations: 18 tools
+- Sub-issue Tools: 5 tools
 - Pull Request: 8 tools
 - Sprint/Iteration: 14 tools
 - Automation: 7 tools
@@ -64,6 +71,7 @@ MCP GitHub Project Manager is an AI-enabled project management system that integ
 - Field Operations: 6 tools
 - Events/Triaging: 5 tools
 - Health: 1 tool
+- Status Update: 3 tools
 
 ## AI Services
 
@@ -88,7 +96,7 @@ MCP GitHub Project Manager is an AI-enabled project management system that integ
 
 | Metric | Value |
 |--------|-------|
-| Passing Tests | 515+ |
+| Passing Tests | 678+ |
 | Skipped Tests | 20 (justified) |
 | Failed Tests | 0 |
 | Context Services Coverage | 94%+ |
@@ -100,13 +108,13 @@ MCP GitHub Project Manager is an AI-enabled project management system that integ
 2. **SDK Type Workaround:** MCP SDK 1.25+ has TS2589 deep type instantiation issue; documented `as any` workaround
 3. **AI Service Mocking:** Complex mock setup required for AI service tests; documented patterns in test files
 
-## Next Steps (Phase 6 Preview)
+## Next Steps (Phase 7 Preview)
 
-**Phase 6: AI Service Enhancement**
-- Structured AI response validation
-- PRD generation improvements
-- Task dependency analysis
-- AI-assisted issue enrichment
+**Phase 7: Webhooks and Automation**
+- GitHub webhook event handling
+- Automation rule execution
+- Event-driven issue management
+- Real-time project synchronization
 
 ## Key Files
 
@@ -114,6 +122,10 @@ MCP GitHub Project Manager is an AI-enabled project management system that integ
 |------|---------|
 | `src/container.ts` | DI container configuration |
 | `src/infrastructure/tools/ToolRegistry.ts` | MCP tool registration |
+| `src/infrastructure/tools/sub-issue-tools.ts` | Sub-issue MCP tools |
+| `src/infrastructure/tools/status-update-tools.ts` | Status update MCP tools |
+| `src/infrastructure/github/repositories/GitHubSubIssueRepository.ts` | Sub-issue GraphQL operations |
+| `src/infrastructure/github/repositories/GitHubStatusUpdateRepository.ts` | Status update GraphQL operations |
 | `src/infrastructure/resilience/` | Circuit breaker, resilience policy |
 | `src/infrastructure/observability/` | Correlation context, tracing logger |
 | `src/infrastructure/health/` | Health service, health check tool |
@@ -122,4 +134,4 @@ MCP GitHub Project Manager is an AI-enabled project management system that integ
 ---
 
 *Last updated: 2026-01-31*
-*Phase 5 completed*
+*Phase 6 completed*

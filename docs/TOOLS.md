@@ -1,13 +1,13 @@
 # MCP Tools Reference
 
-This document provides comprehensive documentation for all 85 MCP tools available in the MCP GitHub Project Manager.
+This document provides comprehensive documentation for all 93 MCP tools available in the MCP GitHub Project Manager.
 
 ## Overview
 
 | Metric | Value |
 |--------|-------|
-| Total Tools | 85 |
-| Categories | 9 |
+| Total Tools | 93 |
+| Categories | 11 |
 | SDK Version | 1.25.3 |
 | All tools have | Behavior annotations, Output schemas |
 
@@ -28,13 +28,15 @@ All tools are annotated with behavior hints that help MCP clients understand the
 
 1. [Project Management Tools](#project-management-tools) (18 tools)
 2. [Issue Tools](#issue-tools) (18 tools)
-3. [Pull Request Tools](#pull-request-tools) (8 tools)
-4. [Sprint & Iteration Tools](#sprint--iteration-tools) (14 tools)
-5. [Field Operations Tools](#field-operations-tools) (6 tools)
-6. [Automation Tools](#automation-tools) (7 tools)
-7. [Events & Triaging Tools](#events--triaging-tools) (5 tools)
-8. [AI Task Tools](#ai-task-tools) (8 tools)
-9. [Health & Observability Tools](#health--observability-tools) (1 tool)
+3. [Sub-issue Tools](#sub-issue-tools) (5 tools)
+4. [Pull Request Tools](#pull-request-tools) (8 tools)
+5. [Sprint & Iteration Tools](#sprint--iteration-tools) (14 tools)
+6. [Field Operations Tools](#field-operations-tools) (6 tools)
+7. [Automation Tools](#automation-tools) (7 tools)
+8. [Events & Triaging Tools](#events--triaging-tools) (5 tools)
+9. [AI Task Tools](#ai-task-tools) (8 tools)
+10. [Health & Observability Tools](#health--observability-tools) (1 tool)
+11. [Status Update Tools](#status-update-tools) (3 tools)
 
 ---
 
@@ -739,6 +741,152 @@ List all GitHub labels.
 **Output:** Array of label objects
 
 **Behavior:** Read-only, idempotent
+
+---
+
+## Sub-issue Tools
+
+Sub-issues allow creating parent-child hierarchies between GitHub issues. These tools manage sub-issue relationships using the GitHub GraphQL API with the `sub_issues` feature flag.
+
+### add_sub_issue
+
+Adds an existing issue as a sub-issue of a parent issue.
+
+**Input Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| owner | string | Yes | Repository owner |
+| repo | string | Yes | Repository name |
+| parentIssueNumber | number | Yes | Parent issue number |
+| subIssueNumber | number | Yes | Issue to add as sub-issue |
+| replaceParent | boolean | No | Replace existing parent (default: false) |
+
+**Output:** SubIssueOperationOutput with parent and sub-issue details
+
+**Behavior:** Idempotent update operation
+
+**Example:**
+```json
+{
+  "owner": "myorg",
+  "repo": "myrepo",
+  "parentIssueNumber": 100,
+  "subIssueNumber": 123
+}
+```
+
+---
+
+### list_sub_issues
+
+Lists all sub-issues for a parent issue with pagination.
+
+**Input Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| owner | string | Yes | Repository owner |
+| repo | string | Yes | Repository name |
+| issueNumber | number | Yes | Parent issue number |
+| first | number | No | Number of results (default: 20, max: 100) |
+| after | string | No | Pagination cursor |
+
+**Output:** SubIssueListOutput with sub-issues, summary, and pagination
+
+**Behavior:** Read-only, idempotent
+
+**Example:**
+```json
+{
+  "owner": "myorg",
+  "repo": "myrepo",
+  "issueNumber": 100,
+  "first": 50
+}
+```
+
+---
+
+### get_parent_issue
+
+Gets the parent issue for a sub-issue, if any.
+
+**Input Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| owner | string | Yes | Repository owner |
+| repo | string | Yes | Repository name |
+| issueNumber | number | Yes | Issue number to check |
+
+**Output:** ParentIssueOutput with parent (or null if no parent)
+
+**Behavior:** Read-only, idempotent
+
+**Example:**
+```json
+{
+  "owner": "myorg",
+  "repo": "myrepo",
+  "issueNumber": 123
+}
+```
+
+---
+
+### reprioritize_sub_issue
+
+Changes the position of a sub-issue within its parent's sub-issue list.
+
+**Input Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| owner | string | Yes | Repository owner |
+| repo | string | Yes | Repository name |
+| parentIssueNumber | number | Yes | Parent issue number |
+| subIssueNumber | number | Yes | Sub-issue to move |
+| afterIssueNumber | number | No | Place after this issue (omit for beginning) |
+
+**Output:** SubIssueOperationOutput with updated position
+
+**Behavior:** Idempotent update operation
+
+**Example:**
+```json
+{
+  "owner": "myorg",
+  "repo": "myrepo",
+  "parentIssueNumber": 100,
+  "subIssueNumber": 123,
+  "afterIssueNumber": 122
+}
+```
+
+---
+
+### remove_sub_issue
+
+Removes a sub-issue from its parent. The issue itself remains, only the relationship is removed.
+
+**Input Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| owner | string | Yes | Repository owner |
+| repo | string | Yes | Repository name |
+| parentIssueNumber | number | Yes | Parent issue number |
+| subIssueNumber | number | Yes | Sub-issue to remove |
+
+**Output:** RemoveSubIssueOutput with success flag and message
+
+**Behavior:** Destructive (removes relationship), idempotent
+
+**Example:**
+```json
+{
+  "owner": "myorg",
+  "repo": "myrepo",
+  "parentIssueNumber": 100,
+  "subIssueNumber": 123
+}
+```
 
 ---
 
@@ -1783,9 +1931,90 @@ Check system health and service availability. Returns status of GitHub connectio
 
 ---
 
+## Status Update Tools
+
+Status updates allow project managers to communicate project progress with optional status indicators. These tools work with GitHub Project V2 status updates via the GraphQL API.
+
+### create_status_update
+
+Creates a new status update for a GitHub project.
+
+**Input Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| projectId | string | Yes | Project node ID (PVT_...) |
+| body | string | Yes | Status update body (supports Markdown) |
+| status | string | No | ON_TRACK, AT_RISK, OFF_TRACK, COMPLETE, INACTIVE |
+| startDate | string | No | ISO date (YYYY-MM-DD) |
+| targetDate | string | No | ISO date (YYYY-MM-DD) |
+
+**Output:** StatusUpdateOutput with full status update details
+
+**Behavior:** Creates new resource (not idempotent)
+
+**Example:**
+```json
+{
+  "projectId": "PVT_kwDOLhQ7gc4AOEbH",
+  "body": "Sprint 3 is progressing well. All P0 features complete.",
+  "status": "ON_TRACK",
+  "startDate": "2026-01-15",
+  "targetDate": "2026-02-15"
+}
+```
+
+---
+
+### list_status_updates
+
+Lists status updates for a GitHub project with pagination.
+
+**Input Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| projectId | string | Yes | Project node ID (PVT_...) |
+| first | number | No | Number of results (default: 10, max: 100) |
+| after | string | No | Pagination cursor |
+
+**Output:** StatusUpdateListOutput with status updates and pagination
+
+**Behavior:** Read-only, idempotent
+
+**Example:**
+```json
+{
+  "projectId": "PVT_kwDOLhQ7gc4AOEbH",
+  "first": 20
+}
+```
+
+---
+
+### get_status_update
+
+Gets a single status update by its node ID.
+
+**Input Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| statusUpdateId | string | Yes | Status update node ID |
+
+**Output:** StatusUpdateOutput (or null if not found)
+
+**Behavior:** Read-only, idempotent
+
+**Example:**
+```json
+{
+  "statusUpdateId": "PVTSU_lADOLhQ7gc4AOEbHzM4AOrKa"
+}
+```
+
+---
+
 ## Tool Registration
 
-All 85 tools are registered in `src/infrastructure/tools/ToolRegistry.ts`. The registry:
+All 93 tools are registered in `src/infrastructure/tools/ToolRegistry.ts`. The registry:
 
 1. Validates tool definitions at registration time
 2. Generates MCP-compliant tool descriptors with annotations
@@ -1797,14 +2026,16 @@ All 85 tools are registered in `src/infrastructure/tools/ToolRegistry.ts`. The r
 | Category | Source File |
 |----------|-------------|
 | Project/Issue/PR/Sprint tools | `src/infrastructure/tools/ToolSchemas.ts` |
+| Sub-issue tools | `src/infrastructure/tools/sub-issue-tools.ts` |
+| Status update tools | `src/infrastructure/tools/status-update-tools.ts` |
 | AI Task tools | `src/infrastructure/tools/ai-tasks/*.ts` |
 | Health tools | `src/infrastructure/tools/health-tools.ts` |
 | Tool Registry | `src/infrastructure/tools/ToolRegistry.ts` |
-| Output schemas | `src/infrastructure/tools/schemas/project-schemas.ts` |
+| Output schemas | `src/infrastructure/tools/schemas/*.ts` |
 | Behavior annotations | `src/infrastructure/tools/annotations/tool-annotations.ts` |
 
 ---
 
 *Generated: 2026-01-31*
-*Tool count: 85*
+*Tool count: 93*
 *MCP SDK: 1.25.3*
