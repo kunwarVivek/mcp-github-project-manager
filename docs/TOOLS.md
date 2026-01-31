@@ -1,13 +1,13 @@
 # MCP Tools Reference
 
-This document provides comprehensive documentation for all 103 MCP tools available in the MCP GitHub Project Manager.
+This document provides comprehensive documentation for all 109 MCP tools available in the MCP GitHub Project Manager.
 
 ## Overview
 
 | Metric | Value |
 |--------|-------|
-| Total Tools | 103 |
-| Categories | 13 |
+| Total Tools | 109 |
+| Categories | 15 |
 | SDK Version | 1.25.3 |
 | All tools have | Behavior annotations, Output schemas |
 
@@ -39,6 +39,8 @@ All tools are annotated with behavior hints that help MCP clients understand the
 11. [Status Update Tools](#status-update-tools) (3 tools)
 12. [Project Template Tools](#project-template-tools) (4 tools)
 13. [Project Linking Tools](#project-linking-tools) (6 tools)
+14. [Project Lifecycle Tools](#project-lifecycle-tools) (3 tools)
+15. [Advanced Operations Tools](#advanced-operations-tools) (3 tools)
 
 ---
 
@@ -2273,9 +2275,212 @@ Lists all teams linked to a project.
 
 ---
 
+## Project Lifecycle Tools
+
+Project lifecycle tools manage the overall state of GitHub ProjectV2 projects, including closing, reopening, and converting draft issues to real issues.
+
+### close_project
+
+Closes a GitHub ProjectV2. Closed projects are hidden from default views but retain all their data and can be reopened at any time.
+
+**Input Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| projectId | string | Yes | Project node ID (PVT_...) |
+
+**Output:** ProjectLifecycleOutput with id, title, closed=true, url
+
+**Behavior:** Idempotent update operation (safe to retry)
+
+**Example:**
+```json
+{
+  "projectId": "PVT_kwDOLhQ7gc4AOEbH"
+}
+```
+
+---
+
+### reopen_project
+
+Reopens a previously closed GitHub ProjectV2. The project becomes visible in default views again with all its data intact.
+
+**Input Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| projectId | string | Yes | Project node ID (PVT_...) |
+
+**Output:** ProjectLifecycleOutput with id, title, closed=false, url
+
+**Behavior:** Idempotent update operation (safe to retry)
+
+**Example:**
+```json
+{
+  "projectId": "PVT_kwDOLhQ7gc4AOEbH"
+}
+```
+
+---
+
+### convert_draft_issue
+
+Converts a draft issue in a project to a real GitHub issue in the specified repository. The draft's title and body are preserved in the new issue.
+
+**Input Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| itemId | string | Yes | ProjectV2Item ID of the draft issue (PVTI_...) |
+| owner | string | Yes | Target repository owner (username or organization) |
+| repo | string | Yes | Target repository name |
+
+**Output:** ConvertedIssueOutput with itemId, issueId, issueNumber, title, url, repository
+
+**Behavior:** Creates new resource (not idempotent)
+
+**Example:**
+```json
+{
+  "itemId": "PVTI_lADOLhQ7gc4AOEbHzgGF9PM",
+  "owner": "my-org",
+  "repo": "my-repo"
+}
+```
+
+---
+
+## Advanced Operations Tools
+
+Advanced operations tools provide powerful search, filtering, and item reordering capabilities for GitHub ProjectV2.
+
+### update_item_position
+
+Reorders an item within a GitHub ProjectV2. Position changes persist across views. If afterId is omitted, the item moves to the first position.
+
+**Input Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| projectId | string | Yes | Project node ID (PVT_...) |
+| itemId | string | Yes | ProjectV2Item ID to move (PVTI_...) |
+| afterId | string | No | Item ID to place after (omit to move to first position) |
+
+**Output:** ItemPositionOutput with success, itemId, position
+
+**Behavior:** Idempotent update operation
+
+**Example (move to top):**
+```json
+{
+  "projectId": "PVT_kwDOLhQ7gc4AOEbH",
+  "itemId": "PVTI_lADOLhQ7gc4AOEbHzgPYx2Y"
+}
+```
+
+**Example (move after another item):**
+```json
+{
+  "projectId": "PVT_kwDOLhQ7gc4AOEbH",
+  "itemId": "PVTI_lADOLhQ7gc4AOEbHzgPYx2Y",
+  "afterId": "PVTI_lADOLhQ7gc4AOEbHzgPYx2Z"
+}
+```
+
+---
+
+### search_issues_advanced
+
+Searches GitHub issues using advanced query syntax with AND/OR operators. Use explicit 'AND' and 'OR' keywords for complex queries. Supports grouping with parentheses and exclusion with '-' or 'NOT'.
+
+**Input Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| query | string | Yes | GitHub search query with AND/OR support |
+| first | number | No | Number of results to return (default: 20, max: 100) |
+| after | string | No | Pagination cursor |
+
+**Output:** SearchIssuesOutput with totalCount, issues array, pageInfo
+
+**Behavior:** Read-only, idempotent
+
+**Query Examples:**
+- `is:issue AND repo:owner/repo AND label:bug`
+- `is:issue AND (label:critical OR label:urgent) AND state:open`
+- `is:issue AND assignee:@me AND -label:wontfix`
+
+**Example:**
+```json
+{
+  "query": "is:issue AND repo:owner/repo AND (label:bug OR label:critical) AND state:open",
+  "first": 50
+}
+```
+
+---
+
+### filter_project_items
+
+Filters items in a GitHub ProjectV2 by status, labels, assignee, or type. Multiple filter criteria are combined with AND logic.
+
+**Note:** Filtering is performed client-side as GitHub's API does not support server-side filtering for project items. For large projects, this may fetch all items before filtering.
+
+**Input Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| projectId | string | Yes | Project node ID (PVT_...) |
+| filter | object | Yes | Filter criteria (see below) |
+| first | number | No | Number of items to return (default: 50, max: 100) |
+| after | string | No | Pagination cursor |
+
+**Filter Object:**
+| Field | Type | Description |
+|-------|------|-------------|
+| status | string | Single select field value (e.g., 'In Progress', 'Done') |
+| labels | string[] | Label names to match (item must have at least one) |
+| assignee | string | Assignee login to match |
+| type | "Issue" \| "PullRequest" \| "DraftIssue" | Item content type |
+
+**Output:** FilterProjectItemsOutput with totalCount, filteredCount, items array, pageInfo
+
+**Behavior:** Read-only, idempotent
+
+**Example (filter by status):**
+```json
+{
+  "projectId": "PVT_kwDOLhQ7gc4AOEbH",
+  "filter": {
+    "status": "In Progress"
+  }
+}
+```
+
+**Example (filter by labels):**
+```json
+{
+  "projectId": "PVT_kwDOLhQ7gc4AOEbH",
+  "filter": {
+    "labels": ["bug", "critical"]
+  }
+}
+```
+
+**Example (combined filters):**
+```json
+{
+  "projectId": "PVT_kwDOLhQ7gc4AOEbH",
+  "filter": {
+    "type": "Issue",
+    "status": "In Review",
+    "assignee": "octocat"
+  },
+  "first": 50
+}
+```
+
+---
+
 ## Tool Registration
 
-All 103 tools are registered in `src/infrastructure/tools/ToolRegistry.ts`. The registry:
+All 109 tools are registered in `src/infrastructure/tools/ToolRegistry.ts`. The registry:
 
 1. Validates tool definitions at registration time
 2. Generates MCP-compliant tool descriptors with annotations
@@ -2291,6 +2496,8 @@ All 103 tools are registered in `src/infrastructure/tools/ToolRegistry.ts`. The 
 | Status update tools | `src/infrastructure/tools/status-update-tools.ts` |
 | Template tools | `src/infrastructure/tools/project-template-tools.ts` |
 | Linking tools | `src/infrastructure/tools/project-linking-tools.ts` |
+| Lifecycle tools | `src/infrastructure/tools/project-lifecycle-tools.ts` |
+| Advanced operations tools | `src/infrastructure/tools/project-advanced-tools.ts` |
 | AI Task tools | `src/infrastructure/tools/ai-tasks/*.ts` |
 | Health tools | `src/infrastructure/tools/health-tools.ts` |
 | Tool Registry | `src/infrastructure/tools/ToolRegistry.ts` |
@@ -2300,5 +2507,5 @@ All 103 tools are registered in `src/infrastructure/tools/ToolRegistry.ts`. The 
 ---
 
 *Generated: 2026-01-31*
-*Tool count: 103*
+*Tool count: 109*
 *MCP SDK: 1.25.3*
