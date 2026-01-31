@@ -6,11 +6,11 @@
 ## Current Position
 
 **Phase:** 5 of 12 (Resilience and Observability)
-**Plan:** 1 of 5 complete
+**Plan:** 2 of 5 complete
 **Status:** In progress
-**Last activity:** 2026-01-31 - Completed 05-01-PLAN.md (Infrastructure Foundation)
+**Last activity:** 2026-01-31 - Completed 05-02-PLAN.md (Integration Services)
 
-**Progress:** [████████░░] 54% (Phase 1-4 complete, Phase 5 in progress)
+**Progress:** [████████░░] 56% (Phase 1-4 complete, Phase 5: 2/5 plans)
 
 ## Project Progress
 
@@ -18,13 +18,13 @@
 |--------|-------|
 | Phases Complete | 4/12 |
 | Requirements Done | 29/99 |
-| Current Phase Progress | Phase 5: 1/5 plans complete |
+| Current Phase Progress | Phase 5: 2/5 plans complete |
 
 ## Performance Metrics
 
 | Metric | Value | Notes |
 |--------|-------|-------|
-| Plans Executed | 23 | Phase 1-4 complete (22), Phase 5 in progress (1) |
+| Plans Executed | 24 | Phase 1-4 complete (22), Phase 5 in progress (2) |
 | Requirements Completed | 29 | DEBT-01 through DEBT-20, MCP-01 through MCP-15 |
 | Iterations | 1 | Gap closure cycle for test regressions |
 | Blockers Resolved | 4 | tsyringe decorators, reflect-metadata, MCP SDK type instantiation, test isolation |
@@ -70,6 +70,9 @@
 | Cockatiel for circuit breaker | TypeScript-first, composable policies, cleaner API than opossum | 2026-01-31 |
 | AsyncLocalStorage for tracing | Native Node.js solution, no external dependency for correlation IDs | 2026-01-31 |
 | Atomic file writes | Write to .tmp file then rename to prevent corruption on crash | 2026-01-31 |
+| Composed resilience policy order | fallback(retry(circuitBreaker(timeout(op)))) - outer to inner | 2026-01-31 |
+| Cooperative timeout strategy | Graceful cancellation vs aggressive abort | 2026-01-31 |
+| Opt-in cache persistence | enablePersistence() call required; does not change existing behavior | 2026-01-31 |
 
 ### Learnings
 
@@ -101,6 +104,9 @@
 - CircuitBreakerService: wrap Cockatiel with state tracking and stderr logging
 - CorrelationContext: startTrace() wraps operations with correlation ID propagation
 - CachePersistence: JSON file persistence with atomic writes and expired entry filtering
+- AIResiliencePolicy: composes fallback, retry, circuit breaker, timeout with Cockatiel
+- TracingLogger: ILogger with correlationId in every JSON log entry
+- ResourceCache persistence: opt-in with enablePersistence(), periodic saves every 5 minutes
 
 ### Open Todos
 
@@ -126,9 +132,9 @@
 - [x] Execute 04-05: Final Verification (0 failing tests, 515 passed)
 - [x] Plan Phase 5
 - [x] Execute 05-01: Infrastructure Foundation (CircuitBreakerService, CorrelationContext, CachePersistence)
-- [ ] Execute 05-02: AI Resilience Policy
+- [x] Execute 05-02: Integration Services (AIResiliencePolicy, TracingLogger, ResourceCache persistence)
 - [ ] Execute 05-03: Health Check Service
-- [ ] Execute 05-04: Tracing Logger
+- [ ] Execute 05-04: (merged into 05-02)
 - [ ] Execute 05-05: Integration and Testing
 - [ ] Consider future extraction: IssueService, PullRequestService, AutomationService
 
@@ -265,9 +271,9 @@
 | Plan | Name | Status | Key Results |
 |------|------|--------|-------------|
 | 05-01 | Infrastructure Foundation | Complete | CircuitBreakerService, CorrelationContext, CachePersistence |
-| 05-02 | AI Resilience Policy | Pending | - |
+| 05-02 | Integration Services | Complete | AIResiliencePolicy, TracingLogger, ResourceCache persistence |
 | 05-03 | Health Check Service | Pending | - |
-| 05-04 | Tracing Logger | Pending | - |
+| 05-04 | (merged into 05-02) | - | - |
 | 05-05 | Integration and Testing | Pending | - |
 
 **Key deliverables so far:**
@@ -275,15 +281,18 @@
 - CircuitBreakerService: Cockatiel wrapper with state tracking
 - CorrelationContext: AsyncLocalStorage-based request tracing
 - CachePersistence: JSON file persistence with atomic writes
+- AIResiliencePolicy: composed fallback/retry/circuit-breaker/timeout
+- TracingLogger: ILogger with correlationId in JSON output
+- ResourceCache: opt-in persistence with enablePersistence()
 
 ## Session Continuity
 
-**Last Session:** 2026-01-31 - Completed 05-01-PLAN.md (Infrastructure Foundation)
+**Last Session:** 2026-01-31 - Completed 05-02-PLAN.md (Integration Services)
 
 **Context for Next Session:**
-- Phase 5 (Resilience and Observability) in progress: 1/5 plans complete
-- Infrastructure foundation laid: circuit breaker, correlation context, cache persistence
-- Ready for 05-02: AI Resilience Policy
+- Phase 5 (Resilience and Observability) in progress: 2/5 plans complete
+- Integration services complete: AIResiliencePolicy, TracingLogger, ResourceCache persistence
+- Ready for 05-03: Health Check Service
 
 **Architecture Context:**
 - DI container (src/container.ts) wires all 6 extracted services
@@ -292,9 +301,9 @@
 - types.ts uses helper type guards for proper narrowing
 - MCPToolTestUtils: hasRealCredentials() for proper credential detection
 - Test isolation: jest.resetAllMocks() in beforeEach for proper mock reset
-- NEW: src/infrastructure/resilience/ - CircuitBreakerService, index.ts
-- NEW: src/infrastructure/observability/ - CorrelationContext, index.ts
-- NEW: src/infrastructure/cache/CachePersistence.ts
+- src/infrastructure/resilience/ - CircuitBreakerService, AIResiliencePolicy, index.ts
+- src/infrastructure/observability/ - CorrelationContext, TracingLogger, index.ts
+- src/infrastructure/cache/ - CachePersistence.ts, ResourceCache.ts (with persistence)
 
 ---
 
@@ -305,3 +314,4 @@
 *Phase 3 completed: 2026-01-31*
 *Phase 4 completed: 2026-01-31*
 *Phase 5 plan 1 completed: 2026-01-31*
+*Phase 5 plan 2 completed: 2026-01-31*
