@@ -5,12 +5,12 @@
 
 ## Current Position
 
-**Phase:** 8 of 12 (Project Lifecycle and Advanced Operations) - COMPLETE
-**Plan:** 4 of 4 complete
-**Status:** Complete
-**Last activity:** 2026-01-31 - Completed 08-04-PLAN.md (Testing and Verification)
+**Phase:** 9 of 12 (AI PRD and Task Enhancement)
+**Plan:** 1 of 4 complete
+**Status:** In progress
+**Last activity:** 2026-01-31 - Completed 09-01-PLAN.md (Confidence Scoring Foundation)
 
-**Progress:** [████████████████░░] 92% (Phase 1-8 complete)
+**Progress:** [████████████████░░] 93% (Phase 1-8 complete, Phase 9: 1/4)
 
 ## Project Progress
 
@@ -18,13 +18,13 @@
 |--------|-------|
 | Phases Complete | 8/12 |
 | Requirements Done | 81/99 |
-| Current Phase Progress | Phase 8: 4/4 plans complete |
+| Current Phase Progress | Phase 9: 1/4 plans complete |
 
 ## Performance Metrics
 
 | Metric | Value | Notes |
 |--------|-------|-------|
-| Plans Executed | 39 | Phase 1-4 complete (22), Phase 5 complete (5), Phase 6 complete (4), Phase 7 complete (4), Phase 8 complete (4) |
+| Plans Executed | 40 | Phase 1-4 complete (22), Phase 5 complete (5), Phase 6 complete (4), Phase 7 complete (4), Phase 8 complete (4), Phase 9: 1/4 |
 | Requirements Completed | 81 | DEBT-01 through DEBT-28, MCP-01 through MCP-15, GHAPI-01 to GHAPI-24 |
 | Iterations | 1 | Gap closure cycle for test regressions |
 | Blockers Resolved | 4 | tsyringe decorators, reflect-metadata, MCP SDK type instantiation, test isolation |
@@ -99,6 +99,9 @@
 | updateIdempotent for close/reopen | Close/reopen project are idempotent (same result if repeated) | 2026-01-31 |
 | Single mutation for close/reopen | Both close and reopen use updateProjectV2 with closed=true/false | 2026-01-31 |
 | resolveRepositoryId helper | Draft conversion needs repository node ID resolved from owner/name | 2026-01-31 |
+| Confidence thresholds | warning: 70, error: 50 for actionable review tiers | 2026-01-31 |
+| Scoring weights | input: 0.3, ai-self: 0.4, pattern: 0.3 - AI assessment most contextual | 2026-01-31 |
+| Max clarifying questions | 5 questions max to keep feedback focused | 2026-01-31 |
 
 ### Learnings
 
