@@ -744,5 +744,87 @@ describe('ContextualReferenceGenerator', () => {
       const loginFeature = result?.relatedFeatures.find(f => f.title === 'User Login');
       expect(loginFeature).toBeDefined();
     });
+
+    it('should use index-based feature ID when feature.id is missing', async () => {
+      const task = createMockTask({
+        title: 'Implement User Login form'
+      });
+      // Features without id field
+      const featuresWithoutId: FeatureRequirement[] = [
+        {
+          id: '', // Empty string is falsy
+          title: 'User Login',
+          description: 'Login feature',
+          priority: TaskPriority.HIGH,
+          userStories: ['As a user I can login'],
+          acceptanceCriteria: ['Login works'],
+          estimatedComplexity: 5 as TaskComplexity,
+          dependencies: []
+        }
+      ];
+
+      const result = await generator.generateReferences(task, createMockPRD(), featuresWithoutId);
+
+      expect(result?.relatedFeatures).toBeDefined();
+      expect(result?.relatedFeatures.length).toBe(1);
+      // Should use 'feature-0' as fallback ID
+      expect(result?.relatedFeatures[0].featureId).toBe('feature-0');
+    });
+
+    it('should use index-based feature ID for parent feature fallback when id is missing', async () => {
+      const task = createMockTask({
+        title: 'Completely unrelated task',
+        description: 'Nothing to do with features'
+      });
+      // Feature without id field (falls through to parent feature fallback)
+      const featuresWithoutId: FeatureRequirement[] = [
+        {
+          id: '', // Empty string is falsy
+          title: 'Some Feature',
+          description: 'Some feature',
+          priority: TaskPriority.HIGH,
+          userStories: ['As a user'],
+          acceptanceCriteria: ['Works'],
+          estimatedComplexity: 5 as TaskComplexity,
+          dependencies: []
+        }
+      ];
+
+      const result = await generator.generateReferences(task, createMockPRD(), featuresWithoutId);
+
+      expect(result?.relatedFeatures).toBeDefined();
+      expect(result?.relatedFeatures.length).toBe(1);
+      expect(result?.relatedFeatures[0].relationship).toBe('depends_on');
+      // Should use 'feature-0' as fallback ID for parent feature
+      expect(result?.relatedFeatures[0].featureId).toBe('feature-0');
+    });
+  });
+
+  // =========================================================================
+  // Additional Edge Cases for Branch Coverage
+  // =========================================================================
+
+  describe('additional edge cases', () => {
+    it('should handle non-Error thrown objects in AI call', async () => {
+      const { generateObject } = require('ai');
+      // Throw a non-Error object to cover the String(error) branch
+      generateObject.mockRejectedValue('string error');
+
+      const result = await generator.generateReferences(createMockTask(), createMockPRD());
+
+      // Should fall back to basic references
+      expect(result).toBeDefined();
+      expect(result?.prdSections).toBeDefined();
+    });
+
+    it('should handle thrown number in AI call', async () => {
+      const { generateObject } = require('ai');
+      // Throw a number to cover the String(error) branch
+      generateObject.mockRejectedValue(42);
+
+      const result = await generator.generateReferences(createMockTask(), createMockPRD());
+
+      expect(result).toBeDefined();
+    });
   });
 });
