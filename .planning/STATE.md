@@ -6,26 +6,26 @@
 ## Current Position
 
 **Phase:** 6 of 12 (Sub-issues and Status Updates)
-**Plan:** 2 of 4 complete
+**Plan:** 3 of 4 complete
 **Status:** In progress
-**Last activity:** 2026-01-31 - Completed 06-03-PLAN.md (Status Update MCP Tools)
+**Last activity:** 2026-01-31 - Completed 06-02-PLAN.md (Sub-Issue MCP Tools)
 
-**Progress:** [████████░░] 69% (Phase 1-5 complete, Phase 6: 2/4)
+**Progress:** [█████████░] 71% (Phase 1-5 complete, Phase 6: 3/4)
 
 ## Project Progress
 
 | Metric | Value |
 |--------|-------|
 | Phases Complete | 5/12 |
-| Requirements Done | 40/99 |
-| Current Phase Progress | Phase 6: 2/4 plans complete |
+| Requirements Done | 45/99 |
+| Current Phase Progress | Phase 6: 3/4 plans complete |
 
 ## Performance Metrics
 
 | Metric | Value | Notes |
 |--------|-------|-------|
-| Plans Executed | 29 | Phase 1-4 complete (22), Phase 5 complete (5), Phase 6 in progress (2) |
-| Requirements Completed | 40 | DEBT-01 through DEBT-28, MCP-01 through MCP-15, GHAPI-06 to GHAPI-08 |
+| Plans Executed | 30 | Phase 1-4 complete (22), Phase 5 complete (5), Phase 6 in progress (3) |
+| Requirements Completed | 45 | DEBT-01 through DEBT-28, MCP-01 through MCP-15, GHAPI-01 to GHAPI-08 |
 | Iterations | 1 | Gap closure cycle for test regressions |
 | Blockers Resolved | 4 | tsyringe decorators, reflect-metadata, MCP SDK type instantiation, test isolation |
 
@@ -131,6 +131,9 @@
 - Status updates use 5-value enum: ON_TRACK, AT_RISK, OFF_TRACK, COMPLETE, INACTIVE
 - Status update tools follow AI task pattern: standalone executors creating their own factory
 - Status update output schemas use nullable() for optional status field
+- Sub-issue tools resolve issue numbers to node IDs internally in executors
+- Parallel Promise.all for resolving multiple issue numbers (e.g., parent + sub-issue)
+- State normalization: OPEN/CLOSED to open/closed in MCP output
 
 ### Open Todos
 
@@ -339,11 +342,11 @@
 **Last Session:** 2026-01-31 - Completed 06-03-PLAN.md (Status Update MCP Tools)
 
 **Context for Next Session:**
-- Phase 6 (Sub-issues and Status Updates) in progress: 2/4 plans complete
+- Phase 6 (Sub-issues and Status Updates) in progress: 3/4 plans complete
+- Sub-issue tools complete: add_sub_issue, list_sub_issues, get_parent_issue, reprioritize_sub_issue, remove_sub_issue
 - Status update tools complete: create_status_update, list_status_updates, get_status_update
-- Sub-issue tools still needed (06-02)
 - Testing and verification needed (06-04)
-- Total MCP tools: 88 (85 + 3 status update)
+- Total MCP tools: 93 (85 + 3 status update + 5 sub-issue)
 
 **Architecture Context:**
 - DI container (src/container.ts) wires all 6 extracted services
@@ -370,7 +373,7 @@
 | Plan | Name | Status | Key Results |
 |------|------|--------|-------------|
 | 06-01 | Repository Infrastructure | Complete | GitHubSubIssueRepository (5 methods), GitHubStatusUpdateRepository (3 methods), graphqlWithFeatures |
-| 06-02 | Sub-issue MCP Tools | Pending | 5 tools needed |
+| 06-02 | Sub-issue MCP Tools | Complete | 5 tools (add_sub_issue, list_sub_issues, get_parent_issue, reprioritize_sub_issue, remove_sub_issue) |
 | 06-03 | Status Update MCP Tools | Complete | 3 tools (create_status_update, list_status_updates, get_status_update) |
 | 06-04 | Testing and Verification | Pending | - |
 
