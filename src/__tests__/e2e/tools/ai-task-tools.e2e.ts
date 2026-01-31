@@ -5,7 +5,7 @@ import { MCPToolTestUtils, MCPTestHelpers } from '../utils/MCPToolTestUtils';
  * Tests all AI-powered MCP tools through the actual MCP interface
  */
 
-MCPToolTestUtils.createTestSuite('AI Task Management Tools E2E', 'both')((utils: MCPToolTestUtils) => {
+MCPToolTestUtils.createTestSuite('AI Task Management Tools E2E', 'both')((utils: MCPToolTestUtils | undefined) => {
   let generatedPRDContent: string;
   let parsedTasks: any[];
   let projectId: string;

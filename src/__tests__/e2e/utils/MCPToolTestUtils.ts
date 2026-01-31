@@ -268,23 +268,61 @@ export class MCPToolTestUtils {
   }
 
   /**
+   * Check if we have real (not fake/test) credentials
+   */
+  static hasRealCredentials(testType: 'github' | 'ai' | 'both'): boolean {
+    const token = process.env.GITHUB_TOKEN;
+    const owner = process.env.GITHUB_OWNER;
+    const repo = process.env.GITHUB_REPO;
+    const anthropicKey = process.env.ANTHROPIC_API_KEY;
+    const openaiKey = process.env.OPENAI_API_KEY;
+
+    // Check for fake test values from setup.ts
+    const hasRealGitHub = !!(
+      token && token !== 'test-token' && token !== '' &&
+      owner && owner !== 'test-owner' &&
+      repo && repo !== 'test-repo'
+    );
+
+    const hasRealAI = !!(
+      (anthropicKey && anthropicKey !== 'sk-ant-test-key' && !anthropicKey.startsWith('sk-ant-test')) ||
+      (openaiKey && openaiKey !== 'sk-test-openai-key' && !openaiKey.startsWith('sk-test'))
+    );
+
+    switch (testType) {
+      case 'github':
+        return hasRealGitHub;
+      case 'ai':
+        return hasRealAI;
+      case 'both':
+        return hasRealGitHub && hasRealAI;
+      default:
+        return false;
+    }
+  }
+
+  /**
    * Check if we should skip tests based on credentials
    */
   static shouldSkipTest(testType: 'github' | 'ai' | 'both'): boolean {
-    return testConfig.skipIfNoCredentials(testType);
+    // Skip if we don't have real credentials for this test type
+    return !MCPToolTestUtils.hasRealCredentials(testType);
   }
 
   /**
    * Create a test suite wrapper that handles server lifecycle
+   *
+   * Tests are always registered but will skip gracefully when credentials
+   * are missing. Individual tests should check `if (!utils)` and return early.
    */
   static createTestSuite(suiteName: string, testType: 'github' | 'ai' | 'both' = 'github') {
-    return (tests: (utils: MCPToolTestUtils) => void) => {
+    return (tests: (utils: MCPToolTestUtils | undefined) => void) => {
       describe(suiteName, () => {
         let utils: MCPToolTestUtils | undefined;
 
         beforeAll(async () => {
           if (MCPToolTestUtils.shouldSkipTest(testType)) {
-            console.log(`⏭️  Skipping ${suiteName} - missing credentials for ${testType} tests`);
+            console.log(`Skipping ${suiteName} - missing real credentials for ${testType} tests`);
             return;
           }
 
@@ -298,15 +336,8 @@ export class MCPToolTestUtils {
           }
         }, 10000);
 
-        beforeEach(() => {
-          if (MCPToolTestUtils.shouldSkipTest(testType)) {
-            test.skip(`Skipping test - missing credentials for ${testType} tests`, () => {});
-          }
-        });
-
-        if (!MCPToolTestUtils.shouldSkipTest(testType)) {
-          tests(utils as MCPToolTestUtils);
-        }
+        // Always register tests - they will skip inside via the `if (!utils)` guard
+        tests(utils);
       });
     };
   }
