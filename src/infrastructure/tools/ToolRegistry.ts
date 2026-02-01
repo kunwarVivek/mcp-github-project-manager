@@ -187,6 +187,22 @@ import {
   filterProjectItemsTool,
 } from "./project-advanced-tools.js";
 
+// Sprint AI tools (Phase 10)
+import {
+  sprintAITools,
+  calculateSprintCapacityTool,
+  prioritizeBacklogTool,
+  assessSprintRiskTool,
+  suggestSprintCompositionTool,
+} from "./sprint-ai-tools.js";
+
+// Roadmap AI tools (Phase 10)
+import {
+  roadmapAITools,
+  generateRoadmapTool as generateAIRoadmapTool,
+  generateRoadmapVisualizationTool,
+} from "./roadmap-ai-tools.js";
+
 /**
  * Central registry of all available tools
  */
@@ -418,6 +434,16 @@ export class ToolRegistry {
     this.registerTool(updateItemPositionTool);
     this.registerTool(searchIssuesAdvancedTool);
     this.registerTool(filterProjectItemsTool);
+
+    // Register Sprint AI tools (Phase 10: AI-09 to AI-12)
+    this.registerTool(calculateSprintCapacityTool);
+    this.registerTool(prioritizeBacklogTool);
+    this.registerTool(assessSprintRiskTool);
+    this.registerTool(suggestSprintCompositionTool);
+
+    // Register Roadmap AI tools (Phase 10: AI-13 to AI-16)
+    this.registerTool(generateAIRoadmapTool);
+    this.registerTool(generateRoadmapVisualizationTool);
   }
 
   /**
