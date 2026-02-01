@@ -358,6 +358,15 @@ Plans:
 4. AI generates roadmap with logical phase sequence from requirements
 5. Roadmap includes milestone dates based on velocity data
 
+**Plans:** 4 plans
+Plans:
+- [ ] 10-01-PLAN.md — Domain types and Zod schemas for sprint/roadmap AI
+- [ ] 10-02-PLAN.md — Sprint AI services (capacity, prioritization, risk, suggestion)
+- [ ] 10-03-PLAN.md — Roadmap AI service (generation, sequencing, milestones)
+- [ ] 10-04-PLAN.md — MCP tools, testing, and documentation
+
+**Status:** Ready for execution
+
 ---
 
 ### Phase 11: AI Issue Intelligence
