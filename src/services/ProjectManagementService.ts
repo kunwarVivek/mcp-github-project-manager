@@ -347,6 +347,10 @@ export class ProjectManagementService {
     return this.templateService.listProjectFields(data);
   }
 
+  async createProjectField(data: { projectId: string; name: string; type: string; options?: Array<{ name: string; color?: string; description?: string }> }): Promise<CustomField> {
+    return this.templateService.createProjectField(data);
+  }
+
   async updateProjectField(data: { projectId: string; fieldId: string; name?: string; options?: Array<{ id?: string; name: string; color?: string; description?: string }> }): Promise<CustomField> {
     return this.templateService.updateProjectField(data);
   }

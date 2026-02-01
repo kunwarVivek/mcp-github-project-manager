@@ -203,6 +203,14 @@ import {
   generateRoadmapVisualizationTool,
 } from "./roadmap-ai-tools.js";
 
+// Issue Intelligence tools (Phase 11: AI-17 to AI-20)
+import {
+  enrichIssueTool as enrichIssueAITool,
+  suggestLabelsTool,
+  detectDuplicatesTool,
+  findRelatedIssuesTool,
+} from "./issue-intelligence-tools.js";
+
 /**
  * Central registry of all available tools
  */
@@ -444,6 +452,14 @@ export class ToolRegistry {
     // Register Roadmap AI tools (Phase 10: AI-13 to AI-16)
     this.registerTool(generateAIRoadmapTool);
     this.registerTool(generateRoadmapVisualizationTool);
+
+    // Register Issue Intelligence tools (Phase 11: AI-17 to AI-20)
+    // Note: enrichIssueAITool uses same name "enrich_issue" as ToolSchemas version
+    // so it will be overwritten with the AI-powered implementation
+    this.registerTool(enrichIssueAITool);
+    this.registerTool(suggestLabelsTool);
+    this.registerTool(detectDuplicatesTool);
+    this.registerTool(findRelatedIssuesTool);
   }
 
   /**

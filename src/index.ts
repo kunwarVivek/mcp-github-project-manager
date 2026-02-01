@@ -726,6 +726,67 @@ class GitHubProjectManagerServer {
       case "list_linked_teams":
         return await executeListLinkedTeams(args);
 
+      // Phase 8 - Project Lifecycle
+      case "close_project":
+        return await executeCloseProject(args);
+
+      case "reopen_project":
+        return await executeReopenProject(args);
+
+      case "convert_draft_issue":
+        return await executeConvertDraftIssue(args);
+
+      // Phase 8 - Advanced Operations
+      case "update_item_position":
+        return await executeUpdateItemPosition(args);
+
+      case "search_issues_advanced":
+        return await executeSearchIssuesAdvanced(args);
+
+      case "filter_project_items":
+        return await executeFilterProjectItems(args);
+
+      // Phase 10 - Sprint AI
+      case "calculate_sprint_capacity":
+        return await executeCalculateSprintCapacity(args);
+
+      case "prioritize_backlog":
+        return await executePrioritizeBacklog(args);
+
+      case "assess_sprint_risk":
+        return await executeAssessSprintRisk(args);
+
+      case "suggest_sprint_composition":
+        return await executeSuggestSprintComposition(args);
+
+      // Phase 10 - Roadmap AI
+      case "generate_ai_roadmap":
+        return await executeGenerateRoadmap(args);
+
+      case "generate_roadmap_visualization":
+        return await executeGenerateRoadmapVisualization(args);
+
+      // Phase 11 - Issue Intelligence
+      case "enrich_issue_ai":
+        return await executeEnrichIssue(args);
+
+      case "suggest_labels":
+        return await executeSuggestLabels(args);
+
+      case "detect_duplicates":
+        return await executeDetectDuplicates(args);
+
+      case "find_related_issues":
+        return await executeFindRelatedIssues(args);
+
+      // Health
+      case "health_check":
+        return await executeHealthCheck();
+
+      // Project Field (delegates to service)
+      case "create_project_field":
+        return await this.service.createProjectField(args);
+
       default:
         throw new McpError(
           ErrorCode.MethodNotFound,

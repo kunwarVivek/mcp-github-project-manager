@@ -145,6 +145,32 @@ export class ProjectTemplateService {
     }
   }
 
+  async createProjectField(data: {
+    projectId: string;
+    name: string;
+    type: string;
+    options?: Array<{
+      name: string;
+      color?: string;
+      description?: string;
+    }>;
+  }): Promise<CustomField> {
+    try {
+      return await this.projectRepo.createField(data.projectId, {
+        name: data.name,
+        type: data.type as CustomField['type'],
+        options: data.options?.map(opt => ({
+          id: '', // Will be assigned by GitHub
+          name: opt.name,
+          color: opt.color,
+          description: opt.description
+        }))
+      });
+    } catch (error) {
+      throw this.mapErrorToMCPError(error);
+    }
+  }
+
   async updateProjectField(data: {
     projectId: string;
     fieldId: string;
