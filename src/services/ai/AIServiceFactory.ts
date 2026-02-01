@@ -379,7 +379,8 @@ export class AIServiceFactory {
             maxTokens: 10
           });
           results.anthropic = true;
-        }        } catch (error) {
+        }
+      } catch (error) {
         process.stderr.write(`Anthropic connection test failed: ${error}\n`);
       }
     }
