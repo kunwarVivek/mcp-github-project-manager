@@ -760,16 +760,10 @@ class GitHubProjectManagerServer {
         return await executeSuggestSprintComposition(args);
 
       // Phase 10 - Roadmap AI
-      case "generate_ai_roadmap":
-        return await executeGenerateRoadmap(args);
-
       case "generate_roadmap_visualization":
         return await executeGenerateRoadmapVisualization(args);
 
       // Phase 11 - Issue Intelligence
-      case "enrich_issue_ai":
-        return await executeEnrichIssue(args);
-
       case "suggest_labels":
         return await executeSuggestLabels(args);
 
