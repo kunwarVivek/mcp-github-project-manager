@@ -431,8 +431,11 @@ Plans:
 Plans:
 - [x] 12-01-PLAN.md — Fix E2E test failures and document skipped tests (PROD-01 to PROD-04)
 - [x] 12-02-PLAN.md — Create configuration and troubleshooting guides (PROD-07, PROD-08)
-- [ ] 12-03-PLAN.md — Update changelog and publish to npm (PROD-09 to PROD-12)
-- [ ] 12-04-PLAN.md — Fix critical gaps: missing tool handlers, JSON.parse safety, resource cleanup (gap closure)
+- [x] 12-03-PLAN.md — Update changelog and publish to npm (PROD-09 to PROD-12)
+- [x] 12-04-PLAN.md — Fix critical gaps: missing tool handlers, JSON.parse safety, resource cleanup (gap closure)
+
+**Status:** Complete ✓
+**Completed:** 2026-02-01
 
 ---
 
@@ -451,7 +454,7 @@ Plans:
 | 9 | AI PRD and Task Enhancement | 8 | Complete ✓ |
 | 10 | AI Sprint and Roadmap Planning | 8 | Complete ✓ |
 | 11 | AI Issue Intelligence | 4 | Complete ✓ |
-| 12 | Production Release | 12 | Pending |
+| 12 | Production Release | 12 | Complete ✓ |
 
 **Total:** 99 requirements across 12 phases
 
@@ -484,3 +487,4 @@ Plans:
 *Phase 9 completed: 2026-02-01*
 *Phase 10 completed: 2026-02-01*
 *Phase 11 completed: 2026-02-01*
+*Phase 12 completed: 2026-02-01*
