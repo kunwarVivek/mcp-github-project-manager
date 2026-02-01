@@ -172,10 +172,15 @@ Return ONLY valid JSON. Start sprints from today's date (${new Date().toISOStrin
     // Parse JSON response
     const jsonMatch = response.text.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
-      throw new Error('Failed to parse AI response for roadmap');
+      throw new Error('Failed to extract JSON from AI response for roadmap');
     }
 
-    return JSON.parse(jsonMatch[0]);
+    try {
+      return JSON.parse(jsonMatch[0]);
+    } catch (parseError) {
+      const message = parseError instanceof Error ? parseError.message : String(parseError);
+      throw new Error(`Failed to parse roadmap JSON: ${message}`);
+    }
   }
 
   /**
