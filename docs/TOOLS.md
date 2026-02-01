@@ -1,12 +1,12 @@
 # MCP Tools Reference
 
-This document provides comprehensive documentation for all 119 MCP tools available in the MCP GitHub Project Manager.
+This document provides comprehensive documentation for all 115 MCP tools available in the MCP GitHub Project Manager.
 
 ## Overview
 
 | Metric | Value |
 |--------|-------|
-| Total Tools | 119 |
+| Total Tools | 115 |
 | Categories | 17 |
 | SDK Version | 1.25.3 |
 | All tools have | Behavior annotations, Output schemas |

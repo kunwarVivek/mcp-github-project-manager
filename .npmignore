@@ -22,6 +22,8 @@ handoffs/
 .github/
 .vscode/
 .idea/
+.planning/
+.claude/
 
 # Other files
 *.log

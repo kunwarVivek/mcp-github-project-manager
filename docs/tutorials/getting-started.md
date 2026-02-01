@@ -18,14 +18,13 @@ Before you begin, make sure you have:
 First, let's install and configure the server:
 
 ```bash
-# Clone the repository
-git clone https://github.com/your-org/github-project-manager-mcp.git
-cd github-project-manager-mcp
+# Install from npm (recommended)
+npm install -g mcp-github-project-manager
 
-# Install dependencies
+# Or clone the repository for development
+git clone https://github.com/kunwarVivek/mcp-github-project-manager.git
+cd mcp-github-project-manager
 npm install
-# or
-pnpm install
 
 # Create environment configuration
 cp .env.example .env

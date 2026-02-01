@@ -72,8 +72,6 @@ docker run -it \
   mcp-github-project-manager
 ```
 
-For more details on Docker usage, see [DOCKER.md](DOCKER.md).
-
 ## Key Features
 
 ### 🤖 AI-Powered Task Management
@@ -811,8 +809,6 @@ The server follows Clean Architecture principles with distinct layers:
 - **Service Layer**: Business logic coordination
 - **MCP Layer**: Tool definitions and request handling
 
-See [ARCHITECTURE.md](ARCHITECTURE.md) for detailed architecture documentation.
-
 ## Contributing
 
 Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
@@ -831,7 +827,6 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 - [Model Context Protocol](https://modelcontextprotocol.io)
 - [GitHub Projects API](https://docs.github.com/en/issues/planning-and-tracking-with-projects/automating-your-project/using-the-api-to-manage-projects)
-- [Project Roadmap](ROADMAP.md)
 
 ## Current Status
 
@@ -933,29 +928,26 @@ Despite the recent improvements, the following functional gaps still exist and a
    - Missing report generation capabilities
    - Limited time-series data analysis
 
-See [docs/mcp/gaps-analysis.md](docs/mcp/gaps-analysis.md) for detailed implementation status.
-
 ## Documentation
 
 ### Getting Started
-- [Configuration Guide](docs/CONFIGURATION.md) - All configuration options and MCP client setup
+- [Deployment Guide](docs/deployment.md) - Installation, Docker, and MCP client setup
+- [Configuration Guide](docs/CONFIGURATION.md) - All configuration options
 - [Troubleshooting Guide](docs/TROUBLESHOOTING.md) - Common issues and solutions
-- [User Guide](docs/user-guide.md) - Detailed usage instructions
 
 ### Reference
-- [Tool Reference](docs/TOOLS.md) - All 119 MCP tools documented
+- [Tool Reference](docs/TOOLS.md) - All 115 MCP tools documented
+- [Architecture](docs/architecture.md) - System design and patterns
 - [API Reference](docs/API.md) - Service and infrastructure APIs
-- [API Explorer](docs/api-reference/index.md) - Interactive API documentation
 
 ### Guides
 - [Tutorials](docs/tutorials/getting-started.md) - Step-by-step guides
-- [Examples](examples/README.md) - Code examples for common tasks
-- [E2E Testing Guide](docs/e2e-testing-guide.md) - End-to-end testing documentation
+- [User Guide](docs/user-guide.md) - Detailed usage instructions
+- [Testing Guide](docs/TESTING.md) - Test suite documentation
 
-### Architecture & Development
-- [Architecture](ARCHITECTURE.md) - System architecture and design
+### Development
 - [Contributing](docs/contributing/index.md) - Development guidelines
-- [MCP Documentation](docs/mcp/) - MCP-specific details
+- [MCP Integration](docs/mcp/) - MCP-specific details
 
 ### Interactive Documentation
 

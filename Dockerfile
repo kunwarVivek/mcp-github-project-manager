@@ -1,30 +1,27 @@
-# Use Node.js 18 as the base image (matches your package.json engine requirement)
-FROM node:18-alpine
+# Use Node.js 22 LTS as the base image
+FROM node:22-alpine
 
 # Create app directory
 WORKDIR /app
 
-# Install pnpm (since your project uses pnpm-lock.yaml)
-RUN npm install -g pnpm
+# Copy package files
+COPY package.json package-lock.json ./
 
-# Copy package.json, pnpm-lock.yaml and other configuration files
-COPY package.json pnpm-lock.yaml tsconfig.json tsconfig.build.json ./
+# Copy TypeScript config for build
+COPY tsconfig.json tsconfig.build.json ./
 
 # Install dependencies
-RUN pnpm install --frozen-lockfile
+RUN npm ci --only=production=false
 
-# Copy source code and other necessary files
+# Copy source code and build scripts
 COPY src/ ./src/
-COPY .env.example ./.env.example
+COPY scripts/fix-imports.js ./scripts/
 
 # Build the project
-RUN pnpm build
+RUN npm run build
 
-# Create a .env file if one doesn't exist
-RUN if [ ! -f .env ]; then cp .env.example .env || echo "No .env.example found"; fi
-
-# Expose any ports your application might need (optional)
-# EXPOSE 3000
+# Remove dev dependencies after build
+RUN npm prune --production
 
 # Set environment variables
 ENV NODE_ENV=production

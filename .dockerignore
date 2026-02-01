@@ -1,0 +1,63 @@
+# Dependencies
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Build output (will rebuild in container)
+build/
+dist/
+
+# Test and coverage
+coverage/
+tests/
+**/*.test.ts
+**/*.test.js
+**/*.spec.ts
+**/*.spec.js
+jest.*.js
+jest.*.mjs
+jest.*.cjs
+
+# Development files
+.git/
+.gitignore
+.claude/
+.mcp-cache/
+.planning/
+handoffs/
+
+# IDE files
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Environment (will be provided at runtime)
+.env
+.env.local
+.env.*.local
+.env.test
+
+# Documentation (not needed in container)
+docs/
+examples/
+*.md
+!README.md
+
+# Debug scripts
+debug-*.js
+scripts/demo-test-client.sh
+scripts/test-mcp*.sh
+scripts/test-mcp*.js
+scripts/README-test-client.md
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Temporary files
+tmp/
+.tmp/
+*.log
