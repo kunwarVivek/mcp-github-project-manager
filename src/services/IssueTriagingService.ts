@@ -59,10 +59,17 @@ export class IssueTriagingService {
 
       const jsonMatch = response.text.match(/\{[\s\S]*\}/);
       if (!jsonMatch) {
-        throw new Error('Failed to parse AI response');
+        throw new Error('Failed to extract JSON from AI triage response');
       }
 
-      const triage = JSON.parse(jsonMatch[0]);
+      let triage;
+      try {
+        triage = JSON.parse(jsonMatch[0]);
+      } catch (parseError) {
+        const message = parseError instanceof Error ? parseError.message : String(parseError);
+        throw new Error(`Failed to parse triage JSON: ${message}`);
+      }
+
       return {
         issueId: params.issueId,
         issueTitle: params.issueTitle,
