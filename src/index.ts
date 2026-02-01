@@ -54,6 +54,46 @@ import {
   executeListLinkedRepositories,
   executeListLinkedTeams,
 } from "./infrastructure/tools/ToolSchemas";
+
+// Phase 8 - Project Lifecycle Tools
+import {
+  executeCloseProject,
+  executeReopenProject,
+  executeConvertDraftIssue,
+} from "./infrastructure/tools/project-lifecycle-tools.js";
+
+// Phase 8 - Project Advanced Tools
+import {
+  executeUpdateItemPosition,
+  executeSearchIssuesAdvanced,
+  executeFilterProjectItems,
+} from "./infrastructure/tools/project-advanced-tools.js";
+
+// Phase 10 - Sprint AI Tools
+import {
+  executeCalculateSprintCapacity,
+  executePrioritizeBacklog,
+  executeAssessSprintRisk,
+  executeSuggestSprintComposition,
+} from "./infrastructure/tools/sprint-ai-tools.js";
+
+// Phase 10 - Roadmap AI Tools
+import {
+  executeGenerateRoadmap,
+  executeGenerateRoadmapVisualization,
+} from "./infrastructure/tools/roadmap-ai-tools.js";
+
+// Phase 11 - Issue Intelligence Tools
+import {
+  executeEnrichIssue,
+  executeSuggestLabels,
+  executeDetectDuplicates,
+  executeFindRelatedIssues,
+} from "./infrastructure/tools/issue-intelligence-tools.js";
+
+// Health Tools
+import { executeHealthCheck } from "./infrastructure/tools/health-tools.js";
+
 import { ToolResultFormatter } from "./infrastructure/tools/ToolResultFormatter";
 import { MCPContentType, MCPErrorCode } from "./domain/mcp-types";
 import { ResourceCache } from "./infrastructure/cache/ResourceCache";
