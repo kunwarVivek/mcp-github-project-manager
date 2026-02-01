@@ -129,16 +129,16 @@ Requirements for this milestone. Each maps to roadmap phases.
 - [ ] **AI-08**: Support task templates
 
 **Sprint Planning:**
-- [ ] **AI-09**: AI-powered sprint capacity planning
-- [ ] **AI-10**: Sprint backlog prioritization suggestions
-- [ ] **AI-11**: Sprint risk assessment
-- [ ] **AI-12**: Sprint scope recommendations based on velocity
+- [x] **AI-09**: AI-powered sprint capacity planning
+- [x] **AI-10**: Sprint backlog prioritization suggestions
+- [x] **AI-11**: Sprint risk assessment
+- [x] **AI-12**: Sprint scope recommendations based on velocity
 
 **Roadmap Generation:**
-- [ ] **AI-13**: Generate roadmap from requirements
-- [ ] **AI-14**: Phase sequencing based on dependencies
-- [ ] **AI-15**: Milestone date estimation
-- [ ] **AI-16**: Roadmap visualization data generation
+- [x] **AI-13**: Generate roadmap from requirements
+- [x] **AI-14**: Phase sequencing based on dependencies
+- [x] **AI-15**: Milestone date estimation
+- [x] **AI-16**: Roadmap visualization data generation
 
 **Issue Intelligence:**
 - [ ] **AI-17**: Improve issue enrichment quality
@@ -277,14 +277,14 @@ Which phases cover which requirements.
 | AI-06 | Phase 9 | Pending |
 | AI-07 | Phase 9 | Pending |
 | AI-08 | Phase 9 | Pending |
-| AI-09 | Phase 10 | Pending |
-| AI-10 | Phase 10 | Pending |
-| AI-11 | Phase 10 | Pending |
-| AI-12 | Phase 10 | Pending |
-| AI-13 | Phase 10 | Pending |
-| AI-14 | Phase 10 | Pending |
-| AI-15 | Phase 10 | Pending |
-| AI-16 | Phase 10 | Pending |
+| AI-09 | Phase 10 | Complete |
+| AI-10 | Phase 10 | Complete |
+| AI-11 | Phase 10 | Complete |
+| AI-12 | Phase 10 | Complete |
+| AI-13 | Phase 10 | Complete |
+| AI-14 | Phase 10 | Complete |
+| AI-15 | Phase 10 | Complete |
+| AI-16 | Phase 10 | Complete |
 | AI-17 | Phase 11 | Pending |
 | AI-18 | Phase 11 | Pending |
 | AI-19 | Phase 11 | Pending |
