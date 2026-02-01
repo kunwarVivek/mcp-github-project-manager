@@ -48,11 +48,12 @@ describe('SprintRiskAssessor', () => {
       });
 
       it('should identify low buffer risk', async () => {
+        // 95% utilization (19/20) triggers the > 0.9 && <= 1.0 check
         const result = await assessor.assessRisks({
           sprintItems: [
-            createBacklogItem({ id: '1', points: 9 })
+            createBacklogItem({ id: '1', points: 19 })
           ],
-          sprintCapacity: createCapacity({ recommendedLoad: 10 })
+          sprintCapacity: createCapacity({ recommendedLoad: 20 })
         });
 
         const bufferRisk = result.risks.find(r =>
@@ -304,7 +305,7 @@ describe('SprintRiskAssessor', () => {
           sprintCapacity: createCapacity({ recommendedLoad: 20 })
         });
 
-        expect(result.confidence.reasoning.toLowerCase()).toContain('algorithm');
+        expect(result.confidence.reasoning?.toLowerCase()).toContain('algorithm');
       });
 
       it('should have higher confidence with good item descriptions', async () => {
