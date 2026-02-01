@@ -1,13 +1,13 @@
 # MCP Tools Reference
 
-This document provides comprehensive documentation for all 115 MCP tools available in the MCP GitHub Project Manager.
+This document provides comprehensive documentation for all 119 MCP tools available in the MCP GitHub Project Manager.
 
 ## Overview
 
 | Metric | Value |
 |--------|-------|
-| Total Tools | 115 |
-| Categories | 16 |
+| Total Tools | 119 |
+| Categories | 17 |
 | SDK Version | 1.25.3 |
 | All tools have | Behavior annotations, Output schemas |
 
@@ -42,6 +42,7 @@ All tools are annotated with behavior hints that help MCP clients understand the
 14. [Project Lifecycle Tools](#project-lifecycle-tools) (3 tools)
 15. [Advanced Operations Tools](#advanced-operations-tools) (3 tools)
 16. [Sprint and Roadmap AI Tools](#sprint-and-roadmap-ai-tools) (6 tools)
+17. [Issue Intelligence Tools (AI)](#issue-intelligence-tools-ai---phase-11) (4 tools)
 
 ---
 
@@ -2879,9 +2880,155 @@ console.log(`Overall confidence: ${result.overallConfidence.score}%`);
 
 ---
 
+## Issue Intelligence Tools (AI) - Phase 11
+
+Phase 11 adds AI-powered issue intelligence capabilities for automated issue enrichment, label suggestion, duplicate detection, and related issue discovery.
+
+### enrich_issue
+
+AI-powered issue enrichment with structured sections (AI-17).
+
+**Input Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| issueTitle | string | Yes | Issue title to enrich |
+| issueDescription | string | Yes | Issue body/description (can be empty) |
+| projectContext | string | No | Project description for context |
+| repositoryLabels | array | No | Available labels for suggestions |
+
+**Output:**
+```json
+{
+  "original": { "title": "...", "body": "..." },
+  "preserveOriginal": true,
+  "enrichedBody": "## Problem\n...\n## Solution\n...",
+  "sections": {
+    "problem": { "content": "...", "confidence": 85 },
+    "solution": { "content": "...", "confidence": 80 },
+    "context": { "content": "...", "confidence": 75 },
+    "impact": { "content": "...", "confidence": 82 },
+    "acceptanceCriteria": { "content": "...", "confidence": 90 }
+  },
+  "suggestedLabels": ["bug", "auth"],
+  "overallConfidence": { "score": 82, "tier": "high", ... }
+}
+```
+
+**Behavior:** AI operation (non-deterministic, makes external AI calls)
+
+---
+
+### suggest_labels
+
+Multi-tier label suggestions with rationale (AI-18).
+
+**Input Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| issueTitle | string | Yes | Issue title for analysis |
+| issueDescription | string | Yes | Issue body/description |
+| existingLabels | array | Yes | Available labels in repository |
+| issueHistory | array | No | Historical issues for pattern learning |
+| config | object | No | Configuration (maxSuggestions, preferExisting, includeNewProposals) |
+
+**Output:**
+```json
+{
+  "high": [{ "label": "bug", "isExisting": true, "confidence": 0.92, "rationale": "...", "matchedPatterns": ["crash"] }],
+  "medium": [{ "label": "auth", "isExisting": true, "confidence": 0.75, "rationale": "...", "matchedPatterns": [] }],
+  "low": [],
+  "newLabelProposals": [{ "name": "security", "description": "...", "color": "ff0000", "rationale": "..." }],
+  "confidence": { "score": 85, "tier": "high", ... }
+}
+```
+
+**Behavior:** AI operation (non-deterministic, makes external AI calls)
+
+---
+
+### detect_duplicates
+
+Embedding-based duplicate detection with tiered confidence (AI-19).
+
+**Input Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| issueTitle | string | Yes | Issue title to check |
+| issueDescription | string | Yes | Issue body/description |
+| existingIssues | array | Yes | Issues to compare against |
+| thresholds | object | No | Custom thresholds (high: 0.92, medium: 0.75) |
+| maxResults | number | No | Maximum results (default: 10) |
+
+**Output:**
+```json
+{
+  "highConfidence": [{ "issueId": "123", "issueNumber": 42, "title": "...", "similarity": 0.95, "reasoning": "..." }],
+  "mediumConfidence": [...],
+  "lowConfidence": [...],
+  "confidence": { "score": 78, "tier": "medium", ... }
+}
+```
+
+**Confidence Tiers:**
+- High (0.92+): Auto-link as duplicate recommended
+- Medium (0.75-0.92): Review recommended
+- Low (<0.75): Reference only
+
+**Behavior:** AI operation (uses embeddings, may fall back to keyword matching)
+
+---
+
+### find_related_issues
+
+Multi-type relationship detection (AI-20).
+
+**Input Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| issueId | string | Yes | Source issue ID |
+| issueTitle | string | Yes | Source issue title |
+| issueDescription | string | Yes | Source issue body |
+| repositoryIssues | array | Yes | Issues to search for relationships |
+| issueLabels | array | No | Source issue labels for component matching |
+| config | object | No | Toggle relationship types |
+
+**Output:**
+```json
+{
+  "relationships": [
+    {
+      "sourceIssueId": "src-123",
+      "targetIssueId": "456",
+      "targetIssueNumber": 42,
+      "targetIssueTitle": "...",
+      "relationshipType": "semantic",
+      "subType": null,
+      "confidence": 0.85,
+      "reasoning": "85% semantic similarity - similar topic"
+    },
+    {
+      "relationshipType": "dependency",
+      "subType": "blocks",
+      "confidence": 0.9,
+      "reasoning": "Keyword match: 'enables work on'"
+    }
+  ],
+  "confidence": { "score": 75, "tier": "medium", ... }
+}
+```
+
+**Relationship Types:**
+- **semantic**: Similar topic/feature (via embeddings)
+- **dependency**: blocks/blocked_by chains (via keywords + AI)
+- **component**: Same area (via shared labels)
+
+**Behavior:** AI operation (uses embeddings and LLM, may fall back to keyword/label matching)
+
+---
+
 ## Tool Registration
 
-All 115 tools are registered in `src/infrastructure/tools/ToolRegistry.ts`. The registry:
+All 119 tools are registered in `src/infrastructure/tools/ToolRegistry.ts`. The registry:
 
 1. Validates tool definitions at registration time
 2. Generates MCP-compliant tool descriptors with annotations
@@ -2903,6 +3050,7 @@ All 115 tools are registered in `src/infrastructure/tools/ToolRegistry.ts`. The 
 | Health tools | `src/infrastructure/tools/health-tools.ts` |
 | Sprint AI tools | `src/infrastructure/tools/sprint-ai-tools.ts` |
 | Roadmap AI tools | `src/infrastructure/tools/roadmap-ai-tools.ts` |
+| Issue Intelligence AI tools | `src/infrastructure/tools/issue-intelligence-tools.ts` |
 | Tool Registry | `src/infrastructure/tools/ToolRegistry.ts` |
 | Output schemas | `src/infrastructure/tools/schemas/*.ts` |
 | Behavior annotations | `src/infrastructure/tools/annotations/tool-annotations.ts` |
@@ -2910,5 +3058,5 @@ All 115 tools are registered in `src/infrastructure/tools/ToolRegistry.ts`. The 
 ---
 
 *Generated: 2026-02-01*
-*Tool count: 115*
+*Tool count: 119*
 *MCP SDK: 1.25.3*

@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-MCP GitHub Project Manager is an AI-enabled project management system that integrates GitHub Projects v2 with the Model Context Protocol (MCP). It provides 109 MCP tools for comprehensive project management, issue tracking, sprint planning, sub-issue hierarchies, project templates, project linking, project lifecycle management, advanced search and filtering, and AI-assisted task generation.
+MCP GitHub Project Manager is an AI-enabled project management system that integrates GitHub Projects v2 with the Model Context Protocol (MCP). It provides 119 MCP tools for comprehensive project management, issue tracking, sprint planning, sub-issue hierarchies, project templates, project linking, project lifecycle management, advanced search and filtering, AI-assisted task generation, and AI-powered issue intelligence.
 
 ## Architecture Summary
 
@@ -41,14 +41,14 @@ MCP GitHub Project Manager is an AI-enabled project management system that integ
 
 ## Current Phase
 
-**Phase 8 of 12: Project Lifecycle and Advanced Operations** - Complete
+**Phase 11 of 12: AI Issue Intelligence** - Complete
 
 | Plan | Name | Status |
 |------|------|--------|
-| 08-01 | Schema Definitions | Complete |
-| 08-02 | Project Lifecycle Tools | Complete |
-| 08-03 | Advanced Operations Tools | Complete |
-| 08-04 | Testing and Verification | Complete |
+| 11-01 | Interfaces and Schemas | Complete |
+| 11-02 | Enrichment and Label Services | Complete |
+| 11-03 | Duplicate Detection and Related Linking | Complete |
+| 11-04 | MCP Tools and Testing | Complete |
 
 ## Completed Phases
 
@@ -62,15 +62,18 @@ MCP GitHub Project Manager is an AI-enabled project management system that integ
 | 6 | Sub-issues & Status Updates | 8 new MCP tools, 2 repositories, 88 new tests |
 | 7 | Project Templates & Linking | 10 new MCP tools, 97 new tests, full documentation |
 | 8 | Project Lifecycle & Advanced Ops | 6 new MCP tools, 109 new tests, client-side filtering |
+| 9 | AI PRD/Task Enhancement | Confidence scoring, validation rules, dependency analysis, effort estimation |
+| 10 | AI Sprint and Roadmap Planning | 4 sprint tools, 2 roadmap tools, velocity-based planning |
+| 11 | AI Issue Intelligence | 4 issue intelligence tools (enrich, labels, duplicates, related), 181 new tests |
 
 ## MCP Compliance
 
 | Metric | Value |
 |--------|-------|
 | SDK Version | 1.25.3 |
-| Registered Tools | 109 |
-| Tools with Annotations | 109 (100%) |
-| Tools with Output Schemas | 109 (100%) |
+| Registered Tools | 119 |
+| Tools with Annotations | 119 (100%) |
+| Tools with Output Schemas | 119 (100%) |
 | Behavior Pattern Types | 6 (readOnly, destructive, idempotent, openWorld, etc.) |
 
 **Tool Categories:**
@@ -89,6 +92,8 @@ MCP GitHub Project Manager is an AI-enabled project management system that integ
 - Linking: 6 tools
 - Lifecycle: 3 tools
 - Advanced Operations: 3 tools
+- Sprint/Roadmap AI: 6 tools
+- Issue Intelligence AI: 4 tools
 
 ## AI Services
 
