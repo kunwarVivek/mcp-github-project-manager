@@ -57,7 +57,14 @@ export class FilePersistenceAdapter {
       }
 
       const data = await this.readFile(this.metadataFile);
-      const metadata = JSON.parse(data) as SyncMetadata[];
+      let metadata: SyncMetadata[];
+      try {
+        metadata = JSON.parse(data) as SyncMetadata[];
+      } catch (parseError) {
+        const message = parseError instanceof Error ? parseError.message : String(parseError);
+        this.logger.error(`Failed to parse metadata JSON: ${message}`);
+        throw new Error(`Corrupted metadata file: ${message}`);
+      }
 
       this.logger.info(`Loaded ${metadata.length} metadata entries from persistence`);
       return metadata;
@@ -321,7 +328,12 @@ export class FilePersistenceAdapter {
     }
 
     const data = await this.readFile(this.metadataFile);
-    return JSON.parse(data) as SyncMetadata[];
+    try {
+      return JSON.parse(data) as SyncMetadata[];
+    } catch (parseError) {
+      const message = parseError instanceof Error ? parseError.message : String(parseError);
+      throw new Error(`Failed to parse metadata file: ${message}`);
+    }
   }
 
   /**
@@ -358,7 +370,14 @@ export class FilePersistenceAdapter {
         try {
           const backupPath = path.join(this.options.cacheDirectory, backupFile);
           const data = await this.readFile(backupPath);
-          const metadata = JSON.parse(data) as SyncMetadata[];
+          let metadata: SyncMetadata[];
+          try {
+            metadata = JSON.parse(data) as SyncMetadata[];
+          } catch (parseError) {
+            const message = parseError instanceof Error ? parseError.message : String(parseError);
+            this.logger.warn(`Failed to parse backup ${backupFile}: ${message}`);
+            continue; // Try next backup
+          }
 
           this.logger.info(`Recovered ${metadata.length} metadata entries from backup: ${backupFile}`);
           return metadata;
