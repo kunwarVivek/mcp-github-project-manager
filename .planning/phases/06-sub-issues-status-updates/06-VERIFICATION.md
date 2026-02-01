@@ -1,22 +1,11 @@
 ---
 phase: 06-sub-issues-status-updates
 verified: 2026-01-31T22:30:00Z
-status: gaps_found
-score: 7/8 must-haves verified
-gaps:
-  - truth: "Status update CRUD operations (create, list, get) are callable"
-    status: failed
-    reason: "Tools are registered but executors not wired in index.ts - calls will throw MethodNotFound"
-    artifacts:
-      - path: "src/index.ts"
-        issue: "Missing imports for executeCreateStatusUpdate, executeListStatusUpdates, executeGetStatusUpdate"
-      - path: "src/index.ts"
-        issue: "Missing case statements for create_status_update, list_status_updates, get_status_update"
-    missing:
-      - "Import status update executors in src/index.ts (like sub-issue executors)"
-      - "Add case 'create_status_update': return await executeCreateStatusUpdate(args);"
-      - "Add case 'list_status_updates': return await executeListStatusUpdates(args);"
-      - "Add case 'get_status_update': return await executeGetStatusUpdate(args);"
+reverified: 2026-02-01
+status: passed
+score: 8/8 must-haves verified
+gaps: []
+note: "Gap closed in Phase 12-04 - status update executors now wired in index.ts"
 ---
 
 # Phase 6: Sub-issues and Status Updates Verification Report
