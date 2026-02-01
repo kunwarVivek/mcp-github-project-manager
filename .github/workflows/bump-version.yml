@@ -1,0 +1,73 @@
+name: Bump Version
+
+on:
+  workflow_dispatch:
+    inputs:
+      version_type:
+        description: 'Version bump type'
+        required: true
+        default: 'patch'
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+
+permissions:
+  contents: write
+
+jobs:
+  bump:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.x'
+          cache: 'npm'
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Bump version
+        id: bump
+        run: |
+          npm version ${{ inputs.version_type }} --no-git-tag-version
+          VERSION=$(node -p "require('./package.json').version")
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Update CHANGELOG
+        run: |
+          VERSION="${{ steps.bump.outputs.VERSION }}"
+          DATE=$(date +%Y-%m-%d)
+          # Add new version section to changelog
+          sed -i "s/## \[Unreleased\]/## [Unreleased]\n\nNo unreleased changes.\n\n## [$VERSION] - $DATE/" CHANGELOG.md
+
+      - name: Commit and tag
+        run: |
+          VERSION="${{ steps.bump.outputs.VERSION }}"
+          git add package.json package-lock.json CHANGELOG.md
+          git commit -m "release: v$VERSION"
+          git tag "v$VERSION"
+
+      - name: Push changes and tag
+        run: |
+          git push origin main
+          git push origin "v${{ steps.bump.outputs.VERSION }}"
+
+      - name: Summary
+        run: |
+          echo "## Release v${{ steps.bump.outputs.VERSION }} created! 🚀" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "The release workflow will now:" >> $GITHUB_STEP_SUMMARY
+          echo "1. Run tests" >> $GITHUB_STEP_SUMMARY
+          echo "2. Publish to npm" >> $GITHUB_STEP_SUMMARY
+          echo "3. Create GitHub release" >> $GITHUB_STEP_SUMMARY
