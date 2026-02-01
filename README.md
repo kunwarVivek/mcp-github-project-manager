@@ -937,10 +937,22 @@ See [docs/mcp/gaps-analysis.md](docs/mcp/gaps-analysis.md) for detailed implemen
 
 ## Documentation
 
+### Getting Started
+- [Configuration Guide](docs/CONFIGURATION.md) - All configuration options and MCP client setup
+- [Troubleshooting Guide](docs/TROUBLESHOOTING.md) - Common issues and solutions
 - [User Guide](docs/user-guide.md) - Detailed usage instructions
-- [API Reference](docs/api-reference/index.md) - Comprehensive tool documentation
+
+### Reference
+- [Tool Reference](docs/TOOLS.md) - All 119 MCP tools documented
+- [API Reference](docs/API.md) - Service and infrastructure APIs
+- [API Explorer](docs/api-reference/index.md) - Interactive API documentation
+
+### Guides
 - [Tutorials](docs/tutorials/getting-started.md) - Step-by-step guides
 - [Examples](examples/README.md) - Code examples for common tasks
+- [E2E Testing Guide](docs/e2e-testing-guide.md) - End-to-end testing documentation
+
+### Architecture & Development
 - [Architecture](ARCHITECTURE.md) - System architecture and design
 - [Contributing](docs/contributing/index.md) - Development guidelines
 - [MCP Documentation](docs/mcp/) - MCP-specific details
