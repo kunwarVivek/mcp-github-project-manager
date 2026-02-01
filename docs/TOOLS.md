@@ -1,13 +1,13 @@
 # MCP Tools Reference
 
-This document provides comprehensive documentation for all 109 MCP tools available in the MCP GitHub Project Manager.
+This document provides comprehensive documentation for all 115 MCP tools available in the MCP GitHub Project Manager.
 
 ## Overview
 
 | Metric | Value |
 |--------|-------|
-| Total Tools | 109 |
-| Categories | 15 |
+| Total Tools | 115 |
+| Categories | 16 |
 | SDK Version | 1.25.3 |
 | All tools have | Behavior annotations, Output schemas |
 
@@ -41,6 +41,7 @@ All tools are annotated with behavior hints that help MCP clients understand the
 13. [Project Linking Tools](#project-linking-tools) (6 tools)
 14. [Project Lifecycle Tools](#project-lifecycle-tools) (3 tools)
 15. [Advanced Operations Tools](#advanced-operations-tools) (3 tools)
+16. [Sprint and Roadmap AI Tools](#sprint-and-roadmap-ai-tools) (6 tools)
 
 ---
 
@@ -2478,6 +2479,235 @@ Filters items in a GitHub ProjectV2 by status, labels, assignee, or type. Multip
 
 ---
 
+## Sprint and Roadmap AI Tools
+
+AI-powered sprint planning and roadmap generation tools (Phase 10). These tools use AI for capacity analysis, prioritization, risk assessment, and roadmap creation.
+
+### calculate_sprint_capacity
+
+Calculate sprint capacity based on team velocity, availability, and buffer. Returns recommended story points with confidence scoring.
+
+**Input Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| velocity | number \| "auto" | Yes | Team velocity in story points, or 'auto' to calculate from history |
+| sprintDurationDays | number | Yes | Sprint duration in days |
+| teamMembers | array | Yes | Team members with id, name, availability (0-1) |
+| historicalSprints | array | No | Historical sprint data for velocity calculation |
+
+**Output:**
+- `totalPoints`: Calculated capacity
+- `recommendedLoad`: 80% of capacity (sustainable pace)
+- `teamAvailability`: Member availability breakdown
+- `buffer`: Buffer percentage and reasoning
+- `confidence`: Confidence score and tier
+
+**Behavior:** Read-only (analysis), safe to cache
+
+**Example:**
+```json
+{
+  "velocity": "auto",
+  "sprintDurationDays": 10,
+  "teamMembers": [
+    { "id": "1", "name": "Alice", "availability": 0.8 },
+    { "id": "2", "name": "Bob", "availability": 1.0 }
+  ],
+  "historicalSprints": [
+    { "sprintId": "s1", "sprintName": "Sprint 1", "completedPoints": 25, "plannedPoints": 30, "durationDays": 10, "startDate": "2026-01-01", "endDate": "2026-01-10" }
+  ]
+}
+```
+
+---
+
+### prioritize_backlog
+
+AI-powered multi-factor backlog prioritization using business value, dependencies, risk, and effort.
+
+**Input Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| backlogItems | array | Yes | Backlog items with id, title, points, priority |
+| sprintCapacity | number | Yes | Available capacity in story points |
+| businessGoals | string[] | No | Business goals to prioritize toward |
+| riskTolerance | "low" \| "medium" \| "high" | No | Risk tolerance level (default: "medium") |
+
+**Output:**
+- `prioritizedItems`: Items with priority tier, score, and factors
+- `reasoning`: Methodology and weightings used (BV: 0.4, Dep: 0.25, Risk: 0.2, Effort: 0.15)
+- `confidence`: Confidence score and tier
+
+**Behavior:** AI operation (non-deterministic)
+
+**Example:**
+```json
+{
+  "backlogItems": [
+    { "id": "1", "title": "User authentication", "points": 5, "priority": "high" },
+    { "id": "2", "title": "Dashboard", "points": 8, "priority": "medium" }
+  ],
+  "sprintCapacity": 20,
+  "businessGoals": ["Increase user engagement"],
+  "riskTolerance": "medium"
+}
+```
+
+---
+
+### assess_sprint_risk
+
+Analyze sprint plan for potential risks. Identifies scope, dependency, capacity, technical, and external risks with mitigation suggestions.
+
+**Input Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| sprintItems | array | Yes | Items planned for sprint |
+| capacity | object | Yes | Sprint capacity (from calculate_sprint_capacity) |
+| dependencies | array | No | Known dependencies between items |
+
+**Output:**
+- `overallRisk`: "high", "medium", or "low"
+- `riskScore`: 0-100 risk score
+- `risks`: Identified risks with category, probability, impact
+- `mitigations`: Suggested mitigation strategies with effort and effectiveness
+- `confidence`: Confidence score and tier
+
+**Behavior:** AI operation (non-deterministic)
+
+**Example:**
+```json
+{
+  "sprintItems": [
+    { "id": "1", "title": "Complex feature", "points": 13 },
+    { "id": "2", "title": "Bug fix", "points": 2 }
+  ],
+  "capacity": {
+    "totalPoints": 25,
+    "recommendedLoad": 20,
+    "buffer": { "percentage": 20, "reasoning": "Standard buffer" }
+  }
+}
+```
+
+---
+
+### suggest_sprint_composition
+
+AI-powered sprint composition suggestion. Selects backlog items that fit capacity while respecting dependencies and business priorities.
+
+**Input Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| backlogItems | array | Yes | Available backlog items |
+| velocity | number | Yes | Team velocity in story points |
+| sprintDurationDays | number | Yes | Sprint duration |
+| teamMembers | array | No | Team members for capacity consideration |
+| businessGoals | string[] | No | Business priorities |
+| riskTolerance | "low" \| "medium" \| "high" | No | Risk tolerance level |
+
+**Output:**
+- `suggestedItems`: Items to include with reasoning
+- `totalPoints`: Sum of selected items
+- `capacityUtilization`: Fraction of capacity used (0-1)
+- `reasoning`: Overall reasoning for selection
+- `risks`: Identified risks in suggestion
+- `confidence`: Confidence score and tier
+
+**Behavior:** AI operation (non-deterministic)
+
+**Example:**
+```json
+{
+  "backlogItems": [
+    { "id": "1", "title": "Feature A", "points": 5, "priority": "high" },
+    { "id": "2", "title": "Feature B", "points": 8, "priority": "medium", "dependencies": ["1"] },
+    { "id": "3", "title": "Feature C", "points": 3, "priority": "low" }
+  ],
+  "velocity": 20,
+  "sprintDurationDays": 10,
+  "businessGoals": ["Launch MVP"]
+}
+```
+
+---
+
+### generate_roadmap
+
+Generate a project roadmap from requirements with phases, milestones, and velocity-grounded date estimates.
+
+**Input Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| requirements | string \| array | Yes | Requirements as text or structured items |
+| constraints | object | No | Timeline, team size, velocity, sprint duration constraints |
+| businessContext | string | No | Additional business context |
+
+**Output:**
+- `phases`: Project phases with objectives and duration
+- `milestones`: Milestones with deliverables and target dates
+- `dependencies`: Milestone dependencies
+- `timeline`: Start/end dates and total weeks
+- `confidence`: Confidence score and tier
+- `reasoning`: Generation reasoning
+
+**Behavior:** AI operation (non-deterministic, velocity-grounded dates)
+
+**Example (text requirements):**
+```json
+{
+  "requirements": "User authentication with OAuth\nDashboard with analytics\nAPI integration with third parties",
+  "constraints": {
+    "velocity": 25,
+    "teamSize": 4,
+    "sprintDurationWeeks": 2
+  }
+}
+```
+
+**Example (structured requirements):**
+```json
+{
+  "requirements": [
+    { "id": "REQ-001", "title": "User authentication", "priority": "critical", "estimatedPoints": 13 },
+    { "id": "REQ-002", "title": "Dashboard", "priority": "high", "estimatedPoints": 21 }
+  ],
+  "constraints": { "velocity": 30 }
+}
+```
+
+---
+
+### generate_roadmap_visualization
+
+Generate Gantt-ready visualization data for a roadmap. Returns simplified data structures optimized for chart rendering.
+
+**Input Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| (roadmap) | object | Yes | Full roadmap object (from generate_roadmap) |
+
+**Output:**
+- `phases`: Phase bars with id, name, startWeek, endWeek, color
+- `milestones`: Milestone markers with id, title, week, phaseId
+- `dependencies`: Dependency edges with from/to milestone IDs
+- `totalWeeks`: Total timeline duration
+
+**Behavior:** Read-only (deterministic transformation)
+
+**Example:**
+```json
+{
+  "phases": [{ "id": "phase-1", "name": "Foundation", ... }],
+  "milestones": [{ "id": "m1", "title": "Milestone 1", ... }],
+  "dependencies": [],
+  "timeline": { "startDate": "2026-02-01", "endDate": "2026-04-15", "totalWeeks": 10 },
+  "confidence": { "score": 75, "tier": "medium", ... }
+}
+```
+
+---
+
 ## AI Enhancement Services (Phase 9)
 
 Phase 9 added advanced AI capabilities for PRD and task generation, including confidence scoring, template customization, validation rules, dependency analysis, and effort estimation.
@@ -2651,7 +2881,7 @@ console.log(`Overall confidence: ${result.overallConfidence.score}%`);
 
 ## Tool Registration
 
-All 109 tools are registered in `src/infrastructure/tools/ToolRegistry.ts`. The registry:
+All 115 tools are registered in `src/infrastructure/tools/ToolRegistry.ts`. The registry:
 
 1. Validates tool definitions at registration time
 2. Generates MCP-compliant tool descriptors with annotations
@@ -2671,12 +2901,14 @@ All 109 tools are registered in `src/infrastructure/tools/ToolRegistry.ts`. The 
 | Advanced operations tools | `src/infrastructure/tools/project-advanced-tools.ts` |
 | AI Task tools | `src/infrastructure/tools/ai-tasks/*.ts` |
 | Health tools | `src/infrastructure/tools/health-tools.ts` |
+| Sprint AI tools | `src/infrastructure/tools/sprint-ai-tools.ts` |
+| Roadmap AI tools | `src/infrastructure/tools/roadmap-ai-tools.ts` |
 | Tool Registry | `src/infrastructure/tools/ToolRegistry.ts` |
 | Output schemas | `src/infrastructure/tools/schemas/*.ts` |
 | Behavior annotations | `src/infrastructure/tools/annotations/tool-annotations.ts` |
 
 ---
 
-*Generated: 2026-01-31*
-*Tool count: 109*
+*Generated: 2026-02-01*
+*Tool count: 115*
 *MCP SDK: 1.25.3*
