@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 No unreleased changes.
 
-## [1.0.1] - 2026-02-01
+## [1.0.2] - 2026-02-01
 
 ### Added
 - AI-powered sprint planning with capacity analysis (AI-09 to AI-12)
