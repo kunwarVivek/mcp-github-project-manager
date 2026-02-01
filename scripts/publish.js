@@ -65,13 +65,26 @@ async function runPublish() {
     
     // Create Git tag and push
     console.log('📌 Creating git tag and pushing...');
-    execSync(`git add package.json`);
-    execSync(`git commit -m "release: version ${newVersion}"`);
+    execSync(`git add package.json package-lock.json`);
+    execSync(`git commit -m "release: v${newVersion}"`);
     execSync(`git tag v${newVersion}`);
     execSync('git push');
     execSync('git push --tags');
-    
-    console.log(`✅ Successfully published version ${newVersion}!`);
+
+    // Create GitHub Release
+    console.log('📋 Creating GitHub release...');
+    try {
+      const releaseNotes = `## v${newVersion}\n\nSee [CHANGELOG.md](https://github.com/kunwarVivek/mcp-github-project-manager/blob/main/CHANGELOG.md) for details.\n\n📦 **npm:** \`npm install mcp-github-project-manager@${newVersion}\``;
+      execSync(`gh release create v${newVersion} --title "v${newVersion}" --notes "${releaseNotes}"`, { stdio: 'inherit' });
+      console.log('✅ GitHub release created!');
+    } catch (error) {
+      console.log('⚠️  GitHub release creation failed (gh CLI may not be installed). Create manually at:');
+      console.log(`   https://github.com/kunwarVivek/mcp-github-project-manager/releases/new?tag=v${newVersion}`);
+    }
+
+    console.log(`\n✅ Successfully published version ${newVersion}!`);
+    console.log(`   npm: https://www.npmjs.com/package/mcp-github-project-manager`);
+    console.log(`   GitHub: https://github.com/kunwarVivek/mcp-github-project-manager/releases/tag/v${newVersion}`);
   } catch (error) {
     process.stderr.write('❌ Error during publishing:', error.message);
     process.exit(1);
