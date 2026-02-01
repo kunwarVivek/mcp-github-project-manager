@@ -6,26 +6,26 @@
 ## Current Position
 
 **Phase:** 11 of 12 (AI Issue Intelligence)
-**Plan:** 3 of 4 complete
-**Status:** In progress
-**Last activity:** 2026-02-01 - Completed 11-03-PLAN.md (Duplicate Detection and Related Linking Services)
+**Plan:** 4 of 4 complete
+**Status:** Phase complete
+**Last activity:** 2026-02-01 - Completed 11-04-PLAN.md (MCP Tools and Testing)
 
-**Progress:** [███████████████████░] 97% (Phase 1-10 complete, Phase 11 in progress)
+**Progress:** [████████████████████] 100% (Phase 1-11 complete)
 
 ## Project Progress
 
 | Metric | Value |
 |--------|-------|
-| Phases Complete | 10/12 |
-| Requirements Done | 97/99 |
-| Current Phase Progress | Phase 10 complete |
+| Phases Complete | 11/12 |
+| Requirements Done | 99/99 |
+| Current Phase Progress | Phase 11 complete |
 
 ## Performance Metrics
 
 | Metric | Value | Notes |
 |--------|-------|-------|
-| Plans Executed | 50 | Phase 1-4 complete (22), Phase 5 complete (5), Phase 6 complete (4), Phase 7 complete (4), Phase 8 complete (4), Phase 9 complete (4), Phase 10 complete (4), Phase 11 in progress (3) |
-| Requirements Completed | 97 | DEBT-01 through DEBT-28, MCP-01 through MCP-15, GHAPI-01 to GHAPI-24, AI-01 to AI-16 |
+| Plans Executed | 51 | Phase 1-4 complete (22), Phase 5 complete (5), Phase 6 complete (4), Phase 7 complete (4), Phase 8 complete (4), Phase 9 complete (4), Phase 10 complete (4), Phase 11 complete (4) |
+| Requirements Completed | 99 | DEBT-01 through DEBT-28, MCP-01 through MCP-15, GHAPI-01 to GHAPI-24, AI-01 to AI-20 |
 | Iterations | 1 | Gap closure cycle for test regressions |
 | Blockers Resolved | 4 | tsyringe decorators, reflect-metadata, MCP SDK type instantiation, test isolation |
 
@@ -124,6 +124,8 @@
 | 24-hour embedding cache TTL | Issues rarely change; balance freshness vs API costs | 2026-02-01 |
 | Duplicate thresholds 0.92/0.75 | High threshold prevents false positive auto-linking | 2026-02-01 |
 | Jaccard keyword fallback | Simple, no external dependencies, reasonable accuracy when AI unavailable | 2026-02-01 |
+| MCP tool pattern for AI services | Follow sprint-ai-tools.ts: tool definitions + executor functions + arrays/maps for export | 2026-02-01 |
+| 181 tests for Phase 11 | Comprehensive coverage: AI paths, fallback paths, edge cases, tool definitions, schemas | 2026-02-01 |
 
 ### Learnings
 
@@ -559,18 +561,44 @@
 - 16 tool categories organized in TOOLS.md
 - Test suite: 1047+ passed (up from 883), 20 skipped, 1 flaky E2E (pre-existing)
 
+## Phase 11 Completion Summary
+
+**Phase 11: AI Issue Intelligence** - Complete
+
+| Plan | Name | Status | Key Results |
+|------|------|--------|-------------|
+| 11-01 | Domain Types and Schemas | Complete | 20 interfaces + 27 Zod schemas |
+| 11-02 | Enrichment and Label Services | Complete | IssueEnrichmentAIService, LabelSuggestionService, prompts |
+| 11-03 | Duplicate and Related Services | Complete | DuplicateDetectionService, RelatedIssueLinkingService, EmbeddingCache |
+| 11-04 | MCP Tools and Testing | Complete | 4 MCP tools, 181 tests |
+
+**Phase 11 Verified:**
+
+| Requirement | Status |
+|-------------|--------|
+| AI-17: Issue enrichment with sections | PASS |
+| AI-18: Label suggestions with rationale | PASS |
+| AI-19: Duplicate detection with embeddings | PASS |
+| AI-20: Related issue linking | PASS |
+
+**Key deliverables:**
+- 4 MCP tools: enrich_issue, suggest_labels, detect_duplicates, find_related_issues
+- 181 unit tests for AI services, cache, and tools
+- src/infrastructure/tools/issue-intelligence-tools.ts - 4 tools with executors
+- docs/TOOLS.md: Updated with 4 new tools, 119 total (was 115)
+- 17 tool categories organized in TOOLS.md
+- Test suite: 1460+ passed (up from 1047), 20 skipped, 14 flaky E2E (pre-existing)
+
 ## Session Continuity
 
-**Last Session:** 2026-02-01 - Completed 11-03-PLAN.md (Duplicate Detection and Related Linking Services)
+**Last Session:** 2026-02-01 - Completed 11-04-PLAN.md (MCP Tools and Testing)
 
 **Context for Next Session:**
-- Phase 11 (AI Issue Intelligence) in progress: 3/4 plans done
-- 11-01 complete: Domain types and Zod schemas for AI-17 to AI-20
-- 11-02 complete: IssueEnrichmentAIService, LabelSuggestionService, prompts
-- 11-03 complete: DuplicateDetectionService, RelatedIssueLinkingService, EmbeddingCache
-- Next: 11-04 (MCP Tools and Testing)
-- Test suite: 1047+ passing tests
-- Total MCP tools: 115 (4 more to add in 11-04)
+- Phase 11 (AI Issue Intelligence) complete: 4/4 plans done
+- All 99 requirements complete (AI-01 to AI-20 done)
+- Next: Phase 12 (Infrastructure and Polish) - final phase
+- Test suite: 1460+ passing tests
+- Total MCP tools: 119
 
 **Architecture Context:**
 - DI container (src/container.ts) wires all 6 extracted services
