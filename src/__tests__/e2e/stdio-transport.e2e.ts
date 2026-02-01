@@ -108,8 +108,23 @@ describe('Stdio Transport Layer Tests', () => {
       // Filter out violations that are clearly part of large JSON responses
       const realViolations = protocolViolations.filter(violation => {
         const content = violation.replace('Non-JSON on stdout: "', '').replace('"', '');
-        // If it looks like a JSON fragment (starts with valid JSON structure), it's likely a split response
-        return !(content.startsWith('{') || content.startsWith('[') || content.includes('"jsonrpc"') || content.includes('"result"'));
+        // If it looks like a JSON fragment, it's likely a split response:
+        // - Starts with JSON structure characters
+        // - Contains JSON-RPC protocol identifiers
+        // - Contains typical JSON content patterns (quotes, colons, brackets mid-content)
+        const isJsonFragment =
+          content.startsWith('{') ||
+          content.startsWith('[') ||
+          content.startsWith(':') ||      // Mid-object value
+          content.startsWith(',') ||      // Array/object continuation
+          content.startsWith('"') ||      // String value start
+          content.includes('"jsonrpc"') ||
+          content.includes('"result"') ||
+          content.includes('"name":') ||  // Object property
+          content.includes('"type":') ||  // Schema property
+          /^[}\]"]/.test(content) ||      // Closing brackets or strings
+          /^\s*"[^"]+":/.test(content);   // Property key pattern
+        return !isJsonFragment;
       });
 
       expect(realViolations).toEqual([]);

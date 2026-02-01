@@ -1,4 +1,6 @@
-import { Graph, alg } from 'graphlib';
+import graphlib from 'graphlib';
+import type { Graph as GraphType } from 'graphlib';
+const { Graph, alg } = graphlib;
 import { AITask, TaskDependency } from '../domain/ai-types';
 import { extractKeywords, checkKeywordDependency } from './KeywordExtractor';
 
@@ -40,7 +42,7 @@ interface EdgeMeta {
  * Graph-based task dependency analysis
  */
 export class DependencyGraph {
-  private graph: Graph;
+  private graph: GraphType;
   private tasks: Map<string, AITask>;
   private implicitDependencies: DetectedDependency[] = [];
 
@@ -205,7 +207,7 @@ export class DependencyGraph {
       const nodeWeight = task?.complexity || 1;
       const currentDist = distances.get(node) || 0;
 
-      for (const successor of this.graph.successors(node) || []) {
+      for (const successor of (this.graph.successors(node) || []) as string[]) {
         const newDist = currentDist + nodeWeight;
         if (newDist > (distances.get(successor) || 0)) {
           distances.set(successor, newDist);
@@ -270,7 +272,7 @@ export class DependencyGraph {
       // Remove these nodes and update in-degrees
       for (const node of group) {
         remaining.delete(node);
-        for (const successor of this.graph.successors(node) || []) {
+        for (const successor of (this.graph.successors(node) || []) as string[]) {
           inDegree.set(successor, (inDegree.get(successor) || 1) - 1);
         }
       }
@@ -283,7 +285,7 @@ export class DependencyGraph {
    * Get orphan tasks (no predecessors - entry points)
    */
   getOrphanTasks(): string[] {
-    return this.graph.nodes().filter(node =>
+    return this.graph.nodes().filter((node: string) =>
       (this.graph.predecessors(node) || []).length === 0
     );
   }
@@ -292,7 +294,7 @@ export class DependencyGraph {
    * Get leaf tasks (no successors - exit points)
    */
   getLeafTasks(): string[] {
-    return this.graph.nodes().filter(node =>
+    return this.graph.nodes().filter((node: string) =>
       (this.graph.successors(node) || []).length === 0
     );
   }
@@ -337,7 +339,7 @@ export class DependencyGraph {
     nodes: Array<{ id: string; label: string; complexity: number }>;
     edges: Array<{ from: string; to: string; type: string; confidence: number }>;
   } {
-    const nodes = this.graph.nodes().map(id => {
+    const nodes = this.graph.nodes().map((id: string) => {
       const task = this.tasks.get(id);
       return {
         id,
@@ -346,7 +348,7 @@ export class DependencyGraph {
       };
     });
 
-    const edges = this.graph.edges().map(e => {
+    const edges = this.graph.edges().map((e: graphlib.Edge) => {
       const edgeData = this.graph.edge(e) as EdgeMeta | undefined;
       return {
         from: e.v,
