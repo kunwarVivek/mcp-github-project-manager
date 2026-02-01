@@ -427,6 +427,12 @@ Plans:
 4. Package publishes successfully to npm registry
 5. Fresh install via npm works end-to-end
 
+**Plans:** 3 plans
+Plans:
+- [ ] 12-01-PLAN.md — Fix E2E test failures and document skipped tests (PROD-01 to PROD-04)
+- [ ] 12-02-PLAN.md — Create configuration and troubleshooting guides (PROD-07, PROD-08)
+- [ ] 12-03-PLAN.md — Update changelog and publish to npm (PROD-09 to PROD-12)
+
 ---
 
 ## Progress
