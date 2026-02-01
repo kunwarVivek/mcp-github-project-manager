@@ -488,6 +488,12 @@ export class ResourceCache {
       return;
     }
 
+    // Clear any existing interval first to prevent duplicates
+    if (this.persistInterval) {
+      clearInterval(this.persistInterval);
+      this.persistInterval = undefined;
+    }
+
     this.persistence = new CachePersistence(cacheDirectory);
 
     // Start periodic persistence
@@ -499,6 +505,15 @@ export class ResourceCache {
         process.stderr.write(`[ResourceCache] Periodic persist failed: ${message}\n`);
       }
     }, this.PERSIST_INTERVAL_MS);
+
+    // Register cleanup on process termination signals
+    const cleanup = async () => {
+      await this.shutdown();
+      process.exit(0);
+    };
+
+    process.once('SIGTERM', cleanup);
+    process.once('SIGINT', cleanup);
 
     process.stderr.write(
       `[ResourceCache] Persistence enabled (interval: ${this.PERSIST_INTERVAL_MS}ms)\n`
