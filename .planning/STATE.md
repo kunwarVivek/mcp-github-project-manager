@@ -6,11 +6,11 @@
 ## Current Position
 
 **Phase:** 11 of 12 (AI Issue Intelligence)
-**Plan:** 1 of 4 complete
+**Plan:** 3 of 4 complete
 **Status:** In progress
-**Last activity:** 2026-02-01 - Completed 11-01-PLAN.md (Domain Types and Schemas)
+**Last activity:** 2026-02-01 - Completed 11-03-PLAN.md (Duplicate Detection and Related Linking Services)
 
-**Progress:** [███████████████████░] 96% (Phase 1-10 complete, Phase 11 started)
+**Progress:** [███████████████████░] 97% (Phase 1-10 complete, Phase 11 in progress)
 
 ## Project Progress
 
@@ -24,7 +24,7 @@
 
 | Metric | Value | Notes |
 |--------|-------|-------|
-| Plans Executed | 48 | Phase 1-4 complete (22), Phase 5 complete (5), Phase 6 complete (4), Phase 7 complete (4), Phase 8 complete (4), Phase 9 complete (4), Phase 10 complete (4), Phase 11 in progress (1) |
+| Plans Executed | 50 | Phase 1-4 complete (22), Phase 5 complete (5), Phase 6 complete (4), Phase 7 complete (4), Phase 8 complete (4), Phase 9 complete (4), Phase 10 complete (4), Phase 11 in progress (3) |
 | Requirements Completed | 97 | DEBT-01 through DEBT-28, MCP-01 through MCP-15, GHAPI-01 to GHAPI-24, AI-01 to AI-16 |
 | Iterations | 1 | Gap closure cycle for test regressions |
 | Blockers Resolved | 4 | tsyringe decorators, reflect-metadata, MCP SDK type instantiation, test isolation |
@@ -120,6 +120,10 @@
 | Default duplicate thresholds | 0.92 high, 0.75 medium for duplicate detection similarity scoring | 2026-02-01 |
 | Three relationship types | semantic, dependency, component for related issue linking | 2026-02-01 |
 | DependencySubType for linking | blocks, blocked_by, related_to sub-types for dependency relationships | 2026-02-01 |
+| text-embedding-3-small model | Best cost/performance ratio for issue semantic similarity | 2026-02-01 |
+| 24-hour embedding cache TTL | Issues rarely change; balance freshness vs API costs | 2026-02-01 |
+| Duplicate thresholds 0.92/0.75 | High threshold prevents false positive auto-linking | 2026-02-01 |
+| Jaccard keyword fallback | Simple, no external dependencies, reasonable accuracy when AI unavailable | 2026-02-01 |
 
 ### Learnings
 
@@ -557,14 +561,16 @@
 
 ## Session Continuity
 
-**Last Session:** 2026-02-01 - Completed 11-01-PLAN.md (Domain Types and Schemas)
+**Last Session:** 2026-02-01 - Completed 11-03-PLAN.md (Duplicate Detection and Related Linking Services)
 
 **Context for Next Session:**
-- Phase 11 (AI Issue Intelligence) in progress: 1/4 plans done
+- Phase 11 (AI Issue Intelligence) in progress: 3/4 plans done
 - 11-01 complete: Domain types and Zod schemas for AI-17 to AI-20
-- Next: 11-02 (AI Services Implementation)
+- 11-02 complete: IssueEnrichmentAIService, LabelSuggestionService, prompts
+- 11-03 complete: DuplicateDetectionService, RelatedIssueLinkingService, EmbeddingCache
+- Next: 11-04 (MCP Tools and Testing)
 - Test suite: 1047+ passing tests
-- Total MCP tools: 115 (4 more to add in 11-03)
+- Total MCP tools: 115 (4 more to add in 11-04)
 
 **Architecture Context:**
 - DI container (src/container.ts) wires all 6 extracted services
@@ -588,6 +594,12 @@
 - src/services/ai/prompts/SprintPlanningPrompts.ts - AI prompts for sprint planning
 - src/infrastructure/tools/sprint-ai-tools.ts - 4 sprint AI MCP tools
 - src/infrastructure/tools/roadmap-ai-tools.ts - 2 roadmap AI MCP tools
+- src/services/ai/IssueEnrichmentAIService.ts - Issue enrichment with structured sections
+- src/services/ai/LabelSuggestionService.ts - Multi-tier label suggestions with rationale
+- src/services/ai/DuplicateDetectionService.ts - Embedding-based duplicate detection with fallback
+- src/services/ai/RelatedIssueLinkingService.ts - Multi-type relationship detection (semantic/dependency/component)
+- src/cache/EmbeddingCache.ts - TTL-based embedding cache with content hash validation
+- src/services/ai/prompts/IssueIntelligencePrompts.ts - AI prompts for issue intelligence
 
 ---
 
