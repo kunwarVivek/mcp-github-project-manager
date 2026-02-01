@@ -5,12 +5,12 @@
 
 ## Current Position
 
-**Phase:** 10 of 12 (AI Sprint and Roadmap Planning)
-**Plan:** 4 of 4 complete
-**Status:** Phase complete
-**Last activity:** 2026-02-01 - Completed 10-04-PLAN.md (MCP Tools and Testing)
+**Phase:** 11 of 12 (AI Issue Intelligence)
+**Plan:** 1 of 4 complete
+**Status:** In progress
+**Last activity:** 2026-02-01 - Completed 11-01-PLAN.md (Domain Types and Schemas)
 
-**Progress:** [███████████████████░] 95% (Phase 1-10 complete)
+**Progress:** [███████████████████░] 96% (Phase 1-10 complete, Phase 11 started)
 
 ## Project Progress
 
@@ -24,7 +24,7 @@
 
 | Metric | Value | Notes |
 |--------|-------|-------|
-| Plans Executed | 47 | Phase 1-4 complete (22), Phase 5 complete (5), Phase 6 complete (4), Phase 7 complete (4), Phase 8 complete (4), Phase 9 complete (4), Phase 10 complete (4) |
+| Plans Executed | 48 | Phase 1-4 complete (22), Phase 5 complete (5), Phase 6 complete (4), Phase 7 complete (4), Phase 8 complete (4), Phase 9 complete (4), Phase 10 complete (4), Phase 11 in progress (1) |
 | Requirements Completed | 97 | DEBT-01 through DEBT-28, MCP-01 through MCP-15, GHAPI-01 to GHAPI-24, AI-01 to AI-16 |
 | Iterations | 1 | Gap closure cycle for test regressions |
 | Blockers Resolved | 4 | tsyringe decorators, reflect-metadata, MCP SDK type instantiation, test isolation |
@@ -116,6 +116,10 @@
 | Visualization-ready types | RoadmapVisualizationData provides simplified types for rendering | 2026-02-01 |
 | Velocity-grounded dates (not AI) | AI structures phases/milestones, dates calculated algorithmically from velocity | 2026-02-01 |
 | Foundation-first phase sequencing | Phase ordering follows foundation -> core -> advanced -> polish pattern | 2026-02-01 |
+| Tiered confidence arrays | high/medium/low arrays for label suggestions and duplicate detection | 2026-02-01 |
+| Default duplicate thresholds | 0.92 high, 0.75 medium for duplicate detection similarity scoring | 2026-02-01 |
+| Three relationship types | semantic, dependency, component for related issue linking | 2026-02-01 |
+| DependencySubType for linking | blocks, blocked_by, related_to sub-types for dependency relationships | 2026-02-01 |
 
 ### Learnings
 
@@ -553,14 +557,14 @@
 
 ## Session Continuity
 
-**Last Session:** 2026-02-01 - Completed 10-04-PLAN.md (MCP Tools and Testing)
+**Last Session:** 2026-02-01 - Completed 11-01-PLAN.md (Domain Types and Schemas)
 
 **Context for Next Session:**
-- Phase 10 (AI Sprint and Roadmap Planning) complete: 4/4 plans done
-- All 8 AI requirements verified (AI-09 to AI-16)
-- Total MCP tools: 115
+- Phase 11 (AI Issue Intelligence) in progress: 1/4 plans done
+- 11-01 complete: Domain types and Zod schemas for AI-17 to AI-20
+- Next: 11-02 (AI Services Implementation)
 - Test suite: 1047+ passing tests
-- Next: Phase 11 (Webhooks and Events)
+- Total MCP tools: 115 (4 more to add in 11-03)
 
 **Architecture Context:**
 - DI container (src/container.ts) wires all 6 extracted services
@@ -570,7 +574,9 @@
 - Test isolation: jest.resetAllMocks() in beforeEach for proper mock reset
 - src/domain/sprint-planning-types.ts - 25 types for sprint capacity/risk/prioritization
 - src/domain/roadmap-planning-types.ts - 17 types for roadmap phases/milestones
+- src/domain/issue-intelligence-types.ts - 20 types for issue enrichment/labels/duplicates/related
 - src/infrastructure/tools/schemas/sprint-roadmap-schemas.ts - 40 Zod schemas for MCP tools
+- src/infrastructure/tools/schemas/issue-intelligence-schemas.ts - 27 Zod schemas for AI-17 to AI-20
 - SectionConfidence integration from Phase 9 for AI confidence scoring
 - src/services/ai/RoadmapAIService.ts - AI-powered roadmap generation with phase sequencing
 - src/services/ai/prompts/RoadmapPrompts.ts - AI prompt templates for roadmap generation
