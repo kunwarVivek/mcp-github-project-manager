@@ -90,6 +90,7 @@ Audit 2026-07-15: `npm outdated` + `npm audit` (was 31 vulns: 1 critical, 8 high
 | G7-05 | **AI SDK major migration**: `ai` 4.3→5, `@ai-sdk/*` 1→2 | HIGH | DONE (coupled with zod 4 — AI SDK v1 peer-blocked zod 4. Fixed `maxTokens`→`maxOutputTokens` at ~30 sites; providers/schemas unchanged. 2250+ tests pass, e2e MCP compliance 5/5) |
 | G7-06 | `zod` 3.25→4 | HIGH | DONE (feasibility gate PASSED — MCP SDK 1.29 + zod-to-json-schema 3.25.2 both peer-accept zod 4; the "pinned/WONTFIX" gotcha was STALE. Fixed: z.record two-arg (7), ZodError.issues (4), .nonstrict removed, ParameterCoercion $ZodType casts, deleted dead convertZodToJsonSchema. Build + MCP schema gen verified) |
 | G7-08 | Self-dependency: `mcp-github-project-manager` listed as its own dependency | LOW | DONE (removed; dragged in stale published tree) |
+| G7-09 | GitHub SDK review (Octokit) | LOW | DONE — `@octokit/rest` 22.0.1 already latest (core 7.0.6, plugins current); no SDK change needed. Fixed a type skew: `rest-types.ts` imported `components` from top-level `@octokit/openapi-types@25` while `@octokit/rest@22` runs on 27. Bumped devDeps `@octokit/openapi-types` 25→27, `@octokit/types` 14→16 to align. tsc 0 errors; github repo tests 48/48 |
 | G7-07 | Tooling majors: TypeScript→7 (Go compiler), jest→30, eslint→10 | — | DEFERRED (no shipped-code value; high churn) |
 
 ## G6 — Feature Proposals (PROPOSED — require go-ahead before build)
