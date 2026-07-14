@@ -85,3 +85,21 @@ Presented for go/no-go **before** any build. Not scheduled until approved.
   - Layer D1: ProjectManagementService (1,696 lines) decomposition — CRITICAL blast radius.
   - G7-05: AI SDK major migration (`ai` 4→7, `@ai-sdk/*` 1→4) — rewrites `services/ai/`.
 - **Layer C gate status**: `test:core` = 1745 pass (the 15 "failures" were missing `build/`; green after `npm run build`; AI suites 61/61; e2e green with build).
+- 2026-07-15: **AI SDK v5 + zod v4 coupled migration DONE** (`afd27a1`, G7-05/06/08). Feasibility gate passed (MCP SDK 1.29 + zod-to-json-schema accept zod 4; the pin was stale). Fixed zod-4 breaks (z.record two-arg, ZodError.issues, .nonstrict, ParameterCoercion casts, deleted dead converter) + AI SDK v5 (maxTokens→maxOutputTokens ~30 sites). Removed self-dep. Verified: build OK, 2250+ tests, e2e MCP compliance 5/5.
+
+## D1 — ProjectManagementService decomposition (NEXT, planned)
+
+**Impact (GitNexus):** HIGH — 22 impacted, 17 direct callers (index.ts tool handlers, container, tests), 3 flows.
+**Safe approach — extract-and-delegate:** keep every PMS public method signature identical so the 17 callers are untouched; move implementations into new focused services; PMS delegates (same pattern as existing milestoneService/subIssueService). Neutralizes the HIGH rating (zero API-surface change).
+**PMS today:** 1,696 lines, 89 methods — 40 already thin delegators; ~49 have inline logic via repo getters.
+**Extraction targets (by cohesive cluster):**
+1. `IssueService` — createIssue, listIssues (sort logic), getIssue, updateIssue, comment ops (4), draft-issue GraphQL (2). Largest cluster; do first.
+2. `ProjectFieldService` — listProjectFields, createProjectField, updateProjectField.
+3. `ProjectViewService` — create/list/update/delete view.
+4. `RoadmapService` — createRoadmap (~73-line inline builder).
+Each: new service takes (issueRepo/projectRepo + factory), move bodies, wire in `container.ts`, PMS delegates, update tests, verify per extraction with GitNexus impact + `test:core`.
+
+## Remaining doc reconciliation (user-requested)
+- `.planning/STATUS.md` says phases 10-12 "Not Started" — reality: phase 10 partial (ProjectAutomationService exists), 11 absent, 12 shipped (v1.1.0). Reconcile.
+- `.planning/REQUIREMENTS.md` "99/99 complete" over-claims (DEBT-07 god-class not done until D1 lands). Reconcile.
+- Ensure PRD→FRD linkage is comprehensive across `.planning`.
