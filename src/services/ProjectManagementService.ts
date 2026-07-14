@@ -58,17 +58,18 @@ import {
 } from "../domain/automation-types";
 
 // Import extracted services
-import { SubIssueService, IssueDependency, IssueHistoryEntry } from "./SubIssueService";
-import { MilestoneService, MilestoneMetrics } from "./MilestoneService";
-import { SprintPlanningService, SprintMetrics } from "./SprintPlanningService";
+import { SubIssueService } from "./SubIssueService";
+import type { IssueDependency, IssueHistoryEntry } from "./SubIssueService";
+import { MilestoneService } from "./MilestoneService";
+import type { MilestoneMetrics } from "./MilestoneService";
+import { SprintPlanningService } from "./SprintPlanningService";
+import type { SprintMetrics } from "./SprintPlanningService";
 import { ProjectStatusService } from "./ProjectStatusService";
 import { ProjectTemplateService } from "./ProjectTemplateService";
 import { ProjectLinkingService } from "./ProjectLinkingService";
 
-// Re-export interfaces for backward compatibility
-export { MilestoneMetrics } from "./MilestoneService";
-export { SprintMetrics } from "./SprintPlanningService";
-export { IssueDependency, IssueHistoryEntry } from "./SubIssueService";
+export type { IssueDependency, IssueHistoryEntry, MilestoneMetrics, SprintMetrics };
+export { SubIssueService, MilestoneService, SprintPlanningService, ProjectStatusService, ProjectTemplateService, ProjectLinkingService };
 
 // Validation schema for roadmap creation
 const CreateRoadmapSchema = z.object({

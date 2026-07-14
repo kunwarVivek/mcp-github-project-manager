@@ -10,9 +10,9 @@
  * draft issues to real issues in specified repositories.
  */
 
-import { ToolDefinition, ToolSchema } from "./ToolValidator.js";
-import { ANNOTATION_PATTERNS } from "./annotations/tool-annotations.js";
-import { GitHubRepositoryFactory } from "../github/GitHubRepositoryFactory.js";
+import { ToolDefinition, ToolSchema } from "./ToolValidator";
+import { ANNOTATION_PATTERNS } from "./annotations/tool-annotations";
+import { GitHubRepositoryFactory } from "../github/GitHubRepositoryFactory";
 import {
   CloseProjectInputSchema,
   CloseProjectInput,
@@ -24,7 +24,7 @@ import {
   ProjectLifecycleOutput,
   ConvertedIssueOutputSchema,
   ConvertedIssueOutput,
-} from "./schemas/project-lifecycle-schemas.js";
+} from "./schemas/project-lifecycle-schemas";
 
 // ============================================================================
 // GraphQL Queries and Mutations

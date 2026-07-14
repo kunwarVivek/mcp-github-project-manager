@@ -10,9 +10,9 @@
  * does not support server-side filtering for project items.
  */
 
-import { ToolDefinition, ToolSchema } from "./ToolValidator.js";
-import { ANNOTATION_PATTERNS } from "./annotations/tool-annotations.js";
-import { GitHubRepositoryFactory } from "../github/GitHubRepositoryFactory.js";
+import { ToolDefinition, ToolSchema } from "./ToolValidator";
+import { ANNOTATION_PATTERNS } from "./annotations/tool-annotations";
+import { GitHubRepositoryFactory } from "../github/GitHubRepositoryFactory";
 import {
   UpdateItemPositionInputSchema,
   UpdateItemPositionInput,
@@ -29,7 +29,7 @@ import {
   FilterProjectItemsOutputSchema,
   FilterProjectItemsOutput,
   ProjectItem,
-} from "./schemas/project-lifecycle-schemas.js";
+} from "./schemas/project-lifecycle-schemas";
 
 // ============================================================================
 // GraphQL Queries and Mutations

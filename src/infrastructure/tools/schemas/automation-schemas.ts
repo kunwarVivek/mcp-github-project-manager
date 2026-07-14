@@ -36,4 +36,4 @@ export const AutomationRuleDeleteOutputSchema = z.object({
 export {
   AutomationRuleOutputSchema,
   AutomationRuleListOutputSchema,
-} from "./project-schemas.js";
+} from "./project-schemas";

@@ -11,9 +11,9 @@
  * with views, custom fields, draft issues (optional), workflows, and insights.
  */
 
-import { ToolDefinition, ToolSchema } from "./ToolValidator.js";
-import { ANNOTATION_PATTERNS } from "./annotations/tool-annotations.js";
-import { GitHubRepositoryFactory } from "../github/GitHubRepositoryFactory.js";
+import { ToolDefinition, ToolSchema } from "./ToolValidator";
+import { ANNOTATION_PATTERNS } from "./annotations/tool-annotations";
+import { GitHubRepositoryFactory } from "../github/GitHubRepositoryFactory";
 import {
   MarkProjectAsTemplateInputSchema,
   MarkProjectAsTemplateInput,
@@ -29,7 +29,7 @@ import {
   CopiedProjectOutput,
   TemplateListOutputSchema,
   TemplateListOutput,
-} from "./schemas/project-template-linking-schemas.js";
+} from "./schemas/project-template-linking-schemas";
 
 // ============================================================================
 // GraphQL Queries and Mutations

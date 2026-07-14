@@ -9,9 +9,9 @@
  * with proper annotations, input/output schemas, and executors.
  */
 
-import { ToolDefinition, ToolSchema } from "./ToolValidator.js";
-import { ANNOTATION_PATTERNS } from "./annotations/tool-annotations.js";
-import { RoadmapAIService } from "../../services/ai/RoadmapAIService.js";
+import { ToolDefinition, ToolSchema } from "./ToolValidator";
+import { ANNOTATION_PATTERNS } from "./annotations/tool-annotations";
+import { RoadmapAIService } from "../../services/ai/RoadmapAIService";
 import {
   RoadmapGenerationInputSchema,
   RoadmapGenerationInput,
@@ -19,7 +19,7 @@ import {
   RoadmapOutput,
   RoadmapVisualizationOutputSchema,
   RoadmapVisualizationOutput,
-} from "./schemas/sprint-roadmap-schemas.js";
+} from "./schemas/sprint-roadmap-schemas";
 
 // ============================================================================
 // Tool Definitions

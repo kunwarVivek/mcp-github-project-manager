@@ -717,36 +717,46 @@ If you prefer to run the MCP server in a Docker container:
 
 1. **Build the Docker Image:**
 
-   Create a `Dockerfile` in your project directory:
+```bash
+docker build -t mcp-gh-project .
+```
 
-   ```dockerfile
-   FROM node:18-alpine
+2. **Run the container:**
 
-   WORKDIR /app
+```bash
+docker run -d \
+  -e GITHUB_TOKEN=your_github_token \
+  -e GITHUB_OWNER=your_github_owner \
+  -e GITHUB_REPO=your_repository_name \
+  mcp-gh-project:latest
+```
 
-   # Install the package globally
-   RUN npm install -g mcp-github-project-manager
+Or with CLI arguments:
 
-   # Default command to run the server
-   CMD ["mcp-github-project-manager"]
-   ```
+```bash
+docker run -d mcp-gh-project:latest \
+  --github_token your_github_token \
+  --github_owner your_owner \
+  --github_repo your_repo
+```
 
-   Build the image:
+3. **Configure Your MCP Client:**
 
-   ```bash
-   docker build -t github-project-manager-mcp .
-   ```
-
-2. **Configure Your MCP Client:**
-
-   Update your MCP client's configuration to use the Docker command:
-
-   ```json
-   {
-     "mcpServers": {
-       "github-project-manager": {
-         "command": "docker",
-         "args": ["run", "-i", "--rm", "github-project-manager-mcp"],
+```json
+{
+  "mcpServers": {
+    "github-project-manager": {
+      "command": "docker",
+      "args": ["run", "-i", "--rm", "-e", "GITHUB_TOKEN", "-e", "GITHUB_OWNER", "-e", "GITHUB_REPO", "mcp-gh-project:latest"],
+      "env": {
+        "GITHUB_TOKEN": "your_token",
+        "GITHUB_OWNER": "your_owner",
+        "GITHUB_REPO": "your_repo"
+      }
+    }
+  }
+}
+```
          "env": {
            "GITHUB_TOKEN": "your_github_token",
            "GITHUB_OWNER": "your_username",

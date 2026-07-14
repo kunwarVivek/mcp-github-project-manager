@@ -1,8 +1,8 @@
 import { z } from "zod";
 import { McpError, ErrorCode } from "@modelcontextprotocol/sdk/types.js";
-import { MCPResponseFormatter } from "../mcp/MCPResponseFormatter.js";
-import { MCPErrorCode, MCPErrorData } from "../../domain/mcp-types.js";
-import { ParameterCoercion } from "./ParameterCoercion.js";
+import { MCPResponseFormatter } from "../mcp/MCPResponseFormatter";
+import { MCPErrorCode, MCPErrorData } from "../../domain/mcp-types";
+import { ParameterCoercion } from "./ParameterCoercion";
 
 export type ToolSchema<T> = z.ZodType<T>;
 

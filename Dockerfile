@@ -1,30 +1,22 @@
-# Use Node.js 22 LTS as the base image
-FROM node:22-alpine
+# Dockerfile - includes node_modules to solve ESM issues
+FROM node:22-slim
 
-# Create app directory
 WORKDIR /app
 
-# Copy package files
 COPY package.json package-lock.json ./
 
-# Copy TypeScript config for build
-COPY tsconfig.json tsconfig.build.json ./
+# Install all deps to get ESM modules properly
+RUN npm install --legacy-peer-deps --ignore-scripts
 
-# Install dependencies
-RUN npm ci --only=production=false
-
-# Copy source code and build scripts
 COPY src/ ./src/
-COPY scripts/fix-imports.js ./scripts/
+COPY tsconfig.json ./
+COPY tsconfig.build.json ./
+COPY scripts/ ./
 
-# Build the project
-RUN npm run build
+# Use tsx to run TypeScript directly (compiles on-the-fly)
+RUN npm install -D tsx
 
-# Remove dev dependencies after build
-RUN npm prune --production
-
-# Set environment variables
 ENV NODE_ENV=production
+ENV NODE_OPTIONS="--no-warnings"
 
-# Start the MCP server
-CMD ["node", "build/index.js"]
+CMD ["npx", "tsx", "src/index.ts"]

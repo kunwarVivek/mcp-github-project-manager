@@ -60,14 +60,14 @@ import {
   executeCloseProject,
   executeReopenProject,
   executeConvertDraftIssue,
-} from "./infrastructure/tools/project-lifecycle-tools.js";
+} from "./infrastructure/tools/project-lifecycle-tools";
 
 // Phase 8 - Project Advanced Tools
 import {
   executeUpdateItemPosition,
   executeSearchIssuesAdvanced,
   executeFilterProjectItems,
-} from "./infrastructure/tools/project-advanced-tools.js";
+} from "./infrastructure/tools/project-advanced-tools";
 
 // Phase 10 - Sprint AI Tools
 import {
@@ -75,13 +75,13 @@ import {
   executePrioritizeBacklog,
   executeAssessSprintRisk,
   executeSuggestSprintComposition,
-} from "./infrastructure/tools/sprint-ai-tools.js";
+} from "./infrastructure/tools/sprint-ai-tools";
 
 // Phase 10 - Roadmap AI Tools
 import {
   executeGenerateRoadmap,
   executeGenerateRoadmapVisualization,
-} from "./infrastructure/tools/roadmap-ai-tools.js";
+} from "./infrastructure/tools/roadmap-ai-tools";
 
 // Phase 11 - Issue Intelligence Tools
 import {
@@ -89,10 +89,10 @@ import {
   executeSuggestLabels,
   executeDetectDuplicates,
   executeFindRelatedIssues,
-} from "./infrastructure/tools/issue-intelligence-tools.js";
+} from "./infrastructure/tools/issue-intelligence-tools";
 
 // Health Tools
-import { executeHealthCheck } from "./infrastructure/tools/health-tools.js";
+import { executeHealthCheck } from "./infrastructure/tools/health-tools";
 
 import { ToolResultFormatter } from "./infrastructure/tools/ToolResultFormatter";
 import { MCPContentType, MCPErrorCode } from "./domain/mcp-types";

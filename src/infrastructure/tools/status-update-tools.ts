@@ -8,9 +8,9 @@
  */
 
 import { z } from "zod";
-import { ToolDefinition, ToolSchema } from "./ToolValidator.js";
-import { ANNOTATION_PATTERNS } from "./annotations/tool-annotations.js";
-import { GitHubRepositoryFactory } from "../github/GitHubRepositoryFactory.js";
+import { ToolDefinition, ToolSchema } from "./ToolValidator";
+import { ANNOTATION_PATTERNS } from "./annotations/tool-annotations";
+import { GitHubRepositoryFactory } from "../github/GitHubRepositoryFactory";
 import {
   CreateStatusUpdateInputSchema,
   CreateStatusUpdateInput,
@@ -22,8 +22,8 @@ import {
   StatusUpdateOutput,
   StatusUpdateListOutputSchema,
   StatusUpdateListOutput,
-} from "./schemas/status-update-schemas.js";
-import { StatusUpdateStatus } from "../github/repositories/types.js";
+} from "./schemas/status-update-schemas";
+import { StatusUpdateStatus } from "../github/repositories/types";
 
 // ============================================================================
 // Helper Functions

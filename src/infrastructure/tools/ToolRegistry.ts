@@ -9,7 +9,7 @@ import {
   ZodEnum,
   type ZodTypeAny,
 } from "zod";
-import { ToolDefinition, ToolAnnotations } from "./ToolValidator.js";
+import { ToolDefinition, ToolAnnotations } from "./ToolValidator";
 import {
   // Original tools
   createRoadmapTool,
@@ -143,7 +143,7 @@ import {
   unmarkProjectAsTemplateTool,
   copyProjectFromTemplateTool,
   listOrganizationTemplatesTool,
-} from "./ToolSchemas.js";
+} from "./ToolSchemas";
 
 // Sub-issue tool executors
 import {
@@ -152,10 +152,10 @@ import {
   executeGetParentIssue,
   executeReprioritizeSubIssue,
   executeRemoveSubIssue,
-} from "./sub-issue-tools.js";
+} from "./sub-issue-tools";
 
 // Health check tool
-import { healthCheckTool } from "./health-tools.js";
+import { healthCheckTool } from "./health-tools";
 
 // Project linking tools
 import {
@@ -171,21 +171,21 @@ import {
   executeUnlinkProjectFromTeam,
   executeListLinkedRepositories,
   executeListLinkedTeams,
-} from "./project-linking-tools.js";
+} from "./project-linking-tools";
 
 // Project lifecycle tools
 import {
   closeProjectTool,
   reopenProjectTool,
   convertDraftIssueTool,
-} from "./project-lifecycle-tools.js";
+} from "./project-lifecycle-tools";
 
 // Advanced operations tools
 import {
   updateItemPositionTool,
   searchIssuesAdvancedTool,
   filterProjectItemsTool,
-} from "./project-advanced-tools.js";
+} from "./project-advanced-tools";
 
 // Sprint AI tools (Phase 10)
 import {
@@ -194,14 +194,14 @@ import {
   prioritizeBacklogTool,
   assessSprintRiskTool,
   suggestSprintCompositionTool,
-} from "./sprint-ai-tools.js";
+} from "./sprint-ai-tools";
 
 // Roadmap AI tools (Phase 10)
 import {
   roadmapAITools,
   generateRoadmapTool as generateAIRoadmapTool,
   generateRoadmapVisualizationTool,
-} from "./roadmap-ai-tools.js";
+} from "./roadmap-ai-tools";
 
 // Issue Intelligence tools (Phase 11: AI-17 to AI-20)
 import {
@@ -209,7 +209,7 @@ import {
   suggestLabelsTool,
   detectDuplicatesTool,
   findRelatedIssuesTool,
-} from "./issue-intelligence-tools.js";
+} from "./issue-intelligence-tools";
 
 /**
  * Central registry of all available tools

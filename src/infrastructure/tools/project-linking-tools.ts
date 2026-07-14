@@ -12,9 +12,9 @@
  * All tools use GraphQL mutations/queries directly via the factory.
  */
 
-import { ToolDefinition, ToolSchema } from "./ToolValidator.js";
-import { ANNOTATION_PATTERNS } from "./annotations/tool-annotations.js";
-import { GitHubRepositoryFactory } from "../github/GitHubRepositoryFactory.js";
+import { ToolDefinition, ToolSchema } from "./ToolValidator";
+import { ANNOTATION_PATTERNS } from "./annotations/tool-annotations";
+import { GitHubRepositoryFactory } from "../github/GitHubRepositoryFactory";
 import {
   LinkProjectToRepositoryInputSchema,
   LinkProjectToRepositoryInput,
@@ -38,7 +38,7 @@ import {
   LinkedTeamsListOutput,
   LinkOperationOutputSchema,
   LinkOperationOutput,
-} from "./schemas/project-template-linking-schemas.js";
+} from "./schemas/project-template-linking-schemas";
 
 // ============================================================================
 // Helper Functions
