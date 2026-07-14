@@ -22,14 +22,14 @@ Canonical docs contradict each other and the code. Truth column is code-verified
 | G0-03 | Wrong AI env var in docs | architecture.md `GOOGLE_AI_API_KEY` | code uses `GOOGLE_API_KEY` | MEDIUM | DONE |
 | G0-04 | Dead README refs | links `STATUS.md`; docs `npm run test:integration`, `npm run type-check` | STATUS.md absent (real one `.planning/STATUS.md`); neither script in package.json | MEDIUM | DONE |
 | G0-05 | Stale graph stats | GAP-ANALYSIS-LIVE "513 nodes/347 edges" | GitNexus index 4632 symbols / 11344 rels | LOW | OPEN |
-| G0-06 | DEBT-09..12 overclaim | REQUIREMENTS: `as any` replaced (complete) | 38 `as any` across 18 files | MEDIUM | OPEN |
+| G0-06 | DEBT-09..12 overclaim | REQUIREMENTS: `as any` replaced (complete) | Was 38 `as any`, but 31 in tests + 3 template-string false-positives + 1 SDK cast + 1 comment. Real prod casts = 2 (SprintSuggestionService). Fixed Layer B. | MEDIUM | DONE |
 | G0-07 | DEBT-07 overclaim | REQUIREMENTS: "reduce PMS to coordination only" complete | ProjectManagementService still 1,696 lines | HIGH | OPEN |
 
 ## G1 — Domain Layer (`src/domain/`)
 
 | ID | Gap | Location | Severity | Status |
 |----|-----|----------|----------|--------|
-| G1-01 | AI response objects untyped; `as any` at boundaries | ai-types.ts + service consumers | MEDIUM | OPEN |
+| G1-01 | AI response objects untyped; `as any` at boundaries | ai-types.ts + service consumers | MEDIUM | DONE (sprint risk path: domain `as const` tuples now single source of truth for type + zod schema; 6 casts removed across SprintSuggestionService + SprintRiskAssessor) |
 | G1-02 | `ai-types.ts` 1,224 lines — cohesion risk | src/domain/ai-types.ts | LOW | OPEN |
 
 ## G2 — Infrastructure Layer (`src/infrastructure/`)
@@ -44,6 +44,7 @@ Canonical docs contradict each other and the code. Truth column is code-verified
 | G2-06 | Webhook signature validation fails OPEN when secret unset | GitHubWebhookHandler.ts:46-48 | HIGH (security) | OPEN |
 | G2-07 | EventStore unbounded memory (no LRU eviction) | EventStore.ts | MEDIUM | OPEN |
 | G2-08 | ResourceCache: no persistence/eviction policy | ResourceCache.ts (808 lines) | MEDIUM | OPEN |
+| G2-09 | **Build blocker** TS2589 "excessively deep type instantiation" (zodToJsonSchema) — pre-existing in WIP checkpoint; breaks `tsc`/`build` | ToolRegistry.ts:277 | HIGH | OPEN |
 
 ## G3 — Service Layer (`src/services/`)
 
@@ -74,6 +75,7 @@ Canonical docs contradict each other and the code. Truth column is code-verified
 | G5-03 | ContextQualityValidator: pipeline integration untested | validation/ContextQualityValidator.ts | MEDIUM | OPEN |
 | G5-04 | Many services lack dedicated unit tests | src/services/* | HIGH | OPEN |
 | G5-05 | E2E logger stderr timing flake | e2e/stdio-transport.e2e.ts | LOW | OPEN |
+| G5-06 | **Test-infra blocker**: `tests/ai-services/*` fail to load — `@ai-sdk/anthropic` → `nanoid` ESM not transformed by Jest (pre-existing; needs transformIgnorePatterns/moduleNameMapper) | jest.config.cjs | HIGH | OPEN |
 
 ## G6 — Feature Proposals (PROPOSED — require go-ahead before build)
 

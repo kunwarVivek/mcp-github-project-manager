@@ -19,6 +19,10 @@
 
 import { z } from "zod";
 import { SectionConfidenceSchema } from "../../../domain/ai-types";
+import {
+  SPRINT_RISK_CATEGORIES,
+  RISK_PROBABILITIES,
+} from "../../../domain/sprint-planning-types";
 
 // ============================================================================
 // Common Schemas (Reused across multiple tools)
@@ -50,15 +54,16 @@ export const MitigationStrategySchema = z.enum([
 export const EffortLevelSchema = z.enum(["low", "medium", "high"]);
 
 /**
- * Schema for sprint risk categories.
+ * Schema for sprint risk categories. Derived from the domain single source of
+ * truth (`SPRINT_RISK_CATEGORIES`) to prevent schema/type drift.
  */
-export const SprintRiskCategorySchema = z.enum([
-  "scope",
-  "dependency",
-  "capacity",
-  "technical",
-  "external",
-]);
+export const SprintRiskCategorySchema = z.enum(SPRINT_RISK_CATEGORIES);
+
+/**
+ * Schema for risk probability levels. Derived from the domain single source of
+ * truth (`RISK_PROBABILITIES`).
+ */
+export const RiskProbabilitySchema = z.enum(RISK_PROBABILITIES);
 
 // ============================================================================
 // Team Member Schemas
