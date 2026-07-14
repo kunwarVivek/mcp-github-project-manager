@@ -40,7 +40,7 @@ Canonical docs contradict each other and the code. Truth column is code-verified
 | G2-02 | `ToolSchemas.ts` god file (2,871 lines) | src/infrastructure/tools/ToolSchemas.ts | HIGH | OPEN |
 | G2-03 | Dual dispatch: index.ts 120-case switch parallel to ToolRegistry | index.ts + ToolRegistry.ts | HIGH | OPEN |
 | G2-04 | Placeholder-factory smell: `GitHubRepositoryFactory(token,"placeholder","placeholder")` | linking/lifecycle/template/status/advanced tools | MEDIUM | OPEN |
-| G2-05 | Health check GitHub rate-limit is a stub (TODO) | HealthService.ts:161 | MEDIUM | OPEN |
+| G2-05 | Health check GitHub rate-limit is a stub (TODO) | HealthService.ts:161 | MEDIUM | DONE (checkGitHub now probes octokit.rest.rateLimit.get via injected GitHubRepositoryFactory; fails honest connected:false on missing factory/error; openWorldHint corrected to true; HealthService suite 16/16) |
 | G2-06 | Webhook signature validation fails OPEN when secret unset | GitHubWebhookHandler.ts:46-48 | HIGH (security) | DONE (now fails closed: rejects unsigned webhooks unless `WEBHOOK_ALLOW_UNSIGNED=true` explicit dev opt-in; 6 security regression tests pass) |
 | G2-07 | EventStore unbounded memory (no LRU eviction) | EventStore.ts | MEDIUM | OPEN |
 | G2-08 | ResourceCache: no persistence/eviction policy | ResourceCache.ts (808 lines) | MEDIUM | OPEN |
