@@ -219,11 +219,13 @@ import {
  * `(schema: ZodTypeAny) => Record<string, unknown>` signature severs the deep
  * generic instantiation without changing runtime behavior.
  */
+const zodToJson = zodToJsonSchema as unknown as (
+  schema: ZodTypeAny,
+  options?: { $refStrategy?: string },
+) => Record<string, unknown>;
+
 const toJsonSchema = (schema: ZodTypeAny): Record<string, unknown> =>
-  (zodToJsonSchema as (
-    s: ZodTypeAny,
-    o?: { $refStrategy?: string },
-  ) => Record<string, unknown>)(schema, { $refStrategy: "none" });
+  zodToJson(schema, { $refStrategy: "none" });
 
 /**
  * Central registry of all available tools
