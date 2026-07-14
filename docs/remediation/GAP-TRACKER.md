@@ -50,7 +50,7 @@ Canonical docs contradict each other and the code. Truth column is code-verified
 
 | ID | Gap | Location | Severity | Status |
 |----|-----|----------|----------|--------|
-| G3-01 | **God class** ProjectManagementService (1,696 lines) | ProjectManagementService.ts | HIGH | IN-PROGRESS — extract-and-delegate. IssueService extracted (11 methods: issue CRUD + comments + draft issues); PMS 1,696→1,458 lines. detect-changes LOW risk / 0 processes (zero API change). Remaining: ProjectFieldService, ProjectViewService, RoadmapService |
+| G3-01 | **God class** ProjectManagementService (1,696 lines) | ProjectManagementService.ts | HIGH | IN-PROGRESS — extract-and-delegate. Extracted IssueService (11 methods) + RoadmapService (createRoadmap + schema); removed 4 orphaned repo getters. PMS 1,696→1,362 lines. Field/View already delegate to templateService (verified — not gaps). Remaining inline cluster: automation (11 automationRepo uses) → AutomationService candidate |
 | G3-02 | Field-value update: fragile mega-switch, no strategy pattern | ProjectManagementService (field handlers) | MEDIUM | OPEN |
 | G3-03 | 38 `as any` across services | see G0-06 | MEDIUM | OPEN |
 | G3-04 | Token estimation hardcoded (300/400/500), no real counting | TaskContextGenerationService.ts:207-256 | MEDIUM | OPEN |

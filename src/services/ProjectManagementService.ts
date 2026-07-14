@@ -61,6 +61,7 @@ import {
 import { SubIssueService } from "./SubIssueService";
 import type { IssueDependency, IssueHistoryEntry } from "./SubIssueService";
 import { IssueService } from "./IssueService";
+import { RoadmapService } from "./RoadmapService";
 import { MilestoneService } from "./MilestoneService";
 import type { MilestoneMetrics } from "./MilestoneService";
 import { SprintPlanningService } from "./SprintPlanningService";
@@ -73,35 +74,6 @@ export type { IssueDependency, IssueHistoryEntry, MilestoneMetrics, SprintMetric
 export { SubIssueService, MilestoneService, SprintPlanningService, ProjectStatusService, ProjectTemplateService, ProjectLinkingService };
 
 // Validation schema for roadmap creation
-const CreateRoadmapSchema = z.object({
-  project: z.object({
-    title: z.string().min(1, "Project title is required"),
-    shortDescription: z.string().optional(),
-    owner: z.string(),
-    visibility: z.enum(['private', 'public']).optional(),
-    views: z.array(z.any()).optional(),
-    fields: z.array(z.any()).optional()
-  }),
-  milestones: z.array(
-    z.object({
-      milestone: z.object({
-        title: z.string().min(1, "Milestone title is required"),
-        description: z.string().optional(),
-        dueDate: z.string().optional(),
-      }),
-      issues: z.array(
-        z.object({
-          title: z.string().min(1, "Issue title is required"),
-          description: z.string(),
-          assignees: z.array(z.string()).optional(),
-          labels: z.array(z.string()).optional(),
-          milestoneId: z.string().optional()
-        })
-      )
-    })
-  )
-});
-
 /**
  * ProjectManagementService - Facade for GitHub project management
  *
@@ -119,6 +91,7 @@ export class ProjectManagementService {
   private readonly templateService: ProjectTemplateService;
   private readonly linkingService: ProjectLinkingService;
   private readonly issueService: IssueService;
+  private readonly roadmapService: RoadmapService;
 
   /**
    * Create a new ProjectManagementService with all dependencies injected.
@@ -131,6 +104,7 @@ export class ProjectManagementService {
    * @param templateService - Service for project customization
    * @param linkingService - Service for project item operations
    * @param issueService - Service for issue CRUD, comments, and draft issues
+   * @param roadmapService - Service for full-roadmap creation
    */
   constructor(
     factory: GitHubRepositoryFactory,
@@ -140,7 +114,8 @@ export class ProjectManagementService {
     projectStatusService: ProjectStatusService,
     templateService: ProjectTemplateService,
     linkingService: ProjectLinkingService,
-    issueService: IssueService
+    issueService: IssueService,
+    roadmapService: RoadmapService
   ) {
     this.factory = factory;
     this.subIssueService = subIssueService;
@@ -150,6 +125,7 @@ export class ProjectManagementService {
     this.templateService = templateService;
     this.linkingService = linkingService;
     this.issueService = issueService;
+    this.roadmapService = roadmapService;
   }
 
   // ============================================================================
@@ -158,22 +134,6 @@ export class ProjectManagementService {
 
   getRepositoryFactory(): GitHubRepositoryFactory {
     return this.factory;
-  }
-
-  private get issueRepo(): GitHubIssueRepository {
-    return this.factory.createIssueRepository();
-  }
-
-  private get milestoneRepo(): GitHubMilestoneRepository {
-    return this.factory.createMilestoneRepository();
-  }
-
-  private get projectRepo(): GitHubProjectRepository {
-    return this.factory.createProjectRepository();
-  }
-
-  private get sprintRepo(): GitHubSprintRepository {
-    return this.factory.createSprintRepository();
   }
 
   private get automationRepo() {
@@ -419,63 +379,7 @@ export class ProjectManagementService {
     project: Project;
     milestones: Array<Milestone & { issues: Issue[] }>;
   }> {
-    try {
-      const validatedData = CreateRoadmapSchema.parse(data);
-
-      const projectData = {
-        ...validatedData.project,
-        type: ResourceType.PROJECT,
-        status: ResourceStatus.ACTIVE,
-        visibility: validatedData.project.visibility || 'private',
-        views: [] as ProjectView[],
-        fields: [] as CustomField[],
-        shortDescription: validatedData.project.shortDescription,
-      };
-
-      const project = await this.projectRepo.create(
-        createResource(ResourceType.PROJECT, projectData)
-      );
-
-      const milestones = [];
-
-      for (const { milestone, issues } of validatedData.milestones) {
-        try {
-          const milestoneWithRequiredFields = {
-            ...milestone,
-            description: milestone.description || ''
-          };
-
-          const createdMilestone = await this.milestoneRepo.create(milestoneWithRequiredFields);
-
-          const createdIssues = await Promise.all(
-            issues.map(async (issue) => {
-              try {
-                return await this.issueRepo.create({
-                  ...issue,
-                  milestoneId: createdMilestone.id,
-                });
-              } catch (error) {
-                throw this.mapErrorToMCPError(error);
-              }
-            })
-          );
-
-          milestones.push({
-            ...createdMilestone,
-            issues: createdIssues,
-          });
-        } catch (error) {
-          throw this.mapErrorToMCPError(error);
-        }
-      }
-
-      return { project, milestones };
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        throw new ValidationError(`Invalid roadmap data: ${error.message}`);
-      }
-      throw this.mapErrorToMCPError(error);
-    }
+    return this.roadmapService.createRoadmap(data);
   }
 
   // ============================================================================
