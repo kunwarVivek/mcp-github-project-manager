@@ -2,7 +2,7 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as zlib from 'zlib';
 import { promisify } from 'util';
-import { SyncMetadata } from '../../services/GitHubStateSyncService';
+import { SyncMetadata } from '../../domain/resource-types';
 import { Logger } from '../logger/index';
 
 const gzip = promisify(zlib.gzip);

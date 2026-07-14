@@ -36,7 +36,7 @@ Canonical docs contradict each other and the code. Truth column is code-verified
 
 | ID | Gap | Location | Severity | Status |
 |----|-----|----------|----------|--------|
-| G2-01 | **Circular dependency** | FilePersistenceAdapter ↔ GitHubStateSyncService | HIGH | OPEN |
+| G2-01 | **Circular dependency** | FilePersistenceAdapter ↔ GitHubStateSyncService | HIGH | DONE (root cause: `SyncMetadata` type defined in service but imported by 2 infra files. Moved to `domain/resource-types.ts`; repointed FilePersistenceAdapter + ResourceCache; service re-exports for compat. `check --cycles` = clean) |
 | G2-02 | `ToolSchemas.ts` god file (2,871 lines) | src/infrastructure/tools/ToolSchemas.ts | HIGH | OPEN |
 | G2-03 | Dual dispatch: index.ts 120-case switch parallel to ToolRegistry | index.ts + ToolRegistry.ts | HIGH | OPEN |
 | G2-04 | Placeholder-factory smell: `GitHubRepositoryFactory(token,"placeholder","placeholder")` | linking/lifecycle/template/status/advanced tools | MEDIUM | OPEN |

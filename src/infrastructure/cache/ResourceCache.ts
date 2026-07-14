@@ -1,5 +1,5 @@
 import { Resource, ResourceCacheOptions, ResourceType } from "../../domain/resource-types";
-import { SyncMetadata } from "../../services/GitHubStateSyncService";
+import { SyncMetadata } from "../../domain/resource-types";
 import { isCacheableResource } from "../../domain/type-guards";
 import { CachePersistence, type CacheEntry as PersistenceCacheEntry } from "./CachePersistence";
 
