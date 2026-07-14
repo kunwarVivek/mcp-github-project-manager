@@ -14,6 +14,7 @@ import { SprintPlanningService } from "./services/SprintPlanningService";
 import { ProjectStatusService } from "./services/ProjectStatusService";
 import { ProjectTemplateService } from "./services/ProjectTemplateService";
 import { ProjectLinkingService } from "./services/ProjectLinkingService";
+import { IssueService } from "./services/IssueService";
 import { ProjectManagementService } from "./services/ProjectManagementService";
 
 /**
@@ -65,6 +66,10 @@ export function configureContainer(
     useFactory: (c) => new ProjectLinkingService(c.resolve("GitHubRepositoryFactory"))
   });
 
+  container.register("IssueService", {
+    useFactory: (c) => new IssueService(c.resolve("GitHubRepositoryFactory"))
+  });
+
   // Register facade - depends on all extracted services
   container.register("ProjectManagementService", {
     useFactory: (c) => new ProjectManagementService(
@@ -74,7 +79,8 @@ export function configureContainer(
       c.resolve("SprintPlanningService"),
       c.resolve("ProjectStatusService"),
       c.resolve("ProjectTemplateService"),
-      c.resolve("ProjectLinkingService")
+      c.resolve("ProjectLinkingService"),
+      c.resolve("IssueService")
     )
   });
 
@@ -105,7 +111,8 @@ export function createProjectManagementService(
     new SprintPlanningService(factory),
     new ProjectStatusService(factory),
     new ProjectTemplateService(factory),
-    new ProjectLinkingService(factory)
+    new ProjectLinkingService(factory),
+    new IssueService(factory)
   );
 }
 
