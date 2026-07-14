@@ -23,6 +23,9 @@ module.exports = {
       },
     ],
   },
+  // reflect-metadata must load before tsyringe's module init in any suite that
+  // imports the DI graph; a setupFile guarantees it regardless of dep load order.
+  setupFiles: ['reflect-metadata'],
   setupFilesAfterEnv: ['<rootDir>/src/__tests__/setup.ts'],
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json', 'node'],
   testMatch: [
