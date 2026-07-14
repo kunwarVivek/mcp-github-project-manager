@@ -212,6 +212,20 @@ import {
 } from "./issue-intelligence-tools";
 
 /**
+ * Convert a Zod schema to JSON Schema.
+ *
+ * `zodToJsonSchema`'s generic return type recurses infinitely when applied to a
+ * broad `ZodType<unknown>` (TS2589). Binding it once to a concrete
+ * `(schema: ZodTypeAny) => Record<string, unknown>` signature severs the deep
+ * generic instantiation without changing runtime behavior.
+ */
+const toJsonSchema = (schema: ZodTypeAny): Record<string, unknown> =>
+  (zodToJsonSchema as (
+    s: ZodTypeAny,
+    o?: { $refStrategy?: string },
+  ) => Record<string, unknown>)(schema, { $refStrategy: "none" });
+
+/**
  * Central registry of all available tools
  */
 export class ToolRegistry {
@@ -274,10 +288,8 @@ export class ToolRegistry {
       name: tool.name,
       title: tool.title,
       description: tool.description,
-      inputSchema: zodToJsonSchema(tool.schema, { $refStrategy: "none" }) as Record<string, unknown>,
-      outputSchema: tool.outputSchema
-        ? zodToJsonSchema(tool.outputSchema, { $refStrategy: "none" }) as Record<string, unknown>
-        : undefined,
+      inputSchema: toJsonSchema(tool.schema),
+      outputSchema: tool.outputSchema ? toJsonSchema(tool.outputSchema) : undefined,
       annotations: tool.annotations,
     }));
   }

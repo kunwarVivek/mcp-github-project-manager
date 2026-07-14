@@ -44,7 +44,7 @@ Canonical docs contradict each other and the code. Truth column is code-verified
 | G2-06 | Webhook signature validation fails OPEN when secret unset | GitHubWebhookHandler.ts:46-48 | HIGH (security) | OPEN |
 | G2-07 | EventStore unbounded memory (no LRU eviction) | EventStore.ts | MEDIUM | OPEN |
 | G2-08 | ResourceCache: no persistence/eviction policy | ResourceCache.ts (808 lines) | MEDIUM | OPEN |
-| G2-09 | **Build blocker** TS2589 "excessively deep type instantiation" (zodToJsonSchema) — pre-existing in WIP checkpoint; breaks `tsc`/`build` | ToolRegistry.ts:277 | HIGH | OPEN |
+| G2-09 | **Build blocker** TS2589 "excessively deep type instantiation" (zodToJsonSchema) — pre-existing in WIP checkpoint; breaks `tsc`/`build` | ToolRegistry.ts:277 | HIGH | DONE (bound zodToJsonSchema to concrete `(ZodTypeAny) => Record<string,unknown>` via `toJsonSchema` helper; tsc now 0 errors) |
 
 ## G3 — Service Layer (`src/services/`)
 
