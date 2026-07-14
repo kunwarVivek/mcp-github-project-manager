@@ -13,7 +13,8 @@
 
 import { ToolDefinition, ToolSchema } from "./ToolValidator";
 import { ANNOTATION_PATTERNS } from "./annotations/tool-annotations";
-import { GitHubRepositoryFactory } from "../github/GitHubRepositoryFactory";
+import { createGitHubFactory } from "./tool-factory";
+import type { GitHubRepositoryFactory } from "../github/GitHubRepositoryFactory";
 import {
   MarkProjectAsTemplateInputSchema,
   MarkProjectAsTemplateInput,
@@ -116,19 +117,6 @@ const LIST_ORGANIZATION_PROJECTS_QUERY = `
  * are only needed for factory initialization. We use placeholders since template
  * operations don't actually require a specific repo context.
  */
-function createFactory(owner?: string, repo?: string): GitHubRepositoryFactory {
-  const token = process.env.GITHUB_TOKEN;
-  if (!token) {
-    throw new Error("GITHUB_TOKEN environment variable is required");
-  }
-
-  // Owner/repo are required by factory but not used for template operations
-  // which work purely with project node IDs
-  const effectiveOwner = owner || process.env.GITHUB_OWNER || "placeholder";
-  const effectiveRepo = repo || process.env.GITHUB_REPO || "placeholder";
-
-  return new GitHubRepositoryFactory(token, effectiveOwner, effectiveRepo);
-}
 
 /**
  * Resolves an organization login to its GitHub node ID.
@@ -373,7 +361,7 @@ export async function executeMarkProjectAsTemplate(
   content: Array<{ type: "text"; text: string }>;
   structuredContent: TemplateProjectOutput;
 }> {
-  const factory = createFactory();
+  const factory = createGitHubFactory();
 
   const response = await factory.graphql<MarkProjectAsTemplateResponse>(
     MARK_PROJECT_AS_TEMPLATE_MUTATION,
@@ -419,7 +407,7 @@ export async function executeUnmarkProjectAsTemplate(
   content: Array<{ type: "text"; text: string }>;
   structuredContent: TemplateProjectOutput;
 }> {
-  const factory = createFactory();
+  const factory = createGitHubFactory();
 
   const response = await factory.graphql<UnmarkProjectAsTemplateResponse>(
     UNMARK_PROJECT_AS_TEMPLATE_MUTATION,
@@ -465,7 +453,7 @@ export async function executeCopyProjectFromTemplate(
   content: Array<{ type: "text"; text: string }>;
   structuredContent: CopiedProjectOutput;
 }> {
-  const factory = createFactory();
+  const factory = createGitHubFactory();
 
   // Resolve the target owner (organization login) to its node ID
   const ownerId = await resolveOrganizationId(factory, args.targetOwner);
@@ -519,7 +507,7 @@ export async function executeListOrganizationTemplates(
   content: Array<{ type: "text"; text: string }>;
   structuredContent: TemplateListOutput;
 }> {
-  const factory = createFactory();
+  const factory = createGitHubFactory();
 
   const response = await factory.graphql<ListOrganizationProjectsResponse>(
     LIST_ORGANIZATION_PROJECTS_QUERY,

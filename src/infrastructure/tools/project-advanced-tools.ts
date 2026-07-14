@@ -12,7 +12,7 @@
 
 import { ToolDefinition, ToolSchema } from "./ToolValidator";
 import { ANNOTATION_PATTERNS } from "./annotations/tool-annotations";
-import { GitHubRepositoryFactory } from "../github/GitHubRepositoryFactory";
+import { createGitHubFactory } from "./tool-factory";
 import {
   UpdateItemPositionInputSchema,
   UpdateItemPositionInput,
@@ -138,19 +138,6 @@ const LIST_PROJECT_ITEMS_QUERY = `
  * are only needed for factory initialization. We use placeholders since these
  * operations don't actually require a specific repo context.
  */
-function createFactory(): GitHubRepositoryFactory {
-  const token = process.env.GITHUB_TOKEN;
-  if (!token) {
-    throw new Error("GITHUB_TOKEN environment variable is required");
-  }
-
-  // Owner/repo are required by factory but not used for advanced operations
-  // which work purely with project node IDs
-  const owner = process.env.GITHUB_OWNER || "placeholder";
-  const repo = process.env.GITHUB_REPO || "placeholder";
-
-  return new GitHubRepositoryFactory(token, owner, repo);
-}
 
 // ============================================================================
 // GraphQL Response Types
@@ -447,7 +434,7 @@ export async function executeUpdateItemPosition(
   content: Array<{ type: "text"; text: string }>;
   structuredContent: ItemPositionOutput;
 }> {
-  const factory = createFactory();
+  const factory = createGitHubFactory();
 
   const input: {
     projectId: string;
@@ -502,7 +489,7 @@ export async function executeSearchIssuesAdvanced(
   content: Array<{ type: "text"; text: string }>;
   structuredContent: SearchIssuesOutput;
 }> {
-  const factory = createFactory();
+  const factory = createGitHubFactory();
 
   const response = await factory.graphql<SearchIssuesResponse>(
     SEARCH_ISSUES_ADVANCED_QUERY,
@@ -566,7 +553,7 @@ export async function executeFilterProjectItems(
   content: Array<{ type: "text"; text: string }>;
   structuredContent: FilterProjectItemsOutput;
 }> {
-  const factory = createFactory();
+  const factory = createGitHubFactory();
 
   const response = await factory.graphql<ListProjectItemsResponse>(
     LIST_PROJECT_ITEMS_QUERY,
