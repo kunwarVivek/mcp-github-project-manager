@@ -1,7 +1,7 @@
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 
-This project is indexed by GitNexus as **mcp-github-project-manager** (4662 symbols, 11376 relationships, 300 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+This project is indexed by GitNexus as **mcp-github-project-manager** (4661 symbols, 11387 relationships, 300 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
 
 > Index stale? Run `node .gitnexus/run.cjs analyze` from the project root — it auto-selects an available runner. No `.gitnexus/run.cjs` yet? `npx gitnexus analyze` (npm 11 crash → `npm i -g gitnexus`; #1939).
 
@@ -84,8 +84,11 @@ This project is indexed by GitNexus as **mcp-github-project-manager** (4662 symb
 - ESM extensions: source omits `.js` in imports; `postbuild` runs
   `scripts/fix-imports.js` to add them. Never ship raw `tsc` output — always
   `npm run build`.
-- `zod` is pinned to exact `3.25` (no caret). Bumping breaks
-  `zod-to-json-schema` / MCP schema generation. Don't upgrade blindly.
+- `zod` is on v4 (`^4.4.3`), paired with `ai`@^5 / `@ai-sdk/*`@^2 and MCP SDK
+  1.29 (all peer-accept zod 4). `zod-to-json-schema`@^3.25.2 supports zod 4 and
+  still drives MCP tool-schema generation in `ToolRegistry`. zod-4 gotchas:
+  `z.record` needs an explicit key schema (`z.record(z.string(), v)`);
+  `ZodError.errors` → `.issues`; `.nonstrict()` removed (objects strip by default).
 - Jest requires `--experimental-vm-modules` (baked into npm scripts). Run tests
   via npm scripts, not bare `jest`.
 - E2E tool tests mock GitHub by default; `E2E_REAL_API=true` hits the live API

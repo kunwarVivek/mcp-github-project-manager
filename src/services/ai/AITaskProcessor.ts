@@ -92,7 +92,7 @@ export class AITaskProcessor {
         system: config.systemPrompt,
         prompt,
         schema: PRDDocumentSchema,
-        maxTokens: config.maxTokens,
+        maxOutputTokens: config.maxTokens,
         temperature: config.temperature
       });
 
@@ -155,7 +155,7 @@ export class AITaskProcessor {
         system: prdConfig.systemPrompt,
         prompt,
         schema: PRDWithConfidenceSchema,
-        maxTokens: prdConfig.maxTokens + 500, // Extra tokens for confidence
+        maxOutputTokens: prdConfig.maxTokens + 500, // Extra tokens for confidence
         temperature: prdConfig.temperature
       });
 
@@ -254,7 +254,7 @@ export class AITaskProcessor {
         system: config.systemPrompt,
         prompt,
         schema: PRDDocumentSchema,
-        maxTokens: config.maxTokens,
+        maxOutputTokens: config.maxTokens,
         temperature: config.temperature
       });
 
@@ -287,7 +287,7 @@ export class AITaskProcessor {
         system: config.systemPrompt,
         prompt,
         schema: z.array(FeatureRequirementSchema),
-        maxTokens: config.maxTokens,
+        maxOutputTokens: config.maxTokens,
         temperature: config.temperature
       });
 
@@ -326,7 +326,7 @@ export class AITaskProcessor {
         system: config.systemPrompt,
         prompt,
         schema: z.array(AITaskSchema),
-        maxTokens: config.maxTokens,
+        maxOutputTokens: config.maxTokens,
         temperature: config.temperature
       });
 
@@ -377,7 +377,7 @@ export class AITaskProcessor {
         model,
         system: config.systemPrompt,
         prompt,
-        maxTokens: config.maxTokens,
+        maxOutputTokens: config.maxTokens,
         temperature: config.temperature
       });
 
@@ -428,7 +428,7 @@ export class AITaskProcessor {
         model,
         system: config.systemPrompt,
         prompt,
-        maxTokens: config.maxTokens,
+        maxOutputTokens: config.maxTokens,
         temperature: config.temperature
       });
 
@@ -487,7 +487,7 @@ export class AITaskProcessor {
         model,
         system: config.systemPrompt,
         prompt,
-        maxTokens: config.maxTokens,
+        maxOutputTokens: config.maxTokens,
         temperature: config.temperature
       });
 
@@ -544,7 +544,7 @@ export class AITaskProcessor {
       await generateText({
         model,
         prompt: 'Test connection',
-        maxTokens: 10
+        maxOutputTokens: 10
       });
       return true;
     } catch (error) {

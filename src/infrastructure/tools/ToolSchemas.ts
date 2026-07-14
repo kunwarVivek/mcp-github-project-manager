@@ -1419,7 +1419,7 @@ export const createAutomationRuleSchema = z.object({
       "add_label", "remove_label", "assign_user", "unassign_user",
       "create_relationship", "delete_relationship", "notify", "webhook", "custom_script"
     ]),
-    parameters: z.record(z.any())
+    parameters: z.record(z.string(), z.any())
   }))
 });
 
@@ -1451,7 +1451,7 @@ export const updateAutomationRuleSchema = z.object({
       "add_label", "remove_label", "assign_user", "unassign_user",
       "create_relationship", "delete_relationship", "notify", "webhook", "custom_script"
     ]),
-    parameters: z.record(z.any())
+    parameters: z.record(z.string(), z.any())
   })).optional()
 });
 

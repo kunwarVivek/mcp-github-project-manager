@@ -54,7 +54,7 @@ export class IssueTriagingService {
         model,
         prompt: `${prompt}\n\nIssue: ${params.issueTitle}`,
         temperature: 0.5,
-        maxTokens: 1000
+        maxOutputTokens: 1000
       });
 
       const jsonMatch = response.text.match(/\{[\s\S]*\}/);

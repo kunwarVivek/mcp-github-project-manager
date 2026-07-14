@@ -206,7 +206,7 @@ export class PRDGenerationService {
         return {
           isComplete: false,
           score: 0,
-          missingElements: validationResult.error.errors.map(e => e.message),
+          missingElements: validationResult.error.issues.map(e => e.message),
           recommendations: ['Fix schema validation errors'],
           qualityIssues: ['PRD does not match required structure']
         };

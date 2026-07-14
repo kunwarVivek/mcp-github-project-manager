@@ -413,7 +413,7 @@ export function safeValidateTaskExecutionContext(
   } else {
     return {
       success: false,
-      errors: result.error.errors.map(err => `${err.path.join('.')}: ${err.message}`)
+      errors: result.error.issues.map(err => `${err.path.join('.')}: ${err.message}`)
     };
   }
 }

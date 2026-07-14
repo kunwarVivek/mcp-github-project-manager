@@ -80,7 +80,7 @@ export class FeatureManagementService {
         model,
         system: config.systemPrompt,
         prompt,
-        maxTokens: config.maxTokens,
+        maxOutputTokens: config.maxTokens,
         temperature: config.temperature
       });
 
@@ -210,7 +210,7 @@ export class FeatureManagementService {
         system: config.systemPrompt,
         prompt,
         schema: z.array(AITaskSchema),
-        maxTokens: config.maxTokens,
+        maxOutputTokens: config.maxTokens,
         temperature: config.temperature
       });
 
@@ -444,7 +444,7 @@ export class FeatureManagementService {
         model,
         system: config.systemPrompt,
         prompt,
-        maxTokens: config.maxTokens,
+        maxOutputTokens: config.maxTokens,
         temperature: config.temperature
       });
 

@@ -87,8 +87,9 @@ Audit 2026-07-15: `npm outdated` + `npm audit` (was 31 vulns: 1 critical, 8 high
 | G7-02 | Safe in-range tier: `npm update` (within-major patch/minor for all deps) | HIGH (sec) | DONE (31→12 vulns; cleared critical + all 8 high; lockfile-only, no package.json/API change; build tsc 0 errors) |
 | G7-03 | `@ai-sdk/provider-utils` resource-consumption HIGH | HIGH | DONE (cleared by in-major @ai-sdk bumps in G7-02) |
 | G7-04 | Remaining 12 vulns (8 low, 4 moderate) need `--force` majors (uuid→14, jest-junit→17) — dev-tooling/transitive | LOW-MED | DEFERRED (low value, breaking) |
-| G7-05 | **AI SDK major migration**: `ai` 4.3→7, `@ai-sdk/*` 1→4. Rewrites `services/ai/` (generateObject API). Domain-isolated, HIGH effort. | — | PROPOSED (needs go-ahead; scope + API-diff before build) |
-| G7-06 | `zod` 3.25→4 | — | WONTFIX (pinned; breaks zod-to-json-schema / MCP schema gen per repo gotcha) |
+| G7-05 | **AI SDK major migration**: `ai` 4.3→5, `@ai-sdk/*` 1→2 | HIGH | DONE (coupled with zod 4 — AI SDK v1 peer-blocked zod 4. Fixed `maxTokens`→`maxOutputTokens` at ~30 sites; providers/schemas unchanged. 2250+ tests pass, e2e MCP compliance 5/5) |
+| G7-06 | `zod` 3.25→4 | HIGH | DONE (feasibility gate PASSED — MCP SDK 1.29 + zod-to-json-schema 3.25.2 both peer-accept zod 4; the "pinned/WONTFIX" gotcha was STALE. Fixed: z.record two-arg (7), ZodError.issues (4), .nonstrict removed, ParameterCoercion $ZodType casts, deleted dead convertZodToJsonSchema. Build + MCP schema gen verified) |
+| G7-08 | Self-dependency: `mcp-github-project-manager` listed as its own dependency | LOW | DONE (removed; dragged in stale published tree) |
 | G7-07 | Tooling majors: TypeScript→7 (Go compiler), jest→30, eslint→10 | — | DEFERRED (no shipped-code value; high churn) |
 
 ## G6 — Feature Proposals (PROPOSED — require go-ahead before build)

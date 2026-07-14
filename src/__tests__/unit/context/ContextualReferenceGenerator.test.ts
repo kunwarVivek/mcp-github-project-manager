@@ -203,7 +203,7 @@ describe('ContextualReferenceGenerator', () => {
           system: expect.any(String),
           prompt: expect.any(String),
           schema: expect.any(Object),
-          maxTokens: expect.any(Number),
+          maxOutputTokens: expect.any(Number),
           temperature: expect.any(Number)
         })
       );

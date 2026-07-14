@@ -277,7 +277,7 @@ export class MCPResponseFormatter {
       metadata: z.object({
         timestamp: z.string(),
         status: z.number(),
-      }).nonstrict(),
+      }),
     }).safeParse(response);
 
     return result.success;

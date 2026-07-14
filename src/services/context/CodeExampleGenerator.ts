@@ -58,7 +58,7 @@ export class CodeExampleGenerator {
         system: this.getSystemPrompt(),
         prompt,
         schema: CodeExamplesSchema,
-        maxTokens: 2000,
+        maxOutputTokens: 2000,
         temperature: 0.4
       });
 

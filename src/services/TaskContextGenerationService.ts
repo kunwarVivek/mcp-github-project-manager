@@ -289,7 +289,7 @@ export class TaskContextGenerationService {
         system: config.systemPrompt,
         prompt,
         schema: BusinessContextSchema,
-        maxTokens: config.maxTokens,
+        maxOutputTokens: config.maxTokens,
         temperature: config.temperature
       });
 
@@ -321,7 +321,7 @@ export class TaskContextGenerationService {
         system: config.systemPrompt,
         prompt,
         schema: TechnicalContextSchema,
-        maxTokens: config.maxTokens,
+        maxOutputTokens: config.maxTokens,
         temperature: config.temperature
       });
 
@@ -386,7 +386,7 @@ export class TaskContextGenerationService {
         system: config.systemPrompt,
         prompt,
         schema: config.schema,
-        maxTokens: config.maxTokens,
+        maxOutputTokens: config.maxTokens,
         temperature: config.temperature
       });
 
