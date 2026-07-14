@@ -881,7 +881,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 | Error Handling | ✅ Complete | According to MCP specifications |
 | Transport | ✅ Complete | Stdio and HTTP support |
 
-See [STATUS.md](STATUS.md) for detailed implementation status.
+See [.planning/STATUS.md](.planning/STATUS.md) for detailed implementation status.
 | Resource Management | ✅ Complete | With optimistic locking and relationship tracking |
 | Response Handling | ✅ Complete | Rich content formatting with multiple content types |
 | Error Handling | ✅ Complete | Comprehensive error mapping to MCP error codes |
@@ -946,7 +946,7 @@ Despite the recent improvements, the following functional gaps still exist and a
 - [Troubleshooting Guide](docs/TROUBLESHOOTING.md) - Common issues and solutions
 
 ### Reference
-- [Tool Reference](docs/TOOLS.md) - All 115 MCP tools documented
+- [Tool Reference](docs/TOOLS.md) - All 120 MCP tools documented
 - [Architecture](docs/architecture.md) - System design and patterns
 - [API Reference](docs/API.md) - Service and infrastructure APIs
 
@@ -970,11 +970,14 @@ For an interactive exploration of the API, open the [API Explorer](docs/api-expl
 # Unit tests
 npm test
 
-# Integration tests
-npm run test:integration
+# AI service/tool tests
+npm run test:ai
 
 # End-to-end tests
 npm run test:e2e
+
+# E2E MCP tool suite (mocked GitHub/AI)
+npm run test:e2e:tools
 ```
 
 ### Code Quality
@@ -983,7 +986,7 @@ npm run test:e2e
 npm run lint
 
 # Type check
-npm run type-check
+npx tsc --noEmit
 
 # Format code
 npm run format

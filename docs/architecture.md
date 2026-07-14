@@ -50,7 +50,7 @@ External integrations and technical concerns:
 | Directory | Purpose |
 |-----------|---------|
 | `github/` | GitHub REST/GraphQL API integration |
-| `tools/` | MCP tool definitions (116 tools) |
+| `tools/` | MCP tool definitions (120 tools) |
 | `cache/` | In-memory caching with TTL |
 | `resilience/` | Circuit breaker, retry policies |
 | `events/` | Webhook handling, event store |
@@ -182,6 +182,6 @@ Environment-based configuration:
 | `GITHUB_REPO` | Repository name |
 | `ANTHROPIC_API_KEY` | Claude AI (optional) |
 | `OPENAI_API_KEY` | OpenAI (optional) |
-| `GOOGLE_AI_API_KEY` | Google AI (optional) |
+| `GOOGLE_API_KEY` | Google AI (optional) |
 
 See [CONFIGURATION.md](CONFIGURATION.md) for full details.
