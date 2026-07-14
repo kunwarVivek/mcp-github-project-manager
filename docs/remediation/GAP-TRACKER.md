@@ -41,7 +41,7 @@ Canonical docs contradict each other and the code. Truth column is code-verified
 | G2-03 | Dual dispatch: index.ts 120-case switch parallel to ToolRegistry | index.ts + ToolRegistry.ts | HIGH | OPEN |
 | G2-04 | Placeholder-factory smell: `GitHubRepositoryFactory(token,"placeholder","placeholder")` | linking/lifecycle/template/status/advanced tools | MEDIUM | OPEN |
 | G2-05 | Health check GitHub rate-limit is a stub (TODO) | HealthService.ts:161 | MEDIUM | OPEN |
-| G2-06 | Webhook signature validation fails OPEN when secret unset | GitHubWebhookHandler.ts:46-48 | HIGH (security) | OPEN |
+| G2-06 | Webhook signature validation fails OPEN when secret unset | GitHubWebhookHandler.ts:46-48 | HIGH (security) | DONE (now fails closed: rejects unsigned webhooks unless `WEBHOOK_ALLOW_UNSIGNED=true` explicit dev opt-in; 6 security regression tests pass) |
 | G2-07 | EventStore unbounded memory (no LRU eviction) | EventStore.ts | MEDIUM | OPEN |
 | G2-08 | ResourceCache: no persistence/eviction policy | ResourceCache.ts (808 lines) | MEDIUM | OPEN |
 | G2-09 | **Build blocker** TS2589 "excessively deep type instantiation" (zodToJsonSchema) — pre-existing in WIP checkpoint; breaks `tsc`/`build` | ToolRegistry.ts:277 | HIGH | DONE (bound zodToJsonSchema to concrete `(ZodTypeAny) => Record<string,unknown>` via `toJsonSchema` helper; tsc now 0 errors) |

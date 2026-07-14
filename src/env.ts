@@ -105,6 +105,10 @@ export const SYNC_RESOURCES = getOptionalConfigValue("SYNC_RESOURCES", "PROJECT,
 
 // Event system configuration
 export const WEBHOOK_SECRET = getOptionalConfigValue("WEBHOOK_SECRET", "");
+// Security: webhook signature validation fails closed by default. When no
+// WEBHOOK_SECRET is set, incoming webhooks are rejected. Set this to true ONLY
+// in trusted local/dev environments to accept unsigned webhooks.
+export const WEBHOOK_ALLOW_UNSIGNED = getBooleanConfigValue("WEBHOOK_ALLOW_UNSIGNED", false);
 export const WEBHOOK_PORT = getNumericConfigValue("WEBHOOK_PORT", 3001);
 export const SSE_ENABLED = getBooleanConfigValue("SSE_ENABLED", true);
 export const EVENT_RETENTION_DAYS = getNumericConfigValue("EVENT_RETENTION_DAYS", 7);
