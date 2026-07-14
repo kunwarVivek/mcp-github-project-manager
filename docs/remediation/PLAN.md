@@ -66,3 +66,13 @@ Presented for go/no-go **before** any build. Not scheduled until approved.
 
 ## Progress log
 - 2026-07-14: Branch cut, WIP checkpoint `84ca9b4`, GitNexus reindexed, audit complete, tracker+plan created. Starting Layer A.
+- 2026-07-14: **Layer A DONE** (`bc40190`) — doc drift reconciled (tool count 120, GOOGLE_API_KEY, dead refs). Tracker+plan committed.
+- 2026-07-14: **Layer B DONE** (`96c5f97`) — domain `as const` tuples single source of truth for sprint risk enums; 6 casts removed; SprintPlanningService 52/52 (later AI suites 61/61).
+- 2026-07-14: **Layer C in progress**:
+  - `c8cf736` G2-09 build blocker (TS2589 zodToJsonSchema) — tsc now 0 errors.
+  - `0df799f` G2-01 circular dependency broken (SyncMetadata → domain).
+  - `d499d27` G2-06 webhook signature fails closed (security) + 6 regression tests.
+  - `6802a32` G2-05 health check wired to real GitHub rate-limit probe; 16/16.
+  - `f2a2c21` G5-06 nanoid ESM test blocker fixed — AI suites unblocked (61/61).
+  - **Remaining Layer C**: C3 (ToolSchemas 2,871-line split), C4 (placeholder-factory consolidation — RCA done, 7+ call sites mapped), C6 (EventStore/ResourceCache eviction). Then Layer C gate (`test:core` + `test:e2e:tools`).
+- **NEXT GATE**: Layer D opens with the CRITICAL ProjectManagementService (1,696 lines) decomposition — requires explicit user go-ahead per mandate before edits.
