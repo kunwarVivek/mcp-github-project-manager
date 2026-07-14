@@ -16,6 +16,8 @@ import { ProjectTemplateService } from "./services/ProjectTemplateService";
 import { ProjectLinkingService } from "./services/ProjectLinkingService";
 import { IssueService } from "./services/IssueService";
 import { RoadmapService } from "./services/RoadmapService";
+import { ProjectAutomationService } from "./services/ProjectAutomationService";
+import { Logger } from "./infrastructure/logger";
 import { ProjectManagementService } from "./services/ProjectManagementService";
 
 /**
@@ -75,6 +77,17 @@ export function configureContainer(
     useFactory: (c) => new RoadmapService(c.resolve("GitHubRepositoryFactory"))
   });
 
+  container.register("ProjectAutomationService", {
+    useFactory: (c) => {
+      const f = c.resolve<GitHubRepositoryFactory>("GitHubRepositoryFactory");
+      return new ProjectAutomationService(
+        f.createAutomationRuleRepository(),
+        f.createProjectRepository(),
+        Logger.getInstance()
+      );
+    }
+  });
+
   // Register facade - depends on all extracted services
   container.register("ProjectManagementService", {
     useFactory: (c) => new ProjectManagementService(
@@ -86,7 +99,8 @@ export function configureContainer(
       c.resolve("ProjectTemplateService"),
       c.resolve("ProjectLinkingService"),
       c.resolve("IssueService"),
-      c.resolve("RoadmapService")
+      c.resolve("RoadmapService"),
+      c.resolve("ProjectAutomationService")
     )
   });
 
@@ -119,7 +133,12 @@ export function createProjectManagementService(
     new ProjectTemplateService(factory),
     new ProjectLinkingService(factory),
     new IssueService(factory),
-    new RoadmapService(factory)
+    new RoadmapService(factory),
+    new ProjectAutomationService(
+      factory.createAutomationRuleRepository(),
+      factory.createProjectRepository(),
+      Logger.getInstance()
+    )
   );
 }
 

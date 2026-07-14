@@ -9,6 +9,7 @@ import { ProjectTemplateService } from '../../../services/ProjectTemplateService
 import { ProjectLinkingService } from '../../../services/ProjectLinkingService';
 import { IssueService } from '../../../services/IssueService';
 import { RoadmapService } from '../../../services/RoadmapService';
+import { ProjectAutomationService } from '../../../services/ProjectAutomationService';
 import { ResourceStatus, ResourceType } from '../../../domain/resource-types';
 import { ValidationError, ResourceNotFoundError, DomainError } from '../../../domain/errors';
 
@@ -57,6 +58,7 @@ describe('ProjectManagementService', () => {
     const mockLinking = {} as ProjectLinkingService;
     const mockIssue = {} as IssueService;
     const mockRoadmap = {} as RoadmapService;
+    const mockAutomation = {} as ProjectAutomationService;
 
     // Instantiate service directly with mocked dependencies
     service = new ProjectManagementService(
@@ -68,7 +70,8 @@ describe('ProjectManagementService', () => {
       mockTemplate,
       mockLinking,
       mockIssue,
-      mockRoadmap
+      mockRoadmap,
+      mockAutomation
     );
   });
 

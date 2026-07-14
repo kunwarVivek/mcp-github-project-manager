@@ -62,6 +62,7 @@ import { SubIssueService } from "./SubIssueService";
 import type { IssueDependency, IssueHistoryEntry } from "./SubIssueService";
 import { IssueService } from "./IssueService";
 import { RoadmapService } from "./RoadmapService";
+import { ProjectAutomationService } from "./ProjectAutomationService";
 import { MilestoneService } from "./MilestoneService";
 import type { MilestoneMetrics } from "./MilestoneService";
 import { SprintPlanningService } from "./SprintPlanningService";
@@ -92,6 +93,7 @@ export class ProjectManagementService {
   private readonly linkingService: ProjectLinkingService;
   private readonly issueService: IssueService;
   private readonly roadmapService: RoadmapService;
+  private readonly automationService: ProjectAutomationService;
 
   /**
    * Create a new ProjectManagementService with all dependencies injected.
@@ -115,7 +117,8 @@ export class ProjectManagementService {
     templateService: ProjectTemplateService,
     linkingService: ProjectLinkingService,
     issueService: IssueService,
-    roadmapService: RoadmapService
+    roadmapService: RoadmapService,
+    automationService: ProjectAutomationService
   ) {
     this.factory = factory;
     this.subIssueService = subIssueService;
@@ -126,6 +129,7 @@ export class ProjectManagementService {
     this.linkingService = linkingService;
     this.issueService = issueService;
     this.roadmapService = roadmapService;
+    this.automationService = automationService;
   }
 
   // ============================================================================
@@ -134,10 +138,6 @@ export class ProjectManagementService {
 
   getRepositoryFactory(): GitHubRepositoryFactory {
     return this.factory;
-  }
-
-  private get automationRepo() {
-    return this.factory.createAutomationRuleRepository();
   }
 
   private mapErrorToMCPError(error: unknown): Error {
@@ -996,7 +996,7 @@ export class ProjectManagementService {
     actions: unknown[];
   }> {
     try {
-      // Map string types to enum types for the repository
+      // Map tool-shaped string types to the domain enum types.
       const mappedTriggers = data.triggers.map(t => ({
         type: t.type as AutomationTriggerType,
         resourceType: t.resourceType as ResourceType | undefined,
@@ -1007,7 +1007,7 @@ export class ProjectManagementService {
         parameters: a.parameters
       }));
 
-      const rule = await this.automationRepo.create({
+      const rule = await this.automationService.createRule({
         name: data.name,
         description: data.description,
         projectId: data.projectId,
@@ -1050,12 +1050,7 @@ export class ProjectManagementService {
     actions: unknown[];
   }> {
     try {
-      const rule = await this.automationRepo.findById(data.ruleId);
-      if (!rule) {
-        throw new ResourceNotFoundError(ResourceType.RELATIONSHIP, data.ruleId);
-      }
-
-      // Map string types to enum types for the repository
+      // Map tool-shaped string types to the domain enum types.
       const mappedTriggers = data.triggers?.map(t => ({
         id: '',
         type: t.type as AutomationTriggerType,
@@ -1068,7 +1063,7 @@ export class ProjectManagementService {
         parameters: a.parameters
       })) as AutomationAction[] | undefined;
 
-      const updated = await this.automationRepo.update(data.ruleId, {
+      const updated = await this.automationService.updateRule(data.ruleId, {
         name: data.name,
         description: data.description,
         enabled: data.enabled,
@@ -1091,12 +1086,7 @@ export class ProjectManagementService {
 
   async deleteAutomationRule(data: { ruleId: string }): Promise<{ success: boolean }> {
     try {
-      const rule = await this.automationRepo.findById(data.ruleId);
-      if (!rule) {
-        throw new ResourceNotFoundError(ResourceType.RELATIONSHIP, data.ruleId);
-      }
-
-      await this.automationRepo.delete(data.ruleId);
+      await this.automationService.deleteRule(data.ruleId);
       return { success: true };
     } catch (error) {
       throw this.mapErrorToMCPError(error);
@@ -1113,11 +1103,7 @@ export class ProjectManagementService {
     actions: unknown[];
   }> {
     try {
-      const rule = await this.automationRepo.findById(data.ruleId);
-      if (!rule) {
-        throw new ResourceNotFoundError(ResourceType.RELATIONSHIP, data.ruleId);
-      }
-
+      const rule = await this.automationService.getRuleById(data.ruleId);
       return {
         id: rule.id,
         name: rule.name,
@@ -1143,7 +1129,7 @@ export class ProjectManagementService {
     }>;
   }> {
     try {
-      const rules = await this.automationRepo.findByProject(data.projectId);
+      const rules = await this.automationService.getRulesByProject(data.projectId);
       return {
         rules: rules.map(rule => ({
           id: rule.id,
@@ -1161,12 +1147,7 @@ export class ProjectManagementService {
 
   async enableAutomationRule(data: { ruleId: string }): Promise<{ id: string; name: string; enabled: boolean }> {
     try {
-      const rule = await this.automationRepo.findById(data.ruleId);
-      if (!rule) {
-        throw new ResourceNotFoundError(ResourceType.RELATIONSHIP, data.ruleId);
-      }
-
-      const updated = await this.automationRepo.enable(data.ruleId);
+      const updated = await this.automationService.enableRule(data.ruleId);
       return { id: updated.id, name: updated.name, enabled: updated.enabled };
     } catch (error) {
       throw this.mapErrorToMCPError(error);
@@ -1175,12 +1156,7 @@ export class ProjectManagementService {
 
   async disableAutomationRule(data: { ruleId: string }): Promise<{ id: string; name: string; enabled: boolean }> {
     try {
-      const rule = await this.automationRepo.findById(data.ruleId);
-      if (!rule) {
-        throw new ResourceNotFoundError(ResourceType.RELATIONSHIP, data.ruleId);
-      }
-
-      const updated = await this.automationRepo.disable(data.ruleId);
+      const updated = await this.automationService.disableRule(data.ruleId);
       return { id: updated.id, name: updated.name, enabled: updated.enabled };
     } catch (error) {
       throw this.mapErrorToMCPError(error);
