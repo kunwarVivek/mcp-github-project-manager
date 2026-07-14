@@ -75,4 +75,13 @@ Presented for go/no-go **before** any build. Not scheduled until approved.
   - `6802a32` G2-05 health check wired to real GitHub rate-limit probe; 16/16.
   - `f2a2c21` G5-06 nanoid ESM test blocker fixed — AI suites unblocked (61/61).
   - **Remaining Layer C**: C3 (ToolSchemas 2,871-line split), C4 (placeholder-factory consolidation — RCA done, 7+ call sites mapped), C6 (EventStore/ResourceCache eviction). Then Layer C gate (`test:core` + `test:e2e:tools`).
-- **NEXT GATE**: Layer D opens with the CRITICAL ProjectManagementService (1,696 lines) decomposition — requires explicit user go-ahead per mandate before edits.
+  - `c0bb28f` G2-04 placeholder-factory consolidated into shared `createGitHubFactory`; 231 tool tests pass.
+  - `d4a1175` G2-09 **completion** — TS2589 fully fixed (double-cast); this also fixed `npm run build` OOM-crashing. Build now succeeds with default heap.
+  - `9f31620` G7 **stack/SDK safe tier** — `npm update` cleared critical Handlebars + all 8 HIGH vulns (31→12); reflect-metadata jest setupFile fixed a load-order regression the dep dedup exposed.
+  - G2-07 verified NOT-A-GAP (EventStore eviction already correct). G2-08 DEFERRED (needs namespace-in-entry data-model change).
+  - **Remaining Layer C**: C3 (ToolSchemas 2,871-line split).
+- **BUILD NOTE**: `tsc`/`npm run build` need adequate heap for the full type graph; default works now that TS2589 is gone. Prior "0 errors" runs during the session were sometimes tsc aborting on OOM before finishing — always confirm exit code, not just error count.
+- **GATES AHEAD (need user go-ahead)**:
+  - Layer D1: ProjectManagementService (1,696 lines) decomposition — CRITICAL blast radius.
+  - G7-05: AI SDK major migration (`ai` 4→7, `@ai-sdk/*` 1→4) — rewrites `services/ai/`.
+- **Layer C gate status**: `test:core` = 1745 pass (the 15 "failures" were missing `build/`; green after `npm run build`; AI suites 61/61; e2e green with build).
