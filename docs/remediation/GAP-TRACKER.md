@@ -75,7 +75,7 @@ Canonical docs contradict each other and the code. Truth column is code-verified
 | G5-03 | ContextQualityValidator: pipeline integration untested | validation/ContextQualityValidator.ts | MEDIUM | OPEN |
 | G5-04 | Many services lack dedicated unit tests | src/services/* | HIGH | OPEN |
 | G5-05 | E2E logger stderr timing flake | e2e/stdio-transport.e2e.ts | LOW | OPEN |
-| G5-06 | **Test-infra blocker**: `tests/ai-services/*` fail to load — `@ai-sdk/anthropic` → `nanoid` ESM not transformed by Jest (pre-existing; needs transformIgnorePatterns/moduleNameMapper) | jest.config.cjs | HIGH | OPEN |
+| G5-06 | **Test-infra blocker**: `tests/ai-services/*` fail to load — `@ai-sdk/anthropic` → `nanoid` ESM not transformed by Jest | jest.config.cjs | HIGH | DONE (moduleNameMapper maps nanoid + nanoid/non-secure to a CJS test stub; AI suites load — SprintRiskAssessor + SprintSuggestionService 61/61, retroactively validating Layer B) |
 
 ## G6 — Feature Proposals (PROPOSED — require go-ahead before build)
 

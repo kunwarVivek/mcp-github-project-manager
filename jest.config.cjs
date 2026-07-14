@@ -5,6 +5,10 @@ module.exports = {
   resolver: '<rootDir>/jest.resolver.cjs',
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1',
+    // nanoid v5 is ESM-only and pulled in transitively by @ai-sdk providers;
+    // map it to a CJS stub so Jest's CommonJS runtime can load AI-touching suites.
+    '^nanoid$': '<rootDir>/src/__tests__/__mocks__/nanoid.cjs',
+    '^nanoid/non-secure$': '<rootDir>/src/__tests__/__mocks__/nanoid.cjs',
   },
   transform: {
     '^.+\\.tsx?$': [
