@@ -1,5 +1,12 @@
 # Gap Analysis - MCP GitHub Project Manager
 
+> **⚠️ SUPERSEDED (2026-07-15).** This snapshot's "95%+ complete, just ship"
+> conclusion was disproven by the spec-driven remediation: it missed a circular
+> dependency, an OOM-crashing build, a fail-open webhook, a lying health check,
+> and an over-claimed god-class. Its graph stats (513 nodes) are ~10× stale.
+> **Authoritative live status:** [`docs/remediation/GAP-TRACKER.md`](remediation/GAP-TRACKER.md)
+> and [`docs/remediation/PLAN.md`](remediation/PLAN.md). Kept for history only.
+
 **Generated:** 2026-05-02
 **Source:** PROJECT.md requirements vs implementation analysis
 

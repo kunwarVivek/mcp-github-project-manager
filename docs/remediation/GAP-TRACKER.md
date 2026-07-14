@@ -17,13 +17,13 @@ Canonical docs contradict each other and the code. Truth column is code-verified
 
 | ID | Gap | Doc claim | Code truth | Severity | Status |
 |----|-----|-----------|------------|----------|--------|
-| G0-01 | STATUS vs REQUIREMENTS contradiction | REQUIREMENTS: 99/99 complete; STATUS: phases 10-12 "Not Started" | Phase 10 partial (ProjectAutomationService exists), phase 11 absent, phase 12 shipped (v1.1.0) | HIGH | OPEN |
+| G0-01 | STATUS vs REQUIREMENTS contradiction | REQUIREMENTS: 99/99 complete; STATUS: phases 10-12 "Not Started" | Phase 10 done, phase 11 absent, phase 12 shipped (v1.1.0) | HIGH | DONE (STATUS.md reconciled to 11/12 + reconciliation note; PROJECT.md gained a PRD→FRD document chain; GAP-ANALYSIS-LIVE marked superseded) |
 | G0-02 | Tool count drift | architecture.md "116", README "115", "40+ & 8" | **120** registered + 120 dispatch cases | MEDIUM | DONE |
 | G0-03 | Wrong AI env var in docs | architecture.md `GOOGLE_AI_API_KEY` | code uses `GOOGLE_API_KEY` | MEDIUM | DONE |
 | G0-04 | Dead README refs | links `STATUS.md`; docs `npm run test:integration`, `npm run type-check` | STATUS.md absent (real one `.planning/STATUS.md`); neither script in package.json | MEDIUM | DONE |
 | G0-05 | Stale graph stats | GAP-ANALYSIS-LIVE "513 nodes/347 edges" | GitNexus index 4632 symbols / 11344 rels | LOW | OPEN |
 | G0-06 | DEBT-09..12 overclaim | REQUIREMENTS: `as any` replaced (complete) | Was 38 `as any`, but 31 in tests + 3 template-string false-positives + 1 SDK cast + 1 comment. Real prod casts = 2 (SprintSuggestionService). Fixed Layer B. | MEDIUM | DONE |
-| G0-07 | DEBT-07 overclaim | REQUIREMENTS: "reduce PMS to coordination only" complete | ProjectManagementService still 1,696 lines | HIGH | OPEN |
+| G0-07 | DEBT-07 overclaim | REQUIREMENTS: "reduce PMS to coordination only" complete | Was 1,696 lines; now genuinely done | HIGH | DONE (REQUIREMENTS.md DEBT-07 annotated with the real completion date; PMS decomposed to 1,338-line facade — see G3-01) |
 
 ## G1 — Domain Layer (`src/domain/`)
 

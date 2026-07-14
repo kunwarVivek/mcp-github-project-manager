@@ -84,6 +84,10 @@ Requirements for this milestone. Each maps to roadmap phases.
 - [x] **DEBT-05**: Extract SprintPlanningService from ProjectManagementService
 - [x] **DEBT-06**: Extract MilestoneService from ProjectManagementService
 - [x] **DEBT-07**: Reduce ProjectManagementService to coordination only
+  <!-- Was over-claimed at v1.0 (PMS was still 1,696 lines). Actually completed
+       in the 2026-07-15 remediation: extracted IssueService + RoadmapService and
+       delegated automation to ProjectAutomationService. PMS now 1,338 lines,
+       a near-pure facade. See docs/remediation/GAP-TRACKER.md (G3-01). -->
 
 **Type Safety:**
 - [x] **DEBT-08**: Define interfaces for all AI response objects
@@ -310,3 +314,12 @@ Which phases cover which requirements.
 ---
 *Requirements defined: 2026-01-30*
 *Last updated: 2026-02-01 - All 99 requirements complete*
+
+<!-- Reconciliation 2026-07-15: the "99/99 complete" claim was partly aspirational
+     at v1.0. Code-verified corrections from the remediation branch:
+     - DEBT-07 (PMS decomposition) was NOT done at v1.0; completed 2026-07-15.
+     - DEBT-09..12 (replace `as any`) were over-claimed — real production casts
+       were 2 (fixed); most were tests/false-positives.
+     - Phase 11 (Analytics & Reporting, would map to a future AI-21..) is absent.
+     Live status: docs/remediation/GAP-TRACKER.md. -->
+
