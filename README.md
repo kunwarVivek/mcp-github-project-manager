@@ -209,7 +209,16 @@ ENHANCED_CONTEXT_LEVEL=standard
 INCLUDE_BUSINESS_CONTEXT=false
 INCLUDE_TECHNICAL_CONTEXT=false
 INCLUDE_IMPLEMENTATION_GUIDANCE=false
+
+# Security, secrets, webhooks & cache (optional)
+SECRETS_DIR=/run/secrets          # load secrets from mounted files (Docker/k8s); takes precedence over env vars
+WEBHOOK_SECRET=your_webhook_secret
+WEBHOOK_ALLOW_UNSIGNED=false       # fail closed: reject unsigned webhooks unless explicitly enabled (dev only)
+WEBHOOK_PORT=3001
+MAX_CACHE_ENTRIES=10000            # in-memory cache cap before oldest-first eviction
 ```
+
+See the [Configuration Guide](docs/CONFIGURATION.md) for the complete list.
 
 ### AI Provider Setup
 
@@ -848,7 +857,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 | Sprint Planning | ✅ Complete | Including metrics tracking |
 | Issue Management | ✅ Complete | With custom fields support |
 | Resource Versioning | ✅ Complete | With optimistic locking and schema validation |
-| Webhook Integration | 📅 Planned | Real-time updates |
+| Webhook Integration | ✅ Complete | Real-time updates; fail-closed HMAC signature validation + SSE streaming |
 
 ### AI-Powered Features
 | Feature | Status | Notes |
@@ -877,7 +886,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 |-----------|--------|-------|
 | Tool Definitions | ✅ Complete | All core tools implemented with Zod validation |
 | Resource Management | ✅ Complete | Full CRUD operations with versioning |
-| Security | ✅ Complete | Token validation and scope checking |
+| Security | ✅ Complete | Token validation, fail-closed webhook signatures, file-mounted secrets (`SECRETS_DIR`) |
 | Error Handling | ✅ Complete | According to MCP specifications |
 | Transport | ✅ Complete | Stdio and HTTP support |
 
@@ -888,6 +897,17 @@ See [.planning/STATUS.md](.planning/STATUS.md) for detailed implementation statu
 | State Management | ✅ Complete | With conflict resolution and rate limiting |
 
 ### Recent Improvements
+
+- **Dependency & SDK modernization (2026-07-15)**:
+  - Migrated to Vercel AI SDK v5 and Zod v4 (coupled upgrade; MCP SDK 1.29 accepts Zod 4)
+  - Aligned Octokit type packages with `@octokit/rest` 22
+  - Cleared the critical Handlebars vulnerability and all high-severity advisories
+
+- **Architecture & reliability (2026-07-15)**:
+  - Decomposed the `ProjectManagementService` facade (extracted `IssueService`, `RoadmapService`; automation delegates to `ProjectAutomationService`)
+  - Broke a circular dependency; health check now performs a real GitHub rate-limit probe
+  - Fail-closed webhook signature validation; file-mounted secrets (`SECRETS_DIR`) with rotation
+  - Size-bounded cache eviction (`MAX_CACHE_ENTRIES`) and a namespace-index cleanup fix
 
 - **Enhanced Resource System**:
   - Added Zod schema validation for all resource types
@@ -911,32 +931,27 @@ See [.planning/STATUS.md](.planning/STATUS.md) for detailed implementation statu
 
 ### Identified Functional Gaps
 
-Despite the recent improvements, the following functional gaps still exist and are prioritized for future development:
+Remaining gaps prioritized for future development (updated 2026-07-15). The live,
+code-verified status is in [`docs/remediation/GAP-TRACKER.md`](docs/remediation/GAP-TRACKER.md).
 
-1. **Persistent Caching Strategy**:
-   - While the ResourceCache provides in-memory caching, it lacks persistence across server restarts
-   - No distributed caching for multi-instance deployments
-   - Missing cache eviction policies for memory management
+1. **Distributed Caching**:
+   - ResourceCache now has persistence (`CachePersistence`) and size-bounded
+     oldest-first eviction (`MAX_CACHE_ENTRIES`). Still single-instance only —
+     no distributed/shared cache for multi-instance deployments.
 
-2. **Real-time Event Processing**:
-   - No webhook integration for real-time updates from GitHub
-   - Missing event-based subscription system for clients
-   - Lack of server-sent events (SSE) support for streaming updates
-
-3. **Advanced GitHub Projects v2 Features**:
-   - Limited support for custom field types and validation
-   - Incomplete integration with GitHub's newer Projects v2 field types
-   - Missing automation rule management
-
-4. **Performance Optimization**:
+2. **Performance Optimization**:
    - No query batching for related resources
    - Missing background refresh for frequently accessed resources
    - Incomplete prefetching for related resources
 
-5. **Data Visualization and Reporting**:
+3. **Data Visualization and Reporting** (roadmap phase 11, not yet built):
    - No built-in visualization generators for metrics
    - Missing report generation capabilities
    - Limited time-series data analysis
+
+Resolved since earlier snapshots: real-time webhook integration + SSE streaming,
+automation-rule management, cache persistence + eviction, and a fail-closed
+webhook signature check.
 
 ## Documentation
 

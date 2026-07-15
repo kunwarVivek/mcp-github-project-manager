@@ -119,7 +119,8 @@ A comprehensive Model Context Protocol (MCP) server that provides AI-powered Git
 | Vercel AI SDK for AI abstraction | Multi-provider support, unified interface | ✓ Good — on v5 (upgraded 2026-07-15) |
 | Zod for validation | Type-safe schemas, good DX, MCP SDK compatible | ✓ Good — on v4 (upgraded 2026-07-15; MCP SDK 1.29 accepts it) |
 | tsyringe for DI | Lightweight, decorator-based, test-friendly | ✓ Shipped (container.ts wires the facade + extracted services) |
-| In-memory cache default | Simple, works for single-instance | ⚠️ Revisit — persistence added; size-eviction still open (GAP-TRACKER G2-08) |
+| In-memory cache default | Simple, works for single-instance | ✓ Good — persistence + size-bounded eviction added (G2-08); distributed cache still single-instance-only |
+| Env-var secrets | Simple, 12-factor | ⚠️ Extended — file-mounted secrets (`SECRETS_DIR`) added (G6-05); Vault/AWS SM are an extension point |
 
 ## Document Chain (PRD → FRD → Delivery)
 

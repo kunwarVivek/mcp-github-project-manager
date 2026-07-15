@@ -88,7 +88,7 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
 |----------|-------------|
 | `ANTHROPIC_API_KEY` | Claude API key |
 | `OPENAI_API_KEY` | OpenAI API key |
-| `GOOGLE_AI_API_KEY` | Google AI API key |
+| `GOOGLE_API_KEY` | Google AI API key |
 | `PERPLEXITY_API_KEY` | Perplexity API key |
 | `AI_PROVIDER` | Preferred provider: `anthropic`, `openai`, `google` |
 
@@ -98,6 +98,10 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
 |----------|-------------|
 | `LOG_LEVEL` | Logging level: `debug`, `info`, `warn`, `error` |
 | `CACHE_TTL` | Cache TTL in seconds (default: 300) |
+| `MAX_CACHE_ENTRIES` | In-memory cache cap before oldest-first eviction (default: 10000) |
+| `SECRETS_DIR` | Load secrets from mounted files (Docker/k8s `/run/secrets`); precedes env vars |
+| `WEBHOOK_SECRET` | Webhook HMAC secret (signature validation fails closed) |
+| `WEBHOOK_ALLOW_UNSIGNED` | Accept unsigned webhooks when no secret is set — trusted dev only |
 | `ENABLE_WEBHOOKS` | Enable webhook server: `true`/`false` |
 | `WEBHOOK_PORT` | Webhook server port (default: 3000) |
 
