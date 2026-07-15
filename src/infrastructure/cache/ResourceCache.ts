@@ -7,10 +7,17 @@ interface CacheEntry<T> {
   value: T;
   expiresAt?: number;
   tags?: string[];
-  namespace?: string;
+  namespaces?: string[];
   lastModified?: string;
   version?: number;
 }
+
+/**
+ * Maximum number of entries the cache holds before evicting the oldest.
+ * Bounds memory when many unique keys are cached and rarely re-read (lazy TTL
+ * alone does not cap entry count). Override with MAX_CACHE_ENTRIES.
+ */
+const MAX_CACHE_ENTRIES = Number(process.env.MAX_CACHE_ENTRIES) || 10000;
 
 /**
  * Cache statistics including persistence status
@@ -38,11 +45,14 @@ export class ResourceCache {
   private readonly PERSIST_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
   private lastPersistTime?: string;
 
-  constructor() {
+  private readonly maxEntries: number;
+
+  constructor(maxEntries: number = MAX_CACHE_ENTRIES) {
     this.cache = new Map();
     this.tagIndex = new Map();
     this.typeIndex = new Map();
     this.namespaceIndex = new Map();
+    this.maxEntries = maxEntries;
   }
 
   /**
@@ -76,11 +86,15 @@ export class ResourceCache {
       value,
       expiresAt,
       tags,
+      namespaces,
       lastModified: isCacheableResource(value) && value.updatedAt ? value.updatedAt : new Date().toISOString(),
       version: isCacheableResource(value) && value.version ? value.version : 1,
     };
 
     const cacheKey = this.getCacheKey(type, id);
+    // Re-set moves the key to the end (most-recently-written) so eviction
+    // targets the oldest keys first.
+    this.cache.delete(cacheKey);
     this.cache.set(cacheKey, entry);
 
     // Index by type
@@ -96,6 +110,27 @@ export class ResourceCache {
       namespaces.forEach((namespace: string) => {
         this.addToNamespaceIndex(namespace, cacheKey);
       });
+    }
+
+    this.evictIfOverCapacity();
+  }
+
+  /**
+   * Evict the oldest entries (Map iteration order = insertion order) until the
+   * cache is within MAX_CACHE_ENTRIES. Index cleanup is delegated to
+   * removeFromIndices so tag/type/namespace indices stay consistent.
+   */
+  private evictIfOverCapacity(): void {
+    while (this.cache.size > this.maxEntries) {
+      const oldestKey = this.cache.keys().next().value as string | undefined;
+      if (oldestKey === undefined) {
+        break;
+      }
+      const oldestEntry = this.cache.get(oldestKey);
+      if (oldestEntry) {
+        this.removeFromIndices(oldestKey, oldestEntry);
+      }
+      this.cache.delete(oldestKey);
     }
   }
 
@@ -435,12 +470,14 @@ export class ResourceCache {
     }
 
     // Remove from namespace index
-    if (entry.namespace) {
-      const namespaceIds = this.namespaceIndex.get(entry.namespace);
-      if (namespaceIds) {
-        namespaceIds.delete(id);
-        if (namespaceIds.size === 0) {
-          this.namespaceIndex.delete(entry.namespace);
+    if (entry.namespaces) {
+      for (const namespace of entry.namespaces) {
+        const namespaceIds = this.namespaceIndex.get(namespace);
+        if (namespaceIds) {
+          namespaceIds.delete(id);
+          if (namespaceIds.size === 0) {
+            this.namespaceIndex.delete(namespace);
+          }
         }
       }
     }

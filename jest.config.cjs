@@ -28,6 +28,10 @@ module.exports = {
   setupFiles: ['reflect-metadata'],
   setupFilesAfterEnv: ['<rootDir>/src/__tests__/setup.ts'],
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json', 'node'],
+  // Never resolve modules from the compiled output; tests run against src/.ts.
+  // Without this, build/*.js collides with src/*.ts in module resolution once a
+  // build exists (e.g. ResourceCache resolves to the compiled module).
+  modulePathIgnorePatterns: ['<rootDir>/build/'],
   testMatch: [
     '**/__tests__/**/*.test.ts',
     '**/__tests__/**/*.spec.ts',
