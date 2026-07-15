@@ -113,8 +113,8 @@ export interface MCPContent {
 export const MCPErrorSchema = z.object({
   code: z.union([z.number(), z.string()]),
   message: z.string(),
-  details: z.record(z.unknown()).optional(),
-  data: z.record(z.unknown()).optional(),
+  details: z.record(z.string(), z.unknown()).optional(),
+  data: z.record(z.string(), z.unknown()).optional(),
 });
 
 // Base MCP Response Schema

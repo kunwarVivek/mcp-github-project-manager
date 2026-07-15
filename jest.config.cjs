@@ -5,6 +5,10 @@ module.exports = {
   resolver: '<rootDir>/jest.resolver.cjs',
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1',
+    // nanoid v5 is ESM-only and pulled in transitively by @ai-sdk providers;
+    // map it to a CJS stub so Jest's CommonJS runtime can load AI-touching suites.
+    '^nanoid$': '<rootDir>/src/__tests__/__mocks__/nanoid.cjs',
+    '^nanoid/non-secure$': '<rootDir>/src/__tests__/__mocks__/nanoid.cjs',
   },
   transform: {
     '^.+\\.tsx?$': [
@@ -19,8 +23,15 @@ module.exports = {
       },
     ],
   },
+  // reflect-metadata must load before tsyringe's module init in any suite that
+  // imports the DI graph; a setupFile guarantees it regardless of dep load order.
+  setupFiles: ['reflect-metadata'],
   setupFilesAfterEnv: ['<rootDir>/src/__tests__/setup.ts'],
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json', 'node'],
+  // Never resolve modules from the compiled output; tests run against src/.ts.
+  // Without this, build/*.js collides with src/*.ts in module resolution once a
+  // build exists (e.g. ResourceCache resolves to the compiled module).
+  modulePathIgnorePatterns: ['<rootDir>/build/'],
   testMatch: [
     '**/__tests__/**/*.test.ts',
     '**/__tests__/**/*.spec.ts',

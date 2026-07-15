@@ -50,7 +50,7 @@ export class IssueEnrichmentService {
         model,
         prompt: `${prompt}\n\nIssue: ${params.issueTitle}\nDescription: ${params.issueDescription || 'None'}`,
         temperature: 0.5,
-        maxTokens: 1000
+        maxOutputTokens: 1000
       });
 
       const jsonMatch = response.text.match(/\{[\s\S]*\}/);

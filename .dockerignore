@@ -5,9 +5,7 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 
-# Build output (will rebuild in container)
-build/
-dist/
+# Build output - already built in container
 
 # Test and coverage
 coverage/

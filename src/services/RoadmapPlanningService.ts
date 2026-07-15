@@ -166,7 +166,7 @@ Return ONLY valid JSON. Start sprints from today's date (${new Date().toISOStrin
       model,
       prompt,
       temperature: 0.7,
-      maxTokens: 4000
+      maxOutputTokens: 4000
     });
 
     // Parse JSON response

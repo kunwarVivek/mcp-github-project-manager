@@ -27,7 +27,9 @@ import {
   SprintRisk,
   PrioritizedItem,
   PriorityTier,
-  SprintMetrics
+  SprintMetrics,
+  SPRINT_RISK_CATEGORIES,
+  RISK_PROBABILITIES
 } from '../../domain/sprint-planning-types';
 import { SectionConfidence, ConfidenceFactors, AITask, TaskStatus, TaskPriority } from '../../domain/ai-types';
 import {
@@ -56,9 +58,9 @@ const SprintSuggestionSchema = z.object({
   capacityUtilization: z.number().min(0).max(1),
   reasoning: z.string(),
   risks: z.array(z.object({
-    category: z.string(),
+    category: z.enum(SPRINT_RISK_CATEGORIES),
     description: z.string(),
-    probability: z.enum(['high', 'medium', 'low']),
+    probability: z.enum(RISK_PROBABILITIES),
     mitigation: z.string()
   }))
 });
@@ -540,10 +542,10 @@ export class SprintSuggestionService {
         reasoning: result.object.reasoning,
         risks: result.object.risks.map(r => ({
           id: `ai-risk-${Math.random().toString(36).substr(2, 9)}`,
-          category: r.category as any,
+          category: r.category,
           title: r.description.substring(0, 50),
           description: r.description,
-          probability: r.probability as any,
+          probability: r.probability,
           impact: 'medium' as const,
           relatedItems: []
         })),

@@ -12,6 +12,7 @@ import { HealthService, type HealthServiceDependencies, type HealthStatus } from
 import type { AIServiceFactory } from '../../../src/services/ai/AIServiceFactory.js';
 import type { ResourceCache, CacheStats } from '../../../src/infrastructure/cache/ResourceCache.js';
 import type { AIResiliencePolicy } from '../../../src/infrastructure/resilience/AIResiliencePolicy.js';
+import type { GitHubRepositoryFactory } from '../../../src/infrastructure/github/GitHubRepositoryFactory.js';
 
 // Mock types for testing
 type MockAIServiceFactory = {
@@ -27,12 +28,29 @@ type MockAIResiliencePolicy = {
   getCircuitState: jest.Mock;
 };
 
+type MockGitHubFactory = {
+  getOctokit: jest.Mock;
+};
+
 describe('HealthService', () => {
   let mockAIFactory: MockAIServiceFactory;
   let mockCache: MockResourceCache;
   let mockResilience: MockAIResiliencePolicy;
+  let mockGitHubFactory: MockGitHubFactory;
 
   beforeEach(() => {
+    mockGitHubFactory = {
+      getOctokit: jest.fn().mockReturnValue({
+        rest: {
+          rateLimit: {
+            get: jest.fn().mockResolvedValue({
+              data: { rate: { remaining: 4999, limit: 5000 } },
+            }),
+          },
+        },
+      }),
+    };
+
     mockAIFactory = {
       isAIAvailable: jest.fn().mockReturnValue(true),
       validateConfiguration: jest.fn().mockReturnValue({
@@ -73,14 +91,38 @@ describe('HealthService', () => {
         aiFactory: mockAIFactory as unknown as AIServiceFactory,
         aiResilience: mockResilience as unknown as AIResiliencePolicy,
         cache: mockCache as unknown as ResourceCache,
+        githubFactory: mockGitHubFactory as unknown as GitHubRepositoryFactory,
       });
 
       const status = await healthService.check();
 
       expect(status.status).toBe('healthy');
       expect(status.services.github.connected).toBe(true);
+      expect(status.services.github.rateLimit).toEqual({ remaining: 4999, limit: 5000 });
       expect(status.services.ai.available).toBe(true);
       expect(status.services.ai.circuitState).toBe('closed');
+    });
+
+    it('reports GitHub unhealthy when the rate-limit probe fails', async () => {
+      mockGitHubFactory.getOctokit.mockReturnValue({
+        rest: {
+          rateLimit: {
+            get: jest.fn().mockRejectedValue(new Error('Bad credentials')),
+          },
+        },
+      });
+
+      const healthService = new HealthService({
+        aiFactory: mockAIFactory as unknown as AIServiceFactory,
+        aiResilience: mockResilience as unknown as AIResiliencePolicy,
+        cache: mockCache as unknown as ResourceCache,
+        githubFactory: mockGitHubFactory as unknown as GitHubRepositoryFactory,
+      });
+
+      const status = await healthService.check();
+
+      expect(status.services.github.connected).toBe(false);
+      expect(status.status).toBe('unhealthy');
     });
 
     it('returns degraded when AI unavailable', async () => {
@@ -90,6 +132,7 @@ describe('HealthService', () => {
         aiFactory: mockAIFactory as unknown as AIServiceFactory,
         aiResilience: mockResilience as unknown as AIResiliencePolicy,
         cache: mockCache as unknown as ResourceCache,
+        githubFactory: mockGitHubFactory as unknown as GitHubRepositoryFactory,
       });
 
       const status = await healthService.check();
@@ -105,6 +148,7 @@ describe('HealthService', () => {
         aiFactory: mockAIFactory as unknown as AIServiceFactory,
         aiResilience: mockResilience as unknown as AIResiliencePolicy,
         cache: mockCache as unknown as ResourceCache,
+        githubFactory: mockGitHubFactory as unknown as GitHubRepositoryFactory,
       });
 
       const status = await healthService.check();
@@ -199,13 +243,14 @@ describe('HealthService', () => {
       expect(status.services.ai.circuitState).toBe('disabled');
     });
 
-    it('returns healthy with all dependencies missing', async () => {
+    it('reports GitHub disconnected when no GitHub factory is wired', async () => {
       const healthService = new HealthService();
       const status = await healthService.check();
 
-      // Without aiFactory, AI appears unavailable but GitHub is still ok
-      // So status would be degraded
-      expect(status.services.github.connected).toBe(true);
+      // No GitHub factory means connectivity cannot be verified, so the check
+      // fails honest (connected: false) rather than reporting a hardcoded success.
+      expect(status.services.github.connected).toBe(false);
+      expect(status.status).toBe('unhealthy');
     });
   });
 

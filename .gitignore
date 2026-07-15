@@ -43,3 +43,10 @@ handoffs/
 
 # Debug scripts (development only)
 debug-*.js
+.gitnexus
+
+# Code-graph tool artifacts
+.tokensave/
+graphify-out/
+**/graphify-out/
+GRAPH_REPORT.md

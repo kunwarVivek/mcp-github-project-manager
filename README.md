@@ -209,7 +209,16 @@ ENHANCED_CONTEXT_LEVEL=standard
 INCLUDE_BUSINESS_CONTEXT=false
 INCLUDE_TECHNICAL_CONTEXT=false
 INCLUDE_IMPLEMENTATION_GUIDANCE=false
+
+# Security, secrets, webhooks & cache (optional)
+SECRETS_DIR=/run/secrets          # load secrets from mounted files (Docker/k8s); takes precedence over env vars
+WEBHOOK_SECRET=your_webhook_secret
+WEBHOOK_ALLOW_UNSIGNED=false       # fail closed: reject unsigned webhooks unless explicitly enabled (dev only)
+WEBHOOK_PORT=3001
+MAX_CACHE_ENTRIES=10000            # in-memory cache cap before oldest-first eviction
 ```
+
+See the [Configuration Guide](docs/CONFIGURATION.md) for the complete list.
 
 ### AI Provider Setup
 
@@ -717,36 +726,46 @@ If you prefer to run the MCP server in a Docker container:
 
 1. **Build the Docker Image:**
 
-   Create a `Dockerfile` in your project directory:
+```bash
+docker build -t mcp-gh-project .
+```
 
-   ```dockerfile
-   FROM node:18-alpine
+2. **Run the container:**
 
-   WORKDIR /app
+```bash
+docker run -d \
+  -e GITHUB_TOKEN=your_github_token \
+  -e GITHUB_OWNER=your_github_owner \
+  -e GITHUB_REPO=your_repository_name \
+  mcp-gh-project:latest
+```
 
-   # Install the package globally
-   RUN npm install -g mcp-github-project-manager
+Or with CLI arguments:
 
-   # Default command to run the server
-   CMD ["mcp-github-project-manager"]
-   ```
+```bash
+docker run -d mcp-gh-project:latest \
+  --github_token your_github_token \
+  --github_owner your_owner \
+  --github_repo your_repo
+```
 
-   Build the image:
+3. **Configure Your MCP Client:**
 
-   ```bash
-   docker build -t github-project-manager-mcp .
-   ```
-
-2. **Configure Your MCP Client:**
-
-   Update your MCP client's configuration to use the Docker command:
-
-   ```json
-   {
-     "mcpServers": {
-       "github-project-manager": {
-         "command": "docker",
-         "args": ["run", "-i", "--rm", "github-project-manager-mcp"],
+```json
+{
+  "mcpServers": {
+    "github-project-manager": {
+      "command": "docker",
+      "args": ["run", "-i", "--rm", "-e", "GITHUB_TOKEN", "-e", "GITHUB_OWNER", "-e", "GITHUB_REPO", "mcp-gh-project:latest"],
+      "env": {
+        "GITHUB_TOKEN": "your_token",
+        "GITHUB_OWNER": "your_owner",
+        "GITHUB_REPO": "your_repo"
+      }
+    }
+  }
+}
+```
          "env": {
            "GITHUB_TOKEN": "your_github_token",
            "GITHUB_OWNER": "your_username",
@@ -838,7 +857,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 | Sprint Planning | ✅ Complete | Including metrics tracking |
 | Issue Management | ✅ Complete | With custom fields support |
 | Resource Versioning | ✅ Complete | With optimistic locking and schema validation |
-| Webhook Integration | 📅 Planned | Real-time updates |
+| Webhook Integration | ✅ Complete | Real-time updates; fail-closed HMAC signature validation + SSE streaming |
 
 ### AI-Powered Features
 | Feature | Status | Notes |
@@ -867,17 +886,28 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 |-----------|--------|-------|
 | Tool Definitions | ✅ Complete | All core tools implemented with Zod validation |
 | Resource Management | ✅ Complete | Full CRUD operations with versioning |
-| Security | ✅ Complete | Token validation and scope checking |
+| Security | ✅ Complete | Token validation, fail-closed webhook signatures, file-mounted secrets (`SECRETS_DIR`) |
 | Error Handling | ✅ Complete | According to MCP specifications |
 | Transport | ✅ Complete | Stdio and HTTP support |
 
-See [STATUS.md](STATUS.md) for detailed implementation status.
+See [.planning/STATUS.md](.planning/STATUS.md) for detailed implementation status.
 | Resource Management | ✅ Complete | With optimistic locking and relationship tracking |
 | Response Handling | ✅ Complete | Rich content formatting with multiple content types |
 | Error Handling | ✅ Complete | Comprehensive error mapping to MCP error codes |
 | State Management | ✅ Complete | With conflict resolution and rate limiting |
 
 ### Recent Improvements
+
+- **Dependency & SDK modernization (2026-07-15)**:
+  - Migrated to Vercel AI SDK v5 and Zod v4 (coupled upgrade; MCP SDK 1.29 accepts Zod 4)
+  - Aligned Octokit type packages with `@octokit/rest` 22
+  - Cleared the critical Handlebars vulnerability and all high-severity advisories
+
+- **Architecture & reliability (2026-07-15)**:
+  - Decomposed the `ProjectManagementService` facade (extracted `IssueService`, `RoadmapService`; automation delegates to `ProjectAutomationService`)
+  - Broke a circular dependency; health check now performs a real GitHub rate-limit probe
+  - Fail-closed webhook signature validation; file-mounted secrets (`SECRETS_DIR`) with rotation
+  - Size-bounded cache eviction (`MAX_CACHE_ENTRIES`) and a namespace-index cleanup fix
 
 - **Enhanced Resource System**:
   - Added Zod schema validation for all resource types
@@ -901,32 +931,27 @@ See [STATUS.md](STATUS.md) for detailed implementation status.
 
 ### Identified Functional Gaps
 
-Despite the recent improvements, the following functional gaps still exist and are prioritized for future development:
+Remaining gaps prioritized for future development (updated 2026-07-15). The live,
+code-verified status is in [`docs/remediation/GAP-TRACKER.md`](docs/remediation/GAP-TRACKER.md).
 
-1. **Persistent Caching Strategy**:
-   - While the ResourceCache provides in-memory caching, it lacks persistence across server restarts
-   - No distributed caching for multi-instance deployments
-   - Missing cache eviction policies for memory management
+1. **Distributed Caching**:
+   - ResourceCache now has persistence (`CachePersistence`) and size-bounded
+     oldest-first eviction (`MAX_CACHE_ENTRIES`). Still single-instance only —
+     no distributed/shared cache for multi-instance deployments.
 
-2. **Real-time Event Processing**:
-   - No webhook integration for real-time updates from GitHub
-   - Missing event-based subscription system for clients
-   - Lack of server-sent events (SSE) support for streaming updates
-
-3. **Advanced GitHub Projects v2 Features**:
-   - Limited support for custom field types and validation
-   - Incomplete integration with GitHub's newer Projects v2 field types
-   - Missing automation rule management
-
-4. **Performance Optimization**:
+2. **Performance Optimization**:
    - No query batching for related resources
    - Missing background refresh for frequently accessed resources
    - Incomplete prefetching for related resources
 
-5. **Data Visualization and Reporting**:
+3. **Data Visualization and Reporting** (roadmap phase 11, not yet built):
    - No built-in visualization generators for metrics
    - Missing report generation capabilities
    - Limited time-series data analysis
+
+Resolved since earlier snapshots: real-time webhook integration + SSE streaming,
+automation-rule management, cache persistence + eviction, and a fail-closed
+webhook signature check.
 
 ## Documentation
 
@@ -936,7 +961,7 @@ Despite the recent improvements, the following functional gaps still exist and a
 - [Troubleshooting Guide](docs/TROUBLESHOOTING.md) - Common issues and solutions
 
 ### Reference
-- [Tool Reference](docs/TOOLS.md) - All 115 MCP tools documented
+- [Tool Reference](docs/TOOLS.md) - All 120 MCP tools documented
 - [Architecture](docs/architecture.md) - System design and patterns
 - [API Reference](docs/API.md) - Service and infrastructure APIs
 
@@ -960,11 +985,14 @@ For an interactive exploration of the API, open the [API Explorer](docs/api-expl
 # Unit tests
 npm test
 
-# Integration tests
-npm run test:integration
+# AI service/tool tests
+npm run test:ai
 
 # End-to-end tests
 npm run test:e2e
+
+# E2E MCP tool suite (mocked GitHub/AI)
+npm run test:e2e:tools
 ```
 
 ### Code Quality
@@ -973,7 +1001,7 @@ npm run test:e2e
 npm run lint
 
 # Type check
-npm run type-check
+npx tsc --noEmit
 
 # Format code
 npm run format

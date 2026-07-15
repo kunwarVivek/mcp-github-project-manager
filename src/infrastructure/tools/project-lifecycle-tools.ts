@@ -10,9 +10,10 @@
  * draft issues to real issues in specified repositories.
  */
 
-import { ToolDefinition, ToolSchema } from "./ToolValidator.js";
-import { ANNOTATION_PATTERNS } from "./annotations/tool-annotations.js";
-import { GitHubRepositoryFactory } from "../github/GitHubRepositoryFactory.js";
+import { ToolDefinition, ToolSchema } from "./ToolValidator";
+import { ANNOTATION_PATTERNS } from "./annotations/tool-annotations";
+import { createGitHubFactory } from "./tool-factory";
+import type { GitHubRepositoryFactory } from "../github/GitHubRepositoryFactory";
 import {
   CloseProjectInputSchema,
   CloseProjectInput,
@@ -24,7 +25,7 @@ import {
   ProjectLifecycleOutput,
   ConvertedIssueOutputSchema,
   ConvertedIssueOutput,
-} from "./schemas/project-lifecycle-schemas.js";
+} from "./schemas/project-lifecycle-schemas";
 
 // ============================================================================
 // GraphQL Queries and Mutations
@@ -76,23 +77,6 @@ const RESOLVE_REPOSITORY_ID_QUERY = `
 // Helper Functions
 // ============================================================================
 
-/**
- * Create a GitHubRepositoryFactory from environment variables.
- *
- * Lifecycle operations work at the project level (via projectId), so owner/repo
- * are only needed for factory initialization. We use placeholders since lifecycle
- * operations don't actually require a specific repo context.
- */
-function createFactory(): GitHubRepositoryFactory {
-  const token = process.env.GITHUB_TOKEN;
-  if (!token) {
-    throw new Error("GITHUB_TOKEN environment variable is required");
-  }
-
-  // Owner/repo are required by factory but not used for lifecycle operations
-  // which work purely with project node IDs
-  return new GitHubRepositoryFactory(token, "placeholder", "placeholder");
-}
 
 /**
  * Resolves a repository owner/name to its GitHub node ID.
@@ -267,7 +251,7 @@ export async function executeCloseProject(
   content: Array<{ type: "text"; text: string }>;
   structuredContent: ProjectLifecycleOutput;
 }> {
-  const factory = createFactory();
+  const factory = createGitHubFactory();
 
   const response = await factory.graphql<UpdateProjectV2Response>(
     UPDATE_PROJECT_MUTATION,
@@ -314,7 +298,7 @@ export async function executeReopenProject(
   content: Array<{ type: "text"; text: string }>;
   structuredContent: ProjectLifecycleOutput;
 }> {
-  const factory = createFactory();
+  const factory = createGitHubFactory();
 
   const response = await factory.graphql<UpdateProjectV2Response>(
     UPDATE_PROJECT_MUTATION,
@@ -361,7 +345,7 @@ export async function executeConvertDraftIssue(
   content: Array<{ type: "text"; text: string }>;
   structuredContent: ConvertedIssueOutput;
 }> {
-  const factory = createFactory();
+  const factory = createGitHubFactory();
 
   // Resolve the repository owner/name to its node ID
   const repositoryId = await resolveRepositoryId(factory, args.owner, args.repo);

@@ -25,7 +25,9 @@ import {
   RiskProbability,
   RiskImpact,
   MitigationStrategy,
-  MitigationEffort
+  MitigationEffort,
+  SPRINT_RISK_CATEGORIES,
+  RISK_PROBABILITIES
 } from '../../domain/sprint-planning-types';
 import { DetectedDependency } from '../../analysis/DependencyGraph';
 import { SectionConfidence, ConfidenceFactors } from '../../domain/ai-types';
@@ -42,15 +44,15 @@ import {
  * Schema for AI risk assessment response.
  */
 const SprintRiskAssessmentSchema = z.object({
-  overallRisk: z.enum(['high', 'medium', 'low']),
+  overallRisk: z.enum(RISK_PROBABILITIES),
   riskScore: z.number().min(0).max(100),
   risks: z.array(z.object({
     id: z.string(),
-    category: z.enum(['scope', 'dependency', 'capacity', 'technical', 'external']),
+    category: z.enum(SPRINT_RISK_CATEGORIES),
     title: z.string(),
     description: z.string(),
-    probability: z.enum(['high', 'medium', 'low']),
-    impact: z.enum(['high', 'medium', 'low']),
+    probability: z.enum(RISK_PROBABILITIES),
+    impact: z.enum(RISK_PROBABILITIES),
     relatedItems: z.array(z.string())
   })),
   mitigations: z.array(z.object({
@@ -126,15 +128,15 @@ export class SprintRiskAssessor {
       const confidence = this.calculateConfidence(params, result.object.riskScore, true);
 
       return {
-        overallRisk: result.object.overallRisk as RiskProbability,
+        overallRisk: result.object.overallRisk,
         riskScore: result.object.riskScore,
         risks: result.object.risks.map(r => ({
           id: r.id,
-          category: r.category as SprintRiskCategory,
+          category: r.category,
           title: r.title,
           description: r.description,
-          probability: r.probability as RiskProbability,
-          impact: r.impact as RiskImpact,
+          probability: r.probability,
+          impact: r.impact,
           relatedItems: r.relatedItems
         })),
         mitigations: result.object.mitigations.map(m => ({

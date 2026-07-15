@@ -71,7 +71,7 @@ export class DependencyContextGenerator {
         system: this.getSystemPrompt(),
         prompt,
         schema: DependencyContextGenerationSchema,
-        maxTokens: 1500,
+        maxOutputTokens: 1500,
         temperature: 0.3
       });
 

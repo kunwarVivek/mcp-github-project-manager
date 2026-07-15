@@ -1,8 +1,8 @@
 import { z } from "zod";
 import { McpError, ErrorCode } from "@modelcontextprotocol/sdk/types.js";
-import { MCPResponseFormatter } from "../mcp/MCPResponseFormatter.js";
-import { MCPErrorCode, MCPErrorData } from "../../domain/mcp-types.js";
-import { ParameterCoercion } from "./ParameterCoercion.js";
+import { MCPResponseFormatter } from "../mcp/MCPResponseFormatter";
+import { MCPErrorCode, MCPErrorData } from "../../domain/mcp-types";
+import { ParameterCoercion } from "./ParameterCoercion";
 
 export type ToolSchema<T> = z.ZodType<T>;
 
@@ -78,7 +78,7 @@ export class ToolValidator {
     } catch (error) {
       if (error instanceof z.ZodError) {
         // Format Zod validation errors
-        const details = error.errors.map(err => ({
+        const details = error.issues.map(err => ({
           path: err.path.join('.'),
           message: err.message,
           code: err.code
@@ -86,7 +86,7 @@ export class ToolValidator {
 
         throw new McpError(
           ErrorCode.InvalidParams,
-          `Invalid parameters for tool ${toolName}: ${error.errors.map(e => e.message).join(", ")}`,
+          `Invalid parameters for tool ${toolName}: ${error.issues.map(e => e.message).join(", ")}`,
           { details }
         );
       }

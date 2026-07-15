@@ -117,6 +117,36 @@ At least one AI API key is required for AI-powered features (PRD generation, tas
 | `NODE_ENV` | `development` | Environment: `development`, `test`, `production` |
 | `LOG_LEVEL` | `info` | Logging level: `debug`, `info`, `warn`, `error` |
 
+### Secrets
+
+Any config/secret can be supplied via a mounted file instead of an environment
+variable — the Docker secrets / Kubernetes mounted-secret convention.
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `SECRETS_DIR` | _(unset)_ | Directory of secret files named after each variable (e.g. `/run/secrets`). When set, a file `SECRETS_DIR/<NAME>` takes precedence over the `<NAME>` env var. Files are re-read on access, so rotating the mounted file is picked up. |
+
+To integrate HashiCorp Vault or AWS Secrets Manager, implement `SecretProvider`
+in `src/infrastructure/secrets/` and add it to the resolver chain.
+
+### Events, Webhooks & Sync
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `SYNC_ENABLED` | `true` | Enable bidirectional GitHub state sync |
+| `SYNC_TIMEOUT_MS` | _(impl default)_ | Sync operation timeout |
+| `CACHE_DIRECTORY` | `.mcp-cache` | Directory for cache persistence |
+| `WEBHOOK_SECRET` | _(unset)_ | HMAC secret for GitHub webhook signature validation |
+| `WEBHOOK_ALLOW_UNSIGNED` | `false` | **Security:** when no `WEBHOOK_SECRET` is set, webhooks are rejected (fail closed). Set `true` only in trusted dev to accept unsigned webhooks. |
+| `WEBHOOK_PORT` | `3001` | Port for the webhook HTTP listener |
+| `SSE_ENABLED` | `true` | Enable server-sent events streaming |
+
+### Cache
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `MAX_CACHE_ENTRIES` | `10000` | Maximum in-memory resource-cache entries before oldest-first eviction |
+
 ---
 
 ## Configuration Methods

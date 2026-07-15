@@ -239,7 +239,7 @@ export const AutomationRuleOutputSchema = z.object({
   })),
   actions: z.array(z.object({
     type: z.string(),
-    parameters: z.record(z.unknown()),
+    parameters: z.record(z.string(), z.unknown()),
   })),
   createdAt: z.string(),
   updatedAt: z.string(),
@@ -258,7 +258,7 @@ export const EventOutputSchema = z.object({
   resourceType: z.string(),
   resourceId: z.string(),
   timestamp: z.string(),
-  data: z.record(z.unknown()).optional(),
+  data: z.record(z.string(), z.unknown()).optional(),
 });
 
 export const EventListOutputSchema = z.object({

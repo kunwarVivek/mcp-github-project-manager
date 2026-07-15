@@ -9,7 +9,7 @@ import {
   ZodEnum,
   type ZodTypeAny,
 } from "zod";
-import { ToolDefinition, ToolAnnotations } from "./ToolValidator.js";
+import { ToolDefinition, ToolAnnotations } from "./ToolValidator";
 import {
   // Original tools
   createRoadmapTool,
@@ -143,7 +143,7 @@ import {
   unmarkProjectAsTemplateTool,
   copyProjectFromTemplateTool,
   listOrganizationTemplatesTool,
-} from "./ToolSchemas.js";
+} from "./ToolSchemas";
 
 // Sub-issue tool executors
 import {
@@ -152,10 +152,10 @@ import {
   executeGetParentIssue,
   executeReprioritizeSubIssue,
   executeRemoveSubIssue,
-} from "./sub-issue-tools.js";
+} from "./sub-issue-tools";
 
 // Health check tool
-import { healthCheckTool } from "./health-tools.js";
+import { healthCheckTool } from "./health-tools";
 
 // Project linking tools
 import {
@@ -171,21 +171,21 @@ import {
   executeUnlinkProjectFromTeam,
   executeListLinkedRepositories,
   executeListLinkedTeams,
-} from "./project-linking-tools.js";
+} from "./project-linking-tools";
 
 // Project lifecycle tools
 import {
   closeProjectTool,
   reopenProjectTool,
   convertDraftIssueTool,
-} from "./project-lifecycle-tools.js";
+} from "./project-lifecycle-tools";
 
 // Advanced operations tools
 import {
   updateItemPositionTool,
   searchIssuesAdvancedTool,
   filterProjectItemsTool,
-} from "./project-advanced-tools.js";
+} from "./project-advanced-tools";
 
 // Sprint AI tools (Phase 10)
 import {
@@ -194,14 +194,14 @@ import {
   prioritizeBacklogTool,
   assessSprintRiskTool,
   suggestSprintCompositionTool,
-} from "./sprint-ai-tools.js";
+} from "./sprint-ai-tools";
 
 // Roadmap AI tools (Phase 10)
 import {
   roadmapAITools,
   generateRoadmapTool as generateAIRoadmapTool,
   generateRoadmapVisualizationTool,
-} from "./roadmap-ai-tools.js";
+} from "./roadmap-ai-tools";
 
 // Issue Intelligence tools (Phase 11: AI-17 to AI-20)
 import {
@@ -209,7 +209,23 @@ import {
   suggestLabelsTool,
   detectDuplicatesTool,
   findRelatedIssuesTool,
-} from "./issue-intelligence-tools.js";
+} from "./issue-intelligence-tools";
+
+/**
+ * Convert a Zod schema to JSON Schema.
+ *
+ * `zodToJsonSchema`'s generic return type recurses infinitely when applied to a
+ * broad `ZodType<unknown>` (TS2589). Binding it once to a concrete
+ * `(schema: ZodTypeAny) => Record<string, unknown>` signature severs the deep
+ * generic instantiation without changing runtime behavior.
+ */
+const zodToJson = zodToJsonSchema as unknown as (
+  schema: ZodTypeAny,
+  options?: { $refStrategy?: string },
+) => Record<string, unknown>;
+
+const toJsonSchema = (schema: ZodTypeAny): Record<string, unknown> =>
+  zodToJson(schema, { $refStrategy: "none" });
 
 /**
  * Central registry of all available tools
@@ -274,10 +290,8 @@ export class ToolRegistry {
       name: tool.name,
       title: tool.title,
       description: tool.description,
-      inputSchema: zodToJsonSchema(tool.schema, { $refStrategy: "none" }) as Record<string, unknown>,
-      outputSchema: tool.outputSchema
-        ? zodToJsonSchema(tool.outputSchema, { $refStrategy: "none" }) as Record<string, unknown>
-        : undefined,
+      inputSchema: toJsonSchema(tool.schema),
+      outputSchema: tool.outputSchema ? toJsonSchema(tool.outputSchema) : undefined,
       annotations: tool.annotations,
     }));
   }
@@ -462,121 +476,4 @@ export class ToolRegistry {
     this.registerTool(findRelatedIssuesTool);
   }
 
-  /**
-   * Convert Zod schema to JSON Schema (simplified version)
-   * @deprecated Use zodToJsonSchema from zod-to-json-schema library instead.
-   * This method is kept for backward compatibility but is no longer used.
-   */
-  private convertZodToJsonSchema(schema: ZodTypeAny): Record<string, unknown> {
-    try {
-      // Access the internal representation of the schema
-      // This is a simplified approach - in a real app, use a proper library
-      const jsonSchema: {
-        type: string;
-        properties: Record<string, unknown>;
-        required: string[];
-      } = {
-        type: "object",
-        properties: {},
-        required: [],
-      };
-
-      // Attempt to extract shape from the schema
-      if (schema instanceof ZodObject) {
-        const shape = schema._def.shape();
-
-        // Extract properties and required fields
-        for (const [key, zodType] of Object.entries(shape) as [string, ZodTypeAny][]) {
-          // Check if the field is required (not optional)
-          if (!(zodType instanceof ZodOptional)) {
-            jsonSchema.required.push(key);
-          }
-
-          // Map Zod types to JSON Schema types (simplified)
-          jsonSchema.properties[key] = this.zodTypeToJsonSchemaType(zodType);
-        }
-      }
-
-      return jsonSchema;
-    } catch (error) {
-      process.stderr.write(`Error converting Zod schema to JSON Schema: ${error instanceof Error ? error.message : String(error)}\n`);
-      // Fallback to basic object schema
-      return {
-        type: "object",
-        properties: {},
-      };
-    }
-  }
-
-  /**
-   * Simplified conversion of Zod type to JSON Schema type.
-   * @deprecated Use zodToJsonSchema from zod-to-json-schema library instead.
-   * This method is kept for backward compatibility but is no longer used.
-   */
-  private zodTypeToJsonSchemaType(zodType: ZodTypeAny): Record<string, unknown> {
-    try {
-      // Handle optional types first
-      if (zodType instanceof ZodOptional) {
-        return this.zodTypeToJsonSchemaType(zodType._def.innerType);
-      }
-
-      // String type
-      if (zodType instanceof ZodString) {
-        return { type: "string" };
-      }
-
-      // Number type
-      if (zodType instanceof ZodNumber) {
-        return { type: "number" };
-      }
-
-      // Boolean type
-      if (zodType instanceof ZodBoolean) {
-        return { type: "boolean" };
-      }
-
-      // Array type
-      if (zodType instanceof ZodArray) {
-        return {
-          type: "array",
-          items: this.zodTypeToJsonSchemaType(zodType._def.type),
-        };
-      }
-
-      // Object type
-      if (zodType instanceof ZodObject) {
-        const properties: Record<string, unknown> = {};
-        const required: string[] = [];
-
-        const shape = zodType._def.shape();
-        for (const [key, fieldType] of Object.entries(shape) as [string, ZodTypeAny][]) {
-          properties[key] = this.zodTypeToJsonSchemaType(fieldType);
-
-          // Check if the field is required (not optional)
-          if (!(fieldType instanceof ZodOptional)) {
-            required.push(key);
-          }
-        }
-
-        return {
-          type: "object",
-          properties,
-          required: required.length > 0 ? required : undefined,
-        };
-      }
-
-      // Enum type
-      if (zodType instanceof ZodEnum) {
-        return {
-          enum: zodType._def.values,
-        };
-      }
-
-      // Default fallback
-      return { type: "string" };
-    } catch (error) {
-      process.stderr.write(`Error mapping Zod type: ${error instanceof Error ? error.message : String(error)}\n`);
-      return { type: "string" };
-    }
-  }
 }

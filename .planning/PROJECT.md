@@ -115,11 +115,26 @@ A comprehensive Model Context Protocol (MCP) server that provides AI-powered Git
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
-| GraphQL-first for GitHub API | REST API incomplete, GraphQL has full feature coverage | — Pending |
-| Vercel AI SDK for AI abstraction | Multi-provider support, unified interface | ✓ Good |
-| Zod for validation | Type-safe schemas, good DX, MCP SDK compatible | ✓ Good |
-| tsyringe for DI | Lightweight, decorator-based, test-friendly | — Pending |
-| In-memory cache default | Simple, works for single-instance | ⚠️ Revisit (needs persistence option) |
+| GraphQL-first for GitHub API | REST API incomplete, GraphQL has full feature coverage | ✓ Shipped (Octokit GraphQL/REST via GitHubRepositoryFactory) |
+| Vercel AI SDK for AI abstraction | Multi-provider support, unified interface | ✓ Good — on v5 (upgraded 2026-07-15) |
+| Zod for validation | Type-safe schemas, good DX, MCP SDK compatible | ✓ Good — on v4 (upgraded 2026-07-15; MCP SDK 1.29 accepts it) |
+| tsyringe for DI | Lightweight, decorator-based, test-friendly | ✓ Shipped (container.ts wires the facade + extracted services) |
+| In-memory cache default | Simple, works for single-instance | ✓ Good — persistence + size-bounded eviction added (G2-08); distributed cache still single-instance-only |
+| Env-var secrets | Simple, 12-factor | ⚠️ Extended — file-mounted secrets (`SECRETS_DIR`) added (G6-05); Vault/AWS SM are an extension point |
+
+## Document Chain (PRD → FRD → Delivery)
+
+This PRD is the top of a traceable chain. Keep them in sync:
+
+| Level | Document | Role |
+|-------|----------|------|
+| PRD | `PROJECT.md` (this file) | Product intent, core value, constraints, decisions |
+| FRD | `REQUIREMENTS.md` | Functional requirements (GHAPI/MCP/DEBT/AI/PROD IDs) + phase traceability |
+| Roadmap | `ROADMAP.md` | 12-phase delivery sequence, each mapped to FRD IDs |
+| Status | `STATUS.md` | Phase completion (reconciled 2026-07-15) |
+| Live remediation | `docs/remediation/GAP-TRACKER.md` + `PLAN.md` | Authoritative post-v1.1.0 gap + fix status |
+
+Superseded: `docs/GAP-ANALYSIS-LIVE.md` (stale snapshot).
 
 ---
-*Last updated: 2026-01-30 after initialization*
+*Last updated: 2026-07-15 — reconciled decisions + added PRD→FRD document chain*

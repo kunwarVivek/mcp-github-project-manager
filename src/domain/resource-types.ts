@@ -124,6 +124,22 @@ export interface ResourceUpdateOptions {
   namespaces?: string[];
 }
 
+/**
+ * Per-resource synchronization metadata tracked by the cache, persistence
+ * adapter, and GitHub state sync service. Lives in the domain layer so
+ * infrastructure (cache, persistence) and services can all depend on it
+ * without infrastructure importing from the service layer (which previously
+ * created a FilePersistenceAdapter <-> GitHubStateSyncService import cycle).
+ */
+export interface SyncMetadata {
+  resourceId: string;
+  resourceType: ResourceType;
+  lastModified: string;
+  etag?: string;
+  version: number;
+  syncedAt: string;
+}
+
 export interface ResourceRepository<T extends Resource> {
   create(data: Omit<T, "id" | "createdAt" | "updatedAt">): Promise<T>;
   update(id: string, data: Partial<T>): Promise<T>;

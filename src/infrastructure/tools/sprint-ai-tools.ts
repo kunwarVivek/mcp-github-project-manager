@@ -11,12 +11,12 @@
  * with proper annotations, input/output schemas, and executors.
  */
 
-import { ToolDefinition, ToolSchema } from "./ToolValidator.js";
-import { ANNOTATION_PATTERNS } from "./annotations/tool-annotations.js";
-import { SprintCapacityAnalyzer } from "../../services/ai/SprintCapacityAnalyzer.js";
-import { BacklogPrioritizer } from "../../services/ai/BacklogPrioritizer.js";
-import { SprintRiskAssessor } from "../../services/ai/SprintRiskAssessor.js";
-import { SprintSuggestionService } from "../../services/ai/SprintSuggestionService.js";
+import { ToolDefinition, ToolSchema } from "./ToolValidator";
+import { ANNOTATION_PATTERNS } from "./annotations/tool-annotations";
+import { SprintCapacityAnalyzer } from "../../services/ai/SprintCapacityAnalyzer";
+import { BacklogPrioritizer } from "../../services/ai/BacklogPrioritizer";
+import { SprintRiskAssessor } from "../../services/ai/SprintRiskAssessor";
+import { SprintSuggestionService } from "../../services/ai/SprintSuggestionService";
 import {
   SprintCapacityInputSchema,
   SprintCapacityInput,
@@ -34,7 +34,7 @@ import {
   SprintSuggestionInput,
   SprintSuggestionOutputSchema,
   SprintSuggestionOutput,
-} from "./schemas/sprint-roadmap-schemas.js";
+} from "./schemas/sprint-roadmap-schemas";
 
 // ============================================================================
 // Tool Definitions

@@ -19,7 +19,7 @@ export const ProjectSchema = BaseResourceSchema.extend({
   description: z.string().optional(),
   repositoryUrl: z.string().url().optional(),
   owner: z.string().optional(),
-  settings: z.record(z.any()).optional()
+  settings: z.record(z.string(), z.any()).optional()
 });
 
 // Schema for Issue resources

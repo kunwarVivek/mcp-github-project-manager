@@ -376,7 +376,7 @@ export class AIServiceFactory {
           await generateText({
             model,
             prompt: 'Test connection',
-            maxTokens: 10
+            maxOutputTokens: 10
           });
           results.anthropic = true;
         }

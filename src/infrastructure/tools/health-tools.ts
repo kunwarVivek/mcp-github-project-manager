@@ -10,6 +10,8 @@ import { ToolDefinition, ToolSchema } from './ToolValidator.js';
 import { HealthService } from '../health/index.js';
 import { AIServiceFactory } from '../../services/ai/AIServiceFactory.js';
 import { ResourceCache } from '../cache/ResourceCache.js';
+import { GitHubRepositoryFactory } from '../github/GitHubRepositoryFactory.js';
+import { GITHUB_TOKEN, GITHUB_OWNER, GITHUB_REPO } from '../../env.js';
 
 /**
  * Schema for health_check tool input (no parameters required)
@@ -69,7 +71,7 @@ export const healthCheckTool: ToolDefinition<HealthCheckArgs, HealthStatusOutput
     readOnlyHint: true,
     destructiveHint: false,
     idempotentHint: true,
-    openWorldHint: false, // Does not make external calls (GitHub check is placeholder)
+    openWorldHint: true, // Makes an external call: GitHub REST rate-limit probe
   },
   examples: [
     {
@@ -92,6 +94,7 @@ export async function executeHealthCheck(): Promise<HealthStatusOutput> {
   const healthService = new HealthService({
     aiFactory: AIServiceFactory.getInstance(),
     cache: ResourceCache.getInstance(),
+    githubFactory: new GitHubRepositoryFactory(GITHUB_TOKEN, GITHUB_OWNER, GITHUB_REPO),
     // Note: aiResilience is not wired here as it requires explicit enablement
     // The health check will show circuitState: 'disabled' in this case
   });

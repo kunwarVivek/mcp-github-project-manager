@@ -58,48 +58,23 @@ import {
 } from "../domain/automation-types";
 
 // Import extracted services
-import { SubIssueService, IssueDependency, IssueHistoryEntry } from "./SubIssueService";
-import { MilestoneService, MilestoneMetrics } from "./MilestoneService";
-import { SprintPlanningService, SprintMetrics } from "./SprintPlanningService";
+import { SubIssueService } from "./SubIssueService";
+import type { IssueDependency, IssueHistoryEntry } from "./SubIssueService";
+import { IssueService } from "./IssueService";
+import { RoadmapService } from "./RoadmapService";
+import { ProjectAutomationService } from "./ProjectAutomationService";
+import { MilestoneService } from "./MilestoneService";
+import type { MilestoneMetrics } from "./MilestoneService";
+import { SprintPlanningService } from "./SprintPlanningService";
+import type { SprintMetrics } from "./SprintPlanningService";
 import { ProjectStatusService } from "./ProjectStatusService";
 import { ProjectTemplateService } from "./ProjectTemplateService";
 import { ProjectLinkingService } from "./ProjectLinkingService";
 
-// Re-export interfaces for backward compatibility
-export { MilestoneMetrics } from "./MilestoneService";
-export { SprintMetrics } from "./SprintPlanningService";
-export { IssueDependency, IssueHistoryEntry } from "./SubIssueService";
+export type { IssueDependency, IssueHistoryEntry, MilestoneMetrics, SprintMetrics };
+export { SubIssueService, MilestoneService, SprintPlanningService, ProjectStatusService, ProjectTemplateService, ProjectLinkingService };
 
 // Validation schema for roadmap creation
-const CreateRoadmapSchema = z.object({
-  project: z.object({
-    title: z.string().min(1, "Project title is required"),
-    shortDescription: z.string().optional(),
-    owner: z.string(),
-    visibility: z.enum(['private', 'public']).optional(),
-    views: z.array(z.any()).optional(),
-    fields: z.array(z.any()).optional()
-  }),
-  milestones: z.array(
-    z.object({
-      milestone: z.object({
-        title: z.string().min(1, "Milestone title is required"),
-        description: z.string().optional(),
-        dueDate: z.string().optional(),
-      }),
-      issues: z.array(
-        z.object({
-          title: z.string().min(1, "Issue title is required"),
-          description: z.string(),
-          assignees: z.array(z.string()).optional(),
-          labels: z.array(z.string()).optional(),
-          milestoneId: z.string().optional()
-        })
-      )
-    })
-  )
-});
-
 /**
  * ProjectManagementService - Facade for GitHub project management
  *
@@ -116,6 +91,9 @@ export class ProjectManagementService {
   private readonly projectStatusService: ProjectStatusService;
   private readonly templateService: ProjectTemplateService;
   private readonly linkingService: ProjectLinkingService;
+  private readonly issueService: IssueService;
+  private readonly roadmapService: RoadmapService;
+  private readonly automationService: ProjectAutomationService;
 
   /**
    * Create a new ProjectManagementService with all dependencies injected.
@@ -127,6 +105,8 @@ export class ProjectManagementService {
    * @param projectStatusService - Service for project CRUD
    * @param templateService - Service for project customization
    * @param linkingService - Service for project item operations
+   * @param issueService - Service for issue CRUD, comments, and draft issues
+   * @param roadmapService - Service for full-roadmap creation
    */
   constructor(
     factory: GitHubRepositoryFactory,
@@ -135,7 +115,10 @@ export class ProjectManagementService {
     sprintPlanningService: SprintPlanningService,
     projectStatusService: ProjectStatusService,
     templateService: ProjectTemplateService,
-    linkingService: ProjectLinkingService
+    linkingService: ProjectLinkingService,
+    issueService: IssueService,
+    roadmapService: RoadmapService,
+    automationService: ProjectAutomationService
   ) {
     this.factory = factory;
     this.subIssueService = subIssueService;
@@ -144,6 +127,9 @@ export class ProjectManagementService {
     this.projectStatusService = projectStatusService;
     this.templateService = templateService;
     this.linkingService = linkingService;
+    this.issueService = issueService;
+    this.roadmapService = roadmapService;
+    this.automationService = automationService;
   }
 
   // ============================================================================
@@ -152,26 +138,6 @@ export class ProjectManagementService {
 
   getRepositoryFactory(): GitHubRepositoryFactory {
     return this.factory;
-  }
-
-  private get issueRepo(): GitHubIssueRepository {
-    return this.factory.createIssueRepository();
-  }
-
-  private get milestoneRepo(): GitHubMilestoneRepository {
-    return this.factory.createMilestoneRepository();
-  }
-
-  private get projectRepo(): GitHubProjectRepository {
-    return this.factory.createProjectRepository();
-  }
-
-  private get sprintRepo(): GitHubSprintRepository {
-    return this.factory.createSprintRepository();
-  }
-
-  private get automationRepo() {
-    return this.factory.createAutomationRuleRepository();
   }
 
   private mapErrorToMCPError(error: unknown): Error {
@@ -413,63 +379,7 @@ export class ProjectManagementService {
     project: Project;
     milestones: Array<Milestone & { issues: Issue[] }>;
   }> {
-    try {
-      const validatedData = CreateRoadmapSchema.parse(data);
-
-      const projectData = {
-        ...validatedData.project,
-        type: ResourceType.PROJECT,
-        status: ResourceStatus.ACTIVE,
-        visibility: validatedData.project.visibility || 'private',
-        views: [] as ProjectView[],
-        fields: [] as CustomField[],
-        shortDescription: validatedData.project.shortDescription,
-      };
-
-      const project = await this.projectRepo.create(
-        createResource(ResourceType.PROJECT, projectData)
-      );
-
-      const milestones = [];
-
-      for (const { milestone, issues } of validatedData.milestones) {
-        try {
-          const milestoneWithRequiredFields = {
-            ...milestone,
-            description: milestone.description || ''
-          };
-
-          const createdMilestone = await this.milestoneRepo.create(milestoneWithRequiredFields);
-
-          const createdIssues = await Promise.all(
-            issues.map(async (issue) => {
-              try {
-                return await this.issueRepo.create({
-                  ...issue,
-                  milestoneId: createdMilestone.id,
-                });
-              } catch (error) {
-                throw this.mapErrorToMCPError(error);
-              }
-            })
-          );
-
-          milestones.push({
-            ...createdMilestone,
-            issues: createdIssues,
-          });
-        } catch (error) {
-          throw this.mapErrorToMCPError(error);
-        }
-      }
-
-      return { project, milestones };
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        throw new ValidationError(`Invalid roadmap data: ${error.message}`);
-      }
-      throw this.mapErrorToMCPError(error);
-    }
+    return this.roadmapService.createRoadmap(data);
   }
 
   // ============================================================================
@@ -485,23 +395,7 @@ export class ProjectManagementService {
     priority?: string;
     type?: string;
   }): Promise<Issue> {
-    try {
-      const labels = data.labels || [];
-      if (data.priority) labels.push(`priority:${data.priority}`);
-      if (data.type) labels.push(`type:${data.type}`);
-
-      const issueData: CreateIssue = {
-        title: data.title,
-        description: data.description,
-        assignees: data.assignees || [],
-        labels,
-        milestoneId: data.milestoneId,
-      };
-
-      return await this.issueRepo.create(issueData);
-    } catch (error) {
-      throw this.mapErrorToMCPError(error);
-    }
+    return this.issueService.createIssue(data);
   }
 
   async listIssues(options: {
@@ -513,65 +407,11 @@ export class ProjectManagementService {
     direction?: string;
     limit?: number;
   } = {}): Promise<Issue[]> {
-    try {
-      const {
-        status = 'open',
-        milestone,
-        labels = [],
-        assignee,
-        sort = 'created',
-        direction = 'desc',
-        limit = 30
-      } = options;
-
-      let issues: Issue[];
-      if (milestone) {
-        issues = await this.issueRepo.findByMilestone(milestone);
-      } else {
-        issues = await this.issueRepo.findAll();
-      }
-
-      if (status !== 'all') {
-        const resourceStatus = status === 'open' ? ResourceStatus.ACTIVE : ResourceStatus.CLOSED;
-        issues = issues.filter(issue => issue.status === resourceStatus);
-      }
-
-      if (labels.length > 0) {
-        issues = issues.filter(issue => labels.every(label => issue.labels.includes(label)));
-      }
-
-      if (assignee) {
-        issues = issues.filter(issue => issue.assignees.includes(assignee));
-      }
-
-      issues.sort((a, b) => {
-        let valueA, valueB;
-        switch(sort) {
-          case 'updated':
-            valueA = a.updatedAt;
-            valueB = b.updatedAt;
-            break;
-          case 'created':
-          default:
-            valueA = a.createdAt;
-            valueB = b.createdAt;
-        }
-        const comparison = valueA.localeCompare(valueB);
-        return direction === 'desc' ? -comparison : comparison;
-      });
-
-      return issues.slice(0, limit);
-    } catch (error) {
-      throw this.mapErrorToMCPError(error);
-    }
+    return this.issueService.listIssues(options);
   }
 
   async getIssue(issueId: string): Promise<Issue | null> {
-    try {
-      return await this.issueRepo.findById(issueId);
-    } catch (error) {
-      throw this.mapErrorToMCPError(error);
-    }
+    return this.issueService.getIssue(issueId);
   }
 
   async updateIssue(
@@ -585,25 +425,7 @@ export class ProjectManagementService {
       labels?: string[];
     }
   ): Promise<Issue> {
-    try {
-      const data: Partial<Issue> = {};
-      if (updates.title) data.title = updates.title;
-      if (updates.description) data.description = updates.description;
-      if (updates.status) {
-        data.status = updates.status === 'open' ? ResourceStatus.ACTIVE : ResourceStatus.CLOSED;
-      }
-      if (updates.assignees) data.assignees = updates.assignees;
-      if (updates.labels) data.labels = updates.labels;
-      if (updates.milestoneId === null) {
-        data.milestoneId = undefined;
-      } else if (updates.milestoneId !== undefined) {
-        data.milestoneId = updates.milestoneId;
-      }
-
-      return await this.issueRepo.update(issueId, data);
-    } catch (error) {
-      throw this.mapErrorToMCPError(error);
-    }
+    return this.issueService.updateIssue(issueId, updates);
   }
 
   // ============================================================================
@@ -614,98 +436,25 @@ export class ProjectManagementService {
     issueNumber: number;
     body: string;
   }): Promise<{ id: number; body: string; user: string; createdAt: string; updatedAt: string }> {
-    try {
-      const octokit = this.factory.getOctokit();
-      const config = this.factory.getConfig();
-
-      const response = await octokit.rest.issues.createComment({
-        owner: config.owner,
-        repo: config.repo,
-        issue_number: data.issueNumber,
-        body: data.body
-      });
-
-      return {
-        id: response.data.id,
-        body: response.data.body || '',
-        user: response.data.user?.login || 'unknown',
-        createdAt: response.data.created_at,
-        updatedAt: response.data.updated_at
-      };
-    } catch (error) {
-      throw this.mapErrorToMCPError(error);
-    }
+    return this.issueService.createIssueComment(data);
   }
 
   async updateIssueComment(data: {
     commentId: number;
     body: string;
   }): Promise<{ id: number; body: string; user: string; createdAt: string; updatedAt: string }> {
-    try {
-      const octokit = this.factory.getOctokit();
-      const config = this.factory.getConfig();
-
-      const response = await octokit.rest.issues.updateComment({
-        owner: config.owner,
-        repo: config.repo,
-        comment_id: data.commentId,
-        body: data.body
-      });
-
-      return {
-        id: response.data.id,
-        body: response.data.body || '',
-        user: response.data.user?.login || 'unknown',
-        createdAt: response.data.created_at,
-        updatedAt: response.data.updated_at
-      };
-    } catch (error) {
-      throw this.mapErrorToMCPError(error);
-    }
+    return this.issueService.updateIssueComment(data);
   }
 
   async deleteIssueComment(data: { commentId: number }): Promise<{ success: boolean; message: string }> {
-    try {
-      const octokit = this.factory.getOctokit();
-      const config = this.factory.getConfig();
-
-      await octokit.rest.issues.deleteComment({
-        owner: config.owner,
-        repo: config.repo,
-        comment_id: data.commentId
-      });
-
-      return { success: true, message: `Comment ${data.commentId} deleted successfully` };
-    } catch (error) {
-      throw this.mapErrorToMCPError(error);
-    }
+    return this.issueService.deleteIssueComment(data);
   }
 
   async listIssueComments(data: {
     issueNumber: number;
     limit?: number;
   }): Promise<Array<{ id: number; body: string; user: string; createdAt: string; updatedAt: string }>> {
-    try {
-      const octokit = this.factory.getOctokit();
-      const config = this.factory.getConfig();
-
-      const response = await octokit.rest.issues.listComments({
-        owner: config.owner,
-        repo: config.repo,
-        issue_number: data.issueNumber,
-        per_page: data.limit || 30
-      });
-
-      return response.data.map(comment => ({
-        id: comment.id,
-        body: comment.body || '',
-        user: comment.user?.login || 'unknown',
-        createdAt: comment.created_at,
-        updatedAt: comment.updated_at
-      }));
-    } catch (error) {
-      throw this.mapErrorToMCPError(error);
-    }
+    return this.issueService.listIssueComments(data);
   }
 
   // ============================================================================
@@ -718,47 +467,7 @@ export class ProjectManagementService {
     body?: string;
     assigneeIds?: string[];
   }): Promise<{ id: string; title: string; body: string }> {
-    try {
-      const mutation = `
-        mutation($input: AddProjectV2DraftIssueInput!) {
-          addProjectV2DraftIssue(input: $input) {
-            projectV2Item {
-              id
-              content {
-                ... on DraftIssue {
-                  id
-                  title
-                  body
-                }
-              }
-            }
-          }
-        }
-      `;
-
-      interface AddDraftIssueResponse {
-        addProjectV2DraftIssue: {
-          projectV2Item: {
-            id: string;
-            content: { id: string; title: string; body: string };
-          };
-        };
-      }
-
-      const response = await this.factory.graphql<AddDraftIssueResponse>(mutation, {
-        input: {
-          projectId: data.projectId,
-          title: data.title,
-          body: data.body || '',
-          assigneeIds: data.assigneeIds || []
-        }
-      });
-
-      const content = response.addProjectV2DraftIssue.projectV2Item.content;
-      return { id: content.id, title: content.title, body: content.body };
-    } catch (error) {
-      throw this.mapErrorToMCPError(error);
-    }
+    return this.issueService.createDraftIssue(data);
   }
 
   async updateDraftIssue(data: {
@@ -767,53 +476,11 @@ export class ProjectManagementService {
     body?: string;
     assigneeIds?: string[];
   }): Promise<{ id: string; title: string; body: string }> {
-    try {
-      const mutation = `
-        mutation($input: UpdateProjectV2DraftIssueInput!) {
-          updateProjectV2DraftIssue(input: $input) {
-            draftIssue {
-              id
-              title
-              body
-            }
-          }
-        }
-      `;
-
-      interface UpdateDraftIssueResponse {
-        updateProjectV2DraftIssue: {
-          draftIssue: { id: string; title: string; body: string };
-        };
-      }
-
-      const input: Record<string, unknown> = { draftIssueId: data.draftIssueId };
-      if (data.title !== undefined) input.title = data.title;
-      if (data.body !== undefined) input.body = data.body;
-      if (data.assigneeIds !== undefined) input.assigneeIds = data.assigneeIds;
-
-      const response = await this.factory.graphql<UpdateDraftIssueResponse>(mutation, { input });
-      const draftIssue = response.updateProjectV2DraftIssue.draftIssue;
-      return { id: draftIssue.id, title: draftIssue.title, body: draftIssue.body };
-    } catch (error) {
-      throw this.mapErrorToMCPError(error);
-    }
+    return this.issueService.updateDraftIssue(data);
   }
 
   async deleteDraftIssue(data: { draftIssueId: string }): Promise<{ success: boolean; message: string }> {
-    try {
-      const mutation = `
-        mutation($input: DeleteProjectV2DraftIssueInput!) {
-          deleteProjectV2DraftIssue(input: $input) {
-            draftIssue { id }
-          }
-        }
-      `;
-
-      await this.factory.graphql(mutation, { input: { draftIssueId: data.draftIssueId } });
-      return { success: true, message: `Draft issue ${data.draftIssueId} deleted successfully` };
-    } catch (error) {
-      throw this.mapErrorToMCPError(error);
-    }
+    return this.issueService.deleteDraftIssue(data);
   }
 
   // ============================================================================
@@ -1329,7 +996,7 @@ export class ProjectManagementService {
     actions: unknown[];
   }> {
     try {
-      // Map string types to enum types for the repository
+      // Map tool-shaped string types to the domain enum types.
       const mappedTriggers = data.triggers.map(t => ({
         type: t.type as AutomationTriggerType,
         resourceType: t.resourceType as ResourceType | undefined,
@@ -1340,7 +1007,7 @@ export class ProjectManagementService {
         parameters: a.parameters
       }));
 
-      const rule = await this.automationRepo.create({
+      const rule = await this.automationService.createRule({
         name: data.name,
         description: data.description,
         projectId: data.projectId,
@@ -1383,12 +1050,7 @@ export class ProjectManagementService {
     actions: unknown[];
   }> {
     try {
-      const rule = await this.automationRepo.findById(data.ruleId);
-      if (!rule) {
-        throw new ResourceNotFoundError(ResourceType.RELATIONSHIP, data.ruleId);
-      }
-
-      // Map string types to enum types for the repository
+      // Map tool-shaped string types to the domain enum types.
       const mappedTriggers = data.triggers?.map(t => ({
         id: '',
         type: t.type as AutomationTriggerType,
@@ -1401,7 +1063,7 @@ export class ProjectManagementService {
         parameters: a.parameters
       })) as AutomationAction[] | undefined;
 
-      const updated = await this.automationRepo.update(data.ruleId, {
+      const updated = await this.automationService.updateRule(data.ruleId, {
         name: data.name,
         description: data.description,
         enabled: data.enabled,
@@ -1424,12 +1086,7 @@ export class ProjectManagementService {
 
   async deleteAutomationRule(data: { ruleId: string }): Promise<{ success: boolean }> {
     try {
-      const rule = await this.automationRepo.findById(data.ruleId);
-      if (!rule) {
-        throw new ResourceNotFoundError(ResourceType.RELATIONSHIP, data.ruleId);
-      }
-
-      await this.automationRepo.delete(data.ruleId);
+      await this.automationService.deleteRule(data.ruleId);
       return { success: true };
     } catch (error) {
       throw this.mapErrorToMCPError(error);
@@ -1446,11 +1103,7 @@ export class ProjectManagementService {
     actions: unknown[];
   }> {
     try {
-      const rule = await this.automationRepo.findById(data.ruleId);
-      if (!rule) {
-        throw new ResourceNotFoundError(ResourceType.RELATIONSHIP, data.ruleId);
-      }
-
+      const rule = await this.automationService.getRuleById(data.ruleId);
       return {
         id: rule.id,
         name: rule.name,
@@ -1476,7 +1129,7 @@ export class ProjectManagementService {
     }>;
   }> {
     try {
-      const rules = await this.automationRepo.findByProject(data.projectId);
+      const rules = await this.automationService.getRulesByProject(data.projectId);
       return {
         rules: rules.map(rule => ({
           id: rule.id,
@@ -1494,12 +1147,7 @@ export class ProjectManagementService {
 
   async enableAutomationRule(data: { ruleId: string }): Promise<{ id: string; name: string; enabled: boolean }> {
     try {
-      const rule = await this.automationRepo.findById(data.ruleId);
-      if (!rule) {
-        throw new ResourceNotFoundError(ResourceType.RELATIONSHIP, data.ruleId);
-      }
-
-      const updated = await this.automationRepo.enable(data.ruleId);
+      const updated = await this.automationService.enableRule(data.ruleId);
       return { id: updated.id, name: updated.name, enabled: updated.enabled };
     } catch (error) {
       throw this.mapErrorToMCPError(error);
@@ -1508,12 +1156,7 @@ export class ProjectManagementService {
 
   async disableAutomationRule(data: { ruleId: string }): Promise<{ id: string; name: string; enabled: boolean }> {
     try {
-      const rule = await this.automationRepo.findById(data.ruleId);
-      if (!rule) {
-        throw new ResourceNotFoundError(ResourceType.RELATIONSHIP, data.ruleId);
-      }
-
-      const updated = await this.automationRepo.disable(data.ruleId);
+      const updated = await this.automationService.disableRule(data.ruleId);
       return { id: updated.id, name: updated.name, enabled: updated.enabled };
     } catch (error) {
       throw this.mapErrorToMCPError(error);

@@ -39,17 +39,17 @@ export class ParameterCoercion {
 
     // Handle ZodDefault
     if (zodType instanceof z.ZodDefault) {
-      return this.coerceValue(value, zodType._def.innerType);
+      return this.coerceValue(value, zodType._def.innerType as z.ZodType);
     }
 
     // Handle ZodOptional
     if (zodType instanceof z.ZodOptional) {
-      return this.coerceValue(value, zodType._def.innerType);
+      return this.coerceValue(value, zodType._def.innerType as z.ZodType);
     }
 
     // Handle ZodNullable
     if (zodType instanceof z.ZodNullable) {
-      return this.coerceValue(value, zodType._def.innerType);
+      return this.coerceValue(value, zodType._def.innerType as z.ZodType);
     }
 
     // Handle ZodBoolean - convert string "true"/"false" to boolean
@@ -111,7 +111,7 @@ export class ParameterCoercion {
 
     // Handle ZodUnion - try each type
     if (zodType instanceof z.ZodUnion) {
-      for (const option of zodType._def.options) {
+      for (const option of zodType._def.options as z.ZodType[]) {
         try {
           const coerced = this.coerceValue(value, option);
           // Quick validation to see if this coercion works

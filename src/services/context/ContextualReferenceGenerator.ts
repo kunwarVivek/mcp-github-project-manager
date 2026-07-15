@@ -57,7 +57,7 @@ export class ContextualReferenceGenerator {
         system: config.systemPrompt,
         prompt,
         schema: config.schema,
-        maxTokens: config.maxTokens,
+        maxOutputTokens: config.maxTokens,
         temperature: config.temperature
       });
 

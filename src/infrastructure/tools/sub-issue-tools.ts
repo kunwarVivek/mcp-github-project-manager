@@ -12,9 +12,9 @@
  * Node ID resolution is handled internally.
  */
 
-import { ToolDefinition, ToolSchema } from "./ToolValidator.js";
-import { ANNOTATION_PATTERNS } from "./annotations/tool-annotations.js";
-import { GitHubRepositoryFactory } from "../github/GitHubRepositoryFactory.js";
+import { ToolDefinition, ToolSchema } from "./ToolValidator";
+import { ANNOTATION_PATTERNS } from "./annotations/tool-annotations";
+import { GitHubRepositoryFactory } from "../github/GitHubRepositoryFactory";
 import {
   AddSubIssueInputSchema,
   AddSubIssueInput,
@@ -34,7 +34,7 @@ import {
   ParentIssueOutput,
   RemoveSubIssueOutputSchema,
   RemoveSubIssueOutput,
-} from "./schemas/sub-issue-schemas.js";
+} from "./schemas/sub-issue-schemas";
 
 // ============================================================================
 // Helper Functions

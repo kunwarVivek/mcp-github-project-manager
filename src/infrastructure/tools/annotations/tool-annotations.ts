@@ -1,4 +1,4 @@
-import { ToolAnnotations } from "../ToolValidator.js";
+import type { ToolAnnotations } from "../ToolValidator";
 
 /**
  * Standard annotation patterns for tool behavior classification.
@@ -86,4 +86,4 @@ export type AnnotationPatternKey = keyof typeof ANNOTATION_PATTERNS;
 /**
  * Re-export ToolAnnotations for convenience
  */
-export { ToolAnnotations } from "../ToolValidator.js";
+export type { ToolAnnotations };

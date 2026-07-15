@@ -78,19 +78,34 @@ export interface SprintCapacity {
 // ============================================================================
 
 /**
+ * Canonical sprint risk categories. Single source of truth: both the
+ * `SprintRiskCategory` type and the Zod validation schemas derive from this
+ * tuple, so a change here propagates to the domain type and AI-response schemas
+ * without drift.
+ */
+export const SPRINT_RISK_CATEGORIES = [
+  "scope",
+  "dependency",
+  "capacity",
+  "technical",
+  "external",
+] as const;
+
+/**
  * Risk category for sprint risks.
  */
-export type SprintRiskCategory =
-  | "scope"
-  | "dependency"
-  | "capacity"
-  | "technical"
-  | "external";
+export type SprintRiskCategory = (typeof SPRINT_RISK_CATEGORIES)[number];
+
+/**
+ * Canonical risk probability levels. Single source of truth for the
+ * `RiskProbability` type and its Zod schemas.
+ */
+export const RISK_PROBABILITIES = ["high", "medium", "low"] as const;
 
 /**
  * Risk probability level.
  */
-export type RiskProbability = "high" | "medium" | "low";
+export type RiskProbability = (typeof RISK_PROBABILITIES)[number];
 
 /**
  * Risk impact level.

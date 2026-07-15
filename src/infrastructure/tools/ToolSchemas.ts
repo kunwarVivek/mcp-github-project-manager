@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { ToolDefinition, ToolSchema } from "./ToolValidator.js";
-import { ANNOTATION_PATTERNS } from "./annotations/tool-annotations.js";
+import { ToolDefinition, ToolSchema } from "./ToolValidator";
+import { ANNOTATION_PATTERNS } from "./annotations/tool-annotations";
 import {
   ProjectOutputSchema,
   ProjectListOutputSchema,
@@ -44,17 +44,17 @@ import {
   AITriageOutputSchema,
   AIRoadmapOutputSchema,
   BulkOperationResultSchema,
-} from "./schemas/project-schemas.js";
+} from "./schemas/project-schemas";
 
 // Import AI tools
-import { addFeatureTool, executeAddFeature } from "./ai-tasks/AddFeatureTool.js";
-import { generatePRDTool, executeGeneratePRD } from "./ai-tasks/GeneratePRDTool.js";
-import { parsePRDTool, executeParsePRD } from "./ai-tasks/ParsePRDTool.js";
-import { getNextTaskTool, executeGetNextTask } from "./ai-tasks/GetNextTaskTool.js";
-import { analyzeTaskComplexityTool, executeAnalyzeTaskComplexity } from "./ai-tasks/AnalyzeTaskComplexityTool.js";
-import { expandTaskTool, executeExpandTask } from "./ai-tasks/ExpandTaskTool.js";
-import { enhancePRDTool, executeEnhancePRD } from "./ai-tasks/EnhancePRDTool.js";
-import { createTraceabilityMatrixTool, executeCreateTraceabilityMatrix } from "./ai-tasks/CreateTraceabilityMatrixTool.js";
+import { addFeatureTool, executeAddFeature } from "./ai-tasks/AddFeatureTool";
+import { generatePRDTool, executeGeneratePRD } from "./ai-tasks/GeneratePRDTool";
+import { parsePRDTool, executeParsePRD } from "./ai-tasks/ParsePRDTool";
+import { getNextTaskTool, executeGetNextTask } from "./ai-tasks/GetNextTaskTool";
+import { analyzeTaskComplexityTool, executeAnalyzeTaskComplexity } from "./ai-tasks/AnalyzeTaskComplexityTool";
+import { expandTaskTool, executeExpandTask } from "./ai-tasks/ExpandTaskTool";
+import { enhancePRDTool, executeEnhancePRD } from "./ai-tasks/EnhancePRDTool";
+import { createTraceabilityMatrixTool, executeCreateTraceabilityMatrix } from "./ai-tasks/CreateTraceabilityMatrixTool";
 
 // Import status update tools
 import {
@@ -64,7 +64,7 @@ import {
   executeCreateStatusUpdate,
   executeListStatusUpdates,
   executeGetStatusUpdate,
-} from "./status-update-tools.js";
+} from "./status-update-tools";
 
 // Schema for create_roadmap tool
 export const createRoadmapSchema = z.object({
@@ -1419,7 +1419,7 @@ export const createAutomationRuleSchema = z.object({
       "add_label", "remove_label", "assign_user", "unassign_user",
       "create_relationship", "delete_relationship", "notify", "webhook", "custom_script"
     ]),
-    parameters: z.record(z.any())
+    parameters: z.record(z.string(), z.any())
   }))
 });
 
@@ -1451,7 +1451,7 @@ export const updateAutomationRuleSchema = z.object({
       "add_label", "remove_label", "assign_user", "unassign_user",
       "create_relationship", "delete_relationship", "notify", "webhook", "custom_script"
     ]),
-    parameters: z.record(z.any())
+    parameters: z.record(z.string(), z.any())
   })).optional()
 });
 
@@ -2804,7 +2804,7 @@ export {
   executeGetParentIssue,
   executeReprioritizeSubIssue,
   executeRemoveSubIssue,
-} from "./sub-issue-tools.js";
+} from "./sub-issue-tools";
 
 // ============================================================================
 // Project Template Tools
@@ -2820,7 +2820,7 @@ export {
   executeUnmarkProjectAsTemplate,
   executeCopyProjectFromTemplate,
   executeListOrganizationTemplates,
-} from "./project-template-tools.js";
+} from "./project-template-tools";
 
 // ============================================================================
 // Project Linking Tools
@@ -2840,7 +2840,7 @@ export {
   executeUnlinkProjectFromTeam,
   executeListLinkedRepositories,
   executeListLinkedTeams,
-} from "./project-linking-tools.js";
+} from "./project-linking-tools";
 
 // ============================================================================
 // Project Lifecycle Tools
@@ -2854,7 +2854,7 @@ export {
   executeCloseProject,
   executeReopenProject,
   executeConvertDraftIssue,
-} from "./project-lifecycle-tools.js";
+} from "./project-lifecycle-tools";
 
 // ============================================================================
 // Advanced Operations Tools
@@ -2868,4 +2868,4 @@ export {
   executeUpdateItemPosition,
   executeSearchIssuesAdvanced,
   executeFilterProjectItems,
-} from "./project-advanced-tools.js";
+} from "./project-advanced-tools";

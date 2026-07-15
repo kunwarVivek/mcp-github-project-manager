@@ -8,9 +8,9 @@
  */
 
 import { z } from "zod";
-import { ToolDefinition, ToolSchema } from "./ToolValidator.js";
-import { ANNOTATION_PATTERNS } from "./annotations/tool-annotations.js";
-import { GitHubRepositoryFactory } from "../github/GitHubRepositoryFactory.js";
+import { ToolDefinition, ToolSchema } from "./ToolValidator";
+import { ANNOTATION_PATTERNS } from "./annotations/tool-annotations";
+import { createGitHubFactory } from "./tool-factory";
 import {
   CreateStatusUpdateInputSchema,
   CreateStatusUpdateInput,
@@ -22,8 +22,8 @@ import {
   StatusUpdateOutput,
   StatusUpdateListOutputSchema,
   StatusUpdateListOutput,
-} from "./schemas/status-update-schemas.js";
-import { StatusUpdateStatus } from "../github/repositories/types.js";
+} from "./schemas/status-update-schemas";
+import { StatusUpdateStatus } from "../github/repositories/types";
 
 // ============================================================================
 // Helper Functions
@@ -36,19 +36,6 @@ import { StatusUpdateStatus } from "../github/repositories/types.js";
  * are only needed for factory initialization. We use defaults since status
  * update operations don't actually require a specific repo context.
  */
-function createRepositoryFactory(): GitHubRepositoryFactory {
-  const token = process.env.GITHUB_TOKEN;
-  if (!token) {
-    throw new Error("GITHUB_TOKEN environment variable is required");
-  }
-
-  // Owner/repo are required by factory but not used for status update operations
-  // which work purely with project node IDs
-  const owner = process.env.GITHUB_OWNER || "placeholder";
-  const repo = process.env.GITHUB_REPO || "placeholder";
-
-  return new GitHubRepositoryFactory(token, owner, repo);
-}
 
 /**
  * Convert status string to StatusUpdateStatus enum value.
@@ -173,7 +160,7 @@ export const getStatusUpdateTool: ToolDefinition<GetStatusUpdateInput, StatusUpd
 export async function executeCreateStatusUpdate(
   args: CreateStatusUpdateInput
 ): Promise<{ content: Array<{ type: "text"; text: string }>; structuredContent: StatusUpdateOutput }> {
-  const factory = createRepositoryFactory();
+  const factory = createGitHubFactory();
   const repository = factory.createStatusUpdateRepository();
 
   const statusUpdate = await repository.createStatusUpdate(
@@ -223,7 +210,7 @@ export async function executeCreateStatusUpdate(
 export async function executeListStatusUpdates(
   args: ListStatusUpdatesInput
 ): Promise<{ content: Array<{ type: "text"; text: string }>; structuredContent: StatusUpdateListOutput }> {
-  const factory = createRepositoryFactory();
+  const factory = createGitHubFactory();
   const repository = factory.createStatusUpdateRepository();
 
   const listResult = await repository.listStatusUpdates(
@@ -276,7 +263,7 @@ export async function executeListStatusUpdates(
 export async function executeGetStatusUpdate(
   args: GetStatusUpdateInput
 ): Promise<{ content: Array<{ type: "text"; text: string }>; structuredContent: StatusUpdateOutput | null }> {
-  const factory = createRepositoryFactory();
+  const factory = createGitHubFactory();
   const repository = factory.createStatusUpdateRepository();
 
   const statusUpdate = await repository.getStatusUpdate(args.statusUpdateId);

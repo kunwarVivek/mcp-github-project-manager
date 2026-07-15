@@ -1,7 +1,7 @@
 import * as crypto from 'crypto';
 import { ResourceType } from '../../domain/resource-types';
 import { Logger } from '../logger/index';
-import { WEBHOOK_SECRET } from '../../env';
+import { WEBHOOK_SECRET, WEBHOOK_ALLOW_UNSIGNED } from '../../env';
 
 export interface WebhookEvent {
   id: string;
@@ -34,18 +34,35 @@ export interface WebhookProcessingResult {
 export class GitHubWebhookHandler {
   private readonly logger = Logger.getInstance();
   private readonly webhookSecret: string;
+  private readonly allowUnsigned: boolean;
 
-  constructor(webhookSecret?: string) {
+  constructor(webhookSecret?: string, allowUnsigned: boolean = WEBHOOK_ALLOW_UNSIGNED) {
     this.webhookSecret = webhookSecret || WEBHOOK_SECRET;
+    this.allowUnsigned = allowUnsigned;
   }
 
   /**
-   * Validate GitHub webhook signature
+   * Validate GitHub webhook signature.
+   *
+   * Security: fails closed. If no webhook secret is configured, requests are
+   * rejected unless WEBHOOK_ALLOW_UNSIGNED (or the constructor override) is
+   * explicitly enabled for trusted local/dev use. This prevents forged,
+   * unsigned webhooks from injecting resource events in production.
    */
   async validateSignature(payload: string, signature: string): Promise<boolean> {
     if (!this.webhookSecret) {
-      this.logger.warn("No webhook secret configured, skipping signature validation");
-      return true; // Allow if no secret is configured
+      if (this.allowUnsigned) {
+        this.logger.warn(
+          "WEBHOOK_ALLOW_UNSIGNED is enabled and no webhook secret is configured — " +
+          "accepting unsigned webhook. Do NOT use this in production."
+        );
+        return true;
+      }
+      this.logger.error(
+        "Rejecting webhook: no WEBHOOK_SECRET configured. Set WEBHOOK_SECRET to enable " +
+        "signature validation, or WEBHOOK_ALLOW_UNSIGNED=true for trusted local/dev use."
+      );
+      return false; // Fail closed
     }
 
     if (!signature) {

@@ -1,18 +1,12 @@
-import { ResourceType, ResourceStatus } from "../domain/resource-types";
+import { ResourceType, ResourceStatus, SyncMetadata } from "../domain/resource-types";
 import { GitHubRepositoryFactory } from "../infrastructure/github/GitHubRepositoryFactory";
 import { ResourceCache } from "../infrastructure/cache/ResourceCache";
 import { FilePersistenceAdapter } from "../infrastructure/persistence/FilePersistenceAdapter";
 import { Logger } from "../infrastructure/logger/index";
 import { Project, Milestone, Issue, Sprint } from "../domain/types";
 
-export interface SyncMetadata {
-  resourceId: string;
-  resourceType: ResourceType;
-  lastModified: string;
-  etag?: string;
-  version: number;
-  syncedAt: string;
-}
+// SyncMetadata moved to domain/resource-types to break the infra->service cycle.
+export type { SyncMetadata };
 
 export interface SyncResult {
   success: boolean;

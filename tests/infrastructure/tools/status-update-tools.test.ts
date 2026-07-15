@@ -93,10 +93,10 @@ describe('Status Update Tools', () => {
         });
         expect(result.success).toBe(true);
         if (result.success) {
-          // Zod optional().default() makes the default available via schema.parse(),
-          // but safeParse doesn't apply defaults to optional fields automatically
-          // The executor will handle the default value
-          expect(result.data.first).toBeUndefined();
+          // zod 4 applies the schema default(10) for the optional `first` field
+          // when the key is absent (a behavior change from zod 3, and the desired
+          // one — `first` is a pagination limit that should default to 10).
+          expect(result.data.first).toBe(10);
         }
       });
 

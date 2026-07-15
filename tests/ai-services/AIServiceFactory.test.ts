@@ -86,25 +86,25 @@ describe('AIServiceFactory', () => {
     it('should return main model instance', () => {
       const model = factory.getMainModel();
       expect(model).toBeDefined();
-      expect(model?.modelId).toBe('claude-3-5-sonnet-20241022');
+      expect((model as { modelId?: string })?.modelId).toBe('claude-3-5-sonnet-20241022');
     });
 
     it('should return research model instance', () => {
       const model = factory.getResearchModel();
       expect(model).toBeDefined();
-      expect(model?.modelId).toBe('perplexity-llama-3.1-sonar-large-128k-online');
+      expect((model as { modelId?: string })?.modelId).toBe('perplexity-llama-3.1-sonar-large-128k-online');
     });
 
     it('should return fallback model instance', () => {
       const model = factory.getFallbackModel();
       expect(model).toBeDefined();
-      expect(model?.modelId).toBe('gpt-4o');
+      expect((model as { modelId?: string })?.modelId).toBe('gpt-4o');
     });
 
     it('should return PRD model instance', () => {
       const model = factory.getPRDModel();
       expect(model).toBeDefined();
-      expect(model?.modelId).toBe('claude-3-5-sonnet-20241022');
+      expect((model as { modelId?: string })?.modelId).toBe('claude-3-5-sonnet-20241022');
     });
   });
 

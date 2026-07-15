@@ -12,9 +12,10 @@
  * All tools use GraphQL mutations/queries directly via the factory.
  */
 
-import { ToolDefinition, ToolSchema } from "./ToolValidator.js";
-import { ANNOTATION_PATTERNS } from "./annotations/tool-annotations.js";
-import { GitHubRepositoryFactory } from "../github/GitHubRepositoryFactory.js";
+import { ToolDefinition, ToolSchema } from "./ToolValidator";
+import { ANNOTATION_PATTERNS } from "./annotations/tool-annotations";
+import { createGitHubFactory } from "./tool-factory";
+import type { GitHubRepositoryFactory } from "../github/GitHubRepositoryFactory";
 import {
   LinkProjectToRepositoryInputSchema,
   LinkProjectToRepositoryInput,
@@ -38,25 +39,12 @@ import {
   LinkedTeamsListOutput,
   LinkOperationOutputSchema,
   LinkOperationOutput,
-} from "./schemas/project-template-linking-schemas.js";
+} from "./schemas/project-template-linking-schemas";
 
 // ============================================================================
 // Helper Functions
 // ============================================================================
 
-/**
- * Creates a repository factory with the given owner and repo.
- *
- * Linking operations use projectId directly, so owner/repo are placeholders
- * for factory initialization but required for repository/team resolution.
- */
-function createFactory(owner: string, repo: string): GitHubRepositoryFactory {
-  const token = process.env.GITHUB_TOKEN;
-  if (!token) {
-    throw new Error("GITHUB_TOKEN environment variable is required");
-  }
-  return new GitHubRepositoryFactory(token, owner, repo);
-}
 
 /**
  * Resolves a repository owner/name to its GitHub node ID.
@@ -323,7 +311,7 @@ export const listLinkedTeamsTool: ToolDefinition<
 export async function executeLinkProjectToRepository(
   args: LinkProjectToRepositoryInput
 ): Promise<{ content: Array<{ type: "text"; text: string }>; structuredContent: LinkedRepositoryOutput }> {
-  const factory = createFactory(args.owner, args.repo);
+  const factory = createGitHubFactory(args.owner, args.repo);
 
   // Resolve repository to node ID
   const repositoryId = await resolveRepositoryId(factory, args.owner, args.repo);
@@ -390,7 +378,7 @@ export async function executeLinkProjectToRepository(
 export async function executeUnlinkProjectFromRepository(
   args: UnlinkProjectFromRepositoryInput
 ): Promise<{ content: Array<{ type: "text"; text: string }>; structuredContent: LinkOperationOutput }> {
-  const factory = createFactory(args.owner, args.repo);
+  const factory = createGitHubFactory(args.owner, args.repo);
 
   // Resolve repository to node ID
   const repositoryId = await resolveRepositoryId(factory, args.owner, args.repo);
@@ -445,7 +433,7 @@ export async function executeUnlinkProjectFromRepository(
 export async function executeLinkProjectToTeam(
   args: LinkProjectToTeamInput
 ): Promise<{ content: Array<{ type: "text"; text: string }>; structuredContent: LinkedTeamOutput }> {
-  const factory = createFactory(args.org, "placeholder");
+  const factory = createGitHubFactory(args.org);
 
   // Resolve team to node ID
   const teamId = await resolveTeamId(factory, args.org, args.teamSlug);
@@ -509,7 +497,7 @@ export async function executeLinkProjectToTeam(
 export async function executeUnlinkProjectFromTeam(
   args: UnlinkProjectFromTeamInput
 ): Promise<{ content: Array<{ type: "text"; text: string }>; structuredContent: LinkOperationOutput }> {
-  const factory = createFactory(args.org, "placeholder");
+  const factory = createGitHubFactory(args.org);
 
   // Resolve team to node ID
   const teamId = await resolveTeamId(factory, args.org, args.teamSlug);
@@ -570,7 +558,7 @@ export async function executeListLinkedRepositories(
   }
 
   // Use placeholder owner/repo since we query by project ID
-  const factory = new GitHubRepositoryFactory(token, "placeholder", "placeholder");
+  const factory = createGitHubFactory();
 
   // Parse args with defaults
   const first = args.first ?? 20;
@@ -670,7 +658,7 @@ export async function executeListLinkedTeams(
   }
 
   // Use placeholder owner/repo since we query by project ID
-  const factory = new GitHubRepositoryFactory(token, "placeholder", "placeholder");
+  const factory = createGitHubFactory();
 
   // Parse args with defaults
   const first = args.first ?? 20;

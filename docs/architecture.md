@@ -50,7 +50,7 @@ External integrations and technical concerns:
 | Directory | Purpose |
 |-----------|---------|
 | `github/` | GitHub REST/GraphQL API integration |
-| `tools/` | MCP tool definitions (116 tools) |
+| `tools/` | MCP tool definitions (120 tools) |
 | `cache/` | In-memory caching with TTL |
 | `resilience/` | Circuit breaker, retry policies |
 | `events/` | Webhook handling, event store |
@@ -58,17 +58,24 @@ External integrations and technical concerns:
 
 ### Service Layer (`src/services/`)
 
-Business logic coordination (17 services):
+Business logic coordination. `ProjectManagementService` is a thin facade that
+delegates to focused, independently-testable services:
 
 | Service | Responsibility |
 |---------|----------------|
-| `ProjectManagementService` | Central orchestrator for project operations |
+| `ProjectManagementService` | Facade — delegates to the services below |
+| `IssueService` | Issue CRUD, comments, Projects v2 draft issues |
+| `MilestoneService` | Milestone CRUD and metrics |
+| `SprintPlanningService` | Sprint planning and capacity |
+| `RoadmapService` | Full-roadmap creation (project + milestones + issues) |
+| `RoadmapPlanningService` | AI roadmap/milestone planning |
+| `ProjectStatusService` | Project CRUD |
+| `ProjectTemplateService` | Template + field/view management |
+| `ProjectLinkingService` | Project item / repo / team linking |
+| `ProjectAutomationService` | Automation-rule management |
+| `SubIssueService` | Hierarchical issue dependencies |
 | `PRDGenerationService` | AI-powered PRD generation |
 | `TaskGenerationService` | Task breakdown and estimation |
-| `SprintPlanningService` | Sprint planning and capacity |
-| `RoadmapPlanningService` | Milestone and roadmap planning |
-| `SubIssueService` | Hierarchical issue management |
-| `ProjectTemplateService` | Template management |
 | `IssueTriagingService` | AI-powered issue triage |
 
 ### MCP Layer (`src/index.ts`)
@@ -182,6 +189,12 @@ Environment-based configuration:
 | `GITHUB_REPO` | Repository name |
 | `ANTHROPIC_API_KEY` | Claude AI (optional) |
 | `OPENAI_API_KEY` | OpenAI (optional) |
-| `GOOGLE_AI_API_KEY` | Google AI (optional) |
+| `GOOGLE_API_KEY` | Google AI (optional) |
+| `SECRETS_DIR` | Load any secret from a mounted file (Docker/k8s); precedes env vars |
+| `WEBHOOK_SECRET` / `WEBHOOK_ALLOW_UNSIGNED` | Webhook HMAC secret; validation fails closed |
+| `MAX_CACHE_ENTRIES` | In-memory cache cap before eviction |
+
+Secrets resolve through `src/infrastructure/secrets/SecretProvider` (env + file
+providers; Vault/AWS SM are an extension point).
 
 See [CONFIGURATION.md](CONFIGURATION.md) for full details.

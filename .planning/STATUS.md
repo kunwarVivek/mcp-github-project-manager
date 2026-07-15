@@ -4,9 +4,18 @@
 
 | Metric | Value |
 |--------|-------|
-| Phases Complete | 9/12 |
-| Current Phase | Phase 10 (Advanced Automation) |
-| Last Updated | 2026-02-01 |
+| Phases Complete | 11/12 (phase 11 Analytics deferred) |
+| Current Phase | Post-v1.1.0 remediation (see below) |
+| Last Updated | 2026-07-15 |
+
+> **Reconciliation note (2026-07-15):** This file previously froze at "9/12,
+> phase 10 not started" while `REQUIREMENTS.md` claimed "99/99 complete" — the
+> two contradicted each other and the shipped `v1.1.0`. Code-verified truth:
+> phase 10 (Advanced Automation) is implemented, phase 12 (Production Hardening)
+> shipped in v1.1.0, phase 11 (Analytics & Reporting) is genuinely **absent**
+> (tracked as feature proposal G6-01). Live remediation status is authoritative
+> in [`docs/remediation/GAP-TRACKER.md`](../docs/remediation/GAP-TRACKER.md);
+> `docs/GAP-ANALYSIS-LIVE.md` is superseded.
 
 ## Phase Completion Status
 
@@ -18,9 +27,9 @@
 | 7 | Project Lifecycle | Complete | 4/4 |
 | 8 | Issue Triaging & Prioritization | Complete | 4/4 |
 | 9 | AI PRD and Task Enhancement | Complete | 4/4 |
-| 10 | Advanced Automation | Not Started | 0/4 |
-| 11 | Analytics & Reporting | Not Started | 0/4 |
-| 12 | Production Hardening | Not Started | 0/4 |
+| 10 | Advanced Automation | Complete | ProjectAutomationService + automation-rule tools implemented |
+| 11 | Analytics & Reporting | Not Started | Deferred — genuinely absent (feature proposal G6-01) |
+| 12 | Production Hardening | Complete | Shipped in v1.1.0 (release 1672d4e) |
 
 ---
 
