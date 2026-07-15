@@ -1,7 +1,7 @@
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 
-This project is indexed by GitNexus as **mcp-github-project-manager** (4661 symbols, 11387 relationships, 300 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+This project is indexed by GitNexus as **mcp-github-project-manager** (4687 symbols, 11493 relationships, 300 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
 
 > Index stale? Run `node .gitnexus/run.cjs analyze` from the project root — it auto-selects an available runner. No `.gitnexus/run.cjs` yet? `npx gitnexus analyze` (npm 11 crash → `npm i -g gitnexus`; #1939).
 
@@ -78,6 +78,10 @@ This project is indexed by GitNexus as **mcp-github-project-manager** (4661 symb
   `WEBHOOK_SECRET`, `WEBHOOK_PORT`, `SSE_ENABLED`.
 - Webhook security: signature validation fails closed. With no `WEBHOOK_SECRET`,
   webhooks are rejected unless `WEBHOOK_ALLOW_UNSIGNED=true` (trusted dev only).
+- Secrets: set `SECRETS_DIR` (e.g. `/run/secrets`) to load any config/secret from
+  a file named after it (Docker/k8s secret convention), checked before env vars.
+  `getSecret(name)` in `env.ts` reads fresh (rotation-aware). Vault/AWS SM are an
+  extension point via `SecretProvider` (`src/infrastructure/secrets/`).
 
 ## Gotchas
 

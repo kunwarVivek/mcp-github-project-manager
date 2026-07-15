@@ -1,6 +1,7 @@
 import { dirname, join, resolve } from 'path';
 import { CliOptions, parseCommandLineArgs } from './cli';
 import * as dotenv from 'dotenv';
+import { createDefaultSecretResolver } from './infrastructure/secrets/SecretProvider';
 
 // Parse command line arguments only if not in test environment
 const cliOptions = process.env.NODE_ENV === 'test'
@@ -18,6 +19,20 @@ if (cliOptions.verbose) {
   process.stderr.write(`Loading environment from: ${envPath}\n`);
 }
 
+// Secret resolution layers file-mounted secrets (SECRETS_DIR, e.g. Docker/k8s
+// /run/secrets) ahead of environment variables. Created after dotenv so a
+// SECRETS_DIR set in .env is honored. See infrastructure/secrets/SecretProvider.
+const secretResolver = createDefaultSecretResolver();
+
+/**
+ * Resolve a secret/config value fresh from the secret chain (file → env).
+ * Reading at call time (rather than a frozen startup const) lets callers observe
+ * rotated secrets when the mounted file changes.
+ */
+export function getSecret(name: string): string | undefined {
+  return secretResolver.resolve(name);
+}
+
 /**
  * Get a required configuration value from command line args or environment variables
  * @param name Environment variable name
@@ -31,10 +46,10 @@ export function getConfigValue(name: string, cliValue?: string): string {
     return cliValue;
   }
 
-  // Then check environment variables
-  const value = process.env[name];
+  // Then check the secret chain (file-mounted secrets, then environment vars)
+  const value = secretResolver.resolve(name);
   if (!value) {
-    throw new Error(`${name} is required. Provide it via command line argument (--${name.toLowerCase()}) or environment variable.`);
+    throw new Error(`${name} is required. Provide it via command line argument (--${name.toLowerCase()}), environment variable, or a mounted secret (SECRETS_DIR).`);
   }
   return value;
 }
@@ -52,8 +67,8 @@ export function getOptionalConfigValue(name: string, defaultValue: string, cliVa
     return cliValue;
   }
 
-  // Then check environment variables
-  return process.env[name] || defaultValue;
+  // Then check the secret chain (file-mounted secrets, then environment vars)
+  return secretResolver.resolve(name) || defaultValue;
 }
 
 /**

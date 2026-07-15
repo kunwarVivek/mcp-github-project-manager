@@ -103,7 +103,7 @@ Audit 2026-07-15: `npm outdated` + `npm audit` (was 31 vulns: 1 critical, 8 high
 | G6-02 | Real-time webhook sync / SSE streaming | README identified gap; V2-01/04 | REQUIREMENTS v2 |
 | G6-03 | Redis / pluggable cache backend + eviction | scaling, multi-instance | V2-08, CONCERNS |
 | G6-04 | OpenTelemetry metrics/observability | production monitoring | V2-09 |
-| G6-05 | Secret-manager support (Vault/AWS SM) + key rotation | secrets hygiene | CONCERNS |
+| G6-05 | Secret-manager support (Vault/AWS SM) + key rotation | secrets hygiene | CONCERNS — DONE (approved). Added `SecretProvider` abstraction (`src/infrastructure/secrets/`): Env + File providers (File = Docker/k8s `/run/secrets` convention, dependency-free, sync). `SECRETS_DIR` layers file secrets before env. env.ts routes config through the resolver; `getSecret(name)` reads fresh for rotation. Vault/AWS SM documented as async extension point. 10 unit tests pass; config consumers 5/5 |
 | G6-06 | Query batching / prefetch for related resources | perf | README gap |
 
 ---
