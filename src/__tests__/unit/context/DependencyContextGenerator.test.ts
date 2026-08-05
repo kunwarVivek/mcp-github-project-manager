@@ -590,4 +590,316 @@ describe('DependencyContextGenerator', () => {
       expect(result!.dependencies[0].dependencyId).toBe('different-id');
     });
   });
+
+  describe('complex dependency graphs', () => {
+    beforeEach(() => {
+      mockAIServiceFactory.getBestAvailableModel.mockReturnValue(null);
+    });
+
+    it('should handle diamond dependency graph (A→B,C→D)', async () => {
+      // D is a shared base; B and C both depend on D; A depends on B and C
+      const taskD = createDependencyTask('d', 'Setup Database Schema');
+      taskD.dependencies = [];
+
+      const taskB = createDependencyTask('b', 'Setup API Layer');
+      taskB.dependencies = [{ id: 'd', type: 'depends_on' }];
+
+      const taskC = createDependencyTask('c', 'Setup Auth Service');
+      taskC.dependencies = [{ id: 'd', type: 'depends_on' }];
+
+      const taskA = createMockTask({
+        id: 'a',
+        title: 'Build Dashboard',
+        description: 'Build the main dashboard',
+        dependencies: [
+          { id: 'b', type: 'depends_on' },
+          { id: 'c', type: 'depends_on' }
+        ]
+      });
+
+      const allTasks = [taskA, taskB, taskC, taskD];
+      const result = await generator.generateDependencyContext(taskA, allTasks);
+
+      expect(result).not.toBeNull();
+      // A's direct dependencies are B and C
+      expect(result!.dependencies).toHaveLength(2);
+      const depIds = result!.dependencies.map(d => d.dependencyId);
+      expect(depIds).toContain('b');
+      expect(depIds).toContain('c');
+      // B and C share the same dependency D, so they should form a parallel group
+      expect(result!.criticalPath).toContain('a');
+    });
+
+    it('should handle circular dependency A→B→C→A without infinite loop', async () => {
+      const taskA = createMockTask({
+        id: 'a',
+        title: 'Feature A',
+        description: 'Feature A implementation',
+        dependencies: [{ id: 'b', type: 'depends_on' }]
+      });
+      const taskB = createDependencyTask('b', 'Feature B');
+      taskB.dependencies = [{ id: 'c', type: 'depends_on' }];
+      const taskC = createDependencyTask('c', 'Feature C');
+      taskC.dependencies = [{ id: 'a', type: 'depends_on' }];
+
+      const allTasks = [taskA, taskB, taskC];
+
+      // Must not throw or hang
+      const result = await generator.generateDependencyContext(taskA, allTasks);
+
+      expect(result).not.toBeNull();
+      expect(result!.dependencies).toHaveLength(1);
+      expect(result!.dependencies[0].dependencyId).toBe('b');
+      // Critical path should contain 'a' without duplicates
+      const uniquePath = new Set(result!.criticalPath);
+      expect(uniquePath.size).toBe(result!.criticalPath.length);
+    });
+
+    it('should handle deep dependency chain of 6 levels', async () => {
+      // chain: L0 → L1 → L2 → L3 → L4 → L5
+      const levels = 6;
+      const tasks: AITask[] = [];
+
+      for (let i = levels - 1; i >= 0; i--) {
+        const deps = i < levels - 1
+          ? [{ id: `level-${i + 1}`, type: 'depends_on' as const }]
+          : [];
+        const t: AITask = {
+          id: `level-${i}`,
+          title: `Level ${i} Task`,
+          description: `Task at depth ${i}`,
+          status: TaskStatus.PENDING,
+          priority: TaskPriority.MEDIUM,
+          complexity: 3,
+          estimatedHours: 4,
+          aiGenerated: false,
+          subtasks: [],
+          dependencies: deps,
+          acceptanceCriteria: [],
+          createdAt: '2024-01-01T00:00:00Z',
+          updatedAt: '2024-01-02T00:00:00Z',
+          tags: []
+        };
+        tasks.push(t);
+      }
+
+      const rootTask = tasks.find(t => t.id === 'level-0')!;
+      const result = await generator.generateDependencyContext(rootTask, tasks);
+
+      expect(result).not.toBeNull();
+      // Root has a direct dependency on level-1
+      expect(result!.dependencies).toHaveLength(1);
+      expect(result!.dependencies[0].dependencyId).toBe('level-1');
+      // Critical path must include the root
+      expect(result!.criticalPath).toContain('level-0');
+    });
+
+    it('should handle multiple missing dependencies gracefully', async () => {
+      const task = createMockTask({
+        id: 'main',
+        title: 'Main Feature',
+        description: 'The main feature',
+        dependencies: [
+          { id: 'ghost-1', type: 'depends_on' },
+          { id: 'ghost-2', type: 'depends_on' },
+          { id: 'ghost-3', type: 'depends_on', description: 'Needs external auth provider' }
+        ]
+      });
+
+      const result = await generator.generateDependencyContext(task, [task]);
+
+      expect(result).not.toBeNull();
+      expect(result!.dependencies).toHaveLength(3);
+
+      for (const dep of result!.dependencies) {
+        // Missing deps get basic fallback entries
+        expect(dep.dependencyType).toBe('blocks');
+        expect(dep.canRunInParallel).toBe(false);
+        expect(dep.interfaces).toEqual([]);
+      }
+      // The one with a description should use it as rationale
+      const ghost3 = result!.dependencies.find(d => d.dependencyId === 'ghost-3')!;
+      expect(ghost3.rationale).toBe('Needs external auth provider');
+    });
+
+    it('should handle mixed resolved and unresolved dependencies', async () => {
+      const task = createMockTask({
+        id: 'app',
+        title: 'Build Application',
+        description: 'Build the app',
+        dependencies: [
+          { id: 'db-setup', type: 'depends_on' },
+          { id: 'missing-service', type: 'depends_on' },
+          { id: 'auth', type: 'depends_on' }
+        ]
+      });
+      const dbTask = createDependencyTask('db-setup', 'Setup Database');
+      const authTask = createDependencyTask('auth', 'Setup Auth Module');
+      // 'missing-service' deliberately absent from allTasks
+      const allTasks = [task, dbTask, authTask];
+
+      const result = await generator.generateDependencyContext(task, allTasks);
+
+      expect(result).not.toBeNull();
+      expect(result!.dependencies).toHaveLength(3);
+
+      // Resolved deps have rich metadata
+      const dbDep = result!.dependencies.find(d => d.dependencyId === 'db-setup')!;
+      expect(dbDep.dependencyTitle).toBe('Setup Database');
+      expect(dbDep.rationale.length).toBeGreaterThan(10);
+
+      // Unresolved dep has fallback fields
+      const missingDep = result!.dependencies.find(d => d.dependencyId === 'missing-service')!;
+      expect(missingDep.dependencyTitle).toBe('missing-service');
+      expect(missingDep.dependencyType).toBe('blocks');
+      expect(missingDep.interfaces).toEqual([]);
+    });
+
+    it('should identify parallel opportunities for tasks sharing same deps', async () => {
+      const sharedDep = createDependencyTask('shared', 'Setup Core Framework');
+      sharedDep.dependencies = [];
+
+      // Two tasks that share the same dependency
+      const taskX = createDependencyTask('x', 'Feature X');
+      taskX.dependencies = [{ id: 'shared', type: 'depends_on' }];
+      const taskY = createDependencyTask('y', 'Feature Y');
+      taskY.dependencies = [{ id: 'shared', type: 'depends_on' }];
+
+      const mainTask = createMockTask({
+        id: 'main',
+        title: 'Integration Task',
+        description: 'Integrate everything',
+        dependencies: []
+      });
+
+      const allTasks = [mainTask, taskX, taskY, sharedDep];
+      const result = await generator.generateDependencyContext(mainTask, allTasks);
+
+      expect(result).not.toBeNull();
+      // groupTasksByDependencies should group X and Y (same dep key)
+      const groupOpportunity = result!.parallelOpportunities.find(
+        op => op.taskIds.includes('x') && op.taskIds.includes('y')
+      );
+      expect(groupOpportunity).toBeDefined();
+      expect(groupOpportunity!.reason).toContain('same dependencies');
+    });
+
+    it('should perform well with a large graph of 50 tasks', async () => {
+      const taskCount = 50;
+      const tasks: AITask[] = [];
+
+      // Create 50 tasks; each task i depends on task i+1 (linear chain)
+      for (let i = 0; i < taskCount; i++) {
+        const deps = i < taskCount - 1
+          ? [{ id: `t-${i + 1}`, type: 'depends_on' as const }]
+          : [];
+        tasks.push({
+          id: `t-${i}`,
+          title: `Task ${i}`,
+          description: `Description for task ${i}`,
+          status: TaskStatus.PENDING,
+          priority: TaskPriority.MEDIUM,
+          complexity: 3,
+          estimatedHours: 4,
+          aiGenerated: false,
+          subtasks: [],
+          dependencies: deps,
+          acceptanceCriteria: [],
+          createdAt: '2024-01-01T00:00:00Z',
+          updatedAt: '2024-01-02T00:00:00Z',
+          tags: []
+        });
+      }
+
+      const start = Date.now();
+      const result = await generator.generateDependencyContext(tasks[0], tasks);
+      const elapsed = Date.now() - start;
+
+      expect(result).not.toBeNull();
+      expect(result!.dependencies).toHaveLength(1);
+      // Should complete in under 1 second (no exponential blowup)
+      expect(elapsed).toBeLessThan(1000);
+    });
+
+    it('should handle fan-out graph where one task depends on many', async () => {
+      // Main task depends on 8 different setup tasks
+      const setupTasks = Array.from({ length: 8 }, (_, i) =>
+        createDependencyTask(`setup-${i}`, `Setup Component ${i}`)
+      );
+      // Remove all dependencies from setup tasks
+      for (const st of setupTasks) {
+        st.dependencies = [];
+      }
+
+      const mainTask = createMockTask({
+        id: 'main',
+        title: 'Build Complete System',
+        description: 'System requires all setup components',
+        dependencies: setupTasks.map(st => ({ id: st.id!, type: 'depends_on' as const }))
+      });
+
+      const allTasks = [mainTask, ...setupTasks];
+      const result = await generator.generateDependencyContext(mainTask, allTasks);
+
+      // The main task has 8 dependencies; the generator may not produce
+      // parallel opportunities from the main task's perspective since it
+      // depends on all of them. Just verify the dependency count is correct.
+      expect(result!.dependencies).toHaveLength(8);
+      // Each dependency should have the correct type
+      for (const dep of result!.dependencies) {
+        expect(dep.dependencyType).toBeDefined();
+      }
+    });
+
+    it('should generate unblock date proportional to blocking dep count', async () => {
+      // 4 blocking dependencies → 4 * 3 = 12 days
+      const setupTasks = Array.from({ length: 4 }, (_, i) => {
+        const t = createDependencyTask(`infra-${i}`, `Setup Infrastructure Part ${i}`);
+        t.description = `Setup infrastructure part ${i}`;
+        t.dependencies = [];
+        return t;
+      });
+
+      const mainTask = createMockTask({
+        id: 'main',
+        title: 'Deploy Application',
+        description: 'Deploy the full application',
+        dependencies: setupTasks.map(st => ({ id: st.id!, type: 'depends_on' as const }))
+      });
+
+      const allTasks = [mainTask, ...setupTasks];
+      const result = await generator.generateDependencyContext(mainTask, allTasks);
+
+      expect(result).not.toBeNull();
+      expect(result!.estimatedUnblockDate).toBeDefined();
+
+      const unblockDate = new Date(result!.estimatedUnblockDate!);
+      const now = new Date();
+      const daysDiff = Math.round((unblockDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+      // 4 blocking deps × 3 days each = ~12 days (allow ±1 for date boundary)
+      expect(daysDiff).toBeGreaterThanOrEqual(11);
+      expect(daysDiff).toBeLessThanOrEqual(13);
+    });
+
+    it('should handle relates_to deps as parallelizable', async () => {
+      // When task title appears in dep description → relates_to → canRunInParallel = true
+      const task = createMockTask({
+        id: 'logging',
+        title: 'Logging Module',
+        description: 'Build the logging module',
+        dependencies: [{ id: 'monitoring', type: 'depends_on' }]
+      });
+      const depTask = createDependencyTask('monitoring', 'Logging Module Monitoring');
+      // dep title contains the task title → relates_to type
+      depTask.description = 'Monitoring for the Logging Module';
+
+      const allTasks = [task, depTask];
+      const result = await generator.generateDependencyContext(task, allTasks);
+
+      expect(result).not.toBeNull();
+      expect(result!.dependencies).toHaveLength(1);
+      expect(result!.dependencies[0].dependencyType).toBe('relates_to');
+      expect(result!.dependencies[0].canRunInParallel).toBe(true);
+    });
+  });
 });

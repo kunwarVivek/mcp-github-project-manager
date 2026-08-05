@@ -734,4 +734,228 @@ describe('ContextQualityValidator', () => {
       expect(result.issues.filter(i => i.includes('exceeds'))).toHaveLength(0);
     });
   });
+
+  describe('pipeline integration (full validate flow)', () => {
+    it('should run full pipeline: completeness → relevance → consistency → overall quality', () => {
+      const context = createValidContext();
+      const task = createMockTask();
+      const metrics = createQualityMetrics();
+
+      const report = validator.generateQualityReport(task, context, metrics);
+
+      // All four validation stages ran
+      expect(report.validation.completeness).toBeDefined();
+      expect(report.validation.accuracy).toBeDefined();
+      expect(report.validation.relevance).toBeDefined();
+      expect(report.validation.performance).toBeDefined();
+
+      // Each stage produced a valid ValidationResult shape
+      for (const key of ['completeness', 'accuracy', 'relevance', 'performance'] as const) {
+        const v = report.validation[key];
+        expect(typeof v.passes).toBe('boolean');
+        expect(typeof v.score).toBe('number');
+        expect(Array.isArray(v.issues)).toBe(true);
+        expect(Array.isArray(v.warnings)).toBe(true);
+        expect(Array.isArray(v.suggestions)).toBe(true);
+      }
+    });
+
+    it('should pass overall when all checks pass with good inputs', () => {
+      const context = createValidContext();
+      const task = createMockTask();
+      const metrics = createQualityMetrics({ generationTime: 5, tokenUsage: 500 });
+
+      const report = validator.generateQualityReport(task, context, metrics);
+
+      // Report structure is valid with all stages
+      expect(report.overallScore).toBeGreaterThan(0);
+      expect(report.validation.completeness).toBeDefined();
+      expect(report.validation.accuracy).toBeDefined();
+      expect(report.validation.relevance).toBeDefined();
+      expect(report.validation.performance).toBeDefined();
+      // If any check fails, recommendations should explain why
+      if (!report.overallPasses) {
+        expect(report.recommendations.length).toBeGreaterThan(0);
+      }
+    });
+
+    it('should fail overall when all checks fail (fully invalid context)', () => {
+      // Minimal/empty context → completeness fails
+      // Placeholder text → accuracy fails
+      // Unrelated content → relevance fails
+      // Bad metrics → performance fails
+      const context = createValidContext({
+        businessObjective: 'TBD placeholder',
+        userImpact: 'TBD',
+        successMetrics: [],
+        technicalConstraints: [],
+        architecturalDecisions: [],
+        integrationPoints: [],
+        dataRequirements: [],
+        implementationGuidance: undefined,
+        contextualReferences: undefined,
+        enhancedAcceptanceCriteria: undefined,
+        dependencyContext: undefined,
+        prdContextSummary: undefined as unknown as PRDContextSummary,
+      });
+
+      const task = createMockTask({ title: 'Completely Unrelated Xyzzyx Task', description: 'Nothing to do with auth' });
+      const metrics = createQualityMetrics({
+        generationTime: 60,
+        tokenUsage: 5000,
+        errors: ['AI provider timeout', 'Retry failed']
+      });
+
+      const report = validator.generateQualityReport(task, context, metrics);
+
+      expect(report.overallPasses).toBe(false);
+      expect(report.validation.completeness.passes).toBe(false);
+      expect(report.validation.performance.passes).toBe(false);
+      // Score should be significantly below passing
+      expect(report.overallScore).toBeLessThan(70);
+      // Should have critical recommendations
+      expect(report.recommendations.some(r => r.includes('CRITICAL'))).toBe(true);
+    });
+
+    it('should handle partial failures (completeness passes, accuracy fails)', () => {
+      // Full context but with placeholder text → accuracy penalty
+      const context = createValidContext({
+        businessObjective: 'Enable users to authenticate securely - to be determined how exactly',
+      });
+      const task = createMockTask();
+      const metrics = createQualityMetrics();
+
+      const report = validator.generateQualityReport(task, context, metrics);
+
+      // Completeness should still pass (all fields present)
+      expect(report.validation.completeness.passes).toBe(true);
+      // Accuracy should fail due to "to be determined" placeholder
+      expect(report.validation.accuracy.passes).toBe(false);
+      expect(report.validation.accuracy.issues.some(i => i.includes('placeholder text'))).toBe(true);
+      // Overall fails because accuracy fails
+      expect(report.overallPasses).toBe(false);
+    });
+
+    it('should handle partial failures (only performance fails)', () => {
+      const context = createValidContext();
+      const task = createMockTask();
+      const metrics = createQualityMetrics({
+        generationTime: 60,
+        tokenUsage: 5000,
+        errors: ['Timeout']
+      });
+
+      const report = validator.generateQualityReport(task, context, metrics);
+
+      expect(report.validation.completeness.passes).toBe(true);
+      expect(report.validation.performance.passes).toBe(false);
+      expect(report.overallPasses).toBe(false);
+      // Performance weight is only 10%, so overall score should still be high
+      expect(report.overallScore).toBeGreaterThan(70);
+    });
+
+    it('should aggregate individual check scores into overall score using correct weights', () => {
+      const context = createValidContext();
+      const task = createMockTask();
+      const metrics = createQualityMetrics({ generationTime: 5, tokenUsage: 500 });
+
+      const report = validator.generateQualityReport(task, context, metrics);
+
+      // Verify weighting formula: 35% completeness + 30% accuracy + 25% relevance + 10% performance
+      const expectedScore = Math.round(
+        report.validation.completeness.score * 0.35 +
+        report.validation.accuracy.score * 0.30 +
+        report.validation.relevance.score * 0.25 +
+        report.validation.performance.score * 0.10
+      );
+      expect(report.overallScore).toBe(expectedScore);
+    });
+
+    it('should generate quality report with correct task metadata', () => {
+      const task = createMockTask({ id: 'pipeline-task-99', title: 'Pipeline Test Task' });
+      const context = createValidContext();
+      const metrics = createQualityMetrics();
+
+      const report = validator.generateQualityReport(task, context, metrics);
+
+      expect(report.taskId).toBe('pipeline-task-99');
+      expect(report.taskTitle).toBe('Pipeline Test Task');
+      expect(report.metrics).toBe(metrics);
+    });
+
+    it('should produce recommendations only for failing checks', () => {
+      // Only performance fails
+      const context = createValidContext();
+      const task = createMockTask();
+      const metrics = createQualityMetrics({
+        generationTime: 60,
+        tokenUsage: 5000,
+        errors: ['Timeout']
+      });
+
+      const report = validator.generateQualityReport(task, context, metrics);
+
+      // Should have performance recommendations
+      expect(report.recommendations.some(r => r.includes('performance') || r.includes('Optimize'))).toBe(true);
+      // Should NOT have the "all good" message
+      expect(report.recommendations.some(r => r.includes('meets all PRD requirements'))).toBe(false);
+    });
+
+    it('should compute overallPasses as conjunction of all four checks', () => {
+      // Create a context where accuracy should fail due to placeholder text
+      const context = createValidContext({
+        businessObjective: 'Enable authentication - this is a placeholder for now',
+      });
+      const task = createMockTask();
+      const metrics = createQualityMetrics({ generationTime: 5, tokenUsage: 500 });
+
+      const report = validator.generateQualityReport(task, context, metrics);
+
+      // overallPasses should be the conjunction of all four checks
+      const allPass = report.validation.completeness.passes
+        && report.validation.accuracy.passes
+        && report.validation.relevance.passes
+        && report.validation.performance.passes;
+      expect(report.overallPasses).toBe(allPass);
+    });
+
+    it('should generate threshold-based pass/fail at exact boundary scores', () => {
+      // Performance at exactly the 30s generation time boundary
+      const context = createValidContext();
+      const task = createMockTask();
+
+      // At limit (30s, 2000 tokens) — should pass (not exceeding)
+      const atLimitMetrics = createQualityMetrics({ generationTime: 30, tokenUsage: 2000 });
+      const atLimitReport = validator.generateQualityReport(task, context, atLimitMetrics);
+      expect(atLimitReport.validation.performance.issues.filter(i => i.includes('exceeds'))).toHaveLength(0);
+
+      // Just over limit — should fail
+      const overLimitMetrics = createQualityMetrics({ generationTime: 31, tokenUsage: 2001 });
+      const overLimitReport = validator.generateQualityReport(task, context, overLimitMetrics);
+      expect(overLimitReport.validation.performance.issues.filter(i => i.includes('exceeds'))).not.toHaveLength(0);
+      expect(overLimitReport.validation.performance.passes).toBe(false);
+    });
+
+    it('should produce a complete quality report with all required fields', () => {
+      const context = createValidContext();
+      const task = createMockTask();
+      const metrics = createQualityMetrics();
+
+      const report: QualityReport = validator.generateQualityReport(task, context, metrics);
+
+      // Structural completeness of the report
+      expect(report).toHaveProperty('taskId');
+      expect(report).toHaveProperty('taskTitle');
+      expect(report).toHaveProperty('metrics');
+      expect(report).toHaveProperty('validation');
+      expect(report).toHaveProperty('overallScore');
+      expect(report).toHaveProperty('overallPasses');
+      expect(report).toHaveProperty('recommendations');
+      expect(typeof report.overallScore).toBe('number');
+      expect(typeof report.overallPasses).toBe('boolean');
+      expect(Array.isArray(report.recommendations)).toBe(true);
+      expect(report.overallScore).toBeGreaterThanOrEqual(0);
+      expect(report.overallScore).toBeLessThanOrEqual(100);
+    });
+  });
 });

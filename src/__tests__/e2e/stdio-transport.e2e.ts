@@ -65,8 +65,9 @@ describe('Stdio Transport Layer Tests', () => {
         stderrBuffer.push(data);
       });
 
-      // Wait for server startup
-      await new Promise(resolve => setTimeout(resolve, 3000));
+      // Wait for server startup message on stderr (poll instead of fixed delay to avoid flakes)
+      const getStderr = () => Buffer.concat(stderrBuffer).toString();
+      await waitForContent(getStderr, 'GitHub Project Manager MCP server running on stdio');
 
       // Send some requests to trigger various code paths
       const requests = [
@@ -284,8 +285,8 @@ describe('Stdio Transport Layer Tests', () => {
         stderrData += data.toString();
       });
 
-      // Wait for server to fully initialize and log startup messages
-      await new Promise(resolve => setTimeout(resolve, 3000));
+      // Wait for server startup message on stderr (poll instead of fixed delay to avoid flakes)
+      await waitForContent(() => stderrData, 'GitHub Project Manager MCP server running on stdio');
 
       // Send a request that might trigger logging
       serverProcess.stdin?.write(JSON.stringify({
@@ -413,4 +414,32 @@ function isValidJSON(str: string): boolean {
   } catch {
     return false;
   }
+}
+
+/**
+ * Poll until `source` contains `expected`, checking every `intervalMs`.
+ * Returns when found or rejects after `timeoutMs`.
+ */
+function waitForContent(
+  source: () => string,
+  expected: string,
+  timeoutMs = 8000,
+  intervalMs = 200
+): Promise<void> {
+  // eslint-disable-next-line no-restricted-syntax -- Promise.withResolvers unavailable (lib < es2024)
+  return new Promise<void>((resolve, reject) => {
+    const deadline = Date.now() + timeoutMs;
+    const check = () => {
+      if (source().includes(expected)) return resolve();
+      if (Date.now() >= deadline) {
+        return reject(
+          new Error(
+            `Timed out waiting for stderr to contain "${expected}". Got: "${source().slice(0, 500)}"`
+          )
+        );
+      }
+      setTimeout(check, intervalMs);
+    };
+    check();
+  });
 }

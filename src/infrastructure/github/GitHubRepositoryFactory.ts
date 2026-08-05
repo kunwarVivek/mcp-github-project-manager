@@ -10,6 +10,7 @@ import { GitHubSprintRepository } from "./repositories/GitHubSprintRepository";
 import { GitHubAutomationRuleRepository } from "./repositories/GitHubAutomationRuleRepository";
 import { GitHubSubIssueRepository } from "./repositories/GitHubSubIssueRepository";
 import { GitHubStatusUpdateRepository } from "./repositories/GitHubStatusUpdateRepository";
+import { RateLimitManager } from "./RateLimitManager";
 
 export interface RepositoryFactoryOptions {
   baseUrl?: string;
@@ -20,6 +21,7 @@ export class GitHubRepositoryFactory {
   private readonly octokit: OctokitInstance;
   private readonly errorHandler: GitHubErrorHandler;
   private readonly config: GitHubConfig;
+  private readonly rateLimitManager: RateLimitManager;
 
   constructor(
     token: string,
@@ -35,10 +37,19 @@ export class GitHubRepositoryFactory {
       baseUrl: options.baseUrl || "https://api.github.com",
       previews: options.previews || ["inertia-preview"],
     });
+
+    this.rateLimitManager = new RateLimitManager(this.octokit as Octokit);
   }
 
   getErrorHandler(): GitHubErrorHandler {
     return this.errorHandler;
+  }
+
+  /**
+   * Returns the rate limit manager for proactive monitoring and backoff.
+   */
+  getRateLimitManager(): RateLimitManager {
+    return this.rateLimitManager;
   }
 
   /**

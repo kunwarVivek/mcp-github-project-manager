@@ -2,15 +2,7 @@ import { GitHubRepositoryFactory } from "../infrastructure/github/GitHubReposito
 import { GitHubIssueRepository } from "../infrastructure/github/repositories/GitHubIssueRepository";
 import { ResourceStatus } from "../domain/resource-types";
 import { Issue, CreateIssue } from "../domain/types";
-import { MCPErrorCode } from "../domain/mcp-types";
-import {
-  DomainError,
-  ResourceNotFoundError,
-  ValidationError,
-  RateLimitError,
-  UnauthorizedError,
-  GitHubAPIError,
-} from "../domain/errors";
+import { mapErrorToMCPError } from './utils/ErrorMapper';
 
 /** A GitHub issue comment as returned by the REST API. */
 export interface IssueComment {
@@ -46,28 +38,6 @@ export class IssueService {
     return this.factory.createIssueRepository();
   }
 
-  /**
-   * Maps domain errors to MCP error codes for consistent error handling.
-   */
-  private mapErrorToMCPError(error: unknown): Error {
-    if (error instanceof ValidationError) {
-      return new DomainError(`${MCPErrorCode.VALIDATION_ERROR}: ${error.message}`);
-    }
-    if (error instanceof ResourceNotFoundError) {
-      return new DomainError(`${MCPErrorCode.RESOURCE_NOT_FOUND}: ${error.message}`);
-    }
-    if (error instanceof RateLimitError) {
-      return new DomainError(`${MCPErrorCode.RATE_LIMITED}: ${error.message}`);
-    }
-    if (error instanceof UnauthorizedError) {
-      return new DomainError(`${MCPErrorCode.UNAUTHORIZED}: ${error.message}`);
-    }
-    if (error instanceof GitHubAPIError) {
-      return new DomainError(`${MCPErrorCode.INTERNAL_ERROR}: GitHub API Error - ${error.message}`);
-    }
-    return new DomainError(`${MCPErrorCode.INTERNAL_ERROR}: ${error instanceof Error ? error.message : String(error)}`);
-  }
-
   async createIssue(data: {
     title: string;
     description: string;
@@ -92,7 +62,7 @@ export class IssueService {
 
       return await this.issueRepo.create(issueData);
     } catch (error) {
-      throw this.mapErrorToMCPError(error);
+      throw mapErrorToMCPError(error);
     }
   }
 
@@ -154,7 +124,7 @@ export class IssueService {
 
       return issues.slice(0, limit);
     } catch (error) {
-      throw this.mapErrorToMCPError(error);
+      throw mapErrorToMCPError(error);
     }
   }
 
@@ -162,7 +132,7 @@ export class IssueService {
     try {
       return await this.issueRepo.findById(issueId);
     } catch (error) {
-      throw this.mapErrorToMCPError(error);
+      throw mapErrorToMCPError(error);
     }
   }
 
@@ -194,7 +164,7 @@ export class IssueService {
 
       return await this.issueRepo.update(issueId, data);
     } catch (error) {
-      throw this.mapErrorToMCPError(error);
+      throw mapErrorToMCPError(error);
     }
   }
 
@@ -221,7 +191,7 @@ export class IssueService {
         updatedAt: response.data.updated_at
       };
     } catch (error) {
-      throw this.mapErrorToMCPError(error);
+      throw mapErrorToMCPError(error);
     }
   }
 
@@ -248,7 +218,7 @@ export class IssueService {
         updatedAt: response.data.updated_at
       };
     } catch (error) {
-      throw this.mapErrorToMCPError(error);
+      throw mapErrorToMCPError(error);
     }
   }
 
@@ -265,7 +235,7 @@ export class IssueService {
 
       return { success: true, message: `Comment ${data.commentId} deleted successfully` };
     } catch (error) {
-      throw this.mapErrorToMCPError(error);
+      throw mapErrorToMCPError(error);
     }
   }
 
@@ -292,7 +262,7 @@ export class IssueService {
         updatedAt: comment.updated_at
       }));
     } catch (error) {
-      throw this.mapErrorToMCPError(error);
+      throw mapErrorToMCPError(error);
     }
   }
 
@@ -341,7 +311,7 @@ export class IssueService {
       const content = response.addProjectV2DraftIssue.projectV2Item.content;
       return { id: content.id, title: content.title, body: content.body };
     } catch (error) {
-      throw this.mapErrorToMCPError(error);
+      throw mapErrorToMCPError(error);
     }
   }
 
@@ -379,7 +349,7 @@ export class IssueService {
       const draftIssue = response.updateProjectV2DraftIssue.draftIssue;
       return { id: draftIssue.id, title: draftIssue.title, body: draftIssue.body };
     } catch (error) {
-      throw this.mapErrorToMCPError(error);
+      throw mapErrorToMCPError(error);
     }
   }
 
@@ -396,7 +366,7 @@ export class IssueService {
       await this.factory.graphql(mutation, { input: { draftIssueId: data.draftIssueId } });
       return { success: true, message: `Draft issue ${data.draftIssueId} deleted successfully` };
     } catch (error) {
-      throw this.mapErrorToMCPError(error);
+      throw mapErrorToMCPError(error);
     }
   }
 }

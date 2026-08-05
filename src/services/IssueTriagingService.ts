@@ -1,4 +1,5 @@
 import { generateText } from 'ai';
+import { InputSanitizer } from './utils/InputSanitizer';
 import { AIServiceFactory } from "./ai/AIServiceFactory";
 import { ProjectManagementService } from "./ProjectManagementService";
 import { IssueEnrichmentService } from "./IssueEnrichmentService";
@@ -43,6 +44,11 @@ export class IssueTriagingService {
     autoApply?: boolean;
   }): Promise<TriageResult> {
     try {
+      const issueTitle = InputSanitizer.sanitizeIssueContent(params.issueTitle);
+      const issueDescription = params.issueDescription
+        ? InputSanitizer.sanitizeIssueContent(params.issueDescription)
+        : undefined;
+
       const model = this.aiFactory.getModel('main') || this.aiFactory.getBestAvailableModel();
       if (!model) {
         throw new Error('AI service is not available');
@@ -52,7 +58,7 @@ export class IssueTriagingService {
 
       const response = await generateText({
         model,
-        prompt: `${prompt}\n\nIssue: ${params.issueTitle}`,
+        prompt: `${prompt}\n\nIssue: ${issueTitle}`,
         temperature: 0.5,
         maxOutputTokens: 1000
       });
@@ -72,7 +78,7 @@ export class IssueTriagingService {
 
       return {
         issueId: params.issueId,
-        issueTitle: params.issueTitle,
+        issueTitle,
         classification: triage.classification,
         actions: triage.actions.map((a: any) => ({ ...a, applied: false })),
         reasoning: triage.reasoning

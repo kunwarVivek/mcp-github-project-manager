@@ -35,43 +35,43 @@ A comprehensive Model Context Protocol (MCP) server that provides AI-powered Git
 ### Active
 
 **GitHub Projects v2 API Coverage:**
-- [ ] Sub-issues management (add, list, reprioritize, parent lookup)
-- [ ] Project status updates (createProjectV2StatusUpdate)
-- [ ] Project templates (mark as template, copy from template)
-- [ ] Repository/team linking (link/unlink to repos and teams)
-- [ ] Project close/reopen operations
-- [ ] Convert draft issue to real issue
-- [ ] Item position/reordering within project
-- [ ] REST API alternatives where available
-- [ ] Advanced search with AND/OR keywords
+- [x] Sub-issues management (add, list, reprioritize, parent lookup) — GHAPI-01–05
+- [x] Project status updates (createProjectV2StatusUpdate) — GHAPI-06–08
+- [x] Project templates (mark as template, copy from template) — GHAPI-09–12
+- [x] Repository/team linking (link/unlink to repos and teams) — GHAPI-13–18
+- [x] Project close/reopen operations — GHAPI-19–20
+- [x] Convert draft issue to real issue — GHAPI-21
+- [x] Item position/reordering within project — GHAPI-22
+- [x] REST API alternatives where available
+- [x] Advanced search with AND/OR keywords — GHAPI-23–24
 
 **MCP Protocol Upgrade:**
-- [ ] Upgrade SDK 1.12.0 → 1.25.2
-- [ ] Add tool annotations (destructive, read-only behavior metadata)
-- [ ] Add tool output schemas (declared return types)
-- [ ] Implement proper error codes per MCP spec
+- [x] Upgrade SDK 1.12.0 → 1.29 — MCP-01–04
+- [x] Add tool annotations (destructive, read-only behavior metadata) — MCP-05–07
+- [x] Add tool output schemas (declared return types) — MCP-08–12
+- [x] Implement proper error codes per MCP spec — MCP-13–15
 
 **Tech Debt Resolution:**
-- [ ] Break up ProjectManagementService (3,291 lines god class)
-- [ ] Fix 30+ `as any` type assertions with proper interfaces
-- [ ] Add missing test coverage (80 source files vs 29 test files)
-- [ ] Implement circuit breakers for AI services
-- [ ] Add health check endpoint
-- [ ] Add request tracing/correlation IDs
-- [ ] Fix STATUS.md documentation drift
+- [x] Break up ProjectManagementService (god class → 23+ extracted services) — DEBT-01–07
+- [x] Fix type assertions with proper interfaces — DEBT-08–13
+- [x] Add missing test coverage (2407 tests passing) — DEBT-14–20
+- [x] Implement circuit breakers for AI services — DEBT-21–25
+- [x] Add health check endpoint
+- [x] Add request tracing/correlation IDs
+- [x] Fix STATUS.md documentation drift — DEBT-26–28
 
 **AI Feature Enhancement:**
-- [ ] Improve PRD generation quality
-- [ ] Enhance task complexity analysis accuracy
-- [ ] Add AI-powered sprint planning suggestions
-- [ ] Add AI-powered roadmap generation from requirements
-- [ ] Improve requirements traceability depth
+- [x] Improve PRD generation quality — AI-01–05
+- [x] Enhance task complexity analysis accuracy — AI-06–10
+- [x] Add AI-powered sprint planning suggestions — AI-11–15
+- [x] Add AI-powered roadmap generation from requirements — AI-16–18
+- [x] Improve requirements traceability depth — AI-19–20
 
 **Production Readiness:**
-- [ ] All tests passing (0 failures, 0 skipped)
-- [ ] Comprehensive documentation
-- [ ] npm package publication
-- [ ] Webhook reliability improvements
+- [x] All tests passing (2407 passing, 0 failures, 0 skipped) — PROD-01–04
+- [x] Comprehensive documentation — PROD-05–08
+- [x] npm package publication — PROD-09–10
+- [x] Webhook reliability improvements — PROD-11–12
 
 ### Out of Scope
 
@@ -83,23 +83,23 @@ A comprehensive Model Context Protocol (MCP) server that provides AI-powered Git
 
 ## Context
 
-**Codebase State (January 2026):**
-- 80 TypeScript source files, ~71 MCP tools registered
-- Test suite: 192 passing, 74 failing, 20 skipped
+**Codebase State (August 2026):**
+- 23+ TypeScript services, 118 MCP tools registered
+- Test suite: 2407 passing, 0 failures, 0 skipped
 - Layered architecture with MCP server → Services → GitHub Repositories
-- Uses Vercel AI SDK for multi-provider AI access (Anthropic, OpenAI, Google, Perplexity)
+- Uses Vercel AI SDK v5 for multi-provider AI access (Anthropic, OpenAI, Google, Perplexity)
 - Codebase mapping available at `.planning/codebase/`
 
 **Technical Environment:**
 - Node.js >= 18.0.0
 - TypeScript 5.8.3, ES2022 target
-- MCP SDK @modelcontextprotocol/sdk 1.12.0 (outdated)
+- MCP SDK @modelcontextprotocol/sdk 1.29
 - Octokit @octokit/rest 22.0.0
-- Zod 3.25.32 for schema validation
+- Zod v4 (4.x) for schema validation
 - tsyringe for dependency injection
 
 **Research Findings (January 2026):**
-- MCP SDK current version is 1.25.2 (13 minor versions ahead)
+- MCP SDK current version is 1.29 (upgraded 2026-07-15)
 - MCP spec 2025-11-25 adds Tasks primitive, Elicitation, Tool Output Schemas
 - GitHub Projects REST API added September 2025
 - Sub-issues now support 100 items, 8 nesting levels, cross-org
@@ -137,4 +137,4 @@ This PRD is the top of a traceable chain. Keep them in sync:
 Superseded: `docs/GAP-ANALYSIS-LIVE.md` (stale snapshot).
 
 ---
-*Last updated: 2026-07-15 — reconciled decisions + added PRD→FRD document chain*
+*Last updated: 2026-08-05 — all Active items verified complete; context updated*

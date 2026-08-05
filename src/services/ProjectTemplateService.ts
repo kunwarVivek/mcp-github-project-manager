@@ -1,16 +1,11 @@
 import { GitHubRepositoryFactory } from "../infrastructure/github/GitHubRepositoryFactory";
 import { GitHubProjectRepository } from "../infrastructure/github/repositories/GitHubProjectRepository";
 import { CustomField, ProjectView } from "../domain/types";
-import { MCPErrorCode } from "../domain/mcp-types";
 import {
-  DomainError,
   ResourceNotFoundError,
-  ValidationError,
-  RateLimitError,
-  UnauthorizedError,
-  GitHubAPIError
 } from "../domain/errors";
 import { ResourceType } from "../domain/resource-types";
+import { mapErrorToMCPError } from './utils/ErrorMapper';
 
 /**
  * ProjectTemplateService handles project customization operations:
@@ -31,31 +26,6 @@ export class ProjectTemplateService {
     return this.factory.createProjectRepository();
   }
 
-  // Helper method to map domain errors to MCP error codes
-  private mapErrorToMCPError(error: unknown): Error {
-    if (error instanceof ValidationError) {
-      return new DomainError(`${MCPErrorCode.VALIDATION_ERROR}: ${error.message}`);
-    }
-
-    if (error instanceof ResourceNotFoundError) {
-      return new DomainError(`${MCPErrorCode.RESOURCE_NOT_FOUND}: ${error.message}`);
-    }
-
-    if (error instanceof RateLimitError) {
-      return new DomainError(`${MCPErrorCode.RATE_LIMITED}: ${error.message}`);
-    }
-
-    if (error instanceof UnauthorizedError) {
-      return new DomainError(`${MCPErrorCode.UNAUTHORIZED}: ${error.message}`);
-    }
-
-    if (error instanceof GitHubAPIError) {
-      return new DomainError(`${MCPErrorCode.INTERNAL_ERROR}: GitHub API Error - ${error.message}`);
-    }
-
-    // Default to internal error
-    return new DomainError(`${MCPErrorCode.INTERNAL_ERROR}: ${error instanceof Error ? error.message : String(error)}`);
-  }
 
   // Project README Management
   async getProjectReadme(data: {
@@ -86,7 +56,7 @@ export class ProjectTemplateService {
         readme: response.node?.readme || ''
       };
     } catch (error) {
-      throw this.mapErrorToMCPError(error);
+      throw mapErrorToMCPError(error);
     }
   }
 
@@ -127,7 +97,7 @@ export class ProjectTemplateService {
         message: `Project README updated successfully`
       };
     } catch (error) {
-      throw this.mapErrorToMCPError(error);
+      throw mapErrorToMCPError(error);
     }
   }
 
@@ -141,7 +111,7 @@ export class ProjectTemplateService {
       }
       return project.fields || [];
     } catch (error) {
-      throw this.mapErrorToMCPError(error);
+      throw mapErrorToMCPError(error);
     }
   }
 
@@ -167,7 +137,7 @@ export class ProjectTemplateService {
         }))
       });
     } catch (error) {
-      throw this.mapErrorToMCPError(error);
+      throw mapErrorToMCPError(error);
     }
   }
 
@@ -197,7 +167,7 @@ export class ProjectTemplateService {
 
       return await this.projectRepo.updateField(data.projectId, data.fieldId, updateData);
     } catch (error) {
-      throw this.mapErrorToMCPError(error);
+      throw mapErrorToMCPError(error);
     }
   }
 
@@ -214,7 +184,7 @@ export class ProjectTemplateService {
         data.layout
       );
     } catch (error) {
-      throw this.mapErrorToMCPError(error);
+      throw mapErrorToMCPError(error);
     }
   }
 
@@ -268,7 +238,7 @@ export class ProjectTemplateService {
         filters: []
       }));
     } catch (error) {
-      throw this.mapErrorToMCPError(error);
+      throw mapErrorToMCPError(error);
     }
   }
 
@@ -330,7 +300,7 @@ export class ProjectTemplateService {
         filters: []
       };
     } catch (error) {
-      throw this.mapErrorToMCPError(error);
+      throw mapErrorToMCPError(error);
     }
   }
 
@@ -346,7 +316,7 @@ export class ProjectTemplateService {
         message: `View ${data.viewId} deleted successfully from project ${data.projectId}`
       };
     } catch (error) {
-      throw this.mapErrorToMCPError(error);
+      throw mapErrorToMCPError(error);
     }
   }
 }

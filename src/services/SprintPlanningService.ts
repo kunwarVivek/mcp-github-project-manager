@@ -5,15 +5,11 @@ import { GitHubSprintRepository } from "../infrastructure/github/repositories/Gi
 import { GitHubIssueRepository } from "../infrastructure/github/repositories/GitHubIssueRepository";
 import { Sprint, CreateSprint, Issue } from "../domain/types";
 import { ResourceStatus, ResourceType } from "../domain/resource-types";
-import { MCPErrorCode } from "../domain/mcp-types";
 import {
-  DomainError,
-  ResourceNotFoundError,
   ValidationError,
-  RateLimitError,
-  UnauthorizedError,
-  GitHubAPIError
+  ResourceNotFoundError,
 } from "../domain/errors";
+import { mapErrorToMCPError } from './utils/ErrorMapper';
 
 /**
  * Schema for validating sprint planning input
@@ -80,33 +76,6 @@ export class SprintPlanningService {
   }
 
   /**
-   * Maps domain errors to MCP error codes for consistent error handling
-   */
-  private mapErrorToMCPError(error: unknown): Error {
-    if (error instanceof ValidationError) {
-      return new DomainError(`${MCPErrorCode.VALIDATION_ERROR}: ${error.message}`);
-    }
-
-    if (error instanceof ResourceNotFoundError) {
-      return new DomainError(`${MCPErrorCode.RESOURCE_NOT_FOUND}: ${error.message}`);
-    }
-
-    if (error instanceof RateLimitError) {
-      return new DomainError(`${MCPErrorCode.RATE_LIMITED}: ${error.message}`);
-    }
-
-    if (error instanceof UnauthorizedError) {
-      return new DomainError(`${MCPErrorCode.UNAUTHORIZED}: ${error.message}`);
-    }
-
-    if (error instanceof GitHubAPIError) {
-      return new DomainError(`${MCPErrorCode.INTERNAL_ERROR}: GitHub API Error - ${error.message}`);
-    }
-
-    return new DomainError(`${MCPErrorCode.INTERNAL_ERROR}: ${error instanceof Error ? error.message : String(error)}`);
-  }
-
-  /**
    * Plan and create a sprint with associated issues.
    *
    * This method validates input with Zod schema, creates the sprint,
@@ -142,12 +111,12 @@ export class SprintPlanningService {
                 await this.issueRepo.update(issueId, { milestoneId: sprint.id });
               } catch (error) {
                 process.stderr.write(`Failed to associate issue ${issueId} with sprint: ${error}`);
-                throw this.mapErrorToMCPError(error);
+                throw mapErrorToMCPError(error);
               }
             })
           );
         } catch (error) {
-          throw this.mapErrorToMCPError(error);
+          throw mapErrorToMCPError(error);
         }
       }
 
@@ -157,7 +126,7 @@ export class SprintPlanningService {
         throw new ValidationError(`Invalid sprint data: ${error.message}`);
       }
 
-      throw this.mapErrorToMCPError(error);
+      throw mapErrorToMCPError(error);
     }
   }
 
@@ -171,7 +140,7 @@ export class SprintPlanningService {
     try {
       return await this.sprintRepo.findAll(filters);
     } catch (error) {
-      throw this.mapErrorToMCPError(error);
+      throw mapErrorToMCPError(error);
     }
   }
 
@@ -226,7 +195,7 @@ export class SprintPlanningService {
 
       return await this.sprintRepo.update(data.sprintId, sprintData);
     } catch (error) {
-      throw this.mapErrorToMCPError(error);
+      throw mapErrorToMCPError(error);
     }
   }
 
@@ -261,7 +230,7 @@ export class SprintPlanningService {
         message: `Added ${addedCount} issue(s) to sprint ${data.sprintId}`
       };
     } catch (error) {
-      throw this.mapErrorToMCPError(error);
+      throw mapErrorToMCPError(error);
     }
   }
 
@@ -296,7 +265,7 @@ export class SprintPlanningService {
         message: `Removed ${removedCount} issue(s) from sprint ${data.sprintId}`
       };
     } catch (error) {
-      throw this.mapErrorToMCPError(error);
+      throw mapErrorToMCPError(error);
     }
   }
 
@@ -348,7 +317,7 @@ export class SprintPlanningService {
         isActive
       };
     } catch (error) {
-      throw this.mapErrorToMCPError(error);
+      throw mapErrorToMCPError(error);
     }
   }
 
@@ -382,7 +351,7 @@ export class SprintPlanningService {
 
       return await this.sprintRepo.create(sprintData);
     } catch (error) {
-      throw this.mapErrorToMCPError(error);
+      throw mapErrorToMCPError(error);
     }
   }
 
@@ -418,7 +387,7 @@ export class SprintPlanningService {
 
       return sprints;
     } catch (error) {
-      throw this.mapErrorToMCPError(error);
+      throw mapErrorToMCPError(error);
     }
   }
 
@@ -454,7 +423,7 @@ export class SprintPlanningService {
 
       return currentSprint;
     } catch (error) {
-      throw this.mapErrorToMCPError(error);
+      throw mapErrorToMCPError(error);
     }
   }
 }

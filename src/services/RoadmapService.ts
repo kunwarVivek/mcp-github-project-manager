@@ -15,15 +15,10 @@ import {
   CustomField,
   createResource,
 } from "../domain/types";
-import { MCPErrorCode } from "../domain/mcp-types";
 import {
-  DomainError,
-  ResourceNotFoundError,
   ValidationError,
-  RateLimitError,
-  UnauthorizedError,
-  GitHubAPIError,
 } from "../domain/errors";
+import { mapErrorToMCPError } from './utils/ErrorMapper';
 
 const CreateRoadmapSchema = z.object({
   project: z.object({
@@ -81,27 +76,6 @@ export class RoadmapService {
     return this.factory.createIssueRepository();
   }
 
-  /**
-   * Maps domain errors to MCP error codes for consistent error handling.
-   */
-  private mapErrorToMCPError(error: unknown): Error {
-    if (error instanceof ValidationError) {
-      return new DomainError(`${MCPErrorCode.VALIDATION_ERROR}: ${error.message}`);
-    }
-    if (error instanceof ResourceNotFoundError) {
-      return new DomainError(`${MCPErrorCode.RESOURCE_NOT_FOUND}: ${error.message}`);
-    }
-    if (error instanceof RateLimitError) {
-      return new DomainError(`${MCPErrorCode.RATE_LIMITED}: ${error.message}`);
-    }
-    if (error instanceof UnauthorizedError) {
-      return new DomainError(`${MCPErrorCode.UNAUTHORIZED}: ${error.message}`);
-    }
-    if (error instanceof GitHubAPIError) {
-      return new DomainError(`${MCPErrorCode.INTERNAL_ERROR}: GitHub API Error - ${error.message}`);
-    }
-    return new DomainError(`${MCPErrorCode.INTERNAL_ERROR}: ${error instanceof Error ? error.message : String(error)}`);
-  }
 
   async createRoadmap(data: {
     project: CreateProject;
@@ -149,7 +123,7 @@ export class RoadmapService {
                   milestoneId: createdMilestone.id,
                 });
               } catch (error) {
-                throw this.mapErrorToMCPError(error);
+                throw mapErrorToMCPError(error);
               }
             })
           );
@@ -159,7 +133,7 @@ export class RoadmapService {
             issues: createdIssues,
           });
         } catch (error) {
-          throw this.mapErrorToMCPError(error);
+          throw mapErrorToMCPError(error);
         }
       }
 
@@ -168,7 +142,7 @@ export class RoadmapService {
       if (error instanceof z.ZodError) {
         throw new ValidationError(`Invalid roadmap data: ${error.message}`);
       }
-      throw this.mapErrorToMCPError(error);
+      throw mapErrorToMCPError(error);
     }
   }
 }

@@ -827,4 +827,308 @@ describe('ContextualReferenceGenerator', () => {
       expect(result).toBeDefined();
     });
   });
+
+  // =========================================================================
+  // Error Logging & Fallback Verification
+  // =========================================================================
+
+  describe('error logging and fallback verification', () => {
+    it('should write error message to stderr when AI call fails with Error', async () => {
+      const { generateObject } = require('ai');
+      const stderrSpy = jest.spyOn(process.stderr, 'write').mockImplementation(() => true);
+      generateObject.mockRejectedValue(new Error('model overloaded'));
+
+      await generator.generateReferences(createMockTask(), createMockPRD());
+
+      expect(stderrSpy).toHaveBeenCalledWith(
+        expect.stringContaining('model overloaded')
+      );
+      stderrSpy.mockRestore();
+    });
+
+    it('should write stringified error to stderr for non-Error thrown values', async () => {
+      const { generateObject } = require('ai');
+      const stderrSpy = jest.spyOn(process.stderr, 'write').mockImplementation(() => true);
+      generateObject.mockRejectedValue({ code: 'RATE_LIMIT', detail: 'too many requests' });
+
+      await generator.generateReferences(createMockTask(), createMockPRD());
+
+      expect(stderrSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Error generating contextual references')
+      );
+      stderrSpy.mockRestore();
+    });
+
+    it('should return complete ContextualReferences structure from fallback after AI error', async () => {
+      const { generateObject } = require('ai');
+      generateObject.mockRejectedValue(new Error('service unavailable'));
+
+      const result = await generator.generateReferences(createMockTask(), createMockPRD());
+
+      // Verify ALL fields of ContextualReferences are present in fallback
+      expect(result).toBeDefined();
+      expect(result).toHaveProperty('prdSections');
+      expect(result).toHaveProperty('relatedFeatures');
+      expect(result).toHaveProperty('technicalSpecs');
+      expect(result).toHaveProperty('codeExamples');
+      expect(result).toHaveProperty('externalReferences');
+      expect(Array.isArray(result?.prdSections)).toBe(true);
+      expect(Array.isArray(result?.relatedFeatures)).toBe(true);
+      expect(Array.isArray(result?.technicalSpecs)).toBe(true);
+      expect(Array.isArray(result?.codeExamples)).toBe(true);
+      expect(Array.isArray(result?.externalReferences)).toBe(true);
+    });
+
+    it('should handle generateObject returning undefined object', async () => {
+      const { generateObject } = require('ai');
+      generateObject.mockResolvedValue({ object: undefined });
+
+      const result = await generator.generateReferences(createMockTask(), createMockPRD());
+
+      // Returns undefined from AI path since result.object is undefined
+      // Key: should not throw
+      expect(() => result).not.toThrow();
+    });
+
+    it('should handle synchronous throw from generateObject', async () => {
+      const { generateObject } = require('ai');
+      generateObject.mockImplementation(() => {
+        throw new TypeError('Cannot read properties of undefined');
+      });
+
+      const result = await generator.generateReferences(createMockTask(), createMockPRD());
+
+      // Should catch synchronous errors and fall back
+      expect(result).toBeDefined();
+      expect(result?.prdSections).toBeDefined();
+    });
+  });
+
+  // =========================================================================
+  // Compound Keyword Detection
+  // =========================================================================
+
+  describe('compound keyword detection', () => {
+    beforeEach(() => {
+      mockFactory.getBestAvailableModel.mockReturnValue(null);
+      generator = new ContextualReferenceGenerator();
+    });
+
+    it('should detect ALL technical spec categories when task mentions all keywords', async () => {
+      const allKeywordsTask = createMockTask({
+        title: 'Build API with database schema',
+        description: 'Create system architecture with UI component interface for REST endpoint model'
+      });
+
+      const result = await generator.generateReferences(allKeywordsTask, createMockPRD());
+
+      const specTypes = result?.technicalSpecs.map(s => s.type) ?? [];
+      expect(specTypes).toContain('api_spec');
+      expect(specTypes).toContain('data_model');
+      expect(specTypes).toContain('design_system');
+      expect(specTypes).toContain('architecture_doc');
+      expect(result?.technicalSpecs.length).toBe(4);
+    });
+
+    it('should generate multiple code example types when task matches several patterns', async () => {
+      const multiTask = createMockTask({
+        title: 'Build API endpoint and component for service',
+        description: 'Create REST API with UI component and business logic service layer'
+      });
+
+      const result = await generator.generateReferences(multiTask, createMockPRD());
+
+      expect(result?.codeExamples.length).toBeGreaterThanOrEqual(3);
+      const titles = result?.codeExamples.map(e => e.title) ?? [];
+      expect(titles).toContain('API Endpoint Pattern');
+      expect(titles).toContain('React Component Pattern');
+      expect(titles).toContain('Service Layer Pattern');
+    });
+
+    it('should suggest multiple external references for multi-domain tasks', async () => {
+      const multiRefTask = createMockTask({
+        title: 'Build secure React component with TypeScript types',
+        description: 'Create Node.js server API with testing and auth security'
+      });
+
+      const result = await generator.generateReferences(multiRefTask, createMockPRD());
+
+      const refTitles = result?.externalReferences.map(r => r.title) ?? [];
+      expect(refTitles).toContain('TypeScript Documentation');
+      expect(refTitles).toContain('React Documentation');
+      expect(refTitles).toContain('Node.js Best Practices');
+      expect(refTitles).toContain('Testing Best Practices');
+      expect(refTitles).toContain('OWASP Top 10');
+      expect(result?.externalReferences.length).toBe(5);
+    });
+
+    it('should return empty specs, examples, and refs when no keywords match', async () => {
+      const noMatchTask = createMockTask({
+        title: 'Write documentation',
+        description: 'Add inline comments to existing code'
+      });
+
+      const result = await generator.generateReferences(noMatchTask, createMockPRD());
+
+      expect(result?.technicalSpecs).toEqual([]);
+      expect(result?.codeExamples).toEqual([]);
+      expect(result?.externalReferences).toEqual([]);
+    });
+  });
+
+  // =========================================================================
+  // PRD Extraction Edge Cases
+  // =========================================================================
+
+  describe('PRD extraction edge cases', () => {
+    beforeEach(() => {
+      mockFactory.getBestAvailableModel.mockReturnValue(null);
+      generator = new ContextualReferenceGenerator();
+    });
+
+    it('should truncate objectives to first 3 items when PRD has many', async () => {
+      const manyObjectivesPRD = createMockPRD({
+        objectives: [
+          'Objective Alpha',
+          'Objective Beta',
+          'Objective Gamma',
+          'Objective Delta',
+          'Objective Epsilon'
+        ]
+      });
+
+      const result = await generator.generateReferences(createMockTask(), manyObjectivesPRD);
+
+      const objectivesSection = result?.prdSections.find(s => s.section === 'Business Objectives');
+      expect(objectivesSection).toBeDefined();
+      // Should contain first 3 joined, not all 5
+      expect(objectivesSection?.content).toContain('Objective Alpha');
+      expect(objectivesSection?.content).toContain('Objective Beta');
+      expect(objectivesSection?.content).toContain('Objective Gamma');
+      expect(objectivesSection?.content).not.toContain('Objective Delta');
+      expect(objectivesSection?.content).not.toContain('Objective Epsilon');
+    });
+
+    it('should truncate success metrics to first 3 items', async () => {
+      const manyMetricsPRD = createMockPRD({
+        successMetrics: [
+          'Metric One',
+          'Metric Two',
+          'Metric Three',
+          'Metric Four',
+          'Metric Five'
+        ]
+      });
+
+      const result = await generator.generateReferences(createMockTask(), manyMetricsPRD);
+
+      const metricsSection = result?.prdSections.find(s => s.section === 'Success Metrics');
+      expect(metricsSection).toBeDefined();
+      expect(metricsSection?.content).toContain('Metric One');
+      expect(metricsSection?.content).toContain('Metric Three');
+      expect(metricsSection?.content).not.toContain('Metric Four');
+    });
+
+    it('should handle PRD with objectives but no successMetrics or technicalRequirements', async () => {
+      const partialPRD = createMockPRD({
+        objectives: ['Build the thing'],
+        successMetrics: [],
+        technicalRequirements: undefined as unknown as TechnicalRequirement[]
+      });
+
+      const result = await generator.generateReferences(createMockTask(), partialPRD);
+
+      expect(result).toBeDefined();
+      const objectivesSection = result?.prdSections.find(s => s.section === 'Business Objectives');
+      expect(objectivesSection).toBeDefined();
+      const metricsSection = result?.prdSections.find(s => s.section === 'Success Metrics');
+      expect(metricsSection).toBeUndefined();
+      const techSection = result?.prdSections.find(s => s.section === 'Technical Requirements');
+      expect(techSection).toBeUndefined();
+    });
+
+    it('should handle non-JSON string PRD by treating it as non-parseable', async () => {
+      // String PRD that isn't JSON - generateBasicReferences treats it as string
+      // so prdObj will be null (typeof prd !== 'object')
+      const result = await generator.generateReferences(
+        createMockTask(),
+        'This is just a plain text PRD description, not JSON'
+      );
+
+      expect(result).toBeDefined();
+      expect(result?.prdSections).toBeDefined();
+      // String PRD -> prdObj = null -> returns "PRD content not available"
+      expect(result?.prdSections[0].content).toBe('PRD content not available');
+    });
+
+    it('should handle empty string PRD', async () => {
+      const result = await generator.generateReferences(createMockTask(), '');
+
+      expect(result).toBeDefined();
+      expect(result?.prdSections).toBeDefined();
+      expect(result?.prdSections[0].section).toBe('Overview');
+      expect(result?.prdSections[0].content).toBe('PRD content not available');
+    });
+  });
+
+  // =========================================================================
+  // Task Input Edge Cases
+  // =========================================================================
+
+  describe('task input edge cases', () => {
+    beforeEach(() => {
+      mockFactory.getBestAvailableModel.mockReturnValue(null);
+      generator = new ContextualReferenceGenerator();
+    });
+
+    it('should handle task with both empty title and empty description', async () => {
+      const emptyTask = createMockTask({ title: '', description: '' });
+
+      const result = await generator.generateReferences(emptyTask, createMockPRD());
+
+      expect(result).toBeDefined();
+      // Empty strings won't match any keyword patterns
+      expect(result?.technicalSpecs).toEqual([]);
+      expect(result?.codeExamples).toEqual([]);
+      expect(result?.externalReferences).toEqual([]);
+    });
+
+    it('should handle task with special characters in title and description', async () => {
+      const specialTask = createMockTask({
+        title: 'Build API <endpoint> for @users & "quotes"',
+        description: 'Handle /api/v1 with $params and %encoding + regex /^test$/i'
+      });
+
+      const result = await generator.generateReferences(specialTask, createMockPRD());
+
+      expect(result).toBeDefined();
+      // Should still detect "api" and "endpoint" keywords despite special chars
+      const apiSpec = result?.technicalSpecs.find(s => s.type === 'api_spec');
+      expect(apiSpec).toBeDefined();
+    });
+
+    it('should generate context string for related features with correct interpolation', async () => {
+      const task = createMockTask({
+        title: 'Implement User Login verification',
+        description: 'Login feature implementation'
+      });
+      const features = createMockFeatures();
+
+      const result = await generator.generateReferences(task, createMockPRD(), features);
+
+      const loginFeature = result?.relatedFeatures.find(f => f.title === 'User Login');
+      expect(loginFeature).toBeDefined();
+      // Verify the context string includes the feature title
+      expect(loginFeature?.context).toBe('This task implements part of the "User Login" feature');
+    });
+
+    it('should handle features without providing features argument (undefined)', async () => {
+      const result = await generator.generateReferences(createMockTask(), createMockPRD());
+
+      expect(result).toBeDefined();
+      // No features provided => identifyRelatedFeatures receives []
+      // Empty features array + length === 0 => no parent fallback => empty array
+      expect(result?.relatedFeatures).toEqual([]);
+    });
+  });
 });

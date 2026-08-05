@@ -38,6 +38,8 @@ export interface ToolDefinition<TInput, TOutput = unknown> {
   outputSchema?: z.ZodType<TOutput>;
   /** Behavior annotations per MCP specification */
   annotations?: ToolAnnotations;
+  /** Executor function for this tool */
+  execute?: (args: TInput) => Promise<unknown>;
   examples?: Array<{
     name: string;
     description: string;

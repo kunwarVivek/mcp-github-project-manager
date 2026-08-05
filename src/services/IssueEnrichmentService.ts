@@ -1,4 +1,5 @@
 import { generateText } from 'ai';
+import { InputSanitizer } from './utils/InputSanitizer';
 import { AIServiceFactory } from "./ai/AIServiceFactory";
 import { ProjectManagementService } from "./ProjectManagementService";
 import { Logger } from "../infrastructure/logger";
@@ -37,7 +38,12 @@ export class IssueEnrichmentService {
     milestones?: Array<{ title: string; description: string }>;
   }): Promise<IssueEnrichmentResult> {
     try {
-      this.logger.info(`Enriching issue: ${params.issueTitle}`);
+      const issueTitle = InputSanitizer.sanitizeIssueContent(params.issueTitle);
+      const issueDescription = params.issueDescription
+        ? InputSanitizer.sanitizeIssueContent(params.issueDescription)
+        : undefined;
+
+      this.logger.info(`Enriching issue: ${issueTitle}`);
 
       const model = this.aiFactory.getModel('main') || this.aiFactory.getBestAvailableModel();
       if (!model) {
@@ -48,7 +54,7 @@ export class IssueEnrichmentService {
 
       const response = await generateText({
         model,
-        prompt: `${prompt}\n\nIssue: ${params.issueTitle}\nDescription: ${params.issueDescription || 'None'}`,
+        prompt: `${prompt}\n\nIssue: ${issueTitle}\nDescription: ${issueDescription || 'None'}`,
         temperature: 0.5,
         maxOutputTokens: 1000
       });

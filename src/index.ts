@@ -10,7 +10,7 @@ import {
   McpError,
 } from "@modelcontextprotocol/sdk/types.js";
 import { ProjectManagementService } from "./services/ProjectManagementService";
-import { createProjectManagementService } from "./container";
+import { configureContainer } from "./container";
 import { GitHubStateSyncService } from "./services/GitHubStateSyncService";
 import {
   GITHUB_TOKEN,
@@ -79,13 +79,11 @@ import {
 
 // Phase 10 - Roadmap AI Tools
 import {
-  executeGenerateRoadmap,
   executeGenerateRoadmapVisualization,
 } from "./infrastructure/tools/roadmap-ai-tools";
 
 // Phase 11 - Issue Intelligence Tools
 import {
-  executeEnrichIssue,
   executeSuggestLabels,
   executeDetectDuplicates,
   executeFindRelatedIssues,
@@ -115,6 +113,7 @@ import { AIServiceFactory } from "./services/ai/AIServiceFactory";
 import { RoadmapPlanningService } from "./services/RoadmapPlanningService";
 import { IssueEnrichmentService } from "./services/IssueEnrichmentService";
 import { IssueTriagingService } from "./services/IssueTriagingService";
+import { GracefulShutdown } from "./infrastructure/lifecycle/GracefulShutdown";
 
 class GitHubProjectManagerServer {
   private server: Server;
@@ -138,6 +137,7 @@ class GitHubProjectManagerServer {
   private subscriptionManager: EventSubscriptionManager;
   private eventStore: EventStore;
   private webhookServer?: WebhookServer;
+  private gracefulShutdown: GracefulShutdown;
 
   constructor() {
     this.logger = Logger.getInstance();
@@ -171,34 +171,27 @@ class GitHubProjectManagerServer {
       enableCompression: true
     });
 
-    // Initialize main service via DI container helper
-    // This wires up all extracted services (SubIssue, Milestone, Sprint, etc.)
-    this.service = createProjectManagementService(
-      GITHUB_OWNER,
-      GITHUB_REPO,
-      GITHUB_TOKEN
-    );
-
-    // Initialize AI-powered automation services
-    this.aiFactory = AIServiceFactory.getInstance();
-    this.roadmapService = new RoadmapPlanningService(this.aiFactory, this.service);
-    this.enrichmentService = new IssueEnrichmentService(this.aiFactory, this.service);
-    this.triagingService = new IssueTriagingService(
-      this.aiFactory,
-      this.service,
-      this.enrichmentService
-    );
+    // Initialize all services via DI container
+    const di = configureContainer(GITHUB_TOKEN, GITHUB_OWNER, GITHUB_REPO);
+    this.service = di.resolve("ProjectManagementService");
+    this.aiFactory = di.resolve("AIServiceFactory");
+    this.roadmapService = di.resolve("RoadmapPlanningService");
+    this.enrichmentService = di.resolve("IssueEnrichmentService");
+    this.triagingService = di.resolve("IssueTriagingService");
 
     // Get the tool registry instance
     this.toolRegistry = ToolRegistry.getInstance();
-
+    this.registerToolExecutors();
     this.setupToolHandlers();
     this.setupEventHandlers();
     this.logAIServiceStatus();
     this.logToolRegistrationStatus();
 
     this.server.onerror = (error) => this.logger.error("[MCP Error]", error);
-    process.on("SIGINT", async () => {
+
+    // Install graceful shutdown with in-flight draining
+    this.gracefulShutdown = new GracefulShutdown({ logger: this.logger });
+    this.gracefulShutdown.installSignalHandlers(async () => {
       await this.shutdown();
     });
   }
@@ -208,8 +201,7 @@ class GitHubProjectManagerServer {
    */
   private logAIServiceStatus(): void {
     try {
-      const aiFactory = AIServiceFactory.getInstance();
-      const validation = aiFactory.validateConfiguration();
+      const validation = this.aiFactory.validateConfiguration();
 
       this.logger.info("🤖 AI Service Status Check");
 
@@ -283,6 +275,154 @@ class GitHubProjectManagerServer {
     }
   }
 
+  /**
+   * Register all tool executors with the ToolRegistry.
+   * Replaces the former 120-case executeToolHandler switch with
+   * a data-driven dispatch via ToolRegistry.execute().
+   */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private registerToolExecutors(): void {
+    const r = this.toolRegistry;
+    const svc = this.service;
+
+    // ── Pattern A: PMS facade (pass-through — args forwarded as-is) ──
+    const passthroughTools: Array<[string, string]> = [
+      ['create_roadmap', 'createRoadmap'],
+      ['plan_sprint', 'planSprint'],
+      ['create_project', 'createProject'],
+      ['update_project', 'updateProject'],
+      ['delete_project', 'deleteProject'],
+      ['get_project_readme', 'getProjectReadme'],
+      ['update_project_readme', 'updateProjectReadme'],
+      ['list_project_fields', 'listProjectFields'],
+      ['update_project_field', 'updateProjectField'],
+      ['create_milestone', 'createMilestone'],
+      ['update_milestone', 'updateMilestone'],
+      ['delete_milestone', 'deleteMilestone'],
+      ['create_issue', 'createIssue'],
+      ['list_issues', 'listIssues'],
+      ['create_issue_comment', 'createIssueComment'],
+      ['update_issue_comment', 'updateIssueComment'],
+      ['delete_issue_comment', 'deleteIssueComment'],
+      ['list_issue_comments', 'listIssueComments'],
+      ['create_draft_issue', 'createDraftIssue'],
+      ['update_draft_issue', 'updateDraftIssue'],
+      ['delete_draft_issue', 'deleteDraftIssue'],
+      ['create_pull_request', 'createPullRequest'],
+      ['get_pull_request', 'getPullRequest'],
+      ['list_pull_requests', 'listPullRequests'],
+      ['update_pull_request', 'updatePullRequest'],
+      ['merge_pull_request', 'mergePullRequest'],
+      ['list_pull_request_reviews', 'listPullRequestReviews'],
+      ['create_pull_request_review', 'createPullRequestReview'],
+      ['create_sprint', 'createSprint'],
+      ['update_sprint', 'updateSprint'],
+      ['add_issues_to_sprint', 'addIssuesToSprint'],
+      ['remove_issues_from_sprint', 'removeIssuesFromSprint'],
+      ['create_label', 'createLabel'],
+      ['list_labels', 'listLabels'],
+      ['create_project_view', 'createProjectView'],
+      ['list_project_views', 'listProjectViews'],
+      ['update_project_view', 'updateProjectView'],
+      ['delete_project_view', 'deleteProjectView'],
+      ['add_project_item', 'addProjectItem'],
+      ['remove_project_item', 'removeProjectItem'],
+      ['list_project_items', 'listProjectItems'],
+      ['archive_project_item', 'archiveProjectItem'],
+      ['unarchive_project_item', 'unarchiveProjectItem'],
+      ['set_field_value', 'setFieldValue'],
+      ['get_field_value', 'getFieldValue'],
+      ['clear_field_value', 'clearFieldValue'],
+      ['create_automation_rule', 'createAutomationRule'],
+      ['update_automation_rule', 'updateAutomationRule'],
+      ['delete_automation_rule', 'deleteAutomationRule'],
+      ['get_automation_rule', 'getAutomationRule'],
+      ['list_automation_rules', 'listAutomationRules'],
+      ['enable_automation_rule', 'enableAutomationRule'],
+      ['disable_automation_rule', 'disableAutomationRule'],
+      ['get_iteration_configuration', 'getIterationConfiguration'],
+      ['get_current_iteration', 'getCurrentIteration'],
+      ['get_iteration_items', 'getIterationItems'],
+      ['get_iteration_by_date', 'getIterationByDate'],
+      ['assign_items_to_iteration', 'assignItemsToIteration'],
+      ['create_project_field', 'createProjectField'],
+    ];
+    for (const [tool, method] of passthroughTools) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      r.registerExecutor(tool, (a: Record<string, unknown>) => (svc as any)[method](a));
+    }
+
+    // Pattern A: PMS facade (arg destructuring required)
+    r.registerExecutor('get_milestone_metrics', (a) => svc.getMilestoneMetrics(a.milestoneId, a.includeIssues));
+    r.registerExecutor('get_sprint_metrics', (a) => svc.getSprintMetrics(a.sprintId, a.includeIssues));
+    r.registerExecutor('get_overdue_milestones', (a) => svc.getOverdueMilestones(a.limit, a.includeIssues));
+    r.registerExecutor('get_upcoming_milestones', (a) => svc.getUpcomingMilestones(a.daysAhead, a.limit, a.includeIssues));
+    r.registerExecutor('list_projects', (a) => svc.listProjects(a.status, a.limit));
+    r.registerExecutor('get_project', (a) => svc.getProject(a.projectId));
+    r.registerExecutor('list_milestones', (a) => svc.listMilestones(a.status, a.sort, a.direction));
+    r.registerExecutor('get_issue', (a) => svc.getIssue(a.issueId));
+    r.registerExecutor('update_issue', (a) => svc.updateIssue(a.issueId, {
+      title: a.title, description: a.description, status: a.status,
+      milestoneId: a.milestoneId, assignees: a.assignees, labels: a.labels,
+    }));
+    r.registerExecutor('list_sprints', (a) => svc.listSprints(a.status));
+    r.registerExecutor('get_current_sprint', (a) => svc.getCurrentSprint(a.includeIssues));
+
+    // ── Pattern B: standalone execute functions ──────────────────────
+    r.registerExecutor('add_feature', executeAddFeature);
+    r.registerExecutor('generate_prd', executeGeneratePRD);
+    r.registerExecutor('parse_prd', executeParsePRD);
+    r.registerExecutor('get_next_task', executeGetNextTask);
+    r.registerExecutor('analyze_task_complexity', executeAnalyzeTaskComplexity);
+    r.registerExecutor('expand_task', executeExpandTask);
+    r.registerExecutor('enhance_prd', executeEnhancePRD);
+    r.registerExecutor('create_traceability_matrix', executeCreateTraceabilityMatrix);
+    r.registerExecutor('add_sub_issue', executeAddSubIssue);
+    r.registerExecutor('list_sub_issues', executeListSubIssues);
+    r.registerExecutor('get_parent_issue', executeGetParentIssue);
+    r.registerExecutor('reprioritize_sub_issue', executeReprioritizeSubIssue);
+    r.registerExecutor('remove_sub_issue', executeRemoveSubIssue);
+    r.registerExecutor('create_status_update', executeCreateStatusUpdate);
+    r.registerExecutor('list_status_updates', executeListStatusUpdates);
+    r.registerExecutor('get_status_update', executeGetStatusUpdate);
+    r.registerExecutor('mark_project_as_template', executeMarkProjectAsTemplate);
+    r.registerExecutor('unmark_project_as_template', executeUnmarkProjectAsTemplate);
+    r.registerExecutor('copy_project_from_template', executeCopyProjectFromTemplate);
+    r.registerExecutor('list_organization_templates', executeListOrganizationTemplates);
+    r.registerExecutor('link_project_to_repository', executeLinkProjectToRepository);
+    r.registerExecutor('unlink_project_from_repository', executeUnlinkProjectFromRepository);
+    r.registerExecutor('link_project_to_team', executeLinkProjectToTeam);
+    r.registerExecutor('unlink_project_from_team', executeUnlinkProjectFromTeam);
+    r.registerExecutor('list_linked_repositories', executeListLinkedRepositories);
+    r.registerExecutor('list_linked_teams', executeListLinkedTeams);
+    r.registerExecutor('close_project', executeCloseProject);
+    r.registerExecutor('reopen_project', executeReopenProject);
+    r.registerExecutor('convert_draft_issue', executeConvertDraftIssue);
+    r.registerExecutor('update_item_position', executeUpdateItemPosition);
+    r.registerExecutor('search_issues_advanced', executeSearchIssuesAdvanced);
+    r.registerExecutor('filter_project_items', executeFilterProjectItems);
+    r.registerExecutor('calculate_sprint_capacity', executeCalculateSprintCapacity);
+    r.registerExecutor('prioritize_backlog', executePrioritizeBacklog);
+    r.registerExecutor('assess_sprint_risk', executeAssessSprintRisk);
+    r.registerExecutor('suggest_sprint_composition', executeSuggestSprintComposition);
+    r.registerExecutor('generate_roadmap_visualization', executeGenerateRoadmapVisualization);
+    r.registerExecutor('suggest_labels', executeSuggestLabels);
+    r.registerExecutor('detect_duplicates', executeDetectDuplicates);
+    r.registerExecutor('find_related_issues', executeFindRelatedIssues);
+    r.registerExecutor('health_check', () => executeHealthCheck());
+
+    // ── Pattern C: server-bound handlers (use this.xxxService) ───────
+    r.registerExecutor('subscribe_to_events', (a) => this.handleSubscribeToEvents(a));
+    r.registerExecutor('get_recent_events', (a) => this.handleGetRecentEvents(a));
+    r.registerExecutor('replay_events', (a) => this.handleReplayEvents(a));
+    r.registerExecutor('generate_roadmap', (a) => this.handleGenerateRoadmap(a));
+    r.registerExecutor('enrich_issue', (a) => this.handleEnrichIssue(a));
+    r.registerExecutor('enrich_issues_bulk', (a) => this.handleEnrichIssuesBulk(a));
+    r.registerExecutor('triage_issue', (a) => this.handleTriageIssue(a));
+    r.registerExecutor('triage_all_issues', (a) => this.handleTriageAllIssues(a));
+    r.registerExecutor('schedule_triaging', (a) => this.handleScheduleTriaging(a));
+  }
+
   private setupToolHandlers() {
     // Handle list_tools request by returning registered tools from the registry
     this.server.setRequestHandler(ListToolsRequestSchema, async () => ({
@@ -316,6 +456,15 @@ class GitHubProjectManagerServer {
     (this.server.setRequestHandler as any)(
       CallToolRequestSchema,
       async (request: CallToolRequest): Promise<CallToolResult> => {
+        // Reject new requests during shutdown
+        if (this.gracefulShutdown.shuttingDown) {
+          throw new McpError(
+            ErrorCode.InternalError,
+            "Server is shutting down — no new requests accepted",
+          );
+        }
+
+        this.gracefulShutdown.trackStart();
         try {
           const { name: toolName, arguments: args } = request.params;
           const tool = this.toolRegistry.getTool(toolName);
@@ -331,7 +480,7 @@ class GitHubProjectManagerServer {
           const validatedArgs = ToolValidator.validate(toolName, args, tool.schema);
 
           // Execute the tool based on its name
-          const result = await this.executeToolHandler(toolName, validatedArgs);
+          const result = await this.toolRegistry.execute(toolName, validatedArgs);
 
           // Format the result as an MCP response
           const mcpResponse = ToolResultFormatter.formatSuccess(toolName, result, {
@@ -376,417 +525,11 @@ class GitHubProjectManagerServer {
           const message =
             error instanceof Error ? error.message : "An unknown error occurred";
           throw new McpError(ErrorCode.InternalError, message);
+        } finally {
+          this.gracefulShutdown.trackEnd();
         }
       }
     );
-  }
-
-  /**
-   * Execute the appropriate tool handler based on the tool name
-   */
-  private async executeToolHandler(toolName: string, args: any): Promise<any> {
-    switch (toolName) {
-      // Roadmap and planning tools
-      case "create_roadmap":
-        return await this.service.createRoadmap(args);
-
-      case "plan_sprint":
-        return await this.service.planSprint(args);
-
-      case "get_milestone_metrics":
-        return await this.service.getMilestoneMetrics(args.milestoneId, args.includeIssues);
-
-      case "get_sprint_metrics":
-        return await this.service.getSprintMetrics(args.sprintId, args.includeIssues);
-
-      case "get_overdue_milestones":
-        return await this.service.getOverdueMilestones(args.limit, args.includeIssues);
-
-      case "get_upcoming_milestones":
-        return await this.service.getUpcomingMilestones(args.daysAhead, args.limit, args.includeIssues);
-
-      // Project tools
-      case "create_project":
-        return await this.service.createProject(args);
-
-      case "list_projects":
-        return await this.service.listProjects(args.status, args.limit);
-
-      case "get_project":
-        return await this.service.getProject(args.projectId);
-
-      case "update_project":
-        return await this.service.updateProject(args);
-
-      case "delete_project":
-        return await this.service.deleteProject(args);
-
-      case "get_project_readme":
-        return await this.service.getProjectReadme(args);
-
-      case "update_project_readme":
-        return await this.service.updateProjectReadme(args);
-
-      case "list_project_fields":
-        return await this.service.listProjectFields(args);
-
-      case "update_project_field":
-        return await this.service.updateProjectField(args);
-
-      // Milestone tools
-      case "create_milestone":
-        return await this.service.createMilestone(args);
-
-      case "list_milestones":
-        return await this.service.listMilestones(args.status, args.sort, args.direction);
-
-      case "update_milestone":
-        return await this.service.updateMilestone(args);
-
-      case "delete_milestone":
-        return await this.service.deleteMilestone(args);
-
-      // Issue tools
-      case "create_issue":
-        return await this.service.createIssue(args);
-
-      case "list_issues":
-        return await this.service.listIssues(args);
-
-      case "get_issue":
-        return await this.service.getIssue(args.issueId);
-
-      case "update_issue":
-        return await this.service.updateIssue(args.issueId, {
-          title: args.title,
-          description: args.description,
-          status: args.status,
-          milestoneId: args.milestoneId,
-          assignees: args.assignees,
-          labels: args.labels
-        });
-
-      // Issue comment tools
-      case "create_issue_comment":
-        return await this.service.createIssueComment(args);
-
-      case "update_issue_comment":
-        return await this.service.updateIssueComment(args);
-
-      case "delete_issue_comment":
-        return await this.service.deleteIssueComment(args);
-
-      case "list_issue_comments":
-        return await this.service.listIssueComments(args);
-
-      // Draft issue tools
-      case "create_draft_issue":
-        return await this.service.createDraftIssue(args);
-
-      case "update_draft_issue":
-        return await this.service.updateDraftIssue(args);
-
-      case "delete_draft_issue":
-        return await this.service.deleteDraftIssue(args);
-
-      // Pull Request tools
-      case "create_pull_request":
-        return await this.service.createPullRequest(args);
-
-      case "get_pull_request":
-        return await this.service.getPullRequest(args);
-
-      case "list_pull_requests":
-        return await this.service.listPullRequests(args);
-
-      case "update_pull_request":
-        return await this.service.updatePullRequest(args);
-
-      case "merge_pull_request":
-        return await this.service.mergePullRequest(args);
-
-      case "list_pull_request_reviews":
-        return await this.service.listPullRequestReviews(args);
-
-      case "create_pull_request_review":
-        return await this.service.createPullRequestReview(args);
-
-      // Sprint tools
-      case "create_sprint":
-        return await this.service.createSprint(args);
-
-      case "list_sprints":
-        return await this.service.listSprints(args.status);
-
-      case "get_current_sprint":
-        return await this.service.getCurrentSprint(args.includeIssues);
-
-      case "update_sprint":
-        return await this.service.updateSprint(args);
-
-      case "add_issues_to_sprint":
-        return await this.service.addIssuesToSprint(args);
-
-      case "remove_issues_from_sprint":
-        return await this.service.removeIssuesFromSprint(args);
-
-      // Label tools
-      case "create_label":
-        return await this.service.createLabel(args);
-
-      case "list_labels":
-        return await this.service.listLabels(args);
-
-      // Project field tools
-
-      // Project view tools
-      case "create_project_view":
-        return await this.service.createProjectView(args);
-
-      case "list_project_views":
-        return await this.service.listProjectViews(args);
-
-      case "update_project_view":
-        return await this.service.updateProjectView(args);
-
-      case "delete_project_view":
-        return await this.service.deleteProjectView(args);
-
-      // Project item tools
-      case "add_project_item":
-        return await this.service.addProjectItem(args);
-
-      case "remove_project_item":
-        return await this.service.removeProjectItem(args);
-
-      case "list_project_items":
-        return await this.service.listProjectItems(args);
-
-      case "archive_project_item":
-        return await this.service.archiveProjectItem(args);
-
-      case "unarchive_project_item":
-        return await this.service.unarchiveProjectItem(args);
-
-      case "set_field_value":
-        return await this.service.setFieldValue(args);
-
-      case "get_field_value":
-        return await this.service.getFieldValue(args);
-
-      case "clear_field_value":
-        return await this.service.clearFieldValue(args);
-
-      // Event management tools
-      case "subscribe_to_events":
-        return await this.handleSubscribeToEvents(args);
-
-      case "get_recent_events":
-        return await this.handleGetRecentEvents(args);
-
-      case "replay_events":
-        return await this.handleReplayEvents(args);
-
-      // AI Task Management tools
-      case "add_feature":
-        return await executeAddFeature(args);
-
-      case "generate_prd":
-        return await executeGeneratePRD(args);
-
-      case "parse_prd":
-        return await executeParsePRD(args);
-
-      case "get_next_task":
-        return await executeGetNextTask(args);
-
-      case "analyze_task_complexity":
-        return await executeAnalyzeTaskComplexity(args);
-
-      case "expand_task":
-        return await executeExpandTask(args);
-
-      case "enhance_prd":
-        return await executeEnhancePRD(args);
-
-      case "create_traceability_matrix":
-        return await executeCreateTraceabilityMatrix(args);
-
-      // Automation service tools
-      case "create_automation_rule":
-        return await this.service.createAutomationRule(args);
-
-      case "update_automation_rule":
-        return await this.service.updateAutomationRule(args);
-
-      case "delete_automation_rule":
-        return await this.service.deleteAutomationRule(args);
-
-      case "get_automation_rule":
-        return await this.service.getAutomationRule(args);
-
-      case "list_automation_rules":
-        return await this.service.listAutomationRules(args);
-
-      case "enable_automation_rule":
-        return await this.service.enableAutomationRule(args);
-
-      case "disable_automation_rule":
-        return await this.service.disableAutomationRule(args);
-
-      // Iteration management tools
-      case "get_iteration_configuration":
-        return await this.service.getIterationConfiguration(args);
-
-      case "get_current_iteration":
-        return await this.service.getCurrentIteration(args);
-
-      case "get_iteration_items":
-        return await this.service.getIterationItems(args);
-
-      case "get_iteration_by_date":
-        return await this.service.getIterationByDate(args);
-
-      case "assign_items_to_iteration":
-        return await this.service.assignItemsToIteration(args);
-
-      // AI-powered automation tools
-      case "generate_roadmap":
-        return await this.handleGenerateRoadmap(args);
-
-      case "enrich_issue":
-        return await this.handleEnrichIssue(args);
-
-      case "enrich_issues_bulk":
-        return await this.handleEnrichIssuesBulk(args);
-
-      case "triage_issue":
-        return await this.handleTriageIssue(args);
-
-      case "triage_all_issues":
-        return await this.handleTriageAllIssues(args);
-
-      case "schedule_triaging":
-        return await this.handleScheduleTriaging(args);
-
-      // Sub-issue management tools
-      case "add_sub_issue":
-        return await executeAddSubIssue(args);
-
-      case "list_sub_issues":
-        return await executeListSubIssues(args);
-
-      case "get_parent_issue":
-        return await executeGetParentIssue(args);
-
-      case "reprioritize_sub_issue":
-        return await executeReprioritizeSubIssue(args);
-
-      case "remove_sub_issue":
-        return await executeRemoveSubIssue(args);
-
-      case "create_status_update":
-        return await executeCreateStatusUpdate(args);
-
-      case "list_status_updates":
-        return await executeListStatusUpdates(args);
-
-      case "get_status_update":
-        return await executeGetStatusUpdate(args);
-
-      // Project template tools
-      case "mark_project_as_template":
-        return await executeMarkProjectAsTemplate(args);
-
-      case "unmark_project_as_template":
-        return await executeUnmarkProjectAsTemplate(args);
-
-      case "copy_project_from_template":
-        return await executeCopyProjectFromTemplate(args);
-
-      case "list_organization_templates":
-        return await executeListOrganizationTemplates(args);
-
-      // Project linking tools
-      case "link_project_to_repository":
-        return await executeLinkProjectToRepository(args);
-
-      case "unlink_project_from_repository":
-        return await executeUnlinkProjectFromRepository(args);
-
-      case "link_project_to_team":
-        return await executeLinkProjectToTeam(args);
-
-      case "unlink_project_from_team":
-        return await executeUnlinkProjectFromTeam(args);
-
-      case "list_linked_repositories":
-        return await executeListLinkedRepositories(args);
-
-      case "list_linked_teams":
-        return await executeListLinkedTeams(args);
-
-      // Phase 8 - Project Lifecycle
-      case "close_project":
-        return await executeCloseProject(args);
-
-      case "reopen_project":
-        return await executeReopenProject(args);
-
-      case "convert_draft_issue":
-        return await executeConvertDraftIssue(args);
-
-      // Phase 8 - Advanced Operations
-      case "update_item_position":
-        return await executeUpdateItemPosition(args);
-
-      case "search_issues_advanced":
-        return await executeSearchIssuesAdvanced(args);
-
-      case "filter_project_items":
-        return await executeFilterProjectItems(args);
-
-      // Phase 10 - Sprint AI
-      case "calculate_sprint_capacity":
-        return await executeCalculateSprintCapacity(args);
-
-      case "prioritize_backlog":
-        return await executePrioritizeBacklog(args);
-
-      case "assess_sprint_risk":
-        return await executeAssessSprintRisk(args);
-
-      case "suggest_sprint_composition":
-        return await executeSuggestSprintComposition(args);
-
-      // Phase 10 - Roadmap AI
-      case "generate_roadmap_visualization":
-        return await executeGenerateRoadmapVisualization(args);
-
-      // Phase 11 - Issue Intelligence
-      case "suggest_labels":
-        return await executeSuggestLabels(args);
-
-      case "detect_duplicates":
-        return await executeDetectDuplicates(args);
-
-      case "find_related_issues":
-        return await executeFindRelatedIssues(args);
-
-      // Health
-      case "health_check":
-        return await executeHealthCheck();
-
-      // Project Field (delegates to service)
-      case "create_project_field":
-        return await this.service.createProjectField(args);
-
-      default:
-        throw new McpError(
-          ErrorCode.MethodNotFound,
-          `Tool handler not implemented: ${toolName}`
-        );
-    }
   }
 
   /**
@@ -1177,8 +920,6 @@ class GitHubProjectManagerServer {
 
     } catch (error) {
       this.logger.error("Error during shutdown:", error);
-    } finally {
-      process.exit(0);
     }
   }
 

@@ -1,4 +1,5 @@
 import { AITaskProcessor } from './ai/AITaskProcessor';
+import { InputSanitizer } from './utils/InputSanitizer';
 import {
   AITask,
   SubTask,
@@ -115,9 +116,10 @@ export class TaskGenerationService {
     }
 
     try {
-      const prdContent = typeof params.prd === 'string'
+      let prdContent = typeof params.prd === 'string'
         ? params.prd
         : JSON.stringify(params.prd, null, 2);
+      prdContent = InputSanitizer.sanitizePRDContent(prdContent);
 
       // Generate basic tasks first
       const basicTasks = await this.generateBasicTasksFromPRD(params);
@@ -204,9 +206,10 @@ export class TaskGenerationService {
     autoPrioritize?: boolean;
   }): Promise<AITask[]> {
     try {
-      const prdContent = typeof params.prd === 'string'
+      let prdContent = typeof params.prd === 'string'
         ? params.prd
         : JSON.stringify(params.prd, null, 2);
+      prdContent = InputSanitizer.sanitizePRDContent(prdContent);
 
       // Generate initial tasks using AI
       let tasks = await this.aiProcessor.generateTasksFromPRD({

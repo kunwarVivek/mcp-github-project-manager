@@ -1,5 +1,9 @@
 import zodToJsonSchema from "zod-to-json-schema";
 import {
+  ErrorCode,
+  McpError,
+} from "@modelcontextprotocol/sdk/types.js";
+import {
   ZodOptional,
   ZodString,
   ZodNumber,
@@ -233,9 +237,11 @@ const toJsonSchema = (schema: ZodTypeAny): Record<string, unknown> =>
 export class ToolRegistry {
   private static _instance: ToolRegistry;
   private _tools: Map<string, ToolDefinition<unknown>>;
+  private _executors: Map<string, (args: any) => Promise<any>>;
 
   private constructor() {
     this._tools = new Map();
+    this._executors = new Map();
     this.registerBuiltInTools();
   }
 
@@ -257,6 +263,35 @@ export class ToolRegistry {
       process.stderr.write(`Tool '${tool.name}' is already registered and will be overwritten.\n`);
     }
     this._tools.set(tool.name, tool as ToolDefinition<unknown>);
+  }
+
+  /**
+   * Register an executor function for a tool by name.
+   * Executors registered here take priority over ToolDefinition.execute.
+   */
+  public registerExecutor(toolName: string, executor: (args: any) => Promise<any>): void {
+    this._executors.set(toolName, executor);
+  }
+
+  /**
+   * Execute a tool by name. Dispatch priority:
+   * 1. Registered executor (via registerExecutor)
+   * 2. ToolDefinition.execute property
+   * 3. Throws McpError(MethodNotFound)
+   */
+  public async execute(toolName: string, args: any): Promise<any> {
+    const executor = this._executors.get(toolName);
+    if (executor) {
+      return executor(args);
+    }
+    const tool = this._tools.get(toolName);
+    if (tool?.execute) {
+      return tool.execute(args);
+    }
+    throw new McpError(
+      ErrorCode.MethodNotFound,
+      `Tool handler not implemented: ${toolName}`,
+    );
   }
 
   /**

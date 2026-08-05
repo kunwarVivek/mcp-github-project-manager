@@ -4,6 +4,30 @@
  * Centralizes dependency injection configuration using tsyringe.
  * Services are registered with string tokens to support both DI
  * resolution and direct instantiation.
+ *
+ * ## Services intentionally outside DI
+ *
+ * The following services are NOT registered in the container by design:
+ *
+ * - **GitHubStateSyncService** — requires ResourceCache and FilePersistenceAdapter
+ *   (infrastructure objects created at server startup in index.ts, not in the container).
+ *
+ * - **RequirementsTraceabilityService** — pure stateless utility with zero constructor
+ *   dependencies. No benefit from container management.
+ *
+ * - **AI sub-services** (AITaskProcessor, DuplicateDetectionService, LabelSuggestionService,
+ *   RelatedIssueLinkingService, RoadmapAIService, BacklogPrioritizer, SprintRiskAssessor,
+ *   SprintSuggestionService, SprintCapacityAnalyzer, IssueEnrichmentAIService) — internal
+ *   strategy/utility classes that obtain AIServiceFactory via getInstance() singleton.
+ *   No injectable constructor parameters; registering them adds ceremony without benefit.
+ *
+ * - **Context sub-services** (ContextualReferenceGenerator, DependencyContextGenerator,
+ *   CodeExampleGenerator) — same pattern as AI sub-services: parameterless constructors
+ *   that call AIServiceFactory.getInstance() internally.
+ *
+ * - **Pure utilities** (ConfidenceScorer, TokenCounter, AIResponseCache,
+ *   ContextQualityValidator, DependencyGraph, EstimationCalibrator) — stateless helpers
+ *   or value-object-like classes with optional config params. No DI deps.
  */
 import "reflect-metadata";
 import { container, DependencyContainer } from "tsyringe";
@@ -17,8 +41,20 @@ import { ProjectLinkingService } from "./services/ProjectLinkingService";
 import { IssueService } from "./services/IssueService";
 import { RoadmapService } from "./services/RoadmapService";
 import { ProjectAutomationService } from "./services/ProjectAutomationService";
+import { PullRequestService } from "./services/PullRequestService";
+import { FieldValueService } from "./services/FieldValueService";
+import { LabelService } from "./services/LabelService";
+import { IterationService } from "./services/IterationService";
 import { Logger } from "./infrastructure/logger";
 import { ProjectManagementService } from "./services/ProjectManagementService";
+import { AIServiceFactory } from "./services/ai/AIServiceFactory";
+import { RoadmapPlanningService } from "./services/RoadmapPlanningService";
+import { IssueEnrichmentService } from "./services/IssueEnrichmentService";
+import { IssueTriagingService } from "./services/IssueTriagingService";
+import { PRDGenerationService } from "./services/PRDGenerationService";
+import { TaskGenerationService } from "./services/TaskGenerationService";
+import { TaskContextGenerationService } from "./services/TaskContextGenerationService";
+import { FeatureManagementService } from "./services/FeatureManagementService";
 
 /**
  * Configure the DI container with all services.
@@ -55,11 +91,13 @@ export function configureContainer(
     useFactory: (c) => new MilestoneService(c.resolve("GitHubRepositoryFactory"))
   });
 
-  // SprintPlanningService uses @injectable/@inject, so useClass works
-  container.register("SprintPlanningService", { useClass: SprintPlanningService });
+  container.register("SprintPlanningService", {
+    useFactory: (c) => new SprintPlanningService(c.resolve("GitHubRepositoryFactory"))
+  });
 
-  // ProjectStatusService uses @injectable/@inject, so useClass works
-  container.register("ProjectStatusService", { useClass: ProjectStatusService });
+  container.register("ProjectStatusService", {
+    useFactory: (c) => new ProjectStatusService(c.resolve("GitHubRepositoryFactory"))
+  });
 
   container.register("ProjectTemplateService", {
     useFactory: (c) => new ProjectTemplateService(c.resolve("GitHubRepositoryFactory"))
@@ -88,6 +126,27 @@ export function configureContainer(
     }
   });
 
+  container.register("PullRequestService", {
+    useFactory: (c) => new PullRequestService(c.resolve("GitHubRepositoryFactory"))
+  });
+
+  container.register("FieldValueService", {
+    useFactory: (c) => new FieldValueService(c.resolve("GitHubRepositoryFactory"))
+  });
+
+  container.register("LabelService", {
+    useFactory: (c) => new LabelService(c.resolve("GitHubRepositoryFactory"))
+  });
+
+  container.register("IterationService", {
+    useFactory: (c) => new IterationService(
+      c.resolve("GitHubRepositoryFactory"),
+      c.resolve("FieldValueService"),
+      c.resolve("ProjectTemplateService"),
+      c.resolve("ProjectLinkingService")
+    )
+  });
+
   // Register facade - depends on all extracted services
   container.register("ProjectManagementService", {
     useFactory: (c) => new ProjectManagementService(
@@ -100,8 +159,57 @@ export function configureContainer(
       c.resolve("ProjectLinkingService"),
       c.resolve("IssueService"),
       c.resolve("RoadmapService"),
-      c.resolve("ProjectAutomationService")
+      c.resolve("ProjectAutomationService"),
+      c.resolve("PullRequestService"),
+      c.resolve("FieldValueService"),
+      c.resolve("LabelService"),
+      c.resolve("IterationService")
     )
+  });
+
+  // Register AI services
+  // AIServiceFactory is a singleton — register the existing instance
+  container.registerInstance("AIServiceFactory", AIServiceFactory.getInstance());
+
+  container.register("RoadmapPlanningService", {
+    useFactory: (c) => new RoadmapPlanningService(
+      c.resolve("AIServiceFactory"),
+      c.resolve("ProjectManagementService")
+    )
+  });
+
+  container.register("IssueEnrichmentService", {
+    useFactory: (c) => new IssueEnrichmentService(
+      c.resolve("AIServiceFactory"),
+      c.resolve("ProjectManagementService")
+    )
+  });
+
+  container.register("IssueTriagingService", {
+    useFactory: (c) => new IssueTriagingService(
+      c.resolve("AIServiceFactory"),
+      c.resolve("ProjectManagementService"),
+      c.resolve("IssueEnrichmentService")
+    )
+  });
+
+  // Register AI task-generation pipeline services
+  // These have no-arg constructors that internally use AIServiceFactory.getInstance().
+  // Registering them centralises construction and enables future constructor injection.
+  container.register("PRDGenerationService", {
+    useFactory: () => new PRDGenerationService()
+  });
+
+  container.register("TaskContextGenerationService", {
+    useFactory: () => new TaskContextGenerationService()
+  });
+
+  container.register("TaskGenerationService", {
+    useFactory: () => new TaskGenerationService()
+  });
+
+  container.register("FeatureManagementService", {
+    useFactory: () => new FeatureManagementService()
   });
 
   return container;
@@ -124,21 +232,28 @@ export function createProjectManagementService(
   token: string
 ): ProjectManagementService {
   const factory = new GitHubRepositoryFactory(token, owner, repo);
+  const templateService = new ProjectTemplateService(factory);
+  const linkingService = new ProjectLinkingService(factory);
+  const fieldValueService = new FieldValueService(factory);
   return new ProjectManagementService(
     factory,
     new SubIssueService(factory),
     new MilestoneService(factory),
     new SprintPlanningService(factory),
     new ProjectStatusService(factory),
-    new ProjectTemplateService(factory),
-    new ProjectLinkingService(factory),
+    templateService,
+    linkingService,
     new IssueService(factory),
     new RoadmapService(factory),
     new ProjectAutomationService(
       factory.createAutomationRuleRepository(),
       factory.createProjectRepository(),
       Logger.getInstance()
-    )
+    ),
+    new PullRequestService(factory),
+    fieldValueService,
+    new LabelService(factory),
+    new IterationService(factory, fieldValueService, templateService, linkingService)
   );
 }
 

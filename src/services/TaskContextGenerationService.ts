@@ -30,6 +30,7 @@ import { ContextualReferenceGenerator } from './context/ContextualReferenceGener
 import { DependencyContextGenerator } from './context/DependencyContextGenerator';
 import { CodeExampleGenerator } from './context/CodeExampleGenerator';
 import { ContextQualityValidator } from './validation/ContextQualityValidator';
+import { TokenCounter } from './ai/TokenCounter';
 
 /**
  * Service for generating comprehensive task context using AI and traceability
@@ -204,7 +205,7 @@ export class TaskContextGenerationService {
           enhancedContext.businessObjective = businessContext.businessObjective;
           enhancedContext.userImpact = businessContext.userImpact;
           enhancedContext.successMetrics = businessContext.successMetrics;
-          totalTokens += 300; // Estimate
+          totalTokens += TokenCounter.estimateFromObject(businessContext);
         }
       }
 
@@ -217,7 +218,7 @@ export class TaskContextGenerationService {
           enhancedContext.architecturalDecisions = technicalContext.architecturalDecisions.map((ad: any) => ad.decision);
           enhancedContext.integrationPoints = technicalContext.integrationPoints.map((ip: any) => ip.description);
           enhancedContext.dataRequirements = technicalContext.dataRequirements.map((dr: any) => dr.description);
-          totalTokens += 400; // Estimate
+          totalTokens += TokenCounter.estimateFromObject(technicalContext);
         }
       }
 
@@ -226,7 +227,7 @@ export class TaskContextGenerationService {
         const guidance = await this.generateImplementationGuidance(task, enhancedContext, technicalContext);
         if (guidance) {
           enhancedContext.implementationGuidance = guidance;
-          totalTokens += 500; // Estimate
+          totalTokens += TokenCounter.estimateFromObject(guidance);
         }
       }
 
@@ -238,7 +239,7 @@ export class TaskContextGenerationService {
       );
       if (contextualRefs) {
         enhancedContext.contextualReferences = contextualRefs;
-        totalTokens += 400; // Estimate
+        totalTokens += TokenCounter.estimateFromObject(contextualRefs);
       }
 
       // FR-5: Generate enhanced acceptance criteria (integration)
@@ -253,7 +254,7 @@ export class TaskContextGenerationService {
         );
         if (depContext) {
           enhancedContext.dependencyContext = depContext;
-          totalTokens += 300; // Estimate
+          totalTokens += TokenCounter.estimateFromObject(depContext);
         }
       }
 

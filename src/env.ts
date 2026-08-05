@@ -2,6 +2,7 @@ import { dirname, join, resolve } from 'path';
 import { CliOptions, parseCommandLineArgs } from './cli';
 import * as dotenv from 'dotenv';
 import { createDefaultSecretResolver } from './infrastructure/secrets/SecretProvider';
+import { validateConfig, validateConfigWarnings } from './domain/config-schema';
 
 // Parse command line arguments only if not in test environment
 const cliOptions = process.env.NODE_ENV === 'test'
@@ -23,6 +24,20 @@ if (cliOptions.verbose) {
 // /run/secrets) ahead of environment variables. Created after dotenv so a
 // SECRETS_DIR set in .env is honored. See infrastructure/secrets/SecretProvider.
 const secretResolver = createDefaultSecretResolver();
+
+// Validate configuration at startup (skip in test environment)
+if (process.env.NODE_ENV !== 'test') {
+  try {
+    validateConfig(process.env as Record<string, string | undefined>);
+  } catch (error) {
+    process.stderr.write(`[CONFIG] ${(error as Error).message}\n`);
+    process.exit(1);
+  }
+  const warnings = validateConfigWarnings(process.env as Record<string, string | undefined>);
+  for (const w of warnings) {
+    process.stderr.write(`[CONFIG WARNING] ${w}\n`);
+  }
+}
 
 /**
  * Resolve a secret/config value fresh from the secret chain (file → env).
@@ -164,4 +179,8 @@ export const AUTO_CREATE_PROJECT_FIELDS = getBooleanConfigValue("AUTO_CREATE_PRO
 export const AI_BATCH_SIZE = getNumericConfigValue("AI_BATCH_SIZE", 10);
 
 // Export CLI options for use in other modules
+
+// Logging configuration
+export const LOG_FORMAT = getOptionalConfigValue('LOG_FORMAT', 'text'); // 'text' | 'json'
+export const LOG_LEVEL = getOptionalConfigValue('LOG_LEVEL', 'info'); // debug, info, warn, error
 export const CLI_OPTIONS = cliOptions;

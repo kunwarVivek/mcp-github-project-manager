@@ -2,8 +2,82 @@ import { injectable, inject } from "tsyringe";
 import { 
   AutomationRule, 
   AutomationRuleRepository, 
+  AutomationTrigger,
+  AutomationAction,
+  AutomationTriggerType,
+  AutomationActionType,
   CreateAutomationRule
 } from "../domain/automation-types";
+
+/** Tool-shaped input for creating an automation rule (string-typed enums). */
+export interface CreateAutomationRuleInput {
+  name: string;
+  description?: string;
+  projectId: string;
+  enabled?: boolean;
+  triggers: Array<{ type: string; resourceType?: string; conditions?: Array<{ field: string; operator: string; value: unknown }> }>;
+  actions: Array<{ type: string; parameters: Record<string, unknown> }>;
+}
+
+/** Tool-shaped input for updating an automation rule. */
+export interface UpdateAutomationRuleInput {
+  ruleId: string;
+  name?: string;
+  description?: string;
+  enabled?: boolean;
+  triggers?: Array<{ type: string; resourceType?: string; conditions?: Array<{ field: string; operator: string; value: unknown }> }>;
+  actions?: Array<{ type: string; parameters: Record<string, unknown> }>;
+}
+
+/** Serializable rule shape returned to tool callers (no Date fields). */
+export interface AutomationRuleDTO {
+  id: string;
+  name: string;
+  description?: string;
+  projectId: string;
+  enabled: boolean;
+  triggers: unknown[];
+  actions: unknown[];
+}
+
+/** Compact summary for list operations. */
+export interface AutomationRuleSummary {
+  id: string;
+  name: string;
+  description?: string;
+  enabled: boolean;
+  triggersCount: number;
+  actionsCount: number;
+}
+
+function ruleToDTO(rule: AutomationRule): AutomationRuleDTO {
+  return { id: rule.id, name: rule.name, description: rule.description, projectId: rule.projectId, enabled: rule.enabled, triggers: rule.triggers, actions: rule.actions };
+}
+
+function mapTriggersForCreate(triggers: CreateAutomationRuleInput['triggers']): Omit<AutomationTrigger, 'id'>[] {
+  return triggers.map(t => ({
+    type: t.type as AutomationTriggerType,
+    resourceType: t.resourceType as ResourceType | undefined,
+    conditions: t.conditions?.map(c => ({ id: '', field: c.field, operator: c.operator, value: c.value }))
+  }));
+}
+
+function mapTriggersForUpdate(triggers?: UpdateAutomationRuleInput['triggers']): AutomationTrigger[] | undefined {
+  return triggers?.map(t => ({
+    id: '',
+    type: t.type as AutomationTriggerType,
+    resourceType: t.resourceType as ResourceType | undefined,
+    conditions: t.conditions?.map(c => ({ id: '', field: c.field, operator: c.operator, value: c.value }))
+  }));
+}
+
+function mapActions(actions: Array<{ type: string; parameters: Record<string, unknown> }>): Omit<AutomationAction, 'id'>[] {
+  return actions.map(a => ({ type: a.type as AutomationActionType, parameters: a.parameters }));
+}
+
+function mapActionsForUpdate(actions?: Array<{ type: string; parameters: Record<string, unknown> }>): AutomationAction[] | undefined {
+  return actions?.map(a => ({ id: '', type: a.type as AutomationActionType, parameters: a.parameters }));
+}
 import { 
   CustomField, 
   FieldId, 
@@ -198,5 +272,48 @@ export class ProjectAutomationService {
       this.logger.error(`Failed to delete field ${fieldId} from project ${projectId}`, error);
       throw error;
     }
+  }
+
+  // ========================================================================
+  // Tool-facing adapter methods (string-typed input, DTO output)
+  // ========================================================================
+
+  async createRuleFromInput(data: CreateAutomationRuleInput): Promise<AutomationRuleDTO> {
+    const rule = await this.createRule({
+      name: data.name,
+      description: data.description,
+      projectId: data.projectId,
+      enabled: data.enabled !== false,
+      triggers: mapTriggersForCreate(data.triggers),
+      actions: mapActions(data.actions)
+    } as CreateAutomationRule);
+    return ruleToDTO(rule);
+  }
+
+  async updateRuleFromInput(data: UpdateAutomationRuleInput): Promise<AutomationRuleDTO> {
+    const updated = await this.updateRule(data.ruleId, {
+      name: data.name,
+      description: data.description,
+      enabled: data.enabled,
+      triggers: mapTriggersForUpdate(data.triggers),
+      actions: mapActionsForUpdate(data.actions)
+    });
+    return ruleToDTO(updated);
+  }
+
+  async getRuleDTO(ruleId: string): Promise<AutomationRuleDTO> {
+    return ruleToDTO(await this.getRuleById(ruleId));
+  }
+
+  async listRuleSummaries(projectId: string): Promise<AutomationRuleSummary[]> {
+    const rules = await this.getRulesByProject(projectId);
+    return rules.map(rule => ({
+      id: rule.id,
+      name: rule.name,
+      description: rule.description,
+      enabled: rule.enabled,
+      triggersCount: rule.triggers.length,
+      actionsCount: rule.actions.length
+    }));
   }
 }

@@ -3,15 +3,7 @@ import { GitHubRepositoryFactory } from "../infrastructure/github/GitHubReposito
 import { GitHubProjectRepository } from "../infrastructure/github/repositories/GitHubProjectRepository";
 import { Project, CreateProject } from "../domain/types";
 import { ResourceStatus } from "../domain/resource-types";
-import { MCPErrorCode } from "../domain/mcp-types";
-import {
-  DomainError,
-  ResourceNotFoundError,
-  ValidationError,
-  RateLimitError,
-  UnauthorizedError,
-  GitHubAPIError
-} from "../domain/errors";
+import { mapErrorToMCPError } from './utils/ErrorMapper';
 
 /**
  * Service for basic project CRUD operations.
@@ -31,33 +23,6 @@ export class ProjectStatusService {
 
   private get projectRepo(): GitHubProjectRepository {
     return this.factory.createProjectRepository();
-  }
-
-  /**
-   * Maps domain errors to MCP error codes for consistent error handling
-   */
-  private mapErrorToMCPError(error: unknown): Error {
-    if (error instanceof ValidationError) {
-      return new DomainError(`${MCPErrorCode.VALIDATION_ERROR}: ${error.message}`);
-    }
-
-    if (error instanceof ResourceNotFoundError) {
-      return new DomainError(`${MCPErrorCode.RESOURCE_NOT_FOUND}: ${error.message}`);
-    }
-
-    if (error instanceof RateLimitError) {
-      return new DomainError(`${MCPErrorCode.RATE_LIMITED}: ${error.message}`);
-    }
-
-    if (error instanceof UnauthorizedError) {
-      return new DomainError(`${MCPErrorCode.UNAUTHORIZED}: ${error.message}`);
-    }
-
-    if (error instanceof GitHubAPIError) {
-      return new DomainError(`${MCPErrorCode.INTERNAL_ERROR}: GitHub API Error - ${error.message}`);
-    }
-
-    return new DomainError(`${MCPErrorCode.INTERNAL_ERROR}: ${error instanceof Error ? error.message : String(error)}`);
   }
 
   /**
@@ -81,7 +46,7 @@ export class ProjectStatusService {
 
       return await this.projectRepo.create(projectData);
     } catch (error) {
-      throw this.mapErrorToMCPError(error);
+      throw mapErrorToMCPError(error);
     }
   }
 
@@ -106,7 +71,7 @@ export class ProjectStatusService {
       // Apply limit
       return filteredProjects.slice(0, limit);
     } catch (error) {
-      throw this.mapErrorToMCPError(error);
+      throw mapErrorToMCPError(error);
     }
   }
 
@@ -120,7 +85,7 @@ export class ProjectStatusService {
     try {
       return await this.projectRepo.findById(projectId);
     } catch (error) {
-      throw this.mapErrorToMCPError(error);
+      throw mapErrorToMCPError(error);
     }
   }
 
@@ -161,7 +126,7 @@ export class ProjectStatusService {
 
       return await this.projectRepo.update(data.projectId, projectData);
     } catch (error) {
-      throw this.mapErrorToMCPError(error);
+      throw mapErrorToMCPError(error);
     }
   }
 
@@ -181,7 +146,7 @@ export class ProjectStatusService {
         message: `Project ${data.projectId} has been deleted`,
       };
     } catch (error) {
-      throw this.mapErrorToMCPError(error);
+      throw mapErrorToMCPError(error);
     }
   }
 }

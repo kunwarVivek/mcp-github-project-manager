@@ -1,4 +1,5 @@
 import { AITaskProcessor } from './ai/AITaskProcessor';
+import { InputSanitizer } from './utils/InputSanitizer';
 import {
   PRDDocument,
   FeatureRequirement,
@@ -36,18 +37,21 @@ export class PRDGenerationService {
     stakeholders?: string[];
   }): Promise<PRDDocument> {
     try {
-      // Validate input
-      if (!params.projectIdea.trim()) {
+      // Sanitize inputs
+      const projectIdea = InputSanitizer.sanitizePRDContent(params.projectIdea);
+      const projectName = InputSanitizer.sanitizeText(params.projectName);
+
+      if (!projectIdea) {
         throw new Error('Project idea is required');
       }
 
-      if (!params.projectName.trim()) {
+      if (!projectName) {
         throw new Error('Project name is required');
       }
 
       // Generate PRD using AI
       const generatedPRD = await this.aiProcessor.generatePRDFromIdea({
-        projectIdea: params.projectIdea,
+        projectIdea,
         targetUsers: params.targetUsers?.join(', '),
         timeline: params.timeline,
         complexity: params.complexity
@@ -56,7 +60,7 @@ export class PRDGenerationService {
       // Enhance with provided metadata
       const enhancedPRD: PRDDocument = {
         ...generatedPRD,
-        title: params.projectName,
+        title: projectName,
         author: params.author,
         stakeholders: params.stakeholders || [],
         version: '1.0.0'
@@ -91,16 +95,20 @@ export class PRDGenerationService {
     lowConfidenceSections: SectionConfidence[];
   }> {
     try {
-      if (!params.projectIdea.trim()) {
+      // Sanitize inputs
+      const projectIdea = InputSanitizer.sanitizePRDContent(params.projectIdea);
+      const projectName = InputSanitizer.sanitizeText(params.projectName);
+
+      if (!projectIdea) {
         throw new Error('Project idea is required');
       }
 
-      if (!params.projectName.trim()) {
+      if (!projectName) {
         throw new Error('Project name is required');
       }
 
       const result = await this.aiProcessor.generatePRDWithConfidence({
-        projectIdea: params.projectIdea,
+        projectIdea,
         targetUsers: params.targetUsers?.join(', '),
         timeline: params.timeline,
         complexity: params.complexity,
@@ -110,7 +118,7 @@ export class PRDGenerationService {
       // Enhance PRD with provided metadata
       const enhancedPRD: PRDDocument = {
         ...result.prd,
-        title: params.projectName,
+        title: projectName,
         author: params.author,
         stakeholders: params.stakeholders || [],
         version: '1.0.0'

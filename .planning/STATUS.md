@@ -6,7 +6,7 @@
 |--------|-------|
 | Phases Complete | 11/12 (phase 11 Analytics deferred) |
 | Current Phase | Post-v1.1.0 remediation (see below) |
-| Last Updated | 2026-07-15 |
+| Last Updated | 2026-08-05 |
 
 > **Reconciliation note (2026-07-15):** This file previously froze at "9/12,
 > phase 10 not started" while `REQUIREMENTS.md` claimed "99/99 complete" — the
@@ -92,14 +92,10 @@
 
 ## Next Phase
 
-**Phase 10: Advanced Automation** - Not Started
-
-Focus areas:
-- Workflow automation rules
-- Custom automation triggers
-- Scheduled actions
-- Event-driven automation
+**Phase 11: Analytics & Reporting** — Deferred (feature proposal G6-01).
+No other phases remain; post-v1.1.0 remediation is tracked in
+[`docs/remediation/GAP-TRACKER.md`](../docs/remediation/GAP-TRACKER.md).
 
 ---
 
-*Last updated: 2026-02-01*
+*Last updated: 2026-08-05*
