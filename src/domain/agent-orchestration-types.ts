@@ -34,6 +34,7 @@ export interface Agent {
   lastHeartbeat?: string;
   registeredAt: string;
   metadata?: Record<string, unknown>;
+  parentAgentId?: string;
   budget?: AgentBudget;
 }
 
@@ -49,6 +50,7 @@ export const AgentSchema = z.object({
   lastHeartbeat: z.string().optional(),
   registeredAt: z.string(),
   metadata: z.record(z.string(), z.unknown()).optional(),
+  parentAgentId: z.string().optional(),
   budget: z.lazy(() => AgentBudgetSchema).optional(),
 });
 

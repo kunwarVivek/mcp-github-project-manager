@@ -103,6 +103,7 @@ import {
   executeGetAgentActivity,
   executeGetBudgetStatus,
   executeSetAgentBudget,
+  executeCheckWorkStatus,
 } from "./infrastructure/tools/agent-orchestration-tools";
 
 // Health Tools
@@ -440,6 +441,7 @@ class GitHubProjectManagerServer {
     r.registerExecutor('get_agent_activity', executeGetAgentActivity);
     r.registerExecutor('get_budget_status', executeGetBudgetStatus);
     r.registerExecutor('set_agent_budget', executeSetAgentBudget);
+    r.registerExecutor('check_work_status', (args) => executeCheckWorkStatus(args));
 
     // ── Pattern C: server-bound handlers (use this.xxxService) ───────
     r.registerExecutor('subscribe_to_events', (a) => this.handleSubscribeToEvents(a));

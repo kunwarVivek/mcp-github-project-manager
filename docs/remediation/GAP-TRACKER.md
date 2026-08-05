@@ -121,6 +121,28 @@ Audit 2026-07-15: `npm outdated` + `npm audit` (was 31 vulns: 1 critical, 8 high
 | IBF-7 | Prompt versioning | DONE — `PromptRegistry` with versioned templates, `{{variable}}` interpolation, getLatest/getVersion/render/list. |
 | IBF-8 | Tool pagination | DONE — `Pagination.ts` with cursor-based pagination (base64url-encoded offset cursors), configurable page size (max 100), `paginate()` and `parsePaginationParams()` utilities. |
 
+
+## G8 — Agent Orchestration (added 2026-08-05)
+
+Full autonomous agent orchestration layer enabling AI agents to self-assign tasks,
+report progress, submit work products, and operate within token budgets.
+
+| ID | Feature | Status |
+|----|---------|--------|
+| G8-01 | Domain types (`agent-orchestration-types.ts`) | DONE — Agent, TaskCheckoutResult, AgentHeartbeat, WorkProduct, TestResults, AgentBudget, BudgetStatus, AgentTaskContext, AgentActivityEntry types with Zod schemas. Subagent hierarchy via `parentAgentId`. |
+| G8-02 | Agent registry infrastructure (`AgentStore`) | DONE — GitHub issue-backed JSON agent registry (pinned issue, label `agent-registry`). CRUD: listAgents, getAgent, upsertAgent, removeAgent, removeAgentCascade, getChildren. |
+| G8-03 | Work product infrastructure (`WorkProductStore`) | DONE — Structured issue comments with `<!-- agent-work-product: -->` markers for machine-parseable retrieval. |
+| G8-04 | Project field setup (`ProjectFieldSetup`) | DONE — Auto-provisions 5 custom project fields: `agent_claimed_by`, `agent_claimed_at`, `agent_status`, `agent_work_branch`, `agent_pr_number`. |
+| G8-05 | Task checkout service (`TaskCheckoutService`) | DONE — Task claiming with configurable strategies (priority, age, skills, deadline), release, completion. Updates project fields on claim/release/complete. |
+| G8-06 | Agent context service (`AgentContextService`) | DONE — Enriched context assembly: issue details, parent issue, milestone, related issues, coding standards, acceptance criteria, branch suggestion. |
+| G8-07 | Work product service (`WorkProductService`) | DONE — Work product submission with test results, branch, PR number, commit SHAs, file list. Records structured comments on issues. |
+| G8-08 | Agent budget service (`AgentBudgetService`) | DONE — Per-agent token budgets with warning thresholds, hard stops, periodic resets (daily/weekly/monthly/never). |
+| G8-09 | MCP tool schemas (`agent-orchestration-schemas.ts`) | DONE — 13 Zod input schemas for all agent orchestration tools. |
+| G8-10 | MCP tool definitions and executors (`agent-orchestration-tools.ts`) | DONE — 13 tool definitions with descriptions, examples, annotations; 13 executor functions with error mapping. |
+| G8-11 | Tool registration (`ToolRegistry.ts`) | DONE — 12 agent tools registered (check_work_status pending wiring). Total tool count: 131 (132 registrations, 1 overwrite). |
+| G8-12 | Executor wiring (`index.ts`) | DONE — All 13 agent tools wired in `registerToolExecutors()`. |
+| G8-13 | Documentation | DONE — README agent orchestration section, architecture.md layer docs, TOOLS.md 13-tool reference, CONFIGURATION.md constants, CHANGELOG entry. |
+
 ---
 
-*Tracker initialized 2026-07-14. Updated 2026-08-05: full remediation pass — all OPEN gaps closed, 8 industry best features added.*
+*Tracker initialized 2026-07-14. Updated 2026-08-05: full remediation pass — all OPEN gaps closed, 8 industry best features added, agent orchestration layer shipped.*

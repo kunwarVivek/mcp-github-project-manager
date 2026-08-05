@@ -7,7 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-No unreleased changes.
+### Added
+- **Agent Orchestration Layer** — 13 new MCP tools for autonomous AI agent task management
+  - Agent registry: `register_agent`, `list_agents`, `deregister_agent` with subagent hierarchy (`parentAgentId`, cascade delete)
+  - Task lifecycle: `checkout_task` (4 strategies: priority, age, skills, deadline), `release_task`, `complete_task`
+  - Task context: `get_task_context` (enriched context with issue, milestone, related issues, acceptance criteria)
+  - Heartbeat monitoring: `agent_heartbeat` with stale-agent detection (30 min timeout)
+  - Work products: `submit_work_product` with branch, PR, commits, files, test results
+  - Budget enforcement: `get_budget_status`, `set_agent_budget` with warning thresholds and hard stops
+  - Activity dashboard: `get_agent_activity` with per-agent task, progress, heartbeat, and budget status
+  - Work status: `check_work_status` for PR review/merge tracking
+- Domain types in `src/domain/agent-orchestration-types.ts` (Agent, TaskCheckoutResult, AgentHeartbeat, WorkProduct, AgentBudget, BudgetStatus, AgentTaskContext, AgentActivityEntry)
+- Infrastructure stores: `AgentStore` (issue-backed registry), `WorkProductStore` (structured comments), `ProjectFieldSetup` (custom field provisioning)
+- Services: `TaskCheckoutService`, `AgentContextService`, `WorkProductService`, `AgentBudgetService`
+- Tool schemas in `src/infrastructure/tools/schemas/agent-orchestration-schemas.ts`
+- GitHub-native data model: 5 custom project fields (`agent_claimed_by`, `agent_claimed_at`, `agent_status`, `agent_work_branch`, `agent_pr_number`)
+
+### Changed
+- Total tool count increased from 118 to 131
+- Updated all documentation (README, architecture, TOOLS.md, CONFIGURATION.md, GAP-TRACKER)
 
 ## [1.0.2] - 2026-02-01
 

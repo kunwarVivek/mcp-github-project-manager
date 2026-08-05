@@ -9,13 +9,13 @@ MCP GitHub Project Manager follows Clean Architecture principles with clear sepa
 │                         MCP Layer                                │
 │  ┌──────────────┐ ┌────────────┐ ┌──────────────┐ ┌───────────┐ │
 │  │ Tool Defs    │ │ Resources  │ │ Req Handling  │ │ Graceful  │ │
-│  │ (118 tools)  │ │            │ │              │ │ Shutdown  │ │
+│  │ (131 tools)  │ │            │ │              │ │ Shutdown  │ │
 │  └──────────────┘ └────────────┘ └──────────────┘ └───────────┘ │
 ├──────────────────────────────────────────────────────────────────┤
 │                       Service Layer                              │
 │  ┌──────────────┐ ┌──────────────┐ ┌──────────────┐ ┌─────────┐ │
-│  │ ProjectMgmt  │ │ AI Services  │ │  Planning    │ │ Sync    │ │
-│  │ Facade       │ │ (PRD, Tasks, │ │  Services    │ │         │ │
+│  │ ProjectMgmt  │ │ AI Services  │ │  Planning    │ │  Agent  │ │
+│  │ Facade       │ │ (PRD, Tasks, │ │  Services    │ │  Orch.  │ │
 │  │              │ │  Triage …)   │ │              │ │         │ │
 │  └──────────────┘ └──────────────┘ └──────────────┘ └─────────┘ │
 ├──────────────────────────────────────────────────────────────────┤
@@ -24,14 +24,14 @@ MCP GitHub Project Manager follows Clean Architecture principles with clear sepa
 │  │ GitHub API │ │ Cache  │ │ Resilience │ │ Rate     │          │
 │  │ Repos      │ │ & Pers.│ │ (CB/Retry) │ │ Limiting │          │
 │  ├────────────┤ ├────────┤ ├────────────┤ ├──────────┤          │
-│  │ Events/SSE │ │ Health │ │ Lifecycle  │ │ Logging  │          │
-│  │ & Webhooks │ │        │ │ & Shutdown │ │ (struct) │          │
+│  │ Events/SSE │ │ Health │ │ Lifecycle  │ │ Agent    │          │
+│  │ & Webhooks │ │        │ │ & Shutdown │ │ Storage  │          │
 │  └────────────┘ └────────┘ └────────────┘ └──────────┘          │
 ├──────────────────────────────────────────────────────────────────┤
 │                       Domain Layer                               │
 │  ┌────────────┐ ┌────────────┐ ┌────────────┐ ┌──────────────┐  │
-│  │ Entities   │ │ Interfaces │ │ Zod Schemas│ │ AI Type      │  │
-│  │ & Types    │ │ (Repos)    │ │            │ │ System       │  │
+│  │ Entities   │ │ Interfaces │ │ Zod Schemas│ │ AI & Agent   │  │
+│  │ & Types    │ │ (Repos)    │ │            │ │ Type System  │  │
 │  └────────────┘ └────────────┘ └────────────┘ └──────────────┘  │
 └──────────────────────────────────────────────────────────────────┘
 ```
@@ -41,7 +41,7 @@ MCP GitHub Project Manager follows Clean Architecture principles with clear sepa
 ### Domain Layer (`src/domain/`)
 
 Core business entities, type definitions, validation schemas, and repository interfaces.
-21 files grouped by concern:
+22 files grouped by concern:
 
 **Core types**
 
@@ -76,6 +76,12 @@ Core business entities, type definitions, validation schemas, and repository int
 | `template-types.ts` | Project template descriptors and field/view definitions |
 | `task-context-schemas.ts` | Zod schemas for rich task-context payloads (business, technical, implementation) |
 
+**Agent orchestration**
+
+| File | Purpose |
+|------|---------|
+| `agent-orchestration-types.ts` | Agent registry, task checkout, heartbeat, work product, budget, context, and activity types with Zod schemas |
+
 **Validation**
 
 | File | Purpose |
@@ -86,12 +92,12 @@ Core business entities, type definitions, validation schemas, and repository int
 
 ### Infrastructure Layer (`src/infrastructure/`)
 
-External integrations and technical concerns. 15 subdirectories:
+External integrations and technical concerns. 16 subdirectories:
 
 | Directory | Purpose |
 |-----------|---------|
 | `github/` | GitHub REST/GraphQL API integration — repositories, `GitHubRepositoryFactory`, `RateLimitManager`, error handling |
-| `tools/` | MCP tool definitions (118 tools — 119 registrations, 1 intentional overwrite), `ToolRegistry`, `ToolValidator`, schemas |
+| `tools/` | MCP tool definitions (131 tools — 132 registrations, 1 intentional overwrite), `ToolRegistry`, `ToolValidator`, schemas |
 | `cache/` | In-memory caching with TTL and LRU eviction (`ResourceCache`), persistence adapter |
 | `resilience/` | Circuit breaker (`CircuitBreakerService`), retry policies, `AIResiliencePolicy` |
 | `events/` | Webhook handling (`GitHubWebhookHandler`), `EventStore` with persistence, `EventSubscriptionManager` |
@@ -105,10 +111,11 @@ External integrations and technical concerns. 15 subdirectories:
 | `resource/` | `ResourceFactory`, `ResourceManager`, `ResourceRelationshipManager`, `OptimisticLockManager` |
 | `observability/` | `CorrelationContext` (request tracing), `TracingLogger` |
 | `http/` | `WebhookServer` — HTTP server for incoming webhooks and SSE connections |
+| `agent/` | `AgentStore` (issue-backed agent registry), `WorkProductStore` (structured issue comments), `ProjectFieldSetup` (custom field provisioning for agent claims) |
 
 ### Service Layer (`src/services/`)
 
-Business logic coordination. 23 top-level services plus supporting subdirectories.
+Business logic coordination. 27 top-level services plus supporting subdirectories.
 
 `ProjectManagementService` is a thin facade that delegates to focused,
 independently-testable services:
@@ -176,6 +183,15 @@ independently-testable services:
 |---------|----------------|
 | `GitHubStateSyncService` | Background state synchronisation with GitHub |
 
+**Agent orchestration** (`services/agent/`)
+
+| Service | Responsibility |
+|---------|----------------|
+| `TaskCheckoutService` | Task claiming, releasing, completion — manages agent_status/agent_claimed_by project fields |
+| `AgentContextService` | Enriched task context assembly (issue, parent, milestone, related issues, acceptance criteria) |
+| `WorkProductService` | Work product submission — records structured comments on issues with test results |
+| `AgentBudgetService` | Per-agent token budget tracking, warning thresholds, hard stops, periodic resets |
+
 **Subdirectories**
 
 | Directory | Contents |
@@ -189,7 +205,7 @@ independently-testable services:
 ### MCP Layer (`src/index.ts`)
 
 Model Context Protocol integration:
-- Tool registration and execution (118 tools via `ToolRegistry`)
+- Tool registration and execution (131 tools via `ToolRegistry`)
 - Resource exposure
 - Request/response handling
 - Error formatting via `MCPErrorHandler`
@@ -424,6 +440,122 @@ Secrets resolve through `src/infrastructure/secrets/SecretProvider` (env + file
 providers; Vault/AWS SM are an extension point).
 
 See [CONFIGURATION.md](CONFIGURATION.md) for full details.
+
+
+## Agent Orchestration Layer
+
+The agent orchestration layer enables autonomous AI agents to operate on a
+GitHub project without human dispatch. All state is stored natively in GitHub
+(issues, project fields, comments) — no external database required.
+
+### Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                   MCP Tool Layer (13 tools)                         │
+│  register_agent · list_agents · deregister_agent                    │
+│  checkout_task · release_task · complete_task · get_task_context     │
+│  agent_heartbeat · submit_work_product · get_agent_activity         │
+│  get_budget_status · set_agent_budget · check_work_status           │
+└───────────────────────────┬─────────────────────────────────────────┘
+                            │
+┌───────────────────────────▼─────────────────────────────────────────┐
+│                       Service Layer                                  │
+│  ┌──────────────────┐ ┌──────────────────┐ ┌─────────────────────┐  │
+│  │TaskCheckoutService│ │AgentContextService│ │WorkProductService   │  │
+│  │ claim / release / │ │ assemble enriched │ │ record structured   │  │
+│  │ complete tasks    │ │ context for agent │ │ comments on issues  │  │
+│  └──────────────────┘ └──────────────────┘ └─────────────────────┘  │
+│  ┌──────────────────┐                                               │
+│  │AgentBudgetService │  Token budget tracking & enforcement          │
+│  └──────────────────┘                                               │
+└───────────────────────────┬─────────────────────────────────────────┘
+                            │
+┌───────────────────────────▼─────────────────────────────────────────┐
+│                    Infrastructure Layer                              │
+│  ┌────────────┐ ┌──────────────────┐ ┌───────────────────────────┐  │
+│  │ AgentStore │ │ WorkProductStore │ │ ProjectFieldSetup         │  │
+│  │ registry   │ │ issue comments   │ │ custom field provisioning │  │
+│  │ (JSON in   │ │ with markers     │ │ (agent_claimed_by, etc.)  │  │
+│  │ pinned     │ └──────────────────┘ └───────────────────────────┘  │
+│  │ issue)     │                                                     │
+│  └────────────┘                                                     │
+└───────────────────────────┬─────────────────────────────────────────┘
+                            │
+┌───────────────────────────▼─────────────────────────────────────────┐
+│                  GitHub-Native Storage                               │
+│  • Agent registry → issue body (label: agent-registry)              │
+│  • Task claims    → project custom fields (SINGLE_SELECT / TEXT)    │
+│  • Work products  → structured issue comments (JSON marker blocks)  │
+│  • Budgets        → agent registry metadata                         │
+│  • Heartbeats     → agent lastHeartbeat timestamp                   │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### GitHub-Native Data Model
+
+The orchestration layer uses five custom project fields (auto-provisioned by
+`ProjectFieldSetup`):
+
+| Field | Type | Purpose |
+|-------|------|---------|
+| `agent_claimed_by` | TEXT | Agent ID that currently owns the task |
+| `agent_claimed_at` | TEXT | ISO 8601 timestamp of when the claim was made |
+| `agent_status` | SINGLE_SELECT | Task status: `unclaimed`, `in_progress`, `review`, `blocked`, `completed` |
+| `agent_work_branch` | TEXT | Git branch name the agent is working on |
+| `agent_pr_number` | TEXT | Pull request number for the submitted work |
+
+Agent records are stored as a JSON array in the body of a pinned issue
+labeled `agent-registry`. Work products are stored as structured issue
+comments with a `<!-- agent-work-product: -->` HTML comment marker for
+machine-parseable retrieval.
+
+### Autonomous Loop
+
+```
+Agent starts
+    │
+    ▼
+register_agent ─── agent record created in registry
+    │
+    ▼
+checkout_task ──── finds unclaimed issue, sets project fields
+    │
+    ├──► get_task_context ── enriched context (issue, milestone, criteria)
+    │
+    ▼
+work loop ────── agent_heartbeat (every N minutes)
+    │              └── stale detection after 30 min
+    │
+    ▼
+submit_work_product ─── structured comment on issue
+    │
+    ▼
+complete_task ──── marks task completed, frees agent
+    │
+    ▼
+checkout_task ──── repeat with next task
+```
+
+### Domain Types
+
+All types are defined in `src/domain/agent-orchestration-types.ts`:
+
+| Type | Purpose |
+|------|---------|
+| `Agent` | Registered agent with role, runtime, capabilities, status, budget |
+| `AgentRole` | `engineer`, `reviewer`, `pm`, `designer`, `qa`, `devops`, `general` |
+| `AgentRuntime` | `claude-code`, `codex`, `cursor`, `cli`, `http`, `custom` |
+| `AgentOperationalStatus` | `idle`, `working`, `blocked`, `needs_review`, `offline`, `budget_exhausted` |
+| `TaskCheckoutResult` | Checkout outcome with issue details and branch suggestion |
+| `CheckoutStrategy` | `highest_priority`, `oldest_first`, `skills_match`, `milestone_deadline` |
+| `AgentHeartbeat` | Liveness ping with progress %, branch, blocker info |
+| `WorkProduct` | Submitted code: branch, PR, commits, files, test results |
+| `TestResults` | passed, failed, skipped, total, coverage |
+| `AgentBudget` | Token budget with warning threshold, hard stop, reset period |
+| `BudgetStatus` | Current budget report: used, remaining, %, warning/exhausted flags |
+| `AgentTaskContext` | Enriched context: issue, parent, milestone, related, criteria |
+| `AgentActivityEntry` | Dashboard entry: agent, task, heartbeat age, budget, completions |
 
 ---
 

@@ -106,4 +106,31 @@ export class AgentStore {
     await this.saveAgents(filtered);
     return true;
   }
+
+  /** Remove an agent and all its descendants. Returns count of removed agents. */
+  async removeAgentCascade(agentId: string): Promise<number> {
+    const agents = await this.listAgents();
+    const toRemove = new Set([agentId]);
+    let found = true;
+    while (found) {
+      found = false;
+      for (const a of agents) {
+        if (a.parentAgentId && toRemove.has(a.parentAgentId) && !toRemove.has(a.id)) {
+          toRemove.add(a.id);
+          found = true;
+        }
+      }
+    }
+    const filtered = agents.filter(a => !toRemove.has(a.id));
+    if (filtered.length < agents.length) {
+      await this.saveAgents(filtered);
+    }
+    return toRemove.size;
+  }
+
+  /** Get direct children of an agent. */
+  async getChildren(parentId: string): Promise<Agent[]> {
+    const agents = await this.listAgents();
+    return agents.filter(a => a.parentAgentId === parentId);
+  }
 }

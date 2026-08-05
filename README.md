@@ -13,6 +13,7 @@ This server implements the [Model Context Protocol](https://modelcontextprotocol
 ### 🚀 What Makes This Special
 
 - **AI-Powered**: Transform project ideas into comprehensive PRDs and actionable tasks using multiple AI providers
+- **Agent Orchestration**: Autonomous AI agent task assignment, heartbeat monitoring, budget enforcement, and work product tracking
 - **Complete Traceability**: Full end-to-end tracking from business requirements → features → use cases → tasks
 - **Intelligent Analysis**: AI-powered complexity analysis, effort estimation, and task recommendations
 - **Professional Standards**: IEEE 830 compliant requirements documentation with enterprise-grade change management
@@ -37,6 +38,7 @@ This server implements the [Model Context Protocol](https://modelcontextprotocol
     - [Cursor](#install-in-cursor)
     - [Using Docker](#using-docker)
   - [Troubleshooting](#troubleshooting)
+- [Agent Orchestration](#agent-orchestration)
 - [Architecture](#architecture)
 - [Contributing](#contributing)
 - [License](#license)
@@ -123,6 +125,15 @@ docker run -it \
 - **Webhook Integration**: Real-time updates via GitHub webhooks
 - **Progress Tracking**: Comprehensive metrics and progress reporting
 - **Event System**: Track and replay project events
+
+### 🤖 Agent Orchestration (131 tools)
+- **Agent Registry**: Register, list, and deregister autonomous AI agents
+- **Task Checkout**: Claim tasks with configurable selection strategies (priority, age, skills, deadline)
+- **Heartbeat Monitoring**: Periodic liveness and progress reporting with stale-agent detection
+- **Work Product Tracking**: Submit code changes, PRs, test results, and review artifacts
+- **Budget Enforcement**: Per-agent token budgets with warning thresholds and hard stops
+- **Activity Dashboard**: Real-time view of all agent statuses, tasks, and budget consumption
+- **Subagent Hierarchy**: Parent-child agent relationships with cascade deregistration
 
 ## Installation
 
@@ -819,6 +830,177 @@ docker run -d mcp-gh-project:latest \
 
    If you encounter permission issues, make sure your GitHub token has the required permissions listed in the Configuration section.
 
+## Agent Orchestration
+
+The agent orchestration layer enables autonomous AI agents (Claude Code, Codex, Cursor, etc.) to self-assign tasks, report progress, submit work products, and operate within token budgets — all backed by GitHub-native storage.
+
+### How It Works
+
+Agents interact with the orchestration layer through 13 MCP tools that manage the full task lifecycle:
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                    Agent Orchestration Layer                        │
+│                                                                     │
+│  ┌───────────┐  ┌──────────────┐  ┌─────────────┐  ┌────────────┐  │
+│  │  Agent     │  │  Task        │  │  Work       │  │  Budget    │  │
+│  │  Registry  │  │  Checkout    │  │  Products   │  │  Manager   │  │
+│  └───────────┘  └──────────────┘  └─────────────┘  └────────────┘  │
+│         │              │                │                │          │
+│         ▼              ▼                ▼                ▼          │
+│  ┌─────────────────────────────────────────────────────────────┐    │
+│  │           GitHub-Native Storage (Issues + Projects)         │    │
+│  │  • Agent registry → pinned issue (label: agent-registry)   │    │
+│  │  • Task claims   → project custom fields                   │    │
+│  │  • Work products → structured issue comments               │    │
+│  │  • Budgets       → agent registry metadata                 │    │
+│  └─────────────────────────────────────────────────────────────┘    │
+│                                                                     │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### The 13 Agent Tools
+
+| Tool | Purpose |
+|------|---------|
+| `register_agent` | Register an AI agent with role, runtime, and capabilities |
+| `list_agents` | List registered agents, filter by role or status |
+| `deregister_agent` | Remove an agent from the registry |
+| `checkout_task` | Claim the next available task using a selection strategy |
+| `release_task` | Return a task to the pool (blocked, wrong skills, etc.) |
+| `complete_task` | Mark a task as completed with a summary |
+| `get_task_context` | Get enriched context for a task (issue, milestone, related issues, acceptance criteria) |
+| `agent_heartbeat` | Report liveness, progress %, branch, and blockers |
+| `submit_work_product` | Submit code changes with branch, PR, files, and test results |
+| `get_agent_activity` | Dashboard of all agents: tasks, progress, heartbeat, budget |
+| `get_budget_status` | Check an agent's token budget (used, remaining, warnings) |
+| `set_agent_budget` | Configure token budget, warning threshold, hard stop, reset period |
+| `check_work_status` | Check the review/merge status of submitted work |
+
+### Quick Start: Autonomous Agent Loop
+
+```typescript
+// 1. Register the agent
+register_agent({
+  name: "claude-eng-1",
+  role: "engineer",
+  runtime: "claude-code",
+  capabilities: ["typescript", "react", "testing"]
+})
+// → { id: "agent-abc123", status: "idle", ... }
+
+// 2. Check out a task
+checkout_task({
+  agentId: "agent-abc123",
+  strategy: "highest_priority"
+})
+// → { success: true, issueNumber: 42, issueTitle: "Add login form", branchSuggestion: "feat/42-add-login-form" }
+
+// 3. Get full context
+get_task_context({ issueNumber: 42 })
+// → { issue: {...}, milestone: {...}, acceptanceCriteria: [...], codingStandards: "..." }
+
+// 4. Work on the task, sending heartbeats periodically
+agent_heartbeat({
+  agentId: "agent-abc123",
+  status: "working",
+  taskId: "issue-42",
+  progress: 60,
+  progressSummary: "Tests passing, working on edge cases",
+  currentBranch: "feat/42-add-login-form"
+})
+
+// 5. Submit the work product
+submit_work_product({
+  agentId: "agent-abc123",
+  taskId: "issue-42",
+  issueNumber: 42,
+  branch: "feat/42-add-login-form",
+  prNumber: 99,
+  commitShas: ["abc1234"],
+  filesChanged: ["src/Login.tsx", "src/Login.test.tsx"],
+  testsPassed: 12,
+  testsFailed: 0,
+  testsTotal: 12,
+  summary: "Added login form with email/password validation"
+})
+
+// 6. Complete the task
+complete_task({
+  agentId: "agent-abc123",
+  taskId: "issue-42",
+  summary: "Implemented login form with validation and tests"
+})
+
+// 7. Repeat: checkout next task
+checkout_task({ agentId: "agent-abc123", strategy: "highest_priority" })
+```
+
+### Subagent Hierarchy
+
+Agents can register child agents using `parentAgentId`. This enables multi-agent architectures:
+
+```typescript
+// Parent agent registers itself
+register_agent({ name: "lead-agent", role: "pm", runtime: "claude-code" })
+// → { id: "agent-lead" }
+
+// Parent spawns a sub-agent
+register_agent({
+  name: "worker-1",
+  role: "engineer",
+  runtime: "claude-code",
+  parentAgentId: "agent-lead",
+  capabilities: ["typescript", "testing"]
+})
+
+// Deregistering the parent cascades to all children
+deregister_agent({ agentId: "agent-lead" })
+// → Removes lead-agent and worker-1
+```
+
+### Budget Enforcement
+
+Token budgets prevent runaway AI costs:
+
+```typescript
+// Set a daily budget with 80% warning
+set_agent_budget({
+  agentId: "agent-abc123",
+  totalTokens: 500000,
+  warningThreshold: 0.8,
+  hardStop: true,
+  resetPeriod: "daily"
+})
+
+// Check budget status before expensive operations
+get_budget_status({ agentId: "agent-abc123" })
+// → { usedTokens: 350000, remainingTokens: 150000, usagePercent: 70, isWarning: false, isExhausted: false }
+```
+
+### GitHub-Native Data Model
+
+All orchestration state lives in your GitHub repository — no external database required:
+
+| Data | Storage | Details |
+|------|---------|---------|
+| Agent registry | Pinned issue | JSON body on an issue labeled `agent-registry` |
+| Task claims | Project custom fields | `agent_claimed_by`, `agent_claimed_at`, `agent_status`, `agent_work_branch`, `agent_pr_number` |
+| Work products | Issue comments | Structured comments with `<!-- agent-work-product: -->` markers |
+| Budgets | Agent metadata | Stored in the agent registry alongside each agent record |
+| Heartbeats | Agent metadata | `lastHeartbeat` timestamp on the agent record |
+
+### Configuration
+
+| Constant | Default | Description |
+|----------|---------|-------------|
+| Heartbeat timeout | 30 minutes | Agent is considered stale after this period |
+| Default budget | 500,000 tokens | Initial token budget per agent |
+| Registry label | `agent-registry` | GitHub issue label for the agent registry |
+
+See the [Tool Reference](docs/TOOLS.md#agent-orchestration-tools) for detailed parameter documentation.
+
+
 ## Architecture
 
 The server follows Clean Architecture principles with distinct layers:
@@ -961,7 +1143,7 @@ webhook signature check.
 - [Troubleshooting Guide](docs/TROUBLESHOOTING.md) - Common issues and solutions
 
 ### Reference
-- [Tool Reference](docs/TOOLS.md) - All 120 MCP tools documented
+- [Tool Reference](docs/TOOLS.md) - All 131 MCP tools documented
 - [Architecture](docs/architecture.md) - System design and patterns
 - [API Reference](docs/API.md) - Service and infrastructure APIs
 

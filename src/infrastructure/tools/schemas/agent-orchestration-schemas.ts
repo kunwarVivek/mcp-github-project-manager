@@ -19,6 +19,7 @@ export const registerAgentSchema = z.object({
   capabilities: z.array(z.string()).default([]),
   budgetTokens: z.number().positive().optional(),
   metadata: z.record(z.string(), z.unknown()).optional(),
+  parentAgentId: z.string().optional(),
 });
 export type RegisterAgentArgs = z.infer<typeof registerAgentSchema>;
 
@@ -57,6 +58,9 @@ export const completeTaskSchema = z.object({
   agentId: z.string().min(1),
   taskId: z.string().min(1),
   summary: z.string().min(1, 'Completion summary is required'),
+  closeIssue: z.boolean().default(true),
+  prNumber: z.number().int().positive().optional(),
+  autoCheckoutNext: z.boolean().default(true),
 });
 export type CompleteTaskArgs = z.infer<typeof completeTaskSchema>;
 
@@ -126,3 +130,14 @@ export const setAgentBudgetSchema = z.object({
   resetPeriod: z.enum(['daily', 'weekly', 'monthly', 'never']).optional(),
 });
 export type SetAgentBudgetArgs = z.infer<typeof setAgentBudgetSchema>;
+
+// ============================================================================
+// Check Work Status Schema
+// ============================================================================
+
+export const checkWorkStatusSchema = z.object({
+  agentId: z.string().min(1),
+  taskId: z.string().min(1),
+  prNumber: z.number().int().positive().optional(),
+});
+export type CheckWorkStatusArgs = z.infer<typeof checkWorkStatusSchema>;

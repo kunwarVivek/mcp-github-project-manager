@@ -147,6 +147,21 @@ in `src/infrastructure/secrets/` and add it to the resolver chain.
 |----------|---------|-------------|
 | `MAX_CACHE_ENTRIES` | `10000` | Maximum in-memory resource-cache entries before oldest-first eviction |
 
+### Agent Orchestration
+
+Agent orchestration uses compile-time constants (not environment variables) defined in
+`src/domain/agent-orchestration-types.ts`. These can be overridden by forking the source:
+
+| Constant | Default | Description |
+|----------|---------|-------------|
+| `DEFAULT_HEARTBEAT_TIMEOUT_MINUTES` | `30` | Minutes before an agent is considered stale (no heartbeat) |
+| `DEFAULT_AGENT_BUDGET_TOKENS` | `500,000` | Default token budget per agent |
+| `AGENT_REGISTRY_LABEL` | `agent-registry` | GitHub issue label used for the agent registry |
+
+Agent orchestration custom fields (`agent_claimed_by`, `agent_claimed_at`, `agent_status`,
+`agent_work_branch`, `agent_pr_number`) are auto-provisioned in your GitHub Project by
+`ProjectFieldSetup` when `AUTO_CREATE_PROJECT_FIELDS=true` (the default).
+
 ---
 
 ## Configuration Methods
@@ -553,6 +568,6 @@ LOG_LEVEL=info
 ## See Also
 
 - [Troubleshooting Guide](TROUBLESHOOTING.md) - Common issues and solutions
-- [Tool Reference](TOOLS.md) - All 119 MCP tools documented
+- [Tool Reference](TOOLS.md) - All 131 MCP tools documented
 - [API Reference](API.md) - Service and infrastructure APIs
 - [User Guide](user-guide.md) - Getting started guide

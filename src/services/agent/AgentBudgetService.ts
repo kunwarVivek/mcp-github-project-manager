@@ -1,5 +1,5 @@
 import type { AgentStore } from '../../infrastructure/agent/AgentStore';
-import type { BudgetStatus, AgentBudget } from '../../domain/agent-orchestration-types';
+import type { Agent, BudgetStatus, AgentBudget } from '../../domain/agent-orchestration-types';
 import { DEFAULT_AGENT_BUDGET_TOKENS } from '../../domain/agent-orchestration-types';
 import { mapErrorToMCPError } from '../utils/ErrorMapper';
 
@@ -17,7 +17,7 @@ export class AgentBudgetService {
     this.agentStore = agentStore;
   }
 
-  /** Return current budget status for an agent. */
+  /** Return current budget status for an agent. Subagents return parent's budget. */
   async getBudgetStatus(agentId: string): Promise<BudgetStatus> {
     try {
       const agent = await this.agentStore.getAgent(agentId);
@@ -25,15 +25,18 @@ export class AgentBudgetService {
         throw new Error(`Agent not found: ${agentId}`);
       }
 
-      const budget = agent.budget ?? defaultBudget();
+      // Subagents delegate to parent's budget
+      const budgetOwner = await this.resolveBudgetOwner(agent);
+
+      const budget = budgetOwner.budget ?? defaultBudget();
       const remainingTokens = Math.max(0, budget.totalTokens - budget.usedTokens);
       const usagePercent = budget.totalTokens > 0
         ? (budget.usedTokens / budget.totalTokens) * 100
         : 0;
 
       return {
-        agentId,
-        agentName: agent.name,
+        agentId: budgetOwner.id,
+        agentName: budgetOwner.name,
         totalTokens: budget.totalTokens,
         usedTokens: budget.usedTokens,
         remainingTokens,
@@ -78,7 +81,7 @@ export class AgentBudgetService {
     }
   }
 
-  /** Record token usage. Returns the updated budget status. */
+  /** Record token usage. Subagents debit from parent's budget. Returns updated status. */
   async recordUsage(agentId: string, tokensUsed: number): Promise<BudgetStatus> {
     try {
       const agent = await this.agentStore.getAgent(agentId);
@@ -86,26 +89,36 @@ export class AgentBudgetService {
         throw new Error(`Agent not found: ${agentId}`);
       }
 
-      const budget = agent.budget ?? defaultBudget();
-      budget.usedTokens += tokensUsed;
-      agent.budget = budget;
+      // Subagents debit from parent's budget
+      const budgetOwner = await this.resolveBudgetOwner(agent);
 
-      // Flip agent status when budget is exhausted
+      const budget = budgetOwner.budget ?? defaultBudget();
+      budget.usedTokens += tokensUsed;
+      budgetOwner.budget = budget;
+
+      // Flip status when budget is exhausted
       if (budget.hardStop && budget.usedTokens >= budget.totalTokens) {
-        agent.status = 'budget_exhausted';
+        budgetOwner.status = 'budget_exhausted';
       }
 
-      await this.agentStore.upsertAgent(agent);
-      return this.getBudgetStatus(agentId);
+      await this.agentStore.upsertAgent(budgetOwner);
+      return this.getBudgetStatus(budgetOwner.id);
     } catch (error) {
       throw mapErrorToMCPError(error);
     }
   }
 
-  /** Check whether the agent can afford an estimated number of tokens. */
+  /** Check whether the agent can afford an estimated number of tokens. Subagents check parent. */
   async canAfford(agentId: string, estimatedTokens: number): Promise<boolean> {
     try {
-      const status = await this.getBudgetStatus(agentId);
+      const agent = await this.agentStore.getAgent(agentId);
+      if (!agent) {
+        throw new Error(`Agent not found: ${agentId}`);
+      }
+
+      // Subagents check parent's budget
+      const budgetOwner = await this.resolveBudgetOwner(agent);
+      const status = await this.getBudgetStatus(budgetOwner.id);
       return status.remainingTokens >= estimatedTokens;
     } catch (error) {
       throw mapErrorToMCPError(error);
@@ -148,6 +161,15 @@ export class AgentBudgetService {
     } catch (error) {
       throw mapErrorToMCPError(error);
     }
+  }
+
+  /** Resolve the agent whose budget should be used. Subagents delegate to parent. */
+  private async resolveBudgetOwner(agent: Agent): Promise<Agent> {
+    if (agent.parentAgentId) {
+      const parent = await this.agentStore.getAgent(agent.parentAgentId);
+      if (parent) return parent;
+    }
+    return agent;
   }
 }
 

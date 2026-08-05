@@ -1,13 +1,13 @@
 # MCP Tools Reference
 
-This document provides comprehensive documentation for all 117 MCP tools available in the MCP GitHub Project Manager.
+This document provides comprehensive documentation for all 131 MCP tools available in the MCP GitHub Project Manager.
 
 ## Overview
 
 | Metric | Value |
 |--------|-------|
-| Total Tools | 117 |
-| Categories | 17 |
+| Total Tools | 131 |
+| Categories | 18 |
 | SDK Version | 1.25.3 |
 | All tools have | Behavior annotations, Output schemas |
 
@@ -43,6 +43,7 @@ All tools are annotated with behavior hints that help MCP clients understand the
 15. [Advanced Operations Tools](#advanced-operations-tools) (3 tools)
 16. [Sprint and Roadmap AI Tools](#sprint-and-roadmap-ai-tools) (6 tools)
 17. [Issue Intelligence Tools (AI)](#issue-intelligence-tools-ai---phase-11) (4 tools)
+18. [Agent Orchestration Tools](#agent-orchestration-tools) (13 tools)
 
 ---
 
@@ -3026,9 +3027,503 @@ Multi-type relationship detection (AI-20).
 
 ---
 
+## Agent Orchestration Tools
+
+Tools for autonomous AI agent task management. Enables agents (Claude Code, Codex, Cursor, etc.)
+to self-register, claim tasks, report progress, submit work products, and operate within token budgets.
+All state is stored natively in GitHub (issues, project fields, comments).
+
+### register_agent
+
+Register a new AI agent in the orchestration registry.
+
+**Input Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| name | string | Yes | Agent name (e.g. `claude-eng-1`) |
+| role | enum | No | `engineer`, `reviewer`, `pm`, `designer`, `qa`, `devops`, `general`. Default: `engineer` |
+| runtime | enum | No | `claude-code`, `codex`, `cursor`, `cli`, `http`, `custom`. Default: `claude-code` |
+| capabilities | string[] | No | Skills the agent can handle (e.g. `["typescript", "react"]`). Default: `[]` |
+| budgetTokens | number | No | Initial token budget. Default: 500,000 |
+| metadata | object | No | Arbitrary key-value metadata |
+| parentAgentId | string | No | ID of parent agent for subagent hierarchy |
+
+**Output:** Agent object with id, name, role, runtime, status, registeredAt, budget
+
+**Behavior:** Creates new agent record (not read-only, not destructive, not idempotent)
+
+**Example:**
+```json
+{
+  "name": "claude-eng-1",
+  "role": "engineer",
+  "runtime": "claude-code",
+  "capabilities": ["typescript", "react", "testing"]
+}
+```
+
+**Example Output:**
+```json
+{
+  "id": "agent-abc123",
+  "name": "claude-eng-1",
+  "role": "engineer",
+  "runtime": "claude-code",
+  "capabilities": ["typescript", "react", "testing"],
+  "status": "idle",
+  "registeredAt": "2026-08-05T10:00:00Z"
+}
+```
+
+---
+
+### list_agents
+
+List all registered agents, optionally filtered by role or status.
+
+**Input Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| role | enum | No | Filter by role: `engineer`, `reviewer`, `pm`, `designer`, `qa`, `devops`, `general` |
+| status | enum | No | Filter by status: `idle`, `working`, `blocked`, `needs_review`, `offline`, `budget_exhausted` |
+
+**Output:** `{ agents: Agent[], total: number }`
+
+**Behavior:** Read-only, idempotent
+
+**Example:**
+```json
+{
+  "role": "engineer",
+  "status": "idle"
+}
+```
+
+---
+
+### deregister_agent
+
+Remove an agent from the orchestration registry. If the agent has child agents (subagents), they are also removed (cascade delete).
+
+**Input Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| agentId | string | Yes | ID of the agent to remove |
+
+**Output:** `{ success: boolean, message: string, removedCount: number }`
+
+**Behavior:** Destructive (removes agent and any subagents)
+
+**Example:**
+```json
+{
+  "agentId": "agent-abc123"
+}
+```
+
+---
+
+### checkout_task
+
+Claim the next available task for an agent. Uses the specified strategy to select which unclaimed issue to assign.
+
+**Input Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| agentId | string | Yes | ID of the agent claiming the task |
+| projectId | string | No | GitHub Project ID to scope task search |
+| strategy | enum | No | `highest_priority`, `oldest_first`, `skills_match`, `milestone_deadline`. Default: `highest_priority` |
+| labels | string[] | No | Filter issues by labels |
+| milestone | string | No | Filter issues by milestone |
+
+**Output:** TaskCheckoutResult with issue details, branch suggestion, labels, milestone
+
+**Behavior:** Not idempotent (claims change state)
+
+**Example:**
+```json
+{
+  "agentId": "agent-abc123",
+  "strategy": "highest_priority",
+  "labels": ["bug", "priority:high"]
+}
+```
+
+**Example Output:**
+```json
+{
+  "success": true,
+  "issueNumber": 42,
+  "issueTitle": "Add login form with validation",
+  "issueBody": "## Description\nImplement a login form...",
+  "labels": ["feature", "frontend"],
+  "milestone": "v2.0",
+  "branchSuggestion": "feat/42-add-login-form",
+  "claimedAt": "2026-08-05T10:05:00Z",
+  "message": "Task checked out successfully"
+}
+```
+
+---
+
+### release_task
+
+Release a previously checked-out task back to the pool. The task becomes available for other agents.
+
+**Input Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| agentId | string | Yes | ID of the agent releasing the task |
+| taskId | string | Yes | ID of the task/issue to release |
+| reason | string | No | Why the task is being released |
+
+**Output:** `{ success: boolean, message: string }`
+
+**Behavior:** Idempotent
+
+**Example:**
+```json
+{
+  "agentId": "agent-abc123",
+  "taskId": "issue-42",
+  "reason": "Missing API credentials for third-party service"
+}
+```
+
+---
+
+### complete_task
+
+Mark a checked-out task as completed. Provide a summary of what was accomplished.
+
+**Input Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| agentId | string | Yes | ID of the agent completing the task |
+| taskId | string | Yes | ID of the task/issue |
+| summary | string | Yes | Completion summary of what was done |
+
+**Output:** `{ success: boolean, message: string }`
+
+**Behavior:** Idempotent
+
+**Example:**
+```json
+{
+  "agentId": "agent-abc123",
+  "taskId": "issue-42",
+  "summary": "Implemented login form with email/password validation, added unit tests, PR #99 merged"
+}
+```
+
+---
+
+### get_task_context
+
+Get enriched context for a task/issue. Returns the full scope needed to understand and implement the task.
+
+**Input Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| issueNumber | number | Yes | GitHub issue number |
+
+**Output:** AgentTaskContext with issue details, parent issue, milestone, related issues, acceptance criteria, coding standards, branch suggestion
+
+**Behavior:** Read-only, idempotent
+
+**Example:**
+```json
+{
+  "issueNumber": 42
+}
+```
+
+**Example Output:**
+```json
+{
+  "issue": {
+    "id": "I_abc123",
+    "number": 42,
+    "title": "Add login form with validation",
+    "body": "## Description\n...",
+    "labels": ["feature"],
+    "assignees": [],
+    "state": "open",
+    "createdAt": "2026-08-01T10:00:00Z"
+  },
+  "milestone": {
+    "title": "v2.0",
+    "description": "User authentication features",
+    "dueDate": "2026-09-01",
+    "progress": 40
+  },
+  "relatedIssues": [
+    { "number": 40, "title": "Set up auth API", "state": "closed", "labels": ["backend"] }
+  ],
+  "branchSuggestion": "feat/42-add-login-form",
+  "acceptanceCriteria": [
+    "Email validation with proper error messages",
+    "Password strength indicator",
+    "Unit tests with >80% coverage"
+  ],
+  "estimatedComplexity": 5
+}
+```
+
+---
+
+### agent_heartbeat
+
+Send a heartbeat to report agent liveness and progress. Agents should send heartbeats periodically while working. Agents without a heartbeat for 30 minutes are considered stale and may have tasks reclaimed.
+
+**Input Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| agentId | string | Yes | Agent ID |
+| status | enum | Yes | `working`, `blocked`, `needs_review` |
+| taskId | string | No | Current task ID |
+| progress | number | No | Progress percentage (0–100) |
+| progressSummary | string | No | Human-readable progress description |
+| currentBranch | string | No | Git branch being worked on |
+| estimatedCompletionMinutes | number | No | Estimated time to completion |
+| blockerDescription | string | No | Description of what is blocking progress |
+
+**Output:** `{ success: boolean, message: string }`
+
+**Behavior:** Idempotent
+
+**Example:**
+```json
+{
+  "agentId": "agent-abc123",
+  "status": "working",
+  "taskId": "issue-42",
+  "progress": 60,
+  "progressSummary": "Tests passing, working on edge cases",
+  "currentBranch": "feat/42-add-login-form",
+  "estimatedCompletionMinutes": 15
+}
+```
+
+---
+
+### submit_work_product
+
+Submit a work product (code changes) for a task. The work product is recorded as a structured comment on the issue.
+
+**Input Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| agentId | string | Yes | Agent ID |
+| taskId | string | Yes | Task/issue ID |
+| issueNumber | number | Yes | GitHub issue number |
+| branch | string | No | Git branch name |
+| prNumber | number | No | Pull request number |
+| commitShas | string[] | No | Commit SHA hashes. Default: `[]` |
+| filesChanged | string[] | No | List of changed file paths. Default: `[]` |
+| testsPassed | number | No | Number of tests passed |
+| testsFailed | number | No | Number of tests failed |
+| testsTotal | number | No | Total number of tests |
+| summary | string | Yes | Summary of changes made |
+
+**Output:** WorkProduct object with id, branch, PR details, test results, timestamps
+
+**Behavior:** Not idempotent (creates new comment each call)
+
+**Example:**
+```json
+{
+  "agentId": "agent-abc123",
+  "taskId": "issue-42",
+  "issueNumber": 42,
+  "branch": "feat/42-add-login-form",
+  "prNumber": 99,
+  "commitShas": ["abc1234", "def5678"],
+  "filesChanged": ["src/Login.tsx", "src/Login.test.tsx", "src/api/auth.ts"],
+  "testsPassed": 12,
+  "testsFailed": 0,
+  "testsTotal": 12,
+  "summary": "Added login form with email/password validation, error handling, and unit tests"
+}
+```
+
+**Example Output:**
+```json
+{
+  "id": "wp-xyz789",
+  "agentId": "agent-abc123",
+  "taskId": "issue-42",
+  "branch": "feat/42-add-login-form",
+  "prNumber": 99,
+  "commitShas": ["abc1234", "def5678"],
+  "filesChanged": ["src/Login.tsx", "src/Login.test.tsx", "src/api/auth.ts"],
+  "testResults": {
+    "passed": 12,
+    "failed": 0,
+    "skipped": 0,
+    "total": 12
+  },
+  "summary": "Added login form with email/password validation, error handling, and unit tests",
+  "submittedAt": "2026-08-05T10:30:00Z"
+}
+```
+
+---
+
+### get_agent_activity
+
+Get an activity dashboard showing all agents and their current state, including tasks, progress, heartbeat status, and budget.
+
+**Input Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| includeOffline | boolean | No | Include agents that have gone offline. Default: `false` |
+
+**Output:** `{ agents: AgentActivityEntry[], summary: { total, active, idle, blocked } }`
+
+**Behavior:** Read-only, idempotent
+
+**Example:**
+```json
+{
+  "includeOffline": true
+}
+```
+
+**Example Output:**
+```json
+{
+  "agents": [
+    {
+      "agent": {
+        "id": "agent-abc123",
+        "name": "claude-eng-1",
+        "role": "engineer",
+        "runtime": "claude-code",
+        "status": "working"
+      },
+      "currentTask": {
+        "issueId": "I_abc123",
+        "issueNumber": 42,
+        "title": "Add login form",
+        "progress": 60,
+        "branch": "feat/42-add-login-form",
+        "claimedAt": "2026-08-05T10:05:00Z"
+      },
+      "lastHeartbeat": "2026-08-05T10:25:00Z",
+      "heartbeatAge": "5m",
+      "isStale": false,
+      "budgetStatus": {
+        "usagePercent": 45,
+        "isWarning": false,
+        "isExhausted": false
+      },
+      "completedToday": 3
+    }
+  ],
+  "summary": { "total": 1, "active": 1, "idle": 0, "blocked": 0 }
+}
+```
+
+---
+
+### get_budget_status
+
+Get the token budget status for an agent. Returns usage breakdown and warning/exhaustion flags.
+
+**Input Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| agentId | string | Yes | Agent ID |
+
+**Output:** BudgetStatus with totalTokens, usedTokens, remainingTokens, usagePercent, warnings
+
+**Behavior:** Read-only, idempotent
+
+**Example:**
+```json
+{
+  "agentId": "agent-abc123"
+}
+```
+
+**Example Output:**
+```json
+{
+  "agentId": "agent-abc123",
+  "agentName": "claude-eng-1",
+  "totalTokens": 500000,
+  "usedTokens": 350000,
+  "remainingTokens": 150000,
+  "usagePercent": 70,
+  "isWarning": false,
+  "isExhausted": false,
+  "resetPeriod": "daily",
+  "lastResetAt": "2026-08-05T00:00:00Z"
+}
+```
+
+---
+
+### set_agent_budget
+
+Set or update the token budget for an agent. Configure spending limits to prevent runaway costs.
+
+**Input Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| agentId | string | Yes | Agent ID |
+| totalTokens | number | Yes | Total token budget (positive integer) |
+| warningThreshold | number | No | Usage fraction that triggers a warning (0–1). Default: `0.8` |
+| hardStop | boolean | No | Whether to stop the agent when budget is exhausted. Default: `true` |
+| resetPeriod | enum | No | `daily`, `weekly`, `monthly`, `never` |
+
+**Output:** BudgetStatus reflecting the updated budget
+
+**Behavior:** Idempotent
+
+**Example:**
+```json
+{
+  "agentId": "agent-abc123",
+  "totalTokens": 500000,
+  "warningThreshold": 0.8,
+  "hardStop": true,
+  "resetPeriod": "daily"
+}
+```
+
+---
+
+### check_work_status
+
+Check the review/merge status of a submitted work product. Returns whether the associated PR has been reviewed, approved, or merged.
+
+**Input Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| agentId | string | Yes | Agent ID |
+| taskId | string | Yes | Task/issue ID |
+| prNumber | number | No | Pull request number to check |
+
+**Output:** Work status with review state, merge status, and any blocking comments
+
+**Behavior:** Read-only, idempotent
+
+**Example:**
+```json
+{
+  "agentId": "agent-abc123",
+  "taskId": "issue-42",
+  "prNumber": 99
+}
+```
+
+---
+
 ## Tool Registration
 
-All 119 tools are registered in `src/infrastructure/tools/ToolRegistry.ts`. The registry:
+All 131 tools are registered in `src/infrastructure/tools/ToolRegistry.ts`. The registry:
 
 1. Validates tool definitions at registration time
 2. Generates MCP-compliant tool descriptors with annotations
@@ -3051,12 +3546,14 @@ All 119 tools are registered in `src/infrastructure/tools/ToolRegistry.ts`. The 
 | Sprint AI tools | `src/infrastructure/tools/sprint-ai-tools.ts` |
 | Roadmap AI tools | `src/infrastructure/tools/roadmap-ai-tools.ts` |
 | Issue Intelligence AI tools | `src/infrastructure/tools/issue-intelligence-tools.ts` |
+| Agent Orchestration tools | `src/infrastructure/tools/agent-orchestration-tools.ts` |
+| Agent Orchestration schemas | `src/infrastructure/tools/schemas/agent-orchestration-schemas.ts` |
 | Tool Registry | `src/infrastructure/tools/ToolRegistry.ts` |
 | Output schemas | `src/infrastructure/tools/schemas/*.ts` |
 | Behavior annotations | `src/infrastructure/tools/annotations/tool-annotations.ts` |
 
 ---
 
-*Generated: 2026-02-01*
-*Tool count: 119*
+*Generated: 2026-08-05*
+*Tool count: 131*
 *MCP SDK: 1.25.3*

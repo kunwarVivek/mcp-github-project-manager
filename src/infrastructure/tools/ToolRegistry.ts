@@ -229,6 +229,7 @@ import {
   getAgentActivityTool,
   getBudgetStatusTool,
   setAgentBudgetTool,
+  checkWorkStatusTool,
 } from "./agent-orchestration-tools";
 
 /**
@@ -539,6 +540,7 @@ export class ToolRegistry {
     this.registerTool(getAgentActivityTool);
     this.registerTool(getBudgetStatusTool);
     this.registerTool(setAgentBudgetTool);
+    this.registerTool(checkWorkStatusTool);
   }
 
 }

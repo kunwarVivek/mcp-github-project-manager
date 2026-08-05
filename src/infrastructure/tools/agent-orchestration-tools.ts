@@ -38,6 +38,7 @@ import {
   getAgentActivitySchema,
   getBudgetStatusSchema,
   setAgentBudgetSchema,
+  checkWorkStatusSchema,
 } from './schemas/agent-orchestration-schemas';
 
 import type {
@@ -53,6 +54,7 @@ import type {
   GetAgentActivityArgs,
   GetBudgetStatusArgs,
   SetAgentBudgetArgs,
+  CheckWorkStatusArgs,
 } from './schemas/agent-orchestration-schemas';
 
 import { SuccessOutputSchema } from './schemas/project-schemas';
@@ -224,6 +226,8 @@ export const completeTaskTool: ToolDefinition<
         agentId: 'agent-abc123',
         taskId: 'issue-42',
         summary: 'Implemented login form with validation and tests',
+        closeIssue: true,
+        autoCheckoutNext: true,
       },
     },
   ],
@@ -405,6 +409,49 @@ export const setAgentBudgetTool: ToolDefinition<
 };
 
 // ============================================================================
+// Tool Definitions — Work Status
+// ============================================================================
+
+const CheckWorkStatusOutputSchema = z.object({
+  taskId: z.string(),
+  prState: z.enum(['open', 'closed', 'merged', 'draft', 'none']).optional(),
+  reviewStatus: z.enum(['approved', 'changes_requested', 'pending', 'none']).optional(),
+  reviewComments: z.array(z.object({
+    author: z.string(),
+    state: z.string(),
+    body: z.string(),
+  })).optional(),
+  actionRequired: z.string().optional(),
+});
+
+export const checkWorkStatusTool: ToolDefinition<
+  CheckWorkStatusArgs,
+  z.infer<typeof CheckWorkStatusOutputSchema>
+> = {
+  name: 'check_work_status',
+  title: 'Check Work Status',
+  description:
+    'Check the status of an agent\'s submitted work — PR state, review status, ' +
+    'and any action required. Use this after submitting a work product to see ' +
+    'if the PR has been approved, changes were requested, or it was merged. ' +
+    'If no prNumber is provided, checks the WorkProductStore for the task\'s issue.',
+  schema: checkWorkStatusSchema as unknown as ToolSchema<CheckWorkStatusArgs>,
+  outputSchema: CheckWorkStatusOutputSchema,
+  annotations: ANNOTATION_PATTERNS.readOnly,
+  examples: [
+    {
+      name: 'Check PR review status',
+      description: 'Check if a PR has been reviewed and approved',
+      args: {
+        agentId: 'agent-abc123',
+        taskId: 'issue-42',
+        prNumber: 99,
+      },
+    },
+  ],
+};
+
+// ============================================================================
 // Executor Functions
 // ============================================================================
 
@@ -422,6 +469,15 @@ export async function executeRegisterAgent(
     const factory = createGitHubFactory();
     const store = new AgentStore(factory);
 
+    // If registering as a child agent, verify the parent exists
+    let parentAgent: Agent | undefined;
+    if (args.parentAgentId) {
+      parentAgent = await store.getAgent(args.parentAgentId);
+      if (!parentAgent) {
+        throw new Error(`Parent agent not found: ${args.parentAgentId}`);
+      }
+    }
+
     const agent: Agent = {
       id: `agent-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       name: args.name,
@@ -431,6 +487,7 @@ export async function executeRegisterAgent(
       status: 'idle',
       registeredAt: new Date().toISOString(),
       metadata: args.metadata,
+      parentAgentId: args.parentAgentId,
       budget: args.budgetTokens
         ? {
             totalTokens: args.budgetTokens,
@@ -440,6 +497,12 @@ export async function executeRegisterAgent(
           }
         : undefined,
     };
+
+    // Inherit parent's current task context
+    if (parentAgent) {
+      agent.currentTaskId = parentAgent.currentTaskId;
+      agent.currentTaskTitle = parentAgent.currentTaskTitle;
+    }
 
     await store.upsertAgent(agent);
 
@@ -500,13 +563,13 @@ export async function executeDeregisterAgent(
     const factory = createGitHubFactory();
     const store = new AgentStore(factory);
 
-    const removed = await store.removeAgent(args.agentId);
+    const removedCount = await store.removeAgentCascade(args.agentId);
 
     const result = {
-      success: removed,
+      success: removedCount > 0,
       agentId: args.agentId,
-      message: removed
-        ? `Agent ${args.agentId} deregistered`
+      message: removedCount > 0
+        ? `Agent ${args.agentId} and ${removedCount - 1} child agent(s) deregistered`
         : `Agent ${args.agentId} not found`,
     };
 
@@ -589,7 +652,7 @@ export async function executeCompleteTask(
   args: CompleteTaskArgs,
 ): Promise<{
   content: Array<{ type: 'text'; text: string }>;
-  structuredContent: { success: boolean; message?: string };
+  structuredContent: { success: boolean; message?: string; nextTask?: unknown };
 }> {
   try {
     const factory = createGitHubFactory();
@@ -597,11 +660,19 @@ export async function executeCompleteTask(
     const contextService = new AgentContextService(factory);
     const service = new TaskCheckoutService(factory, store, contextService);
 
-    await service.completeTask(args.agentId, args.taskId, args.summary);
+    const result = await service.completeTask(args.agentId, args.taskId, args.summary, {
+      closeIssue: args.closeIssue,
+      prNumber: args.prNumber,
+      autoCheckoutNext: args.autoCheckoutNext,
+    });
 
     return {
-      content: [{ type: 'text', text: `Completed task ${args.taskId}` }],
-      structuredContent: { success: true, message: `Task ${args.taskId} completed` },
+      content: [{ type: 'text', text: result.message }],
+      structuredContent: {
+        success: result.success,
+        message: result.message,
+        nextTask: result.nextTask,
+      },
     };
   } catch (error) {
     throw mapErrorToMCPError(error);
@@ -853,6 +924,133 @@ export async function executeSetAgentBudget(
         },
       ],
       structuredContent: status,
+    };
+  } catch (error) {
+    throw mapErrorToMCPError(error);
+  }
+}
+
+/**
+ * Execute the check_work_status tool.
+ * Checks PR state and review status for a task's work product.
+ */
+export async function executeCheckWorkStatus(
+  args: CheckWorkStatusArgs,
+): Promise<{
+  content: Array<{ type: 'text'; text: string }>;
+  structuredContent: {
+    taskId: string;
+    prState?: string;
+    reviewStatus?: string;
+    reviewComments?: Array<{ author: string; state: string; body: string }>;
+    actionRequired?: string;
+  };
+}> {
+  try {
+    const factory = createGitHubFactory();
+    const octokit = factory.getOctokit();
+    const config = factory.getConfig();
+
+    let prNumber = args.prNumber;
+
+    // If no prNumber provided, look it up from the WorkProductStore
+    if (!prNumber) {
+      const issueNumber = parseInt(args.taskId, 10);
+      if (!Number.isNaN(issueNumber)) {
+        const wpStore = new WorkProductStore(factory);
+        const products = await wpStore.listForIssue(issueNumber);
+        const latest = [...products].reverse().find((p: WorkProduct) => p.prNumber != null);
+        prNumber = latest?.prNumber;
+      }
+    }
+
+    if (!prNumber) {
+      return {
+        content: [{ type: 'text', text: `No PR found for task ${args.taskId}` }],
+        structuredContent: {
+          taskId: args.taskId,
+          prState: 'none',
+          reviewStatus: 'none',
+          actionRequired: 'No PR associated with this task. Submit a work product with a PR number first.',
+        },
+      };
+    }
+
+    // Fetch PR details
+    const { data: pr } = await octokit.rest.pulls.get({
+      owner: config.owner,
+      repo: config.repo,
+      pull_number: prNumber,
+    });
+
+    // Fetch reviews
+    const { data: reviews } = await octokit.rest.pulls.listReviews({
+      owner: config.owner,
+      repo: config.repo,
+      pull_number: prNumber,
+    });
+
+    // Determine PR state
+    let prState: string;
+    if (pr.merged) {
+      prState = 'merged';
+    } else if (pr.draft) {
+      prState = 'draft';
+    } else {
+      prState = pr.state; // 'open' | 'closed'
+    }
+
+    // Determine review status from the latest substantive review per reviewer
+    const reviewMap = new Map<string, { state: string; body: string }>();
+    for (const review of reviews) {
+      if (review.state === 'COMMENTED' && !review.body) continue;
+      reviewMap.set(review.user?.login ?? 'unknown', {
+        state: review.state,
+        body: review.body ?? '',
+      });
+    }
+
+    let reviewStatus = 'pending';
+    const hasApproval = [...reviewMap.values()].some(r => r.state === 'APPROVED');
+    const hasChangesRequested = [...reviewMap.values()].some(r => r.state === 'CHANGES_REQUESTED');
+
+    if (hasChangesRequested) {
+      reviewStatus = 'changes_requested';
+    } else if (hasApproval) {
+      reviewStatus = 'approved';
+    }
+
+    const reviewComments = [...reviewMap.entries()].map(([author, r]) => ({
+      author,
+      state: r.state,
+      body: r.body,
+    }));
+
+    // Determine action required
+    let actionRequired: string | undefined;
+    if (prState === 'merged') {
+      actionRequired = 'PR merged. Complete the task.';
+    } else if (reviewStatus === 'changes_requested') {
+      actionRequired = 'Address review feedback and push updates.';
+    } else if (reviewStatus === 'approved') {
+      actionRequired = 'PR approved. Ready to merge and complete the task.';
+    } else if (prState === 'draft') {
+      actionRequired = 'Mark PR as ready for review.';
+    } else {
+      actionRequired = 'Waiting for review.';
+    }
+
+    const summary = `PR #${prNumber}: ${prState}, review: ${reviewStatus}`;
+
+    return {
+      content: [{ type: 'text', text: summary }],
+      structuredContent: {
+        taskId: args.taskId,
+        prState,
+        reviewStatus,
+        reviewComments,
+        actionRequired,
+      },
     };
   } catch (error) {
     throw mapErrorToMCPError(error);

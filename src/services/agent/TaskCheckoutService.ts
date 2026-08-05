@@ -185,6 +185,12 @@ export class TaskCheckoutService {
       if (!agent) {
         return { success: false, message: `Agent not found: ${agentId}` };
       }
+      if (agent.parentAgentId) {
+        return {
+          success: false,
+          message: "Subagents inherit parent's task — use get_task_context with parent's task",
+        };
+      }
 
       if (agent.currentTaskId) {
         return {
@@ -204,7 +210,7 @@ export class TaskCheckoutService {
       const issues = resp.repository.issues.nodes;
 
       // 2. Find an unclaimed issue (no agent_claimed_by, agent_status = unclaimed or absent)
-      const candidate = this.pickCandidate(issues, options);
+      const candidate = this.pickCandidate(issues, options, agent.capabilities);
       if (!candidate) {
         return { success: false, message: 'No unclaimed tasks available' };
       }
@@ -284,12 +290,13 @@ export class TaskCheckoutService {
     }
   }
 
-  /** Mark a task as completed. */
+  /** Mark a task as completed. Optionally close the issue, mention a PR, deregister children, and auto-checkout next. */
   async completeTask(
     agentId: string,
     taskId: string,
     summary: string,
-  ): Promise<{ success: boolean; message: string }> {
+    options?: { closeIssue?: boolean; prNumber?: number; autoCheckoutNext?: boolean },
+  ): Promise<{ success: boolean; message: string; nextTask?: TaskCheckoutResult }> {
     try {
       const agent = await this.agentStore.getAgent(agentId);
       if (!agent) {
@@ -302,24 +309,46 @@ export class TaskCheckoutService {
 
       // Update project fields to completed status and clear claim
       const issueNumber = parseInt(taskId, 10);
+      const config = this.factory.getConfig();
+      const octokit = this.factory.getOctokit();
+
       if (!Number.isNaN(issueNumber)) {
         await this.clearClaimFields(issueNumber, 'completed').catch(() => {});
 
-        // Post a completion comment on the issue
-        const config = this.factory.getConfig();
-        const octokit = this.factory.getOctokit();
+        // Build completion comment body
+        const commentLines = [
+          `## Agent Work Completed`,
+          '',
+          `**Agent:** ${agent.name} (\`${agentId}\`)`,
+          `**Summary:** ${summary}`,
+        ];
+        if (options?.prNumber) {
+          commentLines.push(`**Pull Request:** #${options.prNumber}`);
+        }
+        commentLines.push(`**Completed at:** ${new Date().toISOString()}`);
+
         await octokit.rest.issues.createComment({
           owner: config.owner,
           repo: config.repo,
           issue_number: issueNumber,
-          body: [
-            `## Agent Work Completed`,
-            '',
-            `**Agent:** ${agent.name} (\`${agentId}\`)`,
-            `**Summary:** ${summary}`,
-            `**Completed at:** ${new Date().toISOString()}`,
-          ].join('\n'),
+          body: commentLines.join('\n'),
         }).catch(() => {});
+
+        // Close the issue unless explicitly opted out
+        if (options?.closeIssue !== false) {
+          await octokit.rest.issues.update({
+            owner: config.owner,
+            repo: config.repo,
+            issue_number: issueNumber,
+            state: 'closed',
+          }).catch(() => {});
+        }
+      }
+
+      // Cascade: deregister child agents
+      const children = await this.agentStore.getChildren(agentId);
+      for (const child of children) {
+        await this.agentStore.removeAgent(child.id).catch(() => {});
       }
 
       // Update agent record
@@ -328,7 +357,24 @@ export class TaskCheckoutService {
       agent.status = 'idle';
       await this.agentStore.upsertAgent(agent);
 
-      return { success: true, message: `Task ${taskId} completed by agent ${agentId}` };
+      // Auto-checkout next task unless explicitly opted out
+      let nextTask: TaskCheckoutResult | undefined;
+      if (options?.autoCheckoutNext !== false) {
+        try {
+          const result = await this.checkoutTask(agentId);
+          if (result.success) {
+            nextTask = result;
+          }
+        } catch {
+          // Auto-checkout failure is non-fatal
+        }
+      }
+
+      return {
+        success: true,
+        message: `Task ${taskId} completed by agent ${agentId}`,
+        nextTask,
+      };
     } catch (error) {
       throw mapErrorToMCPError(error);
     }
@@ -364,6 +410,16 @@ export class TaskCheckoutService {
       }
 
       await this.agentStore.upsertAgent(agent);
+
+      // Propagate heartbeat to parent agent
+      if (agent.parentAgentId) {
+        const parent = await this.agentStore.getAgent(agent.parentAgentId);
+        if (parent) {
+          parent.lastHeartbeat = heartbeat.timestamp;
+          await this.agentStore.upsertAgent(parent);
+        }
+      }
+
       return { success: true, message: `Heartbeat processed for agent ${heartbeat.agentId}` };
     } catch (error) {
       throw mapErrorToMCPError(error);
@@ -415,11 +471,14 @@ export class TaskCheckoutService {
   // Private helpers
   // -----------------------------------------------------------------------
 
-  /** Pick the best unclaimed candidate from the issue list. */
+  /** Pick the best unclaimed candidate from the issue list, scoring by skill match. */
   private pickCandidate(
     issues: IssueWithProject[],
     options?: CheckoutOptions,
+    agentCapabilities?: string[],
   ): { issue: IssueWithProject } | null {
+    const unclaimed: Array<{ issue: IssueWithProject; score: number }> = [];
+
     for (const issue of issues) {
       // Skip issues without project items (can't track agent fields)
       if (issue.projectItems.nodes.length === 0) continue;
@@ -453,10 +512,24 @@ export class TaskCheckoutService {
       // Accept if status is absent, 'unclaimed', or empty
       if (status?.name && status.name !== 'unclaimed') continue;
 
-      return { issue };
+      // Score by capability match against issue labels
+      let score = 0;
+      if (agentCapabilities?.length) {
+        const issueLabels = new Set(issue.labels.nodes.map(l => l.name.toLowerCase()));
+        for (const cap of agentCapabilities) {
+          if (issueLabels.has(cap.toLowerCase())) score++;
+        }
+      }
+
+      unclaimed.push({ issue, score });
     }
 
-    return null;
+    if (unclaimed.length === 0) return null;
+
+    // Sort by score descending — best skill match first
+    unclaimed.sort((a, b) => b.score - a.score);
+
+    return { issue: unclaimed[0].issue };
   }
 
   /** Set agent claim fields on a project item. */
