@@ -90,18 +90,35 @@ npm test
 ## Project Structure
 
 ```
-github-project-manager-mcp/
-├── src/                    # Source code
-│   └── index.ts           # Main server implementation
-├── build/                 # Compiled files
-├── tests/                 # Test files
-├── docs/                  # Documentation
-├── package.json          # Project metadata and dependencies
-├── tsconfig.json         # TypeScript configuration
-├── README.md            # Project overview
-├── CONTRIBUTING.md      # Contribution guidelines
-└── LICENSE             # MIT license
+src/
+  domain/          — Types, schemas, interfaces (21 files)
+  services/        — Business logic (27+ service files)
+    agent/         — Agent orchestration services
+    ai/            — AI provider services
+    context/       — Context generation
+    utils/         — Shared utilities
+  infrastructure/  — External integrations (16 subdirs)
+    agent/         — Agent registry stores
+    github/        — GitHub API repositories
+    tools/         — MCP tool definitions
+      compound/    — 16 compound tool schemas + executors
+      schemas/     — Domain-specific schemas
+    cache/         — Caching layer
+    resilience/    — Circuit breaker
+    lifecycle/     — Graceful shutdown
+    logger/        — Structured logging
+  container.ts     — DI configuration (30 registrations)
+  index.ts         — MCP server entry point
+  env.ts           — Configuration + startup validation
+tests/             — Test files (4 suites, 2,422+ passing)
+docs/              — Documentation
 ```
+
+### Architecture Notes
+
+- **Dependency Injection**: Uses `tsyringe` for IoC. `container.ts` has 30 DI registrations wiring services, repositories, and infrastructure.
+- **Compound Tool API**: 16 compound tools (134 actions) replace 131 granular tools. Each compound tool has a schema definition and a `CompoundExecutor` that routes `action` values to internal granular executors.
+- **Test Structure**: Tests live in `src/__tests__/` (unit + integration) and `tests/` (E2E). Run `npm test` for unit tests, `npm run test:e2e:tools` for E2E.
 
 ## Testing
 

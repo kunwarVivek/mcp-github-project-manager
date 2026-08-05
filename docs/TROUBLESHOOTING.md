@@ -592,5 +592,5 @@ Report bugs and feature requests at:
 ## See Also
 
 - [Configuration Guide](CONFIGURATION.md) - Complete configuration reference
-- [Tool Reference](TOOLS.md) - All 119 MCP tools documented
+- [Tool Reference](TOOLS.md) - 16 compound tools (134 actions)
 - [API Reference](API.md) - Service and infrastructure APIs

@@ -90,20 +90,19 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
 | `OPENAI_API_KEY` | OpenAI API key |
 | `GOOGLE_API_KEY` | Google AI API key |
 | `PERPLEXITY_API_KEY` | Perplexity API key |
-| `AI_PROVIDER` | Preferred provider: `anthropic`, `openai`, `google` |
 
 ### Optional (Advanced)
 
 | Variable | Description |
 |----------|-------------|
 | `LOG_LEVEL` | Logging level: `debug`, `info`, `warn`, `error` |
-| `CACHE_TTL` | Cache TTL in seconds (default: 300) |
+| `LOG_FORMAT` | Log output format: `json`, `text` (default: `text`) |
+| `MCP_TOOL_GROUPS` | Comma-separated tool groups to enable: `all`, `core`, `ai`, `agents`, `events`, `system` (default: `all`). `system` group is always enabled. |
 | `MAX_CACHE_ENTRIES` | In-memory cache cap before oldest-first eviction (default: 10000) |
 | `SECRETS_DIR` | Load secrets from mounted files (Docker/k8s `/run/secrets`); precedes env vars |
 | `WEBHOOK_SECRET` | Webhook HMAC secret (signature validation fails closed) |
 | `WEBHOOK_ALLOW_UNSIGNED` | Accept unsigned webhooks when no secret is set — trusted dev only |
-| `ENABLE_WEBHOOKS` | Enable webhook server: `true`/`false` |
-| `WEBHOOK_PORT` | Webhook server port (default: 3000) |
+| `WEBHOOK_PORT` | Webhook server port (default: 3001) |
 
 ## GitHub Token Scopes
 
@@ -111,7 +110,7 @@ Required scopes for your Personal Access Token:
 
 - `repo` - Full repository access
 - `project` - Project board access
-- `read:org` - Organization read access (for org projects)
+- `write:org` - Organization write access (for org projects)
 
 ## Production Considerations
 

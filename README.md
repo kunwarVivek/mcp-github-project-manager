@@ -12,7 +12,7 @@ This server implements the [Model Context Protocol](https://modelcontextprotocol
 
 ### What Makes This Special
 
-- **16 Compound Tools (131 actions)**: Progressive-disclosure API — AI agents see 16 tools instead of 131, with `discover_tools` for runtime exploration
+- **16 Compound Tools (134 actions)**: Progressive-disclosure API — AI agents see 16 tools instead of 131, with `discover_tools` for runtime exploration
 - **AI-Powered**: Transform project ideas into comprehensive PRDs and actionable tasks using multiple AI providers
 - **Agent Orchestration**: Autonomous AI agent task assignment, heartbeat monitoring, budget enforcement, and work product tracking
 - **Complete Traceability**: Full end-to-end tracking from business requirements → features → use cases → tasks
@@ -365,7 +365,7 @@ For more examples, see the [User Guide](docs/user-guide.md) and the [examples/](
 
 ### Compound Tool API Examples
 
-The MCP server exposes 16 compound tools (131 actions). Each tool accepts an `action` parameter that routes to the underlying operation. Use `discover_tools` to explore capabilities at runtime.
+The MCP server exposes 16 compound tools (134 actions). Each tool accepts an `action` parameter that routes to the underlying operation. Use `discover_tools` to explore capabilities at runtime.
 
 #### Quick Start Workflow
 ```json
@@ -434,10 +434,10 @@ Control which compound tools are exposed to MCP clients:
 MCP_TOOL_GROUPS=all
 
 # Expose only project management tools
-MCP_TOOL_GROUPS=manage_project,manage_issues,manage_prs,manage_milestones
+MCP_TOOL_GROUPS=core
 
 # Add AI tools
-MCP_TOOL_GROUPS=manage_project,manage_issues,ai_generate,ai_analyze,ai_plan
+MCP_TOOL_GROUPS=core,ai
 ```
 
 `discover_tools` is always available regardless of this setting.
@@ -1055,7 +1055,7 @@ webhook signature check.
 - [Troubleshooting Guide](docs/TROUBLESHOOTING.md) - Common issues and solutions
 
 ### Reference
-- [Tool Reference](docs/TOOLS.md) - 16 compound tools (131 actions) documented
+- [Tool Reference](docs/TOOLS.md) - 16 compound tools (134 actions) documented
 - [Architecture](docs/architecture.md) - System design and patterns
 - [API Reference](docs/API.md) - Service and infrastructure APIs
 

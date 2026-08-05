@@ -1,14 +1,14 @@
 # MCP Tools Reference
 
-This document provides comprehensive documentation for the 16 compound MCP tools exposed by the MCP GitHub Project Manager. Each compound tool groups related actions behind a single `action` parameter, reducing tool-selection overhead for AI agents while preserving full access to all 131 underlying operations.
+This document provides comprehensive documentation for the 16 compound MCP tools exposed by the MCP GitHub Project Manager. Each compound tool groups related actions behind a single `action` parameter, reducing tool-selection overhead for AI agents while preserving full access to all 134 underlying operations.
 
 ## Overview
 
 | Metric | Value |
 |--------|-------|
 | Compound Tools | 16 |
-| Total Actions | 131 |
-| SDK Version | 1.25.3 |
+| Total Actions | 134 |
+| SDK Version | 1.29 |
 | All tools have | Behavior annotations, Output schemas |
 
 ### Design: Progressive Disclosure
@@ -28,11 +28,13 @@ All tools are annotated with behavior hints that help MCP clients understand the
 
 ### Tool Selection via `MCP_TOOL_GROUPS`
 
-The `MCP_TOOL_GROUPS` environment variable controls which compound tools are exposed to the MCP client. Set it to a comma-separated list of group names, or `all` (default) to expose everything.
+The `MCP_TOOL_GROUPS` environment variable controls which compound tools are exposed to the MCP client. Set it to a comma-separated list of group tags, or `all` (default) to expose everything.
+
+Available group tags: `core`, `ai`, `agents`, `events`, `system`
 
 ```bash
-# Expose only project management and issue tools
-MCP_TOOL_GROUPS=manage_project,manage_issues,manage_prs
+# Expose only core project management tools
+MCP_TOOL_GROUPS=core
 
 # Expose everything (default)
 MCP_TOOL_GROUPS=all
@@ -44,10 +46,10 @@ MCP_TOOL_GROUPS=all
 
 ## Compound Tools
 
-1. [manage_project](#manage_project) (22 actions)
-2. [manage_issues](#manage_issues) (14 actions)
+1. [manage_project](#manage_project) (37 actions)
+2. [manage_issues](#manage_issues) (18 actions)
 3. [manage_prs](#manage_prs) (7 actions)
-4. [manage_milestones](#manage_milestones) (6 actions)
+4. [manage_milestones](#manage_milestones) (7 actions)
 5. [manage_sprints](#manage_sprints) (8 actions)
 6. [manage_labels](#manage_labels) (2 actions)
 7. [manage_automation](#manage_automation) (7 actions)
@@ -55,10 +57,10 @@ MCP_TOOL_GROUPS=all
 9. [manage_events](#manage_events) (3 actions)
 10. [manage_status_updates](#manage_status_updates) (3 actions)
 11. [ai_generate](#ai_generate) (8 actions)
-12. [ai_analyze](#ai_analyze) (6 actions)
+12. [ai_analyze](#ai_analyze) (8 actions)
 13. [ai_plan](#ai_plan) (6 actions)
 14. [agent_work](#agent_work) (7 actions)
-15. [agent_manage](#agent_manage) (5 actions)
+15. [agent_manage](#agent_manage) (6 actions)
 16. [discover_tools](#discover_tools) (meta-tool)
 
 ---
@@ -644,16 +646,14 @@ The `system` group provides infrastructure operations:
 
 ## Granular Tools (Internal)
 
-131 granular tools exist internally for backward compatibility (e.g. `create_project`, `list_issues`, `register_agent`). These are the same operations exposed through the compound tool actions above.
-
 The compound API is the recommended interface for MCP clients:
 - **Fewer tools** — 16 instead of 131 reduces tool-selection overhead for AI agents
 - **Progressive disclosure** — `discover_tools` lets agents explore capabilities at runtime
 - **Same underlying operations** — compound tools delegate directly to the same internal executors
-- **Configurable exposure** — `MCP_TOOL_GROUPS` lets you limit which tool groups are visible
+- **Configurable exposure** — `MCP_TOOL_GROUPS` (group tags: `core`, `ai`, `agents`, `events`, `system`) lets you limit which tool groups are visible
 
 To restore granular tool exposure (not recommended), consult the `ToolRegistry` source in `src/infrastructure/tools/`.
 
 ---
 
-*MCP SDK: 1.25.3*
+*MCP SDK: 1.29*

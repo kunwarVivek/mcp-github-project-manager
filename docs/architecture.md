@@ -9,7 +9,7 @@ MCP GitHub Project Manager follows Clean Architecture principles with clear sepa
 │                         MCP Layer                                │
 │  ┌──────────────┐ ┌────────────┐ ┌──────────────┐ ┌───────────┐ │
 │  │ 16 Compound  │ │ Resources  │ │ Req Handling  │ │ Graceful  │ │
-│  │ Tools (131   │ │            │ │              │ │ Shutdown  │ │
+│  │ Tools (134   │ │            │ │              │ │ Shutdown  │ │
 │  │ actions)     │ │            │ │              │ │           │ │
 │  └──────────────┘ └────────────┘ └──────────────┘ └───────────┘ │
 ├──────────────────────────────────────────────────────────────────┤
@@ -98,7 +98,7 @@ External integrations and technical concerns. 16 subdirectories:
 | Directory | Purpose |
 |-----------|---------|
 | `github/` | GitHub REST/GraphQL API integration — repositories, `GitHubRepositoryFactory`, `RateLimitManager`, error handling |
-| `tools/` | MCP tool definitions: 16 compound tools (131 actions) exposed to MCP clients, with `CompoundExecutor` routing to internal granular executors. `ToolRegistry`, `ToolValidator`, schemas |
+| `tools/` | MCP tool definitions: 16 compound tools (134 actions) exposed to MCP clients, with `CompoundExecutor` routing to internal granular executors. `ToolRegistry`, `ToolValidator`, schemas |
 | `cache/` | In-memory caching with TTL and LRU eviction (`ResourceCache`), persistence adapter |
 | `resilience/` | Circuit breaker (`CircuitBreakerService`), retry policies, `AIResiliencePolicy` |
 | `events/` | Webhook handling (`GitHubWebhookHandler`), `EventStore` with persistence, `EventSubscriptionManager` |
@@ -206,7 +206,7 @@ independently-testable services:
 ### MCP Layer (`src/index.ts`)
 
 Model Context Protocol integration:
-- **Compound tool API** — 16 compound tools (131 actions) registered via `ToolRegistry`; each routes through `CompoundExecutor` to internal granular executors
+- **Compound tool API** — 16 compound tools (134 actions) registered via `ToolRegistry`; each routes through `CompoundExecutor` to internal granular executors
 - **Progressive disclosure** — `discover_tools` meta-tool lets agents explore available actions and schemas at runtime
 - **Capability profiles** — `MCP_TOOL_GROUPS` env var controls which compound tools are exposed (default: `all`)
 - Resource exposure
@@ -475,10 +475,10 @@ Existing execute* functions (unchanged)
 
 | Compound Tool | Actions | Domain |
 |---------------|---------|--------|
-| `manage_project` | 22 | Project CRUD, fields, views, items, templates, linking |
-| `manage_issues` | 14 | Issue CRUD, comments, drafts, search, sub-issues |
+| `manage_project` | 37 | Project CRUD, fields, views, items, templates, linking |
+| `manage_issues` | 18 | Issue CRUD, comments, drafts, search, sub-issues |
 | `manage_prs` | 7 | PR CRUD, merge, reviews |
-| `manage_milestones` | 6 | Milestone CRUD, metrics, deadlines |
+| `manage_milestones` | 7 | Milestone CRUD, metrics, deadlines |
 | `manage_sprints` | 8 | Sprint planning, metrics, velocity |
 | `manage_labels` | 2 | Label CRUD |
 | `manage_automation` | 7 | Automation rules |
@@ -486,10 +486,10 @@ Existing execute* functions (unchanged)
 | `manage_events` | 3 | Event subscription, replay |
 | `manage_status_updates` | 3 | Project status updates |
 | `ai_generate` | 8 | PRD generation, task breakdown, traceability |
-| `ai_analyze` | 6 | Issue enrichment, triage, duplicates |
+| `ai_analyze` | 8 | Issue enrichment, triage, duplicates |
 | `ai_plan` | 6 | Capacity, backlog, risk, roadmap |
 | `agent_work` | 7 | Agent registration, task lifecycle |
-| `agent_manage` | 5 | Agent admin, budgets, work products |
+| `agent_manage` | 6 | Agent admin, budgets, work products |
 | `discover_tools` | — | Runtime tool/action/schema discovery (meta-tool) |
 
 ### Capability Profiles
@@ -500,10 +500,10 @@ exposed to MCP clients. This enables tailored profiles for different use cases:
 | Profile | `MCP_TOOL_GROUPS` value | Use case |
 |---------|------------------------|----------|
 | Full (default) | `all` | All 16 tools exposed |
-| Project management | `manage_project,manage_issues,manage_prs,manage_milestones,manage_sprints,manage_labels` | CRUD-only agents |
-| AI-powered | `manage_project,manage_issues,ai_generate,ai_analyze,ai_plan` | Planning and analysis agents |
-| Agent orchestration | `agent_work,agent_manage` | Autonomous task agents |
-| Minimal | `manage_issues,manage_prs` | Simple issue/PR bots |
+| Project management | `core` | CRUD-only agents |
+| AI-powered | `core,ai` | Planning and analysis agents |
+| Agent orchestration | `agents` | Autonomous task agents |
+| Minimal | `core,events` | Simple issue/PR bots with event tracking |
 
 `discover_tools` is always available regardless of `MCP_TOOL_GROUPS` setting,
 allowing agents to introspect available capabilities at runtime.

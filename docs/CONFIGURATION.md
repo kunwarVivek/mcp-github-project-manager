@@ -116,14 +116,23 @@ At least one AI API key is required for AI-powered features (PRD generation, tas
 |----------|---------|-------------|
 | `NODE_ENV` | `development` | Environment: `development`, `test`, `production` |
 | `LOG_LEVEL` | `info` | Logging level: `debug`, `info`, `warn`, `error` |
+| `LOG_FORMAT` | `text` | Log output format: `text` (human-readable) or `json` (structured JSON to stderr) |
 
 ### Tool Exposure
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `MCP_TOOL_GROUPS` | `all` | Comma-separated list of compound tool groups to expose to MCP clients. Set to `all` to expose all 16 tools. Example: `manage_project,manage_issues,ai_generate`. `discover_tools` is always available regardless of this setting. |
+| `MCP_TOOL_GROUPS` | `all` | Comma-separated list of group tags to expose to MCP clients. Set to `all` to expose all 16 tools. Available tags: `core`, `ai`, `agents`, `events`, `system`. `discover_tools` and `system` are always available regardless of this setting. |
 
-**Available groups:** `manage_project`, `manage_issues`, `manage_prs`, `manage_milestones`, `manage_sprints`, `manage_labels`, `manage_automation`, `manage_iterations`, `manage_events`, `manage_status_updates`, `ai_generate`, `ai_analyze`, `ai_plan`, `agent_work`, `agent_manage`, `system`
+**Available groups:**
+
+| Group | Tools included |
+|-------|---------------|
+| `core` | `manage_project`, `manage_issues`, `manage_prs`, `manage_milestones`, `manage_sprints`, `manage_labels`, `manage_automation`, `manage_iterations`, `manage_status_updates` |
+| `ai` | `ai_generate`, `ai_analyze`, `ai_plan` |
+| `agents` | `agent_work`, `agent_manage` |
+| `events` | `manage_events` |
+| `system` | `system`, `discover_tools` (always enabled) |
 
 **Example profiles:**
 ```bash
@@ -131,13 +140,16 @@ At least one AI API key is required for AI-powered features (PRD generation, tas
 MCP_TOOL_GROUPS=all
 
 # Project management only
-MCP_TOOL_GROUPS=manage_project,manage_issues,manage_prs,manage_milestones,manage_sprints,manage_labels
+MCP_TOOL_GROUPS=core
 
 # AI-powered planning
-MCP_TOOL_GROUPS=manage_project,manage_issues,ai_generate,ai_analyze,ai_plan
+MCP_TOOL_GROUPS=core,ai
 
 # Autonomous agents only
-MCP_TOOL_GROUPS=agent_work,agent_manage
+MCP_TOOL_GROUPS=agents
+
+# Everything except agents
+MCP_TOOL_GROUPS=core,ai,events
 ```
 
 ### Secrets
@@ -584,7 +596,7 @@ AI_BATCH_SIZE=10
 # ===========================
 NODE_ENV=development
 LOG_LEVEL=info
-
+LOG_FORMAT=text
 # ===========================
 # Tool Exposure
 # ===========================
@@ -597,6 +609,6 @@ MCP_TOOL_GROUPS=all
 ## See Also
 
 - [Troubleshooting Guide](TROUBLESHOOTING.md) - Common issues and solutions
-- [Tool Reference](TOOLS.md) - 16 compound tools (131 actions) documented
+- [Tool Reference](TOOLS.md) - 16 compound tools (134 actions) documented
 - [API Reference](API.md) - Service and infrastructure APIs
 - [User Guide](user-guide.md) - Getting started guide

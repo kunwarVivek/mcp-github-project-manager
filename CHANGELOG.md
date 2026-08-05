@@ -13,7 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `discover_tools` meta-tool for runtime exploration of available actions and parameter schemas
   - `MCP_TOOL_GROUPS` env var for capability profiles — control which tool groups are exposed
   - `CompoundExecutor` routes actions to existing internal granular executors (unchanged)
-  - Compound tools: `manage_project` (22 actions), `manage_issues` (14), `manage_prs` (7), `manage_milestones` (6), `manage_sprints` (8), `manage_labels` (2), `manage_automation` (7), `manage_iterations` (5), `manage_events` (3), `manage_status_updates` (3), `ai_generate` (8), `ai_analyze` (6), `ai_plan` (6), `agent_work` (7), `agent_manage` (5), `system` (2)
+  - Compound tools: `manage_project` (37 actions), `manage_issues` (18), `manage_prs` (7), `manage_milestones` (7), `manage_sprints` (8), `manage_labels` (2), `manage_automation` (7), `manage_iterations` (5), `manage_events` (3), `manage_status_updates` (3), `ai_generate` (8), `ai_analyze` (8), `ai_plan` (6), `agent_work` (7), `agent_manage` (6), `system` (2)
 - **Agent Orchestration Layer** — 13 agent operations across 2 compound tools (`agent_work`, `agent_manage`)
   - Agent registry: register, list, deregister with subagent hierarchy (`parentAgentId`, cascade delete)
   - Task lifecycle: checkout_task (4 strategies: priority, age, skills, deadline), release_task, complete_task
@@ -30,7 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - GitHub-native data model: 5 custom project fields (`agent_claimed_by`, `agent_claimed_at`, `agent_status`, `agent_work_branch`, `agent_pr_number`)
 
 ### Changed
-- **Tool API migrated from 131 granular tools to 16 compound tools** (131 actions) — breaking change for MCP clients referencing individual tool names
+- **Tool API migrated from 131 granular tools to 16 compound tools** (134 actions) — breaking change for MCP clients referencing individual tool names
 - Granular tools retained internally as dispatch targets but no longer exposed to MCP clients
 - Updated all documentation (README, architecture, TOOLS.md, CONFIGURATION.md) to reflect compound tool API
 

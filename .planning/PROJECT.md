@@ -52,9 +52,9 @@ A comprehensive Model Context Protocol (MCP) server that provides AI-powered Git
 - [x] Implement proper error codes per MCP spec — MCP-13–15
 
 **Tech Debt Resolution:**
-- [x] Break up ProjectManagementService (god class → 23+ extracted services) — DEBT-01–07
+- [x] Break up ProjectManagementService (god class → 27+ extracted services, PMS reduced to 365-line facade) — DEBT-01–07
 - [x] Fix type assertions with proper interfaces — DEBT-08–13
-- [x] Add missing test coverage (2407 tests passing) — DEBT-14–20
+- [x] Add missing test coverage (2,422 tests passing) — DEBT-14–20
 - [x] Implement circuit breakers for AI services — DEBT-21–25
 - [x] Add health check endpoint
 - [x] Add request tracing/correlation IDs
@@ -68,7 +68,7 @@ A comprehensive Model Context Protocol (MCP) server that provides AI-powered Git
 - [x] Improve requirements traceability depth — AI-19–20
 
 **Production Readiness:**
-- [x] All tests passing (2407 passing, 0 failures, 0 skipped) — PROD-01–04
+- [x] All tests passing (2,422 passing, 0 failures, 20 skipped) — PROD-01–04
 - [x] Comprehensive documentation — PROD-05–08
 - [x] npm package publication — PROD-09–10
 - [x] Webhook reliability improvements — PROD-11–12
@@ -84,8 +84,8 @@ A comprehensive Model Context Protocol (MCP) server that provides AI-powered Git
 ## Context
 
 **Codebase State (August 2026):**
-- 23+ TypeScript services, 118 MCP tools registered
-- Test suite: 2407 passing, 0 failures, 0 skipped
+- 27+ TypeScript services, 16 compound tools (134 actions) exposed via MCP, 131 granular internal tools
+- Test suite: 2,422 passing, 0 failures, 20 skipped
 - Layered architecture with MCP server → Services → GitHub Repositories
 - Uses Vercel AI SDK v5 for multi-provider AI access (Anthropic, OpenAI, Google, Perplexity)
 - Codebase mapping available at `.planning/codebase/`

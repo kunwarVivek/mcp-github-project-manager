@@ -219,15 +219,32 @@ if ('degraded' in result) {
 
 ### ProjectManagementService
 
-Central facade for all project management operations. Delegates to specialized services.
+Thin facade (365 lines) for all project management operations. Delegates to 14 injected specialized services.
 
 **Location:** `src/services/ProjectManagementService.ts`
 
-#### Constructor
+#### Constructor (Facade Pattern)
 
 ```typescript
-constructor(factory: GitHubRepositoryFactory)
+constructor(
+  factory: GitHubRepositoryFactory,
+  issueService: IssueService,
+  pullRequestService: PullRequestService,
+  milestoneService: MilestoneService,
+  sprintService: SprintPlanningService,
+  subIssueService: SubIssueService,
+  projectStatusService: ProjectStatusService,
+  templateService: ProjectTemplateService,
+  linkingService: ProjectLinkingService,
+  automationService: ProjectAutomationService,
+  fieldValueService: FieldValueService,
+  labelService: LabelService,
+  iterationService: IterationService,
+  searchService: SearchService,
+)
 ```
+
+All methods delegate to the appropriate injected service. The PMS retains no inline business logic.
 
 #### Key Methods
 
@@ -279,7 +296,67 @@ Create a new sprint.
 async createSprint(params: CreateSprintParams): Promise<Sprint>
 ```
 
-**Note:** See `src/services/ProjectManagementService.ts` for the full list of 34+ methods.
+**Note:** See `src/services/ProjectManagementService.ts` for the full list of delegated methods.
+
+---
+
+### Extracted Domain Services
+
+These services were extracted from ProjectManagementService and are injected via DI:
+
+#### PullRequestService
+
+**Location:** `src/services/PullRequestService.ts`
+
+Manages pull request operations: create, list, get, merge, create review, list reviews, get diff.
+
+#### FieldValueService
+
+**Location:** `src/services/FieldValueService.ts`
+
+Manages project field values: set field value, get field value, clear field value, list project fields, create/update project fields.
+
+#### LabelService
+
+**Location:** `src/services/LabelService.ts`
+
+Manages repository labels: create label, list labels.
+
+#### IterationService
+
+**Location:** `src/services/IterationService.ts`
+
+Manages project iterations: configure iteration field, list iterations, get current iteration, assign item to iteration, date-based assignment.
+
+---
+
+### Agent Services
+
+Services supporting autonomous agent workflows:
+
+#### TaskCheckoutService
+
+**Location:** `src/services/agents/TaskCheckoutService.ts`
+
+Manages agent task checkout/checkin lifecycle: checkout task, checkin task, get checkout status, list active checkouts.
+
+#### AgentContextService
+
+**Location:** `src/services/agents/AgentContextService.ts`
+
+Generates task context for agents: get task context, get related context, get dependency context.
+
+#### WorkProductService
+
+**Location:** `src/services/agents/WorkProductService.ts`
+
+Manages agent work products: submit work product, list work products, get work product.
+
+#### AgentBudgetService
+
+**Location:** `src/services/agents/AgentBudgetService.ts`
+
+Tracks agent resource budgets: get budget, update budget, check budget, list budgets, reset budget.
 
 ---
 
@@ -890,5 +967,5 @@ AI_FALLBACK_MODEL=gpt-4o
 
 ---
 
-*Generated: 2026-01-31*
-*MCP GitHub Project Manager v1.0*
+*Generated: 2026-08-05*
+*MCP GitHub Project Manager v1.1.0*

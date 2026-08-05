@@ -5,7 +5,7 @@ This document provides an overview of the test suite, how to run tests, and docu
 ## Test Suite Overview
 
 The test suite contains:
-- **1474+ passing tests** across unit, integration, and E2E test categories
+- **2,422 passing tests** across unit, integration, and E2E test categories (4 suites)
 - **20 skipped tests** (documented with justifications below)
 - **0 failing tests** (required for production release)
 
@@ -112,9 +112,20 @@ src/__tests__/
 │   └── GitHubProjectManager.test.ts     # [CONDITIONAL] Needs GITHUB_TOKEN
 ├── unit/                          # Unit tests
 │   ├── application/               # Application layer tests
+│   ├── context/                   # Context generator tests
+│   │   ├── ContextualReferenceGenerator.test.ts
+│   │   └── DependencyContextGenerator.test.ts
 │   ├── domain/                    # Domain model tests
 │   ├── infrastructure/            # Infrastructure tests
-│   └── services/                  # Service tests
+│   ├── services/                  # Service tests (extracted services)
+│   │   ├── IssueService.test.ts
+│   │   ├── PullRequestService.test.ts
+│   │   ├── FieldValueService.test.ts
+│   │   ├── LabelService.test.ts
+│   │   ├── IterationService.test.ts
+│   │   └── ...
+│   └── validation/                # Validator tests
+│       └── ContextQualityValidator.test.ts
 └── test-utils/                    # Test utilities and mocks
 ```
 
@@ -180,4 +191,4 @@ Before each production release, verify:
 3. **Type check passes**: `npm run type-check` (if available) or build includes type checking
 4. **Skipped tests documented**: All skipped tests have documented justification (this file)
 
-Current status: **Ready for release** (1474 passing, 0 failed, 20 skipped with justification)
+Current status: **Ready for release** (2,422 passing, 0 failed, 20 skipped with justification)
