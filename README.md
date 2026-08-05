@@ -10,13 +10,15 @@ A comprehensive Model Context Protocol (MCP) server that provides advanced GitHu
 
 This server implements the [Model Context Protocol](https://modelcontextprotocol.io) to provide comprehensive GitHub project management with advanced AI capabilities. Beyond traditional project management, it offers AI-powered task generation, requirements traceability, and intelligent project planning through GitHub's GraphQL API while maintaining state and handling errors according to MCP specifications.
 
-### 🚀 What Makes This Special
+### What Makes This Special
 
+- **16 Compound Tools (131 actions)**: Progressive-disclosure API — AI agents see 16 tools instead of 131, with `discover_tools` for runtime exploration
 - **AI-Powered**: Transform project ideas into comprehensive PRDs and actionable tasks using multiple AI providers
 - **Agent Orchestration**: Autonomous AI agent task assignment, heartbeat monitoring, budget enforcement, and work product tracking
 - **Complete Traceability**: Full end-to-end tracking from business requirements → features → use cases → tasks
 - **Intelligent Analysis**: AI-powered complexity analysis, effort estimation, and task recommendations
 - **Professional Standards**: IEEE 830 compliant requirements documentation with enterprise-grade change management
+
 
 ## Table of Contents
 
@@ -126,7 +128,8 @@ docker run -it \
 - **Progress Tracking**: Comprehensive metrics and progress reporting
 - **Event System**: Track and replay project events
 
-### 🤖 Agent Orchestration (131 tools)
+### Agent Orchestration (16 compound tools)
+- **Compound Tool API**: 16 tools with `action` routing replace 131 individual tools — simpler for AI agents
 - **Agent Registry**: Register, list, and deregister autonomous AI agents
 - **Task Checkout**: Claim tasks with configurable selection strategies (priority, age, skills, deadline)
 - **Heartbeat Monitoring**: Periodic liveness and progress reporting with stale-agent detection
@@ -134,6 +137,7 @@ docker run -it \
 - **Budget Enforcement**: Per-agent token budgets with warning thresholds and hard stops
 - **Activity Dashboard**: Real-time view of all agent statuses, tasks, and budget consumption
 - **Subagent Hierarchy**: Parent-child agent relationships with cascade deregistration
+- **Runtime Discovery**: `discover_tools` meta-tool for exploring available actions and schemas
 
 ## Installation
 
@@ -349,148 +353,99 @@ const client = new McpClient({
   }
 });
 
-// Call MCP tools
-const result = await client.callTool("create_project", {
+// Call MCP tools (compound API)
+const result = await client.callTool("manage_project", {
+  action: "create",
   title: "My Project",
-  description: "A new GitHub project"
+  owner: "myorg"
 });
 ```
 
 For more examples, see the [User Guide](docs/user-guide.md) and the [examples/](examples/) directory.
 
-### AI Tools Usage Examples
+### Compound Tool API Examples
 
-#### Complete Project Workflow
-```bash
-# 1. Generate PRD from project idea
-generate_prd({
-  "projectIdea": "AI-powered task management system with real-time collaboration",
-  "projectName": "TaskAI Pro",
-  "author": "product-team",
-  "complexity": "high",
-  "timeline": "6 months",
-  "includeResearch": true
-})
+The MCP server exposes 16 compound tools (131 actions). Each tool accepts an `action` parameter that routes to the underlying operation. Use `discover_tools` to explore capabilities at runtime.
 
-# 2. Parse PRD and generate tasks with traceability
-parse_prd({
-  "prdContent": "<generated PRD content>",
-  "maxTasks": 30,
-  "createTraceabilityMatrix": true,
-  "includeUseCases": true,
-  "projectId": "task-ai-pro"
-})
+#### Quick Start Workflow
+```json
+// 1. Create a project
+{"tool": "manage_project", "arguments": {"action": "create", "title": "My Project", "owner": "myorg"}}
 
-# 3. Get next task recommendations
-get_next_task({
-  "sprintCapacity": 40,
-  "teamSkills": ["react", "node.js", "typescript"],
-  "maxComplexity": 7,
-  "includeAnalysis": true
-})
+// 2. Create an issue
+{"tool": "manage_issues", "arguments": {"action": "create", "title": "First Issue", "body": "Description here"}}
 
-# 4. Analyze complex tasks
-analyze_task_complexity({
-  "taskTitle": "Implement real-time collaboration",
-  "taskDescription": "Build WebSocket-based real-time collaboration with conflict resolution",
-  "teamExperience": "mixed",
-  "includeBreakdown": true,
-  "includeRisks": true
-})
+// 3. Register an AI agent
+{"tool": "agent_work", "arguments": {"action": "register", "name": "claude-eng-1", "role": "engineer"}}
 
-# 5. Break down complex tasks
-expand_task({
-  "taskTitle": "Build analytics dashboard",
-  "taskDescription": "Create comprehensive analytics dashboard with AI insights",
-  "currentComplexity": 8,
-  "targetComplexity": 3,
-  "includeEstimates": true,
-  "includeDependencies": true
-})
+// 4. Agent checks out a task
+{"tool": "agent_work", "arguments": {"action": "checkout_task", "agentId": "agent-abc123", "strategy": "highest_priority"}}
+
+// 5. Discover available tools at runtime
+{"tool": "discover_tools", "arguments": {}}
+{"tool": "discover_tools", "arguments": {"group": "manage_issues", "action": "create", "includeSchemas": true}}
+```
+
+#### AI-Powered Project Workflow
+```json
+// 1. Generate PRD from project idea
+{"tool": "ai_generate", "arguments": {"action": "generate_prd", "projectIdea": "AI-powered task management with real-time collaboration", "projectName": "TaskAI Pro", "complexity": "high"}}
+
+// 2. Parse PRD into tasks with traceability
+{"tool": "ai_generate", "arguments": {"action": "parse_prd", "prdContent": "<generated PRD>", "maxTasks": 30, "createTraceabilityMatrix": true}}
+
+// 3. Get next task recommendations
+{"tool": "ai_generate", "arguments": {"action": "get_next_task", "sprintCapacity": 40, "teamSkills": ["react", "node.js", "typescript"]}}
+
+// 4. Analyze task complexity
+{"tool": "ai_generate", "arguments": {"action": "analyze_complexity", "taskTitle": "Implement real-time collaboration", "includeRisks": true}}
+
+// 5. Break down complex tasks
+{"tool": "ai_generate", "arguments": {"action": "expand_task", "taskTitle": "Build analytics dashboard", "currentComplexity": 8, "targetComplexity": 3}}
 ```
 
 #### Feature Addition Workflow
-```bash
-# Add new feature with complete lifecycle
-add_feature({
-  "featureIdea": "Advanced Analytics Dashboard",
-  "description": "Real-time analytics with custom charts and AI-powered insights",
-  "requestedBy": "product-manager",
-  "businessJustification": "Increase user engagement and provide actionable insights",
-  "targetUsers": ["project-managers", "team-leads", "executives"],
-  "autoApprove": true,
-  "expandToTasks": true,
-  "createLifecycle": true
-})
+```json
+// Add new feature with complete lifecycle
+{"tool": "ai_generate", "arguments": {"action": "add_feature", "featureIdea": "Advanced Analytics Dashboard", "description": "Real-time analytics with AI insights", "expandToTasks": true}}
+// Automatically creates: business requirements, use cases, tasks with traceability, lifecycle tracking
 
-# This automatically creates:
-# ✅ Business requirement analysis
-# ✅ Use cases with actor-goal-scenario structure
-# ✅ Tasks with complete traceability links
-# ✅ Lifecycle tracking for all tasks
+// Create traceability matrix
+{"tool": "ai_generate", "arguments": {"action": "create_traceability_matrix", "projectId": "task-ai-pro", "validateCompleteness": true}}
 ```
 
-#### Requirements Traceability
-```bash
-# Create comprehensive traceability matrix
-create_traceability_matrix({
-  "projectId": "task-ai-pro",
-  "prdContent": "<PRD content>",
-  "features": [...],
-  "tasks": [...],
-  "validateCompleteness": true
-})
+#### Tool Discovery
+```json
+// List all 16 compound tools
+{"tool": "discover_tools", "arguments": {}}
 
-# Output includes:
-# ✅ Business Requirements → Features → Use Cases → Tasks
-# ✅ Bidirectional traceability links
-# ✅ Coverage analysis with gap identification
-# ✅ Orphaned task detection
-# ✅ Unimplemented requirement tracking
+// Explore a specific tool's actions
+{"tool": "discover_tools", "arguments": {"group": "ai_generate"}}
+
+// Get full schema for a specific action
+{"tool": "discover_tools", "arguments": {"group": "ai_generate", "action": "generate_prd", "includeSchemas": true}}
 ```
 
-#### Enhanced Task Context Generation
+#### MCP_TOOL_GROUPS Configuration
+
+Control which compound tools are exposed to MCP clients:
 ```bash
-# Default: Traceability-based context (fast, no AI required)
-parse_prd({
-  "prdContent": "<PRD content>",
-  "enhancedGeneration": true,
-  "contextLevel": "standard"
-})
+# Default: all tools exposed
+MCP_TOOL_GROUPS=all
 
-# Enhanced: AI-powered comprehensive context
-parse_prd({
-  "prdContent": "<PRD content>",
-  "enhancedGeneration": true,
-  "contextLevel": "full",
-  "includeBusinessContext": true,
-  "includeTechnicalContext": true,
-  "includeImplementationGuidance": true
-})
+# Expose only project management tools
+MCP_TOOL_GROUPS=manage_project,manage_issues,manage_prs,manage_milestones
 
-# Performance optimized: Minimal context for speed
-parse_prd({
-  "prdContent": "<PRD content>",
-  "enhancedGeneration": true,
-  "contextLevel": "minimal",
-  "includeBusinessContext": false,
-  "includeTechnicalContext": false,
-  "includeImplementationGuidance": false
-})
+# Add AI tools
+MCP_TOOL_GROUPS=manage_project,manage_issues,ai_generate,ai_analyze,ai_plan
 ```
+
+`discover_tools` is always available regardless of this setting.
 
 **Context Generation Levels:**
 - **Minimal**: Basic traceability context only (fastest)
 - **Standard**: Traceability + basic business context (default)
 - **Full**: Complete AI-enhanced context with implementation guidance
-
-**Generated Task Context Includes:**
-- **Business Context**: Why the task matters, user impact, success metrics
-- **Feature Context**: Parent feature information, user stories, business value
-- **Technical Context**: Constraints, architecture decisions, integration points
-- **Implementation Guidance**: Step-by-step recommendations, best practices, pitfalls
-- **Enhanced Acceptance Criteria**: Detailed verification methods and priorities
-- **Contextual References**: Links to relevant PRD sections and technical specs
 
 ### 🧪 Testing Enhanced Context Generation
 
@@ -836,7 +791,7 @@ The agent orchestration layer enables autonomous AI agents (Claude Code, Codex, 
 
 ### How It Works
 
-Agents interact with the orchestration layer through 13 MCP tools that manage the full task lifecycle:
+Agents interact with the orchestration layer through two compound tools — `agent_work` (task lifecycle) and `agent_manage` (administration):
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
@@ -859,103 +814,66 @@ Agents interact with the orchestration layer through 13 MCP tools that manage th
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
-### The 13 Agent Tools
+### Agent Compound Tools
 
-| Tool | Purpose |
-|------|---------|
-| `register_agent` | Register an AI agent with role, runtime, and capabilities |
-| `list_agents` | List registered agents, filter by role or status |
-| `deregister_agent` | Remove an agent from the registry |
-| `checkout_task` | Claim the next available task using a selection strategy |
-| `release_task` | Return a task to the pool (blocked, wrong skills, etc.) |
-| `complete_task` | Mark a task as completed with a summary |
-| `get_task_context` | Get enriched context for a task (issue, milestone, related issues, acceptance criteria) |
-| `agent_heartbeat` | Report liveness, progress %, branch, and blockers |
-| `submit_work_product` | Submit code changes with branch, PR, files, and test results |
-| `get_agent_activity` | Dashboard of all agents: tasks, progress, heartbeat, budget |
-| `get_budget_status` | Check an agent's token budget (used, remaining, warnings) |
-| `set_agent_budget` | Configure token budget, warning threshold, hard stop, reset period |
-| `check_work_status` | Check the review/merge status of submitted work |
+| Tool | Action | Purpose |
+|------|--------|---------|
+| `agent_work` | `register` | Register an AI agent with role, runtime, and capabilities |
+| `agent_work` | `checkout_task` | Claim the next available task using a selection strategy |
+| `agent_work` | `release_task` | Return a task to the pool (blocked, wrong skills, etc.) |
+| `agent_work` | `complete_task` | Mark a task as completed with a summary |
+| `agent_work` | `heartbeat` | Report liveness, progress %, branch, and blockers |
+| `agent_work` | `check_work_status` | Check the review/merge status of submitted work |
+| `agent_work` | `get_task_context` | Get enriched context for a task |
+| `agent_manage` | `list` | List registered agents, filter by role or status |
+| `agent_manage` | `deregister` | Remove an agent from the registry |
+| `agent_manage` | `get_activity` | Dashboard of all agents: tasks, progress, heartbeat, budget |
+| `agent_manage` | `submit_work_product` | Submit code changes with branch, PR, files, and test results |
+| `agent_manage` | `get_budget` | Check an agent's token budget (used, remaining, warnings) |
+| `agent_manage` | `set_budget` | Configure token budget, warning threshold, hard stop, reset period |
 
 ### Quick Start: Autonomous Agent Loop
 
-```typescript
+```json
 // 1. Register the agent
-register_agent({
-  name: "claude-eng-1",
-  role: "engineer",
-  runtime: "claude-code",
-  capabilities: ["typescript", "react", "testing"]
-})
+{"tool": "agent_work", "arguments": {"action": "register", "name": "claude-eng-1", "role": "engineer", "runtime": "claude-code", "capabilities": ["typescript", "react", "testing"]}}
 // → { id: "agent-abc123", status: "idle", ... }
 
 // 2. Check out a task
-checkout_task({
-  agentId: "agent-abc123",
-  strategy: "highest_priority"
-})
+{"tool": "agent_work", "arguments": {"action": "checkout_task", "agentId": "agent-abc123", "strategy": "highest_priority"}}
 // → { success: true, issueNumber: 42, issueTitle: "Add login form", branchSuggestion: "feat/42-add-login-form" }
 
 // 3. Get full context
-get_task_context({ issueNumber: 42 })
+{"tool": "agent_work", "arguments": {"action": "get_task_context", "issueNumber": 42}}
 // → { issue: {...}, milestone: {...}, acceptanceCriteria: [...], codingStandards: "..." }
 
 // 4. Work on the task, sending heartbeats periodically
-agent_heartbeat({
-  agentId: "agent-abc123",
-  status: "working",
-  taskId: "issue-42",
-  progress: 60,
-  progressSummary: "Tests passing, working on edge cases",
-  currentBranch: "feat/42-add-login-form"
-})
+{"tool": "agent_work", "arguments": {"action": "heartbeat", "agentId": "agent-abc123", "status": "working", "taskId": "issue-42", "progress": 60, "progressSummary": "Tests passing, working on edge cases", "currentBranch": "feat/42-add-login-form"}}
 
 // 5. Submit the work product
-submit_work_product({
-  agentId: "agent-abc123",
-  taskId: "issue-42",
-  issueNumber: 42,
-  branch: "feat/42-add-login-form",
-  prNumber: 99,
-  commitShas: ["abc1234"],
-  filesChanged: ["src/Login.tsx", "src/Login.test.tsx"],
-  testsPassed: 12,
-  testsFailed: 0,
-  testsTotal: 12,
-  summary: "Added login form with email/password validation"
-})
+{"tool": "agent_manage", "arguments": {"action": "submit_work_product", "agentId": "agent-abc123", "taskId": "issue-42", "issueNumber": 42, "branch": "feat/42-add-login-form", "prNumber": 99, "summary": "Added login form with email/password validation"}}
 
 // 6. Complete the task
-complete_task({
-  agentId: "agent-abc123",
-  taskId: "issue-42",
-  summary: "Implemented login form with validation and tests"
-})
+{"tool": "agent_work", "arguments": {"action": "complete_task", "agentId": "agent-abc123", "taskId": "issue-42", "summary": "Implemented login form with validation and tests"}}
 
 // 7. Repeat: checkout next task
-checkout_task({ agentId: "agent-abc123", strategy: "highest_priority" })
+{"tool": "agent_work", "arguments": {"action": "checkout_task", "agentId": "agent-abc123", "strategy": "highest_priority"}}
 ```
 
 ### Subagent Hierarchy
 
 Agents can register child agents using `parentAgentId`. This enables multi-agent architectures:
 
-```typescript
+```json
 // Parent agent registers itself
-register_agent({ name: "lead-agent", role: "pm", runtime: "claude-code" })
+{"tool": "agent_work", "arguments": {"action": "register", "name": "lead-agent", "role": "pm", "runtime": "claude-code"}}
 // → { id: "agent-lead" }
 
 // Parent spawns a sub-agent
-register_agent({
-  name: "worker-1",
-  role: "engineer",
-  runtime: "claude-code",
-  parentAgentId: "agent-lead",
-  capabilities: ["typescript", "testing"]
-})
+{"tool": "agent_work", "arguments": {"action": "register", "name": "worker-1", "role": "engineer", "runtime": "claude-code", "parentAgentId": "agent-lead", "capabilities": ["typescript", "testing"]}}
 
 // Deregistering the parent cascades to all children
-deregister_agent({ agentId: "agent-lead" })
+{"tool": "agent_manage", "arguments": {"action": "deregister", "agentId": "agent-lead"}}
 // → Removes lead-agent and worker-1
 ```
 
@@ -963,18 +881,12 @@ deregister_agent({ agentId: "agent-lead" })
 
 Token budgets prevent runaway AI costs:
 
-```typescript
+```json
 // Set a daily budget with 80% warning
-set_agent_budget({
-  agentId: "agent-abc123",
-  totalTokens: 500000,
-  warningThreshold: 0.8,
-  hardStop: true,
-  resetPeriod: "daily"
-})
+{"tool": "agent_manage", "arguments": {"action": "set_budget", "agentId": "agent-abc123", "totalTokens": 500000, "warningThreshold": 0.8, "hardStop": true, "resetPeriod": "daily"}}
 
 // Check budget status before expensive operations
-get_budget_status({ agentId: "agent-abc123" })
+{"tool": "agent_manage", "arguments": {"action": "get_budget", "agentId": "agent-abc123"}}
 // → { usedTokens: 350000, remainingTokens: 150000, usagePercent: 70, isWarning: false, isExhausted: false }
 ```
 
@@ -1143,7 +1055,7 @@ webhook signature check.
 - [Troubleshooting Guide](docs/TROUBLESHOOTING.md) - Common issues and solutions
 
 ### Reference
-- [Tool Reference](docs/TOOLS.md) - All 131 MCP tools documented
+- [Tool Reference](docs/TOOLS.md) - 16 compound tools (131 actions) documented
 - [Architecture](docs/architecture.md) - System design and patterns
 - [API Reference](docs/API.md) - Service and infrastructure APIs
 

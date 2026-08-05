@@ -24,3 +24,6 @@ export { closeProjectTool, reopenProjectTool, convertDraftIssueTool, executeClos
 export { updateItemPositionTool, searchIssuesAdvancedTool, filterProjectItemsTool, executeUpdateItemPosition, executeSearchIssuesAdvanced, executeFilterProjectItems } from './project-advanced-tools';
 
 export * from './agent-orchestration-tools';
+
+// Compound tool schemas (16 aggregated tools for MCP exposure)
+export * from './compound/compound-schemas';

@@ -117,6 +117,29 @@ At least one AI API key is required for AI-powered features (PRD generation, tas
 | `NODE_ENV` | `development` | Environment: `development`, `test`, `production` |
 | `LOG_LEVEL` | `info` | Logging level: `debug`, `info`, `warn`, `error` |
 
+### Tool Exposure
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `MCP_TOOL_GROUPS` | `all` | Comma-separated list of compound tool groups to expose to MCP clients. Set to `all` to expose all 16 tools. Example: `manage_project,manage_issues,ai_generate`. `discover_tools` is always available regardless of this setting. |
+
+**Available groups:** `manage_project`, `manage_issues`, `manage_prs`, `manage_milestones`, `manage_sprints`, `manage_labels`, `manage_automation`, `manage_iterations`, `manage_events`, `manage_status_updates`, `ai_generate`, `ai_analyze`, `ai_plan`, `agent_work`, `agent_manage`, `system`
+
+**Example profiles:**
+```bash
+# Full access (default)
+MCP_TOOL_GROUPS=all
+
+# Project management only
+MCP_TOOL_GROUPS=manage_project,manage_issues,manage_prs,manage_milestones,manage_sprints,manage_labels
+
+# AI-powered planning
+MCP_TOOL_GROUPS=manage_project,manage_issues,ai_generate,ai_analyze,ai_plan
+
+# Autonomous agents only
+MCP_TOOL_GROUPS=agent_work,agent_manage
+```
+
 ### Secrets
 
 Any config/secret can be supplied via a mounted file instead of an environment
@@ -561,6 +584,12 @@ AI_BATCH_SIZE=10
 # ===========================
 NODE_ENV=development
 LOG_LEVEL=info
+
+# ===========================
+# Tool Exposure
+# ===========================
+# Comma-separated list of compound tool groups to expose (default: all)
+MCP_TOOL_GROUPS=all
 ```
 
 ---
@@ -568,6 +597,6 @@ LOG_LEVEL=info
 ## See Also
 
 - [Troubleshooting Guide](TROUBLESHOOTING.md) - Common issues and solutions
-- [Tool Reference](TOOLS.md) - All 131 MCP tools documented
+- [Tool Reference](TOOLS.md) - 16 compound tools (131 actions) documented
 - [API Reference](API.md) - Service and infrastructure APIs
 - [User Guide](user-guide.md) - Getting started guide

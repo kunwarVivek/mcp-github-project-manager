@@ -8,8 +8,9 @@ MCP GitHub Project Manager follows Clean Architecture principles with clear sepa
 ┌──────────────────────────────────────────────────────────────────┐
 │                         MCP Layer                                │
 │  ┌──────────────┐ ┌────────────┐ ┌──────────────┐ ┌───────────┐ │
-│  │ Tool Defs    │ │ Resources  │ │ Req Handling  │ │ Graceful  │ │
-│  │ (131 tools)  │ │            │ │              │ │ Shutdown  │ │
+│  │ 16 Compound  │ │ Resources  │ │ Req Handling  │ │ Graceful  │ │
+│  │ Tools (131   │ │            │ │              │ │ Shutdown  │ │
+│  │ actions)     │ │            │ │              │ │           │ │
 │  └──────────────┘ └────────────┘ └──────────────┘ └───────────┘ │
 ├──────────────────────────────────────────────────────────────────┤
 │                       Service Layer                              │
@@ -97,7 +98,7 @@ External integrations and technical concerns. 16 subdirectories:
 | Directory | Purpose |
 |-----------|---------|
 | `github/` | GitHub REST/GraphQL API integration — repositories, `GitHubRepositoryFactory`, `RateLimitManager`, error handling |
-| `tools/` | MCP tool definitions (131 tools — 132 registrations, 1 intentional overwrite), `ToolRegistry`, `ToolValidator`, schemas |
+| `tools/` | MCP tool definitions: 16 compound tools (131 actions) exposed to MCP clients, with `CompoundExecutor` routing to internal granular executors. `ToolRegistry`, `ToolValidator`, schemas |
 | `cache/` | In-memory caching with TTL and LRU eviction (`ResourceCache`), persistence adapter |
 | `resilience/` | Circuit breaker (`CircuitBreakerService`), retry policies, `AIResiliencePolicy` |
 | `events/` | Webhook handling (`GitHubWebhookHandler`), `EventStore` with persistence, `EventSubscriptionManager` |
@@ -205,7 +206,9 @@ independently-testable services:
 ### MCP Layer (`src/index.ts`)
 
 Model Context Protocol integration:
-- Tool registration and execution (131 tools via `ToolRegistry`)
+- **Compound tool API** — 16 compound tools (131 actions) registered via `ToolRegistry`; each routes through `CompoundExecutor` to internal granular executors
+- **Progressive disclosure** — `discover_tools` meta-tool lets agents explore available actions and schemas at runtime
+- **Capability profiles** — `MCP_TOOL_GROUPS` env var controls which compound tools are exposed (default: `all`)
 - Resource exposure
 - Request/response handling
 - Error formatting via `MCPErrorHandler`
@@ -298,11 +301,18 @@ Log level is controlled by `LOG_LEVEL` (`debug`, `info`, `warn`, `error`).
 ## Data Flow
 
 ```
-MCP Client Request
+MCP Client Request (e.g. manage_issues, action: "create")
        │
        ▼
+┌─────────────────────┐
+│  Compound Tool      │  ← Validates action + input with Zod
+│  (CompoundExecutor)  │
+└────────┬────────────┘
+         │  routes by action
+         ▼
 ┌─────────────────┐
-│  Tool Handler   │  ← Validates input with Zod
+│  Granular        │  ← Internal executor (e.g. executeCreateIssue)
+│  Executor        │
 └────────┬────────┘
          │
          ▼
@@ -442,6 +452,62 @@ providers; Vault/AWS SM are an extension point).
 See [CONFIGURATION.md](CONFIGURATION.md) for full details.
 
 
+## Compound Tool Architecture
+
+The MCP server uses progressive disclosure to reduce tool-selection overhead
+for AI agents: 131 granular operations are grouped into 16 compound tools,
+each accepting an `action` parameter.
+
+```
+MCP Client (Claude/Codex/Cursor)
+  │  sees only 16 compound tools
+  ▼
+ToolRegistry.getToolsForMCP()
+  │  returns compound tools filtered by MCP_TOOL_GROUPS
+  ▼
+CompoundExecutor.execute(action, args)
+  │  validates action, routes to internal executor
+  ▼
+Existing execute* functions (unchanged)
+```
+
+### Tool Groups
+
+| Compound Tool | Actions | Domain |
+|---------------|---------|--------|
+| `manage_project` | 22 | Project CRUD, fields, views, items, templates, linking |
+| `manage_issues` | 14 | Issue CRUD, comments, drafts, search, sub-issues |
+| `manage_prs` | 7 | PR CRUD, merge, reviews |
+| `manage_milestones` | 6 | Milestone CRUD, metrics, deadlines |
+| `manage_sprints` | 8 | Sprint planning, metrics, velocity |
+| `manage_labels` | 2 | Label CRUD |
+| `manage_automation` | 7 | Automation rules |
+| `manage_iterations` | 5 | Iteration field management |
+| `manage_events` | 3 | Event subscription, replay |
+| `manage_status_updates` | 3 | Project status updates |
+| `ai_generate` | 8 | PRD generation, task breakdown, traceability |
+| `ai_analyze` | 6 | Issue enrichment, triage, duplicates |
+| `ai_plan` | 6 | Capacity, backlog, risk, roadmap |
+| `agent_work` | 7 | Agent registration, task lifecycle |
+| `agent_manage` | 5 | Agent admin, budgets, work products |
+| `discover_tools` | — | Runtime tool/action/schema discovery (meta-tool) |
+
+### Capability Profiles
+
+The `MCP_TOOL_GROUPS` environment variable controls which compound tools are
+exposed to MCP clients. This enables tailored profiles for different use cases:
+
+| Profile | `MCP_TOOL_GROUPS` value | Use case |
+|---------|------------------------|----------|
+| Full (default) | `all` | All 16 tools exposed |
+| Project management | `manage_project,manage_issues,manage_prs,manage_milestones,manage_sprints,manage_labels` | CRUD-only agents |
+| AI-powered | `manage_project,manage_issues,ai_generate,ai_analyze,ai_plan` | Planning and analysis agents |
+| Agent orchestration | `agent_work,agent_manage` | Autonomous task agents |
+| Minimal | `manage_issues,manage_prs` | Simple issue/PR bots |
+
+`discover_tools` is always available regardless of `MCP_TOOL_GROUPS` setting,
+allowing agents to introspect available capabilities at runtime.
+
 ## Agent Orchestration Layer
 
 The agent orchestration layer enables autonomous AI agents to operate on a
@@ -452,11 +518,12 @@ GitHub project without human dispatch. All state is stored natively in GitHub
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│                   MCP Tool Layer (13 tools)                         │
-│  register_agent · list_agents · deregister_agent                    │
-│  checkout_task · release_task · complete_task · get_task_context     │
-│  agent_heartbeat · submit_work_product · get_agent_activity         │
-│  get_budget_status · set_agent_budget · check_work_status           │
+│              MCP Compound Tool Layer (2 tools)                      │
+│  agent_work:   register · checkout_task · release_task ·            │
+│                complete_task · heartbeat · check_work_status ·      │
+│                get_task_context                                     │
+│  agent_manage: list · deregister · get_activity ·                   │
+│                submit_work_product · get_budget · set_budget        │
 └───────────────────────────┬─────────────────────────────────────────┘
                             │
 ┌───────────────────────────▼─────────────────────────────────────────┐

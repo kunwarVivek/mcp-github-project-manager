@@ -184,3 +184,8 @@ export const AI_BATCH_SIZE = getNumericConfigValue("AI_BATCH_SIZE", 10);
 export const LOG_FORMAT = getOptionalConfigValue('LOG_FORMAT', 'text'); // 'text' | 'json'
 export const LOG_LEVEL = getOptionalConfigValue('LOG_LEVEL', 'info'); // debug, info, warn, error
 export const CLI_OPTIONS = cliOptions;
+
+// MCP tool exposure configuration
+// Controls which compound tool groups are exposed to MCP clients.
+// Values: 'all' (default) or comma-separated list of: core, ai, agents, events, system
+export const MCP_TOOL_GROUPS = getOptionalConfigValue('MCP_TOOL_GROUPS', 'all');

@@ -232,6 +232,27 @@ import {
   checkWorkStatusTool,
 } from "./agent-orchestration-tools";
 
+// Compound tool schemas
+import {
+  manageProjectSchema,
+  manageIssuesSchema,
+  managePrsSchema,
+  manageMilestonesSchema,
+  manageSprintsSchema,
+  manageLabelsSchema,
+  manageAutomationSchema,
+  manageIterationsSchema,
+  manageEventsSchema,
+  manageStatusUpdatesSchema,
+  aiGenerateSchema,
+  aiAnalyzeSchema,
+  aiPlanSchema,
+  agentWorkSchema,
+  agentManageSchema,
+  systemSchema,
+  discoverToolsSchema,
+} from "./compound/compound-schemas";
+
 /**
  * Convert a Zod schema to JSON Schema.
  *
@@ -249,17 +270,51 @@ const toJsonSchema = (schema: ZodTypeAny): Record<string, unknown> =>
   zodToJson(schema, { $refStrategy: "none" });
 
 /**
- * Central registry of all available tools
+ * Capability groups for compound tools.
+ * Control which groups are exposed via MCP_TOOL_GROUPS env var.
+ */
+export type CompoundToolGroup = 'core' | 'ai' | 'agents' | 'events' | 'system';
+
+/**
+ * Compound tool definition — extends ToolDefinition with a capability group tag.
+ */
+export interface CompoundToolDef<TInput = unknown, TOutput = unknown> extends ToolDefinition<TInput, TOutput> {
+  group: CompoundToolGroup;
+}
+
+/**
+ * Central registry of all available tools.
+ *
+ * Internal (granular) tools live in `_internalTools` and are used for executor dispatch.
+ * Public (compound) tools live in `_publicTools` and are the only tools exposed to MCP clients.
  */
 export class ToolRegistry {
   private static _instance: ToolRegistry;
-  private _tools: Map<string, ToolDefinition<unknown>>;
+
+  /** Granular tools — internal dispatch targets, not exposed to MCP clients */
+  private _internalTools: Map<string, ToolDefinition<unknown>>;
+
+  /** Compound tools — the tools exposed to MCP clients */
+  private _publicTools: Map<string, CompoundToolDef>;
+
   private _executors: Map<string, (args: any) => Promise<any>>;
 
+  /** Which capability groups are enabled for MCP exposure */
+  private _enabledGroups: Set<string>;
+
   private constructor() {
-    this._tools = new Map();
+    this._internalTools = new Map();
+    this._publicTools = new Map();
     this._executors = new Map();
+
+    // Parse MCP_TOOL_GROUPS env var (default: expose all groups)
+    const groups = process.env.MCP_TOOL_GROUPS || 'all';
+    this._enabledGroups = groups === 'all'
+      ? new Set<string>(['core', 'ai', 'agents', 'events', 'system'])
+      : new Set(groups.split(',').map(g => g.trim()));
+
     this.registerBuiltInTools();
+    this.registerCompoundTools();
   }
 
   /**
@@ -273,13 +328,23 @@ export class ToolRegistry {
   }
 
   /**
-   * Register a new tool
+   * Register a new internal (granular) tool
    */
   public registerTool<T>(tool: ToolDefinition<T>): void {
-    if (this._tools.has(tool.name)) {
+    if (this._internalTools.has(tool.name)) {
       process.stderr.write(`Tool '${tool.name}' is already registered and will be overwritten.\n`);
     }
-    this._tools.set(tool.name, tool as ToolDefinition<unknown>);
+    this._internalTools.set(tool.name, tool as ToolDefinition<unknown>);
+  }
+
+  /**
+   * Register a compound tool for MCP exposure
+   */
+  public registerCompoundTool(tool: CompoundToolDef): void {
+    if (this._publicTools.has(tool.name)) {
+      process.stderr.write(`Compound tool '${tool.name}' is already registered and will be overwritten.\n`);
+    }
+    this._publicTools.set(tool.name, tool);
   }
 
   /**
@@ -293,15 +358,16 @@ export class ToolRegistry {
   /**
    * Execute a tool by name. Dispatch priority:
    * 1. Registered executor (via registerExecutor)
-   * 2. ToolDefinition.execute property
-   * 3. Throws McpError(MethodNotFound)
+   * 2. Internal ToolDefinition.execute property
+   * 3. Public (compound) ToolDefinition.execute property
+   * 4. Throws McpError(MethodNotFound)
    */
-  public async execute(toolName: string, args: any): Promise<any> {
+  public async execute(toolName: string, args: unknown): Promise<unknown> {
     const executor = this._executors.get(toolName);
     if (executor) {
       return executor(args);
     }
-    const tool = this._tools.get(toolName);
+    const tool = this._internalTools.get(toolName) ?? this._publicTools.get(toolName);
     if (tool?.execute) {
       return tool.execute(args);
     }
@@ -312,23 +378,23 @@ export class ToolRegistry {
   }
 
   /**
-   * Get a tool by name
+   * Get a tool by name (searches internal first, then public/compound)
    */
   public getTool<T>(name: string): ToolDefinition<T> | undefined {
-    return this._tools.get(name) as ToolDefinition<T> | undefined;
+    return (this._internalTools.get(name) ?? this._publicTools.get(name)) as ToolDefinition<T> | undefined;
   }
 
   /**
-   * Get all registered tools
+   * Get all internal (granular) tools for internal dispatch
    */
   public getAllTools(): ToolDefinition<unknown>[] {
-    return Array.from(this._tools.values());
+    return Array.from(this._internalTools.values());
   }
 
   /**
-   * Convert tools to MCP format for list_tools response.
-   * Uses zod-to-json-schema for proper JSON Schema conversion.
-   * Includes annotations and outputSchema per MCP specification 2025-11-25.
+   * Convert compound tools to MCP format for list_tools response.
+   * Only returns tools from enabled capability groups.
+   * discover_tools is always included regardless of group filter.
    */
   public getToolsForMCP(): Array<{
     name: string;
@@ -338,7 +404,13 @@ export class ToolRegistry {
     outputSchema?: Record<string, unknown>;
     annotations?: ToolAnnotations;
   }> {
-    return this.getAllTools().map(tool => ({
+    const tools: CompoundToolDef[] = [];
+    for (const tool of this._publicTools.values()) {
+      if (tool.name === 'discover_tools' || this._enabledGroups.has(tool.group)) {
+        tools.push(tool);
+      }
+    }
+    return tools.map(tool => ({
       name: tool.name,
       title: tool.title,
       description: tool.description,
@@ -541,6 +613,156 @@ export class ToolRegistry {
     this.registerTool(getBudgetStatusTool);
     this.registerTool(setAgentBudgetTool);
     this.registerTool(checkWorkStatusTool);
+  }
+
+  /**
+   * Register compound tools for MCP exposure.
+   * These aggregate granular tools into domain-oriented compound tools
+   * so MCP clients see ~16 tools instead of 131.
+   */
+  private registerCompoundTools(): void {
+    const compoundTools: CompoundToolDef[] = [
+      {
+        name: 'manage_project',
+        title: 'Manage Projects',
+        description: 'Manage GitHub Projects (v2): create, list, get, update, delete projects; manage readme, fields, views, items; handle templates and link to repos/teams. Use the `action` field to select the operation.',
+        schema: manageProjectSchema,
+        annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
+        group: 'core',
+      },
+      {
+        name: 'manage_issues',
+        title: 'Manage Issues',
+        description: 'Manage GitHub Issues: create, list, get, update issues; manage comments and drafts; search with advanced filters; manage sub-issues. Use the `action` field to select the operation.',
+        schema: manageIssuesSchema,
+        annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
+        group: 'core',
+      },
+      {
+        name: 'manage_prs',
+        title: 'Manage Pull Requests',
+        description: 'Manage Pull Requests: create, get, list, update, merge PRs; list and create reviews. Use the `action` field to select the operation.',
+        schema: managePrsSchema,
+        annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+        group: 'core',
+      },
+      {
+        name: 'manage_milestones',
+        title: 'Manage Milestones',
+        description: 'Manage Milestones: create, list, update, delete milestones; get metrics; find overdue and upcoming milestones. Use the `action` field to select the operation.',
+        schema: manageMilestonesSchema,
+        annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
+        group: 'core',
+      },
+      {
+        name: 'manage_sprints',
+        title: 'Manage Sprints',
+        description: 'Manage Sprints: create, list, update sprints; get current sprint; add/remove issues; get metrics and plan. Use the `action` field to select the operation.',
+        schema: manageSprintsSchema,
+        annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+        group: 'core',
+      },
+      {
+        name: 'manage_labels',
+        title: 'Manage Labels',
+        description: 'Manage repository Labels: create and list labels. Use the `action` field to select the operation.',
+        schema: manageLabelsSchema,
+        annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+        group: 'core',
+      },
+      {
+        name: 'manage_automation',
+        title: 'Manage Automation',
+        description: 'Manage Automation Rules: create, update, delete, get, list rules; enable and disable rules. Use the `action` field to select the operation.',
+        schema: manageAutomationSchema,
+        annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
+        group: 'core',
+      },
+      {
+        name: 'manage_iterations',
+        title: 'Manage Iterations',
+        description: 'Manage Project Iterations: get configuration, current iteration, items; find by date; assign items. Use the `action` field to select the operation.',
+        schema: manageIterationsSchema,
+        annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+        group: 'core',
+      },
+      {
+        name: 'manage_events',
+        title: 'Manage Events',
+        description: 'Manage Events: subscribe to project events, get recent events, replay events. Use the `action` field to select the operation.',
+        schema: manageEventsSchema,
+        annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+        group: 'events',
+      },
+      {
+        name: 'manage_status_updates',
+        title: 'Manage Status Updates',
+        description: 'Manage project Status Updates: create, list, and get status updates. Use the `action` field to select the operation.',
+        schema: manageStatusUpdatesSchema,
+        annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+        group: 'core',
+      },
+      {
+        name: 'ai_generate',
+        title: 'AI Generation',
+        description: 'AI-powered generation: generate/enhance/parse PRDs, add features, get next tasks, analyze complexity, expand tasks, create traceability matrices. Use the `action` field to select the operation.',
+        schema: aiGenerateSchema,
+        annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+        group: 'ai',
+      },
+      {
+        name: 'ai_analyze',
+        title: 'AI Analysis',
+        description: 'AI-powered analysis: enrich issues (single/bulk), triage issues, schedule triaging, suggest labels, detect duplicates, find related issues. Use the `action` field to select the operation.',
+        schema: aiAnalyzeSchema,
+        annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+        group: 'ai',
+      },
+      {
+        name: 'ai_plan',
+        title: 'AI Planning',
+        description: 'AI-powered planning: calculate capacity, prioritize backlog, assess risk, suggest sprint composition, generate roadmaps and visualizations. Use the `action` field to select the operation.',
+        schema: aiPlanSchema,
+        annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+        group: 'ai',
+      },
+      {
+        name: 'agent_work',
+        title: 'Agent Work',
+        description: 'Agent work operations: register agents, checkout/release/complete tasks, send heartbeats, check work status, get task context. Use the `action` field to select the operation.',
+        schema: agentWorkSchema,
+        annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+        group: 'agents',
+      },
+      {
+        name: 'agent_manage',
+        title: 'Agent Management',
+        description: 'Agent management: list/deregister agents, get activity, submit work products, get/set budgets. Use the `action` field to select the operation.',
+        schema: agentManageSchema,
+        annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
+        group: 'agents',
+      },
+      {
+        name: 'system',
+        title: 'System',
+        description: 'System operations: health check and project field setup. Use the `action` field to select the operation.',
+        schema: systemSchema,
+        annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+        group: 'system',
+      },
+      {
+        name: 'discover_tools',
+        title: 'Discover Tools',
+        description: 'Discover available compound tools, their actions, and parameters. Always available regardless of group filter.',
+        schema: discoverToolsSchema,
+        annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+        group: 'system',
+      },
+    ];
+
+    for (const tool of compoundTools) {
+      this.registerCompoundTool(tool);
+    }
   }
 
 }

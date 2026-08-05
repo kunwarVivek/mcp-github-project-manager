@@ -109,6 +109,27 @@ import {
 // Health Tools
 import { executeHealthCheck } from "./infrastructure/tools/health-tools";
 
+// Compound tool executors
+import {
+  executeManageProject,
+  executeManageIssues,
+  executeManagePrs,
+  executeManageMilestones,
+  executeManageSprints,
+  executeManageLabels,
+  executeManageAutomation,
+  executeManageIterations,
+  executeManageEvents,
+  executeManageStatusUpdates,
+  executeAiGenerate,
+  executeAiAnalyze,
+  executeAiPlan,
+  executeAgentWork,
+  executeAgentManage,
+  executeSystem,
+  executeDiscoverTools,
+} from "./infrastructure/tools/compound/compound-executors";
+
 import { ToolResultFormatter } from "./infrastructure/tools/ToolResultFormatter";
 import { MCPContentType, MCPErrorCode } from "./domain/mcp-types";
 import { ResourceCache } from "./infrastructure/cache/ResourceCache";
@@ -453,6 +474,25 @@ class GitHubProjectManagerServer {
     r.registerExecutor('triage_issue', (a) => this.handleTriageIssue(a));
     r.registerExecutor('triage_all_issues', (a) => this.handleTriageAllIssues(a));
     r.registerExecutor('schedule_triaging', (a) => this.handleScheduleTriaging(a));
+
+    // ── Compound tools (aggregated MCP-facing tools) ────────────────
+    r.registerExecutor('manage_project', executeManageProject);
+    r.registerExecutor('manage_issues', executeManageIssues);
+    r.registerExecutor('manage_prs', executeManagePrs);
+    r.registerExecutor('manage_milestones', executeManageMilestones);
+    r.registerExecutor('manage_sprints', executeManageSprints);
+    r.registerExecutor('manage_labels', executeManageLabels);
+    r.registerExecutor('manage_automation', executeManageAutomation);
+    r.registerExecutor('manage_iterations', executeManageIterations);
+    r.registerExecutor('manage_events', executeManageEvents);
+    r.registerExecutor('manage_status_updates', executeManageStatusUpdates);
+    r.registerExecutor('ai_generate', executeAiGenerate);
+    r.registerExecutor('ai_analyze', executeAiAnalyze);
+    r.registerExecutor('ai_plan', executeAiPlan);
+    r.registerExecutor('agent_work', executeAgentWork);
+    r.registerExecutor('agent_manage', executeAgentManage);
+    r.registerExecutor('system', executeSystem);
+    r.registerExecutor('discover_tools', executeDiscoverTools);
   }
 
   private setupToolHandlers() {

@@ -8,24 +8,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- **Agent Orchestration Layer** — 13 new MCP tools for autonomous AI agent task management
-  - Agent registry: `register_agent`, `list_agents`, `deregister_agent` with subagent hierarchy (`parentAgentId`, cascade delete)
-  - Task lifecycle: `checkout_task` (4 strategies: priority, age, skills, deadline), `release_task`, `complete_task`
-  - Task context: `get_task_context` (enriched context with issue, milestone, related issues, acceptance criteria)
-  - Heartbeat monitoring: `agent_heartbeat` with stale-agent detection (30 min timeout)
-  - Work products: `submit_work_product` with branch, PR, commits, files, test results
-  - Budget enforcement: `get_budget_status`, `set_agent_budget` with warning thresholds and hard stops
-  - Activity dashboard: `get_agent_activity` with per-agent task, progress, heartbeat, and budget status
-  - Work status: `check_work_status` for PR review/merge tracking
+- **Compound Tool API** — 131 granular tools consolidated into 16 compound tools with action-based routing
+  - Progressive disclosure: AI agents see 16 tools instead of 131, reducing tool-selection overhead
+  - `discover_tools` meta-tool for runtime exploration of available actions and parameter schemas
+  - `MCP_TOOL_GROUPS` env var for capability profiles — control which tool groups are exposed
+  - `CompoundExecutor` routes actions to existing internal granular executors (unchanged)
+  - Compound tools: `manage_project` (22 actions), `manage_issues` (14), `manage_prs` (7), `manage_milestones` (6), `manage_sprints` (8), `manage_labels` (2), `manage_automation` (7), `manage_iterations` (5), `manage_events` (3), `manage_status_updates` (3), `ai_generate` (8), `ai_analyze` (6), `ai_plan` (6), `agent_work` (7), `agent_manage` (5), `system` (2)
+- **Agent Orchestration Layer** — 13 agent operations across 2 compound tools (`agent_work`, `agent_manage`)
+  - Agent registry: register, list, deregister with subagent hierarchy (`parentAgentId`, cascade delete)
+  - Task lifecycle: checkout_task (4 strategies: priority, age, skills, deadline), release_task, complete_task
+  - Task context: get_task_context (enriched context with issue, milestone, related issues, acceptance criteria)
+  - Heartbeat monitoring with stale-agent detection (30 min timeout)
+  - Work products: submit_work_product with branch, PR, commits, files, test results
+  - Budget enforcement: get_budget, set_budget with warning thresholds and hard stops
+  - Activity dashboard with per-agent task, progress, heartbeat, and budget status
+  - Work status: check_work_status for PR review/merge tracking
 - Domain types in `src/domain/agent-orchestration-types.ts` (Agent, TaskCheckoutResult, AgentHeartbeat, WorkProduct, AgentBudget, BudgetStatus, AgentTaskContext, AgentActivityEntry)
 - Infrastructure stores: `AgentStore` (issue-backed registry), `WorkProductStore` (structured comments), `ProjectFieldSetup` (custom field provisioning)
 - Services: `TaskCheckoutService`, `AgentContextService`, `WorkProductService`, `AgentBudgetService`
-- Tool schemas in `src/infrastructure/tools/schemas/agent-orchestration-schemas.ts`
+- Tool schemas in `src/infrastructure/tools/schemas/`
 - GitHub-native data model: 5 custom project fields (`agent_claimed_by`, `agent_claimed_at`, `agent_status`, `agent_work_branch`, `agent_pr_number`)
 
 ### Changed
-- Total tool count increased from 118 to 131
-- Updated all documentation (README, architecture, TOOLS.md, CONFIGURATION.md, GAP-TRACKER)
+- **Tool API migrated from 131 granular tools to 16 compound tools** (131 actions) — breaking change for MCP clients referencing individual tool names
+- Granular tools retained internally as dispatch targets but no longer exposed to MCP clients
+- Updated all documentation (README, architecture, TOOLS.md, CONFIGURATION.md) to reflect compound tool API
 
 ## [1.0.2] - 2026-02-01
 
