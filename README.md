@@ -1,5 +1,7 @@
 # MCP GitHub Project Manager
 
+[![MCP Toplist](https://mcptoplist.com/badge/glama%2FkunwarVivek%2Fmcp-github-project-manager.svg)](https://mcptoplist.com/server/glama%2FkunwarVivek%2Fmcp-github-project-manager)
+
 A comprehensive Model Context Protocol (MCP) server that provides advanced GitHub project management capabilities with **AI-powered task management** and **complete requirements traceability**. Transform your project ideas into actionable tasks with full end-to-end tracking from business requirements to implementation.
 
 [![npm version](https://img.shields.io/npm/v/mcp-github-project-manager.svg)](https://www.npmjs.com/package/mcp-github-project-manager)
