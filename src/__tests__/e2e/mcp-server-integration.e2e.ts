@@ -24,19 +24,20 @@ describe("MCP Server E2E Tests", () => {
   describe("Tool Registration", () => {
     it("should have all required tools registered", () => {
       const tools = toolRegistry.getToolsForMCP();
-      expect(tools.find((t: any) => t.name === "create_roadmap")).toBeDefined();
-      expect(tools.find((t: any) => t.name === "plan_sprint")).toBeDefined();
-      expect(tools.find((t: any) => t.name === "get_milestone_metrics")).toBeDefined();
-      expect(tools.find((t: any) => t.name === "get_sprint_metrics")).toBeDefined();
-      expect(tools.find((t: any) => t.name === "get_overdue_milestones")).toBeDefined();
-      expect(tools.find((t: any) => t.name === "get_upcoming_milestones")).toBeDefined();
+      // Compound tools are the MCP-facing surface
+      expect(tools.find((t: any) => t.name === "manage_project")).toBeDefined();
+      expect(tools.find((t: any) => t.name === "manage_issues")).toBeDefined();
+      expect(tools.find((t: any) => t.name === "manage_milestones")).toBeDefined();
+      expect(tools.find((t: any) => t.name === "manage_sprints")).toBeDefined();
+      expect(tools.find((t: any) => t.name === "ai_generate")).toBeDefined();
+      expect(tools.find((t: any) => t.name === "discover_tools")).toBeDefined();
     });
 
     it("should validate tool parameters", () => {
-      const createRoadmapTool = toolRegistry.getTool("create_roadmap");
-      expect(createRoadmapTool).toBeDefined();
-      if (createRoadmapTool) {
-        expect(createRoadmapTool.schema).toBeDefined();
+      const projectTool = toolRegistry.getTool("manage_project");
+      expect(projectTool).toBeDefined();
+      if (projectTool) {
+        expect(projectTool.schema).toBeDefined();
       }
     });
   });

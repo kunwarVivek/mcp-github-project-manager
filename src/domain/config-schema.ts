@@ -10,16 +10,13 @@ export const GitHubConfigSchema = z.object({
   GITHUB_REPO: nonEmptyString,
 });
 
-/** AI provider keys — at least one should be set for AI features. */
+/** AI provider keys — all optional; absence produces a warning, not a failure. */
 export const AIConfigSchema = z.object({
   ANTHROPIC_API_KEY: z.string().default(''),
   OPENAI_API_KEY: z.string().default(''),
   GOOGLE_API_KEY: z.string().default(''),
   PERPLEXITY_API_KEY: z.string().default(''),
-}).refine(
-  (data) => !!(data.ANTHROPIC_API_KEY || data.OPENAI_API_KEY || data.GOOGLE_API_KEY || data.PERPLEXITY_API_KEY),
-  { message: 'At least one AI provider API key is recommended for AI features' }
-);
+});
 
 /** Sync/cache configuration. */
 export const SyncConfigSchema = z.object({

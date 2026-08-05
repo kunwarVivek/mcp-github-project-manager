@@ -39,10 +39,8 @@ describe('E2E Test Infrastructure Validation', () => {
     const tools = await utils.listTools();
     
     const expectedGitHubTools = [
-      'create_project', 'list_projects', 'get_project',
-      'create_milestone', 'list_milestones',
-      'create_issue', 'list_issues', 'get_issue',
-      'create_roadmap', 'plan_sprint'
+      'manage_project', 'manage_issues', 'manage_milestones',
+      'manage_sprints', 'manage_prs', 'manage_labels',
     ];
 
     for (const toolName of expectedGitHubTools) {
@@ -55,9 +53,7 @@ describe('E2E Test Infrastructure Validation', () => {
     const tools = await utils.listTools();
     
     const expectedAITools = [
-      'generate_prd', 'parse_prd', 'enhance_prd',
-      'get_next_task', 'analyze_task_complexity', 'expand_task',
-      'add_feature', 'create_traceability_matrix'
+      'ai_generate', 'ai_analyze', 'ai_plan',
     ];
 
     for (const toolName of expectedAITools) {
