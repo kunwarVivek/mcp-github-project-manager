@@ -22,3 +22,5 @@ export { markProjectAsTemplateTool, unmarkProjectAsTemplateTool, copyProjectFrom
 export { linkProjectToRepositoryTool, unlinkProjectFromRepositoryTool, linkProjectToTeamTool, unlinkProjectFromTeamTool, listLinkedRepositoriesTool, listLinkedTeamsTool, executeLinkProjectToRepository, executeUnlinkProjectFromRepository, executeLinkProjectToTeam, executeUnlinkProjectFromTeam, executeListLinkedRepositories, executeListLinkedTeams } from './project-linking-tools';
 export { closeProjectTool, reopenProjectTool, convertDraftIssueTool, executeCloseProject, executeReopenProject, executeConvertDraftIssue } from './project-lifecycle-tools';
 export { updateItemPositionTool, searchIssuesAdvancedTool, filterProjectItemsTool, executeUpdateItemPosition, executeSearchIssuesAdvanced, executeFilterProjectItems } from './project-advanced-tools';
+
+export * from './agent-orchestration-tools';

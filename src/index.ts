@@ -89,6 +89,22 @@ import {
   executeFindRelatedIssues,
 } from "./infrastructure/tools/issue-intelligence-tools";
 
+// Agent orchestration tools
+import {
+  executeRegisterAgent,
+  executeListAgents,
+  executeDeregisterAgent,
+  executeCheckoutTask,
+  executeReleaseTask,
+  executeCompleteTask,
+  executeGetTaskContext,
+  executeAgentHeartbeat,
+  executeSubmitWorkProduct,
+  executeGetAgentActivity,
+  executeGetBudgetStatus,
+  executeSetAgentBudget,
+} from "./infrastructure/tools/agent-orchestration-tools";
+
 // Health Tools
 import { executeHealthCheck } from "./infrastructure/tools/health-tools";
 
@@ -410,6 +426,20 @@ class GitHubProjectManagerServer {
     r.registerExecutor('detect_duplicates', executeDetectDuplicates);
     r.registerExecutor('find_related_issues', executeFindRelatedIssues);
     r.registerExecutor('health_check', () => executeHealthCheck());
+
+    // ── Agent orchestration tools ──────────────────────────────────
+    r.registerExecutor('register_agent', executeRegisterAgent);
+    r.registerExecutor('list_agents', executeListAgents);
+    r.registerExecutor('deregister_agent', executeDeregisterAgent);
+    r.registerExecutor('checkout_task', executeCheckoutTask);
+    r.registerExecutor('release_task', executeReleaseTask);
+    r.registerExecutor('complete_task', executeCompleteTask);
+    r.registerExecutor('get_task_context', executeGetTaskContext);
+    r.registerExecutor('agent_heartbeat', executeAgentHeartbeat);
+    r.registerExecutor('submit_work_product', executeSubmitWorkProduct);
+    r.registerExecutor('get_agent_activity', executeGetAgentActivity);
+    r.registerExecutor('get_budget_status', executeGetBudgetStatus);
+    r.registerExecutor('set_agent_budget', executeSetAgentBudget);
 
     // ── Pattern C: server-bound handlers (use this.xxxService) ───────
     r.registerExecutor('subscribe_to_events', (a) => this.handleSubscribeToEvents(a));

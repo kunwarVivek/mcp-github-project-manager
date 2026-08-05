@@ -55,6 +55,13 @@ import { PRDGenerationService } from "./services/PRDGenerationService";
 import { TaskGenerationService } from "./services/TaskGenerationService";
 import { TaskContextGenerationService } from "./services/TaskContextGenerationService";
 import { FeatureManagementService } from "./services/FeatureManagementService";
+import { AgentStore } from "./infrastructure/agent/AgentStore";
+import { WorkProductStore } from "./infrastructure/agent/WorkProductStore";
+import { ProjectFieldSetup } from "./infrastructure/agent/ProjectFieldSetup";
+import { TaskCheckoutService } from "./services/agent/TaskCheckoutService";
+import { AgentContextService } from "./services/agent/AgentContextService";
+import { WorkProductService } from "./services/agent/WorkProductService";
+import { AgentBudgetService } from "./services/agent/AgentBudgetService";
 
 /**
  * Configure the DI container with all services.
@@ -210,6 +217,42 @@ export function configureContainer(
 
   container.register("FeatureManagementService", {
     useFactory: () => new FeatureManagementService()
+  });
+
+  // Register agent orchestration services
+  container.register("AgentStore", {
+    useFactory: (c) => new AgentStore(c.resolve("GitHubRepositoryFactory"))
+  });
+
+  container.register("WorkProductStore", {
+    useFactory: (c) => new WorkProductStore(c.resolve("GitHubRepositoryFactory"))
+  });
+
+  container.register("ProjectFieldSetup", {
+    useFactory: (c) => new ProjectFieldSetup(c.resolve("GitHubRepositoryFactory"))
+  });
+
+  container.register("AgentContextService", {
+    useFactory: (c) => new AgentContextService(c.resolve("GitHubRepositoryFactory"))
+  });
+
+  container.register("TaskCheckoutService", {
+    useFactory: (c) => new TaskCheckoutService(
+      c.resolve("GitHubRepositoryFactory"),
+      c.resolve("AgentStore"),
+      c.resolve("AgentContextService")
+    )
+  });
+
+  container.register("WorkProductService", {
+    useFactory: (c) => new WorkProductService(
+      c.resolve("GitHubRepositoryFactory"),
+      c.resolve("WorkProductStore")
+    )
+  });
+
+  container.register("AgentBudgetService", {
+    useFactory: (c) => new AgentBudgetService(c.resolve("AgentStore"))
   });
 
   return container;

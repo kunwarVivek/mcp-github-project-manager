@@ -215,6 +215,22 @@ import {
   findRelatedIssuesTool,
 } from "./issue-intelligence-tools";
 
+// Agent orchestration tools
+import {
+  registerAgentTool,
+  listAgentsTool,
+  deregisterAgentTool,
+  checkoutTaskTool,
+  releaseTaskTool,
+  completeTaskTool,
+  getTaskContextTool,
+  agentHeartbeatTool,
+  submitWorkProductTool,
+  getAgentActivityTool,
+  getBudgetStatusTool,
+  setAgentBudgetTool,
+} from "./agent-orchestration-tools";
+
 /**
  * Convert a Zod schema to JSON Schema.
  *
@@ -509,6 +525,20 @@ export class ToolRegistry {
     this.registerTool(suggestLabelsTool);
     this.registerTool(detectDuplicatesTool);
     this.registerTool(findRelatedIssuesTool);
+
+    // Register agent orchestration tools
+    this.registerTool(registerAgentTool);
+    this.registerTool(listAgentsTool);
+    this.registerTool(deregisterAgentTool);
+    this.registerTool(checkoutTaskTool);
+    this.registerTool(releaseTaskTool);
+    this.registerTool(completeTaskTool);
+    this.registerTool(getTaskContextTool);
+    this.registerTool(agentHeartbeatTool);
+    this.registerTool(submitWorkProductTool);
+    this.registerTool(getAgentActivityTool);
+    this.registerTool(getBudgetStatusTool);
+    this.registerTool(setAgentBudgetTool);
   }
 
 }
