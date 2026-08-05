@@ -1,0 +1,7 @@
+{
+  "database": "dolt",
+  "backend": "dolt",
+  "dolt_mode": "embedded",
+  "dolt_database": "mcp_github_project_manager",
+  "project_id": "2514df23-dd6c-4863-87ac-c64caf2ba916"
+}
