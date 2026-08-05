@@ -16,6 +16,7 @@ export abstract class BaseGitHubRepository implements IGitHubRepository {
   protected readonly retryAttempts: number = 3;
   protected readonly apiUtil: GitHubApiUtil;
   protected readonly logger: ILogger;
+  private repositoryNodeId?: string;
 
   constructor(
     public readonly octokit: OctokitInstance,
@@ -171,6 +172,131 @@ export abstract class BaseGitHubRepository implements IGitHubRepository {
     }
 
     return response.repository.issue.id;
+  }
+
+  /**
+   * Resolve the repository's node ID.
+   *
+   * `CreateIssueInput.repositoryId` is an `ID!`, not a repository name.
+   *
+   * Cached for the lifetime of the instance — a repository's node ID is stable.
+   *
+   * @returns The node ID of the configured repository
+   * @throws Error if the repository is not found
+   */
+  protected async resolveRepositoryNodeId(): Promise<string> {
+    if (this.repositoryNodeId) return this.repositoryNodeId;
+
+    const query = `
+      query GetRepositoryNodeId($owner: String!, $repo: String!) {
+        repository(owner: $owner, name: $repo) {
+          id
+        }
+      }
+    `;
+
+    interface RepositoryNodeIdResponse {
+      repository: { id: string } | null;
+    }
+
+    const response = await this.graphql<RepositoryNodeIdResponse>(query, {});
+
+    if (!response.repository) {
+      throw new Error(`Repository ${this.owner}/${this.repo} not found`);
+    }
+
+    this.repositoryNodeId = response.repository.id;
+    return this.repositoryNodeId;
+  }
+
+  /**
+   * Resolve label names to node IDs.
+   *
+   * `CreateIssueInput.labelIds` / `UpdateIssueInput.labelIds` are `[ID!]`, so
+   * passing names produces `Could not resolve to a node with the global id of '<name>'`.
+   *
+   * Labels that do not exist in the repository are skipped with a warning rather
+   * than created — creating them would silently alter the repository's label
+   * taxonomy as a side effect of writing an issue.
+   *
+   * Deliberately not cached: labels change while the server is running.
+   *
+   * @param names - Label names as supplied by the caller
+   * @returns Node IDs of the labels that exist, in the caller's order
+   */
+  protected async resolveLabelIds(names?: string[]): Promise<string[]> {
+    if (!names || names.length === 0) return [];
+
+    const query = `
+      query GetLabelIds($owner: String!, $repo: String!) {
+        repository(owner: $owner, name: $repo) {
+          labels(first: 100) {
+            nodes { id name }
+          }
+        }
+      }
+    `;
+
+    interface LabelIdsResponse {
+      repository: { labels: { nodes: Array<{ id: string; name: string }> } } | null;
+    }
+
+    const response = await this.graphql<LabelIdsResponse>(query, {});
+    const nodes = response.repository?.labels?.nodes ?? [];
+    const idByName = new Map(nodes.map(node => [node.name, node.id]));
+
+    const unknown = names.filter(name => !idByName.has(name));
+    if (unknown.length > 0) {
+      this.logger.warn(
+        `Skipping labels that do not exist in ${this.owner}/${this.repo}: ${unknown.join(', ')}`
+      );
+    }
+
+    return names
+      .map(name => idByName.get(name))
+      .filter((id): id is string => id !== undefined);
+  }
+
+  /**
+   * Resolve assignee logins to user node IDs.
+   *
+   * Same problem as {@link resolveLabelIds}: `assigneeIds` is `[ID!]`, not logins.
+   * Logins that cannot be assigned in this repository are skipped with a warning.
+   *
+   * @param logins - GitHub logins as supplied by the caller
+   * @returns Node IDs of the assignable users, in the caller's order
+   */
+  protected async resolveAssigneeIds(logins?: string[]): Promise<string[]> {
+    if (!logins || logins.length === 0) return [];
+
+    const query = `
+      query GetAssigneeIds($owner: String!, $repo: String!) {
+        repository(owner: $owner, name: $repo) {
+          assignableUsers(first: 100) {
+            nodes { id login }
+          }
+        }
+      }
+    `;
+
+    interface AssigneeIdsResponse {
+      repository: { assignableUsers: { nodes: Array<{ id: string; login: string }> } } | null;
+    }
+
+    const response = await this.graphql<AssigneeIdsResponse>(query, {});
+    const nodes = response.repository?.assignableUsers?.nodes ?? [];
+    const idByLogin = new Map(nodes.map(node => [node.login, node.id]));
+
+    const unknown = logins.filter(login => !idByLogin.has(login));
+    if (unknown.length > 0) {
+      this.logger.warn(
+        `Skipping logins that cannot be assigned in ${this.owner}/${this.repo}: ${unknown.join(', ')}`
+      );
+    }
+
+    return logins
+      .map(login => idByLogin.get(login))
+      .filter((id): id is string => id !== undefined);
   }
 
   /**

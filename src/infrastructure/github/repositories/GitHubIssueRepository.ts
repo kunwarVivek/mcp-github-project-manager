@@ -99,13 +99,20 @@ export class GitHubIssueRepository extends BaseGitHubRepository implements Issue
       }
     `;
 
+    // repositoryId/assigneeIds/labelIds are GraphQL IDs, not names.
+    const [repositoryId, assigneeIds, labelIds] = await Promise.all([
+      this.resolveRepositoryNodeId(),
+      this.resolveAssigneeIds(data.assignees),
+      this.resolveLabelIds(data.labels),
+    ]);
+
     const response = await this.graphql<CreateIssueResponse>(mutation, {
       input: {
-        repositoryId: this.repo,
+        repositoryId,
         title: data.title,
         body: data.description,
-        assigneeIds: data.assignees,
-        labelIds: data.labels,
+        assigneeIds,
+        labelIds,
         milestoneId: data.milestoneId,
       },
     });
@@ -142,14 +149,24 @@ export class GitHubIssueRepository extends BaseGitHubRepository implements Issue
       }
     `;
 
+    // Same ID-vs-name problem as create(). Note the undefined checks: an empty
+    // array means "remove all", so an omitted field must stay undefined ("leave
+    // as is") rather than being resolved into [].
+    const assigneeIds = data.assignees
+      ? await this.resolveAssigneeIds(data.assignees)
+      : undefined;
+    const labelIds = data.labels
+      ? await this.resolveLabelIds(data.labels)
+      : undefined;
+
     const response = await this.graphql<UpdateIssueResponse>(mutation, {
       input: {
         id,
         title: data.title,
         body: data.description,
         state: data.status === ResourceStatus.CLOSED ? "CLOSED" : "OPEN",
-        assigneeIds: data.assignees,
-        labelIds: data.labels,
+        assigneeIds,
+        labelIds,
         milestoneId: data.milestoneId,
       },
     });
