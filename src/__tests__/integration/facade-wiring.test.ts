@@ -6,7 +6,7 @@
  * - ProjectManagementService delegates to extracted services
  * - Service dependencies are properly wired
  */
-import { jest, describe, beforeEach, it, expect } from '@jest/globals';
+import { vi, describe, beforeEach, it, expect } from 'vitest';
 import { configureContainer, container, createProjectManagementService } from '../../container';
 import { ProjectManagementService } from '../../services/ProjectManagementService';
 import { SubIssueService } from '../../services/SubIssueService';

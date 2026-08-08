@@ -1,3 +1,4 @@
+import { vi } from 'vitest';
 import { ResourceCache } from '../../../../infrastructure/cache/ResourceCache';
 import { Resource, ResourceType } from '../../../../domain/resource-types';
 
@@ -10,8 +11,8 @@ describe('ResourceCache', () => {
   beforeEach(() => {
     // Create a manual mock with the methods we need
     cache = {
-      set: jest.fn().mockResolvedValue(undefined),
-      get: jest.fn().mockImplementation(async (id: string) => {
+      set: vi.fn().mockResolvedValue(undefined),
+      get: vi.fn().mockImplementation(async (id: string) => {
         if (id === 'test-id-123') {
           return {
             id: 'test-id-123',

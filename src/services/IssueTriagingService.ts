@@ -3,7 +3,7 @@ import { InputSanitizer } from './utils/InputSanitizer';
 import { AIServiceFactory } from "./ai/AIServiceFactory";
 import { ProjectManagementService } from "./ProjectManagementService";
 import { IssueEnrichmentService } from "./IssueEnrichmentService";
-import { Logger } from "../infrastructure/logger";
+import { ILogger, Logger } from "../infrastructure/logger";
 
 export interface TriageResult {
   issueId: string;
@@ -24,14 +24,15 @@ export interface TriageResult {
 }
 
 export class IssueTriagingService {
-  private logger: Logger;
+  private readonly logger: ILogger;
 
   constructor(
     private aiFactory: AIServiceFactory,
     private projectService: ProjectManagementService,
-    private enrichmentService: IssueEnrichmentService
+    private enrichmentService: IssueEnrichmentService,
+    logger?: ILogger
   ) {
-    this.logger = Logger.getInstance();
+    this.logger = logger ?? Logger.getInstance();
   }
 
   async triageIssue(params: {

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, jest } from "@jest/globals";
+import { beforeEach, describe, expect, it, vi, Mocked, MockedClass, MockedFunction } from 'vitest';
 import { Octokit } from "@octokit/rest";
 import { GitHubConfig } from "../../../../../infrastructure/github/GitHubConfig";
 import { GitHubMilestoneRepository } from "../../../../../infrastructure/github/repositories/GitHubMilestoneRepository";
@@ -7,33 +7,33 @@ import { ResourceType, ResourceStatus } from "../../../../../domain/resource-typ
 import { CreateMilestone, MilestoneId, Issue } from "../../../../../domain/types";
 
 // Mock Octokit and GraphQL response
-jest.mock("@octokit/rest");
+vi.mock("@octokit/rest");
 
 describe("GitHubMilestoneRepository", () => {
   let repository: GitHubMilestoneRepository;
-  let mockOctokit: jest.Mocked<Octokit>;
+  let mockOctokit: Mocked<Octokit>;
   let config: GitHubConfig;
 
   beforeEach(() => {
     // Clear all mocks
-    jest.clearAllMocks();
+    vi.clearAllMocks();
 
     // Create mock Octokit instance with GraphQL method
     mockOctokit = {
-      graphql: jest.fn(),
+      graphql: vi.fn(),
       // Include required REST methods that might be used
       rest: {
         issues: {
-          createMilestone: jest.fn(),
-          updateMilestone: jest.fn(),
-          deleteMilestone: jest.fn(),
-          getMilestone: jest.fn(),
-          listMilestones: jest.fn(),
+          createMilestone: vi.fn(),
+          updateMilestone: vi.fn(),
+          deleteMilestone: vi.fn(),
+          getMilestone: vi.fn(),
+          listMilestones: vi.fn(),
         }
       }
     } as any;
 
-    (Octokit as jest.MockedClass<typeof Octokit>).mockImplementation(
+    (Octokit as MockedClass<typeof Octokit>).mockImplementation(
       () => mockOctokit
     );
 
@@ -200,7 +200,7 @@ describe("GitHubMilestoneRepository", () => {
     it("should get issues for a milestone", async () => {
       // Arrange - need to mock the factory.createIssueRepository method
       const mockIssueRepository = {
-        findByMilestone: jest.fn().mockImplementation(() => {
+        findByMilestone: vi.fn().mockImplementation(function() { return {
           return Promise.resolve([
             {
               id: "issue-123",

@@ -1,5 +1,7 @@
 import { AITaskProcessor } from './ai/AITaskProcessor';
+import { AIServiceFactory } from './ai/AIServiceFactory';
 import { InputSanitizer } from './utils/InputSanitizer';
+import { safeCall } from './utils/safeCall';
 import {
   PRDDocument,
   FeatureRequirement,
@@ -20,8 +22,8 @@ import { z } from 'zod';
 export class PRDGenerationService {
   private aiProcessor: AITaskProcessor;
 
-  constructor() {
-    this.aiProcessor = new AITaskProcessor();
+  constructor(aiFactory?: AIServiceFactory) {
+    this.aiProcessor = new AITaskProcessor(aiFactory);
   }
 
   /**
@@ -36,7 +38,7 @@ export class PRDGenerationService {
     author: string;
     stakeholders?: string[];
   }): Promise<PRDDocument> {
-    try {
+    return safeCall(async () => {
       // Sanitize inputs
       const projectIdea = InputSanitizer.sanitizePRDContent(params.projectIdea);
       const projectName = InputSanitizer.sanitizeText(params.projectName);
@@ -70,10 +72,7 @@ export class PRDGenerationService {
       const validatedPRD = PRDDocumentSchema.parse(enhancedPRD);
 
       return validatedPRD;
-    } catch (error) {
-      process.stderr.write(`Error generating PRD from idea: ${error instanceof Error ? error.message : String(error)}\n`);
-      throw new Error(`Failed to generate PRD: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    }
+    });
   }
 
   /**
@@ -94,7 +93,7 @@ export class PRDGenerationService {
     overallConfidence: { score: number; tier: 'high' | 'medium' | 'low' };
     lowConfidenceSections: SectionConfidence[];
   }> {
-    try {
+    return safeCall(async () => {
       // Sanitize inputs
       const projectIdea = InputSanitizer.sanitizePRDContent(params.projectIdea);
       const projectName = InputSanitizer.sanitizeText(params.projectName);
@@ -133,10 +132,7 @@ export class PRDGenerationService {
         overallConfidence: result.overallConfidence,
         lowConfidenceSections: result.lowConfidenceSections
       };
-    } catch (error) {
-      process.stderr.write(`Error generating PRD with confidence: ${error instanceof Error ? error.message : String(error)}\n`);
-      throw new Error(`Failed to generate PRD: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    }
+    });
   }
 
   /**
@@ -148,7 +144,7 @@ export class PRDGenerationService {
     focusAreas?: string[];
     includeResearch?: boolean;
   }): Promise<PRDDocument> {
-    try {
+    return safeCall(async () => {
       const currentPRDContent = typeof params.currentPRD === 'string'
         ? params.currentPRD
         : JSON.stringify(params.currentPRD, null, 2);
@@ -168,17 +164,14 @@ export class PRDGenerationService {
       }
 
       return PRDDocumentSchema.parse(enhancedPRD);
-    } catch (error) {
-      process.stderr.write(`Error enhancing PRD: ${error instanceof Error ? error.message : String(error)}\n`);
-      throw new Error(`Failed to enhance PRD: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    }
+    });
   }
 
   /**
    * Extract and analyze features from a PRD
    */
   async extractFeaturesFromPRD(prd: PRDDocument | string): Promise<FeatureRequirement[]> {
-    try {
+    return safeCall(async () => {
       const prdContent = typeof prd === 'string'
         ? prd
         : JSON.stringify(prd, null, 2);
@@ -190,10 +183,7 @@ export class PRDGenerationService {
         ...feature,
         id: feature.id || uuidv4()
       }));
-    } catch (error) {
-      process.stderr.write(`Error extracting features from PRD: ${error instanceof Error ? error.message : String(error)}\n`);
-      throw new Error(`Failed to extract features: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    }
+    });
   }
 
   /**
@@ -206,7 +196,7 @@ export class PRDGenerationService {
     recommendations: string[];
     qualityIssues: string[];
   }> {
-    try {
+    return safeCall(async () => {
       // Basic validation using schema
       const validationResult = PRDDocumentSchema.safeParse(prd);
 
@@ -232,10 +222,7 @@ export class PRDGenerationService {
         recommendations,
         qualityIssues: this.identifyQualityIssues(prd)
       };
-    } catch (error) {
-      process.stderr.write(`Error validating PRD completeness: ${error instanceof Error ? error.message : String(error)}\n`);
-      throw new Error(`Failed to validate PRD: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    }
+    });
   }
 
   /**
@@ -247,7 +234,7 @@ export class PRDGenerationService {
       acceptanceCriteria: string[];
     }
   }> {
-    try {
+    return safeCall(async () => {
       const userStoriesMap: { [featureId: string]: { userStories: string[]; acceptanceCriteria: string[] } } = {};
 
       for (const feature of features) {
@@ -260,10 +247,7 @@ export class PRDGenerationService {
       }
 
       return userStoriesMap;
-    } catch (error) {
-      process.stderr.write(`Error generating user stories: ${error instanceof Error ? error.message : String(error)}\n`);
-      throw new Error(`Failed to generate user stories: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    }
+    });
   }
 
   /**

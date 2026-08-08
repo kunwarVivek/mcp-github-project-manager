@@ -7,6 +7,13 @@
  */
 
 import { z } from 'zod';
+import {
+  AgentRoleSchema,
+  AgentRuntimeSchema,
+  AgentOperationalStatusSchema,
+  CheckoutStrategySchema,
+  BudgetResetPeriodSchema,
+} from '../../../domain/agent-orchestration-types';
 
 // ============================================================================
 // Agent Registration Schemas
@@ -14,8 +21,8 @@ import { z } from 'zod';
 
 export const registerAgentSchema = z.object({
   name: z.string().min(1, 'Agent name is required'),
-  role: z.enum(['engineer', 'reviewer', 'pm', 'designer', 'qa', 'devops', 'general']).default('engineer'),
-  runtime: z.enum(['claude-code', 'codex', 'cursor', 'cli', 'http', 'custom']).default('claude-code'),
+  role: AgentRoleSchema.default('engineer'),
+  runtime: AgentRuntimeSchema.default('claude-code'),
   capabilities: z.array(z.string()).default([]),
   budgetTokens: z.number().positive().optional(),
   metadata: z.record(z.string(), z.unknown()).optional(),
@@ -24,8 +31,8 @@ export const registerAgentSchema = z.object({
 export type RegisterAgentArgs = z.infer<typeof registerAgentSchema>;
 
 export const listAgentsSchema = z.object({
-  role: z.enum(['engineer', 'reviewer', 'pm', 'designer', 'qa', 'devops', 'general']).optional(),
-  status: z.enum(['idle', 'working', 'blocked', 'needs_review', 'offline', 'budget_exhausted']).optional(),
+  role: AgentRoleSchema.optional(),
+  status: AgentOperationalStatusSchema.optional(),
 });
 export type ListAgentsArgs = z.infer<typeof listAgentsSchema>;
 
@@ -41,9 +48,13 @@ export type DeregisterAgentArgs = z.infer<typeof deregisterAgentSchema>;
 export const checkoutTaskSchema = z.object({
   agentId: z.string().min(1, 'Agent ID is required'),
   projectId: z.string().optional(),
-  strategy: z.enum(['highest_priority', 'oldest_first', 'skills_match', 'milestone_deadline']).default('highest_priority'),
+  strategy: CheckoutStrategySchema.default('highest_priority'),
   labels: z.array(z.string()).optional(),
   milestone: z.string().optional(),
+  /** Skip issues whose declared blockers are still open (dependency-aware). */
+  skipBlocked: z.boolean().optional(),
+  /** Claim the next task from the review queue instead of the unclaimed pool. */
+  reviewQueue: z.boolean().optional(),
 });
 export type CheckoutTaskArgs = z.infer<typeof checkoutTaskSchema>;
 
@@ -127,7 +138,7 @@ export const setAgentBudgetSchema = z.object({
   totalTokens: z.number().positive(),
   warningThreshold: z.number().min(0).max(1).default(0.8),
   hardStop: z.boolean().default(true),
-  resetPeriod: z.enum(['daily', 'weekly', 'monthly', 'never']).optional(),
+  resetPeriod: BudgetResetPeriodSchema.optional(),
 });
 export type SetAgentBudgetArgs = z.infer<typeof setAgentBudgetSchema>;
 
@@ -141,3 +152,65 @@ export const checkWorkStatusSchema = z.object({
   prNumber: z.number().int().positive().optional(),
 });
 export type CheckWorkStatusArgs = z.infer<typeof checkWorkStatusSchema>;
+
+// ============================================================================
+// Reclaim Stale Tasks Schema
+// ============================================================================
+
+export const reclaimStaleTasksSchema = z.object({
+  timeoutMinutes: z.number().positive().optional(),
+});
+export type ReclaimStaleTasksArgs = z.infer<typeof reclaimStaleTasksSchema>;
+
+// ============================================================================
+// Record Usage Schema
+// ============================================================================
+
+export const recordUsageSchema = z.object({
+  agentId: z.string().min(1),
+  tokensUsed: z.number().nonnegative('Token usage must be non-negative'),
+});
+export type RecordUsageArgs = z.infer<typeof recordUsageSchema>;
+
+// ============================================================================
+// Review Workflow Schemas
+// ============================================================================
+
+export const submitForReviewSchema = z.object({
+  agentId: z.string().min(1),
+  taskId: z.string().min(1),
+  summary: z.string().optional(),
+});
+export type SubmitForReviewArgs = z.infer<typeof submitForReviewSchema>;
+
+export const approveTaskSchema = z.object({
+  reviewerId: z.string().min(1),
+  taskId: z.string().min(1),
+  summary: z.string().optional(),
+});
+export type ApproveTaskArgs = z.infer<typeof approveTaskSchema>;
+
+export const rejectTaskSchema = z.object({
+  reviewerId: z.string().min(1),
+  taskId: z.string().min(1),
+  feedback: z.string().optional(),
+});
+export type RejectTaskArgs = z.infer<typeof rejectTaskSchema>;
+
+// ============================================================================
+// Metrics Schema
+// ============================================================================
+
+export const getAgentMetricsSchema = z.object({
+  staleAfterMinutes: z.number().positive().optional(),
+});
+export type GetAgentMetricsArgs = z.infer<typeof getAgentMetricsSchema>;
+
+// ============================================================================
+// Project Field Setup Schema
+// ============================================================================
+
+export const setupAgentFieldsSchema = z.object({
+  projectId: z.string().min(1, 'Project ID is required'),
+});
+export type SetupAgentFieldsArgs = z.infer<typeof setupAgentFieldsSchema>;

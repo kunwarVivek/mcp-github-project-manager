@@ -1,3 +1,4 @@
+import { vi } from 'vitest';
 /**
  * Unit tests for project linking MCP tools
  *
@@ -32,9 +33,24 @@ import {
 import { GitHubRepositoryFactory } from '../../../src/infrastructure/github/GitHubRepositoryFactory.js';
 
 // Mock the repository factory
-jest.mock('../../../src/infrastructure/github/GitHubRepositoryFactory.js');
+vi.mock('../../../src/infrastructure/github/GitHubRepositoryFactory.js', () => {
+  return {
+    GitHubRepositoryFactory: vi.fn().mockImplementation(function() { return ({
+      createIssueRepository: vi.fn(),
+      createMilestoneRepository: vi.fn(),
+      createProjectRepository: vi.fn(),
+      createSprintRepository: vi.fn(),
+      createAutomationRuleRepository: vi.fn(),
+      createSubIssueRepository: vi.fn(),
+      createStatusUpdateRepository: vi.fn(),
+      getOctokit: vi.fn(),
+      getConfig: vi.fn(),
+      graphql: vi.fn(),
+    })),
+  };
+});
 
-const MockedFactory = GitHubRepositoryFactory as jest.MockedClass<typeof GitHubRepositoryFactory>;
+const MockedFactory = GitHubRepositoryFactory as MockedClass<typeof GitHubRepositoryFactory>;
 
 describe('Project Linking Tools', () => {
   describe('Input Schemas', () => {
@@ -358,17 +374,17 @@ describe('Project Linking Tools', () => {
 
   describe('Executors', () => {
     const originalEnv = process.env;
-    let mockGraphql: jest.Mock;
+    let mockGraphql: Mock;
 
     beforeEach(() => {
-      jest.resetAllMocks();
+      vi.resetAllMocks();
       process.env = { ...originalEnv, GITHUB_TOKEN: 'test-token' };
 
-      mockGraphql = jest.fn();
+      mockGraphql = vi.fn();
 
       MockedFactory.mockImplementation(() => ({
         graphql: mockGraphql,
-        getConfig: jest.fn().mockReturnValue({ owner: 'placeholder', repo: 'placeholder' }),
+        getConfig: vi.fn().mockReturnValue({ owner: 'placeholder', repo: 'placeholder' }),
       } as unknown as GitHubRepositoryFactory));
     });
 

@@ -3,7 +3,7 @@ import * as path from 'path';
 import * as zlib from 'zlib';
 import { promisify } from 'util';
 import { SyncMetadata } from '../../domain/resource-types';
-import { Logger } from '../logger/index';
+import { ILogger, Logger } from '../logger/index';
 
 const gzip = promisify(zlib.gzip);
 const gunzip = promisify(zlib.gunzip);
@@ -23,14 +23,15 @@ export interface PersistenceStats {
 }
 
 export class FilePersistenceAdapter {
-  private readonly logger = Logger.getInstance();
+  private readonly logger: ILogger;
   private readonly options: PersistenceOptions;
   private readonly metadataFile: string;
   private readonly lockFile: string;
   private readonly tempDir: string;
   private directoryInitialized = false;
 
-  constructor(options: Partial<PersistenceOptions> = {}) {
+  constructor(options: Partial<PersistenceOptions> = {}, logger?: ILogger) {
+    this.logger = logger ?? Logger.getInstance();
     this.options = {
       cacheDirectory: options.cacheDirectory || '.mcp-cache',
       enableCompression: options.enableCompression ?? true,

@@ -1,6 +1,7 @@
 import type { GitHubRepositoryFactory } from '../../infrastructure/github/GitHubRepositoryFactory';
 import type { AgentTaskContext } from '../../domain/agent-orchestration-types';
-import { mapErrorToMCPError } from '../utils/ErrorMapper';
+import { AIServiceFactory } from '../ai/AIServiceFactory';
+import { safeCall } from '../utils/safeCall';
 
 // ---------------------------------------------------------------------------
 // GraphQL response types (private to this module)
@@ -118,14 +119,21 @@ const FILE_CONTENT_QUERY = `
  */
 export class AgentContextService {
   private readonly factory: GitHubRepositoryFactory;
+  private readonly aiFactory: AIServiceFactory;
 
-  constructor(factory: GitHubRepositoryFactory) {
+  /**
+   * @param factory - GitHub repository factory for API access.
+   * @param aiFactory - AI service factory for optional AI-augmented context.
+   *     When omitted, defaults to the global singleton via `AIServiceFactory.getInstance()`.
+   */
+  constructor(factory: GitHubRepositoryFactory, aiFactory?: AIServiceFactory) {
     this.factory = factory;
+    this.aiFactory = aiFactory ?? AIServiceFactory.getInstance();
   }
 
   /** Build a full AgentTaskContext for the given issue. */
   async getTaskContext(issueId: string, issueNumber: number): Promise<AgentTaskContext> {
-    try {
+    return safeCall(async () => {
       const config = this.factory.getConfig();
 
       // Fetch issue details (including parent and milestone) in a single query
@@ -174,7 +182,7 @@ export class AgentContextService {
         };
       }
 
-      return {
+      const context: AgentTaskContext = {
         issue: {
           id: issue.id,
           number: issue.number,
@@ -192,14 +200,66 @@ export class AgentContextService {
         branchSuggestion: buildBranchName(issue.number, issue.title),
         acceptanceCriteria: extractAcceptanceCriteria(issue.body ?? ''),
       };
-    } catch (error) {
-      throw mapErrorToMCPError(error);
-    }
+
+      // AI augmentation (best-effort, graceful when unavailable)
+      context.aiSuggestions = await this.generateAISuggestions(context, labels);
+
+      return context;
+    });
   }
 
   // -----------------------------------------------------------------------
   // Private helpers
   // -----------------------------------------------------------------------
+
+  /**
+   * Best-effort AI augmentation of the task context: suggested acceptance
+   * criteria, a complexity estimate, and implementation guidance. Returns
+   * `undefined` when AI is unavailable, disabled via `AGENT_AI_CONTEXT=false`,
+   * or the call fails — the base GitHub-derived context is always returned
+   * regardless.
+   */
+  private async generateAISuggestions(
+    context: AgentTaskContext,
+    labels: string[],
+  ): Promise<AgentTaskContext['aiSuggestions']> {
+    // Opt-out for latency/cost-sensitive deployments
+    if (process.env.AGENT_AI_CONTEXT === 'false') return undefined;
+
+    try {
+      const model = this.aiFactory.getBestAvailableModel();
+      if (!model) return undefined;
+
+      const { generateObject } = await import('ai');
+      const { z } = await import('zod');
+
+      const schema = z.object({
+        acceptanceCriteria: z.array(z.string()).describe('Testable acceptance criteria for the task'),
+        complexityEstimate: z.number().int().min(1).max(13).describe('Story-point complexity estimate (1-13)'),
+        implementationGuidance: z.string().describe('Concise step-by-step implementation guidance'),
+        confidence: z.number().min(0).max(1).describe('Confidence in these suggestions (0-1)'),
+      });
+
+      const { object } = await generateObject({
+        model,
+        schema,
+        system: 'You are an expert engineering advisor generating task context for an autonomous coding agent. ' +
+          'Produce concise, actionable acceptance criteria, a complexity estimate, and implementation guidance. ' +
+          'Do not invent repository facts; base everything on the provided task details.',
+        prompt: `Task title: ${context.issue.title}\n\n` +
+          `Task body:\n${(context.issue.body ?? '').slice(0, 4000)}\n\n` +
+          `Labels: ${labels.join(', ') || 'none'}\n` +
+          `Milestone: ${context.milestone?.title ?? 'none'} (due ${context.milestone?.dueDate ?? 'n/a'})\n` +
+          `Existing acceptance criteria:\n${context.acceptanceCriteria.join('\n') || 'none'}\n\n` +
+          `Repository coding standards:\n${(context.codingStandards ?? 'none').slice(0, 3000)}\n`,
+        maxOutputTokens: 800,
+      });
+
+      return object;
+    } catch {
+      return undefined;
+    }
+  }
 
   /** Fetch issues from the same milestone (excluding the current issue). */
   private async fetchRelatedIssues(

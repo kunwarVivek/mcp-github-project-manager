@@ -82,7 +82,7 @@ export const logger = createLogger('MCP');
 /**
  * Singleton logger class for global access
  */
-export class Logger {
+export class Logger implements ILogger {
   private static instance: Logger;
   private logger: ConsoleLogger;
 

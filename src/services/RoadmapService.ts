@@ -18,7 +18,7 @@ import {
 import {
   ValidationError,
 } from "../domain/errors";
-import { mapErrorToMCPError } from './utils/ErrorMapper';
+import { safeCall } from './utils/safeCall';
 
 const CreateRoadmapSchema = z.object({
   project: z.object({
@@ -87,7 +87,7 @@ export class RoadmapService {
     project: Project;
     milestones: Array<Milestone & { issues: Issue[] }>;
   }> {
-    try {
+    return safeCall(async () => {
       const validatedData = CreateRoadmapSchema.parse(data);
 
       const projectData = {
@@ -107,42 +107,29 @@ export class RoadmapService {
       const milestones = [];
 
       for (const { milestone, issues } of validatedData.milestones) {
-        try {
-          const milestoneWithRequiredFields = {
-            ...milestone,
-            description: milestone.description || ''
-          };
+        const milestoneWithRequiredFields = {
+          ...milestone,
+          description: milestone.description || ''
+        };
 
-          const createdMilestone = await this.milestoneRepo.create(milestoneWithRequiredFields);
+        const createdMilestone = await this.milestoneRepo.create(milestoneWithRequiredFields);
 
-          const createdIssues = await Promise.all(
-            issues.map(async (issue) => {
-              try {
-                return await this.issueRepo.create({
-                  ...issue,
-                  milestoneId: createdMilestone.id,
-                });
-              } catch (error) {
-                throw mapErrorToMCPError(error);
-              }
-            })
-          );
+        const createdIssues = await Promise.all(
+          issues.map(async (issue) => {
+            return await this.issueRepo.create({
+              ...issue,
+              milestoneId: createdMilestone.id,
+            });
+          })
+        );
 
-          milestones.push({
-            ...createdMilestone,
-            issues: createdIssues,
-          });
-        } catch (error) {
-          throw mapErrorToMCPError(error);
-        }
+        milestones.push({
+          ...createdMilestone,
+          issues: createdIssues,
+        });
       }
 
       return { project, milestones };
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        throw new ValidationError(`Invalid roadmap data: ${error.message}`);
-      }
-      throw mapErrorToMCPError(error);
-    }
+    });
   }
 }

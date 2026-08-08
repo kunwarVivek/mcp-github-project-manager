@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, jest } from '@jest/globals';
+import { describe, it, expect, beforeEach, vi, Mocked, MockedClass, MockedFunction } from 'vitest';
 import { executeGeneratePRD } from '../../src/infrastructure/tools/ai-tasks/GeneratePRDTool';
 import { PRDGenerationService } from '../../src/services/PRDGenerationService';
 import { MCPResponse, MCPSuccessResponse } from '../../src/domain/mcp-types';
@@ -41,24 +41,31 @@ function extractContentFromMCPResponse(response: MCPResponse): string {
 }
 
 // Mock the PRD generation service
-jest.mock('../../src/services/PRDGenerationService');
+vi.mock('../../src/services/PRDGenerationService', () => ({
+  PRDGenerationService: vi.fn().mockImplementation(function() { return ({
+    generatePRDFromIdea: vi.fn(),
+    enhancePRD: vi.fn(),
+    extractFeaturesFromPRD: vi.fn(),
+    validatePRDCompleteness: vi.fn(),
+  })),
+}));
 
 describe('GeneratePRDTool', () => {
-  let mockPRDService: jest.Mocked<PRDGenerationService>;
+  let mockPRDService: Mocked<PRDGenerationService>;
 
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
 
     // Create mock service instance
     mockPRDService = {
-      generatePRDFromIdea: jest.fn(),
-      validatePRDCompleteness: jest.fn(),
-      enhancePRD: jest.fn(),
-      extractFeaturesFromPRD: jest.fn()
+      generatePRDFromIdea: vi.fn(),
+      validatePRDCompleteness: vi.fn(),
+      enhancePRD: vi.fn(),
+      extractFeaturesFromPRD: vi.fn()
     } as any;
 
     // Mock the constructor
-    (PRDGenerationService as jest.Mock).mockImplementation(() => mockPRDService);
+    (PRDGenerationService as Mock).mockImplementation(() => mockPRDService);
   });
 
   describe('executeGeneratePRD', () => {

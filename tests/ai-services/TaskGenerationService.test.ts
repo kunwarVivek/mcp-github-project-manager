@@ -1,15 +1,30 @@
-import { describe, it, expect, beforeEach, jest } from '@jest/globals';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { TaskGenerationService } from '../../src/services/TaskGenerationService';
 import { AIServiceFactory } from '../../src/services/ai/AIServiceFactory';
 import { TaskStatus, TaskPriority, TaskComplexity } from '../../src/domain/ai-types';
+import { generateObject, generateText } from 'ai';
 
 // Mock the AI service factory
-jest.mock('../../src/services/ai/AIServiceFactory');
+vi.mock('../../src/services/ai/AIServiceFactory', () => {
+  const mockFactory = {
+    getMainModel: vi.fn(),
+    getFallbackModel: vi.fn(),
+    getModel: vi.fn(),
+    getBestAvailableModel: vi.fn(),
+    getPRDModel: vi.fn(),
+    getResearchModel: vi.fn(),
+  };
+  return {
+    AIServiceFactory: {
+      getInstance: vi.fn().mockReturnValue(mockFactory),
+    },
+  };
+});
 
 // Mock the ai package
-jest.mock('ai', () => ({
-  generateObject: jest.fn(),
-  generateText: jest.fn()
+vi.mock('ai', () => ({
+  generateObject: vi.fn(),
+  generateText: vi.fn()
 }));
 
 describe('TaskGenerationService', () => {
@@ -17,8 +32,8 @@ describe('TaskGenerationService', () => {
   let mockAIService: any;
 
   beforeEach(() => {
-    jest.clearAllMocks();
-    jest.resetAllMocks();
+    vi.clearAllMocks();
+    vi.resetAllMocks();
 
     // Mock AI service - just needs to be a valid model object
     mockAIService = {
@@ -28,15 +43,15 @@ describe('TaskGenerationService', () => {
 
     // Mock AIServiceFactory
     const mockFactory = {
-      getMainModel: jest.fn().mockReturnValue(mockAIService),
-      getFallbackModel: jest.fn().mockReturnValue(mockAIService),
-      getModel: jest.fn().mockReturnValue(mockAIService),
-      getBestAvailableModel: jest.fn().mockReturnValue(mockAIService),
-      getPRDModel: jest.fn().mockReturnValue(mockAIService),
-      getResearchModel: jest.fn().mockReturnValue(mockAIService)
+      getMainModel: vi.fn().mockReturnValue(mockAIService),
+      getFallbackModel: vi.fn().mockReturnValue(mockAIService),
+      getModel: vi.fn().mockReturnValue(mockAIService),
+      getBestAvailableModel: vi.fn().mockReturnValue(mockAIService),
+      getPRDModel: vi.fn().mockReturnValue(mockAIService),
+      getResearchModel: vi.fn().mockReturnValue(mockAIService)
     };
 
-    (AIServiceFactory.getInstance as jest.Mock).mockReturnValue(mockFactory);
+    (AIServiceFactory.getInstance as Mock).mockReturnValue(mockFactory);
 
     service = new TaskGenerationService();
   });
@@ -78,7 +93,7 @@ describe('TaskGenerationService', () => {
         }
       ];
 
-      const { generateObject } = require('ai');
+      
       generateObject.mockResolvedValue({ object: mockTasks });
 
       const input = {
@@ -120,7 +135,7 @@ describe('TaskGenerationService', () => {
         updatedAt: new Date().toISOString()
       }));
 
-      const { generateObject } = require('ai');
+      
       generateObject.mockResolvedValue({ object: mockManyTasks.slice(0, 5) }); // Respect maxTasks limit
 
       const input = {
@@ -173,7 +188,7 @@ describe('TaskGenerationService', () => {
         }
       ];
 
-      const { generateObject } = require('ai');
+      
       generateObject.mockResolvedValue({ object: mockTasksWithSubtasks });
 
       const input = {
@@ -210,7 +225,7 @@ describe('TaskGenerationService', () => {
         ]
       };
 
-      const { generateText } = require('ai');
+      
       generateText.mockResolvedValue({
         text: 'Task complexity analysis: complexity 7, estimated 16 hours. Real-time functionality adds complexity. Consider breaking into smaller tasks.'
       });
@@ -238,7 +253,7 @@ describe('TaskGenerationService', () => {
       expect(result.estimatedHours).toBe(16);
       expect(result.analysis).toBeDefined();
       expect(result.recommendations).toEqual([]); // AITaskProcessor returns empty array for now
-      expect(require('ai').generateText).toHaveBeenCalledTimes(1);
+      expect(vi.mocked(generateText)).toHaveBeenCalledTimes(1);
     });
 
     it('should handle simple tasks with low complexity', async () => {
@@ -250,7 +265,7 @@ describe('TaskGenerationService', () => {
         recommendations: ['Straightforward implementation', 'Good starter task']
       };
 
-      require('ai').generateText.mockResolvedValue({
+      vi.mocked(generateText).mockResolvedValue({
         text: 'Task complexity analysis: complexity 2, estimated 3 hours. Straightforward implementation.'
       });
 
@@ -316,7 +331,7 @@ describe('TaskGenerationService', () => {
         }
       ];
 
-      require('ai').generateText.mockResolvedValue({
+      vi.mocked(generateText).mockResolvedValue({
         text: 'Subtasks: 1. Design dashboard layout 2. Implement dashboard components'
       });
 
@@ -349,7 +364,7 @@ describe('TaskGenerationService', () => {
       expect(result[0].title).toContain('Setup');
       expect(result[0].complexity).toBeLessThan(complexTask.complexity);
       expect(result[1].title).toContain('Implementation');
-      expect(require('ai').generateText).toHaveBeenCalledTimes(1);
+      expect(vi.mocked(generateText)).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -357,7 +372,7 @@ describe('TaskGenerationService', () => {
 
   describe('error handling', () => {
     it('should handle AI service errors gracefully', async () => {
-      const { generateObject } = require('ai');
+      
       generateObject.mockRejectedValue(new Error('AI service error'));
 
       const input = {
@@ -372,7 +387,7 @@ describe('TaskGenerationService', () => {
     });
 
     it('should handle empty PRD input gracefully', async () => {
-      const { generateObject } = require('ai');
+      
       generateObject.mockResolvedValue({ object: [] }); // Return empty tasks for empty PRD
 
       const emptyInput = {

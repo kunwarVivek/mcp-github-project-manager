@@ -1,6 +1,7 @@
 import { BaseGitHubRepository } from "./BaseRepository";
 import { Issue, CreateIssue, IssueRepository, IssueId } from "../../../domain/types";
 import { ResourceType, ResourceStatus } from "../../../domain/resource-types";
+import { parseResourceStatus, toStatusString } from '../../../domain/utils/StatusParser';
 
 interface GitHubIssue {
   id: string;
@@ -59,7 +60,7 @@ export class GitHubIssueRepository extends BaseGitHubRepository implements Issue
       number: parseInt(githubIssue.number.toString()),
       title: githubIssue.title,
       description: githubIssue.body || "",
-      status: githubIssue.state === "OPEN" ? ResourceStatus.ACTIVE : ResourceStatus.CLOSED,
+      status: parseResourceStatus(githubIssue.state, 'githubIssue'),
       assignees: githubIssue.assignees.nodes.map(node => node.login),
       labels: githubIssue.labels.nodes.map(node => node.name),
       milestoneId: githubIssue.milestone?.id,
@@ -99,13 +100,20 @@ export class GitHubIssueRepository extends BaseGitHubRepository implements Issue
       }
     `;
 
+    // createIssue requires the repository node ID (e.g. 'R_kgDO...'), not the
+    // configured repo name — resolve it first. Labels are passed as names
+    // (e.g. 'bug', 'priority:medium'); the mutation requires label node IDs,
+    // so resolve each name to its ID and skip labels that don't exist.
+    const repositoryId = await this.resolveRepositoryNodeId(this.owner, this.repo);
+    const labelIds = await this.resolveLabelNodeIds(data.labels);
+
     const response = await this.graphql<CreateIssueResponse>(mutation, {
       input: {
-        repositoryId: this.repo,
+        repositoryId,
         title: data.title,
         body: data.description,
         assigneeIds: data.assignees,
-        labelIds: data.labels,
+        labelIds,
         milestoneId: data.milestoneId,
       },
     });
@@ -142,14 +150,17 @@ export class GitHubIssueRepository extends BaseGitHubRepository implements Issue
       }
     `;
 
+    // updateIssue accepts labelIds (node IDs); resolve label names first
+    const labelIds = await this.resolveLabelNodeIds(data.labels);
+
     const response = await this.graphql<UpdateIssueResponse>(mutation, {
       input: {
         id,
         title: data.title,
         body: data.description,
-        state: data.status === ResourceStatus.CLOSED ? "CLOSED" : "OPEN",
+        state: toStatusString(data.status || ResourceStatus.ACTIVE, 'githubIssue'),
         assigneeIds: data.assignees,
-        labelIds: data.labels,
+        labelIds,
         milestoneId: data.milestoneId,
       },
     });

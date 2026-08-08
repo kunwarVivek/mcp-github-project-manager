@@ -1,3 +1,4 @@
+import { vi, Mock } from 'vitest';
 /**
  * Unit tests for BacklogPrioritizer
  *
@@ -10,18 +11,32 @@ import { AIServiceFactory } from '../../src/services/ai/AIServiceFactory';
 import { BacklogItem } from '../../src/domain/sprint-planning-types';
 
 // Mock AIServiceFactory
-jest.mock('../../src/services/ai/AIServiceFactory');
+vi.mock('../../src/services/ai/AIServiceFactory', () => {
+  const mockFactory = {
+    getMainModel: vi.fn(),
+    getFallbackModel: vi.fn(),
+    getModel: vi.fn(),
+    getBestAvailableModel: vi.fn(),
+    getPRDModel: vi.fn(),
+    getResearchModel: vi.fn(),
+  };
+  return {
+    AIServiceFactory: {
+      getInstance: vi.fn().mockReturnValue(mockFactory),
+    },
+  };
+});
 
-const mockGetModel = jest.fn().mockReturnValue(null);
-const mockGetBestAvailableModel = jest.fn().mockReturnValue(null);
+const mockGetModel = vi.fn().mockReturnValue(null);
+const mockGetBestAvailableModel = vi.fn().mockReturnValue(null);
 
 describe('BacklogPrioritizer', () => {
   let prioritizer: BacklogPrioritizer;
 
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
     // Re-setup mock for each test
-    (AIServiceFactory.getInstance as jest.Mock).mockReturnValue({
+    (AIServiceFactory.getInstance as Mock).mockReturnValue({
       getModel: mockGetModel,
       getBestAvailableModel: mockGetBestAvailableModel
     });

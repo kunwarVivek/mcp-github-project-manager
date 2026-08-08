@@ -2,7 +2,7 @@ import { generateText } from 'ai';
 import { InputSanitizer } from './utils/InputSanitizer';
 import { AIServiceFactory } from "./ai/AIServiceFactory";
 import { ProjectManagementService } from "./ProjectManagementService";
-import { Logger } from "../infrastructure/logger";
+import { ILogger, Logger } from "../infrastructure/logger";
 import { isProjectItem } from "../domain/type-guards";
 
 export interface IssueEnrichmentResult {
@@ -19,13 +19,14 @@ export interface IssueEnrichmentResult {
 }
 
 export class IssueEnrichmentService {
-  private logger: Logger;
+  private readonly logger: ILogger;
 
   constructor(
     private aiFactory: AIServiceFactory,
-    private projectService: ProjectManagementService
+    private projectService: ProjectManagementService,
+    logger?: ILogger
   ) {
-    this.logger = Logger.getInstance();
+    this.logger = logger ?? Logger.getInstance();
   }
 
   async enrichIssue(params: {

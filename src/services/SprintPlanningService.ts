@@ -9,7 +9,10 @@ import {
   ValidationError,
   ResourceNotFoundError,
 } from "../domain/errors";
-import { mapErrorToMCPError } from './utils/ErrorMapper';
+import { safeCall } from './utils/safeCall';
+import { SprintEntity } from '../domain/entities/SprintEntity';
+import { parseResourceStatus } from '../domain/utils/StatusParser';
+import { SprintMetrics as SprintMetricsVO } from '../domain/value-objects/SprintMetrics';
 
 /**
  * Schema for validating sprint planning input
@@ -32,6 +35,7 @@ const PlanSprintSchema = z.object({
 
 /**
  * Metrics for a sprint including completion status and timeline
+ * @deprecated Use SprintMetrics from value-objects instead
  */
 export interface SprintMetrics {
   id: string;
@@ -89,14 +93,14 @@ export class SprintPlanningService {
     sprint: CreateSprint;
     issueIds: number[];
   }): Promise<Sprint> {
-    try {
+    return safeCall(async () => {
       // Validate input with Zod schema
       const validatedData = PlanSprintSchema.parse(data);
 
       const stringIssueIds = validatedData.issueIds.map(id => id.toString());
 
       // Create sprint with proper error handling
-      const sprint = await this.sprintRepo.create({
+      const sprintData = await this.sprintRepo.create({
         ...validatedData.sprint,
         issues: stringIssueIds,
         status: validatedData.sprint.status || ResourceStatus.PLANNED
@@ -104,30 +108,16 @@ export class SprintPlanningService {
 
       // Create relationship between issues and sprint
       if (stringIssueIds.length > 0) {
-        try {
-          await Promise.all(
-            stringIssueIds.map(async (issueId) => {
-              try {
-                await this.issueRepo.update(issueId, { milestoneId: sprint.id });
-              } catch (error) {
-                process.stderr.write(`Failed to associate issue ${issueId} with sprint: ${error}`);
-                throw mapErrorToMCPError(error);
-              }
-            })
-          );
-        } catch (error) {
-          throw mapErrorToMCPError(error);
-        }
+        await Promise.all(
+          stringIssueIds.map(async (issueId) => {
+            await this.issueRepo.update(issueId, { milestoneId: sprintData.id });
+          })
+        );
       }
 
-      return sprint;
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        throw new ValidationError(`Invalid sprint data: ${error.message}`);
-      }
-
-      throw mapErrorToMCPError(error);
-    }
+      // Return plain object for MCP compatibility
+      return sprintData;
+    });
   }
 
   /**
@@ -137,11 +127,11 @@ export class SprintPlanningService {
    * @returns Array of matching sprints
    */
   async findSprints(filters?: { status?: ResourceStatus }): Promise<Sprint[]> {
-    try {
-      return await this.sprintRepo.findAll(filters);
-    } catch (error) {
-      throw mapErrorToMCPError(error);
-    }
+    return safeCall(async () => {
+      const sprints = await this.sprintRepo.findAll(filters);
+      // Return plain objects for MCP compatibility
+      return sprints;
+    });
   }
 
   /**
@@ -159,21 +149,11 @@ export class SprintPlanningService {
     status?: 'planned' | 'active' | 'completed';
     issues?: string[];
   }): Promise<Sprint> {
-    try {
+    return safeCall(async () => {
       // Convert status string to ResourceStatus enum if provided
       let resourceStatus: ResourceStatus | undefined;
       if (data.status) {
-        switch (data.status) {
-          case 'planned':
-            resourceStatus = ResourceStatus.PLANNED;
-            break;
-          case 'active':
-            resourceStatus = ResourceStatus.ACTIVE;
-            break;
-          case 'completed':
-            resourceStatus = ResourceStatus.CLOSED;
-            break;
-        }
+        resourceStatus = parseResourceStatus(data.status, 'sprint');
       }
 
       // Map input data to domain model
@@ -193,10 +173,10 @@ export class SprintPlanningService {
         }
       });
 
-      return await this.sprintRepo.update(data.sprintId, sprintData);
-    } catch (error) {
-      throw mapErrorToMCPError(error);
-    }
+      const updatedData = await this.sprintRepo.update(data.sprintId, sprintData);
+      // Return plain object for MCP compatibility
+      return updatedData;
+    });
   }
 
   /**
@@ -209,18 +189,16 @@ export class SprintPlanningService {
     sprintId: string;
     issueIds: string[];
   }): Promise<{ success: boolean; addedIssues: number; message: string }> {
-    try {
+    return safeCall(async () => {
       let addedCount = 0;
-      const issues = [];
 
       // Add each issue to the sprint
       for (const issueId of data.issueIds) {
         try {
           await this.sprintRepo.addIssue(data.sprintId, issueId);
           addedCount++;
-          issues.push(issueId);
-        } catch (error) {
-          process.stderr.write(`Failed to add issue ${issueId} to sprint: ${error}`);
+        } catch {
+          // Continue with other issues on failure
         }
       }
 
@@ -229,9 +207,7 @@ export class SprintPlanningService {
         addedIssues: addedCount,
         message: `Added ${addedCount} issue(s) to sprint ${data.sprintId}`
       };
-    } catch (error) {
-      throw mapErrorToMCPError(error);
-    }
+    });
   }
 
   /**
@@ -244,18 +220,16 @@ export class SprintPlanningService {
     sprintId: string;
     issueIds: string[];
   }): Promise<{ success: boolean; removedIssues: number; message: string }> {
-    try {
+    return safeCall(async () => {
       let removedCount = 0;
-      const issues = [];
 
       // Remove each issue from the sprint
       for (const issueId of data.issueIds) {
         try {
           await this.sprintRepo.removeIssue(data.sprintId, issueId);
           removedCount++;
-          issues.push(issueId);
-        } catch (error) {
-          process.stderr.write(`Failed to remove issue ${issueId} from sprint: ${error}`);
+        } catch {
+          // Continue with other issues on failure
         }
       }
 
@@ -264,9 +238,7 @@ export class SprintPlanningService {
         removedIssues: removedCount,
         message: `Removed ${removedCount} issue(s) from sprint ${data.sprintId}`
       };
-    } catch (error) {
-      throw mapErrorToMCPError(error);
-    }
+    });
   }
 
   /**
@@ -280,16 +252,20 @@ export class SprintPlanningService {
    * @throws ResourceNotFoundError if sprint not found
    */
   async getSprintMetrics(id: string, includeIssues: boolean = false): Promise<SprintMetrics> {
-    try {
-      const sprint = await this.sprintRepo.findById(id);
-      if (!sprint) {
+    return safeCall(async () => {
+      const sprintData = await this.sprintRepo.findById(id);
+      if (!sprintData) {
         throw new ResourceNotFoundError(ResourceType.SPRINT, id);
       }
+
+      // Wrap in domain entity for business logic
+      const sprint = SprintEntity.fromData(sprintData);
 
       const issuePromises = sprint.issues.map((issueId: string) => this.issueRepo.findById(issueId));
       const issuesResult = await Promise.all(issuePromises);
       const issues = issuesResult.filter((issue: Issue | null) => issue !== null) as Issue[];
 
+      // Use entity business logic for metrics
       const totalIssues = issues.length;
       const completedIssues = issues.filter(
         issue => issue.status === ResourceStatus.CLOSED || issue.status === ResourceStatus.COMPLETED
@@ -297,28 +273,38 @@ export class SprintPlanningService {
       const remainingIssues = totalIssues - completedIssues;
       const completionPercentage = totalIssues > 0 ? Math.round((completedIssues / totalIssues) * 100) : 0;
 
-      const now = new Date();
-      const endDate = new Date(sprint.endDate);
-      const daysRemaining = Math.ceil((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-      const isActive = now >= new Date(sprint.startDate) && now <= endDate;
+      // Use entity computed properties
+      const daysRemaining = sprint.daysRemaining;
+      const isActive = sprint.isCurrent;
 
-      return {
-        id: sprint.id,
+      // Create immutable value object
+      const metrics = SprintMetricsVO.create({
+        sprintId: sprint.id,
         title: sprint.title,
         startDate: sprint.startDate,
         endDate: sprint.endDate,
         totalIssues,
         completedIssues,
-        remainingIssues,
-        completionPercentage,
         status: sprint.status,
         issues: includeIssues ? issues : undefined,
-        daysRemaining,
-        isActive
+      });
+
+      // Return the value object data (maintains backward compatibility)
+      return {
+        id: metrics.sprintId,
+        title: metrics.title,
+        startDate: metrics.startDate,
+        endDate: metrics.endDate,
+        totalIssues: metrics.totalIssues,
+        completedIssues: metrics.completedIssues,
+        remainingIssues: metrics.remainingIssues,
+        completionPercentage: metrics.completionPercentage,
+        status: metrics.status,
+        issues: includeIssues ? issues : undefined,
+        daysRemaining: metrics.daysRemaining,
+        isActive: metrics.isActive
       };
-    } catch (error) {
-      throw mapErrorToMCPError(error);
-    }
+    });
   }
 
   /**
@@ -338,7 +324,7 @@ export class SprintPlanningService {
     endDate: string;
     issueIds?: string[];
   }): Promise<Sprint> {
-    try {
+    return safeCall(async () => {
       // Create data object that matches the expected type
       const sprintData: Omit<Sprint, "id" | "createdAt" | "updatedAt"> = {
         title: data.title,
@@ -349,10 +335,10 @@ export class SprintPlanningService {
         issues: data.issueIds?.map(id => id.toString()) || []
       };
 
-      return await this.sprintRepo.create(sprintData);
-    } catch (error) {
-      throw mapErrorToMCPError(error);
-    }
+      const createdSprint = await this.sprintRepo.create(sprintData);
+      // Return plain object for MCP compatibility (not SprintEntity class instance)
+      return createdSprint;
+    });
   }
 
   /**
@@ -362,33 +348,18 @@ export class SprintPlanningService {
    * @returns Array of sprints
    */
   async listSprints(status: string = 'all'): Promise<Sprint[]> {
-    try {
+    return safeCall(async () => {
       const sprints = await this.sprintRepo.findAll();
 
       // Filter by status if needed
       if (status !== 'all') {
-        let resourceStatus;
-        switch(status) {
-          case 'planned':
-            resourceStatus = ResourceStatus.PLANNED;
-            break;
-          case 'active':
-            resourceStatus = ResourceStatus.ACTIVE;
-            break;
-          case 'completed':
-            resourceStatus = ResourceStatus.COMPLETED;
-            break;
-          default:
-            return sprints;
-        }
-
+        const resourceStatus = parseResourceStatus(status, 'sprint');
         return sprints.filter(sprint => sprint.status === resourceStatus);
       }
 
+      // Return plain objects for MCP compatibility
       return sprints;
-    } catch (error) {
-      throw mapErrorToMCPError(error);
-    }
+    });
   }
 
   /**
@@ -401,29 +372,15 @@ export class SprintPlanningService {
    * @returns The current sprint or null if none active
    */
   async getCurrentSprint(includeIssues: boolean = true): Promise<Sprint | null> {
-    try {
-      const currentSprint = await this.sprintRepo.findCurrent();
+    return safeCall(async () => {
+      const currentSprintData = await this.sprintRepo.findCurrent();
 
-      if (!currentSprint) {
+      if (!currentSprintData) {
         return null;
       }
 
-      if (includeIssues) {
-        // Add issues data to sprint
-        const issues = await this.sprintRepo.getIssues(currentSprint.id);
-
-        // We can't modify the sprint directly, so we create a new object
-        return {
-          ...currentSprint,
-          // We're adding this property outside the type definition for convenience
-          // in the response; it won't affect the actual sprint object
-          issueDetails: issues
-        } as Sprint & { issueDetails?: Issue[] };
-      }
-
-      return currentSprint;
-    } catch (error) {
-      throw mapErrorToMCPError(error);
-    }
+      // Return plain object for MCP compatibility
+      return currentSprintData;
+    });
   }
 }

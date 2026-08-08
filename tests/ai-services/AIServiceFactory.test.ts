@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, jest } from '@jest/globals';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 
 // Set up environment variables before importing the factory
 process.env.ANTHROPIC_API_KEY = 'sk-ant-test-anthropic-key-12345';
@@ -17,7 +17,7 @@ describe('AIServiceFactory', () => {
   let originalEnv: NodeJS.ProcessEnv;
 
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
 
     // Save original environment
     originalEnv = { ...process.env };

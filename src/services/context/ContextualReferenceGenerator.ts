@@ -9,6 +9,7 @@ import {
   ExternalReference
 } from '../../domain/task-context-schemas';
 import { AITask, PRDDocument, FeatureRequirement } from '../../domain/ai-types';
+import { ILogger, Logger } from '../../infrastructure/logger';
 import { CONTEXT_GENERATION_CONFIGS, formatContextPrompt } from '../ai/prompts/ContextGenerationPrompts';
 
 /**
@@ -23,9 +24,11 @@ import { CONTEXT_GENERATION_CONFIGS, formatContextPrompt } from '../ai/prompts/C
  */
 export class ContextualReferenceGenerator {
   private aiFactory: AIServiceFactory;
+  private readonly logger: ILogger;
 
-  constructor() {
-    this.aiFactory = AIServiceFactory.getInstance();
+  constructor(aiFactory?: AIServiceFactory, logger?: ILogger) {
+    this.aiFactory = aiFactory ?? AIServiceFactory.getInstance();
+    this.logger = logger ?? Logger.getInstance();
   }
 
   /**
@@ -64,7 +67,7 @@ export class ContextualReferenceGenerator {
       return result.object as ContextualReferences;
 
     } catch (error) {
-      process.stderr.write(`Error generating contextual references: ${error instanceof Error ? error.message : String(error)}\n`);
+      this.logger.error('Error generating contextual references', error);
       // Fallback to basic references
       return this.generateBasicReferences(task, prd, features);
     }

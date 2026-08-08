@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, jest } from '@jest/globals';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { GitHubConfig } from '../../infrastructure/github/GitHubConfig';
 
 // Skip these tests in CI environment unless credentials are available

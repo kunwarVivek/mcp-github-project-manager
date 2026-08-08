@@ -8,6 +8,7 @@ The E2E test suite provides comprehensive testing for:
 - **40+ GitHub Project Management Tools** - Complete CRUD operations for projects, milestones, issues, sprints, etc.
 - **8 AI Task Management Tools** - PRD generation, task parsing, complexity analysis, etc.
 - **Complex Workflow Integration** - Multi-tool workflows and real-world scenarios
+- **Platform Validation** - Full platform capability testing
 - **Real API Testing** - Optional testing with actual GitHub and AI APIs
 
 ## Test Structure
@@ -17,6 +18,8 @@ src/__tests__/e2e/tools/
 ├── github-project-tools.e2e.ts      # GitHub project management tools
 ├── ai-task-tools.e2e.ts             # AI-powered task management tools
 ├── tool-integration-workflows.e2e.ts # Complex multi-tool workflows
+├── platform-validation.e2e.ts       # Full platform capability validation
+├── agent-orchestration.e2e.ts       # Agent orchestration lifecycle
 └── utils/
     └── MCPToolTestUtils.ts           # Test utilities and helpers
 ```
@@ -94,6 +97,42 @@ Tests complex workflows combining multiple tools:
 3. Identify overdue items
 4. Generate team recommendations
 
+### 4. Platform Validation (`platform-validation.e2e.ts`)
+
+Comprehensive validation of the full platform capabilities:
+
+**Domain Entities:**
+- Project creation with rich metadata
+- Milestone with deadline tracking
+- Issues with labels and priorities
+- Issue status updates
+
+**Agent Orchestration:**
+- Agent registration with capabilities
+- Task checkout with strategies
+- Heartbeat processing
+- Work product submission
+- Task completion
+
+**Budget Enforcement:**
+- Budget setting and checking
+- Token usage recording
+
+**Agent Metrics:**
+- Activity dashboard
+- Aggregate metrics
+
+**Review Workflow:**
+- Submit → Approve workflow
+- Reviewer agent support
+
+**Sprint Planning:**
+- Sprint creation and listing
+
+**Platform Integration:**
+- All 16 compound tools accessible
+- Domain entities created during test
+
 ## Running Tests
 
 ### Mock Tests (Default)
@@ -116,6 +155,8 @@ npm run test:e2e:tools:real
 npm run test:e2e:tools:real:github
 npm run test:e2e:tools:real:ai
 npm run test:e2e:tools:real:workflows
+npm run test:e2e:tools:real:agent
+npm run test:e2e:tools:real:platform
 
 # Run complete test suite (unit + integration + E2E)
 npm run test:all:real
@@ -187,6 +228,20 @@ The `MCPToolTestUtils` class provides:
 - **Error Testing** - Test tool validation and error handling
 - **Test Data Generation** - Generate realistic test data
 - **Credential Detection** - Skip tests when credentials are missing
+
+### Platform Validation Features
+
+The platform validation tests verify:
+
+| Capability | Validation |
+|------------|------------|
+| MCP Protocol | Tool discovery, schema validation |
+| Domain Entities | Project, Milestone, Issue CRUD |
+| Agent Orchestration | Register → Checkout → Work → Complete |
+| Budget Enforcement | Set, check, record usage |
+| Review Workflow | Submit → Approve cycle |
+| Sprint Planning | Create and list sprints |
+| Tool Accessibility | All 16 compound tools available |
 
 ## Test Configuration
 

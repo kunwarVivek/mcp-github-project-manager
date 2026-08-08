@@ -73,7 +73,7 @@ describe("MCP Server E2E Tests", () => {
         expect(mcpError).toBeInstanceOf(McpError);
         expect(mcpError.code).toBe(ErrorCode.ParseError);
       } catch (error) {
-        fail("Should have converted the rate limit error to an MCP error");
+        throw new Error("Should have converted the rate limit error to an MCP error");
       }
     });
   });

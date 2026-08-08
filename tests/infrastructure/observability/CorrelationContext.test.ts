@@ -1,3 +1,4 @@
+import { vi } from 'vitest';
 /**
  * Unit tests for CorrelationContext
  *
@@ -20,7 +21,7 @@ describe('CorrelationContext', () => {
 
   beforeEach(() => {
     // Suppress stderr output during tests
-    stderrSpy = jest.spyOn(process.stderr, 'write').mockImplementation(() => true);
+    stderrSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
   });
 
   afterEach(() => {

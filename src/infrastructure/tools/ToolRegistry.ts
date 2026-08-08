@@ -230,6 +230,13 @@ import {
   getBudgetStatusTool,
   setAgentBudgetTool,
   checkWorkStatusTool,
+  reclaimStaleTasksTool,
+  recordUsageTool,
+  submitForReviewTool,
+  approveTaskTool,
+  rejectTaskTool,
+  getAgentMetricsTool,
+  setupAgentFieldsTool,
 } from "./agent-orchestration-tools";
 
 // Compound tool schemas
@@ -613,6 +620,13 @@ export class ToolRegistry {
     this.registerTool(getBudgetStatusTool);
     this.registerTool(setAgentBudgetTool);
     this.registerTool(checkWorkStatusTool);
+    this.registerTool(reclaimStaleTasksTool);
+    this.registerTool(recordUsageTool);
+    this.registerTool(submitForReviewTool);
+    this.registerTool(approveTaskTool);
+    this.registerTool(rejectTaskTool);
+    this.registerTool(getAgentMetricsTool);
+    this.registerTool(setupAgentFieldsTool);
   }
 
   /**

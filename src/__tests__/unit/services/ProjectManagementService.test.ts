@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, jest } from '@jest/globals';
+import { beforeEach, describe, expect, it, vi, Mocked, MockedClass, MockedFunction } from 'vitest';
 import { ProjectManagementService } from '../../../services/ProjectManagementService';
 import { GitHubRepositoryFactory } from '../../../infrastructure/github/GitHubRepositoryFactory';
 import { SubIssueService } from '../../../services/SubIssueService';
@@ -33,24 +33,24 @@ import { ValidationError, ResourceNotFoundError, DomainError } from '../../../do
  */
 describe('ProjectManagementService', () => {
   let service: ProjectManagementService;
-  let mockGraphql: jest.MockedFunction<any>;
+  let mockGraphql: MockedFunction<any>;
   let mockFactory: GitHubRepositoryFactory;
 
   beforeEach(() => {
     // Clear all mocks
-    jest.clearAllMocks();
+    vi.clearAllMocks();
 
     // Create mock graphql function BEFORE service instantiation
-    mockGraphql = jest.fn() as jest.MockedFunction<any>;
+    mockGraphql = vi.fn() as MockedFunction<any>;
 
     // Create mock factory with graphql method pre-configured
     mockFactory = {
       graphql: mockGraphql,
-      createProjectRepository: jest.fn(),
-      createMilestoneRepository: jest.fn(),
-      createIssueRepository: jest.fn(),
-      createSprintRepository: jest.fn(),
-      createAutomationRuleRepository: jest.fn()
+      createProjectRepository: vi.fn(),
+      createMilestoneRepository: vi.fn(),
+      createIssueRepository: vi.fn(),
+      createSprintRepository: vi.fn(),
+      createAutomationRuleRepository: vi.fn()
     } as unknown as GitHubRepositoryFactory;
 
     // Create stub services (not used by setFieldValue/getFieldValue tests)

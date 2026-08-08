@@ -16,6 +16,7 @@ import { openai } from '@ai-sdk/openai';
 import { AIServiceFactory } from './AIServiceFactory.js';
 import { ConfidenceScorer, calculateWeightedScore, getConfidenceTier } from './ConfidenceScorer.js';
 import { EmbeddingCache } from '../../cache/EmbeddingCache.js';
+import { ILogger, Logger } from '../../infrastructure/logger';
 import {
   RELATED_ISSUE_SYSTEM_PROMPT,
   formatRelatedIssuePrompt
@@ -101,17 +102,19 @@ export class RelatedIssueLinkingService {
   private embeddingCache: EmbeddingCache;
   private confidenceScorer: ConfidenceScorer;
   private config: Required<Pick<RelatedIssueLinkingConfig, 'includeSemanticSimilarity' | 'includeDependencies' | 'includeComponentGrouping'>>;
+  private readonly logger: ILogger;
 
   /**
    * Create a new related issue linking service.
    *
    * @param config - Optional configuration overrides
    */
-  constructor(config?: Partial<RelatedIssueLinkingConfig>) {
-    this.aiFactory = AIServiceFactory.getInstance();
+  constructor(aiFactory?: AIServiceFactory, config?: Partial<RelatedIssueLinkingConfig>, logger?: ILogger) {
+    this.aiFactory = aiFactory ?? AIServiceFactory.getInstance();
     this.embeddingCache = new EmbeddingCache();
     this.confidenceScorer = new ConfidenceScorer();
     this.config = { ...DEFAULT_CONFIG, ...config };
+    this.logger = logger ?? Logger.getInstance();
   }
 
   /**
@@ -150,7 +153,7 @@ export class RelatedIssueLinkingService {
         });
         allRelationships.push(...semanticRelations);
       } catch (error) {
-        process.stderr.write(`[RelatedIssueLinking] Semantic analysis failed: ${error}\n`);
+        this.logger.error('[RelatedIssueLinking] Semantic analysis failed', error);
         // Continue with other strategies
       }
     }
@@ -425,7 +428,7 @@ export class RelatedIssueLinkingService {
 
       return relationships;
     } catch (error) {
-      process.stderr.write(`[RelatedIssueLinking] AI dependency analysis failed: ${error}\n`);
+      this.logger.error('[RelatedIssueLinking] AI dependency analysis failed', error);
       return [];
     }
   }

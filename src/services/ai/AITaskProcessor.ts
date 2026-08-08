@@ -1,6 +1,7 @@
 import { generateObject, generateText } from 'ai';
 import { z } from 'zod';
 import { AIServiceFactory } from './AIServiceFactory';
+import { ILogger, Logger } from '../../infrastructure/logger';
 import {
   PRDDocumentSchema,
   AITaskSchema,
@@ -40,9 +41,17 @@ import { v4 as uuidv4 } from 'uuid';
 export class AITaskProcessor {
   private aiFactory: AIServiceFactory;
   private confidenceScorer: ConfidenceScorer;
+  private readonly logger: ILogger;
 
-  constructor() {
-    this.aiFactory = AIServiceFactory.getInstance();
+  /**
+   * @param aiFactory - AI service factory for model access. When omitted (DI mode),
+   *   defaults to the global singleton via `AIServiceFactory.getInstance()`.
+   * @param logger - Logger instance for diagnostics. When omitted, defaults to
+   *   the global singleton via `Logger.getInstance()`.
+   */
+  constructor(aiFactory?: AIServiceFactory, logger?: ILogger) {
+    this.aiFactory = aiFactory ?? AIServiceFactory.getInstance();
+    this.logger = logger ?? Logger.getInstance();
     this.confidenceScorer = new ConfidenceScorer();
   }
 
@@ -106,7 +115,7 @@ export class AITaskProcessor {
 
       return prd;
     } catch (error) {
-      process.stderr.write(`Error generating PRD from idea: ${error instanceof Error ? error.message : String(error)}\n`);
+      this.logger.error('Error generating PRD from idea', error);
       throw new Error(`Failed to generate PRD: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
@@ -226,7 +235,7 @@ export class AITaskProcessor {
         lowConfidenceSections: aggregated.lowConfidenceSections
       };
     } catch (error) {
-      process.stderr.write(`Error generating PRD with confidence: ${error instanceof Error ? error.message : String(error)}\n`);
+      this.logger.error('Error generating PRD with confidence', error);
       throw new Error(`Failed to generate PRD: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
@@ -265,7 +274,7 @@ export class AITaskProcessor {
 
       return prd;
     } catch (error) {
-      process.stderr.write(`Error enhancing PRD: ${error}\n`);
+      this.logger.error('Error enhancing PRD', error);
       throw new Error(`Failed to enhance PRD: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
@@ -296,7 +305,7 @@ export class AITaskProcessor {
         id: feature.id || uuidv4()
       }));
     } catch (error) {
-      process.stderr.write(`Error extracting features from PRD: ${error instanceof Error ? error.message : String(error)}\n`);
+      this.logger.error('Error extracting features from PRD', error);
       throw new Error(`Failed to extract features: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
@@ -344,7 +353,7 @@ export class AITaskProcessor {
         tags: task.tags || []
       }));
     } catch (error) {
-      process.stderr.write(`Error generating tasks from PRD: ${error}\n`);
+      this.logger.error('Error generating tasks from PRD', error);
       throw new Error(`Failed to generate tasks: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
@@ -399,7 +408,7 @@ export class AITaskProcessor {
         recommendations: [] // Would extract from structured response
       };
     } catch (error) {
-      process.stderr.write(`Error analyzing task complexity: ${error instanceof Error ? error.message : String(error)}\n`);
+      this.logger.error('Error analyzing task complexity', error);
       throw new Error(`Failed to analyze complexity: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
@@ -458,7 +467,7 @@ export class AITaskProcessor {
         }
       ];
     } catch (error) {
-      process.stderr.write(`Error expanding task into subtasks: ${error}\n`);
+      this.logger.error('Error expanding task into subtasks', error);
       throw new Error(`Failed to expand task: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
@@ -501,7 +510,7 @@ export class AITaskProcessor {
 
       return prioritizedTasks;
     } catch (error) {
-      process.stderr.write(`Error prioritizing tasks: ${error}\n`);
+      this.logger.error('Error prioritizing tasks', error);
       throw new Error(`Failed to prioritize tasks: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
@@ -537,7 +546,7 @@ export class AITaskProcessor {
     try {
       const model = this.aiFactory.getBestAvailableModel();
       if (!model) {
-        process.stderr.write('No AI models available for testing\n');
+        this.logger.warn('No AI models available for testing');
         return false;
       }
 
@@ -548,7 +557,7 @@ export class AITaskProcessor {
       });
       return true;
     } catch (error) {
-      process.stderr.write(`AI connection test failed: ${error}\n`);
+      this.logger.error('AI connection test failed', error);
       return false;
     }
   }

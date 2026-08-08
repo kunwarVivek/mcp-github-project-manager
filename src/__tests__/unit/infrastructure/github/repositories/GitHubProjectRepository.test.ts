@@ -1,5 +1,5 @@
 // filepath: /Users/vivek/grad-saas/mcp-github-project-manager/src/__tests__/unit/infrastructure/github/repositories/GitHubProjectRepository.test.ts
-import { beforeEach, describe, expect, it, jest } from "@jest/globals";
+import { beforeEach, describe, expect, it, vi, Mocked, MockedClass, MockedFunction } from 'vitest';
 import { Octokit } from "@octokit/rest";
 import { CreateProject, ProjectId } from "../../../../../domain/types";
 import { ResourceStatus } from "../../../../../domain/resource-types";
@@ -8,23 +8,23 @@ import { GitHubProjectRepository } from "../../../../../infrastructure/github/re
 import { mockData } from "../../../../setup";
 
 // Mock Octokit
-jest.mock("@octokit/rest");
+vi.mock("@octokit/rest");
 
 describe("GitHubProjectRepository", () => {
   let repository: GitHubProjectRepository;
-  let mockOctokit: jest.Mocked<Octokit>;
+  let mockOctokit: Mocked<Octokit>;
   let config: GitHubConfig;
 
   beforeEach(() => {
     // Clear all mocks
-    jest.clearAllMocks();
+    vi.clearAllMocks();
 
     // Create mock Octokit instance
     mockOctokit = {
-      graphql: jest.fn(),
+      graphql: vi.fn(),
     } as any;
 
-    (Octokit as jest.MockedClass<typeof Octokit>).mockImplementation(
+    (Octokit as MockedClass<typeof Octokit>).mockImplementation(
       () => mockOctokit
     );
 

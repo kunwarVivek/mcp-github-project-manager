@@ -1,6 +1,6 @@
 import { ResourceType } from '../../domain/resource-types';
 import { ResourceEvent } from './GitHubWebhookHandler';
-import { Logger } from '../logger/index';
+import { ILogger, Logger } from '../logger/index';
 import { EventEmitter } from 'events';
 
 export interface EventFilter {
@@ -32,15 +32,16 @@ export interface SubscriptionStats {
 }
 
 export class EventSubscriptionManager extends EventEmitter {
-  private readonly logger = Logger.getInstance();
+  private readonly logger: ILogger;
   private subscriptions = new Map<string, EventSubscription>();
   private clientSubscriptions = new Map<string, Set<string>>();
   private resourceTypeIndex = new Map<ResourceType, Set<string>>();
   private eventTypeIndex = new Map<ResourceEvent['type'], Set<string>>();
 
-  constructor() {
+  constructor(logger?: ILogger) {
     super();
     this.setMaxListeners(1000); // Allow many event listeners
+    this.logger = logger ?? Logger.getInstance();
   }
 
   /**

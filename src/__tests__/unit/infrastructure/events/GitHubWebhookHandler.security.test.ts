@@ -1,4 +1,4 @@
-import { describe, expect, it } from '@jest/globals';
+import { describe, expect, it } from 'vitest';
 import * as crypto from 'crypto';
 import { GitHubWebhookHandler } from '../../../../infrastructure/events/GitHubWebhookHandler';
 

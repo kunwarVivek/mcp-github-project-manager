@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, jest } from "@jest/globals";
+import { beforeEach, describe, expect, it, vi, Mocked, MockedClass, MockedFunction } from 'vitest';
 import { Octokit } from "@octokit/rest";
 import { GitHubConfig } from "../../../../../infrastructure/github/GitHubConfig";
 import { GitHubIssueRepository } from "../../../../../infrastructure/github/repositories/GitHubIssueRepository";
@@ -6,32 +6,32 @@ import { ResourceType, ResourceStatus } from "../../../../../domain/resource-typ
 import { Issue } from "../../../../../domain/types";
 
 // Mock Octokit
-jest.mock("@octokit/rest");
+vi.mock("@octokit/rest");
 
 describe("GitHubIssueRepository", () => {
   let repository: GitHubIssueRepository;
-  let mockOctokit: jest.Mocked<Octokit>;
+  let mockOctokit: Mocked<Octokit>;
   let config: GitHubConfig;
 
   beforeEach(() => {
     // Clear all mocks
-    jest.clearAllMocks();
+    vi.clearAllMocks();
 
     // Create mock Octokit instance with GraphQL method
     mockOctokit = {
-      graphql: jest.fn(),
+      graphql: vi.fn(),
       rest: {
         issues: {
-          create: jest.fn(),
-          update: jest.fn(),
-          get: jest.fn(),
-          list: jest.fn(),
-          listForRepo: jest.fn()
+          create: vi.fn(),
+          update: vi.fn(),
+          get: vi.fn(),
+          list: vi.fn(),
+          listForRepo: vi.fn()
         }
       }
     } as any;
 
-    (Octokit as jest.MockedClass<typeof Octokit>).mockImplementation(
+    (Octokit as MockedClass<typeof Octokit>).mockImplementation(
       () => mockOctokit
     );
 

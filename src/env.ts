@@ -133,6 +133,19 @@ export const SYNC_INTERVAL_MS = getNumericConfigValue("SYNC_INTERVAL_MS", 0); //
 export const CACHE_DIRECTORY = getOptionalConfigValue("CACHE_DIRECTORY", ".mcp-cache");
 export const SYNC_RESOURCES = getOptionalConfigValue("SYNC_RESOURCES", "PROJECT,MILESTONE,ISSUE,SPRINT").split(',');
 
+// Agent orchestration — auto-reclaim scheduler
+// The scheduler is a server-side background sweep that detects agents whose
+// heartbeat has gone stale (crashed/disconnected harnesses) and reclaims their
+// tasks back to the unclaimed pool, then flags the agent offline. This is what
+// makes the swarm self-healing: one crash no longer blocks a task forever.
+//
+// Note: the first sweep may create the `agent-registry` issue + label in the
+// repo (the registry's documented bootstrap mechanism). Disable entirely with
+// AGENT_RECLAIM_ENABLED=false or set AGENT_RECLAIM_INTERVAL_MS=0.
+export const AGENT_RECLAIM_ENABLED = getBooleanConfigValue("AGENT_RECLAIM_ENABLED", true);
+export const AGENT_RECLAIM_INTERVAL_MS = getNumericConfigValue("AGENT_RECLAIM_INTERVAL_MS", 300000); // 5 min; 0 = disabled
+export const AGENT_STALE_AFTER_MINUTES = getNumericConfigValue("AGENT_STALE_AFTER_MINUTES", 30);
+
 // Event system configuration
 export const WEBHOOK_SECRET = getOptionalConfigValue("WEBHOOK_SECRET", "");
 // Security: webhook signature validation fails closed by default. When no

@@ -1,3 +1,4 @@
+import { vi } from 'vitest';
 /**
  * Unit tests for sub-issue MCP tools
  *
@@ -29,9 +30,24 @@ import {
 import { GitHubRepositoryFactory } from '../../../src/infrastructure/github/GitHubRepositoryFactory.js';
 
 // Mock the repository factory
-jest.mock('../../../src/infrastructure/github/GitHubRepositoryFactory.js');
+vi.mock('../../../src/infrastructure/github/GitHubRepositoryFactory.js', () => {
+  return {
+    GitHubRepositoryFactory: vi.fn().mockImplementation(function() { return ({
+      createIssueRepository: vi.fn(),
+      createMilestoneRepository: vi.fn(),
+      createProjectRepository: vi.fn(),
+      createSprintRepository: vi.fn(),
+      createAutomationRuleRepository: vi.fn(),
+      createSubIssueRepository: vi.fn(),
+      createStatusUpdateRepository: vi.fn(),
+      getOctokit: vi.fn(),
+      getConfig: vi.fn(),
+      graphql: vi.fn(),
+    })),
+  };
+});
 
-const MockedFactory = GitHubRepositoryFactory as jest.MockedClass<typeof GitHubRepositoryFactory>;
+const MockedFactory = GitHubRepositoryFactory as MockedClass<typeof GitHubRepositoryFactory>;
 
 describe('Sub-issue Tools', () => {
   describe('Input Schemas', () => {
@@ -254,33 +270,33 @@ describe('Sub-issue Tools', () => {
 
   describe('Executors', () => {
     const originalEnv = process.env;
-    let mockSubIssueRepo: jest.Mocked<{
-      addSubIssue: jest.Mock;
-      listSubIssues: jest.Mock;
-      getParentIssue: jest.Mock;
-      reprioritizeSubIssue: jest.Mock;
-      removeSubIssue: jest.Mock;
+    let mockSubIssueRepo: Mocked<{
+      addSubIssue: Mock;
+      listSubIssues: Mock;
+      getParentIssue: Mock;
+      reprioritizeSubIssue: Mock;
+      removeSubIssue: Mock;
     }>;
-    let mockGraphql: jest.Mock;
+    let mockGraphql: Mock;
 
     beforeEach(() => {
-      jest.resetAllMocks();
+      vi.resetAllMocks();
       process.env = { ...originalEnv, GITHUB_TOKEN: 'test-token' };
 
       mockSubIssueRepo = {
-        addSubIssue: jest.fn(),
-        listSubIssues: jest.fn(),
-        getParentIssue: jest.fn(),
-        reprioritizeSubIssue: jest.fn(),
-        removeSubIssue: jest.fn(),
+        addSubIssue: vi.fn(),
+        listSubIssues: vi.fn(),
+        getParentIssue: vi.fn(),
+        reprioritizeSubIssue: vi.fn(),
+        removeSubIssue: vi.fn(),
       };
 
-      mockGraphql = jest.fn();
+      mockGraphql = vi.fn();
 
       MockedFactory.mockImplementation(() => ({
-        createSubIssueRepository: jest.fn().mockReturnValue(mockSubIssueRepo),
+        createSubIssueRepository: vi.fn().mockReturnValue(mockSubIssueRepo),
         graphql: mockGraphql,
-        getConfig: jest.fn().mockReturnValue({ owner: 'octocat', repo: 'hello-world' }),
+        getConfig: vi.fn().mockReturnValue({ owner: 'octocat', repo: 'hello-world' }),
       } as unknown as GitHubRepositoryFactory));
     });
 

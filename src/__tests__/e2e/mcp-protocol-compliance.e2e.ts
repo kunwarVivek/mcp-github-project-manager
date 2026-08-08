@@ -1,5 +1,5 @@
 import { spawn, ChildProcess } from 'child_process';
-import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from '@jest/globals';
+import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
 import { join } from 'path';
 import { existsSync } from 'fs';
 
@@ -11,6 +11,14 @@ const projectRoot = process.cwd();
  * by spawning the actual server process and testing the stdio transport layer
  */
 describe('MCP Protocol Compliance E2E Tests', () => {
+  // These tests spawn real child processes and need real timers for polling.
+  // setup.ts sets vi.useFakeTimers() in beforeEach, which freezes setTimeout
+  // and breaks the inline polling loops used to wait for server startup/responses.
+  // Use beforeEach (not beforeAll) to override setup.ts's fake timers
+  // which runs before each test and freezes setTimeout.
+  beforeEach(() => {
+    vi.useRealTimers();
+  });
   const serverPath = join(projectRoot, 'build/index.js');
   let serverProcess: ChildProcess;
   const testTimeout = 10000;

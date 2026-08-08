@@ -1,19 +1,41 @@
-import { describe, it, expect, beforeEach, jest } from '@jest/globals';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { RoadmapPlanningService } from '../../src/services/RoadmapPlanningService';
 import { AIServiceFactory } from '../../src/services/ai/AIServiceFactory';
 import { ProjectManagementService } from '../../src/services/ProjectManagementService';
+import { generateText, generateObject } from 'ai';
 
 // Mock the AI service factory
-jest.mock('../../src/services/ai/AIServiceFactory');
+vi.mock('../../src/services/ai/AIServiceFactory', () => {
+  const mockFactory = {
+    getMainModel: vi.fn(),
+    getFallbackModel: vi.fn(),
+    getModel: vi.fn(),
+    getBestAvailableModel: vi.fn(),
+    getPRDModel: vi.fn(),
+    getResearchModel: vi.fn(),
+  };
+  return {
+    AIServiceFactory: {
+      getInstance: vi.fn().mockReturnValue(mockFactory),
+    },
+  };
+});
 
 // Mock the ai package
-jest.mock('ai', () => ({
-  generateText: jest.fn(),
-  generateObject: jest.fn()
+vi.mock('ai', () => ({
+  generateText: vi.fn(),
+  generateObject: vi.fn()
 }));
 
 // Mock ProjectManagementService
-jest.mock('../../src/services/ProjectManagementService');
+vi.mock('../../src/services/ProjectManagementService', () => ({
+  ProjectManagementService: vi.fn().mockImplementation(function() { return ({
+    listProjectItems: vi.fn(),
+    updateProjectItem: vi.fn(),
+    createIssue: vi.fn(),
+    createAutomationRule: vi.fn(),
+  })),
+}));
 
 describe('RoadmapPlanningService', () => {
   let service: RoadmapPlanningService;
@@ -21,7 +43,7 @@ describe('RoadmapPlanningService', () => {
   let mockProjectService: any;
 
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
 
     // Mock AI service - just needs to be a valid model object
     mockAIService = {
@@ -31,24 +53,24 @@ describe('RoadmapPlanningService', () => {
 
     // Mock AIServiceFactory
     const mockFactory = {
-      getMainModel: jest.fn().mockReturnValue(mockAIService),
-      getFallbackModel: jest.fn().mockReturnValue(mockAIService),
-      getModel: jest.fn().mockReturnValue(mockAIService),
-      getBestAvailableModel: jest.fn().mockReturnValue(mockAIService),
-      getPRDModel: jest.fn().mockReturnValue(mockAIService),
-      getResearchModel: jest.fn().mockReturnValue(mockAIService)
+      getMainModel: vi.fn().mockReturnValue(mockAIService),
+      getFallbackModel: vi.fn().mockReturnValue(mockAIService),
+      getModel: vi.fn().mockReturnValue(mockAIService),
+      getBestAvailableModel: vi.fn().mockReturnValue(mockAIService),
+      getPRDModel: vi.fn().mockReturnValue(mockAIService),
+      getResearchModel: vi.fn().mockReturnValue(mockAIService)
     };
 
-    (AIServiceFactory.getInstance as jest.Mock).mockReturnValue(mockFactory);
+    (AIServiceFactory.getInstance as Mock).mockReturnValue(mockFactory);
 
     // Mock ProjectManagementService methods
     mockProjectService = {
-      listProjectItems: jest.fn(),
-      createMilestone: jest.fn(),
-      updateProjectItem: jest.fn()
+      listProjectItems: vi.fn(),
+      createMilestone: vi.fn(),
+      updateProjectItem: vi.fn()
     };
 
-    (ProjectManagementService as jest.Mock).mockImplementation(() => mockProjectService);
+    (ProjectManagementService as Mock).mockImplementation(() => mockProjectService);
 
     // Use mockProjectService directly since ProjectManagementService is mocked
     // This avoids TypeScript errors from the new 7-argument constructor signature
@@ -120,7 +142,7 @@ describe('RoadmapPlanningService', () => {
 
       mockProjectService.listProjectItems.mockResolvedValue(mockIssues.items);
 
-      const { generateText } = require('ai');
+      
       generateText.mockResolvedValue({
         text: JSON.stringify(mockRoadmapResponse)
       });
@@ -170,7 +192,7 @@ describe('RoadmapPlanningService', () => {
         ]
       };
 
-      const { generateText } = require('ai');
+      
       generateText.mockResolvedValue({
         text: JSON.stringify(mockRoadmap)
       });
@@ -214,7 +236,7 @@ describe('RoadmapPlanningService', () => {
         }))
       };
 
-      const { generateText } = require('ai');
+      
       generateText.mockResolvedValue({
         text: JSON.stringify(mockComplexRoadmap)
       });
@@ -333,7 +355,7 @@ describe('RoadmapPlanningService', () => {
         sprints: []
       };
 
-      const { generateText } = require('ai');
+      
       generateText.mockResolvedValue({
         text: `Here's the roadmap analysis:\n\n${JSON.stringify(mockResponse)}\n\nThis roadmap covers all key aspects.`
       });
@@ -352,7 +374,7 @@ describe('RoadmapPlanningService', () => {
     });
 
     it('should handle malformed JSON in AI response', async () => {
-      const { generateText } = require('ai');
+      
       generateText.mockResolvedValue({
         text: 'This is not valid JSON { invalid syntax'
       });
@@ -373,8 +395,8 @@ describe('RoadmapPlanningService', () => {
   describe('error handling', () => {
     it('should throw error when AI service is unavailable', async () => {
       const mockFactory = AIServiceFactory.getInstance();
-      (mockFactory.getModel as jest.Mock).mockReturnValue(null);
-      (mockFactory.getBestAvailableModel as jest.Mock).mockReturnValue(null);
+      (mockFactory.getModel as Mock).mockReturnValue(null);
+      (mockFactory.getBestAvailableModel as Mock).mockReturnValue(null);
 
       mockProjectService.listProjectItems.mockResolvedValue([
         { id: 'test', title: 'Test', body: 'Test' }
@@ -406,7 +428,7 @@ describe('RoadmapPlanningService', () => {
         { id: 'test', title: 'Test', body: 'Test' }
       ]);
 
-      const { generateText } = require('ai');
+      
       generateText.mockRejectedValue(new Error('AI model timeout'));
 
       await expect(
@@ -424,7 +446,7 @@ describe('RoadmapPlanningService', () => {
         { id: 'test', title: 'Test', body: 'Test' }
       ]);
 
-      const { generateText } = require('ai');
+      
       generateText.mockResolvedValue({
         text: JSON.stringify({
           roadmap: { phases: [] },
@@ -448,7 +470,7 @@ describe('RoadmapPlanningService', () => {
         { id: 'test', title: 'Test', body: 'Test' }
       ]);
 
-      const { generateText } = require('ai');
+      
       generateText.mockResolvedValue({
         text: JSON.stringify({
           roadmap: { phases: [] },
@@ -490,7 +512,7 @@ describe('RoadmapPlanningService', () => {
 
       mockProjectService.listProjectItems.mockResolvedValue(mockIssues.items);
 
-      const { generateText } = require('ai');
+      
       generateText.mockResolvedValue({
         text: JSON.stringify({
           roadmap: { phases: [] },

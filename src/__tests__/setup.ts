@@ -1,12 +1,13 @@
+import { vi } from 'vitest';
 import { ResourceType, ResourceStatus } from "../domain/resource-types";
 import { Project, Milestone, Issue } from "../domain/types";
 import { TestFactory } from "./test-utils";
 
 export const mockCache = {
-  set: jest.fn(),
-  get: jest.fn(),
-  delete: jest.fn(),
-  clear: jest.fn(),
+  set: vi.fn(),
+  get: vi.fn(),
+  delete: vi.fn(),
+  clear: vi.fn(),
 };
 
 export const mockOwner = "test-owner";
@@ -103,31 +104,31 @@ export const mockData = {
 
 // Mock Factory Functions
 export const createMockRepository = () => ({
-  graphql: jest.fn(),
-  rest: jest.fn(),
+  graphql: vi.fn(),
+  rest: vi.fn(),
 });
 
-jest.mock("../infrastructure/cache/ResourceCache", () => ({
+vi.mock("../infrastructure/cache/ResourceCache", () => ({
   ResourceCache: {
-    getInstance: jest.fn().mockReturnValue(mockCache),
+    getInstance: vi.fn().mockReturnValue(mockCache),
   },
 }));
 
-jest.mock("@octokit/rest", () => ({
-  Octokit: jest.fn().mockImplementation(() => ({
-    graphql: jest.fn(),
+vi.mock("@octokit/rest", () => ({
+  Octokit: vi.fn().mockImplementation(() => ({
+    graphql: vi.fn(),
     rest: {
       issues: {
-        create: jest.fn(),
-        update: jest.fn(),
-        get: jest.fn(),
-        list: jest.fn(),
+        create: vi.fn(),
+        update: vi.fn(),
+        get: vi.fn(),
+        list: vi.fn(),
       },
       projects: {
-        create: jest.fn(),
-        update: jest.fn(),
-        get: jest.fn(),
-        list: jest.fn(),
+        create: vi.fn(),
+        update: vi.fn(),
+        get: vi.fn(),
+        list: vi.fn(),
       },
     },
   })),

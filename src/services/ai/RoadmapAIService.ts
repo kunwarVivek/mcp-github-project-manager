@@ -110,8 +110,8 @@ export class RoadmapAIService {
   private aiFactory: AIServiceFactory;
   private estimationCalibrator: EstimationCalibrator;
 
-  constructor(estimationCalibrator?: EstimationCalibrator) {
-    this.aiFactory = AIServiceFactory.getInstance();
+  constructor(aiFactory?: AIServiceFactory, estimationCalibrator?: EstimationCalibrator) {
+    this.aiFactory = aiFactory ?? AIServiceFactory.getInstance();
     this.estimationCalibrator = estimationCalibrator || new EstimationCalibrator();
   }
 

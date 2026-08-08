@@ -1,7 +1,7 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { ResourceEvent } from './GitHubWebhookHandler';
-import { Logger } from '../logger/index';
+import { ILogger, Logger } from '../logger/index';
 import { EVENT_RETENTION_DAYS, MAX_EVENTS_IN_MEMORY, CACHE_DIRECTORY } from '../../env';
 
 export interface EventStoreOptions {
@@ -32,7 +32,7 @@ export interface EventStoreStats {
 }
 
 export class EventStore {
-  private readonly logger = Logger.getInstance();
+  private readonly logger: ILogger;
   private readonly options: EventStoreOptions;
   private readonly eventsDirectory: string;
   private readonly indexFile: string;
@@ -47,7 +47,8 @@ export class EventStore {
   private currentFileEvents: number = 0;
   private readonly maxEventsPerFile = 10000;
 
-  constructor(options?: Partial<EventStoreOptions>) {
+  constructor(options?: Partial<EventStoreOptions>, logger?: ILogger) {
+    this.logger = logger ?? Logger.getInstance();
     this.options = {
       retentionDays: options?.retentionDays || EVENT_RETENTION_DAYS,
       maxEventsInMemory: options?.maxEventsInMemory || MAX_EVENTS_IN_MEMORY,

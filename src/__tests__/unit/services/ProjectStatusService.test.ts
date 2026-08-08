@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, jest } from '@jest/globals';
+import { beforeEach, describe, expect, it, vi, Mocked, MockedClass, MockedFunction } from 'vitest';
 import { ProjectStatusService } from '../../../services/ProjectStatusService';
 import { GitHubRepositoryFactory } from '../../../infrastructure/github/GitHubRepositoryFactory';
 import { GitHubProjectRepository } from '../../../infrastructure/github/repositories/GitHubProjectRepository';
@@ -6,15 +6,15 @@ import { ResourceStatus, ResourceType } from '../../../domain/resource-types';
 import { Project } from '../../../domain/types';
 
 // Mock tsyringe decorators
-jest.mock('tsyringe', () => ({
+vi.mock('tsyringe', () => ({
   injectable: () => (target: any) => target,
   inject: () => () => undefined,
 }));
 
 describe('ProjectStatusService', () => {
   let service: ProjectStatusService;
-  let mockFactory: jest.Mocked<GitHubRepositoryFactory>;
-  let mockProjectRepo: jest.Mocked<GitHubProjectRepository>;
+  let mockFactory: Mocked<GitHubRepositoryFactory>;
+  let mockProjectRepo: Mocked<GitHubProjectRepository>;
 
   const mockProject: Project = {
     id: 'project-1',
@@ -42,22 +42,22 @@ describe('ProjectStatusService', () => {
   };
 
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
 
     // Create mock repository
     mockProjectRepo = {
-      findAll: jest.fn(),
-      findById: jest.fn(),
-      create: jest.fn(),
-      update: jest.fn(),
-      delete: jest.fn()
-    } as unknown as jest.Mocked<GitHubProjectRepository>;
+      findAll: vi.fn(),
+      findById: vi.fn(),
+      create: vi.fn(),
+      update: vi.fn(),
+      delete: vi.fn()
+    } as unknown as Mocked<GitHubProjectRepository>;
 
     // Create mock factory
     mockFactory = {
-      createProjectRepository: jest.fn().mockReturnValue(mockProjectRepo),
-      getConfig: jest.fn().mockReturnValue({ owner: 'test-owner', repo: 'test-repo' })
-    } as unknown as jest.Mocked<GitHubRepositoryFactory>;
+      createProjectRepository: vi.fn().mockReturnValue(mockProjectRepo),
+      getConfig: vi.fn().mockReturnValue({ owner: 'test-owner', repo: 'test-repo' })
+    } as unknown as Mocked<GitHubRepositoryFactory>;
 
     // Create service with mock factory
     service = new ProjectStatusService(mockFactory);

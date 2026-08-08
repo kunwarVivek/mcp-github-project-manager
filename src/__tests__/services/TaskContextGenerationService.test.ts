@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, jest } from '@jest/globals';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { TaskContextGenerationService } from '../../services/TaskContextGenerationService';
 import {
   AITask,

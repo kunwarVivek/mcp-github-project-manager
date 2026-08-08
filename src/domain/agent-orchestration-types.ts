@@ -64,11 +64,16 @@ export type AgentTaskStatus = 'unclaimed' | 'in_progress' | 'review' | 'blocked'
 export const AgentTaskStatusSchema = z.enum(['unclaimed', 'in_progress', 'review', 'blocked', 'completed']);
 
 /** Strategy for selecting which task to check out. */
-export type CheckoutStrategy = 'highest_priority' | 'oldest_first' | 'skills_match' | 'milestone_deadline';
+export type CheckoutStrategy = 'highest_priority' | 'oldest_first' | 'skills_match' | 'milestone_deadline' | 'ai';
 
 export const CheckoutStrategySchema = z.enum([
-  'highest_priority', 'oldest_first', 'skills_match', 'milestone_deadline',
+  'highest_priority', 'oldest_first', 'skills_match', 'milestone_deadline', 'ai',
 ]);
+
+/** Budget reset period. */
+export type BudgetResetPeriod = 'daily' | 'weekly' | 'monthly' | 'never';
+
+export const BudgetResetPeriodSchema = z.enum(['daily', 'weekly', 'monthly', 'never']);
 
 /** Result of a task checkout operation. */
 export interface TaskCheckoutResult {
@@ -81,6 +86,8 @@ export interface TaskCheckoutResult {
   milestone?: string;
   branchSuggestion?: string;
   claimedAt?: string;
+  /** For AI-assisted selection: why this task was chosen. */
+  selectionRationale?: string;
   message: string;
 }
 
@@ -94,6 +101,7 @@ export const TaskCheckoutResultSchema = z.object({
   milestone: z.string().optional(),
   branchSuggestion: z.string().optional(),
   claimedAt: z.string().optional(),
+  selectionRationale: z.string().optional(),
   message: z.string(),
 });
 
@@ -276,6 +284,13 @@ export interface AgentTaskContext {
   acceptanceCriteria: string[];
   /** Estimated complexity (from AI analysis if available). */
   estimatedComplexity?: number;
+  /** AI-generated suggestions (acceptance criteria, guidance) when AI is available. */
+  aiSuggestions?: {
+    acceptanceCriteria?: string[];
+    complexityEstimate?: number;
+    implementationGuidance?: string;
+    confidence?: number;
+  };
 }
 
 export const AgentTaskContextSchema = z.object({
@@ -312,6 +327,12 @@ export const AgentTaskContextSchema = z.object({
   branchSuggestion: z.string(),
   acceptanceCriteria: z.array(z.string()),
   estimatedComplexity: z.number().optional(),
+  aiSuggestions: z.object({
+    acceptanceCriteria: z.array(z.string()).optional(),
+    complexityEstimate: z.number().optional(),
+    implementationGuidance: z.string().optional(),
+    confidence: z.number().optional(),
+  }).optional(),
 });
 
 // ============================================================================
@@ -344,6 +365,13 @@ export interface AgentActivityEntry {
     isExhausted: boolean;
   };
   completedToday: number;
+  /** Recent heartbeat history (most recent first). */
+  heartbeatHistory?: Array<{
+    timestamp: string;
+    status: string;
+    progress?: number;
+    progressSummary?: string;
+  }>;
 }
 
 export const AgentActivityEntrySchema = z.object({
@@ -371,6 +399,12 @@ export const AgentActivityEntrySchema = z.object({
     isExhausted: z.boolean(),
   }).optional(),
   completedToday: z.number(),
+  heartbeatHistory: z.array(z.object({
+    timestamp: z.string(),
+    status: z.string(),
+    progress: z.number().optional(),
+    progressSummary: z.string().optional(),
+  })).optional(),
 });
 
 // ============================================================================
@@ -406,3 +440,66 @@ export const AGENT_STATUS_OPTIONS = [
   { name: 'blocked', color: 'RED', description: 'Agent is blocked' },
   { name: 'completed', color: 'GREEN', description: 'Work completed and verified' },
 ] as const;
+
+// ============================================================================
+// Agent Metrics Types
+// ============================================================================
+
+/** Per-agent metric entry for the metrics dashboard. */
+export interface AgentMetricEntry {
+  agentId: string;
+  agentName: string;
+  role: AgentRole;
+  status: AgentOperationalStatus;
+  tasksCompleted: number;
+  tasksInProgress: number;
+  currentTaskId?: string;
+  currentTaskTitle?: string;
+  budgetUsagePercent: number;
+  isStale: boolean;
+  /** Average task duration in minutes (from completed work products), if known. */
+  averageCycleTimeMinutes?: number;
+}
+
+export const AgentMetricEntrySchema = z.object({
+  agentId: z.string(),
+  agentName: z.string(),
+  role: AgentRoleSchema,
+  status: AgentOperationalStatusSchema,
+  tasksCompleted: z.number(),
+  tasksInProgress: z.number(),
+  currentTaskId: z.string().optional(),
+  currentTaskTitle: z.string().optional(),
+  budgetUsagePercent: z.number(),
+  isStale: z.boolean(),
+  averageCycleTimeMinutes: z.number().optional(),
+});
+
+/** Aggregate metrics over all registered agents. */
+export interface AgentMetrics {
+  generatedAt: string;
+  totalAgents: number;
+  activeAgents: number;
+  staleAgents: number;
+  budgetExhaustedAgents: number;
+  totalTasksInProgress: number;
+  totalTasksCompleted: number;
+  totalTokensBudget: number;
+  totalTokensUsed: number;
+  overallBudgetUsagePercent: number;
+  agents: AgentMetricEntry[];
+}
+
+export const AgentMetricsSchema = z.object({
+  generatedAt: z.string(),
+  totalAgents: z.number(),
+  activeAgents: z.number(),
+  staleAgents: z.number(),
+  budgetExhaustedAgents: z.number(),
+  totalTasksInProgress: z.number(),
+  totalTasksCompleted: z.number(),
+  totalTokensBudget: z.number(),
+  totalTokensUsed: z.number(),
+  overallBudgetUsagePercent: z.number(),
+  agents: z.array(AgentMetricEntrySchema),
+});

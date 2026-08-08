@@ -11,12 +11,12 @@ describe('EmbeddingCache', () => {
   let cache: EmbeddingCache;
 
   beforeEach(() => {
-    jest.useFakeTimers();
+    vi.useFakeTimers();
     cache = new EmbeddingCache();
   });
 
   afterEach(() => {
-    jest.useRealTimers();
+    vi.useRealTimers();
   });
 
   describe('Basic Operations', () => {
@@ -99,7 +99,7 @@ describe('EmbeddingCache', () => {
       cacheWithTTL.set('issue-1', contentHash, [0.1]);
 
       // Advance time past TTL
-      jest.advanceTimersByTime(2 * 60 * 60 * 1000); // 2 hours
+      vi.advanceTimersByTime(2 * 60 * 60 * 1000); // 2 hours
 
       const result = cacheWithTTL.get('issue-1', contentHash);
       expect(result).toBeNull();
@@ -112,7 +112,7 @@ describe('EmbeddingCache', () => {
       cacheWithTTL.set('issue-1', contentHash, [0.1]);
 
       // Advance time but not past TTL
-      jest.advanceTimersByTime(30 * 60 * 1000); // 30 minutes
+      vi.advanceTimersByTime(30 * 60 * 1000); // 30 minutes
 
       const result = cacheWithTTL.get('issue-1', contentHash);
       expect(result).toEqual([0.1]);
@@ -123,7 +123,7 @@ describe('EmbeddingCache', () => {
       const contentHash = EmbeddingCache.computeContentHash('title', 'body');
 
       cacheWithTTL.set('issue-1', contentHash, [0.1]);
-      jest.advanceTimersByTime(2 * 60 * 60 * 1000);
+      vi.advanceTimersByTime(2 * 60 * 60 * 1000);
 
       cacheWithTTL.get('issue-1', contentHash);
 
@@ -138,11 +138,11 @@ describe('EmbeddingCache', () => {
       defaultCache.set('issue-1', contentHash, [0.1]);
 
       // 12 hours later should still work
-      jest.advanceTimersByTime(12 * 60 * 60 * 1000);
+      vi.advanceTimersByTime(12 * 60 * 60 * 1000);
       expect(defaultCache.get('issue-1', contentHash)).toEqual([0.1]);
 
       // 25 hours total should expire
-      jest.advanceTimersByTime(13 * 60 * 60 * 1000);
+      vi.advanceTimersByTime(13 * 60 * 60 * 1000);
       expect(defaultCache.get('issue-1', contentHash)).toBeNull();
     });
 
@@ -153,10 +153,10 @@ describe('EmbeddingCache', () => {
       cacheWithTTL.set('issue-1', contentHash, [0.1]);
       cacheWithTTL.set('issue-2', contentHash, [0.2]);
 
-      jest.advanceTimersByTime(30 * 60 * 1000); // 30 min
+      vi.advanceTimersByTime(30 * 60 * 1000); // 30 min
       cacheWithTTL.set('issue-3', contentHash, [0.3]); // Added later
 
-      jest.advanceTimersByTime(45 * 60 * 1000); // 75 min total
+      vi.advanceTimersByTime(45 * 60 * 1000); // 75 min total
 
       const removed = cacheWithTTL.cleanExpired();
 
@@ -233,7 +233,7 @@ describe('EmbeddingCache', () => {
       for (let i = 1; i <= 5; i++) {
         const hash = EmbeddingCache.computeContentHash(`title-${i}`, 'body');
         smallCache.set(`issue-${i}`, hash, [i * 0.1]);
-        jest.advanceTimersByTime(1000); // Space them out in time
+        vi.advanceTimersByTime(1000); // Space them out in time
       }
 
       expect(smallCache.size()).toBe(5);
@@ -254,7 +254,7 @@ describe('EmbeddingCache', () => {
       for (let i = 1; i <= 100; i++) {
         const hash = EmbeddingCache.computeContentHash(`title-${i}`, 'body');
         cache100.set(`issue-${i}`, hash, [i * 0.01]);
-        jest.advanceTimersByTime(10);
+        vi.advanceTimersByTime(10);
       }
 
       // Add one more
@@ -305,9 +305,9 @@ describe('EmbeddingCache', () => {
       const contentHash = EmbeddingCache.computeContentHash('title', 'body');
 
       cache.set('issue-1', contentHash, [0.1]);
-      jest.advanceTimersByTime(60 * 1000); // 1 minute
+      vi.advanceTimersByTime(60 * 1000); // 1 minute
       cache.set('issue-2', contentHash, [0.2]);
-      jest.advanceTimersByTime(30 * 1000); // 30 more seconds
+      vi.advanceTimersByTime(30 * 1000); // 30 more seconds
 
       const stats = cache.getStats();
 

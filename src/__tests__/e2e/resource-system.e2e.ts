@@ -1,5 +1,6 @@
+import { vi } from 'vitest';
 // Unmock ResourceCache for E2E tests
-jest.unmock("../../infrastructure/cache/ResourceCache");
+vi.unmock("../../infrastructure/cache/ResourceCache");
 
 import { ResourceManager } from "../../infrastructure/resource/ResourceManager";
 import { ResourceCache } from "../../infrastructure/cache/ResourceCache";

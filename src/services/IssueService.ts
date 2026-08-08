@@ -2,7 +2,8 @@ import { GitHubRepositoryFactory } from "../infrastructure/github/GitHubReposito
 import { GitHubIssueRepository } from "../infrastructure/github/repositories/GitHubIssueRepository";
 import { ResourceStatus } from "../domain/resource-types";
 import { Issue, CreateIssue } from "../domain/types";
-import { mapErrorToMCPError } from './utils/ErrorMapper';
+import { safeCall } from './utils/safeCall';
+import { parseResourceStatus, filterByStatus } from '../domain/utils/StatusParser';
 
 /** A GitHub issue comment as returned by the REST API. */
 export interface IssueComment {
@@ -47,7 +48,7 @@ export class IssueService {
     priority?: string;
     type?: string;
   }): Promise<Issue> {
-    try {
+    return safeCall(async () => {
       const labels = data.labels || [];
       if (data.priority) labels.push(`priority:${data.priority}`);
       if (data.type) labels.push(`type:${data.type}`);
@@ -60,10 +61,10 @@ export class IssueService {
         milestoneId: data.milestoneId,
       };
 
-      return await this.issueRepo.create(issueData);
-    } catch (error) {
-      throw mapErrorToMCPError(error);
-    }
+      const issue = await this.issueRepo.create(issueData);
+      // Return plain object for MCP compatibility
+      return issue;
+    });
   }
 
   async listIssues(options: {
@@ -75,7 +76,7 @@ export class IssueService {
     direction?: string;
     limit?: number;
   } = {}): Promise<Issue[]> {
-    try {
+    return safeCall(async () => {
       const {
         status = 'open',
         milestone,
@@ -94,8 +95,7 @@ export class IssueService {
       }
 
       if (status !== 'all') {
-        const resourceStatus = status === 'open' ? ResourceStatus.ACTIVE : ResourceStatus.CLOSED;
-        issues = issues.filter(issue => issue.status === resourceStatus);
+        issues = filterByStatus(issues, status, 'issue');
       }
 
       if (labels.length > 0) {
@@ -122,18 +122,17 @@ export class IssueService {
         return direction === 'desc' ? -comparison : comparison;
       });
 
+      // Return plain objects for MCP compatibility
       return issues.slice(0, limit);
-    } catch (error) {
-      throw mapErrorToMCPError(error);
-    }
+    });
   }
 
   async getIssue(issueId: string): Promise<Issue | null> {
-    try {
-      return await this.issueRepo.findById(issueId);
-    } catch (error) {
-      throw mapErrorToMCPError(error);
-    }
+    return safeCall(async () => {
+      const issue = await this.issueRepo.findById(issueId);
+      // Return plain object for MCP compatibility
+      return issue;
+    });
   }
 
   async updateIssue(
@@ -147,12 +146,12 @@ export class IssueService {
       labels?: string[];
     }
   ): Promise<Issue> {
-    try {
+    return safeCall(async () => {
       const data: Partial<Issue> = {};
       if (updates.title) data.title = updates.title;
       if (updates.description) data.description = updates.description;
       if (updates.status) {
-        data.status = updates.status === 'open' ? ResourceStatus.ACTIVE : ResourceStatus.CLOSED;
+        data.status = parseResourceStatus(updates.status, 'issue');
       }
       if (updates.assignees) data.assignees = updates.assignees;
       if (updates.labels) data.labels = updates.labels;
@@ -162,17 +161,17 @@ export class IssueService {
         data.milestoneId = updates.milestoneId;
       }
 
-      return await this.issueRepo.update(issueId, data);
-    } catch (error) {
-      throw mapErrorToMCPError(error);
-    }
+      const issue = await this.issueRepo.update(issueId, data);
+      // Return plain object for MCP compatibility
+      return issue;
+    });
   }
 
   async createIssueComment(data: {
     issueNumber: number;
     body: string;
   }): Promise<IssueComment> {
-    try {
+    return safeCall(async () => {
       const octokit = this.factory.getOctokit();
       const config = this.factory.getConfig();
 
@@ -190,16 +189,14 @@ export class IssueService {
         createdAt: response.data.created_at,
         updatedAt: response.data.updated_at
       };
-    } catch (error) {
-      throw mapErrorToMCPError(error);
-    }
+    });
   }
 
   async updateIssueComment(data: {
     commentId: number;
     body: string;
   }): Promise<IssueComment> {
-    try {
+    return safeCall(async () => {
       const octokit = this.factory.getOctokit();
       const config = this.factory.getConfig();
 
@@ -217,13 +214,11 @@ export class IssueService {
         createdAt: response.data.created_at,
         updatedAt: response.data.updated_at
       };
-    } catch (error) {
-      throw mapErrorToMCPError(error);
-    }
+    });
   }
 
   async deleteIssueComment(data: { commentId: number }): Promise<{ success: boolean; message: string }> {
-    try {
+    return safeCall(async () => {
       const octokit = this.factory.getOctokit();
       const config = this.factory.getConfig();
 
@@ -234,16 +229,14 @@ export class IssueService {
       });
 
       return { success: true, message: `Comment ${data.commentId} deleted successfully` };
-    } catch (error) {
-      throw mapErrorToMCPError(error);
-    }
+    });
   }
 
   async listIssueComments(data: {
     issueNumber: number;
     limit?: number;
   }): Promise<IssueComment[]> {
-    try {
+    return safeCall(async () => {
       const octokit = this.factory.getOctokit();
       const config = this.factory.getConfig();
 
@@ -261,9 +254,7 @@ export class IssueService {
         createdAt: comment.created_at,
         updatedAt: comment.updated_at
       }));
-    } catch (error) {
-      throw mapErrorToMCPError(error);
-    }
+    });
   }
 
   async createDraftIssue(data: {
@@ -272,7 +263,7 @@ export class IssueService {
     body?: string;
     assigneeIds?: string[];
   }): Promise<DraftIssue> {
-    try {
+    return safeCall(async () => {
       const mutation = `
         mutation($input: AddProjectV2DraftIssueInput!) {
           addProjectV2DraftIssue(input: $input) {
@@ -310,9 +301,7 @@ export class IssueService {
 
       const content = response.addProjectV2DraftIssue.projectV2Item.content;
       return { id: content.id, title: content.title, body: content.body };
-    } catch (error) {
-      throw mapErrorToMCPError(error);
-    }
+    });
   }
 
   async updateDraftIssue(data: {
@@ -321,7 +310,7 @@ export class IssueService {
     body?: string;
     assigneeIds?: string[];
   }): Promise<DraftIssue> {
-    try {
+    return safeCall(async () => {
       const mutation = `
         mutation($input: UpdateProjectV2DraftIssueInput!) {
           updateProjectV2DraftIssue(input: $input) {
@@ -348,13 +337,11 @@ export class IssueService {
       const response = await this.factory.graphql<UpdateDraftIssueResponse>(mutation, { input });
       const draftIssue = response.updateProjectV2DraftIssue.draftIssue;
       return { id: draftIssue.id, title: draftIssue.title, body: draftIssue.body };
-    } catch (error) {
-      throw mapErrorToMCPError(error);
-    }
+    });
   }
 
   async deleteDraftIssue(data: { draftIssueId: string }): Promise<{ success: boolean; message: string }> {
-    try {
+    return safeCall(async () => {
       const mutation = `
         mutation($input: DeleteProjectV2DraftIssueInput!) {
           deleteProjectV2DraftIssue(input: $input) {
@@ -365,8 +352,6 @@ export class IssueService {
 
       await this.factory.graphql(mutation, { input: { draftIssueId: data.draftIssueId } });
       return { success: true, message: `Draft issue ${data.draftIssueId} deleted successfully` };
-    } catch (error) {
-      throw mapErrorToMCPError(error);
-    }
+    });
   }
 }

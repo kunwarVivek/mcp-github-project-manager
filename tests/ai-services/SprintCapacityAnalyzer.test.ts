@@ -12,7 +12,7 @@ describe('SprintCapacityAnalyzer', () => {
   let analyzer: SprintCapacityAnalyzer;
 
   beforeEach(() => {
-    jest.resetAllMocks();
+    vi.resetAllMocks();
     analyzer = new SprintCapacityAnalyzer();
   });
 

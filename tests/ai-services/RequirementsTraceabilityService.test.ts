@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, jest } from '@jest/globals';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { RequirementsTraceabilityService } from '../../src/services/RequirementsTraceabilityService';
 import { RequirementType, RequirementStatus, TaskPriority, TaskStatus } from '../../src/domain/ai-types';
 
@@ -6,7 +6,7 @@ describe('RequirementsTraceabilityService', () => {
   let service: RequirementsTraceabilityService;
 
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
     service = new RequirementsTraceabilityService();
   });
 

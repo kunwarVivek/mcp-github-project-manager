@@ -1,5 +1,6 @@
 import { generateObject } from 'ai';
 import { AIServiceFactory } from './ai/AIServiceFactory';
+import { ILogger, Logger } from '../infrastructure/logger';
 import {
   CONTEXT_GENERATION_CONFIGS,
   formatContextPrompt,
@@ -47,14 +48,22 @@ export class TaskContextGenerationService {
   private dependencyContextGenerator: DependencyContextGenerator;
   private codeExampleGenerator: CodeExampleGenerator;
   private qualityValidator: ContextQualityValidator;
+  private readonly logger: ILogger;
 
-  constructor() {
-    this.aiFactory = AIServiceFactory.getInstance();
+  /**
+   * @param aiFactory - AI service factory for model access. When omitted (DI mode),
+   *   defaults to the global singleton via `AIServiceFactory.getInstance()`.
+   * @param logger - Logger instance for diagnostics. When omitted, defaults to
+   *   the global singleton via `Logger.getInstance()`.
+   */
+  constructor(aiFactory?: AIServiceFactory, logger?: ILogger) {
+    this.aiFactory = aiFactory ?? AIServiceFactory.getInstance();
     this.traceabilityService = new RequirementsTraceabilityService();
-    this.contextualRefGenerator = new ContextualReferenceGenerator();
-    this.dependencyContextGenerator = new DependencyContextGenerator();
-    this.codeExampleGenerator = new CodeExampleGenerator();
+    this.contextualRefGenerator = new ContextualReferenceGenerator(this.aiFactory);
+    this.dependencyContextGenerator = new DependencyContextGenerator(this.aiFactory);
+    this.codeExampleGenerator = new CodeExampleGenerator(this.aiFactory);
     this.qualityValidator = new ContextQualityValidator();
+    this.logger = logger ?? Logger.getInstance();
   }
 
   /**
@@ -179,7 +188,7 @@ export class TaskContextGenerationService {
         }
       };
     } catch (error) {
-      process.stderr.write(`Error generating traceability context: ${error instanceof Error ? error.message : String(error)}\n`);
+      this.logger.error('Error generating traceability context', error);
       return this.getMinimalContext(task);
     }
   }
@@ -264,7 +273,7 @@ export class TaskContextGenerationService {
       };
 
     } catch (error) {
-      process.stderr.write(`Error generating AI-enhanced context: ${error instanceof Error ? error.message : String(error)}\n`);
+      this.logger.error('Error generating AI-enhanced context', error);
       return { context: {}, tokenUsage: totalTokens };
     }
   }
@@ -296,7 +305,7 @@ export class TaskContextGenerationService {
 
       return result.object;
     } catch (error) {
-      process.stderr.write(`Error generating business context: ${error instanceof Error ? error.message : String(error)}\n`);
+      this.logger.error('Error generating business context', error);
       return null;
     }
   }
@@ -328,7 +337,7 @@ export class TaskContextGenerationService {
 
       return result.object;
     } catch (error) {
-      process.stderr.write(`Error generating technical context: ${error instanceof Error ? error.message : String(error)}\n`);
+      this.logger.error('Error generating technical context', error);
       return null;
     }
   }
@@ -402,7 +411,7 @@ export class TaskContextGenerationService {
 
       return guidance;
     } catch (error) {
-      process.stderr.write(`Error generating implementation guidance: ${error instanceof Error ? error.message : String(error)}\n`);
+      this.logger.error('Error generating implementation guidance', error);
       return null;
     }
   }

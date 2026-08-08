@@ -2,7 +2,7 @@ import { ResourceType, ResourceStatus, SyncMetadata } from "../domain/resource-t
 import { GitHubRepositoryFactory } from "../infrastructure/github/GitHubRepositoryFactory";
 import { ResourceCache } from "../infrastructure/cache/ResourceCache";
 import { FilePersistenceAdapter } from "../infrastructure/persistence/FilePersistenceAdapter";
-import { Logger } from "../infrastructure/logger/index";
+import { ILogger, Logger } from "../infrastructure/logger/index";
 import { Project, Milestone, Issue, Sprint } from "../domain/types";
 
 // SyncMetadata moved to domain/resource-types to break the infra->service cycle.
@@ -24,7 +24,7 @@ export interface SyncOptions {
 }
 
 export class GitHubStateSyncService {
-  private readonly logger = Logger.getInstance();
+  private readonly logger: ILogger;
   private readonly cache: ResourceCache;
   private readonly persistence: FilePersistenceAdapter;
   private readonly factory: GitHubRepositoryFactory;
@@ -34,11 +34,13 @@ export class GitHubStateSyncService {
   constructor(
     factory: GitHubRepositoryFactory,
     cache: ResourceCache,
-    persistence: FilePersistenceAdapter
+    persistence: FilePersistenceAdapter,
+    logger?: ILogger
   ) {
     this.factory = factory;
     this.cache = cache;
     this.persistence = persistence;
+    this.logger = logger ?? Logger.getInstance();
   }
 
   /**

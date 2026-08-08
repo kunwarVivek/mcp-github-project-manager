@@ -104,11 +104,11 @@ export class SprintSuggestionService {
   private prioritizer: BacklogPrioritizer;
   private riskAssessor: SprintRiskAssessor;
 
-  constructor(estimationCalibrator?: EstimationCalibrator) {
-    this.aiFactory = AIServiceFactory.getInstance();
+  constructor(aiFactory?: AIServiceFactory, estimationCalibrator?: EstimationCalibrator) {
+    this.aiFactory = aiFactory ?? AIServiceFactory.getInstance();
     this.capacityAnalyzer = new SprintCapacityAnalyzer(estimationCalibrator);
-    this.prioritizer = new BacklogPrioritizer();
-    this.riskAssessor = new SprintRiskAssessor();
+    this.prioritizer = new BacklogPrioritizer(this.aiFactory);
+    this.riskAssessor = new SprintRiskAssessor(this.aiFactory);
   }
 
   /**

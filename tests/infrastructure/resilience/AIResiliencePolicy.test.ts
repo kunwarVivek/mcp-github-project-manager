@@ -1,3 +1,4 @@
+import { vi } from 'vitest';
 /**
  * Unit tests for AIResiliencePolicy
  *
@@ -16,7 +17,7 @@ describe('AIResiliencePolicy', () => {
 
   beforeEach(() => {
     // Suppress stderr output during tests
-    stderrSpy = jest.spyOn(process.stderr, 'write').mockImplementation(() => true);
+    stderrSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
   });
 
   afterEach(() => {
@@ -183,11 +184,11 @@ describe('AIResiliencePolicy', () => {
 
 describe('createAIResiliencePolicy', () => {
   beforeEach(() => {
-    jest.spyOn(process.stderr, 'write').mockImplementation(() => true);
+    vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
   });
 
   afterEach(() => {
-    jest.restoreAllMocks();
+    vi.restoreAllMocks();
   });
 
   it('creates AIResiliencePolicy instance', async () => {

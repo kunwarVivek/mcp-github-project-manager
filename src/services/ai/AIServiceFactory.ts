@@ -13,6 +13,7 @@ import {
   AI_FALLBACK_MODEL,
   AI_PRD_MODEL
 } from '../../env';
+import { ILogger, Logger } from '../../infrastructure/logger';
 import {
   AIResiliencePolicy,
   type DegradedResult,
@@ -49,17 +50,19 @@ export class AIServiceFactory {
   private static instance: AIServiceFactory;
   private config: AIServiceConfig;
   private resiliencePolicy?: AIResiliencePolicy;
+  private readonly logger: ILogger;
 
-  private constructor() {
+  private constructor(logger?: ILogger) {
+    this.logger = logger ?? Logger.getInstance();
     this.config = this.buildConfiguration();
   }
 
   /**
    * Get singleton instance
    */
-  public static getInstance(): AIServiceFactory {
+  public static getInstance(logger?: ILogger): AIServiceFactory {
     if (!AIServiceFactory.instance) {
-      AIServiceFactory.instance = new AIServiceFactory();
+      AIServiceFactory.instance = new AIServiceFactory(logger);
     }
     return AIServiceFactory.instance;
   }
@@ -109,7 +112,7 @@ export class AIServiceFactory {
     }
 
     if (!apiKey) {
-      process.stderr.write(`⚠️  AI Provider Warning: No API key found for ${provider} provider. AI features using this provider will be disabled.\n`);
+      this.logger.warn(`AI Provider Warning: No API key found for ${provider} provider. AI features using this provider will be disabled.`);
       return null;
     }
 
@@ -123,7 +126,7 @@ export class AIServiceFactory {
     const config = this.config[type];
 
     if (!config) {
-      process.stderr.write(`⚠️  AI Model Warning: ${type} model is not available due to missing API key.\n`);
+      this.logger.warn(`AI Model Warning: ${type} model is not available due to missing API key.`);
       return null;
     }
 
@@ -281,7 +284,7 @@ export class AIServiceFactory {
    */
   public enableResilience(policy?: AIResiliencePolicy): void {
     this.resiliencePolicy = policy ?? new AIResiliencePolicy();
-    process.stderr.write('[AIServiceFactory] Resilience enabled\n');
+    this.logger.info('[AIServiceFactory] Resilience enabled');
   }
 
   /**
@@ -381,7 +384,7 @@ export class AIServiceFactory {
           results.anthropic = true;
         }
       } catch (error) {
-        process.stderr.write(`Anthropic connection test failed: ${error}\n`);
+        this.logger.error('Anthropic connection test failed', error);
       }
     }
 

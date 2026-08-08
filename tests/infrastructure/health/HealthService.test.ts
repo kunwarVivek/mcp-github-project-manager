@@ -1,3 +1,4 @@
+import { vi } from 'vitest';
 /**
  * Unit tests for HealthService
  *
@@ -16,20 +17,20 @@ import type { GitHubRepositoryFactory } from '../../../src/infrastructure/github
 
 // Mock types for testing
 type MockAIServiceFactory = {
-  isAIAvailable: jest.Mock;
-  validateConfiguration: jest.Mock;
+  isAIAvailable: Mock;
+  validateConfiguration: Mock;
 };
 
 type MockResourceCache = {
-  getStats: jest.Mock;
+  getStats: Mock;
 };
 
 type MockAIResiliencePolicy = {
-  getCircuitState: jest.Mock;
+  getCircuitState: Mock;
 };
 
 type MockGitHubFactory = {
-  getOctokit: jest.Mock;
+  getOctokit: Mock;
 };
 
 describe('HealthService', () => {
@@ -40,10 +41,10 @@ describe('HealthService', () => {
 
   beforeEach(() => {
     mockGitHubFactory = {
-      getOctokit: jest.fn().mockReturnValue({
+      getOctokit: vi.fn().mockReturnValue({
         rest: {
           rateLimit: {
-            get: jest.fn().mockResolvedValue({
+            get: vi.fn().mockResolvedValue({
               data: { rate: { remaining: 4999, limit: 5000 } },
             }),
           },
@@ -52,15 +53,15 @@ describe('HealthService', () => {
     };
 
     mockAIFactory = {
-      isAIAvailable: jest.fn().mockReturnValue(true),
-      validateConfiguration: jest.fn().mockReturnValue({
+      isAIAvailable: vi.fn().mockReturnValue(true),
+      validateConfiguration: vi.fn().mockReturnValue({
         availableModels: ['main', 'fallback'],
         unavailableModels: ['research'],
       }),
     };
 
     mockCache = {
-      getStats: jest.fn().mockReturnValue({
+      getStats: vi.fn().mockReturnValue({
         size: 100,
         persistenceEnabled: true,
         lastPersist: '2026-01-31T07:00:00Z',
@@ -68,7 +69,7 @@ describe('HealthService', () => {
     };
 
     mockResilience = {
-      getCircuitState: jest.fn().mockReturnValue('closed'),
+      getCircuitState: vi.fn().mockReturnValue('closed'),
     };
   });
 
@@ -107,7 +108,7 @@ describe('HealthService', () => {
       mockGitHubFactory.getOctokit.mockReturnValue({
         rest: {
           rateLimit: {
-            get: jest.fn().mockRejectedValue(new Error('Bad credentials')),
+            get: vi.fn().mockRejectedValue(new Error('Bad credentials')),
           },
         },
       });

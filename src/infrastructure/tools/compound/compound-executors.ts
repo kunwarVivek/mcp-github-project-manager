@@ -103,6 +103,12 @@ import {
   executeGetBudgetStatus,
   executeSetAgentBudget,
   executeCheckWorkStatus,
+  executeRecordUsage,
+  executeGetAgentMetrics,
+  executeSubmitForReview,
+  executeApproveTask,
+  executeRejectTask,
+  executeReclaimStaleTasks,
 } from '../agent-orchestration-tools';
 
 // Standalone executors — health
@@ -167,6 +173,22 @@ function route<TArgs, TResult>(
   args: unknown,
 ): Promise<TResult> {
   return executor(args as TArgs);
+}
+
+/**
+ * Serialize a result to a plain JSON-safe object.
+ * Domain entities have methods and non-enumerable properties that
+ * JSON.stringify strips. This ensures the MCP response is a plain record.
+ */
+function toPlain<T>(value: T): T {
+  if (value === null || value === undefined) return value;
+  if (typeof value !== 'object') return value;
+  // Arrays need element-wise serialization
+  if (Array.isArray(value)) return value.map(toPlain) as T;
+  // Already a plain object — avoid re-wrapping
+  if (Object.getPrototypeOf(value) === Object.prototype) return value;
+  // Entity / class instance → copy enumerable own properties
+  return JSON.parse(JSON.stringify(value));
 }
 
 // ============================================================================
@@ -241,31 +263,31 @@ export async function executeManageProject(args: ManageProjectArgs): Promise<unk
   const svc = getPMS();
 
   switch (action) {
-    // ── PMS passthrough (single-object arg) ───────────────────────
-    case 'create':        return pms(svc, 'createProject', rest);
-    case 'update':        return pms(svc, 'updateProject', rest);
-    case 'delete':        return pms(svc, 'deleteProject', rest);
-    case 'get_readme':    return pms(svc, 'getProjectReadme', rest);
-    case 'update_readme': return pms(svc, 'updateProjectReadme', rest);
-    case 'create_field':  return pms(svc, 'createProjectField', rest);
-    case 'list_fields':   return pms(svc, 'listProjectFields', rest);
-    case 'update_field':  return pms(svc, 'updateProjectField', rest);
-    case 'create_view':   return pms(svc, 'createProjectView', rest);
-    case 'list_views':    return pms(svc, 'listProjectViews', rest);
-    case 'update_view':   return pms(svc, 'updateProjectView', rest);
-    case 'delete_view':   return pms(svc, 'deleteProjectView', rest);
-    case 'add_item':      return pms(svc, 'addProjectItem', rest);
-    case 'remove_item':   return pms(svc, 'removeProjectItem', rest);
-    case 'list_items':    return pms(svc, 'listProjectItems', rest);
-    case 'archive_item':  return pms(svc, 'archiveProjectItem', rest);
-    case 'unarchive_item': return pms(svc, 'unarchiveProjectItem', rest);
-    case 'set_field_value':   return pms(svc, 'setFieldValue', rest);
-    case 'get_field_value':   return pms(svc, 'getFieldValue', rest);
-    case 'clear_field_value': return pms(svc, 'clearFieldValue', rest);
+    // ── PMS passthrough (single-object arg) — serialize entity results ─
+    case 'create':        return toPlain(await pms(svc, 'createProject', rest));
+    case 'update':        return toPlain(await pms(svc, 'updateProject', rest));
+    case 'delete':        return toPlain(await pms(svc, 'deleteProject', rest));
+    case 'get_readme':    return toPlain(await pms(svc, 'getProjectReadme', rest));
+    case 'update_readme': return toPlain(await pms(svc, 'updateProjectReadme', rest));
+    case 'create_field':  return toPlain(await pms(svc, 'createProjectField', rest));
+    case 'list_fields':   return toPlain(await pms(svc, 'listProjectFields', rest));
+    case 'update_field':  return toPlain(await pms(svc, 'updateProjectField', rest));
+    case 'create_view':   return toPlain(await pms(svc, 'createProjectView', rest));
+    case 'list_views':    return toPlain(await pms(svc, 'listProjectViews', rest));
+    case 'update_view':   return toPlain(await pms(svc, 'updateProjectView', rest));
+    case 'delete_view':   return toPlain(await pms(svc, 'deleteProjectView', rest));
+    case 'add_item':      return toPlain(await pms(svc, 'addProjectItem', rest));
+    case 'remove_item':   return toPlain(await pms(svc, 'removeProjectItem', rest));
+    case 'list_items':    return toPlain(await pms(svc, 'listProjectItems', rest));
+    case 'archive_item':  return toPlain(await pms(svc, 'archiveProjectItem', rest));
+    case 'unarchive_item': return toPlain(await pms(svc, 'unarchiveProjectItem', rest));
+    case 'set_field_value':   return toPlain(await pms(svc, 'setFieldValue', rest));
+    case 'get_field_value':   return toPlain(await pms(svc, 'getFieldValue', rest));
+    case 'clear_field_value': return toPlain(await pms(svc, 'clearFieldValue', rest));
 
     // ── PMS destructured ─────────────────────────────────────────
-    case 'list': return pms(svc, 'listProjects', rest.status, rest.limit);
-    case 'get':  return pms(svc, 'getProject', rest.projectId);
+    case 'list': return toPlain(await pms(svc, 'listProjects', rest.status, rest.limit));
+    case 'get':  return toPlain(await pms(svc, 'getProject', rest.projectId));
 
     // ── Standalone executors — lifecycle ──────────────────────────
     case 'close':  return route(executeCloseProject, rest);
@@ -309,27 +331,27 @@ export async function executeManageIssues(args: ManageIssuesArgs): Promise<unkno
   const svc = getPMS();
 
   switch (action) {
-    // ── PMS passthrough ──────────────────────────────────────────
-    case 'create':         return pms(svc, 'createIssue', rest);
-    case 'list':           return pms(svc, 'listIssues', rest);
-    case 'create_comment': return pms(svc, 'createIssueComment', rest);
-    case 'update_comment': return pms(svc, 'updateIssueComment', rest);
-    case 'delete_comment': return pms(svc, 'deleteIssueComment', rest);
-    case 'list_comments':  return pms(svc, 'listIssueComments', rest);
-    case 'create_draft':   return pms(svc, 'createDraftIssue', rest);
-    case 'update_draft':   return pms(svc, 'updateDraftIssue', rest);
-    case 'delete_draft':   return pms(svc, 'deleteDraftIssue', rest);
+    // ── PMS passthrough — serialize entity results ────────────────
+    case 'create':         return toPlain(await pms(svc, 'createIssue', rest));
+    case 'list':           return toPlain(await pms(svc, 'listIssues', rest));
+    case 'create_comment': return toPlain(await pms(svc, 'createIssueComment', rest));
+    case 'update_comment': return toPlain(await pms(svc, 'updateIssueComment', rest));
+    case 'delete_comment': return toPlain(await pms(svc, 'deleteIssueComment', rest));
+    case 'list_comments':  return toPlain(await pms(svc, 'listIssueComments', rest));
+    case 'create_draft':   return toPlain(await pms(svc, 'createDraftIssue', rest));
+    case 'update_draft':   return toPlain(await pms(svc, 'updateDraftIssue', rest));
+    case 'delete_draft':   return toPlain(await pms(svc, 'deleteDraftIssue', rest));
 
     // ── PMS destructured ─────────────────────────────────────────
-    case 'get': return pms(svc, 'getIssue', rest.issueId);
-    case 'update': return pms(svc, 'updateIssue', rest.issueId, {
+    case 'get': return toPlain(await pms(svc, 'getIssue', rest.issueId));
+    case 'update': return toPlain(await pms(svc, 'updateIssue', rest.issueId, {
       title: rest.title,
       description: rest.description,
       status: rest.status,
       milestoneId: rest.milestoneId,
       assignees: rest.assignees,
       labels: rest.labels,
-    });
+    }));
 
     // ── Standalone executors ─────────────────────────────────────
     case 'convert_draft':          return route(executeConvertDraftIssue, rest);
@@ -353,13 +375,13 @@ export async function executeManagePrs(args: ManagePrsArgs): Promise<unknown> {
   const svc = getPMS();
 
   switch (action) {
-    case 'create':        return pms(svc, 'createPullRequest', rest);
-    case 'get':           return pms(svc, 'getPullRequest', rest);
-    case 'list':          return pms(svc, 'listPullRequests', rest);
-    case 'update':        return pms(svc, 'updatePullRequest', rest);
-    case 'merge':         return pms(svc, 'mergePullRequest', rest);
-    case 'list_reviews':  return pms(svc, 'listPullRequestReviews', rest);
-    case 'create_review': return pms(svc, 'createPullRequestReview', rest);
+    case 'create':        return toPlain(await pms(svc, 'createPullRequest', rest));
+    case 'get':           return toPlain(await pms(svc, 'getPullRequest', rest));
+    case 'list':          return toPlain(await pms(svc, 'listPullRequests', rest));
+    case 'update':        return toPlain(await pms(svc, 'updatePullRequest', rest));
+    case 'merge':         return toPlain(await pms(svc, 'mergePullRequest', rest));
+    case 'list_reviews':  return toPlain(await pms(svc, 'listPullRequestReviews', rest));
+    case 'create_review': return toPlain(await pms(svc, 'createPullRequestReview', rest));
     default: unknownAction('manage_prs', action);
   }
 }
@@ -373,20 +395,20 @@ export async function executeManageMilestones(args: ManageMilestonesArgs): Promi
   const svc = getPMS();
 
   switch (action) {
-    // ── PMS passthrough ──────────────────────────────────────────
-    case 'create': return pms(svc, 'createMilestone', rest);
-    case 'update': return pms(svc, 'updateMilestone', rest);
-    case 'delete': return pms(svc, 'deleteMilestone', rest);
+    // ── PMS passthrough — serialize entity results ────────────────
+    case 'create': return toPlain(await pms(svc, 'createMilestone', rest));
+    case 'update': return toPlain(await pms(svc, 'updateMilestone', rest));
+    case 'delete': return toPlain(await pms(svc, 'deleteMilestone', rest));
 
     // ── PMS destructured ─────────────────────────────────────────
     case 'list':
-      return pms(svc, 'listMilestones', rest.status, rest.sort, rest.direction);
+      return toPlain(await pms(svc, 'listMilestones', rest.status, rest.sort, rest.direction));
     case 'get_metrics':
-      return pms(svc, 'getMilestoneMetrics', rest.milestoneId, rest.includeIssues);
+      return toPlain(await pms(svc, 'getMilestoneMetrics', rest.milestoneId, rest.includeIssues));
     case 'get_overdue':
-      return pms(svc, 'getOverdueMilestones', rest.limit, rest.includeIssues);
+      return toPlain(await pms(svc, 'getOverdueMilestones', rest.limit, rest.includeIssues));
     case 'get_upcoming':
-      return pms(svc, 'getUpcomingMilestones', rest.daysAhead, rest.limit, rest.includeIssues);
+      return toPlain(await pms(svc, 'getUpcomingMilestones', rest.daysAhead, rest.limit, rest.includeIssues));
 
     default: unknownAction('manage_milestones', action);
   }
@@ -401,17 +423,17 @@ export async function executeManageSprints(args: ManageSprintsArgs): Promise<unk
   const svc = getPMS();
 
   switch (action) {
-    // ── PMS passthrough ──────────────────────────────────────────
-    case 'create':        return pms(svc, 'createSprint', rest);
-    case 'update':        return pms(svc, 'updateSprint', rest);
-    case 'add_issues':    return pms(svc, 'addIssuesToSprint', rest);
-    case 'remove_issues': return pms(svc, 'removeIssuesFromSprint', rest);
-    case 'plan':          return pms(svc, 'planSprint', rest);
+    // ── PMS passthrough — serialize entity results ────────────────
+    case 'create':        return toPlain(await pms(svc, 'createSprint', rest));
+    case 'update':        return toPlain(await pms(svc, 'updateSprint', rest));
+    case 'add_issues':    return toPlain(await pms(svc, 'addIssuesToSprint', rest));
+    case 'remove_issues': return toPlain(await pms(svc, 'removeIssuesFromSprint', rest));
+    case 'plan':          return toPlain(await pms(svc, 'planSprint', rest));
 
     // ── PMS destructured ─────────────────────────────────────────
-    case 'list':        return pms(svc, 'listSprints', rest.status);
-    case 'get_current': return pms(svc, 'getCurrentSprint', rest.includeIssues);
-    case 'get_metrics': return pms(svc, 'getSprintMetrics', rest.sprintId, rest.includeIssues);
+    case 'list':        return toPlain(await pms(svc, 'listSprints', rest.status));
+    case 'get_current': return toPlain(await pms(svc, 'getCurrentSprint', rest.includeIssues));
+    case 'get_metrics': return toPlain(await pms(svc, 'getSprintMetrics', rest.sprintId, rest.includeIssues));
 
     default: unknownAction('manage_sprints', action);
   }
@@ -686,6 +708,9 @@ export async function executeAgentWork(args: AgentWorkArgs): Promise<unknown> {
     case 'heartbeat':         return route(executeAgentHeartbeat, rest);
     case 'check_work_status': return route(executeCheckWorkStatus, rest);
     case 'get_task_context':  return route(executeGetTaskContext, rest);
+    case 'submit_for_review': return route(executeSubmitForReview, rest);
+    case 'approve_task':      return route(executeApproveTask, rest);
+    case 'reject_task':       return route(executeRejectTask, rest);
     default: unknownAction('agent_work', action);
   }
 }
@@ -704,6 +729,14 @@ export async function executeAgentManage(args: AgentManageArgs): Promise<unknown
     case 'submit_work_product': return route(executeSubmitWorkProduct, rest);
     case 'get_budget':          return route(executeGetBudgetStatus, rest);
     case 'set_budget':          return route(executeSetAgentBudget, rest);
+    case 'record_usage':        return route(executeRecordUsage, rest);
+    case 'get_metrics':         return route(executeGetAgentMetrics, rest);
+    case 'reclaim_stale':       return route(executeReclaimStaleTasks, rest);
+    case 'setup_fields': {
+      const factory = createGitHubFactory();
+      const setup = new ProjectFieldSetup(factory);
+      return setup.ensureFields(rest.projectId as string);
+    }
     default: unknownAction('agent_manage', action);
   }
 }
@@ -837,7 +870,9 @@ const TOOL_CATALOG: Record<string, {
     actions: [
       'register', 'checkout_task', 'release_task', 'complete_task',
       'heartbeat', 'check_work_status', 'get_task_context',
+      'submit_for_review', 'approve_task', 'reject_task',
       'list', 'deregister', 'get_activity', 'submit_work_product', 'get_budget', 'set_budget',
+      'reclaim_stale', 'record_usage', 'get_metrics', 'setup_fields',
     ],
     description: 'Agent orchestration — task lifecycle (agent_work) and administration (agent_manage)',
   },

@@ -54,6 +54,15 @@ Core business entities, type definitions, validation schemas, and repository int
 | `resource-types.ts` | Cached-resource metadata, staleness, and sync-state types |
 | `mcp-types.ts` | MCP tool/resource descriptor types and request/response shapes |
 
+**Rich Domain Entities** (`entities/`)
+
+| Entity | Purpose |
+|--------|---------|
+| `IssueEntity` | Rich domain entity for GitHub Issues with computed properties (`isOpen`, `priority`, `isStale`, `isBlocked`) and business logic (`addLabel`, `assignTo`, `close`, `blockBy`) |
+| `MilestoneEntity` | Rich domain entity for GitHub Milestones with computed properties (`isOverdue`, `daysUntilDue`, `progressPercent`) and business logic (`updateProgress`, `close`, `addIssue`) |
+| `SprintEntity` | Rich domain entity for Sprints with computed properties (`durationInDays`, `daysRemaining`, `isCurrent`, `velocity`) and business logic (`start`, `complete`, `addIssue`, `moveIssueTo`) |
+| `ProjectEntity` | Rich domain entity for GitHub Projects with computed properties (`health`, `activityLevel`, `isStale`) and business logic (`addField`, `close`, `archive`) |
+
 **AI types**
 
 | File | Purpose |
@@ -91,6 +100,41 @@ Core business entities, type definitions, validation schemas, and repository int
 | `type-guards.ts` | Runtime type-guard functions for domain entities |
 | `config-schema.ts` | Zod schemas for server configuration; validates env vars at startup |
 
+### Domain Entities Layer (`src/domain/entities/`)
+
+Rich domain models with behavior and business logic. These entities implement the existing interfaces for backward compatibility while adding computed properties and invariant enforcement.
+
+**Design Principles:**
+- **Backward Compatibility**: All entities implement the original interfaces (`IssueEntity implements Issue`, etc.)
+- **Factory Methods**: `fromData()` for creating from existing data, `create()` for new instances
+- **Computed Properties**: Derived values calculated from entity state (e.g., `isOpen`, `isOverdue`)
+- **Business Logic**: Methods that enforce invariants and encapsulate domain rules
+- **Serialization**: `toData()` for converting back to plain objects
+- **Deep Copy**: `clone()` for creating independent copies
+
+**Usage Pattern:**
+```typescript
+import { IssueEntity, MilestoneEntity, SprintEntity, ProjectEntity } from '../domain/entities';
+
+// Create from existing data
+const issue = IssueEntity.fromData(githubIssueData);
+
+// Use business logic
+issue.addLabel('bug');
+issue.assignTo('user1');
+console.log(issue.priority); // 'high'
+console.log(issue.isStale); // true if no update in 14+ days
+
+// Convert back to plain object
+const plainIssue = issue.toData();
+```
+
+**Entity Relationships:**
+- Issues can be linked to Milestones via `assignToMilestone()`
+- Issues can be added to Sprints via `sprint.addIssue(issueId)`
+- Sprints can move issues between each other via `moveIssueTo()`
+- Milestones track issue progress via `addIssue()` and `completeIssue()`
+
 ### Infrastructure Layer (`src/infrastructure/`)
 
 External integrations and technical concerns. 16 subdirectories:
@@ -112,38 +156,49 @@ External integrations and technical concerns. 16 subdirectories:
 | `resource/` | `ResourceFactory`, `ResourceManager`, `ResourceRelationshipManager`, `OptimisticLockManager` |
 | `observability/` | `CorrelationContext` (request tracing), `TracingLogger` |
 | `http/` | `WebhookServer` — HTTP server for incoming webhooks and SSE connections |
-| `agent/` | `AgentStore` (issue-backed agent registry), `WorkProductStore` (structured issue comments), `ProjectFieldSetup` (custom field provisioning for agent claims) |
+| `agent/` | `AgentStore` (issue-backed agent registry with optimistic concurrency), `WorkProductStore` (structured issue comments), `ProjectFieldSetup` (custom field provisioning for agent claims) |
 
 ### Service Layer (`src/services/`)
 
 Business logic coordination. 27 top-level services plus supporting subdirectories.
 
 `ProjectManagementService` is a thin facade that delegates to focused,
-independently-testable services:
+independently-testable services.
+
+**Services return domain entities** — all CRUD services now return rich domain entities
+(`IssueEntity`, `MilestoneEntity`, `SprintEntity`, `ProjectEntity`) instead of plain interfaces.
+This enables consumers to use computed properties and business logic directly:
+
+```typescript
+const issue = await service.createIssue({ title: 'Bug', description: '...' });
+console.log(issue.priority);      // 'high' (computed from labels)
+console.log(issue.isStale);       // true if no update in 14+ days
+console.log(issue.canBeAddedToSprint()); // true if open with priority
+```
 
 **Facade**
 
 | Service | Responsibility |
 |---------|----------------|
-| `ProjectManagementService` | Facade — delegates to all services below |
+| `ProjectManagementService` | Facade — delegates to all services below; returns domain entities |
 
 **Core CRUD**
 
-| Service | Responsibility |
-|---------|----------------|
-| `IssueService` | Issue CRUD, comments, Projects v2 draft issues |
-| `PullRequestService` | PR listing with filtering |
-| `MilestoneService` | Milestone CRUD and metrics |
-| `LabelService` | Label CRUD |
+| Service | Returns | Responsibility |
+|---------|---------|----------------|
+| `IssueService` | `IssueEntity` | Issue CRUD, comments, Projects v2 draft issues |
+| `PullRequestService` | PR types | PR listing with filtering |
+| `MilestoneService` | `MilestoneEntity` | Milestone CRUD and metrics |
+| `LabelService` | Label types | Label CRUD |
 
 **Project management**
 
-| Service | Responsibility |
-|---------|----------------|
-| `ProjectStatusService` | Project CRUD |
-| `ProjectTemplateService` | Template + field/view management |
-| `ProjectLinkingService` | Project item / repo / team linking |
-| `ProjectAutomationService` | Automation-rule management |
+| Service | Returns | Responsibility |
+|---------|---------|----------------|
+| `ProjectStatusService` | `ProjectEntity` | Project CRUD |
+| `ProjectTemplateService` | Template types | Template + field/view management |
+| `ProjectLinkingService` | Linking types | Project item / repo / team linking |
+| `ProjectAutomationService` | Automation types | Automation-rule management |
 
 **Field / View / Item**
 
@@ -154,17 +209,17 @@ independently-testable services:
 
 **Planning**
 
-| Service | Responsibility |
-|---------|----------------|
-| `SprintPlanningService` | Sprint planning and capacity |
-| `RoadmapService` | Full-roadmap creation (project + milestones + issues) |
-| `RoadmapPlanningService` | AI roadmap/milestone planning |
+| Service | Returns | Responsibility |
+|---------|---------|----------------|
+| `SprintPlanningService` | `SprintEntity` | Sprint planning and capacity |
+| `RoadmapService` | Roadmap types | Full-roadmap creation (project + milestones + issues) |
+| `RoadmapPlanningService` | Planning types | AI roadmap/milestone planning |
 
 **Hierarchy**
 
-| Service | Responsibility |
-|---------|----------------|
-| `SubIssueService` | Hierarchical issue dependencies |
+| Service | Returns | Responsibility |
+|---------|---------|----------------|
+| `SubIssueService` | `IssueEntity` | Hierarchical issue dependencies |
 
 **AI-powered**
 
@@ -188,10 +243,11 @@ independently-testable services:
 
 | Service | Responsibility |
 |---------|----------------|
-| `TaskCheckoutService` | Task claiming, releasing, completion — manages agent_status/agent_claimed_by project fields |
-| `AgentContextService` | Enriched task context assembly (issue, parent, milestone, related issues, acceptance criteria) |
+| `TaskCheckoutService` | Task claiming (strategy-driven, dependency-aware, atomic), releasing, completion, review workflow (submit/approve/reject), heartbeat history, stale reclaim — manages agent_status/agent_claimed_by project fields |
+| `AgentContextService` | Enriched task context assembly (issue, parent, milestone, related issues, acceptance criteria) + best-effort AI suggestions (criteria, complexity, guidance) |
 | `WorkProductService` | Work product submission — records structured comments on issues with test results |
-| `AgentBudgetService` | Per-agent token budget tracking, warning thresholds, hard stops, periodic resets |
+| `AgentBudgetService` | Per-agent token budget tracking, warning thresholds, hard stops, periodic resets, usage recording |
+| `AgentMetricsService` | Aggregate + per-agent orchestration metrics (throughput, cycle time, budget burn, staleness) |
 
 **Subdirectories**
 
@@ -213,6 +269,108 @@ Model Context Protocol integration:
 - Request/response handling
 - Error formatting via `MCPErrorHandler`
 - **Graceful shutdown** — `GracefulShutdown` tracks in-flight requests, installs SIGTERM/SIGINT handlers, drains active work before exit
+
+## Bounded Contexts
+
+The domain is organized into distinct bounded contexts, each with its own ubiquitous language, entities, and business rules. These contexts align with the service layer decomposition and the domain entity model.
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                         MCP GitHub Project Manager                          │
+│                         Bounded Context Map                                  │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  ┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐      │
+│  │    PROJECT      │     │    ISSUE        │     │    MILESTONE    │      │
+│  │  MANAGEMENT     │◄────│   MANAGEMENT    │────►│   MANAGEMENT    │      │
+│  │    CONTEXT      │     │    CONTEXT      │     │    CONTEXT      │      │
+│  └────────┬────────┘     └────────┬────────┘     └─────────────────┘      │
+│           │                       │                                        │
+│           │                       │                                        │
+│           ▼                       ▼                                        │
+│  ┌─────────────────┐     ┌─────────────────┐                              │
+│  │    SPRINT       │     │     PULL        │                              │
+│  │   PLANNING      │     │    REQUEST      │                              │
+│  │    CONTEXT      │     │    CONTEXT      │                              │
+│  └─────────────────┘     └─────────────────┘                              │
+│                                                                             │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │                     AI SERVICES CONTEXT                            │   │
+│  │  PRD Generation │ Task Generation │ Issue Triage │ Enrichment      │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│                                                                             │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │                  AGENT ORCHESTRATION CONTEXT                        │   │
+│  │  Agent Registry │ Task Checkout │ Heartbeats │ Work Products        │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Context Definitions
+
+#### 1. Project Management Context
+**Ubiquitous Language:** Project, Field, View, Item, Template
+**Entities:** `ProjectEntity`
+**Services:** `ProjectStatusService`, `ProjectTemplateService`, `ProjectLinkingService`, `FieldValueService`
+**Responsibility:** Managing GitHub Projects, custom fields, views, and project-level configuration.
+
+#### 2. Issue Management Context
+**Ubiquitous Language:** Issue, Label, Assignee, Status, Priority, Type
+**Entities:** `IssueEntity`
+**Services:** `IssueService`, `SubIssueService`, `LabelService`
+**Responsibility:** Issue CRUD, hierarchical relationships, labeling, and assignment.
+
+#### 3. Milestone Management Context
+**Ubiquitous Language:** Milestone, Due Date, Progress, State
+**Entities:** `MilestoneEntity`
+**Services:** `MilestoneService`
+**Responsibility:** Milestone lifecycle, progress tracking, and deadline management.
+
+#### 4. Sprint Planning Context
+**Ubiquitous Language:** Sprint, Capacity, Velocity, Duration, Status
+**Entities:** `SprintEntity`
+**Services:** `SprintPlanningService`, `IterationService`
+**Responsibility:** Sprint planning, capacity analysis, velocity tracking, and iteration fields.
+
+#### 5. Pull Request Context
+**Ubiquitous Language:** Pull Request, Review, Merge, Draft, Branch
+**Entities:** `PullRequestEntity`
+**Services:** `PullRequestService`
+**Responsibility:** PR lifecycle, reviews, merge operations, and branch management.
+
+#### 6. AI Services Context
+**Ubiquitous Language:** PRD, Task, Complexity, Confidence, Traceability, Enrichment
+**Entities:** None (stateless services)
+**Services:** `PRDGenerationService`, `TaskGenerationService`, `IssueTriagingService`, `IssueEnrichmentService`, `RequirementsTraceabilityService`, `FeatureManagementService`, `TaskContextGenerationService`
+**Responsibility:** AI-powered generation, analysis, and enrichment across all domains.
+
+#### 7. Agent Orchestration Context
+**Ubiquitous Language:** Agent, Task, Checkout, Heartbeat, Work Product, Budget, Review
+**Entities:** Agent (in registry)
+**Services:** `TaskCheckoutService`, `AgentContextService`, `WorkProductService`, `AgentBudgetService`, `AgentMetricsService`
+**Responsibility:** Autonomous agent lifecycle, task claiming, progress tracking, and review workflow.
+
+### Context Relationships
+
+| Relationship | Type | Mechanism |
+|--------------|------|-----------|
+│ Project → Issue | Compositional | Issues belong to Projects |
+│ Issue → Milestone | Associative | Issues assigned to Milestones |
+│ Sprint → Issue | Associative | Sprints contain Issues |
+│ Milestone → Sprint | Temporal | Milestones span multiple Sprints |
+│ Agent → Task | Associative | Agents claim Tasks from Issue pool |
+│ AI → Issue | Enriching | AI services add metadata to Issues |
+│ AI → PRD | Generative | AI creates PRDs that spawn Issues |
+
+### Anti-Corruption Layer
+
+The `ProjectManagementService` facade acts as an anti-corruption layer between contexts:
+- Translates between context-specific language
+- Coordinates cross-context workflows
+- Prevents direct coupling between contexts
+
+Each context's services are independently testable and can evolve without affecting other contexts.
 
 ## Key Patterns
 
@@ -488,8 +646,8 @@ Existing execute* functions (unchanged)
 | `ai_generate` | 8 | PRD generation, task breakdown, traceability |
 | `ai_analyze` | 8 | Issue enrichment, triage, duplicates |
 | `ai_plan` | 6 | Capacity, backlog, risk, roadmap |
-| `agent_work` | 7 | Agent registration, task lifecycle |
-| `agent_manage` | 6 | Agent admin, budgets, work products |
+| `agent_work` | 10 | Agent registration, task lifecycle, review workflow |
+| `agent_manage` | 9 | Agent admin, budgets, work products, reclaim, usage, metrics |
 | `discover_tools` | — | Runtime tool/action/schema discovery (meta-tool) |
 
 ### Capability Profiles
@@ -521,9 +679,11 @@ GitHub project without human dispatch. All state is stored natively in GitHub
 │              MCP Compound Tool Layer (2 tools)                      │
 │  agent_work:   register · checkout_task · release_task ·            │
 │                complete_task · heartbeat · check_work_status ·      │
-│                get_task_context                                     │
+│                get_task_context · submit_for_review ·               │
+│                approve_task · reject_task                           │
 │  agent_manage: list · deregister · get_activity ·                   │
-│                submit_work_product · get_budget · set_budget        │
+│                submit_work_product · get_budget · set_budget ·      │
+│                reclaim_stale · record_usage · get_metrics           │
 └───────────────────────────┬─────────────────────────────────────────┘
                             │
 ┌───────────────────────────▼─────────────────────────────────────────┐
@@ -586,22 +746,32 @@ Agent starts
 register_agent ─── agent record created in registry
     │
     ▼
-checkout_task ──── finds unclaimed issue, sets project fields
+checkout_task ──── strategy-driven selection (priority/age/skills/deadline/AI),
+    │              dependency-aware (skipBlocked), atomic TOCTOU-guarded claim
     │
-    ├──► get_task_context ── enriched context (issue, milestone, criteria)
+    ├──► get_task_context ── enriched context (issue, milestone, criteria, AI suggestions)
     │
     ▼
 work loop ────── agent_heartbeat (every N minutes)
-    │              └── stale detection after 30 min
+    │              └── heartbeat history retained (last 50); stale detection after 30 min
     │
     ▼
 submit_work_product ─── structured comment on issue
     │
     ▼
-complete_task ──── marks task completed, frees agent
+submit_for_review ─── issue enters review queue; agent → needs_review
+    │
+    ▼
+(reviewer) checkout_task { reviewQueue: true }
+    │    ├── approve_task ── completes + closes issue
+    │    └── reject_task ─── returns to pool with feedback comment
     │
     ▼
 checkout_task ──── repeat with next task
+
+Recovery: agent_manage/reclaim_stale returns tasks from stale agents to the pool
+Accounting: agent_manage/record_usage keeps budgets accurate; hard stops block draws
+Observability: agent_manage/get_metrics (throughput, cycle time, budget burn, staleness)
 ```
 
 ### Domain Types
@@ -615,7 +785,7 @@ All types are defined in `src/domain/agent-orchestration-types.ts`:
 | `AgentRuntime` | `claude-code`, `codex`, `cursor`, `cli`, `http`, `custom` |
 | `AgentOperationalStatus` | `idle`, `working`, `blocked`, `needs_review`, `offline`, `budget_exhausted` |
 | `TaskCheckoutResult` | Checkout outcome with issue details and branch suggestion |
-| `CheckoutStrategy` | `highest_priority`, `oldest_first`, `skills_match`, `milestone_deadline` |
+| `CheckoutStrategy` | `highest_priority` (default), `oldest_first`, `skills_match`, `milestone_deadline`, `ai` (LLM-ranked with deterministic fallback) |
 | `AgentHeartbeat` | Liveness ping with progress %, branch, blocker info |
 | `WorkProduct` | Submitted code: branch, PR, commits, files, test results |
 | `TestResults` | passed, failed, skipped, total, coverage |
@@ -626,4 +796,4 @@ All types are defined in `src/domain/agent-orchestration-types.ts`:
 
 ---
 
-*Last updated: 2026-08-05*
+*Last updated: 2026-08-08 (bounded contexts documented)*

@@ -3,7 +3,7 @@ import * as url from 'url';
 import { GitHubWebhookHandler, ResourceEvent } from '../events/GitHubWebhookHandler';
 import { EventSubscriptionManager, EventSubscription, EventFilter } from '../events/EventSubscriptionManager';
 import { EventStore } from '../events/EventStore';
-import { Logger } from '../logger/index';
+import { ILogger, Logger } from '../logger/index';
 import { WEBHOOK_PORT, SSE_ENABLED, WEBHOOK_TIMEOUT_MS } from '../../env';
 
 export interface SSEConnection {
@@ -22,7 +22,7 @@ export interface WebhookServerOptions {
 }
 
 export class WebhookServer {
-  private readonly logger = Logger.getInstance();
+  private readonly logger: ILogger;
   private readonly options: WebhookServerOptions;
   private readonly webhookHandler: GitHubWebhookHandler;
   private readonly subscriptionManager: EventSubscriptionManager;
@@ -36,8 +36,10 @@ export class WebhookServer {
     webhookHandler: GitHubWebhookHandler,
     subscriptionManager: EventSubscriptionManager,
     eventStore: EventStore,
-    options?: Partial<WebhookServerOptions>
+    options?: Partial<WebhookServerOptions>,
+    logger?: ILogger
   ) {
+    this.logger = logger ?? Logger.getInstance();
     this.options = {
       port: options?.port || WEBHOOK_PORT,
       enableSSE: options?.enableSSE ?? SSE_ENABLED,

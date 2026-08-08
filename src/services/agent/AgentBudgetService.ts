@@ -1,7 +1,7 @@
 import type { AgentStore } from '../../infrastructure/agent/AgentStore';
 import type { Agent, BudgetStatus, AgentBudget } from '../../domain/agent-orchestration-types';
 import { DEFAULT_AGENT_BUDGET_TOKENS } from '../../domain/agent-orchestration-types';
-import { mapErrorToMCPError } from '../utils/ErrorMapper';
+import { safeCall } from '../utils/safeCall';
 
 /**
  * Per-agent token budget tracking and enforcement.
@@ -19,7 +19,7 @@ export class AgentBudgetService {
 
   /** Return current budget status for an agent. Subagents return parent's budget. */
   async getBudgetStatus(agentId: string): Promise<BudgetStatus> {
-    try {
+    return safeCall(async () => {
       const agent = await this.agentStore.getAgent(agentId);
       if (!agent) {
         throw new Error(`Agent not found: ${agentId}`);
@@ -46,9 +46,7 @@ export class AgentBudgetService {
         resetPeriod: budget.resetPeriod,
         lastResetAt: budget.lastResetAt,
       };
-    } catch (error) {
-      throw mapErrorToMCPError(error);
-    }
+    });
   }
 
   /** Set or update an agent's budget. */
@@ -58,7 +56,7 @@ export class AgentBudgetService {
     warningThreshold?: number,
     resetPeriod?: 'daily' | 'weekly' | 'monthly' | 'never',
   ): Promise<BudgetStatus> {
-    try {
+    return safeCall(async () => {
       const agent = await this.agentStore.getAgent(agentId);
       if (!agent) {
         throw new Error(`Agent not found: ${agentId}`);
@@ -76,14 +74,12 @@ export class AgentBudgetService {
       await this.agentStore.upsertAgent(agent);
 
       return this.getBudgetStatus(agentId);
-    } catch (error) {
-      throw mapErrorToMCPError(error);
-    }
+    });
   }
 
   /** Record token usage. Subagents debit from parent's budget. Returns updated status. */
   async recordUsage(agentId: string, tokensUsed: number): Promise<BudgetStatus> {
-    try {
+    return safeCall(async () => {
       const agent = await this.agentStore.getAgent(agentId);
       if (!agent) {
         throw new Error(`Agent not found: ${agentId}`);
@@ -103,14 +99,12 @@ export class AgentBudgetService {
 
       await this.agentStore.upsertAgent(budgetOwner);
       return this.getBudgetStatus(budgetOwner.id);
-    } catch (error) {
-      throw mapErrorToMCPError(error);
-    }
+    });
   }
 
   /** Check whether the agent can afford an estimated number of tokens. Subagents check parent. */
   async canAfford(agentId: string, estimatedTokens: number): Promise<boolean> {
-    try {
+    return safeCall(async () => {
       const agent = await this.agentStore.getAgent(agentId);
       if (!agent) {
         throw new Error(`Agent not found: ${agentId}`);
@@ -120,14 +114,12 @@ export class AgentBudgetService {
       const budgetOwner = await this.resolveBudgetOwner(agent);
       const status = await this.getBudgetStatus(budgetOwner.id);
       return status.remainingTokens >= estimatedTokens;
-    } catch (error) {
-      throw mapErrorToMCPError(error);
-    }
+    });
   }
 
   /** Reset the budget if the reset period has elapsed. Returns true if a reset occurred. */
   async resetBudgetIfDue(agentId: string): Promise<boolean> {
-    try {
+    return safeCall(async () => {
       const agent = await this.agentStore.getAgent(agentId);
       if (!agent) {
         throw new Error(`Agent not found: ${agentId}`);
@@ -158,9 +150,7 @@ export class AgentBudgetService {
 
       await this.agentStore.upsertAgent(agent);
       return true;
-    } catch (error) {
-      throw mapErrorToMCPError(error);
-    }
+    });
   }
 
   /** Resolve the agent whose budget should be used. Subagents delegate to parent. */

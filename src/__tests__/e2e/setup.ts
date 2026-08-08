@@ -1,4 +1,4 @@
-import { jest, beforeAll, afterAll, beforeEach } from "@jest/globals";
+import { vi, beforeAll, afterAll, beforeEach } from 'vitest';
 import nock from "nock";
 
 // Check if we should run real E2E tests with actual APIs
@@ -46,8 +46,8 @@ beforeEach(() => {
   if (!process.env.PERPLEXITY_API_KEY) process.env.PERPLEXITY_API_KEY = "pplx-test-key";
 
   // Use fake timers for consistent testing
-  jest.useFakeTimers();
-  jest.setSystemTime(new Date("2025-03-01T12:00:00Z"));
+  vi.useFakeTimers();
+  vi.setSystemTime(new Date("2025-03-01T12:00:00Z"));
 });
 
 afterEach(() => {
@@ -60,8 +60,8 @@ afterEach(() => {
   }
 
   // Clear mocks and restore timers
-  jest.clearAllMocks();
-  jest.useRealTimers();
+  vi.clearAllMocks();
+  vi.useRealTimers();
 });
 
 // Export test configuration

@@ -1,3 +1,4 @@
+import { vi } from 'vitest';
 /**
  * Unit tests for miscellaneous MCP tools
  *
@@ -40,9 +41,24 @@ import {
 import { GitHubRepositoryFactory } from '../../../src/infrastructure/github/GitHubRepositoryFactory.js';
 
 // Mock the repository factory
-jest.mock('../../../src/infrastructure/github/GitHubRepositoryFactory.js');
+vi.mock('../../../src/infrastructure/github/GitHubRepositoryFactory.js', () => {
+  return {
+    GitHubRepositoryFactory: vi.fn().mockImplementation(function() { return ({
+      createIssueRepository: vi.fn(),
+      createMilestoneRepository: vi.fn(),
+      createProjectRepository: vi.fn(),
+      createSprintRepository: vi.fn(),
+      createAutomationRuleRepository: vi.fn(),
+      createSubIssueRepository: vi.fn(),
+      createStatusUpdateRepository: vi.fn(),
+      getOctokit: vi.fn(),
+      getConfig: vi.fn(),
+      graphql: vi.fn(),
+    })),
+  };
+});
 
-const MockedFactory = GitHubRepositoryFactory as jest.MockedClass<typeof GitHubRepositoryFactory>;
+const MockedFactory = GitHubRepositoryFactory as MockedClass<typeof GitHubRepositoryFactory>;
 
 describe('Misc Tools - Project View Tools', () => {
   describe('Input Schemas', () => {

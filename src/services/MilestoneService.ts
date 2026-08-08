@@ -6,10 +6,13 @@ import { Issue, Milestone, CreateMilestone } from "../domain/types";
 import {
   ResourceNotFoundError,
 } from "../domain/errors";
-import { mapErrorToMCPError } from './utils/ErrorMapper';
+import { safeCall } from './utils/safeCall';
+import { parseResourceStatus, filterByStatus } from '../domain/utils/StatusParser';
+import { MilestoneMetrics as MilestoneMetricsVO } from '../domain/value-objects/MilestoneMetrics';
 
 /**
  * Metrics for a milestone including completion status and issue counts.
+ * @deprecated Use MilestoneMetrics from value-objects instead
  */
 export interface MilestoneMetrics {
   id: string;
@@ -57,7 +60,7 @@ export class MilestoneService {
    * @throws ResourceNotFoundError if the milestone doesn't exist
    */
   async getMilestoneMetrics(id: string, includeIssues: boolean = false): Promise<MilestoneMetrics> {
-    try {
+    return safeCall(async () => {
       const milestone = await this.milestoneRepo.findById(id);
       if (!milestone) {
         throw new ResourceNotFoundError(ResourceType.MILESTONE, id);
@@ -83,22 +86,32 @@ export class MilestoneService {
         daysRemaining = Math.ceil((dueDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
       }
 
-      return {
-        id: milestone.id,
+      // Create immutable value object
+      const metrics = MilestoneMetricsVO.create({
+        milestoneId: milestone.id,
         title: milestone.title,
         dueDate: milestone.dueDate,
-        openIssues,
-        closedIssues,
         totalIssues,
-        completionPercentage,
+        closedIssues,
         status: milestone.status,
         issues: includeIssues ? issues : undefined,
-        isOverdue,
-        daysRemaining: daysRemaining && daysRemaining > 0 ? daysRemaining : undefined
+      });
+
+      // Return the value object data (maintains backward compatibility)
+      return {
+        id: metrics.milestoneId,
+        title: metrics.title,
+        dueDate: metrics.dueDate ?? undefined,
+        openIssues: metrics.openIssues,
+        closedIssues: metrics.closedIssues,
+        totalIssues: metrics.totalIssues,
+        completionPercentage: metrics.completionPercentage,
+        status: metrics.status,
+        issues: includeIssues ? issues : undefined,
+        isOverdue: metrics.isOverdue,
+        daysRemaining: metrics.daysUntilDue && metrics.daysUntilDue > 0 ? metrics.daysUntilDue : undefined
       };
-    } catch (error) {
-      throw mapErrorToMCPError(error);
-    }
+    });
   }
 
   /**
@@ -109,7 +122,7 @@ export class MilestoneService {
    * @returns Array of overdue milestone metrics, sorted by due date (oldest first)
    */
   async getOverdueMilestones(limit: number = 10, includeIssues: boolean = false): Promise<MilestoneMetrics[]> {
-    try {
+    return safeCall(async () => {
       const milestones = await this.milestoneRepo.findAll();
       const now = new Date();
 
@@ -133,9 +146,7 @@ export class MilestoneService {
       );
 
       return milestoneMetrics;
-    } catch (error) {
-      throw mapErrorToMCPError(error);
-    }
+    });
   }
 
   /**
@@ -147,7 +158,7 @@ export class MilestoneService {
    * @returns Array of upcoming milestone metrics, sorted by due date (soonest first)
    */
   async getUpcomingMilestones(daysAhead: number = 30, limit: number = 10, includeIssues: boolean = false): Promise<MilestoneMetrics[]> {
-    try {
+    return safeCall(async () => {
       const milestones = await this.milestoneRepo.findAll();
       const now = new Date();
       const futureDate = new Date(now);
@@ -175,9 +186,7 @@ export class MilestoneService {
       );
 
       return milestoneMetrics;
-    } catch (error) {
-      throw mapErrorToMCPError(error);
-    }
+    });
   }
 
   /**
@@ -191,17 +200,17 @@ export class MilestoneService {
     description: string;
     dueDate?: string;
   }): Promise<Milestone> {
-    try {
+    return safeCall(async () => {
       const milestoneData: CreateMilestone = {
         title: data.title,
         description: data.description,
         dueDate: data.dueDate,
       };
 
-      return await this.milestoneRepo.create(milestoneData);
-    } catch (error) {
-      throw mapErrorToMCPError(error);
-    }
+      const milestone = await this.milestoneRepo.create(milestoneData);
+      // Return plain object for MCP compatibility
+      return milestone;
+    });
   }
 
   /**
@@ -217,15 +226,14 @@ export class MilestoneService {
     sort: string = 'created_at',
     direction: string = 'asc'
   ): Promise<Milestone[]> {
-    try {
+    return safeCall(async () => {
       // Get all milestones
       const milestones = await this.milestoneRepo.findAll();
 
       // Filter by status if needed
       let filteredMilestones = milestones;
       if (status !== 'all') {
-        const resourceStatus = status === 'open' ? ResourceStatus.ACTIVE : ResourceStatus.CLOSED;
-        filteredMilestones = milestones.filter(milestone => milestone.status === resourceStatus);
+        filteredMilestones = filterByStatus(milestones, status, 'milestone');
       }
 
       // Sort the milestones
@@ -251,10 +259,9 @@ export class MilestoneService {
         return direction === 'asc' ? comparison : -comparison;
       });
 
+      // Return plain objects for MCP compatibility
       return filteredMilestones;
-    } catch (error) {
-      throw mapErrorToMCPError(error);
-    }
+    });
   }
 
   /**
@@ -271,11 +278,11 @@ export class MilestoneService {
     dueDate?: string | null;
     state?: 'open' | 'closed';
   }): Promise<Milestone> {
-    try {
+    return safeCall(async () => {
       // Convert state to ResourceStatus if provided
       let status: ResourceStatus | undefined;
       if (data.state) {
-        status = data.state === 'open' ? ResourceStatus.ACTIVE : ResourceStatus.CLOSED;
+        status = parseResourceStatus(data.state, 'milestone');
       }
 
       // Map input data to domain model
@@ -293,10 +300,10 @@ export class MilestoneService {
         }
       });
 
-      return await this.milestoneRepo.update(data.milestoneId, milestoneData);
-    } catch (error) {
-      throw mapErrorToMCPError(error);
-    }
+      const milestone = await this.milestoneRepo.update(data.milestoneId, milestoneData);
+      // Return plain object for MCP compatibility
+      return milestone;
+    });
   }
 
   /**
@@ -309,15 +316,13 @@ export class MilestoneService {
   async deleteMilestone(data: {
     milestoneId: string;
   }): Promise<{ success: boolean; message: string }> {
-    try {
+    return safeCall(async () => {
       await this.milestoneRepo.delete(data.milestoneId);
 
       return {
         success: true,
         message: `Milestone ${data.milestoneId} has been deleted`
       };
-    } catch (error) {
-      throw mapErrorToMCPError(error);
-    }
+    });
   }
 }

@@ -31,7 +31,7 @@ export class WorkProductStore {
       '',
       `- Branch: \`${product.branch || 'N/A'}\``,
       `- PR: ${product.prNumber ? `#${product.prNumber}` : 'N/A'}`,
-      `- Commits: ${product.commitShas.join(', ') || 'N/A'}`,
+      `- Commits: ${product.commitShas?.join(', ') || 'N/A'}`,
       `- Files: ${product.filesChanged.length} changed`,
       testLine ? testLine.trimEnd() : null,
       '',

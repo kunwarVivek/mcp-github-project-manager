@@ -1,30 +1,30 @@
-import { beforeEach, describe, expect, it, jest } from '@jest/globals';
+import { beforeEach, describe, expect, it, vi, Mocked, MockedClass, MockedFunction } from 'vitest';
 import { ProjectTemplateService } from '../../../services/ProjectTemplateService';
 import { ResourceType } from '../../../domain/resource-types';
 
 describe('ProjectTemplateService', () => {
   let service: ProjectTemplateService;
-  let mockGraphql: jest.MockedFunction<any>;
+  let mockGraphql: MockedFunction<any>;
   let mockProjectRepo: any;
 
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
 
     // Create mock GraphQL function
-    mockGraphql = jest.fn() as jest.MockedFunction<any>;
+    mockGraphql = vi.fn() as MockedFunction<any>;
 
     // Create mock project repository
     mockProjectRepo = {
-      findById: jest.fn(),
-      createView: jest.fn(),
-      updateField: jest.fn(),
-      deleteView: jest.fn()
+      findById: vi.fn(),
+      createView: vi.fn(),
+      updateField: vi.fn(),
+      deleteView: vi.fn()
     };
 
     // Create mock factory
     const mockFactory = {
       graphql: mockGraphql,
-      createProjectRepository: jest.fn().mockReturnValue(mockProjectRepo)
+      createProjectRepository: vi.fn().mockReturnValue(mockProjectRepo)
     };
 
     // Create service with mock factory

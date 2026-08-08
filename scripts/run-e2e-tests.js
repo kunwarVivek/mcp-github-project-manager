@@ -46,6 +46,8 @@ function printUsage() {
   console.log('  --github-only           Run only GitHub tool tests');
   console.log('  --ai-only               Run only AI tool tests');
   console.log('  --workflows-only        Run only workflow integration tests');
+  console.log('  --agent-only            Run only agent orchestration tool tests');
+  console.log('  --platform-only         Run only platform validation tests');
   console.log('  --build                 Build the project before running tests');
   console.log('  --verbose               Enable verbose output');
   console.log('  --timeout <seconds>     Set test timeout (default: 60)');
@@ -131,6 +133,8 @@ function parseArgs() {
     githubOnly: false,
     aiOnly: false,
     workflowsOnly: false,
+    agentOnly: false,
+    platformOnly: false,
     build: false,
     verbose: false,
     timeout: 60
@@ -156,6 +160,12 @@ function parseArgs() {
       case '--workflows-only':
         options.workflowsOnly = true;
         break;
+      case '--agent-only':
+        options.agentOnly = true;
+        break;
+      case '--platform-only':
+        options.platformOnly = true;
+        break;
       case '--build':
         options.build = true;
         break;
@@ -177,8 +187,9 @@ function parseArgs() {
 }
 
 function buildTestCommand(options) {
-  const baseCommand = ['node', '--experimental-vm-modules', 'node_modules/jest/bin/jest.js'];
-  const args = [...baseCommand, '--config', 'jest.e2e.tools.config.js'];
+  // Use Vitest instead of Jest
+  const baseCommand = ['npx', 'vitest', 'run'];
+  const args = [...baseCommand];
   
   // Add test pattern based on options
   if (options.githubOnly) {
@@ -187,11 +198,15 @@ function buildTestCommand(options) {
     args.push('--testPathPattern=ai-task-tools');
   } else if (options.workflowsOnly) {
     args.push('--testPathPattern=tool-integration-workflows');
+  } else if (options.agentOnly) {
+    args.push('--testPathPattern=agent-orchestration');
+  } else if (options.platformOnly) {
+    args.push('--testPathPattern=platform-validation');
   }
   
-  // Add verbose flag
+  // Add reporter based on verbose flag
   if (options.verbose) {
-    args.push('--verbose');
+    args.push('--reporter=verbose');
   }
   
   // Set environment variables
@@ -202,7 +217,7 @@ function buildTestCommand(options) {
   }
   
   if (options.timeout !== 60) {
-    env.JEST_TIMEOUT = (options.timeout * 1000).toString();
+    env.VITEST_TIMEOUT = (options.timeout * 1000).toString();
   }
   
   return { command: args[0], args: args.slice(1), env };
@@ -213,7 +228,7 @@ async function runTests(options) {
   
   console.log(colorize('\n📋 Test Configuration:', 'cyan'));
   console.log(`  Mode: ${options.realApi ? 'Real API' : 'Mock API'}`);
-  console.log(`  Scope: ${options.githubOnly ? 'GitHub Tools' : options.aiOnly ? 'AI Tools' : options.workflowsOnly ? 'Workflows' : 'All Tools'}`);
+  console.log(`  Scope: ${options.githubOnly ? 'GitHub Tools' : options.aiOnly ? 'AI Tools' : options.workflowsOnly ? 'Workflows' : options.agentOnly ? 'Agent Orchestration Tools' : options.platformOnly ? 'Platform Validation' : 'All Tools'}`);
   console.log(`  Timeout: ${options.timeout} seconds`);
   console.log(`  Verbose: ${options.verbose ? 'Yes' : 'No'}`);
   

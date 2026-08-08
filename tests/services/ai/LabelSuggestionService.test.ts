@@ -1,3 +1,4 @@
+import { vi, Mock } from 'vitest';
 /**
  * Unit tests for LabelSuggestionService
  *
@@ -10,14 +11,28 @@ import { AIServiceFactory } from '../../../src/services/ai/AIServiceFactory';
 import { generateObject } from 'ai';
 
 // Mock dependencies
-jest.mock('../../../src/services/ai/AIServiceFactory');
-jest.mock('ai', () => ({
-  generateObject: jest.fn()
+vi.mock('../../../src/services/ai/AIServiceFactory', () => {
+  const mockFactory = {
+    getMainModel: vi.fn(),
+    getFallbackModel: vi.fn(),
+    getModel: vi.fn(),
+    getBestAvailableModel: vi.fn(),
+    getPRDModel: vi.fn(),
+    getResearchModel: vi.fn(),
+  };
+  return {
+    AIServiceFactory: {
+      getInstance: vi.fn().mockReturnValue(mockFactory),
+    },
+  };
+});
+vi.mock('ai', () => ({
+  generateObject: vi.fn()
 }));
 
-const mockGenerateObject = generateObject as jest.MockedFunction<typeof generateObject>;
-const mockGetModel = jest.fn();
-const mockGetBestAvailableModel = jest.fn();
+const mockGenerateObject = generateObject as MockedFunction<typeof generateObject>;
+const mockGetModel = vi.fn();
+const mockGetBestAvailableModel = vi.fn();
 
 describe('LabelSuggestionService', () => {
   let service: LabelSuggestionService;
@@ -30,8 +45,8 @@ describe('LabelSuggestionService', () => {
   ];
 
   beforeEach(() => {
-    jest.clearAllMocks();
-    (AIServiceFactory.getInstance as jest.Mock).mockReturnValue({
+    vi.clearAllMocks();
+    (AIServiceFactory.getInstance as Mock).mockReturnValue({
       getModel: mockGetModel,
       getBestAvailableModel: mockGetBestAvailableModel
     });

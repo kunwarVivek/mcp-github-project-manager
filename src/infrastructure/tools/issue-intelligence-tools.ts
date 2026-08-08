@@ -152,7 +152,7 @@ export async function executeSuggestLabels(
     includeNewProposals: args.config.includeNewProposals,
   } : undefined;
 
-  const service = new LabelSuggestionService(config);
+  const service = new LabelSuggestionService(undefined, config);
 
   const result = await service.suggestLabels({
     issueTitle: args.issueTitle,
@@ -220,7 +220,7 @@ export async function executeFindRelatedIssues(
     includeComponentGrouping: args.config.includeComponentGrouping,
   } : undefined;
 
-  const service = new RelatedIssueLinkingService(config);
+  const service = new RelatedIssueLinkingService(undefined, config);
 
   const result = await service.findRelatedIssues({
     issueId: args.issueId,

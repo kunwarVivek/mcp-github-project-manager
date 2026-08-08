@@ -1,3 +1,4 @@
+import { vi } from 'vitest';
 /**
  * Unit tests for status update MCP tools
  *
@@ -24,9 +25,24 @@ import { GitHubRepositoryFactory } from '../../../src/infrastructure/github/GitH
 import { StatusUpdateStatus } from '../../../src/infrastructure/github/repositories/types.js';
 
 // Mock the repository factory
-jest.mock('../../../src/infrastructure/github/GitHubRepositoryFactory.js');
+vi.mock('../../../src/infrastructure/github/GitHubRepositoryFactory.js', () => {
+  return {
+    GitHubRepositoryFactory: vi.fn().mockImplementation(function() { return ({
+      createIssueRepository: vi.fn(),
+      createMilestoneRepository: vi.fn(),
+      createProjectRepository: vi.fn(),
+      createSprintRepository: vi.fn(),
+      createAutomationRuleRepository: vi.fn(),
+      createSubIssueRepository: vi.fn(),
+      createStatusUpdateRepository: vi.fn(),
+      getOctokit: vi.fn(),
+      getConfig: vi.fn(),
+      graphql: vi.fn(),
+    })),
+  };
+});
 
-const MockedFactory = GitHubRepositoryFactory as jest.MockedClass<typeof GitHubRepositoryFactory>;
+const MockedFactory = GitHubRepositoryFactory as MockedClass<typeof GitHubRepositoryFactory>;
 
 describe('Status Update Tools', () => {
   describe('Input Schemas', () => {
@@ -209,24 +225,24 @@ describe('Status Update Tools', () => {
 
   describe('Executors', () => {
     const originalEnv = process.env;
-    let mockStatusUpdateRepo: jest.Mocked<{
-      createStatusUpdate: jest.Mock;
-      listStatusUpdates: jest.Mock;
-      getStatusUpdate: jest.Mock;
+    let mockStatusUpdateRepo: Mocked<{
+      createStatusUpdate: Mock;
+      listStatusUpdates: Mock;
+      getStatusUpdate: Mock;
     }>;
 
     beforeEach(() => {
-      jest.resetAllMocks();
+      vi.resetAllMocks();
       process.env = { ...originalEnv, GITHUB_TOKEN: 'test-token' };
 
       mockStatusUpdateRepo = {
-        createStatusUpdate: jest.fn(),
-        listStatusUpdates: jest.fn(),
-        getStatusUpdate: jest.fn(),
+        createStatusUpdate: vi.fn(),
+        listStatusUpdates: vi.fn(),
+        getStatusUpdate: vi.fn(),
       };
 
       MockedFactory.mockImplementation(() => ({
-        createStatusUpdateRepository: jest.fn().mockReturnValue(mockStatusUpdateRepo),
+        createStatusUpdateRepository: vi.fn().mockReturnValue(mockStatusUpdateRepo),
       } as unknown as GitHubRepositoryFactory));
     });
 

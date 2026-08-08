@@ -1,20 +1,21 @@
 import { generateText } from 'ai';
 import { AIServiceFactory } from "./ai/AIServiceFactory";
 import { ProjectManagementService } from "./ProjectManagementService";
-import { Logger } from "../infrastructure/logger";
+import { ILogger, Logger } from "../infrastructure/logger";
 
 /**
  * AI-powered roadmap planning service
  * Analyzes project context and issues to create intelligent roadmaps, milestones, and sprints
  */
 export class RoadmapPlanningService {
-  private logger: Logger;
+  private readonly logger: ILogger;
 
   constructor(
     private aiFactory: AIServiceFactory,
-    private projectService: ProjectManagementService
+    private projectService: ProjectManagementService,
+    logger?: ILogger
   ) {
-    this.logger = Logger.getInstance();
+    this.logger = logger ?? Logger.getInstance();
   }
 
   /**

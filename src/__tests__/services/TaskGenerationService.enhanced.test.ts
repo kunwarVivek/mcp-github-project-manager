@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, jest } from '@jest/globals';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 
 // Set up environment variables before importing any services
 process.env.ANTHROPIC_API_KEY = 'sk-ant-test-anthropic-key-12345';
@@ -11,13 +11,14 @@ process.env.AI_FALLBACK_MODEL = 'gpt-4o';
 process.env.AI_PRD_MODEL = 'claude-3-5-sonnet-20241022';
 
 // Mock the ai package
-jest.mock('ai', () => ({
-  generateObject: jest.fn(),
-  generateText: jest.fn()
+vi.mock('ai', () => ({
+  generateObject: vi.fn(),
+  generateText: vi.fn()
 }));
 
 import { TaskGenerationService } from '../../services/TaskGenerationService';
 import {
+import { generateObject, generateText } from 'ai';
   PRDDocument,
   EnhancedTaskGenerationParams
 } from '../../domain/ai-types';
@@ -61,10 +62,11 @@ describe('TaskGenerationService - Enhanced Context Generation', () => {
   };
 
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
 
     // Set up mock responses for AI services
-    const { generateObject, generateText } = require('ai');
+    
+
 
     // Mock task generation response
     const mockTasks = [

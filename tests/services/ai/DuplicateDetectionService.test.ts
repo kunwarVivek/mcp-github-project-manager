@@ -1,3 +1,4 @@
+import { vi } from 'vitest';
 /**
  * Unit tests for DuplicateDetectionService
  *
@@ -7,17 +8,18 @@
 
 import { DuplicateDetectionService } from '../../../src/services/ai/DuplicateDetectionService';
 import { embed, embedMany, cosineSimilarity } from 'ai';
+import { embed, embedMany } from 'ai';
 
 // Mock dependencies
-jest.mock('ai', () => ({
-  embed: jest.fn(),
-  embedMany: jest.fn(),
-  cosineSimilarity: jest.fn()
+vi.mock('ai', () => ({
+  embed: vi.fn(),
+  embedMany: vi.fn(),
+  cosineSimilarity: vi.fn()
 }));
 
-const mockEmbed = embed as jest.MockedFunction<typeof embed>;
-const mockEmbedMany = embedMany as jest.MockedFunction<typeof embedMany>;
-const mockCosineSimilarity = cosineSimilarity as jest.MockedFunction<typeof cosineSimilarity>;
+const mockEmbed = embed as MockedFunction<typeof embed>;
+const mockEmbedMany = embedMany as MockedFunction<typeof embedMany>;
+const mockCosineSimilarity = cosineSimilarity as MockedFunction<typeof cosineSimilarity>;
 
 describe('DuplicateDetectionService', () => {
   let service: DuplicateDetectionService;
@@ -30,7 +32,7 @@ describe('DuplicateDetectionService', () => {
   ];
 
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
     service = new DuplicateDetectionService();
 
     // Default mock for embedding

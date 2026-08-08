@@ -100,8 +100,8 @@ export class LabelSuggestionService {
   private aiFactory: AIServiceFactory;
   private config: LabelSuggestionConfig;
 
-  constructor(config?: Partial<LabelSuggestionConfig>) {
-    this.aiFactory = AIServiceFactory.getInstance();
+  constructor(aiFactory?: AIServiceFactory, config?: Partial<LabelSuggestionConfig>) {
+    this.aiFactory = aiFactory ?? AIServiceFactory.getInstance();
     this.config = {
       ...DEFAULT_CONFIG,
       ...config,

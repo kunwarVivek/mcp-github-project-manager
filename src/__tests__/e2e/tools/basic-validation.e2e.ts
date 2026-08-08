@@ -68,7 +68,7 @@ describe('E2E Test Infrastructure Validation', () => {
 
     try {
       await utils.callTool('create_project', invalidArgs);
-      fail('Should have thrown validation error');
+      throw new Error('Should have thrown validation error');
     } catch (error: any) {
       expect(error.message).toContain('Invalid parameters');
     }
@@ -77,7 +77,7 @@ describe('E2E Test Infrastructure Validation', () => {
   it('should handle unknown tools gracefully', async () => {
     try {
       await utils.callTool('nonexistent_tool', {});
-      fail('Should have thrown error for unknown tool');
+      throw new Error('Should have thrown error for unknown tool');
     } catch (error: any) {
       expect(error.message).toContain('nonexistent_tool');
     }

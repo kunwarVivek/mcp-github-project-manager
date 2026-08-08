@@ -95,8 +95,8 @@ export class IssueEnrichmentAIService {
   private aiFactory: AIServiceFactory;
   private config: IssueEnrichmentConfig;
 
-  constructor(config?: Partial<IssueEnrichmentConfig>) {
-    this.aiFactory = AIServiceFactory.getInstance();
+  constructor(aiFactory?: AIServiceFactory, config?: Partial<IssueEnrichmentConfig>) {
+    this.aiFactory = aiFactory ?? AIServiceFactory.getInstance();
     this.config = { ...DEFAULT_ENRICHMENT_CONFIG, ...config };
   }
 

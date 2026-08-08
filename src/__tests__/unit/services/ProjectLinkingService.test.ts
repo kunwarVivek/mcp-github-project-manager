@@ -1,16 +1,16 @@
-import { beforeEach, describe, expect, it, jest } from '@jest/globals';
+import { beforeEach, describe, expect, it, vi, Mocked, MockedClass, MockedFunction } from 'vitest';
 import { ProjectLinkingService } from '../../../services/ProjectLinkingService';
 import { ResourceType } from '../../../domain/resource-types';
 
 describe('ProjectLinkingService', () => {
   let service: ProjectLinkingService;
-  let mockGraphql: jest.MockedFunction<any>;
+  let mockGraphql: MockedFunction<any>;
 
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
 
     // Create mock GraphQL function
-    mockGraphql = jest.fn() as jest.MockedFunction<any>;
+    mockGraphql = vi.fn() as MockedFunction<any>;
 
     // Create mock factory
     const mockFactory = {

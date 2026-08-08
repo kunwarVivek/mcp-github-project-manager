@@ -22,7 +22,10 @@ import {
   CACHE_DIRECTORY,
   WEBHOOK_SECRET,
   WEBHOOK_PORT,
-  SSE_ENABLED
+  SSE_ENABLED,
+  AGENT_RECLAIM_ENABLED,
+  AGENT_RECLAIM_INTERVAL_MS,
+  AGENT_STALE_AFTER_MINUTES
 } from "./env";
 import { ToolRegistry } from "./infrastructure/tools/ToolRegistry";
 import { ToolValidator } from "./infrastructure/tools/ToolValidator";
@@ -104,6 +107,13 @@ import {
   executeGetBudgetStatus,
   executeSetAgentBudget,
   executeCheckWorkStatus,
+  executeReclaimStaleTasks,
+  executeRecordUsage,
+  executeSubmitForReview,
+  executeApproveTask,
+  executeRejectTask,
+  executeGetAgentMetrics,
+  executeSetupAgentFields,
 } from "./infrastructure/tools/agent-orchestration-tools";
 
 // Health Tools
@@ -146,18 +156,19 @@ import { GitHubWebhookHandler } from "./infrastructure/events/GitHubWebhookHandl
 import { EventSubscriptionManager } from "./infrastructure/events/EventSubscriptionManager";
 import { EventStore } from "./infrastructure/events/EventStore";
 import { WebhookServer } from "./infrastructure/http/WebhookServer";
-import { Logger } from "./infrastructure/logger/index";
+import { ILogger, Logger, logger } from "./infrastructure/logger/index";
 import { AIServiceFactory } from "./services/ai/AIServiceFactory";
 import { RoadmapPlanningService } from "./services/RoadmapPlanningService";
 import { IssueEnrichmentService } from "./services/IssueEnrichmentService";
 import { IssueTriagingService } from "./services/IssueTriagingService";
 import { GracefulShutdown } from "./infrastructure/lifecycle/GracefulShutdown";
+import type { AgentReclaimScheduler } from "./services/agent/AgentReclaimScheduler";
 
 class GitHubProjectManagerServer {
   private server: Server;
   private service: ProjectManagementService;
   private toolRegistry: ToolRegistry;
-  private logger: Logger;
+  private logger: ILogger;
 
   // AI-powered automation services
   private aiFactory: AIServiceFactory;
@@ -177,8 +188,11 @@ class GitHubProjectManagerServer {
   private webhookServer?: WebhookServer;
   private gracefulShutdown: GracefulShutdown;
 
+  // Agent orchestration
+  private reclaimScheduler: AgentReclaimScheduler;
+
   constructor() {
-    this.logger = Logger.getInstance();
+    this.logger = logger;
 
     this.server = new Server(
       {
@@ -216,6 +230,10 @@ class GitHubProjectManagerServer {
     this.roadmapService = di.resolve("RoadmapPlanningService");
     this.enrichmentService = di.resolve("IssueEnrichmentService");
     this.triagingService = di.resolve("IssueTriagingService");
+
+    // Auto-reclaim scheduler: server-side self-healing for the agent swarm
+    this.reclaimScheduler = di.resolve("AgentReclaimScheduler");
+    this.reclaimScheduler.start();
 
     // Get the tool registry instance
     this.toolRegistry = ToolRegistry.getInstance();
@@ -463,6 +481,13 @@ class GitHubProjectManagerServer {
     r.registerExecutor('get_budget_status', executeGetBudgetStatus);
     r.registerExecutor('set_agent_budget', executeSetAgentBudget);
     r.registerExecutor('check_work_status', (args) => executeCheckWorkStatus(args));
+    r.registerExecutor('reclaim_stale_tasks', executeReclaimStaleTasks);
+    r.registerExecutor('record_usage', executeRecordUsage);
+    r.registerExecutor('submit_for_review', executeSubmitForReview);
+    r.registerExecutor('approve_task', executeApproveTask);
+    r.registerExecutor('reject_task', executeRejectTask);
+    r.registerExecutor('get_agent_metrics', executeGetAgentMetrics);
+    r.registerExecutor('setup_agent_fields', executeSetupAgentFields);
 
     // ── Pattern C: server-bound handlers (use this.xxxService) ───────
     r.registerExecutor('subscribe_to_events', (a) => this.handleSubscribeToEvents(a));
@@ -562,10 +587,17 @@ class GitHubProjectManagerServer {
           // Convert our custom MCPResponse to the format expected by the SDK
           // SDK 1.25+ expects { content: [...], structuredContent?: {...}, isError?: boolean }
           if (mcpResponse.status === "success") {
-            // Prepare structuredContent if result is an object
-            // structuredContent provides typed data matching the tool's outputSchema
-            const structuredContent = (result !== null && typeof result === 'object')
-              ? result as Record<string, unknown>
+            // Prepare structuredContent if result is a non-null, non-array object.
+            // Arrays are excluded because most tool outputSchemas expect a record;
+            // array results (e.g., list actions) are still fully accessible via the
+            // text content. Class instances are serialized via JSON round-trip to
+            // produce plain records the MCP SDK can validate.
+            const structuredContent = (
+              result !== null &&
+              typeof result === 'object' &&
+              !Array.isArray(result)
+            )
+              ? JSON.parse(JSON.stringify(result)) as Record<string, unknown>
               : undefined;
 
             return {
@@ -972,6 +1004,9 @@ class GitHubProjectManagerServer {
     this.logger.info("Shutting down GitHub Project Manager server...");
 
     try {
+      // Stop the agent auto-reclaim scheduler
+      this.reclaimScheduler.stop();
+
       // Stop webhook server
       if (this.webhookServer) {
         await this.webhookServer.stop();
@@ -1040,6 +1075,7 @@ class GitHubProjectManagerServer {
         process.stderr.write(`- Cache directory: ${CACHE_DIRECTORY}\n`);
         process.stderr.write(`- Webhook port: ${WEBHOOK_PORT}\n`);
         process.stderr.write(`- SSE enabled: ${SSE_ENABLED}\n`);
+        process.stderr.write(`- Agent auto-reclaim: ${AGENT_RECLAIM_ENABLED ? `enabled (every ${AGENT_RECLAIM_INTERVAL_MS}ms, stale after ${AGENT_STALE_AFTER_MINUTES}min)` : 'disabled'}\n`);
       }
 
       process.stderr.write("GitHub Project Manager MCP server running on stdio\n");

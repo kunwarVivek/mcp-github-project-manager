@@ -85,8 +85,8 @@ export class BacklogPrioritizer {
   private aiFactory: AIServiceFactory;
   private weights: PrioritizationWeights;
 
-  constructor(weights?: Partial<PrioritizationWeights>) {
-    this.aiFactory = AIServiceFactory.getInstance();
+  constructor(aiFactory?: AIServiceFactory, weights?: Partial<PrioritizationWeights>) {
+    this.aiFactory = aiFactory ?? AIServiceFactory.getInstance();
     this.weights = { ...DEFAULT_WEIGHTS, ...weights };
   }
 

@@ -98,8 +98,8 @@ export interface RiskAssessmentParams {
 export class SprintRiskAssessor {
   private aiFactory: AIServiceFactory;
 
-  constructor() {
-    this.aiFactory = AIServiceFactory.getInstance();
+  constructor(aiFactory?: AIServiceFactory) {
+    this.aiFactory = aiFactory ?? AIServiceFactory.getInstance();
   }
 
   /**

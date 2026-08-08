@@ -2,6 +2,7 @@ import { BaseGitHubRepository } from "./BaseRepository";
 import { Milestone, CreateMilestone, MilestoneRepository, MilestoneId, Issue } from "../../../domain/types";
 import { ResourceType, ResourceStatus } from "../../../domain/resource-types";
 import { GitHubIssueRepository } from "./GitHubIssueRepository";
+import { parseResourceStatus, toStatusString } from '../../../domain/utils/StatusParser';
 
 interface GitHubMilestone {
   id: string;
@@ -67,7 +68,7 @@ export class GitHubMilestoneRepository extends BaseGitHubRepository implements M
       title: githubMilestone.title,
       description: githubMilestone.description || "",
       dueDate: githubMilestone.dueOn || undefined,
-      status: githubMilestone.state === "open" ? ResourceStatus.ACTIVE : ResourceStatus.CLOSED,
+      status: parseResourceStatus(githubMilestone.state, 'githubMilestone'),
       progress: {
         percent: githubMilestone.progress?.completionPercentage || 0,
         complete: githubMilestone.progress?.closedIssues || 0,
@@ -86,7 +87,7 @@ export class GitHubMilestoneRepository extends BaseGitHubRepository implements M
       title: restMilestone.title,
       description: restMilestone.description || "",
       dueDate: restMilestone.due_on || undefined,
-      status: restMilestone.state === "open" ? ResourceStatus.ACTIVE : ResourceStatus.CLOSED,
+      status: parseResourceStatus(restMilestone.state, 'githubMilestone'),
       progress: {
         percent: 0, // REST API doesn't provide progress info
         complete: restMilestone.closed_issues || 0,
@@ -122,7 +123,7 @@ export class GitHubMilestoneRepository extends BaseGitHubRepository implements M
         title: data.title,
         description: data.description,
         due_on: data.dueDate,
-        state: data.status === ResourceStatus.CLOSED ? "closed" : "open",
+        state: toStatusString(data.status || ResourceStatus.ACTIVE, 'githubMilestone'),
       }
     );
 
