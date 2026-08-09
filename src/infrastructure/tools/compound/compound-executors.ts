@@ -587,83 +587,298 @@ export async function executeAiGenerate(args: AiGenerateArgs): Promise<unknown> 
 }
 
 /**
- * Materialize generated AITask[] as real GitHub issues in a project.
+ * Plan and materialize generated tasks as a structured GitHub project hierarchy.
  *
- * This is the missing bridge between "parse_prd → in-memory tasks" and
- * "agent checkout_task → claims an issue." Without it, generated tasks
- * never reach GitHub and agents have nothing to claim.
+ * This is the PM's core planning action — the missing bridge between
+ * "parse_prd → in-memory tasks" and "agent checkout_task → claims an issue."
  *
- * For each task:
- * 1. Creates a GitHub issue via PMS.createIssue
- * 2. Optionally adds it to a project via PMS.addProjectItem
- *    (required for agent checkout — checkoutTask only finds project items)
+ * 1. Analyzes task dependencies via DependencyGraph → bottom-up execution order
+ * 2. Groups into phases (milestones) by dependency depth — foundations first
+ * 3. Creates sprints within each phase (real GitHub iterations)
+ * 4. Creates issues with progressive context + validation criteria
+ * 5. Adds issues to the project so agents can claim them via checkout_task
+ *
+ * Each issue body carries:
+ * - Progressive context: only the PRD sections relevant to THAT task
+ * - Concrete deliverable: the specific task to achieve
+ * - Validation criteria: how the agent proves it's done
+ * - Dependencies: which prior tasks must complete first
  */
 async function executeMaterializeTasks(args: {
-  tasks?: Array<{ id?: string; title: string; description: string; complexity?: number; estimatedHours?: number; priority?: string }>;
+  tasks?: Array<{
+    id?: string; title: string; description: string;
+    complexity?: number; estimatedHours?: number; priority?: string;
+    dependencies?: Array<{ id: string; type?: string; description?: string }>;
+    acceptanceCriteria?: Array<{ id?: string; description: string; completed?: boolean }>;
+    tags?: string[];
+  }>;
   projectId?: string;
   labelPrefix?: string;
   addToProject?: boolean;
+  prdContent?: string;
 }): Promise<unknown> {
-  const { tasks, projectId, labelPrefix = 'ai-generated', addToProject = true } = args;
+  const { tasks, projectId, labelPrefix = 'ai-generated', addToProject = true, prdContent } = args;
 
   if (!tasks || tasks.length === 0) {
-    return { created: 0, issues: [], message: 'No tasks provided' };
+    return { created: 0, milestones: [], sprints: [], issues: [], message: 'No tasks provided' };
+  }
+  if (!projectId) {
+    return { created: 0, message: 'projectId is required — agents can only claim issues inside a project' };
   }
 
   const svc = getPMS();
-  const created: Array<{ id: string; number: number; title: string }> = [];
+
+  // ── 1. Build dependency graph and analyze bottom-up order ─────
+  const { DependencyGraph } = await import('../../../analysis/DependencyGraph');
+  const graph = new DependencyGraph();
+  const taskMap = new Map<string, typeof tasks[0]>();
+
+  for (let i = 0; i < tasks.length; i++) {
+    const task = tasks[i];
+    const taskId = task.id || `task-${i}`;
+    taskMap.set(taskId, task);
+
+    graph.addTask({
+      id: taskId,
+      title: task.title,
+      description: task.description,
+      complexity: (task.complexity || 5) as any,
+      estimatedHours: task.estimatedHours || 8,
+      priority: (task.priority || 'medium') as any,
+      status: 'pending' as any,
+      dependencies: (task.dependencies || []).map(d => ({ id: d.id, type: (d.type || 'blocks') as 'blocks' | 'depends_on' | 'related_to', description: d.description })),
+      acceptanceCriteria: (task.acceptanceCriteria || []).map(ac => ({ id: ac.id || `ac-${Math.random().toString(36).slice(2, 6)}`, description: ac.description, completed: ac.completed ?? false })),
+      tags: task.tags || [],
+      aiGenerated: true,
+      subtasks: [],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+  }
   const errors: Array<{ title: string; error: string }> = [];
+  // Rely on caller's explicit dependencies — detectImplicitDependencies()
+  // does all-pairs keyword scan that creates bidirectional edges (A→B AND B→A)
+  // for keyword-overlapping tasks, producing cycles that break topsort and
+  // collapse parallelGroups to []. Don't call it.
+  const analysis = graph.analyze();
 
-  for (const task of tasks) {
+  // parallelGroups = bottom-up layers: [roots (no deps), ..., leaves]
+  let phases: string[][];
+  if (analysis.cycles.length > 0) {
+    // Cycles detected — surface them instead of silently collapsing
+    // Fall back to execution order chunked by dependency depth
+    const allIds = Array.from(taskMap.keys());
+    phases = [allIds]; // Last resort: single phase
+    errors.push({
+      title: 'Dependency analysis',
+      error: `Circular dependencies detected: ${analysis.cycles.map(c => c.join('→')).join('; ')}. All tasks placed in a single phase.`,
+    });
+  } else if (analysis.parallelGroups.length > 0) {
+    phases = analysis.parallelGroups;
+  } else {
+    phases = [Array.from(taskMap.keys())];
+  }
+
+  // ── 2. Extract PRD sections for progressive disclosure ────────
+  const prdSections = prdContent ? extractPRDSections(prdContent) : null;
+
+  const phaseNames = ['Foundation', 'Core Implementation', 'Integration', 'Polish & Testing', 'Delivery'];
+  const createdMilestones: Array<{ id: string; number: number; title: string; phase: number }> = [];
+  const createdSprints: Array<{ id: string; title: string; phase: number }> = [];
+  const createdIssues: Array<{ id: string; number: number; title: string; phase: number; milestone: string }> = [];
+
+  // ── 3. Create milestones, sprints, and issues per phase ───────
+  for (let phaseIdx = 0; phaseIdx < phases.length; phaseIdx++) {
+    const phaseTaskIds = phases[phaseIdx];
+    const phaseName = phaseNames[phaseIdx] || `Phase ${phaseIdx + 1}`;
+    const sprintStart = new Date(Date.now() + phaseIdx * 14 * 24 * 60 * 60 * 1000);
+    const sprintEnd = new Date(sprintStart.getTime() + 14 * 24 * 60 * 60 * 1000);
+
+    // Create milestone for this phase
+    let milestoneNodeId: string | undefined;
     try {
-      // Build labels from task metadata
-      const labels: string[] = [labelPrefix];
-      if (task.priority) labels.push(`priority:${task.priority}`);
-      if (task.complexity) labels.push(`complexity:${task.complexity}`);
-
-      // Create the GitHub issue
-      const issue = await svc.createIssue({
-        title: task.title,
-        description: task.description
-          + (task.estimatedHours ? `\n\n**Estimated hours:** ${task.estimatedHours}` : '')
-          + (task.complexity ? `\n**Complexity:** ${task.complexity}/10` : ''),
-        labels,
-        priority: task.priority,
+      const milestone = await svc.createMilestone({
+        title: `${phaseName} — ${labelPrefix}-${Date.now().toString(36).slice(-4)}`,
+        description: `Phase ${phaseIdx + 1}/${phases.length}: ${phaseTaskIds.length} task(s). ${phaseIdx > 0 ? 'Requires prior phase completion.' : 'No dependencies — start here.'}`,
+        dueDate: sprintEnd.toISOString(),
       });
+      milestoneNodeId = milestone.id; // GraphQL createIssue needs node ID, not number
+      createdMilestones.push({ id: milestone.id, number: milestone.number, title: milestone.title, phase: phaseIdx });
+    } catch (e) {
+      errors.push({ title: `Milestone: ${phaseName}`, error: e instanceof Error ? e.message : String(e) });
+    }
 
-      // Add to project so agents can find it via checkoutTask
-      if (addToProject && projectId) {
+    // Create sprint (real GitHub iteration) for this phase
+    let sprintId: string | undefined;
+    try {
+      const sprint = await svc.createSprint({
+        title: `${phaseName} Sprint`,
+        description: `Sprint for ${phaseName} phase`,
+        startDate: sprintStart.toISOString(),
+        endDate: sprintEnd.toISOString(),
+        issues: [],
+      });
+      sprintId = sprint.id;
+      createdSprints.push({ id: sprint.id, title: sprint.title, phase: phaseIdx });
+    } catch (e) {
+      errors.push({ title: `Sprint: ${phaseName}`, error: e instanceof Error ? e.message : String(e) });
+    }
+
+    // Create issues for each task in this phase
+    for (const taskId of phaseTaskIds) {
+      const task = taskMap.get(taskId);
+      if (!task) continue;
+
+      try {
+        // ── Build progressive-disclosure issue body ──────────
+        const deps = (task.dependencies || []).map(d => {
+          const depTask = taskMap.get(d.id);
+          return depTask
+            ? `- [ ] **${depTask.title}** must be complete (${d.type || 'blocks'})`
+            : `- [ ] ${d.id} (${d.type || 'dependency'})`;
+        });
+
+        // Progressive context: extract only PRD sections relevant to this task
+        const relevantContext = prdSections
+          ? findRelevantPRDSections(task.title, task.description, task.tags || [], prdSections)
+          : null;
+
+        // Validation criteria from task's acceptance criteria or generated defaults
+        const validationCriteria = (task.acceptanceCriteria && task.acceptanceCriteria.length > 0)
+          ? task.acceptanceCriteria.map(ac => `- [ ] ${ac.description}`)
+          : [
+            `- [ ] Implementation matches the task description`,
+            `- [ ] Unit/integration tests cover the changed functionality`,
+            `- [ ] No regressions — existing tests pass`,
+            `- [ ] Code reviewed and approved`,
+          ];
+
+        const issueBody = [
+          `## Deliverable`,
+          ``,
+          task.description,
+          ``,
+          `## Implementation Context`,
+          ``,
+          `| Property | Value |`,
+          `|----------|-------|`,
+          `| **Phase** | ${phaseName} (${phaseIdx + 1}/${phases.length}) |`,
+          `| **Complexity** | ${task.complexity || 5}/10 |`,
+          `| **Estimated hours** | ${task.estimatedHours || 'TBD'} |`,
+          `| **Priority** | ${task.priority || 'medium'} |`,
+          deps.length > 0 ? [
+            ``,
+            `## Dependencies (must complete first)`,
+            ``,
+            ...deps,
+          ].join('\n') : '',
+          relevantContext ? [
+            ``,
+            `## Relevant PRD Context`,
+            ``,
+            `<details><summary>Click to expand relevant requirements</summary>`,
+            ``,
+            relevantContext,
+            ``,
+            `</details>`,
+          ].join('\n') : '',
+          ``,
+          `## Validation Criteria`,
+          ``,
+          ...validationCriteria,
+          ``,
+          `---`,
+          `*Auto-generated by PM planning — ${labelPrefix}*`,
+        ].filter(line => line !== undefined).join('\n');
+
+        const labels: string[] = [labelPrefix, `phase:${phaseIdx + 1}`];
+        if (task.priority) labels.push(`priority:${task.priority}`);
+        if (task.tags) labels.push(...task.tags.slice(0, 3));
+
+        const issue = await svc.createIssue({
+          title: task.title,
+          description: issueBody,
+          labels,
+          priority: task.priority,
+          milestoneId: milestoneNodeId,
+        });
+
+        // Add to project so agents can claim via checkoutTask
         try {
-          await svc.addProjectItem({
-            projectId,
-            contentId: issue.id,
-            contentType: 'issue',
-          });
-        } catch (addError) {
-          // Issue created but not added to project — still useful
-          errors.push({
-            title: task.title,
-            error: `Created issue #${issue.number} but failed to add to project: ${addError instanceof Error ? addError.message : String(addError)}`,
-          });
+          await svc.addProjectItem({ projectId, contentId: issue.id, contentType: 'issue' });
+        } catch (addErr) {
+          errors.push({ title: task.title, error: `Issue #${issue.number} created but project-add failed: ${addErr instanceof Error ? addErr.message : String(addErr)}` });
         }
-      }
 
-      created.push({ id: issue.id, number: issue.number, title: issue.title });
-    } catch (createError) {
-      errors.push({
-        title: task.title,
-        error: createError instanceof Error ? createError.message : String(createError),
-      });
+        createdIssues.push({ id: issue.id, number: issue.number, title: issue.title, phase: phaseIdx, milestone: phaseName });
+      } catch (createErr) {
+        errors.push({ title: task.title, error: createErr instanceof Error ? createErr.message : String(createErr) });
+      }
     }
   }
 
   return {
-    created: created.length,
-    failed: errors.length,
-    issues: created,
+    summary: `Created ${createdMilestones.length} milestones, ${createdSprints.length} sprints, and ${createdIssues.length} issues across ${phases.length} phases`,
+    phases: phases.length,
+    executionOrder: analysis.executionOrder,
+    criticalPath: analysis.criticalPath,
+    milestones: createdMilestones,
+    sprints: createdSprints,
+    issues: createdIssues,
     errors: errors.length > 0 ? errors : undefined,
-    projectId: addToProject ? projectId : undefined,
+    projectId,
   };
+}
+
+// ── Progressive disclosure helpers ──────────────────────────────
+
+/** Split a PRD into titled sections for targeted extraction. */
+function extractPRDSections(prd: string): Map<string, string> {
+  const sections = new Map<string, string>();
+  const headingRegex = /^#{1,3}\s+(.+)$/gm;
+  let lastHeading = 'Overview';
+  let lastIndex = 0;
+  let match;
+
+  while ((match = headingRegex.exec(prd)) !== null) {
+    if (match.index > lastIndex) {
+      sections.set(lastHeading, prd.slice(lastIndex, match.index).trim());
+    }
+    lastHeading = match[1].trim();
+    lastIndex = match.index + match[0].length;
+  }
+  if (lastIndex < prd.length) {
+    sections.set(lastHeading, prd.slice(lastIndex).trim());
+  }
+  return sections;
+}
+
+/** Find PRD sections relevant to a specific task via keyword overlap. */
+function findRelevantPRDSections(
+  title: string, description: string, tags: string[],
+  sections: Map<string, string>,
+): string {
+  const taskWords = new Set(
+    `${title} ${description} ${tags.join(' ')}`
+      .toLowerCase()
+      .split(/\W+/)
+      .filter(w => w.length > 3)
+  );
+
+  const scored: Array<[string, string, number]> = [];
+  for (const [heading, content] of sections) {
+    const sectionWords = `${heading} ${content}`.toLowerCase().split(/\W+/);
+    const overlap = sectionWords.filter(w => taskWords.has(w)).length;
+    if (overlap > 0) {
+      scored.push([heading, content, overlap]);
+    }
+  }
+
+  scored.sort((a, b) => b[2] - a[2]);
+  // Return top 3 most relevant sections, truncated
+  return scored.slice(0, 3)
+    .map(([heading, content]) => `### ${heading}\n${content.slice(0, 500)}${content.length > 500 ? '...' : ''}`)
+    .join('\n\n');
 }
 
 // ============================================================================
