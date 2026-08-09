@@ -181,6 +181,11 @@ export interface CheckoutOptions {
    * (for reviewer agents). Mutually exclusive with other strategies.
    */
   reviewQueue?: boolean;
+  /**
+   * PM assignment: if set, checkout this specific issue instead of
+   * running candidate selection. The agent claims this issue directly.
+   */
+  issueNumber?: number;
 }
 
 /**
@@ -265,13 +270,22 @@ export class TaskCheckoutService {
       // 1. Fetch open issues with their project item fields (paginated)
       const issues = await this.fetchOpenIssues(config.owner, config.repo);
 
-      // 2. Find an unclaimed issue (no agent_claimed_by, agent_status = unclaimed or absent)
-      //    Review-queue claims always take precedence over the AI strategy.
-      const candidate = options?.reviewQueue
-        ? this.pickCandidate(issues, options, agent.capabilities)
-        : options?.strategy === 'ai'
-          ? await this.pickCandidateWithAI(issues, options, agent)
-          : this.pickCandidate(issues, options, agent.capabilities);
+      // PM direct assignment: if issueNumber is specified, claim that exact issue
+      let candidate: { issue: IssueWithProject; rationale?: string } | null;
+      if (options?.issueNumber) {
+        const target = issues.find(i => i.number === options.issueNumber);
+        if (!target) {
+          return { success: false, message: `Issue #${options.issueNumber} not found or not in a project` };
+        }
+        candidate = { issue: target, rationale: 'PM direct assignment' };
+      } else {
+        // 2. Find an unclaimed issue via strategy
+        candidate = options?.reviewQueue
+          ? this.pickCandidate(issues, options, agent.capabilities)
+          : options?.strategy === 'ai'
+            ? await this.pickCandidateWithAI(issues, options, agent)
+            : this.pickCandidate(issues, options, agent.capabilities);
+      }
       if (!candidate) {
         return { success: false, message: 'No unclaimed tasks available' };
       }

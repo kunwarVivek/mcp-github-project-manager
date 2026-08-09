@@ -761,6 +761,8 @@ export const agentManageSchema = z.object({
     'list', 'deregister', 'get_activity',
     'submit_work_product', 'get_budget', 'set_budget',
     'reclaim_stale', 'record_usage', 'get_metrics', 'setup_fields',
+    // PM coordination
+    'assign_task', 'get_swarm_status', 'rebalance_workload',
   ]).describe('The agent management operation to perform'),
   // Common
   agentId: z.string().optional(),
@@ -793,7 +795,7 @@ export const agentManageSchema = z.object({
   tokensUsed: z.number().optional(),
   // Metrics
   staleAfterMinutes: z.number().optional(),
-}).describe('Agent Management — list, deregister, activity, work products, budget, reclaim, usage, metrics');
+}).describe('Agent Management — list, deregister, activity, work products, budget, reclaim, usage, metrics, PM coordination');
 
 export type AgentManageArgs = z.infer<typeof agentManageSchema>;
 

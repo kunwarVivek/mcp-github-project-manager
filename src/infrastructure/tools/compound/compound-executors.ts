@@ -111,6 +111,12 @@ import {
   executeReclaimStaleTasks,
 } from '../agent-orchestration-tools';
 
+// PM coordination services
+import { AgentStore } from '../../agent/AgentStore';
+import { AgentBudgetService } from '../../../services/agent/AgentBudgetService';
+import { AgentContextService } from '../../../services/agent/AgentContextService';
+import { TaskCheckoutService } from '../../../services/agent/TaskCheckoutService';
+
 // Standalone executors — health
 import { executeHealthCheck } from '../health-tools';
 
@@ -1033,6 +1039,82 @@ export async function executeAgentManage(args: AgentManageArgs): Promise<unknown
       const setup = new ProjectFieldSetup(factory);
       return setup.ensureFields(rest.projectId as string);
     }
+
+    // ── PM coordination ──────────────────────────────────────────
+
+    case 'assign_task': {
+      // PM explicitly assigns a task to an agent (bypasses self-service checkout)
+      const factory = createGitHubFactory();
+      const store = new AgentStore(factory);
+      const contextService = new AgentContextService(factory);
+      const service = new TaskCheckoutService(factory, store, contextService);
+      const result = await service.checkoutTask(rest.agentId as string, {
+        projectId: rest.projectId,
+        issueNumber: rest.issueNumber,
+      });
+      return result;
+    }
+
+    case 'get_swarm_status': {
+      // Dashboard: all agents, their tasks, heartbeats, budgets, blocked/stale detection
+      const factory = createGitHubFactory();
+      const store = new AgentStore(factory);
+      const budgetService = new AgentBudgetService(store);
+      const agents = await store.listAgents();
+      const now = Date.now();
+      const staleThreshold = (rest.staleAfterMinutes as number || 30) * 60 * 1000;
+
+      const agentStatuses = await Promise.all(agents.map(async (agent) => {
+        const lastHb = agent.lastHeartbeat ? new Date(agent.lastHeartbeat).getTime() : 0;
+        const isStale = agent.status === 'working' && (now - lastHb) > staleThreshold;
+        const isBlocked = agent.status === 'blocked';
+        let budget;
+        try { budget = await budgetService.getBudgetStatus(agent.id); } catch { /* no budget */ }
+
+        return {
+          id: agent.id,
+          name: agent.name,
+          role: agent.role,
+          status: agent.status,
+          currentTask: agent.currentTaskId ? { id: agent.currentTaskId, title: agent.currentTaskTitle } : null,
+          lastHeartbeat: agent.lastHeartbeat,
+          heartbeatAge: lastHb ? `${Math.round((now - lastHb) / 60000)}m ago` : 'never',
+          isStale,
+          isBlocked,
+          budget: budget ? { usagePercent: budget.usagePercent, isWarning: budget.isWarning, isExhausted: budget.isExhausted } : null,
+        };
+      }));
+
+      return {
+        totalAgents: agents.length,
+        working: agentStatuses.filter(a => a.status === 'working').length,
+        idle: agentStatuses.filter(a => a.status === 'idle').length,
+        blocked: agentStatuses.filter(a => a.isBlocked).length,
+        stale: agentStatuses.filter(a => a.isStale).length,
+        exhausted: agentStatuses.filter(a => a.budget?.isExhausted).length,
+        agents: agentStatuses,
+      };
+    }
+
+    case 'rebalance_workload': {
+      // Reclaim stale agents + return available unclaimed tasks
+      const factory = createGitHubFactory();
+      const store = new AgentStore(factory);
+      const contextService = new AgentContextService(factory);
+      const service = new TaskCheckoutService(factory, store, contextService);
+
+      // Reclaim stale tasks
+      const result = await service.reclaimStaleTasks(rest.staleAfterMinutes as number || 30);
+
+      return {
+        reclaimed: result.reclaimed,
+        reclaimedTasks: result.details,
+        message: result.reclaimed > 0
+          ? `Reclaimed ${result.reclaimed} task(s) from stale agents. Tasks are now available for checkout.`
+          : 'No stale agents found. All active agents have recent heartbeats.',
+      };
+    }
+
     default: unknownAction('agent_manage', action);
   }
 }
@@ -1170,8 +1252,9 @@ const TOOL_CATALOG: Record<string, {
       'submit_for_review', 'approve_task', 'reject_task',
       'list', 'deregister', 'get_activity', 'submit_work_product', 'get_budget', 'set_budget',
       'reclaim_stale', 'record_usage', 'get_metrics', 'setup_fields',
+      'assign_task', 'get_swarm_status', 'rebalance_workload',
     ],
-    description: 'Agent orchestration — task lifecycle (agent_work) and administration (agent_manage)',
+    description: 'Agent orchestration — task lifecycle (agent_work), administration (agent_manage), PM coordination (assign_task, get_swarm_status, rebalance_workload)',
   },
   system: {
     tool: 'system',
