@@ -99,7 +99,7 @@ export class MCPToolTestUtils {
       id: this.messageId++,
       method: "initialize",
       params: {
-        protocolVersion: "2024-11-05",
+        protocolVersion: "2025-03-26",
         capabilities: {},
         clientInfo: { name: "e2e-test", version: "1.0.0" }
       }
@@ -196,7 +196,50 @@ export class MCPToolTestUtils {
       throw new Error(`Tool ${toolName} failed: ${response.error.message}`);
     }
 
+    return MCPToolTestUtils.extractData(response.result);
+  }
+
+  /**
+   * Call a specific tool and return raw MCP result (no extraction)
+   */
+  async callToolRaw(toolName: string, args: any): Promise<any> {
+    const request = {
+      jsonrpc: "2.0",
+      id: this.messageId++,
+      method: "tools/call",
+      params: {
+        name: toolName,
+        arguments: args
+      }
+    };
+
+    const response = await this.sendMessage(request);
+    
+    if (response.error) {
+      throw new Error(`Tool ${toolName} failed: ${response.error.message}`);
+    }
+
     return response.result;
+  }
+
+  /**
+   * Extract domain data from MCP v2 tool response
+   */
+  static extractData(result: any): any {
+    if (!result || typeof result !== 'object') return result;
+    // Check for structuredContent first (MCP v2 with outputSchema)
+    if (result.structuredContent) return result.structuredContent;
+    // Extract from content[0].text
+    if (Array.isArray(result.content) && result.content[0]?.text) {
+      try {
+        const parsed = JSON.parse(result.content[0].text);
+        // Recursively unwrap if needed
+        return MCPToolTestUtils.extractData(parsed);
+      } catch {
+        return result.content[0].text;
+      }
+    }
+    return result;
   }
 
   /**

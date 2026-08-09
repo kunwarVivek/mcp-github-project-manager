@@ -156,15 +156,21 @@ export function getNumericConfigValue(name: string, defaultValue: number): numbe
   return Number.isNaN(parsed) ? defaultValue : parsed;
 }
 
-// Export configuration values with CLI arguments taking precedence over environment variables
-export const GITHUB_TOKEN = process.env.NODE_ENV === 'test'
-  ? 'test-token'
+// Export configuration values with CLI arguments taking precedence over environment variables.
+// Under NODE_ENV=test the credential chain (getSecret, gh auth fallback) is skipped and
+// values are hardcoded to safe test defaults — preserving hermetic unit-test isolation.
+// The ONE exception: when E2E_REAL_API=true is set explicitly, real env vars are honored
+// so live E2E suites that spawn the server as a subprocess can pass real credentials.
+const isTestEnv = process.env.NODE_ENV === 'test';
+const isRealE2E = process.env.E2E_REAL_API === 'true';
+export const GITHUB_TOKEN = isTestEnv
+  ? (isRealE2E ? (process.env.GITHUB_TOKEN || 'test-token') : 'test-token')
   : getConfigValue("GITHUB_TOKEN", cliOptions.token);
-export const GITHUB_OWNER = process.env.NODE_ENV === 'test'
-  ? 'test-owner'
+export const GITHUB_OWNER = isTestEnv
+  ? (isRealE2E ? (process.env.GITHUB_OWNER || 'test-owner') : 'test-owner')
   : getConfigValue("GITHUB_OWNER", cliOptions.owner);
-export const GITHUB_REPO = process.env.NODE_ENV === 'test'
-  ? 'test-repo'
+export const GITHUB_REPO = isTestEnv
+  ? (isRealE2E ? (process.env.GITHUB_REPO || 'test-repo') : 'test-repo')
   : getConfigValue("GITHUB_REPO", cliOptions.repo);
 
 // GitHub App installation auth (optional). When all three are present the

@@ -86,7 +86,7 @@ describe('Stdio Transport Layer Tests', () => {
           id: 1,
           method: "initialize",
           params: {
-            protocolVersion: "2024-11-05",
+            protocolVersion: "2025-03-26",
             capabilities: {},
             clientInfo: { name: "test", version: "1.0.0" }
           }
@@ -216,7 +216,7 @@ describe('Stdio Transport Layer Tests', () => {
         id: 1,
         method: "initialize",
         params: {
-          protocolVersion: "2024-11-05",
+          protocolVersion: "2025-03-26",
           capabilities: {},
           clientInfo: { name: "rapid-test", version: "1.0.0" }
         }
@@ -310,7 +310,7 @@ describe('Stdio Transport Layer Tests', () => {
         id: 1,
         method: "initialize",
         params: {
-          protocolVersion: "2024-11-05",
+          protocolVersion: "2025-03-26",
           capabilities: {},
           clientInfo: { name: "log-test", version: "1.0.0" }
         }

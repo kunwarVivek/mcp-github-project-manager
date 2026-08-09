@@ -10,7 +10,7 @@ const INITIALIZE = JSON.stringify({
   id: 1,
   method: 'initialize',
   params: {
-    protocolVersion: '2024-11-05',
+    protocolVersion: '2025-03-26',
     capabilities: {},
     clientInfo: { name: 'stdout-purity-probe', version: '1' },
   },

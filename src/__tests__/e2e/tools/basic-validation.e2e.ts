@@ -69,7 +69,7 @@ describe('E2E Test Infrastructure Validation', () => {
     // inputSchema and reports a violation as a tool result with isError: true
     // — not as a JSON-RPC protocol error (that form is reserved for a
     // malformed request, e.g. an unknown tool).
-    const result = await utils.callTool('manage_project', {});
+    const result = await utils.callToolRaw('manage_project', {});
 
     expect(result.isError).toBe(true);
     const message = result.content[0].text;

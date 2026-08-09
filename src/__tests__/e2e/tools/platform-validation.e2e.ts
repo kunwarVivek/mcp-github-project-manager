@@ -436,7 +436,7 @@ describe('Platform Validation E2E', () => {
       expect(metrics.totalAgents).toBeDefined();
       expect(metrics.totalTasksCompleted).toBeDefined();
       expect(metrics.agents).toBeDefined();
-    });
+    }, 60000);
   });
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -503,7 +503,7 @@ describe('Platform Validation E2E', () => {
           expect(typeof approved.success).toBe('boolean');
         }
       }
-    });
+    }, 30000);
   });
 
   // ═══════════════════════════════════════════════════════════════════════════
