@@ -397,7 +397,7 @@ export const aiGenerateSchema = z.object({
   action: z.enum([
     'generate_prd', 'enhance_prd', 'parse_prd', 'add_feature',
     'get_next_task', 'analyze_complexity', 'expand_task',
-    'create_traceability_matrix',
+    'create_traceability_matrix', 'materialize_tasks',
   ]).describe('The AI generation operation to perform'),
   // generate_prd
   projectIdea: z.string().optional(),
@@ -490,7 +490,10 @@ export const aiGenerateSchema = z.object({
   includeTraceabilityLinks: z.boolean().optional(),
   includeCoverageAnalysis: z.boolean().optional(),
   validateCompleteness: z.boolean().optional(),
-}).describe('AI Generation — PRD generation/enhancement/parsing, feature management, task analysis');
+  // materialize_tasks — creates GitHub issues from generated tasks
+  labelPrefix: z.string().optional().describe('Label prefix for materialized issues (e.g. "ai-generated")'),
+  addToProject: z.boolean().optional().describe('Whether to add created issues to the specified projectId'),
+}).describe('AI Generation — PRD generation/enhancement/parsing, feature management, task analysis, task materialization');
 
 export type AiGenerateArgs = z.infer<typeof aiGenerateSchema>;
 

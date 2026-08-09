@@ -581,8 +581,89 @@ export async function executeAiGenerate(args: AiGenerateArgs): Promise<unknown> 
     case 'analyze_complexity':       return route(executeAnalyzeTaskComplexity, rest);
     case 'expand_task':              return route(executeExpandTask, rest);
     case 'create_traceability_matrix': return route(executeCreateTraceabilityMatrix, rest);
+    case 'materialize_tasks':          return executeMaterializeTasks(rest);
     default: unknownAction('ai_generate', action);
   }
+}
+
+/**
+ * Materialize generated AITask[] as real GitHub issues in a project.
+ *
+ * This is the missing bridge between "parse_prd → in-memory tasks" and
+ * "agent checkout_task → claims an issue." Without it, generated tasks
+ * never reach GitHub and agents have nothing to claim.
+ *
+ * For each task:
+ * 1. Creates a GitHub issue via PMS.createIssue
+ * 2. Optionally adds it to a project via PMS.addProjectItem
+ *    (required for agent checkout — checkoutTask only finds project items)
+ */
+async function executeMaterializeTasks(args: {
+  tasks?: Array<{ id?: string; title: string; description: string; complexity?: number; estimatedHours?: number; priority?: string }>;
+  projectId?: string;
+  labelPrefix?: string;
+  addToProject?: boolean;
+}): Promise<unknown> {
+  const { tasks, projectId, labelPrefix = 'ai-generated', addToProject = true } = args;
+
+  if (!tasks || tasks.length === 0) {
+    return { created: 0, issues: [], message: 'No tasks provided' };
+  }
+
+  const svc = getPMS();
+  const created: Array<{ id: string; number: number; title: string }> = [];
+  const errors: Array<{ title: string; error: string }> = [];
+
+  for (const task of tasks) {
+    try {
+      // Build labels from task metadata
+      const labels: string[] = [labelPrefix];
+      if (task.priority) labels.push(`priority:${task.priority}`);
+      if (task.complexity) labels.push(`complexity:${task.complexity}`);
+
+      // Create the GitHub issue
+      const issue = await svc.createIssue({
+        title: task.title,
+        description: task.description
+          + (task.estimatedHours ? `\n\n**Estimated hours:** ${task.estimatedHours}` : '')
+          + (task.complexity ? `\n**Complexity:** ${task.complexity}/10` : ''),
+        labels,
+        priority: task.priority,
+      });
+
+      // Add to project so agents can find it via checkoutTask
+      if (addToProject && projectId) {
+        try {
+          await svc.addProjectItem({
+            projectId,
+            contentId: issue.id,
+            contentType: 'issue',
+          });
+        } catch (addError) {
+          // Issue created but not added to project — still useful
+          errors.push({
+            title: task.title,
+            error: `Created issue #${issue.number} but failed to add to project: ${addError instanceof Error ? addError.message : String(addError)}`,
+          });
+        }
+      }
+
+      created.push({ id: issue.id, number: issue.number, title: issue.title });
+    } catch (createError) {
+      errors.push({
+        title: task.title,
+        error: createError instanceof Error ? createError.message : String(createError),
+      });
+    }
+  }
+
+  return {
+    created: created.length,
+    failed: errors.length,
+    issues: created,
+    errors: errors.length > 0 ? errors : undefined,
+    projectId: addToProject ? projectId : undefined,
+  };
 }
 
 // ============================================================================
@@ -846,8 +927,9 @@ const TOOL_CATALOG: Record<string, {
     actions: [
       'generate_prd', 'enhance_prd', 'parse_prd', 'add_feature',
       'get_next_task', 'analyze_complexity', 'expand_task', 'create_traceability_matrix',
+      'materialize_tasks',
     ],
-    description: 'AI-powered generation — PRDs, tasks, features, traceability matrices',
+    description: 'AI-powered generation — PRDs, tasks, features, traceability, task materialization to GitHub issues',
   },
   ai_analysis: {
     tool: 'ai_analyze',

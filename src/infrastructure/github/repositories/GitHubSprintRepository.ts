@@ -9,6 +9,7 @@ interface ListIterationFieldsResponse {
   repository: {
     projectsV2: {
       nodes: Array<{
+        id: string;
         fields: {
           nodes: Array<{
             id?: string;
@@ -45,30 +46,192 @@ export class GitHubSprintRepository extends BaseGitHubRepository implements Spri
   }
 
   async create(data: Omit<Sprint, "id" | "createdAt" | "updatedAt" | "type">): Promise<Sprint> {
-    // GitHub Projects V2 doesn't support creating individual iterations via API
-    // Iterations are managed through the project's iteration field configuration
-    // For now, we'll create a mock sprint that represents the data structure
+    // Find the first project and its iteration field, creating one if needed
+    const { fieldId, projectId, existingIterations } = await this.ensureIterationField();
 
-    const sprintId = `sprint_${Date.now()}`;
+    // Calculate duration in days (GitHub stores as weeks but the input is days)
+    const startDate = new Date(data.startDate);
+    const endDate = new Date(data.endDate);
+    const durationDays = Math.max(7, Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)));
+    // GitHub iteration duration is in DAYS (despite what docs sometimes suggest)
+    const durationValue = durationDays;
 
-    const sprint: Sprint = {
-      id: sprintId,
-      title: data.title,
-      description: data.description,
-      startDate: data.startDate,
-      endDate: data.endDate,
-      status: this.determineSprintStatus(new Date(data.startDate), new Date(data.endDate)),
+    // Append new iteration to existing ones via updateProjectV2Field
+    // The API replaces all iterations, so we must include existing ones
+    const allIterations = [
+      ...existingIterations.map(iter => ({
+        title: iter.title,
+        startDate: iter.startDate,
+        duration: iter.duration,
+      })),
+      {
+        title: data.title,
+        startDate: startDate.toISOString().split('T')[0],
+        duration: durationValue,
+      },
+    ];
+
+    const mutation = `
+      mutation($input: UpdateProjectV2FieldInput!) {
+        updateProjectV2Field(input: $input) {
+          projectV2Field {
+            ... on ProjectV2IterationField {
+              id
+              configuration {
+                ... on ProjectV2IterationFieldConfiguration {
+                  iterations { id title startDate duration }
+                }
+              }
+            }
+          }
+        }
+      }
+    `;
+
+    const response = await this.graphql<{
+      updateProjectV2Field: {
+        projectV2Field: {
+          id: string;
+          configuration: { iterations: Array<{ id: string; title: string; startDate: string; duration: number }> };
+        };
+      };
+    }>(mutation, {
+      input: {
+        fieldId,
+        iterationConfiguration: {
+          startDate: allIterations[0].startDate,
+          duration: durationValue,
+          iterations: allIterations,
+        },
+      },
+    });
+
+    // Find the newly created iteration by title match
+    const created = response.updateProjectV2Field.projectV2Field.configuration.iterations
+      .find(i => i.title === data.title);
+
+    if (!created) {
+      throw new Error(`Iteration "${data.title}" was not found after creation`);
+    }
+
+    const createdStart = new Date(created.startDate);
+    const createdEnd = new Date(createdStart);
+    createdEnd.setDate(createdEnd.getDate() + created.duration);
+
+    return {
+      id: created.id,
+      title: created.title,
+      description: data.description || '',
+      startDate: createdStart.toISOString(),
+      endDate: createdEnd.toISOString(),
+      status: this.determineSprintStatus(createdStart, createdEnd),
       issues: data.issues || [],
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
+  }
 
-    // Note: In a real implementation, you would need to:
-    // 1. Ensure an iteration field exists in the project
-    // 2. Configure the iteration field with the appropriate iterations
-    // 3. Use updateProjectV2ItemFieldValue to assign issues to iterations
+  /**
+   * Find or create the iteration field on the first project.
+   * Returns the field ID, project ID, and current iterations.
+   */
+  private async ensureIterationField(): Promise<{
+    fieldId: string;
+    projectId: string;
+    existingIterations: Array<{ id: string; title: string; startDate: string; duration: number }>;
+  }> {
+    // Check if an iteration field already exists
+    const query = `
+      query($owner: String!, $repo: String!) {
+        repository(owner: $owner, name: $repo) {
+          projectsV2(first: 1) {
+            nodes {
+              id
+              fields(first: 100) {
+                nodes {
+                  ... on ProjectV2IterationField {
+                    id
+                    name
+                    configuration {
+                      ... on ProjectV2IterationFieldConfiguration {
+                        iterations { id title startDate duration }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    `;
 
-    return sprint;
+    const result = await this.graphql<ListIterationFieldsResponse>(query, {
+      owner: this.owner,
+      repo: this.repo,
+    });
+
+    const project = result.repository?.projectsV2?.nodes?.[0];
+    if (!project) {
+      throw new Error('No GitHub Project V2 found for this repository. Create a project first.');
+    }
+
+    // Look for an existing iteration field
+    const iterField = project.fields.nodes.find(
+      (f: any) => f.configuration?.iterations !== undefined
+    );
+
+    if (iterField) {
+      return {
+        fieldId: iterField.id!,
+        projectId: project.id,
+        existingIterations: iterField.configuration?.iterations || [],
+      };
+    }
+
+    // No iteration field — create one
+    const createMutation = `
+      mutation($input: CreateProjectV2FieldInput!) {
+        createProjectV2Field(input: $input) {
+          projectV2Field {
+            ... on ProjectV2IterationField {
+              id
+              configuration {
+                ... on ProjectV2IterationFieldConfiguration {
+                  iterations { id title startDate duration }
+                }
+              }
+            }
+          }
+        }
+      }
+    `;
+
+    const createResult = await this.graphql<{
+      createProjectV2Field: {
+        projectV2Field: {
+          id: string;
+          configuration: { iterations: Array<{ id: string; title: string; startDate: string; duration: number }> };
+        };
+      };
+    }>(createMutation, {
+      input: {
+        projectId: project.id,
+        dataType: 'ITERATION',
+        name: 'Sprint',
+        iterationConfiguration: {
+          startDate: new Date().toISOString().split('T')[0],
+          duration: 14,
+          iterations: [],
+        },
+      },
+    });
+
+    return {
+      fieldId: createResult.createProjectV2Field.projectV2Field.id,
+      projectId: project.id,
+      existingIterations: createResult.createProjectV2Field.projectV2Field.configuration?.iterations || [],
+    };
   }
 
   async update(id: SprintId, data: Partial<Sprint>): Promise<Sprint> {
