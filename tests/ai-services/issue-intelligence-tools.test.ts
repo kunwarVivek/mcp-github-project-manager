@@ -1,3 +1,4 @@
+import { vi } from 'vitest';
 /**
  * Unit tests for Issue Intelligence MCP Tools
  *
@@ -27,25 +28,39 @@ import {
 } from '../../src/infrastructure/tools/schemas/issue-intelligence-schemas';
 
 // Mock dependencies
-jest.mock('../../src/services/ai/AIServiceFactory');
-jest.mock('ai', () => ({
-  generateObject: jest.fn(),
-  embed: jest.fn(),
-  embedMany: jest.fn(),
-  cosineSimilarity: jest.fn()
+vi.mock('../../src/services/ai/AIServiceFactory', () => {
+  const mockFactory = {
+    getMainModel: vi.fn(),
+    getFallbackModel: vi.fn(),
+    getModel: vi.fn(),
+    getBestAvailableModel: vi.fn(),
+    getPRDModel: vi.fn(),
+    getResearchModel: vi.fn(),
+  };
+  return {
+    AIServiceFactory: {
+      getInstance: vi.fn().mockReturnValue(mockFactory),
+    },
+  };
+});
+vi.mock('ai', () => ({
+  generateObject: vi.fn(),
+  embed: vi.fn(),
+  embedMany: vi.fn(),
+  cosineSimilarity: vi.fn()
 }));
 
-const mockGenerateObject = generateObject as jest.MockedFunction<typeof generateObject>;
-const mockEmbed = embed as jest.MockedFunction<typeof embed>;
-const mockEmbedMany = embedMany as jest.MockedFunction<typeof embedMany>;
-const mockCosineSimilarity = cosineSimilarity as jest.MockedFunction<typeof cosineSimilarity>;
-const mockGetModel = jest.fn().mockReturnValue(null);
-const mockGetBestAvailableModel = jest.fn().mockReturnValue(null);
+const mockGenerateObject = generateObject as MockedFunction<typeof generateObject>;
+const mockEmbed = embed as MockedFunction<typeof embed>;
+const mockEmbedMany = embedMany as MockedFunction<typeof embedMany>;
+const mockCosineSimilarity = cosineSimilarity as MockedFunction<typeof cosineSimilarity>;
+const mockGetModel = vi.fn().mockReturnValue(null);
+const mockGetBestAvailableModel = vi.fn().mockReturnValue(null);
 
 describe('Issue Intelligence MCP Tools', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
-    (AIServiceFactory.getInstance as jest.Mock).mockReturnValue({
+    vi.clearAllMocks();
+    (AIServiceFactory.getInstance as Mock).mockReturnValue({
       getModel: mockGetModel,
       getBestAvailableModel: mockGetBestAvailableModel
     });

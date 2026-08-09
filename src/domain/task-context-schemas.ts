@@ -347,8 +347,8 @@ export const ContextQualityMetricsSchema = z.object({
     .describe('Context relevance score (target: 85%)'),
   generationTime: z.number().positive()
     .describe('Time taken to generate context in seconds (target: <30s)'),
-  tokenUsage: z.number().int().positive()
-    .describe('Number of tokens used (target: <2000)'),
+  estimatedTokens: z.number().int().positive()
+    .describe('Estimated number of tokens used (target: <2000)'),
   cacheHit: z.boolean()
     .describe('Whether this context was retrieved from cache'),
   aiEnhanced: z.boolean()
@@ -440,8 +440,6 @@ export function calculateCompletenessScore(context: Partial<TaskExecutionContext
     'enhancedAcceptanceCriteria',
     'dependencyContext'
   ];
-
-  const allFields = [...requiredFields, ...optionalButValuableFields];
 
   const populatedRequired = requiredFields.filter(field => {
     const value = context[field as keyof TaskExecutionContext];

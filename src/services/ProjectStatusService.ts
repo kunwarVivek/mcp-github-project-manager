@@ -1,9 +1,10 @@
 import { injectable, inject } from "tsyringe";
-import { GitHubRepositoryFactory } from "../infrastructure/github/GitHubRepositoryFactory";
-import { GitHubProjectRepository } from "../infrastructure/github/repositories/GitHubProjectRepository";
-import { Project, CreateProject } from "../domain/types";
-import { ResourceStatus } from "../domain/resource-types";
-import { mapErrorToMCPError } from './utils/ErrorMapper';
+import type { GitHubRepositoryFactory } from "../infrastructure/github/GitHubRepositoryFactory";
+import type { GitHubProjectRepository } from "../infrastructure/github/repositories/GitHubProjectRepository";
+import type { Project, CreateProject } from "../domain/types";
+import type { ResourceStatus } from "../domain/resource-types";
+import { safeCall } from './utils/safeCall';
+import { parseResourceStatus, filterByStatus } from '../domain/utils/StatusParser';
 
 /**
  * Service for basic project CRUD operations.
@@ -36,7 +37,7 @@ export class ProjectStatusService {
     shortDescription?: string;
     visibility?: 'private' | 'public';
   }): Promise<Project> {
-    try {
+    return safeCall(async () => {
       const projectData: CreateProject = {
         title: data.title,
         shortDescription: data.shortDescription,
@@ -44,10 +45,10 @@ export class ProjectStatusService {
         visibility: data.visibility || 'private',
       };
 
-      return await this.projectRepo.create(projectData);
-    } catch (error) {
-      throw mapErrorToMCPError(error);
-    }
+      const project = await this.projectRepo.create(projectData);
+      // Return plain object for MCP compatibility
+      return project;
+    });
   }
 
   /**
@@ -58,21 +59,18 @@ export class ProjectStatusService {
    * @returns Array of projects
    */
   async listProjects(status: string = 'active', limit: number = 10): Promise<Project[]> {
-    try {
+    return safeCall(async () => {
       const projects = await this.projectRepo.findAll();
 
       // Filter by status if needed
       let filteredProjects = projects;
       if (status !== 'all') {
-        const resourceStatus = status === 'active' ? ResourceStatus.ACTIVE : ResourceStatus.CLOSED;
-        filteredProjects = projects.filter(project => project.status === resourceStatus);
+        filteredProjects = filterByStatus(projects, status, 'project');
       }
 
-      // Apply limit
+      // Return plain objects for MCP compatibility
       return filteredProjects.slice(0, limit);
-    } catch (error) {
-      throw mapErrorToMCPError(error);
-    }
+    });
   }
 
   /**
@@ -82,11 +80,11 @@ export class ProjectStatusService {
    * @returns The project or null if not found
    */
   async getProject(projectId: string): Promise<Project | null> {
-    try {
-      return await this.projectRepo.findById(projectId);
-    } catch (error) {
-      throw mapErrorToMCPError(error);
-    }
+    return safeCall(async () => {
+      const project = await this.projectRepo.findById(projectId);
+      // Return plain object for MCP compatibility
+      return project;
+    });
   }
 
   /**
@@ -102,11 +100,11 @@ export class ProjectStatusService {
     visibility?: 'private' | 'public';
     status?: 'active' | 'closed';
   }): Promise<Project> {
-    try {
+    return safeCall(async () => {
       // Convert the status string to ResourceStatus enum
       let resourceStatus: ResourceStatus | undefined;
       if (data.status) {
-        resourceStatus = data.status === 'active' ? ResourceStatus.ACTIVE : ResourceStatus.CLOSED;
+        resourceStatus = parseResourceStatus(data.status, 'project');
       }
 
       // Map the data to the domain model
@@ -124,10 +122,10 @@ export class ProjectStatusService {
         }
       });
 
-      return await this.projectRepo.update(data.projectId, projectData);
-    } catch (error) {
-      throw mapErrorToMCPError(error);
-    }
+      const updatedProject = await this.projectRepo.update(data.projectId, projectData);
+      // Return plain object for MCP compatibility
+      return updatedProject;
+    });
   }
 
   /**
@@ -139,14 +137,12 @@ export class ProjectStatusService {
   async deleteProject(data: {
     projectId: string;
   }): Promise<{ success: boolean; message: string }> {
-    try {
+    return safeCall(async () => {
       await this.projectRepo.delete(data.projectId);
       return {
         success: true,
         message: `Project ${data.projectId} has been deleted`,
       };
-    } catch (error) {
-      throw mapErrorToMCPError(error);
-    }
+    });
   }
 }

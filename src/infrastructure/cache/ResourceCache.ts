@@ -1,5 +1,5 @@
-import { Resource, ResourceCacheOptions, ResourceType } from "../../domain/resource-types";
-import { SyncMetadata } from "../../domain/resource-types";
+import type { Resource, ResourceCacheOptions, ResourceType } from "../../domain/resource-types";
+import type { SyncMetadata } from "../../domain/resource-types";
 import { isCacheableResource } from "../../domain/type-guards";
 import { CachePersistence, type CacheEntry as PersistenceCacheEntry } from "./CachePersistence";
 
@@ -458,7 +458,7 @@ export class ResourceCache {
     }
 
     // Remove from type index
-    if (entry.value && entry.value.type) {
+    if (entry.value?.type) {
       const type = entry.value.type;
       const typeIds = this.typeIndex.get(type);
       if (typeIds) {

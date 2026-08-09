@@ -14,21 +14,20 @@ import { generateObject } from 'ai';
 import { z } from 'zod';
 import { openai } from '@ai-sdk/openai';
 import { AIServiceFactory } from './AIServiceFactory.js';
-import { ConfidenceScorer, calculateWeightedScore, getConfidenceTier } from './ConfidenceScorer.js';
+import { calculateWeightedScore, getConfidenceTier } from './ConfidenceScorer.js';
 import { EmbeddingCache } from '../../cache/EmbeddingCache.js';
+import { type ILogger, Logger } from '../../infrastructure/logger';
 import {
   RELATED_ISSUE_SYSTEM_PROMPT,
-  formatRelatedIssuePrompt
 } from './prompts/IssueIntelligencePrompts.js';
-import {
+import type {
   IssueRelationship,
   RelatedIssueResult,
   RelatedIssueLinkingConfig,
-  RelationshipType,
   DependencySubType,
   IssueInput
 } from '../../domain/issue-intelligence-types.js';
-import { SectionConfidence, ConfidenceFactors } from '../../domain/ai-types.js';
+import type { SectionConfidence, ConfidenceFactors } from '../../domain/ai-types.js';
 
 // ============================================================================
 // Constants
@@ -81,8 +80,6 @@ const AIDependencySchema = z.object({
   }))
 });
 
-type AIDependencyResult = z.infer<typeof AIDependencySchema>;
-
 // ============================================================================
 // RelatedIssueLinkingService
 // ============================================================================
@@ -99,19 +96,19 @@ type AIDependencyResult = z.infer<typeof AIDependencySchema>;
 export class RelatedIssueLinkingService {
   private aiFactory: AIServiceFactory;
   private embeddingCache: EmbeddingCache;
-  private confidenceScorer: ConfidenceScorer;
   private config: Required<Pick<RelatedIssueLinkingConfig, 'includeSemanticSimilarity' | 'includeDependencies' | 'includeComponentGrouping'>>;
+  private readonly logger: ILogger;
 
   /**
    * Create a new related issue linking service.
    *
    * @param config - Optional configuration overrides
    */
-  constructor(config?: Partial<RelatedIssueLinkingConfig>) {
-    this.aiFactory = AIServiceFactory.getInstance();
+  constructor(aiFactory?: AIServiceFactory, config?: Partial<RelatedIssueLinkingConfig>, logger?: ILogger) {
+    this.aiFactory = aiFactory ?? AIServiceFactory.getInstance();
     this.embeddingCache = new EmbeddingCache();
-    this.confidenceScorer = new ConfidenceScorer();
     this.config = { ...DEFAULT_CONFIG, ...config };
+    this.logger = logger ?? Logger.getInstance();
   }
 
   /**
@@ -150,7 +147,7 @@ export class RelatedIssueLinkingService {
         });
         allRelationships.push(...semanticRelations);
       } catch (error) {
-        process.stderr.write(`[RelatedIssueLinking] Semantic analysis failed: ${error}\n`);
+        this.logger.error('[RelatedIssueLinking] Semantic analysis failed', error);
         // Continue with other strategies
       }
     }
@@ -425,7 +422,7 @@ export class RelatedIssueLinkingService {
 
       return relationships;
     } catch (error) {
-      process.stderr.write(`[RelatedIssueLinking] AI dependency analysis failed: ${error}\n`);
+      this.logger.error('[RelatedIssueLinking] AI dependency analysis failed', error);
       return [];
     }
   }
@@ -487,11 +484,18 @@ Return an empty array if no relationships are detected.`;
       const candidateLabels = candidate.labels || [];
       if (candidateLabels.length === 0) continue;
 
-      const overlapScore = this.calculateLabelOverlap(sourceLabels, candidateLabels);
+      // Filter candidate labels through the same component prefix filter
+      const candidateComponentLabels = candidateLabels.filter(label =>
+        componentPrefixes.some(prefix => label.toLowerCase().startsWith(prefix)) ||
+        !['bug', 'feature', 'enhancement', 'documentation', 'help wanted', 'good first issue'].includes(label.toLowerCase())
+      );
+      if (candidateComponentLabels.length === 0) continue;
+
+      const overlapScore = this.calculateLabelOverlap(sourceComponentLabels, candidateComponentLabels);
 
       if (overlapScore >= COMPONENT_LABEL_THRESHOLD) {
-        // Find the common labels for reasoning
-        const commonLabels = sourceLabels.filter(l => candidateLabels.includes(l));
+        // Find the common component labels for reasoning
+        const commonLabels = sourceComponentLabels.filter(l => candidateComponentLabels.includes(l));
 
         relationships.push({
           sourceIssueId: sourceId,
@@ -571,7 +575,7 @@ Return an empty array if no relationships are detected.`;
 
     const merged: IssueRelationship[] = [];
 
-    for (const [targetId, rels] of byTarget) {
+    for (const [, rels] of byTarget) {
       // Sort by confidence descending
       rels.sort((a, b) => b.confidence - a.confidence);
 

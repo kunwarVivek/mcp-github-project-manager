@@ -1,8 +1,7 @@
-import {
+import type {
   TemplateFormat,
   TemplateSection,
   ParsedTemplate,
-  TemplateValidationResult
 } from '../../domain/template-types';
 
 /**

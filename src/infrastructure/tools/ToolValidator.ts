@@ -1,7 +1,30 @@
 import { z } from "zod";
-import { McpError, ErrorCode } from "@modelcontextprotocol/sdk/types.js";
+import {
+  ProtocolError,
+  INTERNAL_ERROR,
+  INVALID_PARAMS,
+  METHOD_NOT_FOUND,
+  INVALID_REQUEST,
+  PARSE_ERROR,
+} from "@modelcontextprotocol/server";
+
+/**
+ * v2 compatibility aliases: `McpError` became `ProtocolError` (same
+ * `(code, message, data)` shape) and the `ErrorCode` enum became constants.
+ */
+const McpError = ProtocolError;
+const ErrorCode = {
+  InternalError: INTERNAL_ERROR,
+  InvalidParams: INVALID_PARAMS,
+  MethodNotFound: METHOD_NOT_FOUND,
+  InvalidRequest: INVALID_REQUEST,
+  ParseError: PARSE_ERROR,
+} as const;
+
+/** The numeric JSON-RPC codes, for signatures that took the old enum type. */
+type ErrorCodeValue = number;
 import { MCPResponseFormatter } from "../mcp/MCPResponseFormatter";
-import { MCPErrorCode, MCPErrorData } from "../../domain/mcp-types";
+import { MCPErrorCode, type MCPErrorData } from "../../domain/mcp-types";
 import { ParameterCoercion } from "./ParameterCoercion";
 
 export type ToolSchema<T> = z.ZodType<T>;
@@ -106,7 +129,7 @@ export class ToolValidator {
    * Map GitHub API errors to MCP error codes with rich context.
    * Handles Octokit RequestError and extracts rate limit info, validation errors, etc.
    */
-  static mapGitHubError(error: unknown, toolName: string): McpError {
+  static mapGitHubError(error: unknown, toolName: string): ProtocolError {
     const data: MCPErrorData = { tool: toolName };
 
     // Handle Octokit RequestError
@@ -235,7 +258,7 @@ export class ToolValidator {
 
     // Check if this is a GitHub API error (has status property)
     if (error && typeof error === "object" && "status" in error && typeof (error as { status: unknown }).status === "number") {
-      const mcpError = this.mapGitHubError(error, toolName);
+      const mcpError = ToolValidator.mapGitHubError(error, toolName);
       return MCPResponseFormatter.error(
         mcpError.code as MCPErrorCode,
         mcpError.message,
@@ -246,7 +269,7 @@ export class ToolValidator {
     // Handle MCP SDK errors
     if (error instanceof McpError) {
       return MCPResponseFormatter.error(
-        this.mapErrorCode(error.code),
+        ToolValidator.mapErrorCode(error.code),
         error.message,
         // Safely handle potentially unknown error.data
         error.data && typeof error.data === 'object' ? error.data as Record<string, unknown> : undefined
@@ -273,7 +296,7 @@ export class ToolValidator {
   /**
    * Map MCP SDK error codes to our custom error codes
    */
-  private static mapErrorCode(mcpErrorCode: ErrorCode): MCPErrorCode {
+  private static mapErrorCode(mcpErrorCode: ErrorCodeValue): MCPErrorCode {
     switch (mcpErrorCode) {
       case ErrorCode.InvalidParams:
         return MCPErrorCode.VALIDATION_ERROR;

@@ -1,17 +1,16 @@
 import { BaseGitHubRepository } from "./BaseRepository";
-import { Project, CreateProject, ProjectRepository, ProjectId, ProjectView, CustomField, ViewLayout } from "../../../domain/types";
+import type { Project, CreateProject, ProjectRepository, ProjectId, ProjectView, CustomField, ViewLayout } from "../../../domain/types";
 import { ResourceType, ResourceStatus } from "../../../domain/resource-types";
-import { GitHubTypeConverter } from "../util/conversion";
 import {
   mapToGraphQLFieldType,
   mapFromGraphQLFieldType,
-  CreateProjectV2FieldResponse,
-  UpdateProjectV2FieldResponse
+  type CreateProjectV2FieldResponse,
+  type UpdateProjectV2FieldResponse
 } from "../util/graphql-helpers";
 import {
-  GraphQLFieldType,
-  CreateProjectV2ViewResponse,
-  UpdateProjectV2ViewResponse,
+  type GraphQLFieldType,
+  type CreateProjectV2ViewResponse,
+  type UpdateProjectV2ViewResponse,
   mapToGraphQLViewLayout
 } from "../graphql-types";
 
@@ -49,6 +48,24 @@ interface ListProjectsResponse {
   };
 }
 
+/** ProjectV2.fields is a ProjectV2FieldConfiguration UNION — use fragments. */
+const LIST_PROJECT_FIELDS_QUERY = `
+  query($projectId: ID!) {
+    node(id: $projectId) {
+      ... on ProjectV2 {
+        fields(first: 100) {
+          nodes {
+            __typename
+            ... on ProjectV2Field { id name dataType }
+            ... on ProjectV2SingleSelectField { id name dataType }
+            ... on ProjectV2IterationField { id name dataType }
+          }
+        }
+      }
+    }
+  }
+`;
+
 export class GitHubProjectRepository extends BaseGitHubRepository implements ProjectRepository {
   async create(data: CreateProject): Promise<Project> {
     // Step 1: Create project with valid CreateProjectV2Input schema
@@ -67,15 +84,19 @@ export class GitHubProjectRepository extends BaseGitHubRepository implements Pro
       }
     `;
 
-    // Build input according to official GitHub schema
+    // Build input according to official GitHub schema.
+    // createProjectV2 requires node IDs (e.g. 'U_kgDO...', 'R_kgDO...'), not
+    // the configured owner login / repo name — resolve them first.
+    const ownerId = await this.resolveOwnerNodeId(this.owner);
+
     const createInput: any = {
-      ownerId: this.owner,
+      ownerId,
       title: data.title,
     };
 
     // Add optional repositoryId if available
     if (this.repo) {
-      createInput.repositoryId = this.repo;
+      createInput.repositoryId = await this.resolveRepositoryNodeId(this.owner, this.repo);
     }
 
     const createResponse = await this.graphql<CreateProjectResponse>(createMutation, {
@@ -117,8 +138,8 @@ export class GitHubProjectRepository extends BaseGitHubRepository implements Pro
       title: project.title,
       description: project.shortDescription || "",
       owner: this.owner,
-      number: parseInt(project.id.split('_').pop() || '0'),
-      url: `https://github.com/orgs/${this.owner}/projects/${parseInt(project.id.split('_').pop() || '0')}`,
+      number: parseInt(project.id.split('_').pop() || '0', 10),
+      url: `https://github.com/orgs/${this.owner}/projects/${parseInt(project.id.split('_').pop() || '0', 10)}`,
       status: project.closed ? ResourceStatus.CLOSED : ResourceStatus.ACTIVE,
       visibility: data.visibility || "private",
       views: data.views || [],
@@ -161,8 +182,8 @@ export class GitHubProjectRepository extends BaseGitHubRepository implements Pro
       title: project.title,
       description: project.shortDescription || "",
       owner: this.owner,
-      number: parseInt(project.id.split('_').pop() || '0'),
-      url: `https://github.com/orgs/${this.owner}/projects/${parseInt(project.id.split('_').pop() || '0')}`,
+      number: parseInt(project.id.split('_').pop() || '0', 10),
+      url: `https://github.com/orgs/${this.owner}/projects/${parseInt(project.id.split('_').pop() || '0', 10)}`,
       status: project.closed ? ResourceStatus.CLOSED : ResourceStatus.ACTIVE,
       visibility: "private",
       views: [],
@@ -217,8 +238,8 @@ export class GitHubProjectRepository extends BaseGitHubRepository implements Pro
       title: project.title,
       description: project.shortDescription || "",
       owner: this.owner,
-      number: parseInt(project.id.split('_').pop() || '0'),
-      url: `https://github.com/orgs/${this.owner}/projects/${parseInt(project.id.split('_').pop() || '0')}`,
+      number: parseInt(project.id.split('_').pop() || '0', 10),
+      url: `https://github.com/orgs/${this.owner}/projects/${parseInt(project.id.split('_').pop() || '0', 10)}`,
       status: project.closed ? ResourceStatus.CLOSED : ResourceStatus.ACTIVE,
       visibility: "private",
       views: [],
@@ -258,8 +279,8 @@ export class GitHubProjectRepository extends BaseGitHubRepository implements Pro
       title: project.title,
       description: project.shortDescription || "",
       owner: this.owner,
-      number: parseInt(project.id.split('_').pop() || '0'),
-      url: `https://github.com/orgs/${this.owner}/projects/${parseInt(project.id.split('_').pop() || '0')}`,
+      number: parseInt(project.id.split('_').pop() || '0', 10),
+      url: `https://github.com/orgs/${this.owner}/projects/${parseInt(project.id.split('_').pop() || '0', 10)}`,
       status: project.closed ? ResourceStatus.CLOSED : ResourceStatus.ACTIVE,
       visibility: "private",
       views: [],
@@ -313,8 +334,8 @@ export class GitHubProjectRepository extends BaseGitHubRepository implements Pro
         title: project.title,
         description: project.shortDescription || "",
         owner: owner,
-        number: parseInt(project.id.split('_').pop() || '0'),
-        url: `https://github.com/${owner}/projects/${parseInt(project.id.split('_').pop() || '0')}`,
+        number: parseInt(project.id.split('_').pop() || '0', 10),
+        url: `https://github.com/${owner}/projects/${parseInt(project.id.split('_').pop() || '0', 10)}`,
         status: project.closed ? ResourceStatus.CLOSED : ResourceStatus.ACTIVE,
         visibility: "private",
         views: [],
@@ -457,13 +478,16 @@ export class GitHubProjectRepository extends BaseGitHubRepository implements Pro
   }
 
   async createField(projectId: ProjectId, field: Omit<CustomField, "id">): Promise<CustomField> {
+    // createProjectV2Field.projectV2Field returns the ProjectV2FieldConfiguration
+    // UNION — selections must use concrete-type fragments, never direct fields.
     const mutation = `
       mutation($input: CreateProjectV2FieldInput!) {
         createProjectV2Field(input: $input) {
           projectV2Field {
-            id
-            name
-            dataType
+            __typename
+            ... on ProjectV2Field { id name dataType }
+            ... on ProjectV2SingleSelectField { id name dataType }
+            ... on ProjectV2IterationField { id name dataType }
           }
         }
       }
@@ -500,7 +524,8 @@ export class GitHubProjectRepository extends BaseGitHubRepository implements Pro
       const response = await this.graphql<CreateProjectV2FieldResponse>(mutation, variables);
       const createdField = response.createProjectV2Field.projectV2Field;
 
-      // Since the createdField object doesn't have a dataType property, we need to fetch it
+      // Since the createdField object doesn't have a dataType property, we need
+      // to fetch it (getField resolves id → name internally)
       const fieldDetails = await this.getField(projectId, createdField.id);
       
       return {
@@ -521,13 +546,16 @@ export class GitHubProjectRepository extends BaseGitHubRepository implements Pro
   }
   
   async updateField(projectId: ProjectId, fieldId: string, updates: Partial<CustomField>): Promise<CustomField> {
+    // updateProjectV2Field.projectV2Field returns the ProjectV2FieldConfiguration
+    // UNION — selections must use concrete-type fragments.
     const mutation = `
       mutation($input: UpdateProjectV2FieldInput!) {
         updateProjectV2Field(input: $input) {
           projectV2Field {
-            id
-            name
-            dataType
+            __typename
+            ... on ProjectV2Field { id name dataType }
+            ... on ProjectV2SingleSelectField { id name dataType }
+            ... on ProjectV2IterationField { id name dataType }
           }
         }
       }
@@ -592,7 +620,7 @@ export class GitHubProjectRepository extends BaseGitHubRepository implements Pro
           // Update existing options (color changes)
           for (const option of optionsToUpdate) {
             const currOpt = currentOptions.find(c => c.name === option.name);
-            if (currOpt && currOpt.id) {
+            if (currOpt?.id) {
               const updateMutation = `
                 mutation($input: UpdateProjectV2SingleSelectOptionInput!) {
                   updateProjectV2SingleSelectOption(input: $input) {
@@ -643,7 +671,7 @@ export class GitHubProjectRepository extends BaseGitHubRepository implements Pro
       const response = await this.graphql<UpdateProjectV2FieldResponse>(mutation, variables);
       const updatedField = response.updateProjectV2Field.projectV2Field;
 
-      return await this.getField(projectId, fieldId) as CustomField;
+      return await this.getField(projectId, updatedField.id ?? fieldId) as CustomField;
     } catch (error) {
       this.logger.error(`Failed to update field ${fieldId} for project ${projectId}`, error);
       throw this.handleGraphQLError(error);
@@ -672,12 +700,32 @@ export class GitHubProjectRepository extends BaseGitHubRepository implements Pro
     }
   }
 
-  private async getField(projectId: ProjectId, fieldId: string): Promise<CustomField | null> {
+  /**
+   * Get a field by id (or by name when the id is not available).
+   *
+   * ProjectV2.field resolves by NAME only (no id argument), so we first
+   * resolve the name from the project's field list when only an id is known,
+   * then fetch the full field. The field value is a ProjectV2FieldConfiguration
+   * UNION — selections use concrete-type fragments with __typename.
+   */
+  private async getField(projectId: ProjectId, fieldIdOrName: string): Promise<CustomField | null> {
+    // Resolve name from id if needed (ProjectV2.field takes name, not id)
+    let fieldName = fieldIdOrName;
+    if (fieldIdOrName.startsWith('PVTF_')) {
+      const listResp = await this.graphql<any>(LIST_PROJECT_FIELDS_QUERY, { projectId });
+      const match = (listResp.node?.fields?.nodes ?? []).find(
+        (f: { id: string }) => f.id === fieldIdOrName,
+      );
+      if (!match) return null;
+      fieldName = match.name;
+    }
+
     const query = `
-      query($projectId: ID!, $fieldId: ID!) {
+      query($projectId: ID!, $fieldName: String!) {
         node(id: $projectId) {
           ... on ProjectV2 {
-            field(id: $fieldId) {
+            field(name: $fieldName) {
+              __typename
               ... on ProjectV2Field {
                 id
                 name
@@ -705,7 +753,7 @@ export class GitHubProjectRepository extends BaseGitHubRepository implements Pro
                     id
                     title
                     startDate
-                    endDate
+                    duration
                   }
                 }
               }
@@ -716,7 +764,7 @@ export class GitHubProjectRepository extends BaseGitHubRepository implements Pro
     `;
 
     try {
-      const response = await this.graphql<any>(query, { projectId, fieldId });
+      const response = await this.graphql<any>(query, { projectId, fieldName });
       const fieldData = response.node?.field;
       
       if (!fieldData) return null;
@@ -746,7 +794,7 @@ export class GitHubProjectRepository extends BaseGitHubRepository implements Pro
       
       return customField;
     } catch (error) {
-      this.logger.error(`Failed to fetch field ${fieldId} for project ${projectId}`, error);
+      this.logger.error(`Failed to fetch field ${fieldName} for project ${projectId}`, error);
       throw this.handleGraphQLError(error);
     }
   }

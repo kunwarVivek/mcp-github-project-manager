@@ -1,23 +1,23 @@
-import { beforeEach, describe, expect, it, jest } from '@jest/globals';
+import { type Mocked, type MockedFunction, beforeEach, describe, expect, it, vi } from 'vitest';
 import { PullRequestService } from '../../../services/PullRequestService';
-import { GitHubRepositoryFactory } from '../../../infrastructure/github/GitHubRepositoryFactory';
+import type { GitHubRepositoryFactory } from '../../../infrastructure/github/GitHubRepositoryFactory';
 import { DomainError } from '../../../domain/errors';
 
-jest.mock('../../../infrastructure/github/GitHubRepositoryFactory');
+vi.mock('../../../infrastructure/github/GitHubRepositoryFactory');
 
 describe('PullRequestService', () => {
   let service: PullRequestService;
-  let mockFactory: jest.Mocked<GitHubRepositoryFactory>;
+  let mockFactory: Mocked<GitHubRepositoryFactory>;
   let mockOctokit: {
     rest: {
       pulls: {
-        create: jest.MockedFunction<any>;
-        get: jest.MockedFunction<any>;
-        list: jest.MockedFunction<any>;
-        update: jest.MockedFunction<any>;
-        merge: jest.MockedFunction<any>;
-        listReviews: jest.MockedFunction<any>;
-        createReview: jest.MockedFunction<any>;
+        create: MockedFunction<any>;
+        get: MockedFunction<any>;
+        list: MockedFunction<any>;
+        update: MockedFunction<any>;
+        merge: MockedFunction<any>;
+        listReviews: MockedFunction<any>;
+        createReview: MockedFunction<any>;
       };
     };
   };
@@ -25,26 +25,26 @@ describe('PullRequestService', () => {
   const config = { owner: 'testOwner', repo: 'testRepo' };
 
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
 
     mockOctokit = {
       rest: {
         pulls: {
-          create: jest.fn(),
-          get: jest.fn(),
-          list: jest.fn(),
-          update: jest.fn(),
-          merge: jest.fn(),
-          listReviews: jest.fn(),
-          createReview: jest.fn(),
+          create: vi.fn(),
+          get: vi.fn(),
+          list: vi.fn(),
+          update: vi.fn(),
+          merge: vi.fn(),
+          listReviews: vi.fn(),
+          createReview: vi.fn(),
         },
       },
     };
 
     mockFactory = {
-      getOctokit: jest.fn().mockReturnValue(mockOctokit),
-      getConfig: jest.fn().mockReturnValue(config),
-    } as unknown as jest.Mocked<GitHubRepositoryFactory>;
+      getOctokit: vi.fn().mockReturnValue(mockOctokit),
+      getConfig: vi.fn().mockReturnValue(config),
+    } as unknown as Mocked<GitHubRepositoryFactory>;
 
     service = new PullRequestService(mockFactory);
   });

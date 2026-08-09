@@ -1,9 +1,9 @@
 import { z } from 'zod';
-import { ToolDefinition, ToolSchema } from '../ToolValidator.js';
+import type { ToolDefinition, ToolSchema } from '../ToolValidator.js';
 import { RequirementsTraceabilityService } from '../../../services/RequirementsTraceabilityService.js';
-import { MCPResponse } from '../../../domain/mcp-types.js';
+import type { MCPResponse } from '../../../domain/mcp-types.js';
 import { ToolResultFormatter } from '../ToolResultFormatter.js';
-import { TaskStatus, TaskPriority, TaskComplexity, MockPRD, FeatureRequirement } from '../../../domain/ai-types.js';
+import { TaskStatus, type TaskPriority, type TaskComplexity, type MockPRD, type FeatureRequirement } from '../../../domain/ai-types.js';
 import { ANNOTATION_PATTERNS } from '../annotations/tool-annotations.js';
 import { TraceabilityMatrixOutputSchema } from '../schemas/ai-schemas.js';
 
@@ -96,7 +96,8 @@ async function executeCreateTraceabilityMatrix(args: CreateTraceabilityMatrixArg
     );
 
     // Validate completeness if requested
-    let validation;
+    // biome-ignore lint/suspicious/noExplicitAny: unvalidated AI response shape
+    let validation: any;
     if (args.validateCompleteness) {
       validation = validateTraceabilityCompleteness(traceabilityMatrix);
     }

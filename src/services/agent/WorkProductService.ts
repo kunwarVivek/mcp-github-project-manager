@@ -2,7 +2,7 @@ import type { GitHubRepositoryFactory } from '../../infrastructure/github/GitHub
 import type { WorkProductStore } from '../../infrastructure/agent/WorkProductStore';
 import type { WorkProduct } from '../../domain/agent-orchestration-types';
 import { AGENT_FIELDS } from '../../domain/agent-orchestration-types';
-import { mapErrorToMCPError } from '../utils/ErrorMapper';
+import { safeCall } from '../utils/safeCall';
 
 // ---------------------------------------------------------------------------
 // GraphQL helpers
@@ -137,7 +137,7 @@ export class WorkProductService {
 
   /** Submit a work product and update project fields. */
   async submitWorkProduct(product: WorkProduct): Promise<void> {
-    try {
+    return safeCall(async () => {
       // Parse issueNumber from taskId (expected format: issue number as string)
       const issueNumber = parseInt(product.taskId, 10);
       if (Number.isNaN(issueNumber)) {
@@ -151,23 +151,17 @@ export class WorkProductService {
       await this.updateProjectFields(issueNumber, product).catch(() => {
         // Non-fatal — the work product is already persisted
       });
-    } catch (error) {
-      throw mapErrorToMCPError(error);
-    }
+    });
   }
 
   /** List work products for an issue. */
   async listWorkProducts(issueNumber: number): Promise<WorkProduct[]> {
-    try {
-      return await this.workProductStore.listForIssue(issueNumber);
-    } catch (error) {
-      throw mapErrorToMCPError(error);
-    }
+    return safeCall(() => this.workProductStore.listForIssue(issueNumber));
   }
 
   /** List all work products submitted by a specific agent (across issues). */
   async getWorkProductsByAgent(agentId: string): Promise<WorkProduct[]> {
-    try {
+    return safeCall(async () => {
       // WorkProductStore only supports per-issue listing, so we need to
       // scan the agent store's known tasks. For now, use the octokit REST API
       // to find issues with agent comments, then filter.
@@ -194,9 +188,7 @@ export class WorkProductService {
       }
 
       return results;
-    } catch (error) {
-      throw mapErrorToMCPError(error);
-    }
+    });
   }
 
   // -----------------------------------------------------------------------

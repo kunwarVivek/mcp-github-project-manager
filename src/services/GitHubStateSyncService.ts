@@ -1,9 +1,8 @@
-import { ResourceType, ResourceStatus, SyncMetadata } from "../domain/resource-types";
-import { GitHubRepositoryFactory } from "../infrastructure/github/GitHubRepositoryFactory";
-import { ResourceCache } from "../infrastructure/cache/ResourceCache";
-import { FilePersistenceAdapter } from "../infrastructure/persistence/FilePersistenceAdapter";
-import { Logger } from "../infrastructure/logger/index";
-import { Project, Milestone, Issue, Sprint } from "../domain/types";
+import { ResourceType, type SyncMetadata } from "../domain/resource-types";
+import type { GitHubRepositoryFactory } from "../infrastructure/github/GitHubRepositoryFactory";
+import type { ResourceCache } from "../infrastructure/cache/ResourceCache";
+import type { FilePersistenceAdapter } from "../infrastructure/persistence/FilePersistenceAdapter";
+import { type ILogger, Logger } from "../infrastructure/logger/index";
 
 // SyncMetadata moved to domain/resource-types to break the infra->service cycle.
 export type { SyncMetadata };
@@ -24,7 +23,7 @@ export interface SyncOptions {
 }
 
 export class GitHubStateSyncService {
-  private readonly logger = Logger.getInstance();
+  private readonly logger: ILogger;
   private readonly cache: ResourceCache;
   private readonly persistence: FilePersistenceAdapter;
   private readonly factory: GitHubRepositoryFactory;
@@ -34,11 +33,13 @@ export class GitHubStateSyncService {
   constructor(
     factory: GitHubRepositoryFactory,
     cache: ResourceCache,
-    persistence: FilePersistenceAdapter
+    persistence: FilePersistenceAdapter,
+    logger?: ILogger
   ) {
     this.factory = factory;
     this.cache = cache;
     this.persistence = persistence;
+    this.logger = logger ?? Logger.getInstance();
   }
 
   /**
@@ -97,24 +98,33 @@ export class GitHubStateSyncService {
    * Sync specific resource type
    */
   async syncResourceType(type: ResourceType, forceSync = false): Promise<void> {
-    this.logger.info(`Syncing resource type: ${type}`);
+    this.logger.info(`Syncing resource type: ${type} (forceSync=${forceSync})`);
 
     try {
-      switch (type) {
-        case ResourceType.PROJECT:
-          await this.syncProjects(forceSync);
-          break;
-        case ResourceType.MILESTONE:
-          await this.syncMilestones(forceSync);
-          break;
-        case ResourceType.ISSUE:
-          await this.syncIssues(forceSync);
-          break;
-        case ResourceType.SPRINT:
-          await this.syncSprints(forceSync);
-          break;
-        default:
-          this.logger.warn(`Unknown resource type for sync: ${type}`);
+      if (forceSync) {
+        // Brute-force: re-fetch everything regardless of freshness
+        switch (type) {
+          case ResourceType.PROJECT:
+            await this.syncProjects(forceSync);
+            break;
+          case ResourceType.MILESTONE:
+            await this.syncMilestones(forceSync);
+            break;
+          case ResourceType.ISSUE:
+            await this.syncIssues(forceSync);
+            break;
+          case ResourceType.SPRINT:
+            await this.syncSprints(forceSync);
+            break;
+          default:
+            this.logger.warn(`Unknown resource type for sync: ${type}`);
+        }
+      } else {
+        // Incremental: use metadata freshness checks to skip up-to-date resources
+        const allMetadata = await this.persistence.loadMetadata();
+        const typeMetadata = allMetadata.filter(m => m.resourceType === type);
+        const result = await this.syncResourceTypeWithMetadata(type, typeMetadata);
+        this.logger.info(`Incremental sync for ${type}: ${result.synced} synced, ${result.skipped} skipped`);
       }
     } catch (error) {
       this.logger.error(`Failed to sync resource type ${type}:`, error);
@@ -249,7 +259,7 @@ export class GitHubStateSyncService {
    */
   private async syncSingleResource(type: ResourceType, resourceId: string): Promise<void> {
     switch (type) {
-      case ResourceType.PROJECT:
+      case ResourceType.PROJECT: {
         const projectRepo = this.factory.createProjectRepository();
         const project = await projectRepo.findById(resourceId);
         if (project) {
@@ -257,7 +267,8 @@ export class GitHubStateSyncService {
           await this.updateMetadata(type, resourceId, project);
         }
         break;
-      case ResourceType.MILESTONE:
+      }
+      case ResourceType.MILESTONE: {
         const milestoneRepo = this.factory.createMilestoneRepository();
         const milestone = await milestoneRepo.findById(resourceId);
         if (milestone) {
@@ -265,7 +276,8 @@ export class GitHubStateSyncService {
           await this.updateMetadata(type, milestone.id.toString(), milestone);
         }
         break;
-      case ResourceType.ISSUE:
+      }
+      case ResourceType.ISSUE: {
         const issueRepo = this.factory.createIssueRepository();
         const issue = await issueRepo.findById(resourceId);
         if (issue) {
@@ -273,7 +285,8 @@ export class GitHubStateSyncService {
           await this.updateMetadata(type, issue.id.toString(), issue);
         }
         break;
-      case ResourceType.SPRINT:
+      }
+      case ResourceType.SPRINT: {
         const sprintRepo = this.factory.createSprintRepository();
         const sprint = await sprintRepo.findById(resourceId);
         if (sprint) {
@@ -281,6 +294,7 @@ export class GitHubStateSyncService {
           await this.updateMetadata(type, resourceId, sprint);
         }
         break;
+      }
     }
   }
 

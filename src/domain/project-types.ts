@@ -1,4 +1,4 @@
-import { Resource, ResourceType, ResourceStatus } from "./resource-types";
+import { type Resource, ResourceStatus } from "./resource-types";
 
 export interface BaseProjectResource extends Resource {
   title: string;

@@ -1,7 +1,7 @@
-import { spawn, ChildProcess } from 'child_process';
-import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from '@jest/globals';
-import { join } from 'path';
-import { existsSync } from 'fs';
+import { spawn, type ChildProcess } from 'node:child_process';
+import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from 'vitest';
+import { join } from 'node:path';
+import { existsSync } from 'node:fs';
 
 const projectRoot = process.cwd();
 
@@ -11,6 +11,14 @@ const projectRoot = process.cwd();
  * by spawning the actual server process and testing the stdio transport layer
  */
 describe('MCP Protocol Compliance E2E Tests', () => {
+  // These tests spawn real child processes and need real timers for polling.
+  // setup.ts sets vi.useFakeTimers() in beforeEach, which freezes setTimeout
+  // and breaks the inline polling loops used to wait for server startup/responses.
+  // Use beforeEach (not beforeAll) to override setup.ts's fake timers
+  // which runs before each test and freezes setTimeout.
+  beforeEach(() => {
+    vi.useRealTimers();
+  });
   const serverPath = join(projectRoot, 'build/index.js');
   let serverProcess: ChildProcess;
   const testTimeout = 10000;
@@ -31,16 +39,18 @@ describe('MCP Protocol Compliance E2E Tests', () => {
 
   describe('Stdio Transport Protocol Compliance', () => {
     it('should only output JSON messages to stdout, logs to stderr', async () => {
-      let stdoutData = '';
       let stderrData = '';
-      let stdoutMessages: any[] = [];
-      let jsonParseErrors: string[] = [];
+      const stdoutMessages: any[] = [];
+      const jsonParseErrors: string[] = [];
       let receivedInitResponse = false;
 
       // Spawn the server process
       serverProcess = spawn('node', [serverPath], {
         env: {
           ...process.env,
+          // stdio suites don't test webhooks; without this every spawned
+          // server binds WEBHOOK_PORT 3001 and parallel files collide.
+          SSE_ENABLED: 'false',
           GITHUB_TOKEN: 'test-token',
           GITHUB_OWNER: 'test-owner',
           GITHUB_REPO: 'test-repo'
@@ -51,7 +61,6 @@ describe('MCP Protocol Compliance E2E Tests', () => {
       // Collect stdout data (should be JSON only)
       serverProcess.stdout?.on('data', (data) => {
         const chunk = data.toString();
-        stdoutData += chunk;
         
         // Try to parse each line as JSON
         const lines = chunk.split('\n').filter((line: string) => line.trim());
@@ -63,7 +72,7 @@ describe('MCP Protocol Compliance E2E Tests', () => {
             if (parsed.id === 1 && parsed.result) {
               receivedInitResponse = true;
             }
-          } catch (error) {
+          } catch {
             if (line.trim()) {
               jsonParseErrors.push(`Non-JSON on stdout: "${line.trim()}"`);
             }
@@ -106,7 +115,7 @@ describe('MCP Protocol Compliance E2E Tests', () => {
       };
 
       // Send the request
-      serverProcess.stdin?.write(JSON.stringify(initRequest) + '\n');
+      serverProcess.stdin?.write(`${JSON.stringify(initRequest)}\n`);
 
       // Wait for response with proper timeout
       await new Promise<void>((resolve) => {
@@ -127,7 +136,7 @@ describe('MCP Protocol Compliance E2E Tests', () => {
         jsonrpc: "2.0",
         method: "notifications/initialized"
       };
-      serverProcess.stdin?.write(JSON.stringify(initializedNotification) + '\n');
+      serverProcess.stdin?.write(`${JSON.stringify(initializedNotification)}\n`);
 
       // Wait a bit more for any additional processing
       await new Promise(resolve => setTimeout(resolve, 500));
@@ -158,6 +167,9 @@ describe('MCP Protocol Compliance E2E Tests', () => {
       serverProcess = spawn('node', [serverPath], {
         env: {
           ...process.env,
+          // stdio suites don't test webhooks; without this every spawned
+          // server binds WEBHOOK_PORT 3001 and parallel files collide.
+          SSE_ENABLED: 'false',
           GITHUB_TOKEN: 'test-token',
           GITHUB_OWNER: 'test-owner',
           GITHUB_REPO: 'test-repo'
@@ -180,7 +192,7 @@ describe('MCP Protocol Compliance E2E Tests', () => {
             if (parsed.id === 2 && parsed.result && parsed.result.tools) {
               receivedToolsResponse = true;
             }
-          } catch (error) {
+          } catch {
             // Ignore parse errors for this test
           }
         }
@@ -214,7 +226,7 @@ describe('MCP Protocol Compliance E2E Tests', () => {
           clientInfo: { name: "test-client", version: "1.0.0" }
         }
       };
-      serverProcess.stdin?.write(JSON.stringify(initRequest) + '\n');
+      serverProcess.stdin?.write(`${JSON.stringify(initRequest)}\n`);
 
       // Wait for init response
       await new Promise<void>((resolve) => {
@@ -230,10 +242,10 @@ describe('MCP Protocol Compliance E2E Tests', () => {
       });
 
       // Send initialized notification
-      serverProcess.stdin?.write(JSON.stringify({
+      serverProcess.stdin?.write(`${JSON.stringify({
         jsonrpc: "2.0",
         method: "notifications/initialized"
-      }) + '\n');
+      })}\n`);
 
       await new Promise(resolve => setTimeout(resolve, 200));
 
@@ -244,7 +256,7 @@ describe('MCP Protocol Compliance E2E Tests', () => {
         method: "tools/list",
         params: {}
       };
-      serverProcess.stdin?.write(JSON.stringify(listToolsRequest) + '\n');
+      serverProcess.stdin?.write(`${JSON.stringify(listToolsRequest)}\n`);
 
       // Wait for tools response
       await new Promise<void>((resolve) => {
@@ -286,12 +298,15 @@ describe('MCP Protocol Compliance E2E Tests', () => {
     }, testTimeout);
 
     it('should handle tool execution without stderr pollution in JSON responses', async () => {
-      let responseMessages: any[] = [];
+      const responseMessages: any[] = [];
       let stderrData = '';
 
       serverProcess = spawn('node', [serverPath], {
         env: {
           ...process.env,
+          // stdio suites don't test webhooks; without this every spawned
+          // server binds WEBHOOK_PORT 3001 and parallel files collide.
+          SSE_ENABLED: 'false',
           GITHUB_TOKEN: 'test-token',
           GITHUB_OWNER: 'test-owner',
           GITHUB_REPO: 'test-repo'
@@ -305,7 +320,7 @@ describe('MCP Protocol Compliance E2E Tests', () => {
           try {
             const parsed = JSON.parse(line);
             responseMessages.push(parsed);
-          } catch (error) {
+          } catch {
             // Ignore parse errors for this test
           }
         }
@@ -319,7 +334,7 @@ describe('MCP Protocol Compliance E2E Tests', () => {
       await new Promise(resolve => setTimeout(resolve, 2000));
 
       // Initialize the server
-      serverProcess.stdin?.write(JSON.stringify({
+      serverProcess.stdin?.write(`${JSON.stringify({
         jsonrpc: "2.0",
         id: 1,
         method: "initialize",
@@ -328,14 +343,14 @@ describe('MCP Protocol Compliance E2E Tests', () => {
           capabilities: {},
           clientInfo: { name: "test-client", version: "1.0.0" }
         }
-      }) + '\n');
+      })}\n`);
 
       await new Promise(resolve => setTimeout(resolve, 500));
 
-      serverProcess.stdin?.write(JSON.stringify({
+      serverProcess.stdin?.write(`${JSON.stringify({
         jsonrpc: "2.0",
         method: "notifications/initialized"
-      }) + '\n');
+      })}\n`);
 
       await new Promise(resolve => setTimeout(resolve, 500));
 
@@ -351,7 +366,7 @@ describe('MCP Protocol Compliance E2E Tests', () => {
           }
         }
       };
-      serverProcess.stdin?.write(JSON.stringify(callToolRequest) + '\n');
+      serverProcess.stdin?.write(`${JSON.stringify(callToolRequest)}\n`);
 
       // Wait for tool execution
       await new Promise(resolve => setTimeout(resolve, 2000));
@@ -378,11 +393,14 @@ describe('MCP Protocol Compliance E2E Tests', () => {
 
   describe('Error Handling Protocol Compliance', () => {
     it('should return proper MCP error responses for invalid requests', async () => {
-      let responseMessages: any[] = [];
+      const responseMessages: any[] = [];
 
       serverProcess = spawn('node', [serverPath], {
         env: {
           ...process.env,
+          // stdio suites don't test webhooks; without this every spawned
+          // server binds WEBHOOK_PORT 3001 and parallel files collide.
+          SSE_ENABLED: 'false',
           GITHUB_TOKEN: 'test-token',
           GITHUB_OWNER: 'test-owner',
           GITHUB_REPO: 'test-repo'
@@ -396,7 +414,7 @@ describe('MCP Protocol Compliance E2E Tests', () => {
           try {
             const parsed = JSON.parse(line);
             responseMessages.push(parsed);
-          } catch (error) {
+          } catch {
             // Ignore parse errors for this test
           }
         }
@@ -405,7 +423,26 @@ describe('MCP Protocol Compliance E2E Tests', () => {
       // Wait for server initialization
       await new Promise(resolve => setTimeout(resolve, 2000));
 
-      // Send an invalid request (missing required fields)
+      // MCP v2 requires the initialize handshake before any tools/* call.
+      // v1 tolerated calling straight in; without this the server never answers
+      // the request below and the assertion sees undefined.
+      serverProcess.stdin?.write(`${JSON.stringify({
+        jsonrpc: "2.0",
+        id: 0,
+        method: "initialize",
+        params: {
+          protocolVersion: "2025-06-18",
+          capabilities: {},
+          clientInfo: { name: "compliance-probe", version: "1" },
+        },
+      })}\n`);
+      await new Promise(resolve => setTimeout(resolve, 500));
+      serverProcess.stdin?.write(
+        `${JSON.stringify({ jsonrpc: "2.0", method: "notifications/initialized" })}\n`
+      );
+      await new Promise(resolve => setTimeout(resolve, 200));
+
+      // Now an invalid request: a tool that does not exist.
       const invalidRequest = {
         jsonrpc: "2.0",
         id: 1,
@@ -415,7 +452,7 @@ describe('MCP Protocol Compliance E2E Tests', () => {
           arguments: {}
         }
       };
-      serverProcess.stdin?.write(JSON.stringify(invalidRequest) + '\n');
+      serverProcess.stdin?.write(`${JSON.stringify(invalidRequest)}\n`);
 
       // Wait for error response
       await new Promise(resolve => setTimeout(resolve, 1000));
@@ -441,6 +478,9 @@ describe('MCP Protocol Compliance E2E Tests', () => {
       serverProcess = spawn('node', [serverPath], {
         env: {
           ...process.env,
+          // stdio suites don't test webhooks; without this every spawned
+          // server binds WEBHOOK_PORT 3001 and parallel files collide.
+          SSE_ENABLED: 'false',
           GITHUB_TOKEN: 'test-token',
           GITHUB_OWNER: 'test-owner',
           GITHUB_REPO: 'test-repo'
@@ -466,10 +506,10 @@ describe('MCP Protocol Compliance E2E Tests', () => {
               } else if (parsed.id === 2 && parsed.result) {
                 toolsListResponse = parsed;
               }
-            } catch (error) {
+            } catch {
               // For debugging: log parse errors for potential responses
               if (trimmed.includes('"jsonrpc"') || trimmed.includes('"result"')) {
-                console.warn('JSON parse error for potential response:', trimmed.substring(0, 100) + '...');
+                console.warn('JSON parse error for potential response:', `${trimmed.substring(0, 100)}...`);
               }
             }
           }
@@ -480,7 +520,7 @@ describe('MCP Protocol Compliance E2E Tests', () => {
       await new Promise(resolve => setTimeout(resolve, 2000));
 
       // Step 1: Initialize (exactly like MCP Inspector would)
-      serverProcess.stdin?.write(JSON.stringify({
+      serverProcess.stdin?.write(`${JSON.stringify({
         jsonrpc: "2.0",
         id: 1,
         method: "initialize",
@@ -497,7 +537,7 @@ describe('MCP Protocol Compliance E2E Tests', () => {
             version: "1.0.0"
           }
         }
-      }) + '\n');
+      })}\n`);
 
       // Wait for initialize response with timeout
       await new Promise((resolve, reject) => {
@@ -521,20 +561,20 @@ describe('MCP Protocol Compliance E2E Tests', () => {
       expect(initializeResponse.result.capabilities).toBeDefined();
 
       // Step 2: Send initialized notification
-      serverProcess.stdin?.write(JSON.stringify({
+      serverProcess.stdin?.write(`${JSON.stringify({
         jsonrpc: "2.0",
         method: "notifications/initialized"
-      }) + '\n');
+      })}\n`);
 
       await new Promise(resolve => setTimeout(resolve, 500));
 
       // Step 3: List tools
-      serverProcess.stdin?.write(JSON.stringify({
+      serverProcess.stdin?.write(`${JSON.stringify({
         jsonrpc: "2.0",
         id: 2,
         method: "tools/list",
         params: {}
-      }) + '\n');
+      })}\n`);
 
       // Wait for tools response with timeout
       await new Promise((resolve, reject) => {
@@ -552,8 +592,8 @@ describe('MCP Protocol Compliance E2E Tests', () => {
                   resolve(undefined);
                   return;
                 }
-              } catch (error) {
-                console.warn('Failed to parse remaining buffer as JSON:', stdoutBuffer.substring(0, 200) + '...');
+              } catch {
+                console.warn('Failed to parse remaining buffer as JSON:', `${stdoutBuffer.substring(0, 200)}...`);
               }
             }
             reject(new Error('Timeout waiting for tools list response'));

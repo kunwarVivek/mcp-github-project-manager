@@ -1,5 +1,5 @@
-import { describe, expect, it } from '@jest/globals';
-import * as crypto from 'crypto';
+import { describe, expect, it } from 'vitest';
+import * as crypto from 'node:crypto';
 import { GitHubWebhookHandler } from '../../../../infrastructure/events/GitHubWebhookHandler';
 
 /**
@@ -54,7 +54,7 @@ describe('GitHubWebhookHandler signature validation (security)', () => {
       const handler = new GitHubWebhookHandler(secret, false);
       const signature = sign(secret, payload);
       await expect(
-        handler.validateSignature(payload + 'tampered', signature),
+        handler.validateSignature(`${payload}tampered`, signature),
       ).resolves.toBe(false);
     });
   });

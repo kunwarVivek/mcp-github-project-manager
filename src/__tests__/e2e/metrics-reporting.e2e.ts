@@ -1,4 +1,4 @@
-import { ProjectManagementService } from "../../services/ProjectManagementService";
+import type { ProjectManagementService } from "../../services/ProjectManagementService";
 import { createProjectManagementService } from "../../container";
 import { ResourceStatus } from "../../domain/resource-types";
 import { TestFactory } from "../test-utils";
@@ -27,7 +27,7 @@ describe.skip("Metrics and Reporting E2E Tests", () => {
         status: ResourceStatus.ACTIVE,
       })
     );
-    testMilestoneId = parseInt(milestone.id);
+    testMilestoneId = parseInt(milestone.id, 10);
 
     // Create issues for the milestone
     await service.createIssue(

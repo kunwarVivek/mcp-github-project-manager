@@ -1,13 +1,13 @@
 import { z } from 'zod';
-import { ToolDefinition, ToolSchema } from '../ToolValidator.js';
+import type { ToolDefinition, ToolSchema } from '../ToolValidator.js';
 import { TaskGenerationService } from '../../../services/TaskGenerationService.js';
 import { PRDGenerationService } from '../../../services/PRDGenerationService.js';
 import { RequirementsTraceabilityService } from '../../../services/RequirementsTraceabilityService.js';
-import { MCPResponse } from '../../../domain/mcp-types.js';
+import type { MCPResponse } from '../../../domain/mcp-types.js';
 import { ToolResultFormatter } from '../ToolResultFormatter.js';
 import { ANNOTATION_PATTERNS } from '../annotations/tool-annotations.js';
 import { PRDParseOutputSchema } from '../schemas/ai-schemas.js';
-import { MockPRD } from '../../../domain/ai-types.js';
+import type { MockPRD } from '../../../domain/ai-types.js';
 
 // Schema for parse_prd tool
 const parsePRDSchema = z.object({
@@ -83,7 +83,8 @@ async function executeParsePRD(args: ParsePRDArgs): Promise<MCPResponse> {
     }
 
     // Create traceability matrix if requested
-    let traceabilityMatrix;
+    // biome-ignore lint/suspicious/noExplicitAny: unvalidated AI response shape
+    let traceabilityMatrix: any;
     if (args.createTraceabilityMatrix) {
       // Create mock PRD for traceability
       const mockPRD: MockPRD = {
@@ -189,7 +190,7 @@ function calculateProjectMetrics(tasks: any[], features: any[]) {
 /**
  * Generate task recommendations
  */
-async function generateTaskRecommendations(tasks: any[], args: ParsePRDArgs) {
+async function generateTaskRecommendations(tasks: any[], _args: ParsePRDArgs) {
   // Get high-priority tasks
   const highPriorityTasks = tasks
     .filter(task => task.priority === 'critical' || task.priority === 'high')

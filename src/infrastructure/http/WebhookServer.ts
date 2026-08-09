@@ -1,9 +1,9 @@
-import * as http from 'http';
-import * as url from 'url';
-import { GitHubWebhookHandler, ResourceEvent } from '../events/GitHubWebhookHandler';
-import { EventSubscriptionManager, EventSubscription, EventFilter } from '../events/EventSubscriptionManager';
-import { EventStore } from '../events/EventStore';
-import { Logger } from '../logger/index';
+import * as http from 'node:http';
+import * as url from 'node:url';
+import type { GitHubWebhookHandler, ResourceEvent } from '../events/GitHubWebhookHandler';
+import type { EventSubscriptionManager, EventSubscription, } from '../events/EventSubscriptionManager';
+import type { EventStore } from '../events/EventStore';
+import { type ILogger, Logger } from '../logger/index';
 import { WEBHOOK_PORT, SSE_ENABLED, WEBHOOK_TIMEOUT_MS } from '../../env';
 
 export interface SSEConnection {
@@ -22,7 +22,7 @@ export interface WebhookServerOptions {
 }
 
 export class WebhookServer {
-  private readonly logger = Logger.getInstance();
+  private readonly logger: ILogger;
   private readonly options: WebhookServerOptions;
   private readonly webhookHandler: GitHubWebhookHandler;
   private readonly subscriptionManager: EventSubscriptionManager;
@@ -36,8 +36,10 @@ export class WebhookServer {
     webhookHandler: GitHubWebhookHandler,
     subscriptionManager: EventSubscriptionManager,
     eventStore: EventStore,
-    options?: Partial<WebhookServerOptions>
+    options?: Partial<WebhookServerOptions>,
+    logger?: ILogger
   ) {
+    this.logger = logger ?? Logger.getInstance();
     this.options = {
       port: options?.port || WEBHOOK_PORT,
       enableSSE: options?.enableSSE ?? SSE_ENABLED,
@@ -327,7 +329,7 @@ export class WebhookServer {
   /**
    * Handle delete subscription
    */
-  private async handleDeleteSubscription(req: http.IncomingMessage, res: http.ServerResponse, pathname: string): Promise<void> {
+  private async handleDeleteSubscription(_req: http.IncomingMessage, res: http.ServerResponse, pathname: string): Promise<void> {
     const subscriptionId = pathname.split('/').pop();
 
     if (!subscriptionId) {
@@ -347,7 +349,7 @@ export class WebhookServer {
   /**
    * Handle event replay
    */
-  private async handleEventReplay(req: http.IncomingMessage, res: http.ServerResponse, pathname: string): Promise<void> {
+  private async handleEventReplay(_req: http.IncomingMessage, res: http.ServerResponse, pathname: string): Promise<void> {
     const timestamp = pathname.split('/').pop();
 
     if (!timestamp) {
@@ -367,8 +369,8 @@ export class WebhookServer {
   /**
    * Handle recent events
    */
-  private async handleRecentEvents(req: http.IncomingMessage, res: http.ServerResponse, query: any): Promise<void> {
-    const limit = parseInt(query.limit as string) || 100;
+  private async handleRecentEvents(_req: http.IncomingMessage, res: http.ServerResponse, query: any): Promise<void> {
+    const limit = parseInt(query.limit as string, 10) || 100;
 
     try {
       const events = await this.eventStore.getRecentEvents(limit);
@@ -382,7 +384,7 @@ export class WebhookServer {
   /**
    * Handle health check
    */
-  private async handleHealthCheck(req: http.IncomingMessage, res: http.ServerResponse): Promise<void> {
+  private async handleHealthCheck(_req: http.IncomingMessage, res: http.ServerResponse): Promise<void> {
     const stats = await this.eventStore.getStats();
     const subscriptionStats = this.subscriptionManager.getStats();
 

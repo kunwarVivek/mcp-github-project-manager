@@ -1,20 +1,16 @@
+import { vi } from 'vitest';
 // Unmock ResourceCache for E2E tests
-jest.unmock("../../infrastructure/cache/ResourceCache");
+vi.unmock("../../infrastructure/cache/ResourceCache");
 
 import { ResourceManager } from "../../infrastructure/resource/ResourceManager";
 import { ResourceCache } from "../../infrastructure/cache/ResourceCache";
-import { BaseProjectResource } from "../../domain/project-types";
+import type { BaseProjectResource } from "../../domain/project-types";
 import {
   ResourceStatus,
   ResourceType,
-  ResourceEvent,
   ResourceEventType,
-  ResourceNotFoundError,
   ResourceVersionError,
-  ResourceValidationError,
-  ResourceValidationRule
 } from "../../domain/resource-types";
-import { TestFactory } from "../test-utils";
 
 describe("Resource System", () => {
   let manager: ResourceManager;

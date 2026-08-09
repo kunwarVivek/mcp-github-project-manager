@@ -1,19 +1,41 @@
-import { describe, it, expect, beforeEach, jest } from '@jest/globals';
+import { describe, it, expect, beforeEach, vi, type Mock } from 'vitest';
 import { IssueEnrichmentService } from '../../src/services/IssueEnrichmentService';
 import { AIServiceFactory } from '../../src/services/ai/AIServiceFactory';
 import { ProjectManagementService } from '../../src/services/ProjectManagementService';
+import { generateObject } from 'ai';
 
 // Mock the AI service factory
-jest.mock('../../src/services/ai/AIServiceFactory');
+vi.mock('../../src/services/ai/AIServiceFactory', () => {
+  const mockFactory = {
+    getMainModel: vi.fn(),
+    getFallbackModel: vi.fn(),
+    getModel: vi.fn(),
+    getBestAvailableModel: vi.fn(),
+    getPRDModel: vi.fn(),
+    getResearchModel: vi.fn(),
+  };
+  return {
+    AIServiceFactory: {
+      getInstance: vi.fn().mockReturnValue(mockFactory),
+    },
+  };
+});
 
 // Mock the ai package
-jest.mock('ai', () => ({
-  generateText: jest.fn(),
-  generateObject: jest.fn()
+vi.mock('ai', () => ({
+  generateText: vi.fn(),
+  generateObject: vi.fn()
 }));
 
 // Mock ProjectManagementService
-jest.mock('../../src/services/ProjectManagementService');
+vi.mock('../../src/services/ProjectManagementService', () => ({
+  ProjectManagementService: vi.fn().mockImplementation(function () { return ({
+    listProjectItems: vi.fn(),
+    updateProjectItem: vi.fn(),
+    createIssue: vi.fn(),
+    createAutomationRule: vi.fn(),
+  }); }),
+}));
 
 describe('IssueEnrichmentService', () => {
   let service: IssueEnrichmentService;
@@ -21,7 +43,7 @@ describe('IssueEnrichmentService', () => {
   let mockProjectService: any;
 
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
 
     // Mock AI service - just needs to be a valid model object
     mockAIService = {
@@ -31,24 +53,24 @@ describe('IssueEnrichmentService', () => {
 
     // Mock AIServiceFactory
     const mockFactory = {
-      getMainModel: jest.fn().mockReturnValue(mockAIService),
-      getFallbackModel: jest.fn().mockReturnValue(mockAIService),
-      getModel: jest.fn().mockReturnValue(mockAIService),
-      getBestAvailableModel: jest.fn().mockReturnValue(mockAIService),
-      getPRDModel: jest.fn().mockReturnValue(mockAIService),
-      getResearchModel: jest.fn().mockReturnValue(mockAIService)
+      getMainModel: vi.fn().mockReturnValue(mockAIService),
+      getFallbackModel: vi.fn().mockReturnValue(mockAIService),
+      getModel: vi.fn().mockReturnValue(mockAIService),
+      getBestAvailableModel: vi.fn().mockReturnValue(mockAIService),
+      getPRDModel: vi.fn().mockReturnValue(mockAIService),
+      getResearchModel: vi.fn().mockReturnValue(mockAIService)
     };
 
-    (AIServiceFactory.getInstance as jest.Mock).mockReturnValue(mockFactory);
+    (AIServiceFactory.getInstance as Mock).mockReturnValue(mockFactory);
 
     // Mock ProjectManagementService methods
     mockProjectService = {
-      listProjectItems: jest.fn(),
-      listMilestones: jest.fn(),
-      updateProjectItem: jest.fn()
+      listProjectItems: vi.fn(),
+      listMilestones: vi.fn(),
+      updateProjectItem: vi.fn()
     };
 
-    (ProjectManagementService as jest.Mock).mockImplementation(() => mockProjectService);
+    (ProjectManagementService as Mock).mockImplementation(() => mockProjectService);
 
     // Use mockProjectService directly since ProjectManagementService is mocked
     // This avoids TypeScript errors from the new 7-argument constructor signature
@@ -73,9 +95,9 @@ describe('IssueEnrichmentService', () => {
         { id: '1', title: 'v1.0', state: 'open' }
       ]);
 
-      const { generateText } = require('ai');
-      generateText.mockResolvedValue({
-        text: JSON.stringify(mockEnrichment)
+
+      (generateObject as Mock).mockResolvedValue({
+        object: mockEnrichment
       });
 
       const result = await service.enrichIssue({
@@ -95,7 +117,7 @@ describe('IssueEnrichmentService', () => {
       expect(result.estimatedEffort).toBe('3-5 days');
       expect(result.relatedIssues).toHaveLength(2);
       expect(result.reasoning).toBeDefined();
-      expect(generateText).toHaveBeenCalledTimes(1);
+      expect(generateObject).toHaveBeenCalledTimes(1);
     });
 
     it('should handle feature requests differently than bugs', async () => {
@@ -111,9 +133,9 @@ describe('IssueEnrichmentService', () => {
 
       mockProjectService.listMilestones.mockResolvedValue([]);
 
-      const { generateText } = require('ai');
-      generateText.mockResolvedValue({
-        text: JSON.stringify(mockFeatureEnrichment)
+
+      (generateObject as Mock).mockResolvedValue({
+        object: mockFeatureEnrichment
       });
 
       const result = await service.enrichIssue({
@@ -141,9 +163,9 @@ describe('IssueEnrichmentService', () => {
 
       mockProjectService.listMilestones.mockResolvedValue([]);
 
-      const { generateText } = require('ai');
-      generateText.mockResolvedValue({
-        text: JSON.stringify(mockDocsEnrichment)
+
+      (generateObject as Mock).mockResolvedValue({
+        object: mockDocsEnrichment
       });
 
       const result = await service.enrichIssue({
@@ -172,9 +194,9 @@ describe('IssueEnrichmentService', () => {
 
       mockProjectService.listMilestones.mockResolvedValue([]);
 
-      const { generateText } = require('ai');
-      generateText.mockResolvedValue({
-        text: JSON.stringify(mockCriticalEnrichment)
+
+      (generateObject as Mock).mockResolvedValue({
+        object: mockCriticalEnrichment
       });
 
       const result = await service.enrichIssue({
@@ -212,10 +234,10 @@ describe('IssueEnrichmentService', () => {
       mockProjectService.listProjectItems.mockResolvedValue(mockIssues.items);
       mockProjectService.listMilestones.mockResolvedValue([]);
 
-      const { generateText } = require('ai');
-      generateText
+
+      (generateObject as Mock)
         .mockResolvedValueOnce({
-          text: JSON.stringify({
+          object: {
             suggestedLabels: ['bug'],
             suggestedPriority: 'high',
             suggestedType: 'bug',
@@ -223,10 +245,10 @@ describe('IssueEnrichmentService', () => {
             estimatedEffort: '2 days',
             relatedIssues: [],
             reasoning: 'Critical bug'
-          })
+          }
         })
         .mockResolvedValueOnce({
-          text: JSON.stringify({
+          object: {
             suggestedLabels: ['feature'],
             suggestedPriority: 'medium',
             suggestedType: 'feature',
@@ -234,7 +256,7 @@ describe('IssueEnrichmentService', () => {
             estimatedEffort: '1 week',
             relatedIssues: [],
             reasoning: 'New feature'
-          })
+          }
         });
 
       const result = await service.enrichIssues({
@@ -246,7 +268,7 @@ describe('IssueEnrichmentService', () => {
       expect(result).toHaveLength(2);
       expect(result[0].suggestedType).toBe('bug');
       expect(result[1].suggestedType).toBe('feature');
-      expect(generateText).toHaveBeenCalledTimes(2);
+      expect(generateObject).toHaveBeenCalledTimes(2);
     });
 
     it('should filter issues by provided issueIds', async () => {
@@ -261,9 +283,9 @@ describe('IssueEnrichmentService', () => {
       mockProjectService.listProjectItems.mockResolvedValue(mockIssues.items);
       mockProjectService.listMilestones.mockResolvedValue([]);
 
-      const { generateText } = require('ai');
-      generateText.mockResolvedValue({
-        text: JSON.stringify({
+
+      (generateObject as Mock).mockResolvedValue({
+        object: {
           suggestedLabels: ['bug'],
           suggestedPriority: 'high',
           suggestedType: 'bug',
@@ -271,7 +293,7 @@ describe('IssueEnrichmentService', () => {
           estimatedEffort: '1 day',
           relatedIssues: [],
           reasoning: 'Bug fix needed'
-        })
+        }
       });
 
       const result = await service.enrichIssues({
@@ -356,8 +378,8 @@ describe('IssueEnrichmentService', () => {
   describe('error handling', () => {
     it('should throw error when AI service is unavailable', async () => {
       const mockFactory = AIServiceFactory.getInstance();
-      (mockFactory.getModel as jest.Mock).mockReturnValue(null);
-      (mockFactory.getBestAvailableModel as jest.Mock).mockReturnValue(null);
+      (mockFactory.getModel as Mock).mockReturnValue(null);
+      (mockFactory.getBestAvailableModel as Mock).mockReturnValue(null);
 
       mockProjectService.listMilestones.mockResolvedValue([]);
 
@@ -373,10 +395,8 @@ describe('IssueEnrichmentService', () => {
     it('should handle malformed AI responses', async () => {
       mockProjectService.listMilestones.mockResolvedValue([]);
 
-      const { generateText } = require('ai');
-      generateText.mockResolvedValue({
-        text: 'This is not valid JSON'
-      });
+
+      (generateObject as Mock).mockRejectedValue(new Error('Schema validation failed'));
 
       await expect(
         service.enrichIssue({
@@ -384,14 +404,14 @@ describe('IssueEnrichmentService', () => {
           issueId: 'test',
           issueTitle: 'Test'
         })
-      ).rejects.toThrow();
+      ).rejects.toThrow('Schema validation failed');
     });
 
     it('should handle AI generation errors', async () => {
       mockProjectService.listMilestones.mockResolvedValue([]);
 
-      const { generateText } = require('ai');
-      generateText.mockRejectedValue(new Error('AI model error'));
+
+      (generateObject as Mock).mockRejectedValue(new Error('AI model error'));
 
       await expect(
         service.enrichIssue({
@@ -417,9 +437,9 @@ describe('IssueEnrichmentService', () => {
 
       mockProjectService.listMilestones.mockResolvedValue([]);
 
-      const { generateText } = require('ai');
-      generateText.mockResolvedValue({
-        text: JSON.stringify(mockEnrichment)
+
+      (generateObject as Mock).mockResolvedValue({
+        object: mockEnrichment
       });
 
       const result = await service.enrichIssue({
@@ -449,9 +469,9 @@ describe('IssueEnrichmentService', () => {
 
       mockProjectService.listMilestones.mockResolvedValue([]);
 
-      const { generateText } = require('ai');
-      generateText.mockResolvedValue({
-        text: JSON.stringify(mockEnrichment)
+
+      (generateObject as Mock).mockResolvedValue({
+        object: mockEnrichment
       });
 
       const result = await service.enrichIssue({
@@ -478,9 +498,9 @@ describe('IssueEnrichmentService', () => {
 
       mockProjectService.listMilestones.mockResolvedValue([]);
 
-      const { generateText } = require('ai');
-      generateText.mockResolvedValue({
-        text: JSON.stringify(mockEnrichment)
+
+      (generateObject as Mock).mockResolvedValue({
+        object: mockEnrichment
       });
 
       const result = await service.enrichIssue({

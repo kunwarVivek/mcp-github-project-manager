@@ -11,7 +11,7 @@
  * - AI-16: Roadmap visualization data
  */
 
-import { SectionConfidence } from "./ai-types";
+import type { SectionConfidence } from "./ai-types";
 
 // ============================================================================
 // Roadmap Phase Types

@@ -1,5 +1,4 @@
-import { MCPError, MCPErrorCode, MCPResponse, MCPContentType, MCPErrorResponse } from "../../domain/mcp-types";
-import { MCPResponseFormatter } from "./MCPResponseFormatter";
+import { type MCPError, MCPErrorCode, type MCPErrorResponse } from "../../domain/mcp-types";
 import { ValidationError, ResourceNotFoundError, UnauthorizedError, RateLimitError } from "../../domain/errors";
 
 export class MCPErrorHandler {
@@ -7,7 +6,7 @@ export class MCPErrorHandler {
    * Convert any error to a standardized MCP error response
    */
   static handle(error: unknown, requestId?: string): MCPErrorResponse {
-    const mcpError = this.createMCPError(error);
+    const mcpError = MCPErrorHandler.createMCPError(error);
     
     // Create proper MCPErrorResponse object
     return {
@@ -30,7 +29,7 @@ export class MCPErrorHandler {
    */
   private static createMCPError(error: unknown): MCPError {
     if (error instanceof Error) {
-      const code = this.determineErrorCode(error);
+      const code = MCPErrorHandler.determineErrorCode(error);
       return {
         code,
         message: error.message,
@@ -74,24 +73,6 @@ export class MCPErrorHandler {
   }
 
   /**
-   * Map MCP error codes to HTTP status codes
-   */
-  private static getStatusCode(errorCode: MCPErrorCode): number {
-    switch (errorCode) {
-      case MCPErrorCode.VALIDATION_ERROR:
-        return 400;
-      case MCPErrorCode.UNAUTHORIZED:
-        return 401;
-      case MCPErrorCode.RESOURCE_NOT_FOUND:
-        return 404;
-      case MCPErrorCode.RATE_LIMITED:
-        return 429;
-      default:
-        return 500;
-    }
-  }
-
-  /**
    * Create custom error with specific MCP error code
    */
   static createError(
@@ -110,27 +91,27 @@ export class MCPErrorHandler {
    * Helper method to create validation error
    */
   static validationError(message: string, details?: Record<string, unknown>): MCPError {
-    return this.createError(MCPErrorCode.VALIDATION_ERROR, message, details);
+    return MCPErrorHandler.createError(MCPErrorCode.VALIDATION_ERROR, message, details);
   }
 
   /**
    * Helper method to create not found error
    */
   static notFoundError(message: string, details?: Record<string, unknown>): MCPError {
-    return this.createError(MCPErrorCode.RESOURCE_NOT_FOUND, message, details);
+    return MCPErrorHandler.createError(MCPErrorCode.RESOURCE_NOT_FOUND, message, details);
   }
 
   /**
    * Helper method to create unauthorized error
    */
   static unauthorizedError(message: string, details?: Record<string, unknown>): MCPError {
-    return this.createError(MCPErrorCode.UNAUTHORIZED, message, details);
+    return MCPErrorHandler.createError(MCPErrorCode.UNAUTHORIZED, message, details);
   }
 
   /**
    * Helper method to create rate limit error
    */
   static rateLimitError(message: string, details?: Record<string, unknown>): MCPError {
-    return this.createError(MCPErrorCode.RATE_LIMITED, message, details);
+    return MCPErrorHandler.createError(MCPErrorCode.RATE_LIMITED, message, details);
   }
 }

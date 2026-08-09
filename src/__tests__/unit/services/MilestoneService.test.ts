@@ -1,25 +1,25 @@
-import { beforeEach, describe, expect, it, jest } from '@jest/globals';
-import { MilestoneService, MilestoneMetrics } from '../../../services/MilestoneService';
-import { GitHubRepositoryFactory } from '../../../infrastructure/github/GitHubRepositoryFactory';
+import { type Mocked, type MockedFunction, beforeEach, describe, expect, it, vi } from 'vitest';
+import { MilestoneService, } from '../../../services/MilestoneService';
+import type { GitHubRepositoryFactory } from '../../../infrastructure/github/GitHubRepositoryFactory';
 import { ResourceStatus } from '../../../domain/resource-types';
 import { DomainError } from '../../../domain/errors';
-import { Issue, Milestone } from '../../../domain/types';
+import type { Issue, Milestone } from '../../../domain/types';
 
 // Mock the factory
-jest.mock('../../../infrastructure/github/GitHubRepositoryFactory');
+vi.mock('../../../infrastructure/github/GitHubRepositoryFactory');
 
 describe('MilestoneService', () => {
   let service: MilestoneService;
-  let mockFactory: jest.Mocked<GitHubRepositoryFactory>;
+  let mockFactory: Mocked<GitHubRepositoryFactory>;
   let mockMilestoneRepo: {
-    findById: jest.MockedFunction<any>;
-    findAll: jest.MockedFunction<any>;
-    create: jest.MockedFunction<any>;
-    update: jest.MockedFunction<any>;
-    delete: jest.MockedFunction<any>;
+    findById: MockedFunction<any>;
+    findAll: MockedFunction<any>;
+    create: MockedFunction<any>;
+    update: MockedFunction<any>;
+    delete: MockedFunction<any>;
   };
   let mockIssueRepo: {
-    findAll: jest.MockedFunction<any>;
+    findAll: MockedFunction<any>;
   };
 
   const now = new Date();
@@ -54,26 +54,26 @@ describe('MilestoneService', () => {
   };
 
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
 
     // Create mock repositories
     mockMilestoneRepo = {
-      findById: jest.fn(),
-      findAll: jest.fn(),
-      create: jest.fn(),
-      update: jest.fn(),
-      delete: jest.fn(),
+      findById: vi.fn(),
+      findAll: vi.fn(),
+      create: vi.fn(),
+      update: vi.fn(),
+      delete: vi.fn(),
     };
 
     mockIssueRepo = {
-      findAll: jest.fn(),
+      findAll: vi.fn(),
     };
 
     // Create mock factory
     mockFactory = {
-      createMilestoneRepository: jest.fn().mockReturnValue(mockMilestoneRepo),
-      createIssueRepository: jest.fn().mockReturnValue(mockIssueRepo),
-    } as unknown as jest.Mocked<GitHubRepositoryFactory>;
+      createMilestoneRepository: vi.fn().mockReturnValue(mockMilestoneRepo),
+      createIssueRepository: vi.fn().mockReturnValue(mockIssueRepo),
+    } as unknown as Mocked<GitHubRepositoryFactory>;
 
     // Create service with mock factory
     service = new MilestoneService(mockFactory);

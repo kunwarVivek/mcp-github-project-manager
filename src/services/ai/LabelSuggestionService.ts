@@ -19,14 +19,13 @@ import {
   calculateWeightedScore,
   getConfidenceTier
 } from './ConfidenceScorer';
-import {
+import type {
   LabelSuggestion,
   LabelSuggestionResult,
   LabelSuggestionConfig,
   NewLabelProposal,
-  RepositoryLabel
 } from '../../domain/issue-intelligence-types';
-import { SectionConfidence, ConfidenceFactors, ConfidenceTier } from '../../domain/ai-types';
+import type { SectionConfidence, ConfidenceFactors, ConfidenceTier } from '../../domain/ai-types';
 import {
   LABEL_SUGGESTION_SYSTEM_PROMPT,
   formatLabelPrompt
@@ -100,8 +99,8 @@ export class LabelSuggestionService {
   private aiFactory: AIServiceFactory;
   private config: LabelSuggestionConfig;
 
-  constructor(config?: Partial<LabelSuggestionConfig>) {
-    this.aiFactory = AIServiceFactory.getInstance();
+  constructor(aiFactory?: AIServiceFactory, config?: Partial<LabelSuggestionConfig>) {
+    this.aiFactory = aiFactory ?? AIServiceFactory.getInstance();
     this.config = {
       ...DEFAULT_CONFIG,
       ...config,

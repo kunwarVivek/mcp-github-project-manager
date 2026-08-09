@@ -1,4 +1,4 @@
-import { GitHubError } from './types';
+import type { GitHubError } from './types';
 import { ResourceNotFoundError } from '../../domain/errors';
 import { MCPErrorCode } from '../../domain/mcp-types';
 import { ResourceType } from '../../domain/resource-types';
@@ -97,7 +97,7 @@ export class GitHubErrorHandler {
       if (status === 429 || this.isRateLimitError(error)) {
         const resetTimestamp = error.response?.headers?.['x-ratelimit-reset'];
         const resetDate = resetTimestamp
-          ? new Date(parseInt(resetTimestamp) * 1000)
+          ? new Date(parseInt(resetTimestamp, 10) * 1000)
           : new Date(Date.now() + 60000); // Default to 1 minute from now
 
         return new GitHubRateLimitError(
@@ -188,7 +188,7 @@ export class GitHubErrorHandler {
     // Use GitHub's rate limit reset if available
     const resetTimestamp = headers['x-ratelimit-reset'];
     if (resetTimestamp) {
-      const resetTime = parseInt(resetTimestamp) * 1000;
+      const resetTime = parseInt(resetTimestamp, 10) * 1000;
       const now = Date.now();
       if (resetTime > now) {
         return {
@@ -200,7 +200,7 @@ export class GitHubErrorHandler {
 
     // Use exponential backoff with jitter
     const retryAfter = headers['retry-after'];
-    const baseDelay = retryAfter ? parseInt(retryAfter) * 1000 : this.defaultRetryDelay;
+    const baseDelay = retryAfter ? parseInt(retryAfter, 10) * 1000 : this.defaultRetryDelay;
 
     return {
       baseDelay,

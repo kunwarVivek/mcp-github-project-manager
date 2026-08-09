@@ -3,9 +3,9 @@ import {
   getComplexityBand,
   complexityToPoints,
   calculateRange,
-  EstimationRecord
+  type EstimationRecord
 } from '../../src/analysis/EstimationCalibrator';
-import { TaskComplexity } from '../../src/domain/ai-types';
+import type { TaskComplexity } from '../../src/domain/ai-types';
 
 describe('EstimationCalibrator helpers', () => {
   describe('getComplexityBand', () => {

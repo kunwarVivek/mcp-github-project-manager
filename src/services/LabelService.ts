@@ -1,6 +1,15 @@
-import { GitHubRepositoryFactory } from "../infrastructure/github/GitHubRepositoryFactory";
-import { mapErrorToMCPError } from './utils/ErrorMapper';
+import type { GitHubRepositoryFactory } from "../infrastructure/github/GitHubRepositoryFactory";
+import { safeCall } from './utils/safeCall';
 
+/**
+ * Service for managing GitHub repository labels.
+ *
+ * Handles:
+ * - Creating new labels with custom colors and descriptions
+ * - Listing all labels in a repository
+ *
+ * Can be instantiated directly with a GitHubRepositoryFactory or via dependency injection.
+ */
 export class LabelService {
   private readonly factory: GitHubRepositoryFactory;
 
@@ -13,7 +22,7 @@ export class LabelService {
     color?: string;
     description?: string;
   }): Promise<{ id: number; name: string; color: string; description: string }> {
-    try {
+    return safeCall(async () => {
       const octokit = this.factory.getOctokit();
       const config = this.factory.getConfig();
 
@@ -31,9 +40,7 @@ export class LabelService {
         color: response.data.color,
         description: response.data.description || ''
       };
-    } catch (error) {
-      throw mapErrorToMCPError(error);
-    }
+    });
   }
 
   async listLabels(data: { limit?: number } = {}): Promise<Array<{
@@ -42,7 +49,7 @@ export class LabelService {
     color: string;
     description: string;
   }>> {
-    try {
+    return safeCall(async () => {
       const octokit = this.factory.getOctokit();
       const config = this.factory.getConfig();
 
@@ -58,8 +65,6 @@ export class LabelService {
         color: label.color,
         description: label.description || ''
       }));
-    } catch (error) {
-      throw mapErrorToMCPError(error);
-    }
+    });
   }
 }

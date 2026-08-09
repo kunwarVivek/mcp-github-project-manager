@@ -1,11 +1,11 @@
-import { GitHubRepositoryFactory } from "../infrastructure/github/GitHubRepositoryFactory";
-import { GitHubProjectRepository } from "../infrastructure/github/repositories/GitHubProjectRepository";
-import { CustomField, ProjectView } from "../domain/types";
+import type { GitHubRepositoryFactory } from "../infrastructure/github/GitHubRepositoryFactory";
+import type { GitHubProjectRepository } from "../infrastructure/github/repositories/GitHubProjectRepository";
+import type { CustomField, ProjectView } from "../domain/types";
 import {
   ResourceNotFoundError,
 } from "../domain/errors";
 import { ResourceType } from "../domain/resource-types";
-import { mapErrorToMCPError } from './utils/ErrorMapper';
+import { safeCall } from './utils/safeCall';
 
 /**
  * ProjectTemplateService handles project customization operations:
@@ -31,7 +31,7 @@ export class ProjectTemplateService {
   async getProjectReadme(data: {
     projectId: string;
   }): Promise<{ readme: string }> {
-    try {
+    return safeCall(async () => {
       const query = `
         query($projectId: ID!) {
           node(id: $projectId) {
@@ -55,16 +55,14 @@ export class ProjectTemplateService {
       return {
         readme: response.node?.readme || ''
       };
-    } catch (error) {
-      throw mapErrorToMCPError(error);
-    }
+    });
   }
 
   async updateProjectReadme(data: {
     projectId: string;
     readme: string;
   }): Promise<{ success: boolean; message: string }> {
-    try {
+    return safeCall(async () => {
       const mutation = `
         mutation($input: UpdateProjectV2Input!) {
           updateProjectV2(input: $input) {
@@ -96,23 +94,19 @@ export class ProjectTemplateService {
         success: true,
         message: `Project README updated successfully`
       };
-    } catch (error) {
-      throw mapErrorToMCPError(error);
-    }
+    });
   }
 
   async listProjectFields(data: {
     projectId: string;
   }): Promise<CustomField[]> {
-    try {
+    return safeCall(async () => {
       const project = await this.projectRepo.findById(data.projectId);
       if (!project) {
         throw new ResourceNotFoundError(ResourceType.PROJECT, data.projectId);
       }
       return project.fields || [];
-    } catch (error) {
-      throw mapErrorToMCPError(error);
-    }
+    });
   }
 
   async createProjectField(data: {
@@ -125,7 +119,7 @@ export class ProjectTemplateService {
       description?: string;
     }>;
   }): Promise<CustomField> {
-    try {
+    return safeCall(async () => {
       return await this.projectRepo.createField(data.projectId, {
         name: data.name,
         type: data.type as CustomField['type'],
@@ -136,9 +130,7 @@ export class ProjectTemplateService {
           description: opt.description
         }))
       });
-    } catch (error) {
-      throw mapErrorToMCPError(error);
-    }
+    });
   }
 
   async updateProjectField(data: {
@@ -150,7 +142,7 @@ export class ProjectTemplateService {
       color?: string;
     }>;
   }): Promise<CustomField> {
-    try {
+    return safeCall(async () => {
       const updateData: Partial<CustomField> = {};
 
       if (data.name !== undefined) {
@@ -166,9 +158,7 @@ export class ProjectTemplateService {
       }
 
       return await this.projectRepo.updateField(data.projectId, data.fieldId, updateData);
-    } catch (error) {
-      throw mapErrorToMCPError(error);
-    }
+    });
   }
 
   // Project View Operations
@@ -177,21 +167,19 @@ export class ProjectTemplateService {
     name: string;
     layout: 'board' | 'table' | 'timeline' | 'roadmap';
   }): Promise<ProjectView> {
-    try {
+    return safeCall(async () => {
       return await this.projectRepo.createView(
         data.projectId,
         data.name,
         data.layout
       );
-    } catch (error) {
-      throw mapErrorToMCPError(error);
-    }
+    });
   }
 
   async listProjectViews(data: {
     projectId: string;
   }): Promise<ProjectView[]> {
-    try {
+    return safeCall(async () => {
       const query = `
         query($projectId: ID!) {
           node(id: $projectId) {
@@ -237,9 +225,7 @@ export class ProjectTemplateService {
         groupBy: undefined,
         filters: []
       }));
-    } catch (error) {
-      throw mapErrorToMCPError(error);
-    }
+    });
   }
 
   async updateProjectView(data: {
@@ -248,7 +234,7 @@ export class ProjectTemplateService {
     name?: string;
     layout?: 'board' | 'table' | 'timeline' | 'roadmap';
   }): Promise<ProjectView> {
-    try {
+    return safeCall(async () => {
       const mutation = `
         mutation($input: UpdateProjectV2ViewInput!) {
           updateProjectV2View(input: $input) {
@@ -299,24 +285,20 @@ export class ProjectTemplateService {
         groupBy: undefined,
         filters: []
       };
-    } catch (error) {
-      throw mapErrorToMCPError(error);
-    }
+    });
   }
 
   async deleteProjectView(data: {
     projectId: string;
     viewId: string;
   }): Promise<{ success: boolean; message: string }> {
-    try {
+    return safeCall(async () => {
       await this.projectRepo.deleteView(data.projectId, data.viewId);
 
       return {
         success: true,
         message: `View ${data.viewId} deleted successfully from project ${data.projectId}`
       };
-    } catch (error) {
-      throw mapErrorToMCPError(error);
-    }
+    });
   }
 }

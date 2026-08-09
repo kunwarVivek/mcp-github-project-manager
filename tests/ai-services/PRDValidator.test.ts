@@ -1,8 +1,8 @@
 import { PRDValidator } from '../../src/infrastructure/validation/PRDValidator';
-import { ValidationRuleEngine, ValidationRule } from '../../src/infrastructure/validation/ValidationRuleEngine';
+import { ValidationRuleEngine, type ValidationRule } from '../../src/infrastructure/validation/ValidationRuleEngine';
 import { COMPLETENESS_RULES } from '../../src/infrastructure/validation/rules/CompletenessRules';
 import { CLARITY_RULES } from '../../src/infrastructure/validation/rules/ClarityRules';
-import { PRDDocument, TaskPriority } from '../../src/domain/ai-types';
+import { type PRDDocument, TaskPriority } from '../../src/domain/ai-types';
 
 function createMinimalPRD(overrides: Partial<PRDDocument> = {}): PRDDocument {
   return {

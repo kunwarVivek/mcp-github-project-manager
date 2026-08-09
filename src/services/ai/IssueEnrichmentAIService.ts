@@ -18,13 +18,13 @@ import {
   calculateWeightedScore,
   getConfidenceTier
 } from './ConfidenceScorer';
-import {
+import type {
   EnrichedIssue,
   EnrichedIssueSections,
   EnrichedSection,
   IssueEnrichmentConfig
 } from '../../domain/issue-intelligence-types';
-import { SectionConfidence, ConfidenceFactors, ConfidenceTier } from '../../domain/ai-types';
+import type { SectionConfidence, ConfidenceFactors, ConfidenceTier } from '../../domain/ai-types';
 import {
   ENRICHMENT_SYSTEM_PROMPT,
   formatEnrichmentPrompt
@@ -95,8 +95,8 @@ export class IssueEnrichmentAIService {
   private aiFactory: AIServiceFactory;
   private config: IssueEnrichmentConfig;
 
-  constructor(config?: Partial<IssueEnrichmentConfig>) {
-    this.aiFactory = AIServiceFactory.getInstance();
+  constructor(aiFactory?: AIServiceFactory, config?: Partial<IssueEnrichmentConfig>) {
+    this.aiFactory = aiFactory ?? AIServiceFactory.getInstance();
     this.config = { ...DEFAULT_ENRICHMENT_CONFIG, ...config };
   }
 
@@ -112,8 +112,9 @@ export class IssueEnrichmentAIService {
     projectContext?: string;
     repositoryLabels?: string[];
   }): Promise<EnrichedIssue> {
-    // Determine if original description is substantial
-    const preserveOriginal = (params.issueDescription?.length || 0) > SUBSTANTIAL_DESCRIPTION_LENGTH;
+    // Only preserve original when config allows AND description is substantial
+    const preserveOriginal = this.config.preserveOriginal
+      && (params.issueDescription?.length || 0) > SUBSTANTIAL_DESCRIPTION_LENGTH;
 
     // Get AI model
     const model = this.aiFactory.getModel('main') || this.aiFactory.getBestAvailableModel();
@@ -141,7 +142,7 @@ export class IssueEnrichmentAIService {
         temperature: 0.4 // Balanced for consistent enrichment with some creativity
       });
 
-      return this.formatEnrichmentResult(result.object, params, preserveOriginal);
+      return this.formatEnrichmentResult(result.object, params, preserveOriginal, this.config);
     } catch (error) {
       // Fallback on AI error
       console.error('Issue enrichment AI call failed:', error);
@@ -158,25 +159,27 @@ export class IssueEnrichmentAIService {
   private formatEnrichmentResult(
     aiResult: AIEnrichmentResponse,
     params: { issueTitle: string; issueDescription: string },
-    preserveOriginal: boolean
+    preserveOriginal: boolean,
+    config: IssueEnrichmentConfig = DEFAULT_ENRICHMENT_CONFIG
   ): EnrichedIssue {
     // Convert AI sections to typed sections with 0-100 confidence
     const sections: EnrichedIssueSections = {};
 
     const aiSections = aiResult.sections;
-    if (aiSections.problem?.content) {
+    const included = config.includeSections;
+    if (included.includes('problem') && aiSections.problem?.content) {
       sections.problem = this.convertSection(aiSections.problem as { content: string; confidence: number });
     }
-    if (aiSections.solution?.content) {
+    if (included.includes('solution') && aiSections.solution?.content) {
       sections.solution = this.convertSection(aiSections.solution as { content: string; confidence: number });
     }
-    if (aiSections.context?.content) {
+    if (included.includes('context') && aiSections.context?.content) {
       sections.context = this.convertSection(aiSections.context as { content: string; confidence: number });
     }
-    if (aiSections.impact?.content) {
+    if (included.includes('impact') && aiSections.impact?.content) {
       sections.impact = this.convertSection(aiSections.impact as { content: string; confidence: number });
     }
-    if (aiSections.acceptanceCriteria?.content) {
+    if (included.includes('acceptanceCriteria') && aiSections.acceptanceCriteria?.content) {
       sections.acceptanceCriteria = this.convertSection(aiSections.acceptanceCriteria as { content: string; confidence: number });
     }
 
@@ -195,8 +198,8 @@ export class IssueEnrichmentAIService {
       preserveOriginal,
       enrichedBody: aiResult.enrichedBody,
       sections,
-      suggestedLabels: aiResult.suggestedLabels,
-      suggestedAssignees: aiResult.suggestedAssignees,
+      suggestedLabels: config.suggestLabels ? aiResult.suggestedLabels : [],
+      suggestedAssignees: config.suggestAssignees ? aiResult.suggestedAssignees : undefined,
       overallConfidence
     };
   }

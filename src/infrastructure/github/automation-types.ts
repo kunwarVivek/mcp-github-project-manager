@@ -1,9 +1,6 @@
 import { 
   AutomationTriggerType, 
   AutomationActionType,
-  AutomationCondition,
-  AutomationAction,
-  AutomationTrigger 
 } from '../../domain/automation-types';
 
 // GitHub GraphQL automation types

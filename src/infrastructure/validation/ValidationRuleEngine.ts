@@ -1,4 +1,4 @@
-import { PRDDocument } from '../../domain/ai-types';
+import type { PRDDocument } from '../../domain/ai-types';
 
 /**
  * Validation rule severity levels

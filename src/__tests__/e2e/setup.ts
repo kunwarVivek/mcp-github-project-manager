@@ -1,4 +1,4 @@
-import { jest, beforeAll, afterAll, beforeEach } from "@jest/globals";
+import { vi, beforeAll, afterAll, beforeEach, expect } from 'vitest';
 import nock from "nock";
 
 // Check if we should run real E2E tests with actual APIs
@@ -28,6 +28,18 @@ afterAll(() => {
   }
 });
 
+
+/**
+ * True when the currently-running file is an E2E suite.
+ *
+ * Scopes this file's E2E-only side effects while it remains a global
+ * `setupFiles` entry (its env-var seeding IS wanted everywhere).
+ */
+function isE2ETestFile(): boolean {
+  const path = expect.getState().testPath ?? "";
+  return path.includes("/__tests__/e2e/");
+}
+
 beforeEach(() => {
   if (!isRealE2ETest) {
     // Clear all nock interceptors for mock tests
@@ -45,9 +57,19 @@ beforeEach(() => {
   if (!process.env.GOOGLE_API_KEY) process.env.GOOGLE_API_KEY = "test-google-key";
   if (!process.env.PERPLEXITY_API_KEY) process.env.PERPLEXITY_API_KEY = "pplx-test-key";
 
-  // Use fake timers for consistent testing
-  jest.useFakeTimers();
-  jest.setSystemTime(new Date("2025-03-01T12:00:00Z"));
+  // Fake timers are E2E-ONLY and must not leak into unit/integration suites.
+  //
+  // This file is registered as a GLOBAL `setupFiles` entry, so freezing the
+  // clock here froze it for all ~118 suites. That silently broke two whole
+  // classes of test: anything awaiting a real `setTimeout` (retry backoff,
+  // `await new Promise(setTimeout)`) hung to the 10s timeout, and any domain
+  // computation against `Date.now()` was measured from 2025-03-01 — e.g. a
+  // `daysUntilDue` assertion failed with "expected 540 to be <= 14", 540 being
+  // exactly the gap between the real date and the frozen one.
+  if (isE2ETestFile()) {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2025-03-01T12:00:00Z"));
+  }
 });
 
 afterEach(() => {
@@ -60,8 +82,8 @@ afterEach(() => {
   }
 
   // Clear mocks and restore timers
-  jest.clearAllMocks();
-  jest.useRealTimers();
+  vi.clearAllMocks();
+  vi.useRealTimers();
 });
 
 // Export test configuration

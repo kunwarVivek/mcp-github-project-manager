@@ -1,4 +1,4 @@
-import { describe, expect, it, beforeEach, afterEach } from '@jest/globals';
+import { describe, expect, it, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -100,5 +100,45 @@ describe('SecretProvider', () => {
         rmSync(dir, { recursive: true, force: true });
       }
     });
+  });
+});
+
+describe('EnvSecretProvider reads the live environment', () => {
+  const original = process.env;
+
+  afterEach(() => {
+    process.env = original;
+  });
+
+  // Regression: the provider used to capture `process.env` by reference at
+  // construction. Because the default resolver is built once when src/env.ts is
+  // imported, any later *rebind* of process.env left it reading a detached
+  // object — which silently defeated the standard `process.env = {...}` test
+  // idiom and contradicted the documented read-fresh contract.
+  it('sees a value added after construction', () => {
+    const provider = new EnvSecretProvider();
+    process.env.__LATE_SECRET__ = 'added-later';
+    expect(provider.get('__LATE_SECRET__')).toBe('added-later');
+    delete process.env.__LATE_SECRET__;
+  });
+
+  it('survives process.env being rebound, not just mutated', () => {
+    const provider = new EnvSecretProvider();
+    process.env = { ...original, __REBOUND__: 'from-new-object' };
+    expect(provider.get('__REBOUND__')).toBe('from-new-object');
+  });
+
+  it('sees a deletion made after construction', () => {
+    process.env.__DOOMED__ = 'present';
+    const provider = new EnvSecretProvider();
+    delete process.env.__DOOMED__;
+    expect(provider.get('__DOOMED__')).toBeUndefined();
+  });
+
+  it('still honours an explicitly supplied environment', () => {
+    const provider = new EnvSecretProvider({ PINNED: 'fixed' } as NodeJS.ProcessEnv);
+    process.env.PINNED = 'ignored';
+    expect(provider.get('PINNED')).toBe('fixed');
+    delete process.env.PINNED;
   });
 });

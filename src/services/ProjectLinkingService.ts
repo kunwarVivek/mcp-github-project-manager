@@ -1,7 +1,7 @@
-import { GitHubRepositoryFactory } from "../infrastructure/github/GitHubRepositoryFactory";
-import { ProjectItem } from "../domain/types";
+import type { GitHubRepositoryFactory } from "../infrastructure/github/GitHubRepositoryFactory";
+import type { ProjectItem } from "../domain/types";
 import { ResourceType } from "../domain/resource-types";
-import { mapErrorToMCPError } from './utils/ErrorMapper';
+import { safeCall } from './utils/safeCall';
 
 /**
  * ProjectLinkingService handles project item operations:
@@ -12,6 +12,18 @@ import { mapErrorToMCPError } from './utils/ErrorMapper';
  *
  * Extracted from ProjectManagementService for better separation of concerns.
  */
+interface AddProjectItemResponse {
+  addProjectV2ItemById: {
+    item: {
+      id: string;
+      content: {
+        id: string;
+        title: string;
+      };
+    };
+  };
+}
+
 export class ProjectLinkingService {
   private readonly factory: GitHubRepositoryFactory;
 
@@ -26,7 +38,7 @@ export class ProjectLinkingService {
     contentId: string;
     contentType: 'issue' | 'pull_request';
   }): Promise<ProjectItem> {
-    try {
+    return safeCall(async () => {
       // GraphQL mutation to add an item to a project
       const mutation = `
         mutation($input: AddProjectV2ItemByIdInput!) {
@@ -48,24 +60,11 @@ export class ProjectLinkingService {
         }
       `;
 
-      interface AddProjectItemResponse {
-        addProjectV2ItemById: {
-          item: {
-            id: string;
-            content: {
-              id: string;
-              title: string;
-            };
-          };
-        };
-      }
-
-      const response = await this.factory.graphql<AddProjectItemResponse>(mutation, {
-        input: {
-          projectId: data.projectId,
-          contentId: data.contentId
-        }
-      });
+      // GitHub intermittently returns "temporary conflict" when concurrent
+      // project mutations race (e.g. an item is being added/updated by the
+      // auto-reclaim scheduler or another client). Retry a few times with a
+      // short backoff before surfacing the error.
+      const response = await this.addProjectItemWithRetry(mutation, data);
 
       const itemId = response.addProjectV2ItemById.item.id;
       const contentId = response.addProjectV2ItemById.item.content.id;
@@ -81,16 +80,43 @@ export class ProjectLinkingService {
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       };
-    } catch (error) {
-      throw mapErrorToMCPError(error);
+    });
+  }
+
+  /**
+   * Run the addProjectV2ItemById mutation with retries for GitHub's
+   * transient "temporary conflict" errors.
+   */
+  private async addProjectItemWithRetry(
+    mutation: string,
+    data: { projectId: string; contentId: string },
+  ): Promise<AddProjectItemResponse> {
+    let lastError: unknown;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        return await this.factory.graphql<AddProjectItemResponse>(mutation, {
+          input: {
+            projectId: data.projectId,
+            contentId: data.contentId,
+          },
+        });
+      } catch (error) {
+        lastError = error;
+        const message = String((error as Error)?.message ?? error);
+        if (!/temporary conflict/i.test(message) && !/try again/i.test(message)) {
+          throw error;
+        }
+        await new Promise(resolve => setTimeout(resolve, 250 * (attempt + 1)));
+      }
     }
+    throw lastError;
   }
 
   async removeProjectItem(data: {
     projectId: string;
     itemId: string;
   }): Promise<{ success: boolean; message: string }> {
-    try {
+    return safeCall(async () => {
       const mutation = `
         mutation($input: DeleteProjectV2ItemInput!) {
           deleteProjectV2Item(input: $input) {
@@ -116,16 +142,14 @@ export class ProjectLinkingService {
         success: true,
         message: `Item ${data.itemId} has been removed from project ${data.projectId}`
       };
-    } catch (error) {
-      throw mapErrorToMCPError(error);
-    }
+    });
   }
 
   async archiveProjectItem(data: {
     projectId: string;
     itemId: string;
   }): Promise<{ success: boolean; message: string }> {
-    try {
+    return safeCall(async () => {
       const mutation = `
         mutation($input: ArchiveProjectV2ItemInput!) {
           archiveProjectV2Item(input: $input) {
@@ -157,16 +181,14 @@ export class ProjectLinkingService {
         success: true,
         message: `Item ${data.itemId} has been archived in project ${data.projectId}`
       };
-    } catch (error) {
-      throw mapErrorToMCPError(error);
-    }
+    });
   }
 
   async unarchiveProjectItem(data: {
     projectId: string;
     itemId: string;
   }): Promise<{ success: boolean; message: string }> {
-    try {
+    return safeCall(async () => {
       const mutation = `
         mutation($input: UnarchiveProjectV2ItemInput!) {
           unarchiveProjectV2Item(input: $input) {
@@ -198,16 +220,14 @@ export class ProjectLinkingService {
         success: true,
         message: `Item ${data.itemId} has been unarchived in project ${data.projectId}`
       };
-    } catch (error) {
-      throw mapErrorToMCPError(error);
-    }
+    });
   }
 
   async listProjectItems(data: {
     projectId: string;
     limit?: number;
   }): Promise<ProjectItem[]> {
-    try {
+    return safeCall(async () => {
       const limit = data.limit || 50;
       const query = `
         query($projectId: ID!, $limit: Int!) {
@@ -298,19 +318,18 @@ export class ProjectLinkingService {
       });
 
       // If project doesn't exist or has no items
-      if (!response.node || !response.node.items || !response.node.items.nodes) {
+      if (!response.node?.items?.nodes) {
         return [];
       }
 
       return response.node.items.nodes.map((item) => {
         // Build field values map
         const fieldValues: Record<string, any> = {};
-        if (item.fieldValues && item.fieldValues.nodes) {
+        if (item.fieldValues?.nodes) {
           item.fieldValues.nodes.forEach((fieldValue: any) => {
-            if (!fieldValue || !fieldValue.field) return;
+            if (!fieldValue?.field) return;
 
             const fieldId = fieldValue.field.id;
-            const fieldName = fieldValue.field.name;
 
             if ('text' in fieldValue) {
               fieldValues[fieldId] = fieldValue.text;
@@ -324,7 +343,7 @@ export class ProjectLinkingService {
 
         // Determine content type
         let contentType = ResourceType.ISSUE; // Default
-        if (item.content && item.content.__typename) {
+        if (item.content?.__typename) {
           contentType = item.content.__typename === 'Issue'
             ? ResourceType.ISSUE
             : ResourceType.PULL_REQUEST;
@@ -340,8 +359,6 @@ export class ProjectLinkingService {
           updatedAt: new Date().toISOString()
         };
       });
-    } catch (error) {
-      throw mapErrorToMCPError(error);
-    }
+    });
   }
 }

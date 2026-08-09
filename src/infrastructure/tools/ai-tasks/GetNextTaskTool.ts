@@ -1,7 +1,6 @@
 import { z } from 'zod';
-import { ToolDefinition, ToolSchema } from '../ToolValidator.js';
-import { TaskGenerationService } from '../../../services/TaskGenerationService.js';
-import { MCPResponse } from '../../../domain/mcp-types.js';
+import type { ToolDefinition, ToolSchema } from '../ToolValidator.js';
+import type { MCPResponse } from '../../../domain/mcp-types.js';
 import { ToolResultFormatter } from '../ToolResultFormatter.js';
 import { ANNOTATION_PATTERNS } from '../annotations/tool-annotations.js';
 import { NextTaskOutputSchema } from '../schemas/ai-schemas.js';
@@ -27,8 +26,6 @@ export type GetNextTaskArgs = z.infer<typeof getNextTaskSchema>;
  * Implementation function for get_next_task tool
  */
 async function executeGetNextTask(args: GetNextTaskArgs): Promise<MCPResponse> {
-  const taskService = new TaskGenerationService();
-  
   try {
     // For now, create mock tasks for demonstration
     // In a full implementation, this would integrate with ResourceManager
@@ -131,7 +128,7 @@ async function executeGetNextTask(args: GetNextTaskArgs): Promise<MCPResponse> {
 /**
  * Generate AI analysis for task recommendations
  */
-function generateTaskAnalysis(tasks: any[], args: GetNextTaskArgs): string {
+function generateTaskAnalysis(tasks: any[], _args: GetNextTaskArgs): string {
   const highComplexityTasks = tasks.filter(task => task.complexity >= 7).length;
   const setupTasks = tasks.filter(task => task.tags.includes('setup')).length;
   

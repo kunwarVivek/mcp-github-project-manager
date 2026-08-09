@@ -1,7 +1,8 @@
 import { generateObject } from 'ai';
 import { AIServiceFactory } from '../ai/AIServiceFactory';
-import { CodeExample } from '../../domain/task-context-schemas';
-import { AITask } from '../../domain/ai-types';
+import type { CodeExample } from '../../domain/task-context-schemas';
+import type { AITask } from '../../domain/ai-types';
+import { type ILogger, Logger } from '../../infrastructure/logger';
 import { z } from 'zod';
 
 /**
@@ -30,9 +31,11 @@ const CodeExamplesSchema = z.object({
 export class CodeExampleGenerator {
   private aiFactory: AIServiceFactory;
   private exampleTemplates: Map<string, CodeExample[]>;
+  private readonly logger: ILogger;
 
-  constructor() {
-    this.aiFactory = AIServiceFactory.getInstance();
+  constructor(aiFactory?: AIServiceFactory, logger?: ILogger) {
+    this.aiFactory = aiFactory ?? AIServiceFactory.getInstance();
+    this.logger = logger ?? Logger.getInstance();
     this.exampleTemplates = this.initializeTemplates();
   }
 
@@ -65,7 +68,7 @@ export class CodeExampleGenerator {
       return result.object.examples.slice(0, maxExamples) as CodeExample[];
 
     } catch (error) {
-      process.stderr.write(`Error generating code examples: ${error instanceof Error ? error.message : String(error)}\n`);
+      this.logger.error('Error generating code examples', error);
       // Fallback to templates
       return this.generateTemplateExamples(task, maxExamples);
     }
@@ -542,7 +545,7 @@ describe('ResourceService', () => {
   /**
    * Get generic examples for any task
    */
-  private getGenericExamples(task: AITask): CodeExample[] {
+  private getGenericExamples(_task: AITask): CodeExample[] {
     return [
       {
         title: 'Error Handling Pattern',
@@ -646,7 +649,7 @@ Focus on practical examples that developers can reference during implementation.
   /**
    * Detect technology stack from task
    */
-  private detectTechnologyStack(task: AITask, technicalContext?: any): string[] {
+  private detectTechnologyStack(task: AITask, _technicalContext?: any): string[] {
     const stack: string[] = [];
     const taskText = `${task.title} ${task.description}`.toLowerCase();
 

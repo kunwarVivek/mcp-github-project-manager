@@ -1,6 +1,6 @@
-import * as crypto from 'crypto';
+import * as crypto from 'node:crypto';
 import { ResourceType } from '../../domain/resource-types';
-import { Logger } from '../logger/index';
+import { type ILogger, Logger } from '../logger/index';
 import { WEBHOOK_SECRET, WEBHOOK_ALLOW_UNSIGNED } from '../../env';
 
 export interface WebhookEvent {
@@ -32,13 +32,14 @@ export interface WebhookProcessingResult {
 }
 
 export class GitHubWebhookHandler {
-  private readonly logger = Logger.getInstance();
+  private readonly logger: ILogger;
   private readonly webhookSecret: string;
   private readonly allowUnsigned: boolean;
 
-  constructor(webhookSecret?: string, allowUnsigned: boolean = WEBHOOK_ALLOW_UNSIGNED) {
+  constructor(webhookSecret?: string, allowUnsigned: boolean = WEBHOOK_ALLOW_UNSIGNED, logger?: ILogger) {
     this.webhookSecret = webhookSecret || WEBHOOK_SECRET;
     this.allowUnsigned = allowUnsigned;
+    this.logger = logger ?? Logger.getInstance();
   }
 
   /**

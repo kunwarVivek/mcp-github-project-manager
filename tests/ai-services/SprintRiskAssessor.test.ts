@@ -1,3 +1,4 @@
+import { vi } from 'vitest';
 /**
  * Unit tests for SprintRiskAssessor
  *
@@ -5,23 +6,37 @@
  * and fallback behavior when AI is unavailable.
  */
 
-import { SprintRiskAssessor, RiskAssessmentParams } from '../../src/services/ai/SprintRiskAssessor';
+import { SprintRiskAssessor, } from '../../src/services/ai/SprintRiskAssessor';
 import { AIServiceFactory } from '../../src/services/ai/AIServiceFactory';
-import { BacklogItem, SprintCapacity } from '../../src/domain/sprint-planning-types';
+import type { BacklogItem, SprintCapacity } from '../../src/domain/sprint-planning-types';
 
 // Mock AIServiceFactory
-jest.mock('../../src/services/ai/AIServiceFactory');
+vi.mock('../../src/services/ai/AIServiceFactory', () => {
+  const mockFactory = {
+    getMainModel: vi.fn(),
+    getFallbackModel: vi.fn(),
+    getModel: vi.fn(),
+    getBestAvailableModel: vi.fn(),
+    getPRDModel: vi.fn(),
+    getResearchModel: vi.fn(),
+  };
+  return {
+    AIServiceFactory: {
+      getInstance: vi.fn().mockReturnValue(mockFactory),
+    },
+  };
+});
 
-const mockGetModel = jest.fn().mockReturnValue(null);
-const mockGetBestAvailableModel = jest.fn().mockReturnValue(null);
+const mockGetModel = vi.fn().mockReturnValue(null);
+const mockGetBestAvailableModel = vi.fn().mockReturnValue(null);
 
 describe('SprintRiskAssessor', () => {
   let assessor: SprintRiskAssessor;
 
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
     // Re-setup mock for each test
-    (AIServiceFactory.getInstance as jest.Mock).mockReturnValue({
+    (AIServiceFactory.getInstance as Mock).mockReturnValue({
       getModel: mockGetModel,
       getBestAvailableModel: mockGetBestAvailableModel
     });

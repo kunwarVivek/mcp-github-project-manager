@@ -12,21 +12,20 @@
 
 import { generateObject } from 'ai';
 import { z } from 'zod';
-import { DependencyGraph, GraphAnalysisResult } from '../../analysis/DependencyGraph';
+import { DependencyGraph, type GraphAnalysisResult } from '../../analysis/DependencyGraph';
 import { AIServiceFactory } from './AIServiceFactory';
 import {
   calculateWeightedScore,
   getConfidenceTier
 } from './ConfidenceScorer';
-import {
+import type {
   BacklogItem,
   PrioritizedItem,
   PrioritizationResult,
   PriorityTier,
   PriorityFactors,
-  PrioritizationReasoning
 } from '../../domain/sprint-planning-types';
-import { SectionConfidence, ConfidenceFactors, AITask, TaskStatus, TaskPriority } from '../../domain/ai-types';
+import { type SectionConfidence, type ConfidenceFactors, type AITask, TaskStatus, TaskPriority } from '../../domain/ai-types';
 import {
   SPRINT_PRIORITIZATION_SYSTEM_PROMPT,
   formatPrioritizationPrompt
@@ -85,8 +84,8 @@ export class BacklogPrioritizer {
   private aiFactory: AIServiceFactory;
   private weights: PrioritizationWeights;
 
-  constructor(weights?: Partial<PrioritizationWeights>) {
-    this.aiFactory = AIServiceFactory.getInstance();
+  constructor(aiFactory?: AIServiceFactory, weights?: Partial<PrioritizationWeights>) {
+    this.aiFactory = aiFactory ?? AIServiceFactory.getInstance();
     this.weights = { ...DEFAULT_WEIGHTS, ...weights };
   }
 
@@ -107,7 +106,7 @@ export class BacklogPrioritizer {
     }
 
     // 1. Build dependency graph
-    const { dependencyGraph, graphAnalysis } = this.buildDependencyGraph(params.backlogItems);
+    const { graphAnalysis } = this.buildDependencyGraph(params.backlogItems);
 
     // 2. Get AI business value scoring (with fallback)
     const aiScoring = await this.getAIBusinessValueScoring(

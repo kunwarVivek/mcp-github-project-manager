@@ -1,9 +1,9 @@
-import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
-import * as fs from 'fs/promises';
-import * as path from 'path';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import * as fs from 'node:fs/promises';
+import * as path from 'node:path';
 import { FilePersistenceAdapter } from '../../infrastructure/persistence/FilePersistenceAdapter';
 import { ResourceCache } from '../../infrastructure/cache/ResourceCache';
-import { GitHubWebhookHandler, ResourceEvent } from '../../infrastructure/events/GitHubWebhookHandler';
+import { GitHubWebhookHandler, type ResourceEvent } from '../../infrastructure/events/GitHubWebhookHandler';
 import { EventSubscriptionManager } from '../../infrastructure/events/EventSubscriptionManager';
 import { EventStore } from '../../infrastructure/events/EventStore';
 import { ResourceType } from '../../domain/resource-types';
@@ -14,7 +14,6 @@ describe('Persistence and Events Integration', () => {
   let cache: ResourceCache;
   let webhookHandler: GitHubWebhookHandler;
   let subscriptionManager: EventSubscriptionManager;
-  let eventStore: EventStore;
 
   beforeEach(async () => {
     // Clean up test directory

@@ -7,8 +7,8 @@
  * is properly tested and working correctly.
  */
 
-import { execSync } from 'child_process';
-import { existsSync } from 'fs';
+import { execSync } from 'node:child_process';
+import { existsSync } from 'node:fs';
 import chalk from 'chalk';
 
 const REQUIRED_ENV_VARS = {
@@ -82,8 +82,8 @@ class TestValidator {
         const passedMatch = summaryLine.match(/(\d+) passed/);
         const failedMatch = summaryLine.match(/(\d+) failed/);
         
-        this.results.unit.passed = passedMatch ? parseInt(passedMatch[1]) : 0;
-        this.results.unit.failed = failedMatch ? parseInt(failedMatch[1]) : 0;
+        this.results.unit.passed = passedMatch ? parseInt(passedMatch[1], 10) : 0;
+        this.results.unit.failed = failedMatch ? parseInt(failedMatch[1], 10) : 0;
       }
 
       this.log(`Unit tests completed: ${this.results.unit.passed} passed, ${this.results.unit.failed} failed`, 'success');
@@ -119,9 +119,9 @@ class TestValidator {
         const failedMatch = summaryLine.match(/(\d+) failed/);
         const skippedMatch = summaryLine.match(/(\d+) skipped/);
         
-        this.results.e2e.passed = passedMatch ? parseInt(passedMatch[1]) : 0;
-        this.results.e2e.failed = failedMatch ? parseInt(failedMatch[1]) : 0;
-        this.results.e2e.skipped = skippedMatch ? parseInt(skippedMatch[1]) : 0;
+        this.results.e2e.passed = passedMatch ? parseInt(passedMatch[1], 10) : 0;
+        this.results.e2e.failed = failedMatch ? parseInt(failedMatch[1], 10) : 0;
+        this.results.e2e.skipped = skippedMatch ? parseInt(skippedMatch[1], 10) : 0;
       }
 
       this.log(`E2E tests completed: ${this.results.e2e.passed} passed, ${this.results.e2e.failed} failed, ${this.results.e2e.skipped} skipped`, 'success');
@@ -165,7 +165,7 @@ class TestValidator {
   }
 
   generateReport() {
-    this.log('\n' + '='.repeat(60), 'info');
+    this.log(`\n${'='.repeat(60)}`, 'info');
     this.log('TEST VALIDATION REPORT', 'info');
     this.log('='.repeat(60), 'info');
 

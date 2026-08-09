@@ -1,21 +1,29 @@
-import { MCPToolTestUtils, MCPTestHelpers } from '../utils/MCPToolTestUtils';
+import { MCPToolTestUtils, } from '../utils/MCPToolTestUtils';
 
 /**
  * Comprehensive E2E tests for Tool Integration and Workflows
  * Tests complex workflows that combine multiple MCP tools
+ *
+ * All tests use compound tools with action-based routing:
+ * - manage_project: create, get, list, update, delete, ...
+ * - manage_milestones: create, list, get_metrics, get_upcoming, get_overdue, ...
+ * - manage_sprints: create, list, plan, get_metrics, ...
+ * - manage_issues: create, list, get, update, ...
+ * - ai_generate: generate_prd, enhance_prd, parse_prd, add_feature,
+ *                get_next_task, analyze_complexity, expand_task,
+ *                create_traceability_matrix
  */
 
 describe('Tool Integration Workflows E2E', () => {
   let utils: MCPToolTestUtils | undefined;
   let workflowProjectId: string;
   let workflowMilestoneId: string;
-  let workflowIssueIds: string[] = [];
+  const workflowIssueIds: string[] = [];
   let workflowSprintId: string;
   let workflowPRDContent: string;
 
   beforeAll(async () => {
     if (MCPToolTestUtils.shouldSkipTest('both')) {
-      console.log('Skipping Tool Integration Workflows E2E - missing credentials for both tests');
       return;
     }
 
@@ -40,7 +48,8 @@ describe('Tool Integration Workflows E2E', () => {
       }
 
       // Step 1: Generate PRD
-      const prdResponse = await utils.callTool('generate_prd', {
+      const prdResponse = await utils.callTool('ai_generate', {
+        action: 'generate_prd',
         projectIdea: 'A comprehensive project management dashboard with real-time analytics and team collaboration',
         projectName: 'ProjectHub Pro',
         targetUsers: ['project-managers', 'team-leads', 'executives'],
@@ -56,7 +65,8 @@ describe('Tool Integration Workflows E2E', () => {
       expect(workflowPRDContent).toContain('ProjectHub Pro');
 
       // Step 2: Create GitHub Project
-      const projectResponse = await utils.callTool('create_project', {
+      const projectResponse = await utils.callTool('manage_project', {
+        action: 'create',
         title: 'ProjectHub Pro Development',
         shortDescription: 'Development project for ProjectHub Pro dashboard',
         owner: process.env.GITHUB_OWNER || "test-owner",
@@ -67,7 +77,8 @@ describe('Tool Integration Workflows E2E', () => {
       expect(workflowProjectId).toBeDefined();
 
       // Step 3: Parse PRD to generate tasks
-      const parseResponse = await utils.callTool('parse_prd', {
+      const parseResponse = await utils.callTool('ai_generate', {
+        action: 'parse_prd',
         prdContent: workflowPRDContent,
         maxTasks: 15,
         includeSubtasks: true,
@@ -84,7 +95,8 @@ describe('Tool Integration Workflows E2E', () => {
       expect(parseResponse).toBeDefined();
 
       // Step 4: Create milestone for first phase
-      const milestoneResponse = await utils.callTool('create_milestone', {
+      const milestoneResponse = await utils.callTool('manage_milestones', {
+        action: 'create',
         title: 'Phase 1: Core Infrastructure',
         description: 'Establish core infrastructure and basic functionality',
         dueDate: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString() // 60 days
@@ -104,80 +116,87 @@ describe('Tool Integration Workflows E2E', () => {
         return;
       }
 
-      const roadmapData = {
-        project: {
-          title: 'ProjectHub Pro Roadmap',
-          shortDescription: 'Complete development roadmap for ProjectHub Pro',
-          owner: process.env.GITHUB_OWNER || "test-owner",
-          visibility: 'private'
-        },
-        milestones: [
-          {
-            milestone: {
-              title: 'Phase 1: Foundation',
-              description: 'Core infrastructure and authentication',
-              dueDate: new Date(Date.now() + 45 * 24 * 60 * 60 * 1000).toISOString()
-            },
-            issues: [
-              {
-                title: 'Set up project infrastructure',
-                description: 'Initialize project structure, CI/CD, and development environment',
-                priority: 'high',
-                type: 'feature',
-                assignees: [],
-                labels: ['infrastructure', 'setup']
-              },
-              {
-                title: 'Implement user authentication',
-                description: 'Create secure authentication system with OAuth integration',
-                priority: 'critical',
-                type: 'feature',
-                assignees: [],
-                labels: ['auth', 'security']
-              }
-            ]
-          },
-          {
-            milestone: {
-              title: 'Phase 2: Core Features',
-              description: 'Dashboard and project management features',
-              dueDate: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString()
-            },
-            issues: [
-              {
-                title: 'Build main dashboard',
-                description: 'Create responsive dashboard with real-time analytics',
-                priority: 'high',
-                type: 'feature',
-                assignees: [],
-                labels: ['dashboard', 'analytics']
-              },
-              {
-                title: 'Implement project management features',
-                description: 'Add project creation, task management, and team collaboration',
-                priority: 'high',
-                type: 'feature',
-                assignees: [],
-                labels: ['project-management', 'collaboration']
-              }
-            ]
-          }
-        ]
-      };
+      // Build roadmap by creating project + milestones + issues individually
+      // via compound tools (create_roadmap was a granular convenience tool
+      // not exposed on the MCP compound surface)
+      const owner = process.env.GITHUB_OWNER || "test-owner";
 
-      const roadmapResponse = await utils.callTool('create_roadmap', roadmapData);
-      
-      expect(roadmapResponse.project).toBeDefined();
-      expect(roadmapResponse.milestones).toHaveLength(2);
-      expect(roadmapResponse.milestones[0].issues).toHaveLength(2);
-      expect(roadmapResponse.milestones[1].issues).toHaveLength(2);
+      // Create project
+      const project = await utils.callTool('manage_project', {
+        action: 'create',
+        title: 'ProjectHub Pro Roadmap',
+        shortDescription: 'Complete development roadmap for ProjectHub Pro',
+        owner,
+        visibility: 'private'
+      });
+      expect(project.id).toBeDefined();
+
+      // Phase 1 milestone + issues
+      const milestone1 = await utils.callTool('manage_milestones', {
+        action: 'create',
+        title: 'Phase 1: Foundation',
+        description: 'Core infrastructure and authentication',
+        dueDate: new Date(Date.now() + 45 * 24 * 60 * 60 * 1000).toISOString()
+      });
+
+      const issue1 = await utils.callTool('manage_issues', {
+        action: 'create',
+        title: 'Set up project infrastructure',
+        description: 'Initialize project structure, CI/CD, and development environment',
+        priority: 'high',
+        type: 'feature',
+        assignees: [],
+        labels: ['infrastructure', 'setup']
+      });
+
+      const issue2 = await utils.callTool('manage_issues', {
+        action: 'create',
+        title: 'Implement user authentication',
+        description: 'Create secure authentication system with OAuth integration',
+        priority: 'critical',
+        type: 'feature',
+        assignees: [],
+        labels: ['auth', 'security']
+      });
+
+      // Phase 2 milestone + issues
+      const milestone2 = await utils.callTool('manage_milestones', {
+        action: 'create',
+        title: 'Phase 2: Core Features',
+        description: 'Dashboard and project management features',
+        dueDate: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString()
+      });
+
+      const issue3 = await utils.callTool('manage_issues', {
+        action: 'create',
+        title: 'Build main dashboard',
+        description: 'Create responsive dashboard with real-time analytics',
+        priority: 'high',
+        type: 'feature',
+        assignees: [],
+        labels: ['dashboard', 'analytics']
+      });
+
+      const issue4 = await utils.callTool('manage_issues', {
+        action: 'create',
+        title: 'Implement project management features',
+        description: 'Add project creation, task management, and team collaboration',
+        priority: 'high',
+        type: 'feature',
+        assignees: [],
+        labels: ['project-management', 'collaboration']
+      });
+
+      // Validate created resources
+      expect(milestone1.id).toBeDefined();
+      expect(milestone2.id).toBeDefined();
+      expect(issue1.id).toBeDefined();
+      expect(issue2.id).toBeDefined();
+      expect(issue3.id).toBeDefined();
+      expect(issue4.id).toBeDefined();
 
       // Store created issue IDs for later use
-      roadmapResponse.milestones.forEach((milestone: any) => {
-        milestone.issues.forEach((issue: any) => {
-          workflowIssueIds.push(issue.id);
-        });
-      });
+      workflowIssueIds.push(issue1.id, issue2.id, issue3.id, issue4.id);
 
       console.log('✅ Comprehensive roadmap created with multiple milestones');
     });
@@ -192,7 +211,8 @@ describe('Tool Integration Workflows E2E', () => {
         return;
       }
 
-      const sprintData = {
+      const sprintResponse = await utils.callTool('manage_sprints', {
+        action: 'plan',
         sprint: {
           title: 'Sprint 1: Foundation Setup',
           description: 'First sprint focusing on infrastructure and authentication',
@@ -205,12 +225,10 @@ describe('Tool Integration Workflows E2E', () => {
           ]
         },
         issueIds: workflowIssueIds.slice(0, 2) // First 2 issues
-      };
-
-      const sprintResponse = await utils.callTool('plan_sprint', sprintData);
+      });
       
       expect(sprintResponse.id).toBeDefined();
-      expect(sprintResponse.title).toBe(sprintData.sprint.title);
+      expect(sprintResponse.title).toBe('Sprint 1: Foundation Setup');
       expect(sprintResponse.issues).toHaveLength(2);
 
       workflowSprintId = sprintResponse.id;
@@ -229,7 +247,8 @@ describe('Tool Integration Workflows E2E', () => {
         return;
       }
 
-      const enhanceResponse = await utils.callTool('enhance_prd', {
+      const enhanceResponse = await utils.callTool('ai_generate', {
+        action: 'enhance_prd',
         prdContent: workflowPRDContent,
         enhancementType: 'technical',
         focusAreas: ['architecture', 'security', 'performance', 'scalability'],
@@ -255,7 +274,8 @@ describe('Tool Integration Workflows E2E', () => {
         return;
       }
 
-      const featureResponse = await utils.callTool('add_feature', {
+      const featureResponse = await utils.callTool('ai_generate', {
+        action: 'add_feature',
         featureIdea: 'Advanced Analytics Dashboard',
         description: 'Add comprehensive analytics with custom reports, data visualization, and export capabilities',
         targetProject: workflowProjectId || 'workflow-test',
@@ -284,7 +304,8 @@ describe('Tool Integration Workflows E2E', () => {
         return;
       }
 
-      const traceabilityResponse = await utils.callTool('create_traceability_matrix', {
+      const traceabilityResponse = await utils.callTool('ai_generate', {
+        action: 'create_traceability_matrix',
         projectId: workflowProjectId || 'workflow-test',
         prdContent: workflowPRDContent,
         features: [
@@ -333,7 +354,8 @@ describe('Tool Integration Workflows E2E', () => {
         return;
       }
 
-      const metricsResponse = await utils.callTool('get_milestone_metrics', {
+      const metricsResponse = await utils.callTool('manage_milestones', {
+        action: 'get_metrics',
         milestoneId: workflowMilestoneId,
         includeIssues: true
       });
@@ -356,7 +378,8 @@ describe('Tool Integration Workflows E2E', () => {
         return;
       }
 
-      const sprintMetricsResponse = await utils.callTool('get_sprint_metrics', {
+      const sprintMetricsResponse = await utils.callTool('manage_sprints', {
+        action: 'get_metrics',
         sprintId: workflowSprintId,
         includeIssues: true
       });
@@ -375,7 +398,8 @@ describe('Tool Integration Workflows E2E', () => {
         return;
       }
 
-      const upcomingResponse = await utils.callTool('get_upcoming_milestones', {
+      const upcomingResponse = await utils.callTool('manage_milestones', {
+        action: 'get_upcoming',
         daysAhead: 30,
         limit: 10,
         includeIssues: true
@@ -391,7 +415,8 @@ describe('Tool Integration Workflows E2E', () => {
         return;
       }
 
-      const overdueResponse = await utils.callTool('get_overdue_milestones', {
+      const overdueResponse = await utils.callTool('manage_milestones', {
+        action: 'get_overdue',
         limit: 5,
         includeIssues: true
       });
@@ -408,7 +433,8 @@ describe('Tool Integration Workflows E2E', () => {
         return;
       }
 
-      const nextTaskResponse = await utils.callTool('get_next_task', {
+      const nextTaskResponse = await utils.callTool('ai_generate', {
+        action: 'get_next_task',
         projectId: workflowProjectId || 'workflow-test',
         teamCapacity: 80,
         sprintCapacity: 40,
@@ -431,7 +457,8 @@ describe('Tool Integration Workflows E2E', () => {
         return;
       }
 
-      const complexityResponse = await utils.callTool('analyze_task_complexity', {
+      const complexityResponse = await utils.callTool('ai_generate', {
+        action: 'analyze_complexity',
         taskTitle: 'Implement real-time analytics engine',
         taskDescription: 'Build a scalable real-time analytics engine that can process large volumes of data and provide instant insights through WebSocket connections',
         projectContext: 'Enterprise dashboard application with high performance requirements',
@@ -452,7 +479,8 @@ describe('Tool Integration Workflows E2E', () => {
         return;
       }
 
-      const expandResponse = await utils.callTool('expand_task', {
+      const expandResponse = await utils.callTool('ai_generate', {
+        action: 'expand_task',
         taskTitle: 'Build comprehensive user management system',
         taskDescription: 'Create a complete user management system with authentication, authorization, profile management, and admin controls',
         currentComplexity: 8,
@@ -483,12 +511,16 @@ describe('Tool Integration Workflows E2E', () => {
 
       // Verify all created resources exist and are properly linked
       if (workflowProjectId) {
-        const project = await utils.callTool('get_project', { projectId: workflowProjectId });
+        const project = await utils.callTool('manage_project', {
+          action: 'get',
+          projectId: workflowProjectId
+        });
         expect(project.id).toBe(workflowProjectId);
       }
 
       if (workflowMilestoneId) {
-        const milestoneMetrics = await utils.callTool('get_milestone_metrics', {
+        const milestoneMetrics = await utils.callTool('manage_milestones', {
+          action: 'get_metrics',
           milestoneId: workflowMilestoneId,
           includeIssues: false
         });
@@ -496,7 +528,8 @@ describe('Tool Integration Workflows E2E', () => {
       }
 
       if (workflowSprintId) {
-        const sprintMetrics = await utils.callTool('get_sprint_metrics', {
+        const sprintMetrics = await utils.callTool('manage_sprints', {
+          action: 'get_metrics',
           sprintId: workflowSprintId,
           includeIssues: false
         });
@@ -515,19 +548,21 @@ describe('Tool Integration Workflows E2E', () => {
       // Test that tools work together seamlessly
       const tools = await utils.listTools();
       
-      // Verify all expected tool categories are present
-      const githubTools = tools.filter(t => 
-        t.name.includes('project') || t.name.includes('milestone') || 
-        t.name.includes('issue') || t.name.includes('sprint')
+      // Verify compound tool categories are present
+      const coreTools = tools.filter((t: any) => 
+        t.name.startsWith('manage_')
       );
       
-      const aiTools = tools.filter(t => 
-        t.name.includes('prd') || t.name.includes('task') || 
-        t.name.includes('feature') || t.name.includes('analyze')
+      const aiTools = tools.filter((t: any) => 
+        t.name.startsWith('ai_')
       );
 
-      expect(githubTools.length).toBeGreaterThan(15);
-      expect(aiTools.length).toBeGreaterThan(5);
+      // Compound tools: manage_project, manage_issues, manage_milestones,
+      // manage_sprints, manage_prs, manage_labels, manage_automation,
+      // manage_iterations, manage_events, manage_status_updates
+      expect(coreTools.length).toBeGreaterThanOrEqual(8);
+      // AI compound tools: ai_generate, ai_analyze, ai_plan
+      expect(aiTools.length).toBeGreaterThanOrEqual(3);
 
       console.log('✅ Tool interoperability demonstrated');
     });

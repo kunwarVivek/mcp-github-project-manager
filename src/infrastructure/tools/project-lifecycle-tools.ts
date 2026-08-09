@@ -10,21 +10,21 @@
  * draft issues to real issues in specified repositories.
  */
 
-import { ToolDefinition, ToolSchema } from "./ToolValidator";
+import type { ToolDefinition, ToolSchema } from "./ToolValidator";
 import { ANNOTATION_PATTERNS } from "./annotations/tool-annotations";
 import { createGitHubFactory } from "./tool-factory";
 import type { GitHubRepositoryFactory } from "../github/GitHubRepositoryFactory";
 import {
   CloseProjectInputSchema,
-  CloseProjectInput,
+  type CloseProjectInput,
   ReopenProjectInputSchema,
-  ReopenProjectInput,
+  type ReopenProjectInput,
   ConvertDraftIssueInputSchema,
-  ConvertDraftIssueInput,
+  type ConvertDraftIssueInput,
   ProjectLifecycleOutputSchema,
-  ProjectLifecycleOutput,
+  type ProjectLifecycleOutput,
   ConvertedIssueOutputSchema,
-  ConvertedIssueOutput,
+  type ConvertedIssueOutput,
 } from "./schemas/project-lifecycle-schemas";
 
 // ============================================================================

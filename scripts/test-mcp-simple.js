@@ -4,9 +4,9 @@
  * Simple MCP Test - Minimal test to verify MCP communication
  */
 
-import { spawn } from 'child_process';
-import { fileURLToPath } from 'url';
-import { dirname, join } from 'path';
+import { spawn } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -72,7 +72,7 @@ async function testMCPConnection() {
     }
   };
 
-  const message = JSON.stringify(initRequest) + '\n';
+  const message = `${JSON.stringify(initRequest)}\n`;
   console.log('📨 Sending:', message.trim());
   
   serverProcess.stdin.write(message);
@@ -89,7 +89,7 @@ async function testMCPConnection() {
     method: 'tools/list'
   };
 
-  const listMessage = JSON.stringify(listRequest) + '\n';
+  const listMessage = `${JSON.stringify(listRequest)}\n`;
   console.log('📨 Sending:', listMessage.trim());
   
   serverProcess.stdin.write(listMessage);

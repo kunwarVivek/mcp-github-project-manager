@@ -1,7 +1,6 @@
 import { injectable, inject } from "tsyringe";
-import { 
+import type { 
   AutomationRule, 
-  AutomationRuleRepository, 
   AutomationTrigger,
   AutomationAction,
   AutomationTriggerType,
@@ -78,94 +77,100 @@ function mapActions(actions: Array<{ type: string; parameters: Record<string, un
 function mapActionsForUpdate(actions?: Array<{ type: string; parameters: Record<string, unknown> }>): AutomationAction[] | undefined {
   return actions?.map(a => ({ id: '', type: a.type as AutomationActionType, parameters: a.parameters }));
 }
-import { 
+import type { 
   CustomField, 
   FieldId, 
   ProjectId, 
-  ProjectRepository 
 } from "../domain/types";
+// Decorated constructor params: `emitDecoratorMetadata` references these types
+// at runtime, so `isolatedModules` requires an explicit type-only import.
+import type { AutomationRuleRepository } from "../domain/automation-types";
+import type { ProjectRepository } from "../domain/types";
 import { ResourceNotFoundError } from "../domain/errors";
-import { Logger } from "../infrastructure/logger";
+import type { ILogger } from "../infrastructure/logger";
 import { ResourceType } from "../domain/resource-types";
+import { safeCall } from './utils/safeCall';
 
+/**
+ * Service for managing project automation rules.
+ *
+ * Handles:
+ * - Creating, updating, and deleting automation rules
+ * - Enabling and disabling rules
+ * - Managing custom fields for projects
+ * - Tool-facing adapters with string-typed input and DTO output
+ *
+ * Automation rules define triggers (e.g., issue created, label added) and
+ * actions (e.g., add to project, assign label) that execute automatically.
+ *
+ * Can be instantiated via dependency injection with tsyringe.
+ */
 @injectable()
 export class ProjectAutomationService {
   constructor(
     @inject("AutomationRuleRepository") private automationRepo: AutomationRuleRepository,
     @inject("ProjectRepository") private projectRepo: ProjectRepository,
-    @inject("Logger") private logger: Logger
+    @inject("ILogger") private logger: ILogger
   ) {}
 
   /**
    * Creates a new automation rule for a project
    */
   async createRule(data: CreateAutomationRule): Promise<AutomationRule> {
-    // Verify project exists
-    const project = await this.projectRepo.findById(data.projectId);
-    if (!project) {
-      throw new ResourceNotFoundError(ResourceType.PROJECT, data.projectId);
-    }
+    return safeCall(async () => {
+      // Verify project exists
+      const project = await this.projectRepo.findById(data.projectId);
+      if (!project) {
+        throw new ResourceNotFoundError(ResourceType.PROJECT, data.projectId);
+      }
 
-    try {
       return await this.automationRepo.create(data);
-    } catch (error) {
-      this.logger.error(`Failed to create automation rule for project ${data.projectId}`, error);
-      throw error;
-    }
+    });
   }
 
   /**
    * Updates an existing automation rule
    */
   async updateRule(id: string, data: Partial<AutomationRule>): Promise<AutomationRule> {
-    // Verify rule exists
-    const rule = await this.automationRepo.findById(id);
-    if (!rule) {
-      throw new ResourceNotFoundError(ResourceType.RELATIONSHIP, id);
-    }
+    return safeCall(async () => {
+      // Verify rule exists
+      const rule = await this.automationRepo.findById(id);
+      if (!rule) {
+        throw new ResourceNotFoundError(ResourceType.RELATIONSHIP, id);
+      }
 
-    try {
       return await this.automationRepo.update(id, data);
-    } catch (error) {
-      this.logger.error(`Failed to update automation rule ${id}`, error);
-      throw error;
-    }
+    });
   }
 
   /**
    * Deletes an automation rule
    */
   async deleteRule(id: string): Promise<void> {
-    // Verify rule exists
-    const rule = await this.automationRepo.findById(id);
-    if (!rule) {
-      throw new ResourceNotFoundError(ResourceType.RELATIONSHIP, id);
-    }
+    return safeCall(async () => {
+      // Verify rule exists
+      const rule = await this.automationRepo.findById(id);
+      if (!rule) {
+        throw new ResourceNotFoundError(ResourceType.RELATIONSHIP, id);
+      }
 
-    try {
       await this.automationRepo.delete(id);
-    } catch (error) {
-      this.logger.error(`Failed to delete automation rule ${id}`, error);
-      throw error;
-    }
+    });
   }
 
   /**
    * Gets all automation rules for a project
    */
   async getRulesByProject(projectId: ProjectId): Promise<AutomationRule[]> {
-    // Verify project exists
-    const project = await this.projectRepo.findById(projectId);
-    if (!project) {
-      throw new ResourceNotFoundError(ResourceType.PROJECT, projectId);
-    }
+    return safeCall(async () => {
+      // Verify project exists
+      const project = await this.projectRepo.findById(projectId);
+      if (!project) {
+        throw new ResourceNotFoundError(ResourceType.PROJECT, projectId);
+      }
 
-    try {
       return await this.automationRepo.findByProject(projectId);
-    } catch (error) {
-      this.logger.error(`Failed to get automation rules for project ${projectId}`, error);
-      throw error;
-    }
+    });
   }
 
   /**
@@ -208,70 +213,59 @@ export class ProjectAutomationService {
    * Creates a custom field for a project
    */
   async createField(projectId: ProjectId, field: Omit<CustomField, "id">): Promise<CustomField> {
-    // Verify project exists
-    const project = await this.projectRepo.findById(projectId);
-    if (!project) {
-      throw new ResourceNotFoundError(ResourceType.PROJECT, projectId);
-    }
+    return safeCall(async () => {
+      // Verify project exists
+      const project = await this.projectRepo.findById(projectId);
+      if (!project) {
+        throw new ResourceNotFoundError(ResourceType.PROJECT, projectId);
+      }
 
-    try {
       return await this.projectRepo.createField(projectId, field);
-    } catch (error) {
-      this.logger.error(`Failed to create field for project ${projectId}`, error);
-      throw error;
-    }
+    });
   }
 
   /**
    * Updates a custom field
    */
   async updateField(projectId: ProjectId, fieldId: FieldId, data: Partial<CustomField>): Promise<CustomField> {
-    // Verify project exists
-    const project = await this.projectRepo.findById(projectId);
-    if (!project) {
-      throw new ResourceNotFoundError(ResourceType.PROJECT, projectId);
-    }
+    return safeCall(async () => {
+      // Verify project exists
+      const project = await this.projectRepo.findById(projectId);
+      if (!project) {
+        throw new ResourceNotFoundError(ResourceType.PROJECT, projectId);
+      }
 
-    // Check if field exists in the project
-    const fieldExists = project.fields.some((f: CustomField) => f.id === fieldId);
-    if (!fieldExists) {
-      throw new ResourceNotFoundError(ResourceType.FIELD, fieldId);
-    }
+      // Check if field exists in the project
+      const fieldExists = project.fields.some((f: CustomField) => f.id === fieldId);
+      if (!fieldExists) {
+        throw new ResourceNotFoundError(ResourceType.FIELD, fieldId);
+      }
 
-    // Use the repository method to update the field
-    // This assumes an updateField method has been added to ProjectRepository
-    try {
+      // Use the repository method to update the field
       return await this.projectRepo.updateField(projectId, fieldId, data);
-    } catch (error) {
-      this.logger.error(`Failed to update field ${fieldId} for project ${projectId}`, error);
-      throw error;
-    }
+    });
   }
 
   /**
    * Deletes a custom field
    */
   async deleteField(projectId: ProjectId, fieldId: FieldId): Promise<void> {
-    // Verify project exists
-    const project = await this.projectRepo.findById(projectId);
-    if (!project) {
-      throw new ResourceNotFoundError(ResourceType.PROJECT, projectId);
-    }
+    return safeCall(async () => {
+      // Verify project exists
+      const project = await this.projectRepo.findById(projectId);
+      if (!project) {
+        throw new ResourceNotFoundError(ResourceType.PROJECT, projectId);
+      }
 
-    // Check if field exists in the project
-    const fieldExists: boolean = project.fields.some((f: CustomField) => f.id === fieldId);
-    if (!fieldExists) {
-      throw new ResourceNotFoundError(ResourceType.FIELD, fieldId);
-    }
+      // Check if field exists in the project
+      const fieldExists: boolean = project.fields.some((f: CustomField) => f.id === fieldId);
+      if (!fieldExists) {
+        throw new ResourceNotFoundError(ResourceType.FIELD, fieldId);
+      }
 
-    // Use the repository method to delete the field
-    // This assumes a deleteField method has been added to ProjectRepository
-    try {
+      // Use the repository method to delete the field
       await this.projectRepo.deleteField(projectId, fieldId);
-    } catch (error) {
-      this.logger.error(`Failed to delete field ${fieldId} from project ${projectId}`, error);
-      throw error;
-    }
+    });
   }
 
   // ========================================================================

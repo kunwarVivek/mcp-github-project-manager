@@ -1,11 +1,9 @@
 import {
-  MCPContent,
   MCPContentType,
-  MCPResponse,
   MCPErrorSchema,
   MCPErrorCode,
-  MCPSuccessResponse,
-  MCPErrorResponse
+  type MCPSuccessResponse,
+  type MCPErrorResponse
 } from "../../domain/mcp-types";
 import { z } from "zod";
 
@@ -32,7 +30,7 @@ export class MCPResponseFormatter {
     metadata?: Record<string, unknown>
   ): MCPSuccessResponse {
     // Convert the formatted content to string
-    const formattedContent = this.formatContent(data, contentType);
+    const formattedContent = MCPResponseFormatter.formatContent(data, contentType);
 
     // Create a success response that matches the MCPSuccessResponse type
     return {
@@ -42,7 +40,7 @@ export class MCPResponseFormatter {
       output: {
         content: formattedContent,
         format: {
-          type: this.getTypeFromContentType(contentType)
+          type: MCPResponseFormatter.getTypeFromContentType(contentType)
         },
         context: metadata
       }
@@ -58,7 +56,7 @@ export class MCPResponseFormatter {
     // Combine all content into a single string with formatting
     let combinedContent = "";
     contents.forEach(({ data, contentType }) => {
-      combinedContent += this.formatContent(data, contentType) + "\n\n";
+      combinedContent += `${MCPResponseFormatter.formatContent(data, contentType)}\n\n`;
     });
 
     // Create a success response with combined content
@@ -86,8 +84,8 @@ export class MCPResponseFormatter {
     let combinedContent = "";
 
     contents.forEach(({ type, data }) => {
-      const contentType = this.getContentTypeFromType(type);
-      combinedContent += this.formatContent(data, contentType) + "\n\n";
+      const contentType = MCPResponseFormatter.getContentTypeFromType(type);
+      combinedContent += `${MCPResponseFormatter.formatContent(data, contentType)}\n\n`;
     });
 
     // Create a success response with the combined content
@@ -128,12 +126,12 @@ export class MCPResponseFormatter {
     let markdown = options?.title ? `# ${options.title}\n\n` : '';
 
     // Build table header
-    markdown += '| ' + columns.map(col => col.header).join(' | ') + ' |\n';
-    markdown += '| ' + columns.map(() => '---').join(' | ') + ' |\n';
+    markdown += `| ${columns.map(col => col.header).join(' | ')} |\n`;
+    markdown += `| ${columns.map(() => '---').join(' | ')} |\n`;
 
     // Build table rows
     for (const row of data) {
-      markdown += '| ' + columns.map(col => String(row[col.key] ?? '')).join(' | ') + ' |\n';
+      markdown += `| ${columns.map(col => String(row[col.key] ?? '')).join(' | ')} |\n`;
     }
 
     return markdown;
@@ -213,7 +211,7 @@ export class MCPResponseFormatter {
     requestId?: string,
     metadata?: Record<string, unknown>
   ): MCPSuccessResponse {
-    const formattedContent = this.formatContent(data, contentType || MCPContentType.JSON);
+    const formattedContent = MCPResponseFormatter.formatContent(data, contentType || MCPContentType.JSON);
 
     return {
       version: "1.0",
@@ -222,7 +220,7 @@ export class MCPResponseFormatter {
       output: {
         content: formattedContent,
         format: {
-          type: this.getTypeFromContentType(contentType || MCPContentType.JSON)
+          type: MCPResponseFormatter.getTypeFromContentType(contentType || MCPContentType.JSON)
         },
         context: metadata
       }
@@ -242,7 +240,7 @@ export class MCPResponseFormatter {
       totalItems?: number;
     }
   ): MCPSuccessResponse {
-    const formattedContent = this.formatContent(data, options?.contentType || MCPContentType.JSON);
+    const formattedContent = MCPResponseFormatter.formatContent(data, options?.contentType || MCPContentType.JSON);
 
     return {
       version: "1.0",
@@ -251,7 +249,7 @@ export class MCPResponseFormatter {
       output: {
         content: formattedContent,
         format: {
-          type: this.getTypeFromContentType(options?.contentType || MCPContentType.JSON)
+          type: MCPResponseFormatter.getTypeFromContentType(options?.contentType || MCPContentType.JSON)
         },
         context: {
           pagination: {
@@ -365,22 +363,6 @@ export class MCPResponseFormatter {
         return MCPContentType.HTML;
       default:
         return MCPContentType.TEXT;
-    }
-  }
-
-  private static getStatusCodeForError(code: MCPErrorCode): number {
-    switch (code) {
-      case MCPErrorCode.VALIDATION_ERROR:
-        return 400; // Bad Request
-      case MCPErrorCode.RESOURCE_NOT_FOUND:
-        return 404; // Not Found
-      case MCPErrorCode.UNAUTHORIZED:
-        return 401; // Unauthorized
-      case MCPErrorCode.RATE_LIMITED:
-        return 429; // Too Many Requests
-      case MCPErrorCode.INTERNAL_ERROR:
-      default:
-        return 500; // Internal Server Error
     }
   }
 }

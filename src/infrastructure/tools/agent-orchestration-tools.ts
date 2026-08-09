@@ -17,13 +17,20 @@ import { mapErrorToMCPError } from '../../services/utils/ErrorMapper';
 
 import { AgentStore } from '../agent/AgentStore';
 import { WorkProductStore } from '../agent/WorkProductStore';
+import { ProjectFieldSetup } from '../agent/ProjectFieldSetup';
 import { TaskCheckoutService } from '../../services/agent/TaskCheckoutService';
 import { AgentContextService } from '../../services/agent/AgentContextService';
 import { WorkProductService } from '../../services/agent/WorkProductService';
 import { AgentBudgetService } from '../../services/agent/AgentBudgetService';
+import { AgentMetricsService } from '../../services/agent/AgentMetricsService';
+import { DomainEventBus } from '../../domain/events/DomainEventBus';
+import { AgentRegisteredEvent, AgentDeregisteredEvent } from '../../domain/events/AgentEvents';
 
-import type { Agent, AgentActivityEntry, BudgetStatus, WorkProduct } from '../../domain/agent-orchestration-types';
-import { AgentSchema, TaskCheckoutResultSchema, AgentTaskContextSchema, WorkProductSchema, BudgetStatusSchema, AgentActivityEntrySchema } from '../../domain/agent-orchestration-types';
+import type { Agent, AgentActivityEntry, AgentMetrics, BudgetStatus, WorkProduct } from '../../domain/agent-orchestration-types';
+import { AgentSchema, TaskCheckoutResultSchema, AgentTaskContextSchema, WorkProductSchema, BudgetStatusSchema, AgentActivityEntrySchema, AgentMetricsSchema,
+  MAX_AGENT_HIERARCHY_DEPTH,
+  MAX_AGENT_CHILDREN,
+} from '../../domain/agent-orchestration-types';
 
 import {
   registerAgentSchema,
@@ -39,6 +46,13 @@ import {
   getBudgetStatusSchema,
   setAgentBudgetSchema,
   checkWorkStatusSchema,
+  reclaimStaleTasksSchema,
+  recordUsageSchema,
+  submitForReviewSchema,
+  approveTaskSchema,
+  rejectTaskSchema,
+  getAgentMetricsSchema,
+  setupAgentFieldsSchema,
 } from './schemas/agent-orchestration-schemas';
 
 import type {
@@ -55,6 +69,13 @@ import type {
   GetBudgetStatusArgs,
   SetAgentBudgetArgs,
   CheckWorkStatusArgs,
+  ReclaimStaleTasksArgs,
+  RecordUsageArgs,
+  SubmitForReviewArgs,
+  ApproveTaskArgs,
+  RejectTaskArgs,
+  GetAgentMetricsArgs,
+  SetupAgentFieldsArgs,
 } from './schemas/agent-orchestration-schemas';
 
 import { SuccessOutputSchema } from './schemas/project-schemas';
@@ -388,7 +409,7 @@ export const setAgentBudgetTool: ToolDefinition<
   title: 'Set Agent Budget',
   description:
     'Set or update the token budget for an agent. ' +
-    'Configure total tokens, warning threshold, hard stop behavior, and reset period. ' +
+    'Configure total tokens, warning fraction (0-1), hard stop behavior, and reset period. ' +
     'Use this to control agent spending and prevent runaway costs.',
   schema: setAgentBudgetSchema as unknown as ToolSchema<SetAgentBudgetArgs>,
   outputSchema: BudgetStatusSchema,
@@ -400,7 +421,7 @@ export const setAgentBudgetTool: ToolDefinition<
       args: {
         agentId: 'agent-abc123',
         totalTokens: 500000,
-        warningThreshold: 0.8,
+        warningFraction: 0.8,
         hardStop: true,
         resetPeriod: 'daily',
       },
@@ -452,8 +473,204 @@ export const checkWorkStatusTool: ToolDefinition<
 };
 
 // ============================================================================
+// Tool Definitions — Reclaim, Usage, Review, Metrics
+// ============================================================================
+
+const ReclaimStaleOutputSchema = z.object({
+  reclaimed: z.number(),
+  details: z.array(z.object({
+    agentId: z.string(),
+    taskId: z.string(),
+  })),
+});
+
+export const reclaimStaleTasksTool: ToolDefinition<
+  ReclaimStaleTasksArgs,
+  z.infer<typeof ReclaimStaleOutputSchema>
+> = {
+  name: 'reclaim_stale_tasks',
+  title: 'Reclaim Stale Tasks',
+  description:
+    'Reclaim tasks from agents whose heartbeat has gone stale. ' +
+    'Tasks are returned to the unclaimed pool and the agents are marked offline. ' +
+    'Use this to recover work from crashed or hung agents.',
+  schema: reclaimStaleTasksSchema as unknown as ToolSchema<ReclaimStaleTasksArgs>,
+  outputSchema: ReclaimStaleOutputSchema,
+  annotations: ANNOTATION_PATTERNS.updateNonIdempotent,
+  examples: [
+    {
+      name: 'Reclaim tasks stale for 30+ minutes',
+      description: 'Recover tasks from stale agents',
+      args: { timeoutMinutes: 30 },
+    },
+  ],
+};
+
+export const recordUsageTool: ToolDefinition<
+  RecordUsageArgs,
+  z.infer<typeof BudgetStatusSchema>
+> = {
+  name: 'record_usage',
+  title: 'Record Token Usage',
+  description:
+    'Record token usage for an agent\'s budget. ' +
+    'Agents should call this periodically to report token spend so budgets ' +
+    'are enforced and hard stops trigger before runaway costs.',
+  schema: recordUsageSchema as unknown as ToolSchema<RecordUsageArgs>,
+  outputSchema: BudgetStatusSchema,
+  annotations: ANNOTATION_PATTERNS.updateIdempotent,
+  examples: [
+    {
+      name: 'Report 12,000 tokens used',
+      description: 'Record token usage against an agent budget',
+      args: { agentId: 'agent-abc123', tokensUsed: 12000 },
+    },
+  ],
+};
+
+export const submitForReviewTool: ToolDefinition<
+  SubmitForReviewArgs,
+  z.infer<typeof SuccessOutputSchema>
+> = {
+  name: 'submit_for_review',
+  title: 'Submit Task for Review',
+  description:
+    'Submit a checked-out task for review. ' +
+    'The issue moves to the review queue (agent_status = review) and the agent ' +
+    'enters needs_review status. Reviewer agents can then claim it from the queue.',
+  schema: submitForReviewSchema as unknown as ToolSchema<SubmitForReviewArgs>,
+  outputSchema: SuccessOutputSchema,
+  annotations: ANNOTATION_PATTERNS.updateNonIdempotent,
+  examples: [
+    {
+      name: 'Submit work for review',
+      description: 'Move a task into the review queue',
+      args: { agentId: 'agent-abc123', taskId: 'issue-42', summary: 'Implemented login form' },
+    },
+  ],
+};
+
+export const approveTaskTool: ToolDefinition<
+  ApproveTaskArgs,
+  z.infer<typeof SuccessOutputSchema>
+> = {
+  name: 'approve_task',
+  title: 'Approve Task',
+  description:
+    'Approve a task from the review queue. ' +
+    'The issue is marked completed and closed. Use this after reviewing an agent\'s work product.',
+  schema: approveTaskSchema as unknown as ToolSchema<ApproveTaskArgs>,
+  outputSchema: SuccessOutputSchema,
+  annotations: ANNOTATION_PATTERNS.updateIdempotent,
+  examples: [
+    {
+      name: 'Approve reviewed work',
+      description: 'Complete a task after review',
+      args: { reviewerId: 'agent-reviewer-1', taskId: 'issue-42', summary: 'LGTM' },
+    },
+  ],
+};
+
+export const rejectTaskTool: ToolDefinition<
+  RejectTaskArgs,
+  z.infer<typeof SuccessOutputSchema>
+> = {
+  name: 'reject_task',
+  title: 'Reject Task',
+  description:
+    'Reject a task from the review queue. ' +
+    'The issue returns to the unclaimed pool with the reviewer\'s feedback recorded ' +
+    'as a comment, so another agent can pick it up with the feedback in context.',
+  schema: rejectTaskSchema as unknown as ToolSchema<RejectTaskArgs>,
+  outputSchema: SuccessOutputSchema,
+  annotations: ANNOTATION_PATTERNS.updateNonIdempotent,
+  examples: [
+    {
+      name: 'Reject with feedback',
+      description: 'Return a task to the pool with feedback',
+      args: { reviewerId: 'agent-reviewer-1', taskId: 'issue-42', feedback: 'Missing test coverage' },
+    },
+  ],
+};
+
+const AgentMetricsOutputSchema = AgentMetricsSchema;
+
+const SetupAgentFieldsOutputSchema = z.object({
+  created: z.array(z.string()),
+  existing: z.array(z.string()),
+});
+
+export const setupAgentFieldsTool: ToolDefinition<
+  SetupAgentFieldsArgs,
+  z.infer<typeof SetupAgentFieldsOutputSchema>
+> = {
+  name: 'setup_agent_fields',
+  title: 'Set Up Agent Fields',
+  description:
+    'Idempotently create the GitHub Project custom fields required for agent ' +
+    'orchestration (agent_claimed_by, agent_claimed_at, agent_status, ' +
+    'agent_work_branch, agent_pr_number). Existing fields are left untouched. ' +
+    'Call this once per project before the first checkout_task.',
+  schema: setupAgentFieldsSchema as unknown as ToolSchema<SetupAgentFieldsArgs>,
+  outputSchema: SetupAgentFieldsOutputSchema,
+  annotations: ANNOTATION_PATTERNS.updateIdempotent,
+  examples: [
+    {
+      name: 'Provision agent fields',
+      description: 'Ensure agent orchestration fields exist on a project',
+      args: { projectId: 'PVT_kwDOLhQ7gc4AOEbH' },
+    },
+  ],
+};
+
+export const getAgentMetricsTool: ToolDefinition<
+  GetAgentMetricsArgs,
+  z.infer<typeof AgentMetricsOutputSchema>
+> = {
+  name: 'get_agent_metrics',
+  title: 'Get Agent Metrics',
+  description:
+    'Get orchestration metrics across all agents: throughput, cycle time, ' +
+    'budget burn, and staleness. Returns aggregate totals plus a per-agent breakdown. ' +
+    'Use this to monitor the health and productivity of the agent swarm.',
+  schema: getAgentMetricsSchema as unknown as ToolSchema<GetAgentMetricsArgs>,
+  outputSchema: AgentMetricsOutputSchema,
+  annotations: ANNOTATION_PATTERNS.readOnly,
+  examples: [
+    {
+      name: 'Get swarm metrics',
+      description: 'Show aggregate and per-agent metrics',
+      args: { staleAfterMinutes: 30 },
+    },
+  ],
+};
+
+// ============================================================================
 // Executor Functions
 // ============================================================================
+
+/**
+ * Depth of an agent in the hierarchy (a root agent is depth 0).
+ *
+ * Walks toward the root, bounded by MAX_AGENT_HIERARCHY_DEPTH and a visited set
+ * so a cyclic or malformed registry terminates instead of looping.
+ */
+async function resolveAgentDepth(store: AgentStore, agent: Agent): Promise<number> {
+  const seen = new Set<string>([agent.id]);
+  let depth = 0;
+  let current = agent;
+
+  while (current.parentAgentId && depth < MAX_AGENT_HIERARCHY_DEPTH) {
+    if (seen.has(current.parentAgentId)) break;
+    const parent = await store.getAgent(current.parentAgentId);
+    if (!parent) break;
+    seen.add(parent.id);
+    current = parent;
+    depth++;
+  }
+
+  return depth;
+}
 
 /**
  * Execute the register_agent tool.
@@ -469,12 +686,30 @@ export async function executeRegisterAgent(
     const factory = createGitHubFactory();
     const store = new AgentStore(factory);
 
-    // If registering as a child agent, verify the parent exists
+    // If registering as a child agent, verify the parent exists and that the
+    // new agent stays inside the hierarchy's depth and fan-out limits. Without
+    // these caps, subagents can be nested and spawned without bound.
     let parentAgent: Agent | undefined;
     if (args.parentAgentId) {
       parentAgent = await store.getAgent(args.parentAgentId);
       if (!parentAgent) {
         throw new Error(`Parent agent not found: ${args.parentAgentId}`);
+      }
+
+      const parentDepth = await resolveAgentDepth(store, parentAgent);
+      if (parentDepth + 1 >= MAX_AGENT_HIERARCHY_DEPTH) {
+        throw new Error(
+          `Cannot nest deeper than ${MAX_AGENT_HIERARCHY_DEPTH} levels: ` +
+            `"${parentAgent.name}" is already at depth ${parentDepth}`,
+        );
+      }
+
+      const siblings = await store.getChildren(parentAgent.id);
+      if (siblings.length >= MAX_AGENT_CHILDREN) {
+        throw new Error(
+          `Agent "${parentAgent.name}" already has the maximum ` +
+            `${MAX_AGENT_CHILDREN} subagents`,
+        );
       }
     }
 
@@ -491,8 +726,10 @@ export async function executeRegisterAgent(
       budget: args.budgetTokens
         ? {
             totalTokens: args.budgetTokens,
+            meteredTokens: 0,
+            reportedTokens: 0,
             usedTokens: 0,
-            warningThreshold: 0.8,
+            warningFraction: 0.8,
             hardStop: true,
           }
         : undefined,
@@ -505,6 +742,16 @@ export async function executeRegisterAgent(
     }
 
     await store.upsertAgent(agent);
+
+    const eventBus = DomainEventBus.getInstance();
+    eventBus.publish(AgentRegisteredEvent.create({
+      agentId: agent.id,
+      agentName: agent.name,
+      role: agent.role,
+      runtime: agent.runtime,
+      capabilities: agent.capabilities,
+      parentAgentId: agent.parentAgentId,
+    }));
 
     return {
       content: [{ type: 'text', text: `Registered agent "${agent.name}" (${agent.id})` }],
@@ -563,7 +810,17 @@ export async function executeDeregisterAgent(
     const factory = createGitHubFactory();
     const store = new AgentStore(factory);
 
+    const agent = await store.getAgent(args.agentId);
     const removedCount = await store.removeAgentCascade(args.agentId);
+
+    if (removedCount > 0 && agent) {
+      const eventBus = DomainEventBus.getInstance();
+      eventBus.publish(AgentDeregisteredEvent.create({
+        agentId: args.agentId,
+        agentName: agent.name,
+        reason: 'deregistered',
+      }));
+    }
 
     const result = {
       success: removedCount > 0,
@@ -602,6 +859,8 @@ export async function executeCheckoutTask(
       projectId: args.projectId,
       strategy: args.strategy,
       labels: args.labels,
+      skipBlocked: args.skipBlocked,
+      reviewQueue: args.reviewQueue,
     });
 
     const text = result.success
@@ -800,6 +1059,7 @@ export async function executeGetAgentActivity(
   try {
     const factory = createGitHubFactory();
     const store = new AgentStore(factory);
+    const budgetService = new AgentBudgetService(store);
 
     let agents = await store.listAgents();
 
@@ -808,10 +1068,22 @@ export async function executeGetAgentActivity(
     }
 
     const now = new Date();
-    const entries: AgentActivityEntry[] = agents.map((agent) => {
+    const entries: AgentActivityEntry[] = await Promise.all(agents.map(async (agent) => {
       const lastHb = agent.lastHeartbeat ? new Date(agent.lastHeartbeat) : undefined;
       const ageMs = lastHb ? now.getTime() - lastHb.getTime() : undefined;
       const isStale = ageMs != null && ageMs > 30 * 60 * 1000;
+
+      let budgetStatus: AgentActivityEntry['budgetStatus'];
+      try {
+        const status = await budgetService.getBudgetStatus(agent.id);
+        budgetStatus = {
+          usagePercent: status.usagePercent,
+          isWarning: status.isWarning,
+          isExhausted: status.isExhausted,
+        };
+      } catch {
+        // Budget status is optional; leave undefined on failure
+      }
 
       return {
         agent: {
@@ -825,26 +1097,26 @@ export async function executeGetAgentActivity(
           ? {
               issueId: agent.currentTaskId,
               title: agent.currentTaskTitle ?? 'Unknown',
+              // Approximation: no dedicated claimedAt on Agent; lastHeartbeat
+              // is updated on claim, so it's the closest available timestamp.
               claimedAt: agent.lastHeartbeat ?? agent.registeredAt,
             }
           : undefined,
         lastHeartbeat: agent.lastHeartbeat,
         heartbeatAge: ageMs != null ? `${Math.round(ageMs / 60000)}m` : undefined,
         isStale,
-        budgetStatus: agent.budget
-          ? {
-              usagePercent: agent.budget.totalTokens > 0
-                ? (agent.budget.usedTokens / agent.budget.totalTokens) * 100
-                : 0,
-              isWarning: agent.budget.totalTokens > 0
-                ? agent.budget.usedTokens / agent.budget.totalTokens >= agent.budget.warningThreshold
-                : false,
-              isExhausted: agent.budget.hardStop && agent.budget.usedTokens >= agent.budget.totalTokens,
-            }
+        budgetStatus,
+        completedToday: 0, // Not populated: requires scanning all work products per agent per day
+        heartbeatHistory: Array.isArray(agent.metadata?.heartbeatHistory)
+          ? (agent.metadata.heartbeatHistory as Array<{
+              timestamp: string;
+              status: string;
+              progress?: number;
+              progressSummary?: string;
+            }>).slice(0, 10)
           : undefined,
-        completedToday: 0, // Requires additional query; populated by service layer
       };
-    });
+    }));
 
     const result = {
       agents: entries,
@@ -910,8 +1182,9 @@ export async function executeSetAgentBudget(
     await service.setBudget(
       args.agentId,
       args.totalTokens,
-      args.warningThreshold,
+      args.warningFraction,
       args.resetPeriod,
+      args.hardStop,
     );
 
     const status = await service.getBudgetStatus(args.agentId);
@@ -1051,6 +1324,204 @@ export async function executeCheckWorkStatus(
         reviewComments,
         actionRequired,
       },
+    };
+  } catch (error) {
+    throw mapErrorToMCPError(error);
+  }
+}
+
+/**
+ * Execute the reclaim_stale_tasks tool.
+ * Reclaims tasks from agents with stale heartbeats.
+ */
+export async function executeReclaimStaleTasks(
+  args: ReclaimStaleTasksArgs,
+): Promise<{
+  content: Array<{ type: 'text'; text: string }>;
+  structuredContent: { reclaimed: number; details: Array<{ agentId: string; taskId: string }> };
+}> {
+  try {
+    const factory = createGitHubFactory();
+    const store = new AgentStore(factory);
+    const contextService = new AgentContextService(factory);
+    const service = new TaskCheckoutService(factory, store, contextService);
+
+    const result = await service.reclaimStaleTasks(args.timeoutMinutes);
+
+    return {
+      content: [{ type: 'text', text: `Reclaimed ${result.reclaimed} stale task(s)` }],
+      structuredContent: result,
+    };
+  } catch (error) {
+    throw mapErrorToMCPError(error);
+  }
+}
+
+/**
+ * Execute the record_usage tool.
+ * Records token usage against an agent's budget.
+ */
+export async function executeRecordUsage(
+  args: RecordUsageArgs,
+): Promise<{
+  content: Array<{ type: 'text'; text: string }>;
+  structuredContent: BudgetStatus;
+}> {
+  try {
+    const factory = createGitHubFactory();
+    const store = new AgentStore(factory);
+    const service = new AgentBudgetService(store);
+
+    const status = await service.recordReportedUsage(args.agentId, args.tokensUsed);
+
+    return {
+      content: [{
+        type: 'text',
+        text: `Recorded ${args.tokensUsed} tokens for ${status.agentName} — ${status.usagePercent.toFixed(1)}% used${status.isExhausted ? ' (BUDGET EXHAUSTED)' : ''}`,
+      }],
+      structuredContent: status,
+    };
+  } catch (error) {
+    throw mapErrorToMCPError(error);
+  }
+}
+
+/**
+ * Execute the submit_for_review tool.
+ * Moves a task into the review queue.
+ */
+export async function executeSubmitForReview(
+  args: SubmitForReviewArgs,
+): Promise<{
+  content: Array<{ type: 'text'; text: string }>;
+  structuredContent: { success: boolean; message?: string };
+}> {
+  try {
+    const factory = createGitHubFactory();
+    const store = new AgentStore(factory);
+    const contextService = new AgentContextService(factory);
+    const service = new TaskCheckoutService(factory, store, contextService);
+
+    const result = await service.submitForReview(args.agentId, args.taskId, args.summary);
+
+    return {
+      content: [{ type: 'text', text: result.message }],
+      structuredContent: result,
+    };
+  } catch (error) {
+    throw mapErrorToMCPError(error);
+  }
+}
+
+/**
+ * Execute the approve_task tool.
+ * Approves a reviewed task and completes it.
+ */
+export async function executeApproveTask(
+  args: ApproveTaskArgs,
+): Promise<{
+  content: Array<{ type: 'text'; text: string }>;
+  structuredContent: { success: boolean; message?: string };
+}> {
+  try {
+    const factory = createGitHubFactory();
+    const store = new AgentStore(factory);
+    const contextService = new AgentContextService(factory);
+    const service = new TaskCheckoutService(factory, store, contextService);
+
+    const result = await service.approveTask(args.reviewerId, args.taskId, args.summary);
+
+    return {
+      content: [{ type: 'text', text: result.message }],
+      structuredContent: result,
+    };
+  } catch (error) {
+    throw mapErrorToMCPError(error);
+  }
+}
+
+/**
+ * Execute the reject_task tool.
+ * Rejects a reviewed task and returns it to the pool.
+ */
+export async function executeRejectTask(
+  args: RejectTaskArgs,
+): Promise<{
+  content: Array<{ type: 'text'; text: string }>;
+  structuredContent: { success: boolean; message?: string };
+}> {
+  try {
+    const factory = createGitHubFactory();
+    const store = new AgentStore(factory);
+    const contextService = new AgentContextService(factory);
+    const service = new TaskCheckoutService(factory, store, contextService);
+
+    const result = await service.rejectTask(args.reviewerId, args.taskId, args.feedback);
+
+    return {
+      content: [{ type: 'text', text: result.message }],
+      structuredContent: result,
+    };
+  } catch (error) {
+    throw mapErrorToMCPError(error);
+  }
+}
+
+/**
+ * Execute the setup_agent_fields tool.
+ * Idempotently provisions the agent orchestration custom fields on a project.
+ */
+export async function executeSetupAgentFields(
+  args: SetupAgentFieldsArgs,
+): Promise<{
+  content: Array<{ type: 'text'; text: string }>;
+  structuredContent: { created: string[]; existing: string[] };
+}> {
+  try {
+    const factory = createGitHubFactory();
+    const setup = new ProjectFieldSetup(factory);
+
+    const result = await setup.ensureFields(args.projectId);
+
+    const text = result.created.length > 0
+      ? `Agent fields created: ${result.created.join(', ')}`
+      : `Agent fields already present: ${result.existing.join(', ')}`;
+
+    return {
+      content: [{ type: 'text', text }],
+      structuredContent: result,
+    };
+  } catch (error) {
+    throw mapErrorToMCPError(error);
+  }
+}
+
+/**
+ * Execute the get_agent_metrics tool.
+ * Returns aggregate and per-agent orchestration metrics.
+ */
+export async function executeGetAgentMetrics(
+  args: GetAgentMetricsArgs,
+): Promise<{
+  content: Array<{ type: 'text'; text: string }>;
+  structuredContent: AgentMetrics;
+}> {
+  try {
+    const factory = createGitHubFactory();
+    const store = new AgentStore(factory);
+    const wpStore = new WorkProductStore(factory);
+    const service = new AgentMetricsService(factory, store, wpStore);
+
+    const metrics = await service.getMetrics(args.staleAfterMinutes);
+
+    const text =
+      `Agents: ${metrics.totalAgents} (${metrics.activeAgents} active, ${metrics.staleAgents} stale, ${metrics.budgetExhaustedAgents} budget-exhausted)\n` +
+      `Tasks: ${metrics.totalTasksInProgress} in progress, ${metrics.totalTasksCompleted} completed\n` +
+      `Budget: ${metrics.totalTokensUsed}/${metrics.totalTokensBudget} tokens (${metrics.overallBudgetUsagePercent}%)`;
+
+    return {
+      content: [{ type: 'text', text }],
+      structuredContent: metrics,
     };
   } catch (error) {
     throw mapErrorToMCPError(error);

@@ -1,11 +1,26 @@
-import { GitHubRepositoryFactory } from "../infrastructure/github/GitHubRepositoryFactory";
+import type { GitHubRepositoryFactory } from "../infrastructure/github/GitHubRepositoryFactory";
 import { ResourceNotFoundError, ResourceType } from "../domain/resource-types";
-import { CustomField, ProjectItem } from "../domain/types";
-import { mapErrorToMCPError } from './utils/ErrorMapper';
-import { FieldValueService } from "./FieldValueService";
-import { ProjectTemplateService } from "./ProjectTemplateService";
-import { ProjectLinkingService } from "./ProjectLinkingService";
+import type { CustomField, ProjectItem } from "../domain/types";
+import { safeCall } from './utils/safeCall';
+import type { FieldValueService } from "./FieldValueService";
+import type { ProjectTemplateService } from "./ProjectTemplateService";
+import type { ProjectLinkingService } from "./ProjectLinkingService";
 
+/**
+ * Service for managing GitHub Projects v2 iterations (sprints/cycles).
+ *
+ * Handles:
+ * - Getting iteration configuration (duration, start day, iterations list)
+ * - Finding the current active iteration
+ * - Getting items assigned to a specific iteration
+ * - Finding which iteration a date falls into
+ * - Assigning items to iterations
+ *
+ * Iterations are a built-in field type in GitHub Projects v2 that allow
+ * time-boxed work management similar to sprints.
+ *
+ * Can be instantiated directly with a GitHubRepositoryFactory or via dependency injection.
+ */
 export class IterationService {
   private readonly factory: GitHubRepositoryFactory;
   private readonly fieldValueService: FieldValueService;
@@ -34,7 +49,7 @@ export class IterationService {
     startDay: number;
     iterations: Array<{ id: string; title: string; startDate: string; duration: number }>;
   }> {
-    try {
+    return safeCall(async () => {
       const fields = await this.templateService.listProjectFields({ projectId: data.projectId });
       const iterationField = fields.find((f: CustomField) =>
         f.type === 'iteration' && (!data.fieldName || f.name === data.fieldName)
@@ -60,16 +75,14 @@ export class IterationService {
           duration: iter.duration
         }))
       };
-    } catch (error) {
-      throw mapErrorToMCPError(error);
-    }
+    });
   }
 
   async getCurrentIteration(data: {
     projectId: string;
     fieldName?: string;
   }): Promise<{ id: string; title: string; startDate: string; endDate: string; duration: number } | null> {
-    try {
+    return safeCall(async () => {
       const config = await this.getIterationConfiguration(data);
       const now = new Date();
 
@@ -90,9 +103,7 @@ export class IterationService {
       }
 
       return null;
-    } catch (error) {
-      throw mapErrorToMCPError(error);
-    }
+    });
   }
 
   async getIterationItems(data: {
@@ -100,7 +111,7 @@ export class IterationService {
     iterationId: string;
     limit?: number;
   }): Promise<{ items: Array<{ id: string; title: string; type: string; status?: string }> }> {
-    try {
+    return safeCall(async () => {
       const items = await this.linkingService.listProjectItems({
         projectId: data.projectId,
         limit: data.limit || 50
@@ -119,9 +130,7 @@ export class IterationService {
           status: undefined
         }))
       };
-    } catch (error) {
-      throw mapErrorToMCPError(error);
-    }
+    });
   }
 
   async getIterationByDate(data: {
@@ -129,7 +138,7 @@ export class IterationService {
     date: string;
     fieldName?: string;
   }): Promise<{ id: string; title: string; startDate: string; endDate: string; duration: number } | null> {
-    try {
+    return safeCall(async () => {
       const config = await this.getIterationConfiguration(data);
       const targetDate = new Date(data.date);
 
@@ -150,9 +159,7 @@ export class IterationService {
       }
 
       return null;
-    } catch (error) {
-      throw mapErrorToMCPError(error);
-    }
+    });
   }
 
   async assignItemsToIteration(data: {
@@ -161,7 +168,7 @@ export class IterationService {
     iterationId: string;
     fieldName?: string;
   }): Promise<{ success: boolean; assignedCount: number }> {
-    try {
+    return safeCall(async () => {
       const fields = await this.templateService.listProjectFields({ projectId: data.projectId });
       const iterationField = fields.find((f: CustomField) =>
         f.type === 'iteration' && (!data.fieldName || f.name === data.fieldName)
@@ -188,8 +195,6 @@ export class IterationService {
       }
 
       return { success: assignedCount > 0, assignedCount };
-    } catch (error) {
-      throw mapErrorToMCPError(error);
-    }
+    });
   }
 }

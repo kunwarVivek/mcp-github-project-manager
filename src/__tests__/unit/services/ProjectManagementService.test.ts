@@ -1,21 +1,19 @@
-import { beforeEach, describe, expect, it, jest } from '@jest/globals';
+import { beforeEach, describe, expect, it, vi, type MockedFunction } from 'vitest';
 import { ProjectManagementService } from '../../../services/ProjectManagementService';
-import { GitHubRepositoryFactory } from '../../../infrastructure/github/GitHubRepositoryFactory';
-import { SubIssueService } from '../../../services/SubIssueService';
-import { MilestoneService } from '../../../services/MilestoneService';
-import { SprintPlanningService } from '../../../services/SprintPlanningService';
-import { ProjectStatusService } from '../../../services/ProjectStatusService';
-import { ProjectTemplateService } from '../../../services/ProjectTemplateService';
-import { ProjectLinkingService } from '../../../services/ProjectLinkingService';
-import { IssueService } from '../../../services/IssueService';
-import { RoadmapService } from '../../../services/RoadmapService';
-import { ProjectAutomationService } from '../../../services/ProjectAutomationService';
-import { PullRequestService } from '../../../services/PullRequestService';
-import { FieldValueService } from '../../../services/FieldValueService';
-import { LabelService } from '../../../services/LabelService';
-import { IterationService } from '../../../services/IterationService';
-import { ResourceStatus, ResourceType } from '../../../domain/resource-types';
-import { ValidationError, ResourceNotFoundError, DomainError } from '../../../domain/errors';
+import type { GitHubRepositoryFactory } from '../../../infrastructure/github/GitHubRepositoryFactory';
+import type { SubIssueService } from '../../../services/SubIssueService';
+import type { MilestoneService } from '../../../services/MilestoneService';
+import type { SprintPlanningService } from '../../../services/SprintPlanningService';
+import type { ProjectStatusService } from '../../../services/ProjectStatusService';
+import type { ProjectTemplateService } from '../../../services/ProjectTemplateService';
+import type { ProjectLinkingService } from '../../../services/ProjectLinkingService';
+import type { IssueService } from '../../../services/IssueService';
+import type { RoadmapService } from '../../../services/RoadmapService';
+import type { ProjectAutomationService } from '../../../services/ProjectAutomationService';
+import type { PullRequestService } from '../../../services/PullRequestService';
+import type { FieldValueService } from '../../../services/FieldValueService';
+import type { LabelService } from '../../../services/LabelService';
+import type { IterationService } from '../../../services/IterationService';
 
 /**
  * ProjectManagementService Unit Tests
@@ -33,24 +31,24 @@ import { ValidationError, ResourceNotFoundError, DomainError } from '../../../do
  */
 describe('ProjectManagementService', () => {
   let service: ProjectManagementService;
-  let mockGraphql: jest.MockedFunction<any>;
+  let mockGraphql: MockedFunction<any>;
   let mockFactory: GitHubRepositoryFactory;
 
   beforeEach(() => {
     // Clear all mocks
-    jest.clearAllMocks();
+    vi.clearAllMocks();
 
     // Create mock graphql function BEFORE service instantiation
-    mockGraphql = jest.fn() as jest.MockedFunction<any>;
+    mockGraphql = vi.fn() as MockedFunction<any>;
 
     // Create mock factory with graphql method pre-configured
     mockFactory = {
       graphql: mockGraphql,
-      createProjectRepository: jest.fn(),
-      createMilestoneRepository: jest.fn(),
-      createIssueRepository: jest.fn(),
-      createSprintRepository: jest.fn(),
-      createAutomationRuleRepository: jest.fn()
+      createProjectRepository: vi.fn(),
+      createMilestoneRepository: vi.fn(),
+      createIssueRepository: vi.fn(),
+      createSprintRepository: vi.fn(),
+      createAutomationRuleRepository: vi.fn()
     } as unknown as GitHubRepositoryFactory;
 
     // Create stub services (not used by setFieldValue/getFieldValue tests)
@@ -65,9 +63,9 @@ describe('ProjectManagementService', () => {
     const mockAutomation = {} as ProjectAutomationService;
     const mockPullRequest = {} as PullRequestService;
     const mockFieldValue = {
-      setFieldValue: jest.fn<any>().mockResolvedValue({ success: true, message: 'Field updated' }),
-      getFieldValue: jest.fn<any>().mockResolvedValue({ fieldId: 'field-1', fieldName: 'Status', value: 'Done', type: 'SINGLE_SELECT' }),
-      clearFieldValue: jest.fn<any>().mockResolvedValue({ success: true, message: 'Field cleared' }),
+      setFieldValue: vi.fn<any>().mockResolvedValue({ success: true, message: 'Field updated' }),
+      getFieldValue: vi.fn<any>().mockResolvedValue({ fieldId: 'field-1', fieldName: 'Status', value: 'Done', type: 'SINGLE_SELECT' }),
+      clearFieldValue: vi.fn<any>().mockResolvedValue({ success: true, message: 'Field cleared' }),
     } as unknown as FieldValueService;
     const mockLabel = {} as LabelService;
     const mockIteration = {} as IterationService;

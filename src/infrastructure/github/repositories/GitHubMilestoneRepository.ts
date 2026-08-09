@@ -1,7 +1,8 @@
 import { BaseGitHubRepository } from "./BaseRepository";
-import { Milestone, CreateMilestone, MilestoneRepository, MilestoneId, Issue } from "../../../domain/types";
-import { ResourceType, ResourceStatus } from "../../../domain/resource-types";
+import type { Milestone, CreateMilestone, MilestoneRepository, MilestoneId, Issue } from "../../../domain/types";
+import { ResourceStatus } from "../../../domain/resource-types";
 import { GitHubIssueRepository } from "./GitHubIssueRepository";
+import { parseResourceStatus, toStatusString } from '../../../domain/utils/StatusParser';
 
 interface GitHubMilestone {
   id: string;
@@ -18,18 +19,6 @@ interface GitHubMilestone {
     openIssues: number;
     closedIssues: number;
     completionPercentage: number;
-  };
-}
-
-interface CreateMilestoneResponse {
-  createMilestone: {
-    milestone: GitHubMilestone;
-  };
-}
-
-interface UpdateMilestoneResponse {
-  updateMilestone: {
-    milestone: GitHubMilestone;
   };
 }
 
@@ -63,11 +52,11 @@ export class GitHubMilestoneRepository extends BaseGitHubRepository implements M
   private mapGitHubMilestoneToMilestone(githubMilestone: GitHubMilestone): Milestone {
     return {
       id: githubMilestone.id,
-      number: parseInt(githubMilestone.number.toString()),
+      number: parseInt(githubMilestone.number.toString(), 10),
       title: githubMilestone.title,
       description: githubMilestone.description || "",
       dueDate: githubMilestone.dueOn || undefined,
-      status: githubMilestone.state === "open" ? ResourceStatus.ACTIVE : ResourceStatus.CLOSED,
+      status: parseResourceStatus(githubMilestone.state, 'githubMilestone'),
       progress: {
         percent: githubMilestone.progress?.completionPercentage || 0,
         complete: githubMilestone.progress?.closedIssues || 0,
@@ -86,7 +75,7 @@ export class GitHubMilestoneRepository extends BaseGitHubRepository implements M
       title: restMilestone.title,
       description: restMilestone.description || "",
       dueDate: restMilestone.due_on || undefined,
-      status: restMilestone.state === "open" ? ResourceStatus.ACTIVE : ResourceStatus.CLOSED,
+      status: parseResourceStatus(restMilestone.state, 'githubMilestone'),
       progress: {
         percent: 0, // REST API doesn't provide progress info
         complete: restMilestone.closed_issues || 0,
@@ -114,15 +103,18 @@ export class GitHubMilestoneRepository extends BaseGitHubRepository implements M
   }
 
   async update(id: MilestoneId, data: Partial<Milestone>): Promise<Milestone> {
-    // Use REST API for milestone updates since GraphQL doesn't support it
+    // REST API needs milestone_number (integer). Callers may pass either a
+    // numeric string ("22") or a GraphQL node ID ("MI_kwDO...").
+    const milestoneNumber = await this.resolveNumber(id);
+
     const response = await this.rest(
       (params) => this.octokit.rest.issues.updateMilestone(params),
       {
-        milestone_number: parseInt(id),
+        milestone_number: milestoneNumber,
         title: data.title,
         description: data.description,
         due_on: data.dueDate,
-        state: data.status === ResourceStatus.CLOSED ? "closed" : "open",
+        state: toStatusString(data.status || ResourceStatus.ACTIVE, 'githubMilestone'),
       }
     );
 
@@ -130,16 +122,38 @@ export class GitHubMilestoneRepository extends BaseGitHubRepository implements M
   }
 
   async delete(id: MilestoneId): Promise<void> {
-    // Use REST API for milestone deletion since GraphQL doesn't support it
+    const milestoneNumber = await this.resolveNumber(id);
+
     await this.rest(
       (params) => this.octokit.rest.issues.deleteMilestone(params),
       {
-        milestone_number: parseInt(id)
+        milestone_number: milestoneNumber
       }
     );
   }
 
+  /** Resolve any milestone ID format to its numeric milestone_number. */
+  private async resolveNumber(id: MilestoneId): Promise<number> {
+    const parsed = parseInt(id, 10);
+    if (!isNaN(parsed) && String(parsed) === id) return parsed;
+    // Node ID — look up the milestone to get its number
+    const milestone = await this.findByNodeId(id);
+    if (!milestone) throw new Error(`Milestone not found: ${id}`);
+    return milestone.number;
+  }
+
   async findById(id: MilestoneId): Promise<Milestone | null> {
+    const milestoneNumber = parseInt(id, 10);
+
+    // If id is a numeric string (e.g. "22"), query by milestone number.
+    // If id is a node ID (e.g. "MI_kwDO..."), query by node ID.
+    if (!isNaN(milestoneNumber) && String(milestoneNumber) === id) {
+      return this.findByNumber(milestoneNumber);
+    }
+    return this.findByNodeId(id);
+  }
+
+  private async findByNumber(number: number): Promise<Milestone | null> {
     const query = `
       query($owner: String!, $repo: String!, $number: Int!) {
         repository(owner: $owner, name: $repo) {
@@ -160,7 +174,7 @@ export class GitHubMilestoneRepository extends BaseGitHubRepository implements M
     const response = await this.graphql<GetMilestoneResponse>(query, {
       owner: this.owner,
       repo: this.repo,
-      number: parseInt(id),
+      number,
     });
 
     const milestone = response.repository.milestone;
@@ -169,11 +183,36 @@ export class GitHubMilestoneRepository extends BaseGitHubRepository implements M
     return this.mapGitHubMilestoneToMilestone(milestone);
   }
 
+  private async findByNodeId(nodeId: string): Promise<Milestone | null> {
+    const query = `
+      query($id: ID!) {
+        node(id: $id) {
+          ... on Milestone {
+            id
+            number
+            title
+            description
+            dueOn
+            state
+            createdAt
+            updatedAt
+          }
+        }
+      }
+    `;
+
+    type NodeResponse = { node: { id: string; number: number; title: string; description: string; dueOn: string; state: string; createdAt: string; updatedAt: string } | null };
+    const response = await this.graphql<NodeResponse>(query, { id: nodeId });
+    if (!response.node) return null;
+
+    return this.mapGitHubMilestoneToMilestone(response.node as any);
+  }
+
   async findAll(): Promise<Milestone[]> {
     const query = `
       query($owner: String!, $repo: String!) {
         repository(owner: $owner, name: $repo) {
-          milestones(first: 100) {
+          milestones(first: 100, orderBy: { field: CREATED_AT, direction: DESC }) {
             nodes {
               id
               number

@@ -1,10 +1,11 @@
 import { generateObject } from 'ai';
 import { AIServiceFactory } from '../ai/AIServiceFactory';
-import {
+import type {
   DependencyContext,
   Dependency
 } from '../../domain/task-context-schemas';
-import { AITask, TaskDependency, EnhancedTaskDependency } from '../../domain/ai-types';
+import type { AITask, TaskDependency, EnhancedTaskDependency } from '../../domain/ai-types';
+import { type ILogger, Logger } from '../../infrastructure/logger';
 import { z } from 'zod';
 
 /**
@@ -41,9 +42,11 @@ const DependencyContextGenerationSchema = z.object({
  */
 export class DependencyContextGenerator {
   private aiFactory: AIServiceFactory;
+  private readonly logger: ILogger;
 
-  constructor() {
-    this.aiFactory = AIServiceFactory.getInstance();
+  constructor(aiFactory?: AIServiceFactory, logger?: ILogger) {
+    this.aiFactory = aiFactory ?? AIServiceFactory.getInstance();
+    this.logger = logger ?? Logger.getInstance();
   }
 
   /**
@@ -78,7 +81,7 @@ export class DependencyContextGenerator {
       return result.object as DependencyContext;
 
     } catch (error) {
-      process.stderr.write(`Error generating dependency context: ${error instanceof Error ? error.message : String(error)}\n`);
+      this.logger.error('Error generating dependency context', error);
       // Fallback to basic analysis
       return this.generateBasicDependencyContext(task, allTasks, dependencies);
     }
@@ -229,7 +232,7 @@ export class DependencyContextGenerator {
   /**
    * Generate integration guidance
    */
-  private generateIntegrationGuidance(task: AITask, depTask: AITask): string {
+  private generateIntegrationGuidance(_task: AITask, depTask: AITask): string {
     const depText = depTask.title.toLowerCase();
 
     if (depText.includes('api')) {
@@ -254,7 +257,7 @@ export class DependencyContextGenerator {
   /**
    * Identify integration interfaces
    */
-  private identifyInterfaces(task: AITask, depTask: AITask): string[] {
+  private identifyInterfaces(_task: AITask, depTask: AITask): string[] {
     const interfaces: string[] = [];
     const depText = `${depTask.title} ${depTask.description}`.toLowerCase();
 

@@ -184,8 +184,24 @@ in `src/infrastructure/secrets/` and add it to the resolver chain.
 
 ### Agent Orchestration
 
-Agent orchestration uses compile-time constants (not environment variables) defined in
-`src/domain/agent-orchestration-types.ts`. These can be overridden by forking the source:
+The **auto-reclaim scheduler** is the server-side self-healing loop: it periodically
+sweeps the agent registry, returns tasks held by agents whose heartbeat has gone stale
+(crashed/disconnected harnesses) to the unclaimed pool, marks those agents `offline`, and
+posts an audit comment on each reclaimed issue. One crash no longer blocks a task forever.
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `AGENT_RECLAIM_ENABLED` | `true` | Master switch for the auto-reclaim scheduler |
+| `AGENT_RECLAIM_INTERVAL_MS` | `300000` (5 min) | How often the reclaim sweep runs. `0` disables the loop. |
+| `AGENT_STALE_AFTER_MINUTES` | `30` | Heartbeat age after which a working agent is considered stale and its task reclaimed |
+
+> **Note:** the first sweep may create the `agent-registry` issue + label in the repo
+> (the registry's documented bootstrap mechanism), the same side effect as any
+> `register_agent` / `list_agents` call. Set `AGENT_RECLAIM_ENABLED=false` if you never
+> use the agent layer.
+
+The remaining agent constants are compile-time (defined in
+`src/domain/agent-orchestration-types.ts`) and can be overridden by forking the source:
 
 | Constant | Default | Description |
 |----------|---------|-------------|
@@ -195,7 +211,8 @@ Agent orchestration uses compile-time constants (not environment variables) defi
 
 Agent orchestration custom fields (`agent_claimed_by`, `agent_claimed_at`, `agent_status`,
 `agent_work_branch`, `agent_pr_number`) are auto-provisioned in your GitHub Project by
-`ProjectFieldSetup` when `AUTO_CREATE_PROJECT_FIELDS=true` (the default).
+`ProjectFieldSetup` when `AUTO_CREATE_PROJECT_FIELDS=true` (the default), or on demand via
+the `manage_project/setup_agent_fields` (or `agent_manage/setup_fields`) action.
 
 ---
 
@@ -590,6 +607,13 @@ INCLUDE_IMPLEMENTATION_GUIDANCE=false
 # ===========================
 AUTO_CREATE_PROJECT_FIELDS=true
 AI_BATCH_SIZE=10
+
+# ===========================
+# Agent Orchestration (auto-reclaim scheduler)
+# ===========================
+AGENT_RECLAIM_ENABLED=true
+AGENT_RECLAIM_INTERVAL_MS=300000
+AGENT_STALE_AFTER_MINUTES=30
 
 # ===========================
 # Server Configuration

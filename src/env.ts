@@ -1,5 +1,5 @@
-import { dirname, join, resolve } from 'path';
-import { CliOptions, parseCommandLineArgs } from './cli';
+import { join, resolve } from 'node:path';
+import { parseCommandLineArgs } from './cli';
 import * as dotenv from 'dotenv';
 import { createDefaultSecretResolver } from './infrastructure/secrets/SecretProvider';
 import { validateConfig, validateConfigWarnings } from './domain/config-schema';
@@ -14,7 +14,10 @@ const envPath = cliOptions.envFile
   ? resolve(process.cwd(), cliOptions.envFile)
   : join(process.cwd(), '.env');
 
-dotenv.config({ path: envPath });
+// `quiet` is mandatory, not cosmetic: dotenv v17 prints an "injected env"
+// banner to STDOUT, which corrupts the JSON-RPC stream this server speaks over
+// stdio and drops the MCP client before the first response.
+dotenv.config({ path: envPath, quiet: true });
 
 if (cliOptions.verbose) {
   process.stderr.write(`Loading environment from: ${envPath}\n`);
@@ -25,16 +28,50 @@ if (cliOptions.verbose) {
 // SECRETS_DIR set in .env is honored. See infrastructure/secrets/SecretProvider.
 const secretResolver = createDefaultSecretResolver();
 
+/**
+ * Configuration keys that participate in secret resolution (CLI flag →
+ * SECRETS_DIR file → environment variable).
+ */
+const RESOLVED_CONFIG_KEYS = [
+  'GITHUB_TOKEN', 'GITHUB_OWNER', 'GITHUB_REPO',
+  'GITHUB_APP_ID', 'GITHUB_APP_PRIVATE_KEY', 'GITHUB_APP_INSTALLATION_ID',
+  'ANTHROPIC_API_KEY', 'OPENAI_API_KEY', 'GOOGLE_API_KEY', 'PERPLEXITY_API_KEY',
+  'WEBHOOK_SECRET',
+] as const;
+
+/**
+ * Snapshot of configuration as the server will actually see it.
+ *
+ * Startup validation has to run against *resolved* values. Validating raw
+ * `process.env` meant a token mounted only at `$SECRETS_DIR/GITHUB_TOKEN` failed
+ * the required-field check and the process exited before the file provider was
+ * ever consulted — making SECRETS_DIR unusable for the very values it exists for.
+ */
+function buildResolvedEnv(): Record<string, string | undefined> {
+  const resolved: Record<string, string | undefined> = { ...process.env };
+  for (const key of RESOLVED_CONFIG_KEYS) {
+    const value = secretResolver.resolve(key);
+    if (value !== undefined) {
+      resolved[key] = value;
+    }
+  }
+  // CLI flags outrank both file-mounted secrets and environment variables.
+  if (cliOptions.token) resolved.GITHUB_TOKEN = cliOptions.token;
+  if (cliOptions.owner) resolved.GITHUB_OWNER = cliOptions.owner;
+  if (cliOptions.repo) resolved.GITHUB_REPO = cliOptions.repo;
+  return resolved;
+}
+
 // Validate configuration at startup (skip in test environment)
 if (process.env.NODE_ENV !== 'test') {
+  const resolvedEnv = buildResolvedEnv();
   try {
-    validateConfig(process.env as Record<string, string | undefined>);
+    validateConfig(resolvedEnv);
   } catch (error) {
     process.stderr.write(`[CONFIG] ${(error as Error).message}\n`);
     process.exit(1);
   }
-  const warnings = validateConfigWarnings(process.env as Record<string, string | undefined>);
-  for (const w of warnings) {
+  for (const w of validateConfigWarnings(resolvedEnv)) {
     process.stderr.write(`[CONFIG WARNING] ${w}\n`);
   }
 }
@@ -93,11 +130,14 @@ export function getOptionalConfigValue(name: string, defaultValue: string, cliVa
  * @returns The boolean configuration value
  */
 export function getBooleanConfigValue(name: string, defaultValue: boolean): boolean {
-  const value = process.env[name];
+  // Resolve through the secret chain so SECRETS_DIR works for flags too, not
+  // only for string values.
+  const value = secretResolver.resolve(name);
   if (!value) {
     return defaultValue;
   }
-  return value.toLowerCase() === 'true' || value === '1';
+  const normalized = value.trim().toLowerCase();
+  return normalized === 'true' || normalized === '1';
 }
 
 /**
@@ -107,24 +147,56 @@ export function getBooleanConfigValue(name: string, defaultValue: boolean): bool
  * @returns The numeric configuration value
  */
 export function getNumericConfigValue(name: string, defaultValue: number): number {
-  const value = process.env[name];
+  // Resolve through the secret chain (see getBooleanConfigValue).
+  const value = secretResolver.resolve(name);
   if (!value) {
     return defaultValue;
   }
-  const parsed = parseInt(value, 10);
-  return isNaN(parsed) ? defaultValue : parsed;
+  const parsed = Number.parseInt(value, 10);
+  return Number.isNaN(parsed) ? defaultValue : parsed;
 }
 
-// Export configuration values with CLI arguments taking precedence over environment variables
-export const GITHUB_TOKEN = process.env.NODE_ENV === 'test'
-  ? 'test-token'
+// Export configuration values with CLI arguments taking precedence over environment variables.
+// Under NODE_ENV=test the credential chain (getSecret, gh auth fallback) is skipped and
+// values are hardcoded to safe test defaults — preserving hermetic unit-test isolation.
+// The ONE exception: when E2E_REAL_API=true is set explicitly, real env vars are honored
+// so live E2E suites that spawn the server as a subprocess can pass real credentials.
+const isTestEnv = process.env.NODE_ENV === 'test';
+const isRealE2E = process.env.E2E_REAL_API === 'true';
+export const GITHUB_TOKEN = isTestEnv
+  ? (isRealE2E ? (process.env.GITHUB_TOKEN || 'test-token') : 'test-token')
   : getConfigValue("GITHUB_TOKEN", cliOptions.token);
-export const GITHUB_OWNER = process.env.NODE_ENV === 'test'
-  ? 'test-owner'
+export const GITHUB_OWNER = isTestEnv
+  ? (isRealE2E ? (process.env.GITHUB_OWNER || 'test-owner') : 'test-owner')
   : getConfigValue("GITHUB_OWNER", cliOptions.owner);
-export const GITHUB_REPO = process.env.NODE_ENV === 'test'
-  ? 'test-repo'
+export const GITHUB_REPO = isTestEnv
+  ? (isRealE2E ? (process.env.GITHUB_REPO || 'test-repo') : 'test-repo')
   : getConfigValue("GITHUB_REPO", cliOptions.repo);
+
+// GitHub App installation auth (optional). When all three are present the
+// server authenticates as the App installation instead of using a PAT.
+// A PAT remains the default and documented path.
+export const GITHUB_APP_ID = getOptionalConfigValue("GITHUB_APP_ID", "");
+export const GITHUB_APP_PRIVATE_KEY = getOptionalConfigValue("GITHUB_APP_PRIVATE_KEY", "");
+export const GITHUB_APP_INSTALLATION_ID = getOptionalConfigValue("GITHUB_APP_INSTALLATION_ID", "");
+
+/**
+ * GitHub App credentials, or undefined when the App is not fully configured.
+ * All three values are required — a partial configuration falls back to the PAT
+ * rather than failing, so a half-set env cannot lock the server out.
+ */
+export function getGitHubAppCredentials():
+  | { appId: string; privateKey: string; installationId: string }
+  | undefined {
+  const appId = getOptionalConfigValue("GITHUB_APP_ID", "");
+  const privateKey = getOptionalConfigValue("GITHUB_APP_PRIVATE_KEY", "");
+  const installationId = getOptionalConfigValue("GITHUB_APP_INSTALLATION_ID", "");
+  if (!appId || !privateKey || !installationId) {
+    return undefined;
+  }
+  // Private keys are commonly supplied with literal \n escapes in env vars.
+  return { appId, privateKey: privateKey.replace(/\\n/g, "\n"), installationId };
+}
 
 // Sync configuration
 export const SYNC_ENABLED = getBooleanConfigValue("SYNC_ENABLED", true);
@@ -132,6 +204,20 @@ export const SYNC_TIMEOUT_MS = getNumericConfigValue("SYNC_TIMEOUT_MS", 30000);
 export const SYNC_INTERVAL_MS = getNumericConfigValue("SYNC_INTERVAL_MS", 0); // 0 = disabled
 export const CACHE_DIRECTORY = getOptionalConfigValue("CACHE_DIRECTORY", ".mcp-cache");
 export const SYNC_RESOURCES = getOptionalConfigValue("SYNC_RESOURCES", "PROJECT,MILESTONE,ISSUE,SPRINT").split(',');
+
+// Agent orchestration — auto-reclaim scheduler
+// The scheduler is a server-side background sweep that detects agents whose
+// heartbeat has gone stale (crashed/disconnected harnesses) and reclaims their
+// tasks back to the unclaimed pool, then flags the agent offline. This is what
+// makes the swarm self-healing: one crash no longer blocks a task forever.
+//
+// Note: the sweep never bootstraps the registry — it probes with
+// AgentStore.registryExists() and returns early when no registry issue exists,
+// so a repo that never opted into the agent layer is not mutated. Disable
+// entirely with AGENT_RECLAIM_ENABLED=false or AGENT_RECLAIM_INTERVAL_MS=0.
+export const AGENT_RECLAIM_ENABLED = getBooleanConfigValue("AGENT_RECLAIM_ENABLED", true);
+export const AGENT_RECLAIM_INTERVAL_MS = getNumericConfigValue("AGENT_RECLAIM_INTERVAL_MS", 300000); // 5 min; 0 = disabled
+export const AGENT_STALE_AFTER_MINUTES = getNumericConfigValue("AGENT_STALE_AFTER_MINUTES", 30);
 
 // Event system configuration
 export const WEBHOOK_SECRET = getOptionalConfigValue("WEBHOOK_SECRET", "");
@@ -152,10 +238,10 @@ export const GOOGLE_API_KEY = getOptionalConfigValue("GOOGLE_API_KEY", "");
 export const PERPLEXITY_API_KEY = getOptionalConfigValue("PERPLEXITY_API_KEY", "");
 
 // AI Model configuration
-export const AI_MAIN_MODEL = getOptionalConfigValue("AI_MAIN_MODEL", "claude-3-5-sonnet-20241022");
-export const AI_RESEARCH_MODEL = getOptionalConfigValue("AI_RESEARCH_MODEL", "perplexity-llama-3.1-sonar-large-128k-online");
-export const AI_FALLBACK_MODEL = getOptionalConfigValue("AI_FALLBACK_MODEL", "gpt-4o");
-export const AI_PRD_MODEL = getOptionalConfigValue("AI_PRD_MODEL", "claude-3-5-sonnet-20241022");
+export const AI_MAIN_MODEL = getOptionalConfigValue("AI_MAIN_MODEL", "claude-opus-5");
+export const AI_RESEARCH_MODEL = getOptionalConfigValue("AI_RESEARCH_MODEL", "sonar-pro");
+export const AI_FALLBACK_MODEL = getOptionalConfigValue("AI_FALLBACK_MODEL", "claude-sonnet-5");
+export const AI_PRD_MODEL = getOptionalConfigValue("AI_PRD_MODEL", "claude-opus-5");
 
 // AI Task Generation configuration
 export const MAX_TASKS_PER_PRD = getNumericConfigValue("MAX_TASKS_PER_PRD", 50);

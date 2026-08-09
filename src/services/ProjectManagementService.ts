@@ -1,22 +1,43 @@
 /**
  * ProjectManagementService - Facade for GitHub project management.
  *
- * Every method delegates to a specialized service. Public signatures are
- * preserved for backward compatibility.
+ * **Architecture note:** This facade delegates every method to a specialized
+ * service. The 76 methods are grouped by domain. For new code, prefer
+ * accessing sub-services directly via the typed getters at the bottom of this
+ * class (e.g., `pms.issues.createIssue(...)`) — the legacy delegation
+ * methods are preserved for backward compatibility only.
+ *
+ * ## Method Groups
+ * | Group | Methods | Sub-service |
+ * |-------|---------|-------------|
+ * | Issues | createIssue, listIssues, getIssue, updateIssue, … | IssueService |
+ * | Sub-issues | updateIssueStatus, addIssueDependency, … | SubIssueService |
+ * | Milestones | createMilestone, listMilestones, getMilestoneMetrics, … | MilestoneService |
+ * | Sprints | createSprint, listSprints, planSprint, … | SprintPlanningService |
+ * | Projects | createProject, listProjects, getProject, … | ProjectStatusService |
+ * | Templates | getProjectReadme, listProjectFields, createProjectView, … | ProjectTemplateService |
+ * | Linking | addProjectItem, removeProjectItem, listProjectItems, … | ProjectLinkingService |
+ * | Roadmap | createRoadmap | RoadmapService |
+ * | PRs | createPullRequest, listPullRequests, mergePullRequest, … | PullRequestService |
+ * | Fields | setFieldValue, getFieldValue, clearFieldValue | FieldValueService |
+ * | Labels | createLabel, listLabels | LabelService |
+ * | Automation | createAutomationRule, listAutomationRules, … | ProjectAutomationService |
+ * | Iterations | getIterationConfiguration, getCurrentIteration, … | IterationService |
  */
-import { GitHubRepositoryFactory } from "../infrastructure/github/GitHubRepositoryFactory";
-import { ResourceStatus } from "../domain/resource-types";
-import {
+import type { GitHubRepositoryFactory } from "../infrastructure/github/GitHubRepositoryFactory";
+import type { ResourceStatus } from "../domain/resource-types";
+import type {
   Issue, CreateIssue, Milestone, CreateMilestone, Project, CreateProject,
   Sprint, CreateSprint, CustomField, ProjectView, ProjectItem
 } from "../domain/types";
-import { mapErrorToMCPError } from './utils/ErrorMapper';
+// Entity imports removed - services now return plain objects for MCP compatibility
+import { safeCall } from './utils/safeCall';
 
 import { SubIssueService } from "./SubIssueService";
 import type { IssueDependency, IssueHistoryEntry } from "./SubIssueService";
-import { IssueService } from "./IssueService";
-import { RoadmapService } from "./RoadmapService";
-import { ProjectAutomationService, type CreateAutomationRuleInput, type UpdateAutomationRuleInput, type AutomationRuleDTO, type AutomationRuleSummary } from "./ProjectAutomationService";
+import type { IssueService } from "./IssueService";
+import type { RoadmapService } from "./RoadmapService";
+import type { ProjectAutomationService, CreateAutomationRuleInput, UpdateAutomationRuleInput, AutomationRuleDTO, AutomationRuleSummary } from "./ProjectAutomationService";
 import { MilestoneService } from "./MilestoneService";
 import type { MilestoneMetrics } from "./MilestoneService";
 import { SprintPlanningService } from "./SprintPlanningService";
@@ -24,10 +45,10 @@ import type { SprintMetrics } from "./SprintPlanningService";
 import { ProjectStatusService } from "./ProjectStatusService";
 import { ProjectTemplateService } from "./ProjectTemplateService";
 import { ProjectLinkingService } from "./ProjectLinkingService";
-import { PullRequestService } from "./PullRequestService";
-import { FieldValueService } from "./FieldValueService";
-import { LabelService } from "./LabelService";
-import { IterationService } from "./IterationService";
+import type { PullRequestService } from "./PullRequestService";
+import type { FieldValueService } from "./FieldValueService";
+import type { LabelService } from "./LabelService";
+import type { IterationService } from "./IterationService";
 
 export type { IssueDependency, IssueHistoryEntry, MilestoneMetrics, SprintMetrics };
 export { SubIssueService, MilestoneService, SprintPlanningService, ProjectStatusService, ProjectTemplateService, ProjectLinkingService };
@@ -313,36 +334,34 @@ export class ProjectManagementService {
   // -- ProjectAutomationService -----------------------------------------------
 
   async createAutomationRule(data: CreateAutomationRuleInput): Promise<AutomationRuleDTO> {
-    try { return await this.automationService.createRuleFromInput(data); }
-    catch (error) { throw mapErrorToMCPError(error); }
+    return safeCall(() => this.automationService.createRuleFromInput(data));
   }
   async updateAutomationRule(data: UpdateAutomationRuleInput): Promise<Omit<AutomationRuleDTO, 'projectId'>> {
-    try { return await this.automationService.updateRuleFromInput(data); }
-    catch (error) { throw mapErrorToMCPError(error); }
+    return safeCall(() => this.automationService.updateRuleFromInput(data));
   }
   async deleteAutomationRule(data: { ruleId: string }): Promise<{ success: boolean }> {
-    try { await this.automationService.deleteRule(data.ruleId); return { success: true }; }
-    catch (error) { throw mapErrorToMCPError(error); }
+    return safeCall(async () => {
+      await this.automationService.deleteRule(data.ruleId);
+      return { success: true };
+    });
   }
   async getAutomationRule(data: { ruleId: string }): Promise<AutomationRuleDTO> {
-    try { return await this.automationService.getRuleDTO(data.ruleId); }
-    catch (error) { throw mapErrorToMCPError(error); }
+    return safeCall(() => this.automationService.getRuleDTO(data.ruleId));
   }
   async listAutomationRules(data: { projectId: string }): Promise<{ rules: AutomationRuleSummary[] }> {
-    try { return { rules: await this.automationService.listRuleSummaries(data.projectId) }; }
-    catch (error) { throw mapErrorToMCPError(error); }
+    return safeCall(async () => ({ rules: await this.automationService.listRuleSummaries(data.projectId) }));
   }
   async enableAutomationRule(data: { ruleId: string }): Promise<{ id: string; name: string; enabled: boolean }> {
-    try {
+    return safeCall(async () => {
       const updated = await this.automationService.enableRule(data.ruleId);
       return { id: updated.id, name: updated.name, enabled: updated.enabled };
-    } catch (error) { throw mapErrorToMCPError(error); }
+    });
   }
   async disableAutomationRule(data: { ruleId: string }): Promise<{ id: string; name: string; enabled: boolean }> {
-    try {
+    return safeCall(async () => {
       const updated = await this.automationService.disableRule(data.ruleId);
       return { id: updated.id, name: updated.name, enabled: updated.enabled };
-    } catch (error) { throw mapErrorToMCPError(error); }
+    });
   }
 
   // -- IterationService -------------------------------------------------------
@@ -362,4 +381,48 @@ export class ProjectManagementService {
   async assignItemsToIteration(data: { projectId: string; itemIds: string[]; iterationId: string; fieldName?: string }): Promise<{ success: boolean; assignedCount: number }> {
     return this.iterationService.assignItemsToIteration(data);
   }
+
+  // ==========================================================================
+  // Typed sub-service accessors — prefer these over the delegation methods
+  // above for new code.
+  // ==========================================================================
+
+  /** Direct access to issue operations (create, list, update, comments, drafts). */
+  get issues(): IssueService { return this.issueService; }
+
+  /** Direct access to sub-issue operations (dependencies, history, status). */
+  get subIssues(): SubIssueService { return this.subIssueService; }
+
+  /** Direct access to milestone operations (CRUD, metrics, overdue). */
+  get milestones(): MilestoneService { return this.milestoneService; }
+
+  /** Direct access to sprint planning operations (CRUD, metrics, current sprint). */
+  get sprints(): SprintPlanningService { return this.sprintPlanningService; }
+
+  /** Direct access to project CRUD and status operations. */
+  get projects(): ProjectStatusService { return this.projectStatusService; }
+
+  /** Direct access to project template operations (README, fields, views). */
+  get templates(): ProjectTemplateService { return this.templateService; }
+
+  /** Direct access to project linking operations (add/remove/archive items). */
+  get linking(): ProjectLinkingService { return this.linkingService; }
+
+  /** Direct access to roadmap operations. */
+  get roadmap(): RoadmapService { return this.roadmapService; }
+
+  /** Direct access to automation rule operations (CRUD, enable/disable). */
+  get automation(): ProjectAutomationService { return this.automationService; }
+
+  /** Direct access to pull request operations (CRUD, merge, reviews). */
+  get pullRequests(): PullRequestService { return this.pullRequestService; }
+
+  /** Direct access to field value operations (get/set/clear). */
+  get fieldValues(): FieldValueService { return this.fieldValueService; }
+
+  /** Direct access to label operations (create, list). */
+  get labels(): LabelService { return this.labelService; }
+
+  /** Direct access to iteration operations (config, current, items). */
+  get iterations(): IterationService { return this.iterationService; }
 }

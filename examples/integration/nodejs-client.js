@@ -8,7 +8,7 @@
 import { Server } from "../../build/index.js";
 import { McpClient } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
-import { ChildProcess, spawn } from "child_process";
+import { spawn } from "node:child_process";
 
 // Example 1: Direct usage within the same process
 async function directUsageExample() {

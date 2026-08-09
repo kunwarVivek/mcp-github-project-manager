@@ -1,17 +1,17 @@
 import { AITaskProcessor } from './ai/AITaskProcessor';
+import type { AIServiceFactory } from './ai/AIServiceFactory';
 import { InputSanitizer } from './utils/InputSanitizer';
 import {
-  AITask,
-  SubTask,
-  PRDDocument,
-  MockPRD,
-  TaskPriority,
+  type AITask,
+  type SubTask,
+  type PRDDocument,
+  type MockPRD,
   TaskStatus,
-  TaskComplexity,
-  TaskDependency,
-  AcceptanceCriteria,
-  SectionConfidence,
-  ConfidenceConfig,
+  type TaskComplexity,
+  type TaskDependency,
+  type AcceptanceCriteria,
+  type SectionConfidence,
+  type ConfidenceConfig,
   DEFAULT_CONFIDENCE_CONFIG
 } from '../domain/ai-types';
 import {
@@ -28,7 +28,7 @@ import {
   INCLUDE_TECHNICAL_CONTEXT,
   INCLUDE_IMPLEMENTATION_GUIDANCE
 } from '../env';
-import {
+import type {
   EnhancedTaskGenerationConfig,
   EnhancedTaskGenerationParams,
   EnhancedAITask
@@ -36,9 +36,11 @@ import {
 import { RequirementsTraceabilityService } from './RequirementsTraceabilityService';
 import { TaskContextGenerationService } from './TaskContextGenerationService';
 import { v4 as uuidv4 } from 'uuid';
-import { DependencyGraph, DetectedDependency, GraphAnalysisResult } from '../analysis/DependencyGraph';
-import { EstimationCalibrator, EffortEstimate } from '../analysis/EstimationCalibrator';
+import { DependencyGraph, type DetectedDependency, type GraphAnalysisResult } from '../analysis/DependencyGraph';
+import { EstimationCalibrator, type EffortEstimate } from '../analysis/EstimationCalibrator';
 import { ConfidenceScorer } from './ai/ConfidenceScorer';
+import { safeCall } from './utils/safeCall';
+import { type ILogger, Logger } from '../infrastructure/logger';
 
 /**
  * Task with effort estimate and dependency analysis
@@ -74,14 +76,23 @@ export class TaskGenerationService {
   private dependencyGraph: DependencyGraph;
   private estimationCalibrator: EstimationCalibrator;
   private confidenceScorer: ConfidenceScorer;
+  private readonly logger: ILogger;
 
-  constructor() {
-    this.aiProcessor = new AITaskProcessor();
+  /**
+   * @param aiFactory - AI service factory for model access. When omitted (DI mode),
+   *   defaults to the global singleton via `AIServiceFactory.getInstance()`.
+   *   Passed through to `AITaskProcessor` and `TaskContextGenerationService`.
+   * @param logger - Logger instance for diagnostics. When omitted, defaults to
+   *   the global singleton via `Logger.getInstance()`.
+   */
+  constructor(aiFactory?: AIServiceFactory, logger?: ILogger) {
+    this.aiProcessor = new AITaskProcessor(aiFactory);
     this.traceabilityService = new RequirementsTraceabilityService();
-    this.contextGenerationService = new TaskContextGenerationService();
+    this.contextGenerationService = new TaskContextGenerationService(aiFactory);
     this.dependencyGraph = new DependencyGraph();
     this.estimationCalibrator = new EstimationCalibrator();
     this.confidenceScorer = new ConfidenceScorer();
+    this.logger = logger ?? Logger.getInstance();
   }
 
   /**
@@ -115,7 +126,7 @@ export class TaskGenerationService {
       return basicTasks.map(task => ({ ...task } as EnhancedAITask));
     }
 
-    try {
+    return safeCall(async () => {
       let prdContent = typeof params.prd === 'string'
         ? params.prd
         : JSON.stringify(params.prd, null, 2);
@@ -125,7 +136,11 @@ export class TaskGenerationService {
       const basicTasks = await this.generateBasicTasksFromPRD(params);
 
       // Create traceability matrix if enabled
-      let traceabilityMatrix;
+      // Explicit `any`: this holds an unvalidated AI response. Properly typing
+      // it is real work (the shape varies by prompt); making the `any` explicit
+      // at least removes the *implicit* one so the gap is visible.
+      // biome-ignore lint/suspicious/noExplicitAny: unvalidated AI response shape
+      let traceabilityMatrix: any;
       if (config.createTraceabilityMatrix) {
         // Create mock PRD for traceability
         const mockPRD: MockPRD = {
@@ -165,10 +180,7 @@ export class TaskGenerationService {
       );
 
       return enhancedTasks;
-    } catch (error) {
-      process.stderr.write(`Error generating enhanced tasks from PRD: ${error instanceof Error ? error.message : String(error)}\n`);
-      throw new Error(`Failed to generate enhanced tasks: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    }
+    });
   }
 
   /**
@@ -205,7 +217,7 @@ export class TaskGenerationService {
     autoEstimate?: boolean;
     autoPrioritize?: boolean;
   }): Promise<AITask[]> {
-    try {
+    return safeCall(async () => {
       let prdContent = typeof params.prd === 'string'
         ? params.prd
         : JSON.stringify(params.prd, null, 2);
@@ -234,10 +246,7 @@ export class TaskGenerationService {
 
       // Ensure all tasks have required metadata
       return tasks.map(task => this.enrichTaskMetadata(task, params.prd));
-    } catch (error) {
-      process.stderr.write(`Error generating basic tasks from PRD: ${error instanceof Error ? error.message : String(error)}\n`);
-      throw new Error(`Failed to generate basic tasks: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    }
+    });
   }
 
   /**
@@ -263,7 +272,7 @@ export class TaskGenerationService {
         }
 
         // Generate comprehensive context
-        const { context: executionContext, metrics: contextMetrics } = await this.contextGenerationService.generateTaskContext(
+        const { context: executionContext } = await this.contextGenerationService.generateTaskContext(
           task,
           prdContent,
           config
@@ -288,8 +297,7 @@ export class TaskGenerationService {
         enhancedTask.enhancedAcceptanceCriteria = this.enhanceAcceptanceCriteria(task.acceptanceCriteria);
 
         enhancedTasks.push(enhancedTask);
-      } catch (error) {
-        process.stderr.write(`Error enhancing task ${task.id}: ${error instanceof Error ? error.message : String(error)}\n`);
+      } catch {
         // Fallback to basic enhanced task
         enhancedTasks.push({ ...task } as EnhancedAITask);
       }
@@ -322,7 +330,7 @@ export class TaskGenerationService {
     maxTasks?: number;
     complexity?: 'low' | 'medium' | 'high';
   }): Promise<AITask[]> {
-    try {
+    return safeCall(async () => {
       // Create a minimal PRD-like structure from the description
       const simplePRD = {
         overview: params.description,
@@ -338,10 +346,7 @@ export class TaskGenerationService {
         autoEstimate: true,
         autoPrioritize: true
       });
-    } catch (error) {
-      process.stderr.write(`Error generating tasks from description: ${error instanceof Error ? error.message : String(error)}\n`);
-      throw new Error(`Failed to generate tasks: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    }
+    });
   }
 
   /**
@@ -352,10 +357,7 @@ export class TaskGenerationService {
     maxDepth?: number;
     autoEstimate?: boolean;
   }): Promise<SubTask[]> {
-    try {
-      if (params.task.subtasks.length > 0) {
-        process.stderr.write('Task already has subtasks. Consider using updateTaskSubtasks instead.\n');
-      }
+    return safeCall(async () => {
 
       // Use AI to break down the task
       const subtasks = await this.aiProcessor.expandTaskIntoSubtasks({
@@ -375,10 +377,7 @@ export class TaskGenerationService {
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       }));
-    } catch (error) {
-      process.stderr.write(`Error expanding task into subtasks: ${error instanceof Error ? error.message : String(error)}\n`);
-      throw new Error(`Failed to expand task: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    }
+    });
   }
 
   /**
@@ -391,7 +390,7 @@ export class TaskGenerationService {
     analysis: string;
     recommendations: string[];
   }> {
-    try {
+    return safeCall(async () => {
       const analysis = await this.aiProcessor.analyzeTaskComplexity({
         taskTitle: task.title,
         taskDescription: task.description,
@@ -405,10 +404,7 @@ export class TaskGenerationService {
         analysis: analysis.analysis,
         recommendations: analysis.recommendations
       };
-    } catch (error) {
-      process.stderr.write(`Error analyzing task complexity: ${error instanceof Error ? error.message : String(error)}\n`);
-      throw new Error(`Failed to analyze complexity: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    }
+    });
   }
 
   /**
@@ -420,17 +416,14 @@ export class TaskGenerationService {
     timeline?: string;
     teamSize?: number;
   }): Promise<AITask[]> {
-    try {
+    return safeCall(async () => {
       return await this.aiProcessor.prioritizeTasks({
         tasks: params.tasks,
         projectGoals: params.projectGoals,
         timeline: params.timeline,
         teamSize: params.teamSize
       });
-    } catch (error) {
-      process.stderr.write(`Error prioritizing tasks: ${error instanceof Error ? error.message : String(error)}\n`);
-      throw new Error(`Failed to prioritize tasks: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    }
+    });
   }
 
   /**
@@ -474,8 +467,8 @@ export class TaskGenerationService {
 
       return tasksWithDependencies;
     } catch (error) {
-      process.stderr.write(`Error detecting task dependencies: ${error instanceof Error ? error.message : String(error)}\n`);
-      return tasks; // Return original tasks if dependency detection fails
+      this.logger.error('Dependency detection failed, returning original tasks', error);
+      return tasks;
     }
   }
 
@@ -483,7 +476,7 @@ export class TaskGenerationService {
    * Generate acceptance criteria for a task
    */
   async generateAcceptanceCriteria(task: AITask): Promise<AcceptanceCriteria[]> {
-    try {
+    return safeCall(async () => {
       // For now, generate basic acceptance criteria
       // In a full implementation, you'd use AI to generate comprehensive criteria
 
@@ -523,10 +516,7 @@ export class TaskGenerationService {
       }
 
       return criteria;
-    } catch (error) {
-      process.stderr.write(`Error generating acceptance criteria: ${error instanceof Error ? error.message : String(error)}\n`);
-      throw new Error(`Failed to generate acceptance criteria: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    }
+    });
   }
 
   /**
@@ -543,7 +533,7 @@ export class TaskGenerationService {
     confidence: 'high' | 'medium' | 'low';
     factors: string[];
   }> {
-    try {
+    return safeCall(async () => {
       // Simple effort estimation based on complexity
       const baseHours = task.complexity * 3; // 3 hours per complexity point
 
@@ -566,10 +556,7 @@ export class TaskGenerationService {
           `Dependencies: ${task.dependencies.length} identified`
         ]
       };
-    } catch (error) {
-      process.stderr.write(`Error estimating task effort: ${error instanceof Error ? error.message : String(error)}\n`);
-      throw new Error(`Failed to estimate effort: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    }
+    });
   }
 
   /**
@@ -581,7 +568,7 @@ export class TaskGenerationService {
     currentSprintCapacity?: number;
     teamSkills?: string[];
   }): Promise<AITask[]> {
-    try {
+    return safeCall(async () => {
       const availableTasks = params.allTasks.filter(task =>
         !params.completedTaskIds.includes(task.id) &&
         task.status !== TaskStatus.DONE &&
@@ -612,10 +599,7 @@ export class TaskGenerationService {
       }
 
       return recommendedTasks;
-    } catch (error) {
-      process.stderr.write(`Error getting recommended next tasks: ${error instanceof Error ? error.message : String(error)}\n`);
-      throw new Error(`Failed to get recommendations: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    }
+    });
   }
 
   /**
@@ -672,6 +656,7 @@ export class TaskGenerationService {
     confidenceConfig?: Partial<ConfidenceConfig>;
   }): Promise<TaskGenerationResult> {
     const config = { ...DEFAULT_CONFIDENCE_CONFIG, ...params.confidenceConfig };
+    const scorer = new ConfidenceScorer(config);
 
     // Generate enhanced tasks using existing method
     const enhancedTasks = await this.generateEnhancedTasksFromPRD({
@@ -713,7 +698,7 @@ export class TaskGenerationService {
         ? params.prd
         : JSON.stringify(params.prd);
 
-      const taskConfidence = this.confidenceScorer.calculateSectionConfidence({
+      const taskConfidence = scorer.calculateSectionConfidence({
         sectionId: task.id,
         sectionName: task.title,
         inputData: {
@@ -746,7 +731,7 @@ export class TaskGenerationService {
 
     // Calculate overall confidence
     const confidenceScores = tasksWithEstimates.map(t => t.taskConfidence);
-    const aggregated = this.confidenceScorer.aggregateConfidence(confidenceScores);
+    const aggregated = scorer.aggregateConfidence(confidenceScores);
 
     // Find low confidence tasks
     const lowConfidenceTasks = tasksWithEstimates.filter(

@@ -1,7 +1,7 @@
 import { z } from 'zod';
-import { ToolDefinition, ToolSchema } from '../ToolValidator.js';
+import type { ToolDefinition, ToolSchema } from '../ToolValidator.js';
 import { PRDGenerationService } from '../../../services/PRDGenerationService.js';
-import { MCPResponse } from '../../../domain/mcp-types.js';
+import type { MCPResponse } from '../../../domain/mcp-types.js';
 import { ToolResultFormatter } from '../ToolResultFormatter.js';
 import { ANNOTATION_PATTERNS } from '../annotations/tool-annotations.js';
 import { PRDOutputSchema } from '../schemas/ai-schemas.js';

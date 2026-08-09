@@ -8,7 +8,7 @@
  * - AI-20: Related issue linking by relationship type
  */
 
-import { SectionConfidence } from "./ai-types";
+import type { SectionConfidence } from "./ai-types";
 
 // ============================================================================
 // Common Types

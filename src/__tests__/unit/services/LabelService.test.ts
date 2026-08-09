@@ -1,18 +1,18 @@
-import { beforeEach, describe, expect, it, jest } from '@jest/globals';
+import { type Mocked, type MockedFunction, beforeEach, describe, expect, it, vi } from 'vitest';
 import { LabelService } from '../../../services/LabelService';
-import { GitHubRepositoryFactory } from '../../../infrastructure/github/GitHubRepositoryFactory';
+import type { GitHubRepositoryFactory } from '../../../infrastructure/github/GitHubRepositoryFactory';
 import { DomainError } from '../../../domain/errors';
 
-jest.mock('../../../infrastructure/github/GitHubRepositoryFactory');
+vi.mock('../../../infrastructure/github/GitHubRepositoryFactory');
 
 describe('LabelService', () => {
   let service: LabelService;
-  let mockFactory: jest.Mocked<GitHubRepositoryFactory>;
+  let mockFactory: Mocked<GitHubRepositoryFactory>;
   let mockOctokit: {
     rest: {
       issues: {
-        createLabel: jest.MockedFunction<any>;
-        listLabelsForRepo: jest.MockedFunction<any>;
+        createLabel: MockedFunction<any>;
+        listLabelsForRepo: MockedFunction<any>;
       };
     };
   };
@@ -20,21 +20,21 @@ describe('LabelService', () => {
   const config = { owner: 'testOwner', repo: 'testRepo' };
 
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
 
     mockOctokit = {
       rest: {
         issues: {
-          createLabel: jest.fn(),
-          listLabelsForRepo: jest.fn(),
+          createLabel: vi.fn(),
+          listLabelsForRepo: vi.fn(),
         },
       },
     };
 
     mockFactory = {
-      getOctokit: jest.fn().mockReturnValue(mockOctokit),
-      getConfig: jest.fn().mockReturnValue(config),
-    } as unknown as jest.Mocked<GitHubRepositoryFactory>;
+      getOctokit: vi.fn().mockReturnValue(mockOctokit),
+      getConfig: vi.fn().mockReturnValue(config),
+    } as unknown as Mocked<GitHubRepositoryFactory>;
 
     service = new LabelService(mockFactory);
   });

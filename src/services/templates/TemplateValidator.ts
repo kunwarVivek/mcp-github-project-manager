@@ -1,4 +1,4 @@
-import { ParsedTemplate, TemplateValidationResult, TemplateSection } from '../../domain/template-types';
+import type { ParsedTemplate, TemplateValidationResult, TemplateSection } from '../../domain/template-types';
 import { TemplateParser, extractPlaceholders } from './TemplateParser';
 import { TemplateEngine } from './TemplateEngine';
 

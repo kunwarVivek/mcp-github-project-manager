@@ -7,21 +7,20 @@
  * Implements requirement AI-09: Sprint capacity planning with velocity.
  */
 
-import {
+import type {
   EstimationCalibrator,
-  getComplexityBand
 } from '../../analysis/EstimationCalibrator';
 import {
   calculateWeightedScore,
   getConfidenceTier
 } from './ConfidenceScorer';
-import {
+import type {
   SprintCapacity,
   TeamMember,
   SprintMetrics,
   TeamAvailability
 } from '../../domain/sprint-planning-types';
-import { SectionConfidence, ConfidenceFactors } from '../../domain/ai-types';
+import type { SectionConfidence, ConfidenceFactors } from '../../domain/ai-types';
 
 /**
  * Availability adjustment for capacity calculation.
@@ -127,11 +126,6 @@ export class SprintCapacityAnalyzer {
 
     // Use last 3-5 sprints
     const recentSprints = sorted.slice(0, Math.min(5, sorted.length));
-
-    // Calculate completion rates (completed / planned)
-    const completionRates = recentSprints.map(s =>
-      s.plannedPoints > 0 ? s.completedPoints / s.plannedPoints : 1
-    );
 
     // Filter outliers (beyond 1.5 IQR)
     const filteredVelocities = this.filterOutliers(
@@ -316,7 +310,7 @@ export class SprintCapacityAnalyzer {
   /**
    * Generate reasoning for buffer percentage.
    */
-  private getBufferReasoning(bufferPercentage: number, hasHistoricalData: boolean): string {
+  private getBufferReasoning(bufferPercentage: number, _hasHistoricalData: boolean): string {
     const bufferPercent = Math.round(bufferPercentage * 100);
 
     if (bufferPercent <= 15) {
@@ -343,7 +337,7 @@ export class SprintCapacityAnalyzer {
 
     const avgCompletion = completionRates.reduce((a, b) => a + b, 0) / completionRates.length;
     const variance = completionRates.reduce((sum, rate) =>
-      sum + Math.pow(rate - avgCompletion, 2), 0
+      sum + (rate - avgCompletion) ** 2, 0
     ) / completionRates.length;
     const stdDev = Math.sqrt(variance);
 

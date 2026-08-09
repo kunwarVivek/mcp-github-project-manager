@@ -1,9 +1,7 @@
 import { z } from 'zod';
-import { ToolDefinition, ToolSchema } from '../ToolValidator.js';
+import type { ToolDefinition, ToolSchema } from '../ToolValidator.js';
 import { FeatureManagementService } from '../../../services/FeatureManagementService.js';
-import { ResourceManager } from '../../resource/ResourceManager.js';
-import { ResourceType } from '../../../domain/resource-types.js';
-import { MCPResponse } from '../../../domain/mcp-types.js';
+import type { MCPResponse } from '../../../domain/mcp-types.js';
 import { ToolResultFormatter } from '../ToolResultFormatter.js';
 import { ANNOTATION_PATTERNS } from '../annotations/tool-annotations.js';
 import { AddFeatureOutputSchema } from '../schemas/ai-schemas.js';

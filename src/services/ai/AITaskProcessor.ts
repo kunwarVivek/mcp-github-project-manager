@@ -1,18 +1,20 @@
 import { generateObject, generateText } from 'ai';
 import { z } from 'zod';
 import { AIServiceFactory } from './AIServiceFactory';
+import { type ILogger, Logger } from '../../infrastructure/logger';
 import {
   PRDDocumentSchema,
   AITaskSchema,
   FeatureRequirementSchema,
-  AITask,
-  PRDDocument,
-  FeatureRequirement,
+  type AITask,
+  type PRDDocument,
+  type FeatureRequirement,
   TaskPriority,
+  TaskPrioritySchema,
   TaskStatus,
-  AIGenerationMetadata,
-  SectionConfidence,
-  ConfidenceConfig,
+  type AIGenerationMetadata,
+  type SectionConfidence,
+  type ConfidenceConfig,
   DEFAULT_CONFIDENCE_CONFIG
 } from '../../domain/ai-types';
 import {
@@ -25,13 +27,9 @@ import {
 } from './prompts/TaskGenerationPrompts';
 import {
   CONFIDENCE_PROMPT_CONFIGS,
-  AIConfidenceAssessmentSchema,
   withConfidenceAssessment
 } from './prompts/ConfidencePrompts';
-import {
-  ConfidenceScorer,
-  calculateInputCompleteness
-} from './ConfidenceScorer';
+import { ConfidenceScorer } from './ConfidenceScorer';
 import { v4 as uuidv4 } from 'uuid';
 
 /**
@@ -40,9 +38,17 @@ import { v4 as uuidv4 } from 'uuid';
 export class AITaskProcessor {
   private aiFactory: AIServiceFactory;
   private confidenceScorer: ConfidenceScorer;
+  private readonly logger: ILogger;
 
-  constructor() {
-    this.aiFactory = AIServiceFactory.getInstance();
+  /**
+   * @param aiFactory - AI service factory for model access. When omitted (DI mode),
+   *   defaults to the global singleton via `AIServiceFactory.getInstance()`.
+   * @param logger - Logger instance for diagnostics. When omitted, defaults to
+   *   the global singleton via `Logger.getInstance()`.
+   */
+  constructor(aiFactory?: AIServiceFactory, logger?: ILogger) {
+    this.aiFactory = aiFactory ?? AIServiceFactory.getInstance();
+    this.logger = logger ?? Logger.getInstance();
     this.confidenceScorer = new ConfidenceScorer();
   }
 
@@ -106,7 +112,7 @@ export class AITaskProcessor {
 
       return prd;
     } catch (error) {
-      process.stderr.write(`Error generating PRD from idea: ${error instanceof Error ? error.message : String(error)}\n`);
+      this.logger.error('Error generating PRD from idea', error);
       throw new Error(`Failed to generate PRD: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
@@ -127,13 +133,7 @@ export class AITaskProcessor {
     lowConfidenceSections: SectionConfidence[];
   }> {
     const config = { ...DEFAULT_CONFIDENCE_CONFIG, ...params.confidenceConfig };
-
-    // Calculate input completeness
-    const inputCompleteness = calculateInputCompleteness({
-      description: params.projectIdea,
-      context: params.targetUsers,
-      constraints: params.timeline ? [params.timeline] : []
-    });
+    const scorer = new ConfidenceScorer(config);
 
     // Generate PRD with confidence request
     const prdConfig = PRD_PROMPT_CONFIGS.generateFromIdea;
@@ -166,7 +166,7 @@ export class AITaskProcessor {
       const sectionConfidence: SectionConfidence[] = [];
 
       // Overview section
-      sectionConfidence.push(this.confidenceScorer.calculateSectionConfidence({
+      sectionConfidence.push(scorer.calculateSectionConfidence({
         sectionId: 'overview',
         sectionName: 'Overview',
         inputData: { description: params.projectIdea },
@@ -176,7 +176,7 @@ export class AITaskProcessor {
       }));
 
       // Features section
-      sectionConfidence.push(this.confidenceScorer.calculateSectionConfidence({
+      sectionConfidence.push(scorer.calculateSectionConfidence({
         sectionId: 'features',
         sectionName: 'Features',
         inputData: {
@@ -191,7 +191,7 @@ export class AITaskProcessor {
       }));
 
       // Technical requirements section
-      sectionConfidence.push(this.confidenceScorer.calculateSectionConfidence({
+      sectionConfidence.push(scorer.calculateSectionConfidence({
         sectionId: 'technicalRequirements',
         sectionName: 'Technical Requirements',
         inputData: {
@@ -203,7 +203,7 @@ export class AITaskProcessor {
       }));
 
       // Aggregate confidence
-      const aggregated = this.confidenceScorer.aggregateConfidence(sectionConfidence);
+      const aggregated = scorer.aggregateConfidence(sectionConfidence);
 
       // Build PRD without confidence field
       const prd: PRDDocument = {
@@ -226,7 +226,7 @@ export class AITaskProcessor {
         lowConfidenceSections: aggregated.lowConfidenceSections
       };
     } catch (error) {
-      process.stderr.write(`Error generating PRD with confidence: ${error instanceof Error ? error.message : String(error)}\n`);
+      this.logger.error('Error generating PRD with confidence', error);
       throw new Error(`Failed to generate PRD: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
@@ -265,7 +265,7 @@ export class AITaskProcessor {
 
       return prd;
     } catch (error) {
-      process.stderr.write(`Error enhancing PRD: ${error}\n`);
+      this.logger.error('Error enhancing PRD', error);
       throw new Error(`Failed to enhance PRD: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
@@ -296,7 +296,7 @@ export class AITaskProcessor {
         id: feature.id || uuidv4()
       }));
     } catch (error) {
-      process.stderr.write(`Error extracting features from PRD: ${error instanceof Error ? error.message : String(error)}\n`);
+      this.logger.error('Error extracting features from PRD', error);
       throw new Error(`Failed to extract features: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
@@ -344,7 +344,7 @@ export class AITaskProcessor {
         tags: task.tags || []
       }));
     } catch (error) {
-      process.stderr.write(`Error generating tasks from PRD: ${error}\n`);
+      this.logger.error('Error generating tasks from PRD', error);
       throw new Error(`Failed to generate tasks: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
@@ -373,34 +373,33 @@ export class AITaskProcessor {
     });
 
     try {
-      const result = await generateText({
+      const ComplexitySchema = z.object({
+        complexity: z.number().min(1).max(10),
+        estimatedHours: z.number().positive(),
+        analysis: z.string(),
+        riskFactors: z.array(z.string()),
+        recommendations: z.array(z.string()),
+      });
+
+      const result = await generateObject({
         model,
         system: config.systemPrompt,
         prompt,
+        schema: ComplexitySchema,
         maxOutputTokens: config.maxTokens,
         temperature: config.temperature
       });
 
-      // Parse the response (in a real implementation, you'd want structured output)
-      const analysis = result.text;
-
-      // Extract complexity score (simplified - in practice, use structured output)
-      const complexityMatch = analysis.match(/complexity.*?(\d+)/i);
-      const complexity = complexityMatch ? parseInt(complexityMatch[1]) : 5;
-
-      const hoursMatch = analysis.match(/(\d+)\s*hours?/i);
-      const estimatedHours = hoursMatch ? parseInt(hoursMatch[1]) : complexity * 4;
-
-      return {
-        complexity: Math.min(Math.max(complexity, 1), 10),
-        estimatedHours,
-        analysis,
-        riskFactors: [], // Would extract from structured response
-        recommendations: [] // Would extract from structured response
-      };
+      return result.object;
     } catch (error) {
-      process.stderr.write(`Error analyzing task complexity: ${error instanceof Error ? error.message : String(error)}\n`);
-      throw new Error(`Failed to analyze complexity: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      this.logger.error('Error analyzing task complexity', error);
+      return {
+        complexity: 5,
+        estimatedHours: 20,
+        analysis: 'Fallback: AI analysis unavailable',
+        riskFactors: [],
+        recommendations: [],
+      };
     }
   }
 
@@ -424,16 +423,31 @@ export class AITaskProcessor {
     });
 
     try {
-      const result = await generateText({
+      const SubtaskSchema = z.object({
+        subtasks: z.array(z.object({
+          title: z.string(),
+          description: z.string(),
+          complexity: z.number().min(1).max(10),
+          estimatedHours: z.number().positive(),
+        }))
+      });
+
+      const result = await generateObject({
         model,
         system: config.systemPrompt,
         prompt,
+        schema: SubtaskSchema,
         maxOutputTokens: config.maxTokens,
         temperature: config.temperature
       });
 
-      // For now, return a simple subtask structure
-      // In a real implementation, you'd use structured output
+      return result.object.subtasks.map(subtask => ({
+        id: uuidv4(),
+        ...subtask
+      }));
+    } catch (error) {
+      this.logger.error('Error expanding task into subtasks, using fallback', error);
+      // Fallback to hardcoded structure
       return [
         {
           id: uuidv4(),
@@ -457,9 +471,6 @@ export class AITaskProcessor {
           estimatedHours: 2
         }
       ];
-    } catch (error) {
-      process.stderr.write(`Error expanding task into subtasks: ${error}\n`);
-      throw new Error(`Failed to expand task: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 
@@ -483,26 +494,40 @@ export class AITaskProcessor {
     });
 
     try {
-      const result = await generateText({
+      const PrioritySchema = z.object({
+        priorities: z.array(z.object({
+          taskId: z.string(),
+          priority: TaskPrioritySchema,
+        }))
+      });
+
+      const result = await generateObject({
         model,
         system: config.systemPrompt,
         prompt,
+        schema: PrioritySchema,
         maxOutputTokens: config.maxTokens,
         temperature: config.temperature
       });
 
-      // In a real implementation, you'd use structured output to get priority assignments
-      // For now, we'll apply a simple priority assignment based on the analysis
-      const prioritizedTasks = params.tasks.map((task, index) => ({
+      // Map AI-assigned priorities onto input tasks by taskId
+      const priorityMap = new Map(
+        result.object.priorities.map(p => [p.taskId, p.priority])
+      );
+
+      return params.tasks.map((task, index) => ({
+        ...task,
+        priority: priorityMap.get(task.id) ?? this.assignPriorityBasedOnIndex(index, params.tasks.length),
+        updatedAt: new Date().toISOString()
+      }));
+    } catch (error) {
+      this.logger.error('Error prioritizing tasks, using fallback', error);
+      // Fallback to index-based priority assignment
+      return params.tasks.map((task, index) => ({
         ...task,
         priority: this.assignPriorityBasedOnIndex(index, params.tasks.length),
         updatedAt: new Date().toISOString()
       }));
-
-      return prioritizedTasks;
-    } catch (error) {
-      process.stderr.write(`Error prioritizing tasks: ${error}\n`);
-      throw new Error(`Failed to prioritize tasks: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 
@@ -537,7 +562,7 @@ export class AITaskProcessor {
     try {
       const model = this.aiFactory.getBestAvailableModel();
       if (!model) {
-        process.stderr.write('No AI models available for testing\n');
+        this.logger.warn('No AI models available for testing');
         return false;
       }
 
@@ -548,7 +573,7 @@ export class AITaskProcessor {
       });
       return true;
     } catch (error) {
-      process.stderr.write(`AI connection test failed: ${error}\n`);
+      this.logger.error('AI connection test failed', error);
       return false;
     }
   }

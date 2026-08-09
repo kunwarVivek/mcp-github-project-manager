@@ -1,9 +1,6 @@
-import { spawn, ChildProcess } from 'child_process';
-import { join } from 'path';
-import { existsSync } from 'fs';
-import { CallToolRequestSchema } from '@modelcontextprotocol/sdk/types.js';
-import { MCPResponse, MCPSuccessResponse, MCPErrorResponse } from '../../../domain/mcp-types';
-import { testConfig } from '../setup';
+import { spawn, type ChildProcess } from 'node:child_process';
+import { join } from 'node:path';
+import { existsSync } from 'node:fs';
 
 /**
  * Utility class for testing MCP tools through the actual MCP interface
@@ -35,6 +32,10 @@ export class MCPToolTestUtils {
       GITHUB_TOKEN: process.env.GITHUB_TOKEN || 'test-token',
       GITHUB_OWNER: process.env.GITHUB_OWNER || 'test-owner',
       GITHUB_REPO: process.env.GITHUB_REPO || 'test-repo',
+      // These suites exercise the stdio protocol, not webhooks. Without this
+      // every spawned server binds WEBHOOK_PORT (default 3001); Vitest runs
+      // files in parallel, so they collided and failed nondeterministically.
+      SSE_ENABLED: 'false',
     };
 
     this.serverProcess = spawn('node', [MCPToolTestUtils.serverPath], {
@@ -98,7 +99,7 @@ export class MCPToolTestUtils {
       id: this.messageId++,
       method: "initialize",
       params: {
-        protocolVersion: "2024-11-05",
+        protocolVersion: "2025-03-26",
         capabilities: {},
         clientInfo: { name: "e2e-test", version: "1.0.0" }
       }
@@ -117,7 +118,6 @@ export class MCPToolTestUtils {
 
     return new Promise((resolve, reject) => {
       let responseData = '';
-      let errorData = '';
 
       const timeout = setTimeout(() => {
         reject(new Error('Message timeout'));
@@ -138,21 +138,21 @@ export class MCPToolTestUtils {
               resolve(response);
               return;
             }
-          } catch (e) {
+          } catch {
             // Continue parsing other lines
           }
         }
       };
 
-      const onError = (data: Buffer) => {
-        errorData += data.toString();
+      const onError = (_data: Buffer) => {
+        // Drain stderr so the child process does not block on a full pipe.
       };
 
       this.serverProcess!.stdout!.on('data', onData);
       this.serverProcess!.stderr!.on('data', onError);
 
       // Send the message
-      this.serverProcess!.stdin!.write(JSON.stringify(message) + '\n');
+      this.serverProcess!.stdin!.write(`${JSON.stringify(message)}\n`);
     });
   }
 
@@ -196,7 +196,50 @@ export class MCPToolTestUtils {
       throw new Error(`Tool ${toolName} failed: ${response.error.message}`);
     }
 
+    return MCPToolTestUtils.extractData(response.result);
+  }
+
+  /**
+   * Call a specific tool and return raw MCP result (no extraction)
+   */
+  async callToolRaw(toolName: string, args: any): Promise<any> {
+    const request = {
+      jsonrpc: "2.0",
+      id: this.messageId++,
+      method: "tools/call",
+      params: {
+        name: toolName,
+        arguments: args
+      }
+    };
+
+    const response = await this.sendMessage(request);
+    
+    if (response.error) {
+      throw new Error(`Tool ${toolName} failed: ${response.error.message}`);
+    }
+
     return response.result;
+  }
+
+  /**
+   * Extract domain data from MCP v2 tool response
+   */
+  static extractData(result: any): any {
+    if (!result || typeof result !== 'object') return result;
+    // Check for structuredContent first (MCP v2 with outputSchema)
+    if (result.structuredContent) return result.structuredContent;
+    // Extract from content[0].text
+    if (Array.isArray(result.content) && result.content[0]?.text) {
+      try {
+        const parsed = JSON.parse(result.content[0].text);
+        // Recursively unwrap if needed
+        return MCPToolTestUtils.extractData(parsed);
+      } catch {
+        return result.content[0].text;
+      }
+    }
+    return result;
   }
 
   /**

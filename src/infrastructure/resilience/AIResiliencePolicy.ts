@@ -196,6 +196,26 @@ export class AIResiliencePolicy {
   }
 
   /**
+   * Execute an operation with retry + circuit breaker + timeout but NO fallback.
+   *
+   * Unlike {@link execute}, this throws on failure instead of returning a
+   * DegradedResult. Designed for the metering middleware where the caller's
+   * existing try/catch provides the fallback.
+   */
+  async executeRaw<T>(operation: () => Promise<T>): Promise<T> {
+    return this.retryPolicy.execute(async () => {
+      return this.circuitBreaker.execute(async () => {
+        return this.timeoutPolicy.execute(async ({ signal }) => {
+          if (signal.aborted) {
+            throw new TaskCancelledError('Operation timed out');
+          }
+          return operation();
+        });
+      });
+    });
+  }
+
+  /**
    * Get the current state of the circuit breaker.
    *
    * @returns The current circuit state: 'closed', 'open', or 'half-open'

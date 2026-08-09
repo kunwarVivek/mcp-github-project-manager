@@ -10,25 +10,25 @@
  * does not support server-side filtering for project items.
  */
 
-import { ToolDefinition, ToolSchema } from "./ToolValidator";
+import type { ToolDefinition, ToolSchema } from "./ToolValidator";
 import { ANNOTATION_PATTERNS } from "./annotations/tool-annotations";
 import { createGitHubFactory } from "./tool-factory";
 import {
   UpdateItemPositionInputSchema,
-  UpdateItemPositionInput,
+  type UpdateItemPositionInput,
   SearchIssuesAdvancedInputSchema,
-  SearchIssuesAdvancedInput,
+  type SearchIssuesAdvancedInput,
   FilterProjectItemsInputSchema,
-  FilterProjectItemsInput,
-  ProjectItemFilter,
+  type FilterProjectItemsInput,
+  type ProjectItemFilter,
   ItemPositionOutputSchema,
-  ItemPositionOutput,
+  type ItemPositionOutput,
   SearchIssuesOutputSchema,
-  SearchIssuesOutput,
-  SearchIssueItem,
+  type SearchIssuesOutput,
+  type SearchIssueItem,
   FilterProjectItemsOutputSchema,
-  FilterProjectItemsOutput,
-  ProjectItem,
+  type FilterProjectItemsOutput,
+  type ProjectItem,
 } from "./schemas/project-lifecycle-schemas";
 
 // ============================================================================

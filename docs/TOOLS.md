@@ -1,13 +1,13 @@
 # MCP Tools Reference
 
-This document provides comprehensive documentation for the 16 compound MCP tools exposed by the MCP GitHub Project Manager. Each compound tool groups related actions behind a single `action` parameter, reducing tool-selection overhead for AI agents while preserving full access to all 134 underlying operations.
+This document provides comprehensive documentation for the 16 compound MCP tools exposed by the MCP GitHub Project Manager. Each compound tool groups related actions behind a single `action` parameter, reducing tool-selection overhead for AI agents while preserving full access to all 135 underlying operations.
 
 ## Overview
 
 | Metric | Value |
 |--------|-------|
 | Compound Tools | 16 |
-| Total Actions | 134 |
+| Total Actions | 135 |
 | SDK Version | 1.29 |
 | All tools have | Behavior annotations, Output schemas |
 
@@ -59,8 +59,8 @@ MCP_TOOL_GROUPS=all
 11. [ai_generate](#ai_generate) (8 actions)
 12. [ai_analyze](#ai_analyze) (8 actions)
 13. [ai_plan](#ai_plan) (6 actions)
-14. [agent_work](#agent_work) (7 actions)
-15. [agent_manage](#agent_manage) (6 actions)
+14. [agent_work](#agent_work) (10 actions)
+15. [agent_manage](#agent_manage) (10 actions)
 16. [discover_tools](#discover_tools) (meta-tool)
 
 ---
@@ -538,19 +538,22 @@ AI-powered planning: capacity analysis, backlog prioritization, risk assessment,
 
 Agent task lifecycle: register, check out tasks, report progress, and complete work.
 
-**Action enum:** `register` | `checkout_task` | `release_task` | `complete_task` | `heartbeat` | `check_work_status` | `get_task_context`
+**Action enum:** `register` | `checkout_task` | `release_task` | `complete_task` | `heartbeat` | `check_work_status` | `get_task_context` | `submit_for_review` | `approve_task` | `reject_task`
 
 ### Per-Action Parameters
 
 | Action | Additional Parameters | Description |
 |--------|----------------------|-------------|
 | `register` | `name` (req), `role` (req), `runtime`, `capabilities`, `parentAgentId` | Register an AI agent |
-| `checkout_task` | `agentId` (req), `strategy`, `labels`, `skills` | Claim next available task |
+| `checkout_task` | `agentId` (req), `strategy`, `labels`, `projectId`, `skipBlocked`, `reviewQueue` | Claim next available task (strategies: `highest_priority` (default), `oldest_first`, `skills_match`, `milestone_deadline`, `ai`; `skipBlocked: true` skips tasks with open blockers; `reviewQueue: true` claims from the review queue for reviewers) |
 | `release_task` | `agentId` (req), `taskId` (req), `reason` | Return task to pool |
 | `complete_task` | `agentId` (req), `taskId` (req), `summary` (req) | Mark task completed |
-| `heartbeat` | `agentId` (req), `status`, `taskId`, `progress`, `progressSummary`, `currentBranch`, `blockers` | Report liveness and progress |
+| `heartbeat` | `agentId` (req), `status`, `taskId`, `progress`, `progressSummary`, `currentBranch`, `blockers` | Report liveness and progress (history retained) |
 | `check_work_status` | `agentId` (req), `taskId` (req) | Check PR review/merge status |
-| `get_task_context` | `issueNumber` (req) | Get enriched task context |
+| `get_task_context` | `issueNumber` (req) | Get enriched task context (incl. AI suggestions when configured) |
+| `submit_for_review` | `agentId` (req), `taskId` (req), `summary` | Move a task into the review queue |
+| `approve_task` | `reviewerId` (req), `taskId` (req), `summary` | Approve a reviewed task (completes + closes) |
+| `reject_task` | `reviewerId` (req), `taskId` (req), `feedback` | Reject a reviewed task (returns to pool with feedback) |
 
 ### Examples
 
@@ -571,7 +574,7 @@ Agent task lifecycle: register, check out tasks, report progress, and complete w
 
 Agent administration: list agents, manage budgets, view activity, and submit work products.
 
-**Action enum:** `list` | `deregister` | `get_activity` | `submit_work_product` | `get_budget` | `set_budget`
+**Action enum:** `list` | `deregister` | `get_activity` | `submit_work_product` | `get_budget` | `set_budget` | `reclaim_stale` | `record_usage` | `get_metrics` | `setup_fields`
 
 ### Per-Action Parameters
 
@@ -579,10 +582,22 @@ Agent administration: list agents, manage budgets, view activity, and submit wor
 |--------|----------------------|-------------|
 | `list` | `role`, `status` | List registered agents |
 | `deregister` | `agentId` (req) | Remove agent (cascades to children) |
-| `get_activity` | `agentId` | Get agent activity dashboard |
+| `get_activity` | `agentId` | Get agent activity dashboard (incl. heartbeat history) |
 | `submit_work_product` | `agentId` (req), `taskId` (req), `issueNumber` (req), `branch`, `prNumber`, `commitShas`, `filesChanged`, `testsPassed`, `testsFailed`, `testsTotal`, `summary` | Submit work product |
 | `get_budget` | `agentId` (req) | Check token budget status |
 | `set_budget` | `agentId` (req), `totalTokens` (req), `warningThreshold`, `hardStop`, `resetPeriod` | Configure token budget |
+| `reclaim_stale` | `timeoutMinutes` | Reclaim tasks from agents with stale heartbeats (default 30 min). Also run automatically by the server-side **auto-reclaim scheduler** (see below). |
+| `record_usage` | `agentId` (req), `tokensUsed` (req) | Report token usage against an agent's budget |
+| `get_metrics` | `staleAfterMinutes` | Aggregate + per-agent metrics (throughput, cycle time, budget burn, staleness) |
+| `setup_fields` | `projectId` (req) | Idempotently provision the agent orchestration fields (`agent_claimed_by`, `agent_claimed_at`, `agent_status`, `agent_work_branch`, `agent_pr_number`) on a project |
+
+> **Auto-reclaim scheduler:** the server runs a background sweep every
+> `AGENT_RECLAIM_INTERVAL_MS` (default 5 min, enabled by default) that reclaims
+> tasks from agents whose heartbeat is older than `AGENT_STALE_AFTER_MINUTES`
+> (default 30) and marks those agents `offline`. Each reclamation is recorded as
+> an audit comment on the issue. Disable with `AGENT_RECLAIM_ENABLED=false` or
+> `AGENT_RECLAIM_INTERVAL_MS=0`. This is what makes the swarm self-healing — a
+> crashed harness no longer blocks a task forever.
 
 ### Examples
 

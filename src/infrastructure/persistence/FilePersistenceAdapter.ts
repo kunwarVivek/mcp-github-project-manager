@@ -1,9 +1,9 @@
-import * as fs from 'fs/promises';
-import * as path from 'path';
-import * as zlib from 'zlib';
-import { promisify } from 'util';
-import { SyncMetadata } from '../../domain/resource-types';
-import { Logger } from '../logger/index';
+import * as fs from 'node:fs/promises';
+import * as path from 'node:path';
+import * as zlib from 'node:zlib';
+import { promisify } from 'node:util';
+import type { SyncMetadata } from '../../domain/resource-types';
+import { type ILogger, Logger } from '../logger/index';
 
 const gzip = promisify(zlib.gzip);
 const gunzip = promisify(zlib.gunzip);
@@ -23,14 +23,15 @@ export interface PersistenceStats {
 }
 
 export class FilePersistenceAdapter {
-  private readonly logger = Logger.getInstance();
+  private readonly logger: ILogger;
   private readonly options: PersistenceOptions;
   private readonly metadataFile: string;
   private readonly lockFile: string;
   private readonly tempDir: string;
   private directoryInitialized = false;
 
-  constructor(options: Partial<PersistenceOptions> = {}) {
+  constructor(options: Partial<PersistenceOptions> = {}, logger?: ILogger) {
+    this.logger = logger ?? Logger.getInstance();
     this.options = {
       cacheDirectory: options.cacheDirectory || '.mcp-cache',
       enableCompression: options.enableCompression ?? true,
@@ -227,7 +228,7 @@ export class FilePersistenceAdapter {
       try {
         await fs.writeFile(this.lockFile, process.pid.toString(), { flag: 'wx' });
         return;
-      } catch (error) {
+      } catch {
         // Lock file exists, wait and retry
         await new Promise(resolve => setTimeout(resolve, 100));
       }
@@ -247,7 +248,7 @@ export class FilePersistenceAdapter {
 
     try {
       await fs.unlink(this.lockFile);
-    } catch (error) {
+    } catch {
       // Lock file might not exist, which is fine
       this.logger.debug("Lock file already removed or doesn't exist");
     }

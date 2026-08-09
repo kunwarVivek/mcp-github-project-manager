@@ -1,6 +1,19 @@
-import { GitHubRepositoryFactory } from "../infrastructure/github/GitHubRepositoryFactory";
-import { mapErrorToMCPError } from './utils/ErrorMapper';
+import type { GitHubRepositoryFactory } from "../infrastructure/github/GitHubRepositoryFactory";
+import { safeCall } from './utils/safeCall';
 
+/**
+ * Service for managing GitHub pull requests.
+ *
+ * Handles:
+ * - Creating pull requests (draft or ready for review)
+ * - Getting pull request details
+ * - Listing pull requests with state filtering
+ * - Updating pull request properties (title, body, state)
+ * - Merging pull requests (merge, squash, rebase)
+ * - Managing pull request reviews (list, create with approval/changes)
+ *
+ * Can be instantiated directly with a GitHubRepositoryFactory or via dependency injection.
+ */
 export class PullRequestService {
   private readonly factory: GitHubRepositoryFactory;
 
@@ -15,7 +28,7 @@ export class PullRequestService {
     base: string;
     draft?: boolean;
   }): Promise<{ number: number; id: number; title: string; state: string; url: string }> {
-    try {
+    return safeCall(async () => {
       const octokit = this.factory.getOctokit();
       const config = this.factory.getConfig();
 
@@ -36,9 +49,7 @@ export class PullRequestService {
         state: response.data.state,
         url: response.data.html_url
       };
-    } catch (error) {
-      throw mapErrorToMCPError(error);
-    }
+    });
   }
 
   async getPullRequest(data: { pullNumber: number }): Promise<{
@@ -52,7 +63,7 @@ export class PullRequestService {
     merged: boolean;
     url: string;
   }> {
-    try {
+    return safeCall(async () => {
       const octokit = this.factory.getOctokit();
       const config = this.factory.getConfig();
 
@@ -73,16 +84,14 @@ export class PullRequestService {
         merged: response.data.merged,
         url: response.data.html_url
       };
-    } catch (error) {
-      throw mapErrorToMCPError(error);
-    }
+    });
   }
 
   async listPullRequests(data: {
     state?: 'open' | 'closed' | 'all';
     limit?: number;
   }): Promise<Array<{ number: number; title: string; state: string; user: string; url: string }>> {
-    try {
+    return safeCall(async () => {
       const octokit = this.factory.getOctokit();
       const config = this.factory.getConfig();
 
@@ -100,9 +109,7 @@ export class PullRequestService {
         user: pr.user?.login || 'unknown',
         url: pr.html_url
       }));
-    } catch (error) {
-      throw mapErrorToMCPError(error);
-    }
+    });
   }
 
   async updatePullRequest(data: {
@@ -111,7 +118,7 @@ export class PullRequestService {
     body?: string;
     state?: 'open' | 'closed';
   }): Promise<{ number: number; title: string; state: string; url: string }> {
-    try {
+    return safeCall(async () => {
       const octokit = this.factory.getOctokit();
       const config = this.factory.getConfig();
 
@@ -130,9 +137,7 @@ export class PullRequestService {
         state: response.data.state,
         url: response.data.html_url
       };
-    } catch (error) {
-      throw mapErrorToMCPError(error);
-    }
+    });
   }
 
   async mergePullRequest(data: {
@@ -141,7 +146,7 @@ export class PullRequestService {
     commitTitle?: string;
     commitMessage?: string;
   }): Promise<{ merged: boolean; message: string; sha: string }> {
-    try {
+    return safeCall(async () => {
       const octokit = this.factory.getOctokit();
       const config = this.factory.getConfig();
 
@@ -159,9 +164,7 @@ export class PullRequestService {
         message: response.data.message,
         sha: response.data.sha
       };
-    } catch (error) {
-      throw mapErrorToMCPError(error);
-    }
+    });
   }
 
   async listPullRequestReviews(data: { pullNumber: number }): Promise<Array<{
@@ -170,7 +173,7 @@ export class PullRequestService {
     state: string;
     body: string;
   }>> {
-    try {
+    return safeCall(async () => {
       const octokit = this.factory.getOctokit();
       const config = this.factory.getConfig();
 
@@ -186,9 +189,7 @@ export class PullRequestService {
         state: review.state,
         body: review.body || ''
       }));
-    } catch (error) {
-      throw mapErrorToMCPError(error);
-    }
+    });
   }
 
   async createPullRequestReview(data: {
@@ -197,7 +198,7 @@ export class PullRequestService {
     event: 'APPROVE' | 'REQUEST_CHANGES' | 'COMMENT';
     comments?: Array<{ path: string; position?: number; body: string }>;
   }): Promise<{ id: number; user: string; state: string; body: string }> {
-    try {
+    return safeCall(async () => {
       const octokit = this.factory.getOctokit();
       const config = this.factory.getConfig();
 
@@ -216,8 +217,6 @@ export class PullRequestService {
         state: response.data.state,
         body: response.data.body || ''
       };
-    } catch (error) {
-      throw mapErrorToMCPError(error);
-    }
+    });
   }
 }

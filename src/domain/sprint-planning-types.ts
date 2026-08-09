@@ -11,7 +11,7 @@
  * - AI-12: Sprint scope recommendations
  */
 
-import { SectionConfidence } from "./ai-types";
+import type { SectionConfidence } from "./ai-types";
 
 // ============================================================================
 // Team and Capacity Types

@@ -15,22 +15,20 @@ import {
   getConfidenceTier
 } from './ConfidenceScorer';
 import {
-  SprintRiskAssessment,
-  SprintRisk,
-  MitigationSuggestion,
-  BacklogItem,
-  SprintCapacity,
-  SprintMetrics,
-  SprintRiskCategory,
-  RiskProbability,
-  RiskImpact,
-  MitigationStrategy,
-  MitigationEffort,
+  type SprintRiskAssessment,
+  type SprintRisk,
+  type MitigationSuggestion,
+  type BacklogItem,
+  type SprintCapacity,
+  type SprintMetrics,
+  type RiskProbability,
+  type MitigationStrategy,
+  type MitigationEffort,
   SPRINT_RISK_CATEGORIES,
   RISK_PROBABILITIES
 } from '../../domain/sprint-planning-types';
-import { DetectedDependency } from '../../analysis/DependencyGraph';
-import { SectionConfidence, ConfidenceFactors } from '../../domain/ai-types';
+import type { DetectedDependency } from '../../analysis/DependencyGraph';
+import type { SectionConfidence, ConfidenceFactors } from '../../domain/ai-types';
 import {
   SPRINT_RISK_SYSTEM_PROMPT,
   formatRiskPrompt
@@ -65,11 +63,6 @@ const SprintRiskAssessmentSchema = z.object({
   reasoning: z.string()
 });
 
-/**
- * Type for AI risk assessment response.
- */
-type AIRiskAssessmentResult = z.infer<typeof SprintRiskAssessmentSchema>;
-
 // ============================================================================
 // Risk Assessment Parameters
 // ============================================================================
@@ -98,8 +91,8 @@ export interface RiskAssessmentParams {
 export class SprintRiskAssessor {
   private aiFactory: AIServiceFactory;
 
-  constructor() {
-    this.aiFactory = AIServiceFactory.getInstance();
+  constructor(aiFactory?: AIServiceFactory) {
+    this.aiFactory = aiFactory ?? AIServiceFactory.getInstance();
   }
 
   /**
@@ -360,7 +353,7 @@ export class SprintRiskAssessor {
    */
   private calculateConfidence(
     params: RiskAssessmentParams,
-    riskScore: number,
+    _riskScore: number,
     usedAI: boolean
   ): SectionConfidence {
     // Input completeness based on item details

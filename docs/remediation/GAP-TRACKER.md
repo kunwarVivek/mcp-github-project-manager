@@ -143,6 +143,40 @@ report progress, submit work products, and operate within token budgets.
 | G8-12 | Executor wiring (`index.ts`) | DONE — All 13 agent tools wired in `registerToolExecutors()`. |
 | G8-13 | Documentation | DONE — README agent orchestration section, architecture.md layer docs, TOOLS.md 13-tool reference, CONFIGURATION.md constants, CHANGELOG entry. |
 
+## G9 — Agentic Capability Waves (added 2026-08-07)
+
+Five waves building the agent orchestration layer into a production-grade
+operating layer for any agentic harness (Codex / Claude Code / Cursor / custom
+loops) over GitHub Projects as the task substrate. All waves: full implementation + tests + docs.
+
+| ID | Feature | Status |
+|----|---------|--------|
+| G9-01 | **Real checkout strategies** — `pickCandidate` now actually implements `highest_priority` (P0-P3 / `priority:*` labels), `oldest_first` (createdAt), `skills_match`, `milestone_deadline` (milestone `dueOn`); returns `selectionRationale` | DONE — TaskCheckoutService; 46 new unit tests |
+| G9-02 | **Atomic claims** — TOCTOU guard: re-reads item field values immediately before claiming; aborts cleanly if another agent claimed concurrently. Registry blob: `AgentStore.mutateAgents` read-modify-write with verify-and-merge retry (max 3) — parallel heartbeats/registrations can't silently drop agents | DONE — TaskCheckoutService.claimProjectItemAtomic + AgentStore |
+| G9-03 | **Dependency-aware checkout** — `skipBlocked: true` skips issues whose declared blockers are open (`Blocked by #N`, `Depends on #N`, `blocked` label) | DONE |
+| G9-04 | **`reclaim_stale` action** — exposes `reclaimStaleTasks()` via `agent_manage`; returns stale-heartbeat tasks to the pool, marks agents offline | DONE |
+| G9-05 | **`record_usage` action** — agents report token spend (`AgentBudgetService.recordUsage`); hard stops now actually trigger | DONE |
+| G9-06 | **Review workflow** — `submit_for_review` (issue → review queue, agent → `needs_review`), reviewer `checkout_task { reviewQueue: true }`, `approve_task` (complete+close), `reject_task` (return to pool + feedback comment) | DONE — first-class `reviewer` role |
+| G9-07 | **AI checkout strategy (`ai`)** — LLM ranks the claimable pool via `generateObject` with skill/priority/deadline/blocker context; graceful deterministic fallback when AI unavailable | DONE — TaskCheckoutService.pickCandidateWithAI |
+| G9-08 | **AI-augmented task context** — `AgentContextService` best-effort AI suggestions: acceptance criteria, complexity estimate (1-13), implementation guidance, confidence; base GitHub-derived context always returned | DONE |
+| G9-09 | **Heartbeat history** — bounded (50) most-recent-first log on agent metadata; surfaced in `get_activity` | DONE |
+| G9-10 | **Agent metrics (`get_metrics`)** — `AgentMetricsService`: aggregate + per-agent throughput, cycle time, budget burn, staleness (G6-01 analytics subset) | DONE |
+| G9-11 | **Checkout pagination** — open-issues query walks cursors (max 5 pages) instead of `first: 100` | DONE |
+| G9-12 | **Harness DX** — `docs/agent-harness-integration.md` (Codex/Claude/Cursor/custom recipes) + `examples/basic/agent-loop.ts` reference loop | DONE |
+| G9-13 | **G8 layer unit tests** — 46 tests across AgentStore, TaskCheckoutService, AgentBudgetService, WorkProductService, ProjectFieldSetup, AgentMetricsService | DONE — all 6 suites pass; full suite 2436 pass / 20 pre-existing skips |
+
+## G10 — Auto-Reclaim Scheduler + Field Setup Tool + Agent E2E (added 2026-08-07)
+
+Closes the last autonomy gap (self-healing without a dispatcher), exposes field
+provisioning as a first-class tool, and adds real-GitHub E2E coverage for the
+whole agent layer.
+
+| ID | Feature | Status |
+|----|---------|--------|
+| G10-01 | **Auto-reclaim scheduler** — `AgentReclaimScheduler` service runs a server-side sweep every `AGENT_RECLAIM_INTERVAL_MS` (default 5 min, enabled by default) reclaiming tasks from agents whose heartbeat exceeds `AGENT_STALE_AFTER_MINUTES` (default 30); marks agents `offline`; posts an `## Agent Task Auto-Reclaimed` audit comment per issue (added to `reclaimStaleTasks`); unref'd timer never blocks stdio shutdown; re-entrancy guard; sweep errors logged not thrown | DONE — wired in container.ts + index.ts lifecycle (start on boot, stop on graceful shutdown); env-configurable; 10 new unit tests |
+| G10-02 | **`setup_agent_fields` tool** — idempotently provisions the 5 agent orchestration fields on a project via `ProjectFieldSetup`; exposed as granular tool + `agent_manage/setup_fields` (was already reachable via `manage_project/setup_agent_fields` and `system/setup_project_fields`) | DONE — schema + tool def + executor + ToolRegistry + index.ts + compound routing |
+| G10-03 | **Agent orchestration E2E suite (real GitHub)** — `src/__tests__/e2e/tools/agent-orchestration.e2e.ts`: tool presence/schema, invalid-enum validation, project + field provisioning (idempotency), register/list, full lifecycle (checkout → context → heartbeat → activity → work product → review → approve → release), double-claim rejection, budgets (set/status/record), crash-recovery reclaim (deterministic staleness via `timeoutMinutes: 0.01` + real-timer wait), metrics; agent cleanup in afterAll; graceful skip without real creds | DONE — run via `npm run test:e2e:tools:real:agent` or `node scripts/run-e2e-tests.js --agent-only --real-api`; runner gained `--agent-only` |
+
 ---
 
-*Tracker initialized 2026-07-14. Updated 2026-08-05: full remediation pass — all OPEN gaps closed, 8 industry best features added, agent orchestration layer shipped.*
+*Tracker initialized 2026-07-14. Updated 2026-08-07: full remediation pass — all OPEN gaps closed, 8 industry best features added, agent orchestration layer shipped, then waves G9-01..G9-13 (correctness, autonomy, intelligence, observability, harness DX) shipped with tests + docs, then G10-01..G10-03 (auto-reclaim scheduler, setup_agent_fields tool, agent E2E suite) closed the self-healing + verification loop.*

@@ -1,3 +1,4 @@
+import { vi, type Mock } from 'vitest';
 /**
  * Unit tests for LabelSuggestionService
  *
@@ -10,14 +11,28 @@ import { AIServiceFactory } from '../../../src/services/ai/AIServiceFactory';
 import { generateObject } from 'ai';
 
 // Mock dependencies
-jest.mock('../../../src/services/ai/AIServiceFactory');
-jest.mock('ai', () => ({
-  generateObject: jest.fn()
+vi.mock('../../../src/services/ai/AIServiceFactory', () => {
+  const mockFactory = {
+    getMainModel: vi.fn(),
+    getFallbackModel: vi.fn(),
+    getModel: vi.fn(),
+    getBestAvailableModel: vi.fn(),
+    getPRDModel: vi.fn(),
+    getResearchModel: vi.fn(),
+  };
+  return {
+    AIServiceFactory: {
+      getInstance: vi.fn().mockReturnValue(mockFactory),
+    },
+  };
+});
+vi.mock('ai', () => ({
+  generateObject: vi.fn()
 }));
 
-const mockGenerateObject = generateObject as jest.MockedFunction<typeof generateObject>;
-const mockGetModel = jest.fn();
-const mockGetBestAvailableModel = jest.fn();
+const mockGenerateObject = generateObject as MockedFunction<typeof generateObject>;
+const mockGetModel = vi.fn();
+const mockGetBestAvailableModel = vi.fn();
 
 describe('LabelSuggestionService', () => {
   let service: LabelSuggestionService;
@@ -30,8 +45,8 @@ describe('LabelSuggestionService', () => {
   ];
 
   beforeEach(() => {
-    jest.clearAllMocks();
-    (AIServiceFactory.getInstance as jest.Mock).mockReturnValue({
+    vi.clearAllMocks();
+    (AIServiceFactory.getInstance as Mock).mockReturnValue({
       getModel: mockGetModel,
       getBestAvailableModel: mockGetBestAvailableModel
     });
@@ -299,7 +314,7 @@ describe('LabelSuggestionService', () => {
         }
       } as any);
 
-      const customService = new LabelSuggestionService({ maxSuggestions: 5 });
+      const customService = new LabelSuggestionService(undefined, { maxSuggestions: 5 });
       const result = await customService.suggestLabels({
         issueTitle: 'Test',
         issueDescription: 'Description',
@@ -322,7 +337,7 @@ describe('LabelSuggestionService', () => {
       } as any);
 
       // Higher threshold means fewer in high tier
-      const customService = new LabelSuggestionService({
+      const customService = new LabelSuggestionService(undefined, {
         confidenceThresholds: { high: 0.9, medium: 0.7 }
       });
 
@@ -347,7 +362,7 @@ describe('LabelSuggestionService', () => {
         }
       } as any);
 
-      const customService = new LabelSuggestionService({ includeNewProposals: false });
+      const customService = new LabelSuggestionService(undefined, { includeNewProposals: false });
       const result = await customService.suggestLabels({
         issueTitle: 'Test',
         issueDescription: 'Description',
@@ -358,7 +373,7 @@ describe('LabelSuggestionService', () => {
     });
 
     it('should use preferExisting config', () => {
-      const customService = new LabelSuggestionService({ preferExisting: false });
+      const customService = new LabelSuggestionService(undefined, { preferExisting: false });
       expect(customService).toBeDefined();
     });
   });

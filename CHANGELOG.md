@@ -8,6 +8,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Agentic capability waves (G9)** — five waves hardening the agent orchestration layer for any agentic harness:
+  - **Real checkout strategies** — `highest_priority` (P0-P3 / `priority:*` labels), `oldest_first`, `skills_match`, `milestone_deadline` (milestone dueOn) now actually implemented; results include a `selectionRationale`
+  - **Atomic claims** — TOCTOU guard re-verifies the claim is free immediately before writing; `AgentStore` registry writes use read-modify-write with verify-and-merge retry so concurrent heartbeats/registrations never drop agents
+  - **Dependency-aware checkout** — `skipBlocked: true` skips tasks whose blockers (`Blocked by #N`, `Depends on #N`, `blocked` label) are still open
+  - **`agent_manage/reclaim_stale`** — returns tasks from stale-heartbeat agents to the pool
+  - **`agent_manage/record_usage`** — agents report token spend; budget hard stops now trigger
+  - **Review workflow** — `submit_for_review` (task → review queue), reviewer `checkout_task { reviewQueue: true }`, `approve_task`, `reject_task` (pool + feedback); first-class `reviewer` role
+  - **AI checkout strategy (`ai`)** — LLM-ranked task selection with graceful deterministic fallback
+  - **AI-augmented task context** — `get_task_context` includes best-effort AI acceptance criteria, complexity estimate, implementation guidance, confidence
+  - **Heartbeat history** — bounded (50) most-recent-first log surfaced in `get_activity`
+  - **`agent_manage/get_metrics`** — aggregate + per-agent throughput, cycle time, budget burn, staleness
+  - **Checkout pagination** — open-issues scan walks cursors (up to 5 pages)
+  - **Harness DX** — `docs/agent-harness-integration.md` + `examples/basic/agent-loop.ts` reference loop
+  - **46 new unit tests** for the agent orchestration layer (AgentStore, TaskCheckoutService, AgentBudgetService, WorkProductService, ProjectFieldSetup, AgentMetricsService)
+- **Auto-reclaim scheduler (self-healing)** — the server now runs a background sweep (every `AGENT_RECLAIM_INTERVAL_MS`, default 5 min) that reclaims tasks from agents whose heartbeat exceeds `AGENT_STALE_AFTER_MINUTES` (default 30), marks them `offline`, and posts an `## Agent Task Auto-Reclaimed` audit comment on each issue. A crashed harness no longer blocks a task forever; disable with `AGENT_RECLAIM_ENABLED=false`. New `AgentReclaimScheduler` service wired through the DI container and started/stopped with the server lifecycle; 10 new unit tests.
+- **`setup_agent_fields` tool** — idempotently provisions the agent orchestration project fields (`agent_claimed_by`, `agent_claimed_at`, `agent_status`, `agent_work_branch`, `agent_pr_number`); exposed as a granular tool and as `agent_manage/setup_fields` (already available via `manage_project/setup_agent_fields` and `system/setup_project_fields`).
+- **Agent orchestration E2E suite (real GitHub)** — `src/__tests__/e2e/tools/agent-orchestration.e2e.ts` exercises the full lifecycle through the MCP interface (tool presence, field setup, register → checkout → context → heartbeat → work product → review → approve, double-claim rejection, budgets, crash-recovery reclaim, metrics) with graceful skip when credentials are absent. Run with `npm run test:e2e:tools:real:agent` or `node scripts/run-e2e-tests.js --agent-only --real-api`.
 - **Compound Tool API** — 131 granular tools consolidated into 16 compound tools with action-based routing
   - Progressive disclosure: AI agents see 16 tools instead of 131, reducing tool-selection overhead
   - `discover_tools` meta-tool for runtime exploration of available actions and parameter schemas

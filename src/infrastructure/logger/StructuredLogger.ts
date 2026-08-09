@@ -1,3 +1,5 @@
+import { redactSecrets } from './index.js';
+
 export enum LogLevel {
   DEBUG = 0,
   INFO = 1,
@@ -68,13 +70,13 @@ export class StructuredLogger {
         timestamp: new Date().toISOString(),
         level: levelName,
         message,
-        ...(context && { context }),
+        ...(context && { context: redactSecrets(context) as Record<string, unknown> }),
         ...(error && { error: { name: error.name, message: error.message, stack: error.stack } }),
       };
-      process.stderr.write(JSON.stringify(entry) + '\n');
+      process.stderr.write(`${JSON.stringify(entry)}\n`);
     } else {
       // Delegate to existing Logger (text format)
-      const contextStr = context ? ` ${JSON.stringify(context)}` : '';
+      const contextStr = context ? ` ${JSON.stringify(redactSecrets(context))}` : '';
       const errorStr = error ? ` ${error.message}` : '';
       process.stderr.write(`[${levelName}] ${message}${contextStr}${errorStr}\n`);
     }

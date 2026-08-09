@@ -12,15 +12,16 @@
 
 import { embed, embedMany, cosineSimilarity } from 'ai';
 import { openai } from '@ai-sdk/openai';
-import { ConfidenceScorer, calculateWeightedScore, getConfidenceTier } from './ConfidenceScorer.js';
+import { calculateWeightedScore, getConfidenceTier } from './ConfidenceScorer.js';
 import { EmbeddingCache } from '../../cache/EmbeddingCache.js';
-import {
+import { type ILogger, Logger } from '../../infrastructure/logger';
+import type {
   DuplicateCandidate,
   DuplicateDetectionResult,
   DuplicateDetectionThresholds,
   IssueInput
 } from '../../domain/issue-intelligence-types.js';
-import { SectionConfidence, ConfidenceFactors } from '../../domain/ai-types.js';
+import type { SectionConfidence, ConfidenceFactors } from '../../domain/ai-types.js';
 
 // ============================================================================
 // Constants
@@ -74,18 +75,19 @@ const DEFAULT_MAX_RESULTS = 10;
  */
 export class DuplicateDetectionService {
   private embeddingCache: EmbeddingCache;
-  private confidenceScorer: ConfidenceScorer;
   private thresholds: DuplicateDetectionThresholds;
+  private readonly logger: ILogger;
 
   /**
    * Create a new duplicate detection service.
    *
    * @param thresholds - Optional custom confidence thresholds
+   * @param logger - Optional logger instance for diagnostics
    */
-  constructor(thresholds?: Partial<DuplicateDetectionThresholds>) {
+  constructor(thresholds?: Partial<DuplicateDetectionThresholds>, logger?: ILogger) {
     this.embeddingCache = new EmbeddingCache();
-    this.confidenceScorer = new ConfidenceScorer();
     this.thresholds = { ...DEFAULT_THRESHOLDS, ...thresholds };
+    this.logger = logger ?? Logger.getInstance();
   }
 
   /**
@@ -121,7 +123,7 @@ export class DuplicateDetectionService {
       });
     } catch (error) {
       // Fallback to keyword-based detection
-      process.stderr.write(`[DuplicateDetection] Embedding failed, using keyword fallback: ${error}\n`);
+      this.logger.error('[DuplicateDetection] Embedding failed, using keyword fallback', error);
       return this.getFallbackDetection({
         newIssueText,
         existingIssues,
@@ -140,7 +142,7 @@ export class DuplicateDetectionService {
     existingIssues: IssueInput[];
     maxResults: number;
   }): Promise<DuplicateDetectionResult> {
-    const { newIssueText, issueTitle, issueDescription, existingIssues, maxResults } = params;
+    const { newIssueText, issueTitle, existingIssues, maxResults } = params;
 
     // Get embedding for the new issue
     const newIssueEmbedding = await this.getEmbedding(newIssueText);
@@ -369,8 +371,8 @@ export class DuplicateDetectionService {
    */
   private generateReasoning(
     similarity: number,
-    candidate: IssueInput,
-    newTitle: string
+    _candidate: IssueInput,
+    _newTitle: string
   ): string {
     const percent = (similarity * 100).toFixed(0);
 

@@ -1,3 +1,4 @@
+import { vi } from 'vitest';
 /**
  * Unit tests for CachePersistence
  *
@@ -23,7 +24,7 @@ describe('CachePersistence', () => {
     // Create temp directory for each test
     tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'cache-test-'));
     // Suppress stderr output during tests
-    stderrSpy = jest.spyOn(process.stderr, 'write').mockImplementation(() => true);
+    stderrSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
   });
 
   afterEach(async () => {

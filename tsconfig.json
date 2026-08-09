@@ -2,7 +2,7 @@
   "compilerOptions": {
     "target": "ES2022",
     "module": "ESNext",
-    "moduleResolution": "node",
+    "moduleResolution": "bundler",
     "outDir": "./build",
     "rootDir": "./src",
     "strict": true,
@@ -10,22 +10,21 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
+    // Guarantees every file can be transpiled independently: catches types
+    // re-exported as values, which tsc elides but esbuild/tsx/bundlers emit as
+    // real runtime imports that then fail to resolve.
+    "isolatedModules": true,
     "allowJs": true,
     "declaration": true,
     "sourceMap": true,
-    "baseUrl": ".",
     "paths": {
-      "*": ["*", "*.js"],
-      "@/*": ["src/*"]
+      "@/*": ["./src/*"]
     },
-    "types": ["node", "jest"],
+    "types": ["node"],
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "**/*.test.ts", "build"],
-  "ts-node": {
-    "esm": true,
-    "experimentalSpecifierResolution": "node"
-  }
+
 }

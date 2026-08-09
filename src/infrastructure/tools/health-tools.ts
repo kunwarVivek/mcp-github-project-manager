@@ -6,7 +6,7 @@
  */
 
 import { z } from 'zod';
-import { ToolDefinition, ToolSchema } from './ToolValidator.js';
+import type { ToolDefinition, ToolSchema } from './ToolValidator.js';
 import { HealthService } from '../health/index.js';
 import { AIServiceFactory } from '../../services/ai/AIServiceFactory.js';
 import { ResourceCache } from '../cache/ResourceCache.js';

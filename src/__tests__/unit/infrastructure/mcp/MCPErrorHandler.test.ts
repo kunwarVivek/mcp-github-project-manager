@@ -1,4 +1,4 @@
-import { beforeEach, afterEach, describe, expect, it } from '@jest/globals';
+import { beforeEach, afterEach, describe, expect, it } from 'vitest';
 import { MCPErrorHandler } from "../../../../infrastructure/mcp/MCPErrorHandler";
 import {
   ValidationError,
@@ -10,12 +10,12 @@ import { ResourceNotFoundError, ResourceType } from '../../../../domain/resource
 
 describe("MCPErrorHandler", () => {
   beforeEach(() => {
-    jest.useFakeTimers();
-    jest.setSystemTime(new Date("2025-03-01T12:00:00Z"));
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2025-03-01T12:00:00Z"));
   });
 
   afterEach(() => {
-    jest.useRealTimers();
+    vi.useRealTimers();
   });
 
   describe("handle", () => {

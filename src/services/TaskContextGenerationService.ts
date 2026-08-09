@@ -1,22 +1,23 @@
 import { generateObject } from 'ai';
 import { AIServiceFactory } from './ai/AIServiceFactory';
+import { type ILogger, Logger } from '../infrastructure/logger';
 import {
   CONTEXT_GENERATION_CONFIGS,
   formatContextPrompt,
   BusinessContextSchema,
   TechnicalContextSchema
 } from './ai/prompts/ContextGenerationPrompts';
-import {
+import type {
   AITask,
   PRDDocument,
   EnhancedTaskGenerationConfig,
   FeatureRequirement
 } from '../domain/ai-types';
 import {
-  TaskExecutionContext,
-  ContextQualityMetrics
+  type TaskExecutionContext,
+  type ContextQualityMetrics,
+  calculateCompletenessScore
 } from '../domain/task-context-schemas';
-import { RequirementsTraceabilityService } from './RequirementsTraceabilityService';
 import {
   ENHANCED_TASK_GENERATION,
   INCLUDE_BUSINESS_CONTEXT,
@@ -42,19 +43,25 @@ import { TokenCounter } from './ai/TokenCounter';
  */
 export class TaskContextGenerationService {
   private aiFactory: AIServiceFactory;
-  private traceabilityService: RequirementsTraceabilityService;
   private contextualRefGenerator: ContextualReferenceGenerator;
   private dependencyContextGenerator: DependencyContextGenerator;
   private codeExampleGenerator: CodeExampleGenerator;
   private qualityValidator: ContextQualityValidator;
+  private readonly logger: ILogger;
 
-  constructor() {
-    this.aiFactory = AIServiceFactory.getInstance();
-    this.traceabilityService = new RequirementsTraceabilityService();
-    this.contextualRefGenerator = new ContextualReferenceGenerator();
-    this.dependencyContextGenerator = new DependencyContextGenerator();
-    this.codeExampleGenerator = new CodeExampleGenerator();
+  /**
+   * @param aiFactory - AI service factory for model access. When omitted (DI mode),
+   *   defaults to the global singleton via `AIServiceFactory.getInstance()`.
+   * @param logger - Logger instance for diagnostics. When omitted, defaults to
+   *   the global singleton via `Logger.getInstance()`.
+   */
+  constructor(aiFactory?: AIServiceFactory, logger?: ILogger) {
+    this.aiFactory = aiFactory ?? AIServiceFactory.getInstance();
+    this.contextualRefGenerator = new ContextualReferenceGenerator(this.aiFactory);
+    this.dependencyContextGenerator = new DependencyContextGenerator(this.aiFactory);
+    this.codeExampleGenerator = new CodeExampleGenerator(this.aiFactory);
     this.qualityValidator = new ContextQualityValidator();
+    this.logger = logger ?? Logger.getInstance();
   }
 
   /**
@@ -68,7 +75,7 @@ export class TaskContextGenerationService {
     features?: FeatureRequirement[]
   ): Promise<{ context: TaskExecutionContext; metrics: ContextQualityMetrics }> {
     const startTime = Date.now();
-    let tokenUsage = 0;
+    let estimatedTokens = 0;
     const errors: string[] = [];
     const warnings: string[] = [];
 
@@ -92,7 +99,7 @@ export class TaskContextGenerationService {
             features
           );
           aiEnhancedContext = aiResult.context;
-          tokenUsage = aiResult.tokenUsage;
+          estimatedTokens = aiResult.estimatedTokens;
           aiEnhanced = true;
         } catch (error) {
           errors.push(`AI enhancement failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -110,7 +117,7 @@ export class TaskContextGenerationService {
       const metrics: ContextQualityMetrics = {
         completenessScore: this.calculateContextCompleteness(context),
         generationTime,
-        tokenUsage,
+        estimatedTokens,
         cacheHit: false, // TODO: Implement caching
         aiEnhanced,
         errors,
@@ -129,7 +136,7 @@ export class TaskContextGenerationService {
       const metrics: ContextQualityMetrics = {
         completenessScore: this.calculateContextCompleteness(fallbackContext),
         generationTime,
-        tokenUsage: 0,
+        estimatedTokens: 0,
         cacheHit: false,
         aiEnhanced: false,
         errors,
@@ -179,7 +186,7 @@ export class TaskContextGenerationService {
         }
       };
     } catch (error) {
-      process.stderr.write(`Error generating traceability context: ${error instanceof Error ? error.message : String(error)}\n`);
+      this.logger.error('Error generating traceability context', error);
       return this.getMinimalContext(task);
     }
   }
@@ -193,7 +200,7 @@ export class TaskContextGenerationService {
     config: EnhancedTaskGenerationConfig,
     allTasks?: AITask[],
     features?: FeatureRequirement[]
-  ): Promise<{ context: Partial<TaskExecutionContext>; tokenUsage: number }> {
+  ): Promise<{ context: Partial<TaskExecutionContext>; estimatedTokens: number }> {
     const enhancedContext: Partial<TaskExecutionContext> = {};
     let totalTokens = 0;
 
@@ -214,10 +221,20 @@ export class TaskContextGenerationService {
       if (config.includeTechnicalContext) {
         technicalContext = await this.generateTechnicalContext(task, prdContent);
         if (technicalContext) {
-          enhancedContext.technicalConstraints = technicalContext.technicalConstraints;
-          enhancedContext.architecturalDecisions = technicalContext.architecturalDecisions.map((ad: any) => ad.decision);
-          enhancedContext.integrationPoints = technicalContext.integrationPoints.map((ip: any) => ip.description);
-          enhancedContext.dataRequirements = technicalContext.dataRequirements.map((dr: any) => dr.description);
+          // Every field here comes from an LLM response, so a partial object is
+          // routine rather than exceptional. Mapping unguarded threw
+          // "Cannot read properties of undefined (reading 'map')" and took down
+          // the whole context generation for a merely incomplete answer.
+          enhancedContext.technicalConstraints = technicalContext.technicalConstraints ?? [];
+          enhancedContext.architecturalDecisions = (technicalContext.architecturalDecisions ?? []).map(
+            (ad: any) => ad?.decision,
+          );
+          enhancedContext.integrationPoints = (technicalContext.integrationPoints ?? []).map(
+            (ip: any) => ip?.description,
+          );
+          enhancedContext.dataRequirements = (technicalContext.dataRequirements ?? []).map(
+            (dr: any) => dr?.description,
+          );
           totalTokens += TokenCounter.estimateFromObject(technicalContext);
         }
       }
@@ -260,12 +277,12 @@ export class TaskContextGenerationService {
 
       return {
         context: enhancedContext,
-        tokenUsage: totalTokens
+        estimatedTokens: totalTokens
       };
 
     } catch (error) {
-      process.stderr.write(`Error generating AI-enhanced context: ${error instanceof Error ? error.message : String(error)}\n`);
-      return { context: {}, tokenUsage: totalTokens };
+      this.logger.error('Error generating AI-enhanced context', error);
+      return { context: {}, estimatedTokens: totalTokens };
     }
   }
 
@@ -296,7 +313,7 @@ export class TaskContextGenerationService {
 
       return result.object;
     } catch (error) {
-      process.stderr.write(`Error generating business context: ${error instanceof Error ? error.message : String(error)}\n`);
+      this.logger.error('Error generating business context', error);
       return null;
     }
   }
@@ -328,7 +345,7 @@ export class TaskContextGenerationService {
 
       return result.object;
     } catch (error) {
-      process.stderr.write(`Error generating technical context: ${error instanceof Error ? error.message : String(error)}\n`);
+      this.logger.error('Error generating technical context', error);
       return null;
     }
   }
@@ -402,7 +419,7 @@ export class TaskContextGenerationService {
 
       return guidance;
     } catch (error) {
-      process.stderr.write(`Error generating implementation guidance: ${error instanceof Error ? error.message : String(error)}\n`);
+      this.logger.error('Error generating implementation guidance', error);
       return null;
     }
   }
@@ -451,8 +468,6 @@ export class TaskContextGenerationService {
    * Calculate context completeness score
    */
   private calculateContextCompleteness(context: Partial<TaskExecutionContext>): number {
-    // Import the function from schemas
-    const { calculateCompletenessScore } = require('../domain/task-context-schemas');
     return calculateCompletenessScore(context);
   }
 

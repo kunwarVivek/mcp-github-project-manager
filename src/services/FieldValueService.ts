@@ -1,8 +1,8 @@
-import { GitHubRepositoryFactory } from "../infrastructure/github/GitHubRepositoryFactory";
+import type { GitHubRepositoryFactory } from "../infrastructure/github/GitHubRepositoryFactory";
 import { ResourceNotFoundError } from "../domain/resource-types";
 import { ResourceType } from "../domain/resource-types";
 import { ValidationError } from "../domain/errors";
-import { mapErrorToMCPError } from './utils/ErrorMapper';
+import { safeCall } from './utils/safeCall';
 
 /** Strategy for building a field-type-specific mutation and variables. */
 interface FieldTypeStrategy {
@@ -69,6 +69,19 @@ function makeStrategy(dataType: string, options?: Array<{ id: string; name: stri
   }
 }
 
+/**
+ * Service for managing GitHub Projects v2 custom field values.
+ *
+ * Handles:
+ * - Setting field values (text, number, date, single select, iteration)
+ * - Getting field values for project items
+ * - Clearing field values
+ *
+ * Uses GraphQL mutations to interact with the GitHub Projects v2 API.
+ * Supports field types: TEXT, NUMBER, DATE, SINGLE_SELECT, ITERATION.
+ *
+ * Can be instantiated directly with a GitHubRepositoryFactory or via dependency injection.
+ */
 export class FieldValueService {
   private readonly factory: GitHubRepositoryFactory;
 
@@ -82,7 +95,7 @@ export class FieldValueService {
     fieldId: string;
     value: unknown;
   }): Promise<{ success: boolean; message: string }> {
-    try {
+    return safeCall(async () => {
       const fieldQuery = `
         query($projectId: ID!, $fieldId: ID!) {
           node(id: $projectId) {
@@ -127,9 +140,7 @@ export class FieldValueService {
 
       await this.factory.graphql(mutation, variables);
       return { success: true, message: `Field ${field.name} updated successfully` };
-    } catch (error) {
-      throw mapErrorToMCPError(error);
-    }
+    });
   }
 
   async getFieldValue(data: {
@@ -137,7 +148,7 @@ export class FieldValueService {
     itemId: string;
     fieldId: string;
   }): Promise<{ fieldId: string; fieldName: string; value: unknown; type: string }> {
-    try {
+    return safeCall(async () => {
       const query = `
         query($itemId: ID!) {
           node(id: $itemId) {
@@ -205,9 +216,7 @@ export class FieldValueService {
       }
 
       return { fieldId: data.fieldId, fieldName: fieldValue.field?.name || 'unknown', value, type };
-    } catch (error) {
-      throw mapErrorToMCPError(error);
-    }
+    });
   }
 
   async clearFieldValue(data: {
@@ -215,7 +224,7 @@ export class FieldValueService {
     itemId: string;
     fieldId: string;
   }): Promise<{ success: boolean; message: string }> {
-    try {
+    return safeCall(async () => {
       const mutation = `
         mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!) {
           clearProjectV2ItemFieldValue(input: { projectId: $projectId, itemId: $itemId, fieldId: $fieldId }) {
@@ -231,8 +240,6 @@ export class FieldValueService {
       });
 
       return { success: true, message: `Field ${data.fieldId} cleared successfully` };
-    } catch (error) {
-      throw mapErrorToMCPError(error);
-    }
+    });
   }
 }

@@ -1,24 +1,24 @@
-import { beforeEach, describe, expect, it, jest } from '@jest/globals';
+import { type Mocked, beforeEach, describe, expect, it, vi } from 'vitest';
 import { IterationService } from '../../../services/IterationService';
-import { GitHubRepositoryFactory } from '../../../infrastructure/github/GitHubRepositoryFactory';
-import { FieldValueService } from '../../../services/FieldValueService';
-import { ProjectTemplateService } from '../../../services/ProjectTemplateService';
-import { ProjectLinkingService } from '../../../services/ProjectLinkingService';
+import type { GitHubRepositoryFactory } from '../../../infrastructure/github/GitHubRepositoryFactory';
+import type { FieldValueService } from '../../../services/FieldValueService';
+import type { ProjectTemplateService } from '../../../services/ProjectTemplateService';
+import type { ProjectLinkingService } from '../../../services/ProjectLinkingService';
 import { DomainError } from '../../../domain/errors';
 import { ResourceType } from '../../../domain/resource-types';
-import { CustomField, ProjectItem } from '../../../domain/types';
+import type { CustomField, ProjectItem } from '../../../domain/types';
 
-jest.mock('../../../infrastructure/github/GitHubRepositoryFactory');
-jest.mock('../../../services/FieldValueService');
-jest.mock('../../../services/ProjectTemplateService');
-jest.mock('../../../services/ProjectLinkingService');
+vi.mock('../../../infrastructure/github/GitHubRepositoryFactory');
+vi.mock('../../../services/FieldValueService');
+vi.mock('../../../services/ProjectTemplateService');
+vi.mock('../../../services/ProjectLinkingService');
 
 describe('IterationService', () => {
   let service: IterationService;
-  let mockFactory: jest.Mocked<GitHubRepositoryFactory>;
-  let mockFieldValueService: jest.Mocked<FieldValueService>;
-  let mockTemplateService: jest.Mocked<ProjectTemplateService>;
-  let mockLinkingService: jest.Mocked<ProjectLinkingService>;
+  let mockFactory: Mocked<GitHubRepositoryFactory>;
+  let mockFieldValueService: Mocked<FieldValueService>;
+  let mockTemplateService: Mocked<ProjectTemplateService>;
+  let mockLinkingService: Mocked<ProjectLinkingService>;
 
   const projectId = 'PVT_proj1';
 
@@ -60,12 +60,12 @@ describe('IterationService', () => {
   };
 
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
 
-    mockFactory = {} as jest.Mocked<GitHubRepositoryFactory>;
-    mockFieldValueService = { setFieldValue: jest.fn() } as unknown as jest.Mocked<FieldValueService>;
-    mockTemplateService = { listProjectFields: jest.fn() } as unknown as jest.Mocked<ProjectTemplateService>;
-    mockLinkingService = { listProjectItems: jest.fn() } as unknown as jest.Mocked<ProjectLinkingService>;
+    mockFactory = {} as Mocked<GitHubRepositoryFactory>;
+    mockFieldValueService = { setFieldValue: vi.fn() } as unknown as Mocked<FieldValueService>;
+    mockTemplateService = { listProjectFields: vi.fn() } as unknown as Mocked<ProjectTemplateService>;
+    mockLinkingService = { listProjectItems: vi.fn() } as unknown as Mocked<ProjectLinkingService>;
 
     service = new IterationService(
       mockFactory,

@@ -1,4 +1,4 @@
-import { FieldType } from "../../domain/types";
+import type { FieldType } from "../../domain/types";
 
 // GitHub GraphQL field data types
 export type GraphQLFieldType = 

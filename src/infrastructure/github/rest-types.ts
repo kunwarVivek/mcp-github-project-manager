@@ -1,5 +1,5 @@
-import { Octokit } from "@octokit/rest";
-import { components } from "@octokit/openapi-types";
+
+import type { components } from "@octokit/openapi-types";
 import { hasRestUserProperties } from "../../domain/type-guards";
 
 type OctokitIssue = components["schemas"]["issue"];
@@ -179,6 +179,20 @@ export interface IssueEvent {
   milestone?: RestMilestone;
 }
 
+/**
+ * Octokit v22 models GitHub database IDs as `number | bigint`. The REST-facing
+ * compatibility types in this module intentionally retain `number`, so reject
+ * values that cannot be represented without losing precision.
+ */
+function toSafeRestId(value: number | bigint | undefined, field: string): number | undefined {
+  if (value === undefined) return undefined;
+  const normalized = typeof value === "bigint" ? Number(value) : value;
+  if (!Number.isSafeInteger(normalized)) {
+    throw new RangeError(`${field} is outside JavaScript's safe integer range`);
+  }
+  return normalized;
+}
+
 // Helper function to ensure type safety when mapping API responses
 export function mapOctokitResponseToRestIssue(response: OctokitIssue): RestIssue {
   const user = response.user || {
@@ -188,7 +202,7 @@ export function mapOctokitResponseToRestIssue(response: OctokitIssue): RestIssue
   };
 
   return {
-    id: response.id,
+    id: toSafeRestId(response.id, "issue.id") ?? 0,
     node_id: response.node_id,
     number: response.number,
     title: response.title || "",
@@ -199,7 +213,7 @@ export function mapOctokitResponseToRestIssue(response: OctokitIssue): RestIssue
           typeof label === "string"
             ? label
             : {
-                id: label.id,
+                id: toSafeRestId(label.id, "label.id"),
                 name: label.name || "",
                 color: label.color ?? null,
                 description: label.description ?? null,
@@ -210,7 +224,7 @@ export function mapOctokitResponseToRestIssue(response: OctokitIssue): RestIssue
       : [],
     assignees: (response.assignees || []).map(assignee => ({
       login: assignee.login,
-      id: assignee.id,
+      id: toSafeRestId(assignee.id, "assignee.id") ?? 0,
       avatar_url: assignee.avatar_url,
       gravatar_id: assignee.gravatar_id ?? null,
       url: assignee.url,
@@ -241,7 +255,7 @@ export function mapOctokitResponseToRestIssue(response: OctokitIssue): RestIssue
     html_url: response.html_url,
     user: {
       login: user.login,
-      id: user.id,
+      id: toSafeRestId(user.id, "user.id") ?? 0,
       avatar_url: hasRestUserProperties(user) ? user.avatar_url : undefined,
       gravatar_id: hasRestUserProperties(user) ? (user.gravatar_id ?? null) : null,
       url: hasRestUserProperties(user) ? user.url : undefined,

@@ -1,4 +1,4 @@
-import { GitHubRepositoryFactory } from '../github/GitHubRepositoryFactory.js';
+import type { GitHubRepositoryFactory } from '../github/GitHubRepositoryFactory.js';
 import type { WorkProduct } from '../../domain/agent-orchestration-types.js';
 import { WORK_PRODUCT_MARKER } from '../../domain/agent-orchestration-types.js';
 
@@ -31,7 +31,7 @@ export class WorkProductStore {
       '',
       `- Branch: \`${product.branch || 'N/A'}\``,
       `- PR: ${product.prNumber ? `#${product.prNumber}` : 'N/A'}`,
-      `- Commits: ${product.commitShas.join(', ') || 'N/A'}`,
+      `- Commits: ${product.commitShas?.join(', ') || 'N/A'}`,
       `- Files: ${product.filesChanged.length} changed`,
       testLine ? testLine.trimEnd() : null,
       '',

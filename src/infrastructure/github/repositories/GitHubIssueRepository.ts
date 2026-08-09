@@ -1,6 +1,7 @@
 import { BaseGitHubRepository } from "./BaseRepository";
-import { Issue, CreateIssue, IssueRepository, IssueId } from "../../../domain/types";
-import { ResourceType, ResourceStatus } from "../../../domain/resource-types";
+import type { Issue, CreateIssue, IssueRepository, IssueId } from "../../../domain/types";
+import { ResourceStatus } from "../../../domain/resource-types";
+import { parseResourceStatus, toStatusString } from '../../../domain/utils/StatusParser';
 
 interface GitHubIssue {
   id: string;
@@ -56,10 +57,10 @@ export class GitHubIssueRepository extends BaseGitHubRepository implements Issue
   private mapGitHubIssueToIssue(githubIssue: GitHubIssue): Issue {
     return {
       id: githubIssue.id,
-      number: parseInt(githubIssue.number.toString()),
+      number: parseInt(githubIssue.number.toString(), 10),
       title: githubIssue.title,
       description: githubIssue.body || "",
-      status: githubIssue.state === "OPEN" ? ResourceStatus.ACTIVE : ResourceStatus.CLOSED,
+      status: parseResourceStatus(githubIssue.state, 'githubIssue'),
       assignees: githubIssue.assignees.nodes.map(node => node.login),
       labels: githubIssue.labels.nodes.map(node => node.name),
       milestoneId: githubIssue.milestone?.id,
@@ -99,13 +100,20 @@ export class GitHubIssueRepository extends BaseGitHubRepository implements Issue
       }
     `;
 
+    // createIssue requires the repository node ID (e.g. 'R_kgDO...'), not the
+    // configured repo name — resolve it first. Labels are passed as names
+    // (e.g. 'bug', 'priority:medium'); the mutation requires label node IDs,
+    // so resolve each name to its ID and skip labels that don't exist.
+    const repositoryId = await this.resolveRepositoryNodeId(this.owner, this.repo);
+    const labelIds = await this.resolveLabelNodeIds(data.labels);
+
     const response = await this.graphql<CreateIssueResponse>(mutation, {
       input: {
-        repositoryId: this.repo,
+        repositoryId,
         title: data.title,
         body: data.description,
         assigneeIds: data.assignees,
-        labelIds: data.labels,
+        labelIds,
         milestoneId: data.milestoneId,
       },
     });
@@ -114,6 +122,10 @@ export class GitHubIssueRepository extends BaseGitHubRepository implements Issue
   }
 
   async update(id: IssueId, data: Partial<Issue>): Promise<Issue> {
+    // GraphQL updateIssue needs the node ID (e.g. "I_kwDO...").
+    // Callers may pass a numeric string (issue number) — resolve it first.
+    const nodeId = await this.resolveNodeId(id);
+
     const mutation = `
       mutation($input: UpdateIssueInput!) {
         updateIssue(input: $input) {
@@ -142,14 +154,17 @@ export class GitHubIssueRepository extends BaseGitHubRepository implements Issue
       }
     `;
 
+    // updateIssue accepts labelIds (node IDs); resolve label names first
+    const labelIds = await this.resolveLabelNodeIds(data.labels);
+
     const response = await this.graphql<UpdateIssueResponse>(mutation, {
       input: {
-        id,
+        id: nodeId,
         title: data.title,
         body: data.description,
-        state: data.status === ResourceStatus.CLOSED ? "CLOSED" : "OPEN",
+        state: toStatusString(data.status || ResourceStatus.ACTIVE, 'githubIssue'),
         assigneeIds: data.assignees,
-        labelIds: data.labels,
+        labelIds,
         milestoneId: data.milestoneId,
       },
     });
@@ -161,7 +176,28 @@ export class GitHubIssueRepository extends BaseGitHubRepository implements Issue
     await this.update(id, { status: ResourceStatus.DELETED });
   }
 
+  /** Resolve any issue ID format to its GraphQL node ID. */
+  private async resolveNodeId(id: IssueId): Promise<string> {
+    const parsed = parseInt(id, 10);
+    if (isNaN(parsed) || String(parsed) !== id) return id; // already a node ID
+    // Numeric — look up the issue to get the node ID
+    const issue = await this.findByNumber(parsed);
+    if (!issue) throw new Error(`Issue not found: ${id}`);
+    return issue.id;
+  }
+
   async findById(id: IssueId): Promise<Issue | null> {
+    const issueNumber = parseInt(id, 10);
+
+    // If id is a numeric string (e.g. "42"), query by issue number.
+    // If id is a node ID (e.g. "I_kwDOTxNJaM8..."), query by node ID.
+    if (!isNaN(issueNumber) && String(issueNumber) === id) {
+      return this.findByNumber(issueNumber);
+    }
+    return this.findByNodeId(id);
+  }
+
+  private async findByNumber(number: number): Promise<Issue | null> {
     const query = `
       query($owner: String!, $repo: String!, $number: Int!) {
         repository(owner: $owner, name: $repo) {
@@ -194,7 +230,7 @@ export class GitHubIssueRepository extends BaseGitHubRepository implements Issue
     const response = await this.graphql<GetIssueResponse>(query, {
       owner: this.owner,
       repo: this.repo,
-      number: parseInt(id),
+      number,
     });
 
     const issue = response.repository.issue;
@@ -203,11 +239,47 @@ export class GitHubIssueRepository extends BaseGitHubRepository implements Issue
     return this.mapGitHubIssueToIssue(issue);
   }
 
+  private async findByNodeId(nodeId: string): Promise<Issue | null> {
+    const query = `
+      query($id: ID!) {
+        node(id: $id) {
+          ... on Issue {
+            id
+            number
+            title
+            body
+            state
+            createdAt
+            updatedAt
+            assignees(first: 100) {
+              nodes {
+                login
+              }
+            }
+            labels(first: 100) {
+              nodes {
+                name
+              }
+            }
+            milestone {
+              id
+            }
+          }
+        }
+      }
+    `;
+
+    const response = await this.graphql<{ node: GitHubIssue | null }>(query, { id: nodeId });
+    if (!response.node) return null;
+
+    return this.mapGitHubIssueToIssue(response.node);
+  }
+
   async findAll(): Promise<Issue[]> {
     const query = `
       query($owner: String!, $repo: String!) {
         repository(owner: $owner, name: $repo) {
-          issues(first: 100) {
+          issues(first: 100, orderBy: { field: CREATED_AT, direction: DESC }) {
             nodes {
               id
               number

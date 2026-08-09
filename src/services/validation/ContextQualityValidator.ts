@@ -1,11 +1,10 @@
 import {
-  TaskExecutionContext,
-  ContextQualityMetrics,
+  type TaskExecutionContext,
+  type ContextQualityMetrics,
   calculateCompletenessScore,
-  meetsQualityThresholds,
   getMissingFields
 } from '../../domain/task-context-schemas';
-import { AITask } from '../../domain/ai-types';
+import type { AITask } from '../../domain/ai-types';
 
 /**
  * Quality thresholds from PRD requirements
@@ -15,7 +14,7 @@ export const QUALITY_THRESHOLDS = {
   ACCURACY_TARGET: 90,     // PRD requirement: 90% accuracy validated
   RELEVANCE_TARGET: 85,    // PRD requirement: 85% rated as "highly relevant"
   GENERATION_TIME_MAX: 30, // PRD requirement: < 30 seconds per task
-  TOKEN_USAGE_MAX: 2000,   // PRD requirement: < 2000 tokens per task
+  TOKEN_USAGE_MAX: 2000,   // PRD requirement: < 2000 estimated tokens per task
   ERROR_RATE_MAX: 5        // PRD requirement: < 5% error rate
 };
 
@@ -142,7 +141,7 @@ export class ContextQualityValidator {
     if (context.businessObjective) {
       const hasTaskKeywords = this.containsKeywords(
         context.businessObjective.toLowerCase(),
-        this.extractKeywords(taskTitleLower + ' ' + taskDescLower)
+        this.extractKeywords(`${taskTitleLower} ${taskDescLower}`)
       );
 
       if (!hasTaskKeywords) {
@@ -300,14 +299,14 @@ export class ContextQualityValidator {
     }
 
     // Check token usage: PRD requirement < 2000 tokens
-    if (metrics.tokenUsage > QUALITY_THRESHOLDS.TOKEN_USAGE_MAX) {
+    if (metrics.estimatedTokens > QUALITY_THRESHOLDS.TOKEN_USAGE_MAX) {
       issues.push(
-        `Token usage ${metrics.tokenUsage} exceeds target of ${QUALITY_THRESHOLDS.TOKEN_USAGE_MAX}`
+        `Token usage ${metrics.estimatedTokens} exceeds target of ${QUALITY_THRESHOLDS.TOKEN_USAGE_MAX}`
       );
       score -= 20;
       suggestions.push('Reduce prompt size or implement token optimization');
-    } else if (metrics.tokenUsage > QUALITY_THRESHOLDS.TOKEN_USAGE_MAX * 0.8) {
-      warnings.push(`Token usage ${metrics.tokenUsage} is approaching limit`);
+    } else if (metrics.estimatedTokens > QUALITY_THRESHOLDS.TOKEN_USAGE_MAX * 0.8) {
+      warnings.push(`Token usage ${metrics.estimatedTokens} is approaching limit`);
       score -= 5;
     }
 

@@ -11,25 +11,25 @@
  * with views, custom fields, draft issues (optional), workflows, and insights.
  */
 
-import { ToolDefinition, ToolSchema } from "./ToolValidator";
+import type { ToolDefinition, ToolSchema } from "./ToolValidator";
 import { ANNOTATION_PATTERNS } from "./annotations/tool-annotations";
 import { createGitHubFactory } from "./tool-factory";
 import type { GitHubRepositoryFactory } from "../github/GitHubRepositoryFactory";
 import {
   MarkProjectAsTemplateInputSchema,
-  MarkProjectAsTemplateInput,
+  type MarkProjectAsTemplateInput,
   UnmarkProjectAsTemplateInputSchema,
-  UnmarkProjectAsTemplateInput,
+  type UnmarkProjectAsTemplateInput,
   CopyProjectFromTemplateInputSchema,
-  CopyProjectFromTemplateInput,
+  type CopyProjectFromTemplateInput,
   ListOrganizationTemplatesInputSchema,
-  ListOrganizationTemplatesInput,
+  type ListOrganizationTemplatesInput,
   TemplateProjectOutputSchema,
-  TemplateProjectOutput,
+  type TemplateProjectOutput,
   CopiedProjectOutputSchema,
-  CopiedProjectOutput,
+  type CopiedProjectOutput,
   TemplateListOutputSchema,
-  TemplateListOutput,
+  type TemplateListOutput,
 } from "./schemas/project-template-linking-schemas";
 
 // ============================================================================

@@ -1,9 +1,10 @@
-import { generateText } from 'ai';
+import { generateObject } from 'ai';
+import { z } from 'zod';
 import { InputSanitizer } from './utils/InputSanitizer';
-import { AIServiceFactory } from "./ai/AIServiceFactory";
-import { ProjectManagementService } from "./ProjectManagementService";
-import { IssueEnrichmentService } from "./IssueEnrichmentService";
-import { Logger } from "../infrastructure/logger";
+import type { AIServiceFactory } from "./ai/AIServiceFactory";
+import type { ProjectManagementService } from "./ProjectManagementService";
+import type { IssueEnrichmentService } from "./IssueEnrichmentService";
+import { type ILogger, Logger } from "../infrastructure/logger";
 
 export interface TriageResult {
   issueId: string;
@@ -24,14 +25,15 @@ export interface TriageResult {
 }
 
 export class IssueTriagingService {
-  private logger: Logger;
+  private readonly logger: ILogger;
 
   constructor(
     private aiFactory: AIServiceFactory,
     private projectService: ProjectManagementService,
-    private enrichmentService: IssueEnrichmentService
+    private enrichmentService: IssueEnrichmentService,
+    logger?: ILogger
   ) {
-    this.logger = Logger.getInstance();
+    this.logger = logger ?? Logger.getInstance();
   }
 
   async triageIssue(params: {
@@ -54,33 +56,36 @@ export class IssueTriagingService {
         throw new Error('AI service is not available');
       }
 
-      const prompt = `Triage this issue as JSON: {"classification":{"category":"bug","priority":"high","actionable":true},"actions":[{"type":"add_label","description":"Add bug label","value":"bug"}],"reasoning":"..."}`;
+      const TriageSchema = z.object({
+        classification: z.object({
+          category: z.string(),
+          priority: z.string(),
+          severity: z.string().optional(),
+          actionable: z.boolean(),
+        }),
+        actions: z.array(z.object({
+          type: z.string(),
+          description: z.string(),
+          value: z.string(),
+        })),
+        reasoning: z.string(),
+      });
 
-      const response = await generateText({
+      const result = await generateObject({
         model,
-        prompt: `${prompt}\n\nIssue: ${issueTitle}`,
+        prompt: `Triage this issue.\n\nIssue Title: ${issueTitle}${issueDescription ? `\nDescription: ${issueDescription}` : ''}`,
+        schema: TriageSchema,
         temperature: 0.5,
         maxOutputTokens: 1000
       });
 
-      const jsonMatch = response.text.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) {
-        throw new Error('Failed to extract JSON from AI triage response');
-      }
-
-      let triage;
-      try {
-        triage = JSON.parse(jsonMatch[0]);
-      } catch (parseError) {
-        const message = parseError instanceof Error ? parseError.message : String(parseError);
-        throw new Error(`Failed to parse triage JSON: ${message}`);
-      }
+      const triage = result.object;
 
       return {
         issueId: params.issueId,
         issueTitle,
         classification: triage.classification,
-        actions: triage.actions.map((a: any) => ({ ...a, applied: false })),
+        actions: triage.actions.map((a) => ({ ...a, applied: false })),
         reasoning: triage.reasoning
       };
     } catch (error) {
@@ -89,7 +94,7 @@ export class IssueTriagingService {
     }
   }
 
-  async triageAllIssues(params: {
+  async triageAllIssues(_params: {
     projectId: string;
     onlyUntriaged?: boolean;
     autoApply?: boolean;

@@ -1,4 +1,4 @@
-import { GitHubRepositoryFactory } from '../github/GitHubRepositoryFactory.js';
+import type { GitHubRepositoryFactory } from '../github/GitHubRepositoryFactory.js';
 import { AGENT_FIELDS, AGENT_STATUS_OPTIONS } from '../../domain/agent-orchestration-types.js';
 import type { CustomField, FieldType } from '../../domain/types.js';
 
@@ -7,9 +7,10 @@ interface ListFieldsResponse {
   node: {
     fields: {
       nodes: Array<{
-        id: string;
-        name: string;
-        dataType: string;
+        __typename?: string;
+        id?: string;
+        name?: string;
+        dataType?: string;
       }>;
     };
   } | null;
@@ -83,16 +84,23 @@ export class ProjectFieldSetup {
    *
    * The repository's `findById` currently returns `fields: []`,
    * so we query the fields connection directly.
+   *
+   * Gracefully handles corrupt or deleted fields by filtering out nodes
+   * that have no valid id/name (e.g. stale union members from deleted fields).
    */
   private async listProjectFields(
     projectId: string,
   ): Promise<Array<{ id: string; name: string; dataType: string }>> {
+    // ProjectV2.fields is a union (ProjectV2FieldConfiguration) — select
+    // __typename plus the fields shared by every member, then map dataType
+    // from the concrete types below.
     const query = `
       query($projectId: ID!) {
         node(id: $projectId) {
           ... on ProjectV2 {
             fields(first: 100) {
               nodes {
+                __typename
                 ... on ProjectV2Field {
                   id
                   name
@@ -108,6 +116,41 @@ export class ProjectFieldSetup {
                   name
                   dataType
                 }
+                ... on ProjectV2DateField {
+                  id
+                  name
+                  dataType
+                }
+                ... on ProjectV2NumberField {
+                  id
+                  name
+                  dataType
+                }
+                ... on ProjectV2TrackerField {
+                  id
+                  name
+                  dataType
+                }
+                ... on ProjectV2LabelsField {
+                  id
+                  name
+                  dataType
+                }
+                ... on ProjectV2MilestoneField {
+                  id
+                  name
+                  dataType
+                }
+                ... on ProjectV2RepositoryField {
+                  id
+                  name
+                  dataType
+                }
+                ... on ProjectV2PullRequestField {
+                  id
+                  name
+                  dataType
+                }
               }
             }
           }
@@ -115,10 +158,23 @@ export class ProjectFieldSetup {
       }
     `;
 
-    const response = await this.factory.graphql<ListFieldsResponse>(query, {
-      projectId,
-    });
+    let response: ListFieldsResponse;
+    try {
+      response = await this.factory.graphql<ListFieldsResponse>(query, {
+        projectId,
+      });
+    } catch {
+      // If the fields query fails (e.g., corrupt field IDs), return empty
+      // so ensureFields can still proceed with creating missing fields.
+      return [];
+    }
 
-    return response.node?.fields.nodes ?? [];
+    return (response.node?.fields.nodes ?? [])
+      .filter((node) => node.id && node.name) // Skip corrupt fields with no id/name
+      .map((node) => ({
+        id: node.id ?? '',
+        name: node.name ?? '',
+        dataType: node.dataType ?? (node.__typename === 'ProjectV2SingleSelectField' ? 'SINGLE_SELECT' : 'TEXT'),
+      }));
   }
 }

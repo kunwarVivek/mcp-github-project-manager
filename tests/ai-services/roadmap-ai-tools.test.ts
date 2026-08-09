@@ -1,3 +1,4 @@
+import { vi } from 'vitest';
 /**
  * Unit tests for Roadmap AI MCP Tools
  *
@@ -20,15 +21,29 @@ import {
 } from '../../src/infrastructure/tools/schemas/sprint-roadmap-schemas';
 
 // Mock AIServiceFactory
-jest.mock('../../src/services/ai/AIServiceFactory');
+vi.mock('../../src/services/ai/AIServiceFactory', () => {
+  const mockFactory = {
+    getMainModel: vi.fn(),
+    getFallbackModel: vi.fn(),
+    getModel: vi.fn(),
+    getBestAvailableModel: vi.fn(),
+    getPRDModel: vi.fn(),
+    getResearchModel: vi.fn(),
+  };
+  return {
+    AIServiceFactory: {
+      getInstance: vi.fn().mockReturnValue(mockFactory),
+    },
+  };
+});
 
-const mockGetModel = jest.fn().mockReturnValue(null);
-const mockGetBestAvailableModel = jest.fn().mockReturnValue(null);
+const mockGetModel = vi.fn().mockReturnValue(null);
+const mockGetBestAvailableModel = vi.fn().mockReturnValue(null);
 
 describe('Roadmap AI MCP Tools', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
-    (AIServiceFactory.getInstance as jest.Mock).mockReturnValue({
+    vi.clearAllMocks();
+    (AIServiceFactory.getInstance as Mock).mockReturnValue({
       getModel: mockGetModel,
       getBestAvailableModel: mockGetBestAvailableModel
     });

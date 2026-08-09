@@ -1,30 +1,26 @@
-import { beforeEach, describe, expect, it, jest } from '@jest/globals';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ResourceManager } from '../../../../infrastructure/resource/ResourceManager';
 import {
-  Resource,
   ResourceType,
   ResourceStatus,
   ResourceNotFoundError,
-  ResourceCacheOptions
 } from '../../../../domain/resource-types';
 
 // Mock the ResourceCache class
-jest.mock('../../../../infrastructure/cache/ResourceCache', () => {
+vi.mock('../../../../infrastructure/cache/ResourceCache', () => {
   return {
-    ResourceCache: jest.fn().mockImplementation(() => {
-      return {
-        set: jest.fn(),
-        get: jest.fn(),
-        getByType: jest.fn(),
-        getByTags: jest.fn(),
-        getByNamespace: jest.fn(),
-        delete: jest.fn(),
-        clear: jest.fn(),
-        invalidateByTags: jest.fn(),
-        invalidateByType: jest.fn(),
-        invalidateByNamespace: jest.fn()
-      };
-    })
+    ResourceCache: vi.fn().mockImplementation(function () { return ({
+        set: vi.fn(),
+        get: vi.fn(),
+        getByType: vi.fn(),
+        getByTags: vi.fn(),
+        getByNamespace: vi.fn(),
+        delete: vi.fn(),
+        clear: vi.fn(),
+        invalidateByTags: vi.fn(),
+        invalidateByType: vi.fn(),
+        invalidateByNamespace: vi.fn()
+      }); })
   };
 });
 
@@ -36,7 +32,7 @@ describe('ResourceManager', () => {
 
   beforeEach(() => {
     // Reset mocks before each test
-    jest.clearAllMocks();
+    vi.clearAllMocks();
 
     // Create a new instance of the mocked ResourceCache
     mockCache = new ResourceCache();

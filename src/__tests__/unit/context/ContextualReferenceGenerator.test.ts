@@ -1,23 +1,38 @@
-import { describe, it, expect, beforeEach, jest } from '@jest/globals';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { ContextualReferenceGenerator } from '../../../services/context/ContextualReferenceGenerator';
 import { AIServiceFactory } from '../../../services/ai/AIServiceFactory';
 import {
-  AITask,
-  PRDDocument,
+  type AITask,
+  type PRDDocument,
   TaskStatus,
   TaskPriority,
-  TaskComplexity,
-  FeatureRequirement,
-  TechnicalRequirement
+  type TaskComplexity,
+  type FeatureRequirement,
+  type TechnicalRequirement
 } from '../../../domain/ai-types';
-import { ContextualReferences } from '../../../domain/task-context-schemas';
+import type { ContextualReferences } from '../../../domain/task-context-schemas';
+import { generateObject } from 'ai';
 
 // Mock the AI service factory
-jest.mock('../../../services/ai/AIServiceFactory');
+vi.mock('../../../services/ai/AIServiceFactory', () => {
+  const mockFactory = {
+    getMainModel: vi.fn(),
+    getFallbackModel: vi.fn(),
+    getModel: vi.fn(),
+    getBestAvailableModel: vi.fn(),
+    getPRDModel: vi.fn(),
+    getResearchModel: vi.fn(),
+  };
+  return {
+    AIServiceFactory: {
+      getInstance: vi.fn().mockReturnValue(mockFactory),
+    },
+  };
+});
 
 // Mock the ai package
-jest.mock('ai', () => ({
-  generateObject: jest.fn()
+vi.mock('ai', () => ({
+  generateObject: vi.fn()
 }));
 
 describe('ContextualReferenceGenerator', () => {
@@ -156,15 +171,15 @@ describe('ContextualReferenceGenerator', () => {
   // =========================================================================
 
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
 
     mockFactory = {
-      getBestAvailableModel: jest.fn().mockReturnValue({ modelId: 'test-model' }),
-      getMainModel: jest.fn().mockReturnValue({ modelId: 'test-model' }),
-      getFallbackModel: jest.fn().mockReturnValue({ modelId: 'fallback-model' })
+      getBestAvailableModel: vi.fn().mockReturnValue({ modelId: 'test-model' }),
+      getMainModel: vi.fn().mockReturnValue({ modelId: 'test-model' }),
+      getFallbackModel: vi.fn().mockReturnValue({ modelId: 'fallback-model' })
     };
 
-    (AIServiceFactory.getInstance as jest.Mock).mockReturnValue(mockFactory);
+    (AIServiceFactory.getInstance as Mock).mockReturnValue(mockFactory);
 
     generator = new ContextualReferenceGenerator();
   });
@@ -175,7 +190,7 @@ describe('ContextualReferenceGenerator', () => {
 
   describe('generateReferences - AI available', () => {
     it('should generate references with AI when available', async () => {
-      const { generateObject } = require('ai');
+      
       const mockReferences = createMockContextualReferences();
       generateObject.mockResolvedValue({ object: mockReferences });
 
@@ -188,7 +203,7 @@ describe('ContextualReferenceGenerator', () => {
     });
 
     it('should pass correct config to generateObject', async () => {
-      const { generateObject } = require('ai');
+      
       const mockReferences = createMockContextualReferences();
       generateObject.mockResolvedValue({ object: mockReferences });
 
@@ -210,7 +225,7 @@ describe('ContextualReferenceGenerator', () => {
     });
 
     it('should handle string PRD input', async () => {
-      const { generateObject } = require('ai');
+      
       const mockReferences = createMockContextualReferences();
       generateObject.mockResolvedValue({ object: mockReferences });
 
@@ -224,7 +239,7 @@ describe('ContextualReferenceGenerator', () => {
     });
 
     it('should include features in generation when provided', async () => {
-      const { generateObject } = require('ai');
+      
       const mockReferences = createMockContextualReferences();
       generateObject.mockResolvedValue({ object: mockReferences });
 
@@ -249,7 +264,7 @@ describe('ContextualReferenceGenerator', () => {
     });
 
     it('should use fallback when AI is unavailable', async () => {
-      const { generateObject } = require('ai');
+      
 
       const result = await generator.generateReferences(createMockTask(), createMockPRD());
 
@@ -513,7 +528,7 @@ describe('ContextualReferenceGenerator', () => {
 
   describe('generateReferences - error handling', () => {
     it('should handle AI errors gracefully and use fallback', async () => {
-      const { generateObject } = require('ai');
+      
       generateObject.mockRejectedValue(new Error('AI service error'));
 
       const result = await generator.generateReferences(createMockTask(), createMockPRD());
@@ -524,7 +539,7 @@ describe('ContextualReferenceGenerator', () => {
     });
 
     it('should handle timeout errors', async () => {
-      const { generateObject } = require('ai');
+      
       generateObject.mockRejectedValue(new Error('timeout'));
 
       const result = await generator.generateReferences(createMockTask(), createMockPRD());
@@ -534,7 +549,7 @@ describe('ContextualReferenceGenerator', () => {
     });
 
     it('should handle malformed AI response', async () => {
-      const { generateObject } = require('ai');
+      
       generateObject.mockResolvedValue({ object: null });
 
       // This will use the null return from AI
@@ -546,7 +561,7 @@ describe('ContextualReferenceGenerator', () => {
     });
 
     it('should handle AI returning partial data', async () => {
-      const { generateObject } = require('ai');
+      
       generateObject.mockResolvedValue({
         object: {
           prdSections: [],
@@ -806,7 +821,7 @@ describe('ContextualReferenceGenerator', () => {
 
   describe('additional edge cases', () => {
     it('should handle non-Error thrown objects in AI call', async () => {
-      const { generateObject } = require('ai');
+      
       // Throw a non-Error object to cover the String(error) branch
       generateObject.mockRejectedValue('string error');
 
@@ -818,7 +833,7 @@ describe('ContextualReferenceGenerator', () => {
     });
 
     it('should handle thrown number in AI call', async () => {
-      const { generateObject } = require('ai');
+      
       // Throw a number to cover the String(error) branch
       generateObject.mockRejectedValue(42);
 
@@ -834,8 +849,8 @@ describe('ContextualReferenceGenerator', () => {
 
   describe('error logging and fallback verification', () => {
     it('should write error message to stderr when AI call fails with Error', async () => {
-      const { generateObject } = require('ai');
-      const stderrSpy = jest.spyOn(process.stderr, 'write').mockImplementation(() => true);
+      
+      const stderrSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
       generateObject.mockRejectedValue(new Error('model overloaded'));
 
       await generator.generateReferences(createMockTask(), createMockPRD());
@@ -847,8 +862,8 @@ describe('ContextualReferenceGenerator', () => {
     });
 
     it('should write stringified error to stderr for non-Error thrown values', async () => {
-      const { generateObject } = require('ai');
-      const stderrSpy = jest.spyOn(process.stderr, 'write').mockImplementation(() => true);
+      
+      const stderrSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
       generateObject.mockRejectedValue({ code: 'RATE_LIMIT', detail: 'too many requests' });
 
       await generator.generateReferences(createMockTask(), createMockPRD());
@@ -860,7 +875,7 @@ describe('ContextualReferenceGenerator', () => {
     });
 
     it('should return complete ContextualReferences structure from fallback after AI error', async () => {
-      const { generateObject } = require('ai');
+      
       generateObject.mockRejectedValue(new Error('service unavailable'));
 
       const result = await generator.generateReferences(createMockTask(), createMockPRD());
@@ -880,7 +895,7 @@ describe('ContextualReferenceGenerator', () => {
     });
 
     it('should handle generateObject returning undefined object', async () => {
-      const { generateObject } = require('ai');
+      
       generateObject.mockResolvedValue({ object: undefined });
 
       const result = await generator.generateReferences(createMockTask(), createMockPRD());
@@ -891,7 +906,7 @@ describe('ContextualReferenceGenerator', () => {
     });
 
     it('should handle synchronous throw from generateObject', async () => {
-      const { generateObject } = require('ai');
+      
       generateObject.mockImplementation(() => {
         throw new TypeError('Cannot read properties of undefined');
       });

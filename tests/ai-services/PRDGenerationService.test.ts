@@ -1,26 +1,33 @@
-import { describe, it, expect, beforeEach, jest } from '@jest/globals';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { PRDGenerationService } from '../../src/services/PRDGenerationService';
 import { AITaskProcessor } from '../../src/services/ai/AITaskProcessor';
 
 // Mock the AITaskProcessor directly
-jest.mock('../../src/services/ai/AITaskProcessor');
+vi.mock('../../src/services/ai/AITaskProcessor', () => ({
+  AITaskProcessor: vi.fn().mockImplementation(function () { return ({
+    generatePRDFromIdea: vi.fn(),
+    enhancePRD: vi.fn(),
+    extractFeaturesFromPRD: vi.fn(),
+    testConnection: vi.fn(),
+  }); }),
+}));
 
 describe('PRDGenerationService', () => {
   let service: PRDGenerationService;
   let mockAIService: any;
 
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
 
     // Mock AITaskProcessor methods
     const mockAITaskProcessor = {
-      generatePRDFromIdea: jest.fn(),
-      enhancePRD: jest.fn(),
-      extractFeaturesFromPRD: jest.fn(),
-      testConnection: jest.fn()
+      generatePRDFromIdea: vi.fn(),
+      enhancePRD: vi.fn(),
+      extractFeaturesFromPRD: vi.fn(),
+      testConnection: vi.fn()
     };
 
-    (AITaskProcessor as jest.Mock).mockImplementation(() => mockAITaskProcessor);
+    (AITaskProcessor as Mock).mockImplementation(function () { return mockAITaskProcessor; });
     mockAIService = mockAITaskProcessor;
 
     service = new PRDGenerationService();

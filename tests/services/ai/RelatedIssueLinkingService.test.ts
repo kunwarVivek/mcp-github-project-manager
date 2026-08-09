@@ -1,3 +1,4 @@
+import { vi, type Mock } from 'vitest';
 /**
  * Unit tests for RelatedIssueLinkingService
  *
@@ -10,20 +11,34 @@ import { AIServiceFactory } from '../../../src/services/ai/AIServiceFactory';
 import { embed, embedMany, cosineSimilarity, generateObject } from 'ai';
 
 // Mock dependencies
-jest.mock('../../../src/services/ai/AIServiceFactory');
-jest.mock('ai', () => ({
-  embed: jest.fn(),
-  embedMany: jest.fn(),
-  cosineSimilarity: jest.fn(),
-  generateObject: jest.fn()
+vi.mock('../../../src/services/ai/AIServiceFactory', () => {
+  const mockFactory = {
+    getMainModel: vi.fn(),
+    getFallbackModel: vi.fn(),
+    getModel: vi.fn(),
+    getBestAvailableModel: vi.fn(),
+    getPRDModel: vi.fn(),
+    getResearchModel: vi.fn(),
+  };
+  return {
+    AIServiceFactory: {
+      getInstance: vi.fn().mockReturnValue(mockFactory),
+    },
+  };
+});
+vi.mock('ai', () => ({
+  embed: vi.fn(),
+  embedMany: vi.fn(),
+  cosineSimilarity: vi.fn(),
+  generateObject: vi.fn()
 }));
 
-const mockEmbed = embed as jest.MockedFunction<typeof embed>;
-const mockEmbedMany = embedMany as jest.MockedFunction<typeof embedMany>;
-const mockCosineSimilarity = cosineSimilarity as jest.MockedFunction<typeof cosineSimilarity>;
-const mockGenerateObject = generateObject as jest.MockedFunction<typeof generateObject>;
-const mockGetModel = jest.fn();
-const mockGetBestAvailableModel = jest.fn();
+const mockEmbed = embed as MockedFunction<typeof embed>;
+const mockEmbedMany = embedMany as MockedFunction<typeof embedMany>;
+const mockCosineSimilarity = cosineSimilarity as MockedFunction<typeof cosineSimilarity>;
+const mockGenerateObject = generateObject as MockedFunction<typeof generateObject>;
+const mockGetModel = vi.fn();
+const mockGetBestAvailableModel = vi.fn();
 
 describe('RelatedIssueLinkingService', () => {
   let service: RelatedIssueLinkingService;
@@ -37,9 +52,9 @@ describe('RelatedIssueLinkingService', () => {
   ];
 
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
 
-    (AIServiceFactory.getInstance as jest.Mock).mockReturnValue({
+    (AIServiceFactory.getInstance as Mock).mockReturnValue({
       getModel: mockGetModel,
       getBestAvailableModel: mockGetBestAvailableModel
     });
@@ -277,7 +292,7 @@ describe('RelatedIssueLinkingService', () => {
     it('should toggle semantic similarity', async () => {
       mockCosineSimilarity.mockReturnValue(0.9);
 
-      const customService = new RelatedIssueLinkingService({
+      const customService = new RelatedIssueLinkingService(undefined, {
         includeSemanticSimilarity: false
       });
 
@@ -293,7 +308,7 @@ describe('RelatedIssueLinkingService', () => {
     });
 
     it('should toggle dependency detection', async () => {
-      const customService = new RelatedIssueLinkingService({
+      const customService = new RelatedIssueLinkingService(undefined, {
         includeDependencies: false
       });
 
@@ -309,7 +324,7 @@ describe('RelatedIssueLinkingService', () => {
     });
 
     it('should toggle component grouping', async () => {
-      const customService = new RelatedIssueLinkingService({
+      const customService = new RelatedIssueLinkingService(undefined, {
         includeComponentGrouping: false
       });
 
@@ -473,7 +488,7 @@ describe('RelatedIssueLinkingService', () => {
       });
 
       // Only one strategy
-      const limitedService = new RelatedIssueLinkingService({
+      const limitedService = new RelatedIssueLinkingService(undefined, {
         includeDependencies: false,
         includeComponentGrouping: false
       });

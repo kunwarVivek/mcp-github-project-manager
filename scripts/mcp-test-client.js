@@ -22,11 +22,10 @@
  *   MCP_SERVER_PATH    Path to the MCP server executable (optional)
  */
 
-import { spawn } from 'child_process';
-import { readFileSync } from 'fs';
-import { fileURLToPath } from 'url';
-import { dirname, join } from 'path';
-import readline from 'readline';
+import { spawn } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
+import readline from 'node:readline';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -157,7 +156,7 @@ class MCPTestClient {
 
       this.pendingRequests.set(request.id, { resolve, reject, timeout });
       
-      const message = JSON.stringify(request) + '\n';
+      const message = `${JSON.stringify(request)}\n`;
       this.serverProcess.stdin.write(message);
     });
   }
@@ -634,7 +633,7 @@ async function interactiveMode(client) {
         await callToolInteractive(client, args[0], rl);
         break;
 
-      case 'schema':
+      case 'schema': {
         if (args.length === 0) {
           console.log(colorize('Usage: schema <tool-name>', 'yellow'));
           break;
@@ -646,6 +645,7 @@ async function interactiveMode(client) {
           console.log(colorize(`Tool '${args[0]}' not found`, 'red'));
         }
         break;
+      }
 
       case 'exit':
         rl.close();
@@ -767,11 +767,11 @@ function showHelp() {
   console.log('\nUsage:');
   console.log('  node scripts/mcp-test-client.js <command> [options]');
   console.log('\nCommands:');
-  console.log(colorize('  list-tools', 'green') + '          List all available tools with descriptions');
-  console.log(colorize('  test-tool <name>', 'green') + '    Test a specific tool with sample data');
-  console.log(colorize('  test-all', 'green') + '            Test all tools with sample data');
-  console.log(colorize('  interactive', 'green') + '         Enter interactive mode for manual testing');
-  console.log(colorize('  help', 'green') + '               Show this help message');
+  console.log(`${colorize('  list-tools', 'green')}          List all available tools with descriptions`);
+  console.log(`${colorize('  test-tool <name>', 'green')}    Test a specific tool with sample data`);
+  console.log(`${colorize('  test-all', 'green')}            Test all tools with sample data`);
+  console.log(`${colorize('  interactive', 'green')}         Enter interactive mode for manual testing`);
+  console.log(`${colorize('  help', 'green')}               Show this help message`);
   console.log('\nEnvironment Variables (Required):');
   console.log('  GITHUB_TOKEN       GitHub personal access token');
   console.log('  GITHUB_OWNER       GitHub repository owner');

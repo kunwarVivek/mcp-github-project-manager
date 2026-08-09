@@ -1,3 +1,4 @@
+import { vi, type Mock } from 'vitest';
 /**
  * Unit tests for IssueEnrichmentAIService
  *
@@ -10,21 +11,35 @@ import { AIServiceFactory } from '../../../src/services/ai/AIServiceFactory';
 import { generateObject } from 'ai';
 
 // Mock dependencies
-jest.mock('../../../src/services/ai/AIServiceFactory');
-jest.mock('ai', () => ({
-  generateObject: jest.fn()
+vi.mock('../../../src/services/ai/AIServiceFactory', () => {
+  const mockFactory = {
+    getMainModel: vi.fn(),
+    getFallbackModel: vi.fn(),
+    getModel: vi.fn(),
+    getBestAvailableModel: vi.fn(),
+    getPRDModel: vi.fn(),
+    getResearchModel: vi.fn(),
+  };
+  return {
+    AIServiceFactory: {
+      getInstance: vi.fn().mockReturnValue(mockFactory),
+    },
+  };
+});
+vi.mock('ai', () => ({
+  generateObject: vi.fn()
 }));
 
-const mockGenerateObject = generateObject as jest.MockedFunction<typeof generateObject>;
-const mockGetModel = jest.fn();
-const mockGetBestAvailableModel = jest.fn();
+const mockGenerateObject = generateObject as MockedFunction<typeof generateObject>;
+const mockGetModel = vi.fn();
+const mockGetBestAvailableModel = vi.fn();
 
 describe('IssueEnrichmentAIService', () => {
   let service: IssueEnrichmentAIService;
 
   beforeEach(() => {
-    jest.clearAllMocks();
-    (AIServiceFactory.getInstance as jest.Mock).mockReturnValue({
+    vi.clearAllMocks();
+    (AIServiceFactory.getInstance as Mock).mockReturnValue({
       getModel: mockGetModel,
       getBestAvailableModel: mockGetBestAvailableModel
     });
@@ -91,7 +106,7 @@ describe('IssueEnrichmentAIService', () => {
       });
 
       it('should preserve original when description is substantial (>200 chars)', async () => {
-        const longDescription = 'A'.repeat(250) + ' This is a very detailed issue description.';
+        const longDescription = `${'A'.repeat(250)} This is a very detailed issue description.`;
 
         mockGenerateObject.mockResolvedValue({
           object: {
@@ -150,6 +165,9 @@ describe('IssueEnrichmentAIService', () => {
       });
 
       it('should include suggested assignees when available', async () => {
+        // Create service with suggestAssignees enabled (default is false)
+        const assigneeService = new IssueEnrichmentAIService(undefined, { suggestAssignees: true });
+
         mockGenerateObject.mockResolvedValue({
           object: {
             enrichedBody: 'Content',
@@ -160,7 +178,7 @@ describe('IssueEnrichmentAIService', () => {
           }
         } as any);
 
-        const result = await service.enrichIssue({
+        const result = await assigneeService.enrichIssue({
           issueTitle: 'Test',
           issueDescription: 'Description'
         });
@@ -391,7 +409,7 @@ describe('IssueEnrichmentAIService', () => {
 
   describe('Configuration', () => {
     it('should accept custom configuration', () => {
-      const customService = new IssueEnrichmentAIService({
+      const customService = new IssueEnrichmentAIService(undefined, {
         preserveOriginal: false,
         suggestLabels: false
       });
@@ -400,7 +418,7 @@ describe('IssueEnrichmentAIService', () => {
     });
 
     it('should merge custom config with defaults', () => {
-      const customService = new IssueEnrichmentAIService({
+      const customService = new IssueEnrichmentAIService(undefined, {
         suggestLabels: false
       });
 
@@ -410,7 +428,7 @@ describe('IssueEnrichmentAIService', () => {
     it('should handle includeSections config', async () => {
       mockGetModel.mockReturnValue(null);
 
-      const customService = new IssueEnrichmentAIService({
+      const customService = new IssueEnrichmentAIService(undefined, {
         includeSections: ['problem', 'solution']
       });
 

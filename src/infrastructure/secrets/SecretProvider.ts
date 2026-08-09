@@ -1,4 +1,5 @@
 import { existsSync, readFileSync } from 'node:fs';
+import { GhCliSecretProvider } from './GhCliSecretProvider';
 import { join } from 'node:path';
 
 /**
@@ -10,12 +11,33 @@ export interface SecretProvider {
   get(name: string): string | undefined;
 }
 
+/**
+ * Secret names map 1:1 onto file names inside `SECRETS_DIR`. Anything carrying a
+ * path separator, a NUL, or a relative-path segment is rejected rather than
+ * joined, so a caller can never read outside the mounted directory.
+ */
+function isSafeSecretName(name: string): boolean {
+  if (name.length === 0 || name === '.' || name === '..') return false;
+  return !/[/\\\0]/.test(name);
+}
+
 /** Reads secrets from environment variables (the default). */
 export class EnvSecretProvider implements SecretProvider {
-  constructor(private readonly env: NodeJS.ProcessEnv = process.env) {}
+  /**
+   * Pass an explicit env to read from a fixed object; omit it to read the live
+   * `process.env` at call time.
+   *
+   * Capturing `process.env` by reference at construction is subtly wrong here:
+   * the default resolver is built once when `src/env.ts` is imported, so a
+   * later `process.env = { ...process.env }` (a very common test idiom, and
+   * anything else that *rebinds* rather than mutates) leaves this provider
+   * reading a detached object forever. It also contradicts this module's
+   * documented read-fresh/rotation-aware contract.
+   */
+  constructor(private readonly env?: NodeJS.ProcessEnv) {}
 
   get(name: string): string | undefined {
-    return this.env[name];
+    return (this.env ?? process.env)[name];
   }
 }
 
@@ -29,6 +51,11 @@ export class FileSecretProvider implements SecretProvider {
   constructor(private readonly dir: string) {}
 
   get(name: string): string | undefined {
+    // A secret name is a file name, never a path. Reject anything that could
+    // escape the mounted directory before it reaches `join`.
+    if (!isSafeSecretName(name)) {
+      return undefined;
+    }
     const path = join(this.dir, name);
     if (!existsSync(path)) {
       return undefined;
@@ -77,16 +104,32 @@ export class SecretResolver {
  * Build the default resolver from environment configuration.
  * - `SECRETS_DIR` (e.g. `/run/secrets`): enables the file provider, checked
  *   before env vars.
- * - Environment variables are always the fallback provider.
+ * - Environment variables are the standard fallback provider.
+ * - `gh auth token` is consulted last (GITHUB_TOKEN only), unless
+ *   GH_CLI_TOKEN_FALLBACK=false.
  */
 export function createDefaultSecretResolver(
-  env: NodeJS.ProcessEnv = process.env,
+  env?: NodeJS.ProcessEnv,
 ): SecretResolver {
+  // Read config off the live env when no explicit one is supplied, for the same
+  // reason EnvSecretProvider does (see its constructor docs).
+  const config = env ?? process.env;
   const providers: SecretProvider[] = [];
-  const secretsDir = env.SECRETS_DIR;
+  const secretsDir = config.SECRETS_DIR;
   if (secretsDir) {
     providers.push(new FileSecretProvider(secretsDir));
   }
-  providers.push(new EnvSecretProvider(env));
+  providers.push(new EnvSecretProvider(env));  // undefined -> live process.env
+
+  // Last resort: borrow the token from an authenticated `gh` CLI so local
+  // development needs no explicit configuration. Everything above wins over it.
+  // Opt out with GH_CLI_TOKEN_FALLBACK=false where shelling out is unwanted.
+  const ghFallbackAllowed =
+    config.NODE_ENV !== 'test' &&
+    (config.GH_CLI_TOKEN_FALLBACK ?? 'true').toLowerCase() !== 'false';
+  if (ghFallbackAllowed) {
+    providers.push(new GhCliSecretProvider());
+  }
+
   return new SecretResolver(providers);
 }

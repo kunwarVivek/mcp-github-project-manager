@@ -1,3 +1,4 @@
+import { vi } from 'vitest';
 /**
  * Unit tests for project linking MCP tools
  *
@@ -32,9 +33,24 @@ import {
 import { GitHubRepositoryFactory } from '../../../src/infrastructure/github/GitHubRepositoryFactory.js';
 
 // Mock the repository factory
-jest.mock('../../../src/infrastructure/github/GitHubRepositoryFactory.js');
+vi.mock('../../../src/infrastructure/github/GitHubRepositoryFactory.js', () => {
+  return {
+    GitHubRepositoryFactory: vi.fn().mockImplementation(function () { return ({
+      createIssueRepository: vi.fn(),
+      createMilestoneRepository: vi.fn(),
+      createProjectRepository: vi.fn(),
+      createSprintRepository: vi.fn(),
+      createAutomationRuleRepository: vi.fn(),
+      createSubIssueRepository: vi.fn(),
+      createStatusUpdateRepository: vi.fn(),
+      getOctokit: vi.fn(),
+      getConfig: vi.fn(),
+      graphql: vi.fn(),
+    }); }),
+  };
+});
 
-const MockedFactory = GitHubRepositoryFactory as jest.MockedClass<typeof GitHubRepositoryFactory>;
+const MockedFactory = GitHubRepositoryFactory as MockedClass<typeof GitHubRepositoryFactory>;
 
 describe('Project Linking Tools', () => {
   describe('Input Schemas', () => {
@@ -357,23 +373,22 @@ describe('Project Linking Tools', () => {
   });
 
   describe('Executors', () => {
-    const originalEnv = process.env;
-    let mockGraphql: jest.Mock;
+    let mockGraphql: Mock;
 
     beforeEach(() => {
-      jest.resetAllMocks();
-      process.env = { ...originalEnv, GITHUB_TOKEN: 'test-token' };
+      vi.resetAllMocks();
+      vi.stubEnv('GITHUB_TOKEN', 'test-token');
 
-      mockGraphql = jest.fn();
+      mockGraphql = vi.fn();
 
-      MockedFactory.mockImplementation(() => ({
+      MockedFactory.mockImplementation(function () { return ({
         graphql: mockGraphql,
-        getConfig: jest.fn().mockReturnValue({ owner: 'placeholder', repo: 'placeholder' }),
-      } as unknown as GitHubRepositoryFactory));
+        getConfig: vi.fn().mockReturnValue({ owner: 'placeholder', repo: 'placeholder' }),
+      } as unknown as GitHubRepositoryFactory); });
     });
 
     afterEach(() => {
-      process.env = originalEnv;
+      vi.unstubAllEnvs();
     });
 
     describe('executeLinkProjectToRepository', () => {
@@ -428,7 +443,7 @@ describe('Project Linking Tools', () => {
       });
 
       it('returns error when GITHUB_TOKEN is missing', async () => {
-        delete process.env.GITHUB_TOKEN;
+        vi.stubEnv('GITHUB_TOKEN', undefined as unknown as string);
 
         const input = LinkProjectToRepositoryInputSchema.parse({
           projectId: 'PVT_kwDOTest123',
@@ -437,7 +452,7 @@ describe('Project Linking Tools', () => {
         });
 
         await expect(executeLinkProjectToRepository(input))
-          .rejects.toThrow('GITHUB_TOKEN environment variable is required');
+          .rejects.toThrow(/No GitHub token available/);
       });
     });
 
@@ -469,7 +484,7 @@ describe('Project Linking Tools', () => {
       });
 
       it('returns error when GITHUB_TOKEN is missing', async () => {
-        delete process.env.GITHUB_TOKEN;
+        vi.stubEnv('GITHUB_TOKEN', undefined as unknown as string);
 
         const input = UnlinkProjectFromRepositoryInputSchema.parse({
           projectId: 'PVT_kwDOTest123',
@@ -478,7 +493,7 @@ describe('Project Linking Tools', () => {
         });
 
         await expect(executeUnlinkProjectFromRepository(input))
-          .rejects.toThrow('GITHUB_TOKEN environment variable is required');
+          .rejects.toThrow(/No GitHub token available/);
       });
     });
 
@@ -551,7 +566,7 @@ describe('Project Linking Tools', () => {
       });
 
       it('returns error when GITHUB_TOKEN is missing', async () => {
-        delete process.env.GITHUB_TOKEN;
+        vi.stubEnv('GITHUB_TOKEN', undefined as unknown as string);
 
         const input = LinkProjectToTeamInputSchema.parse({
           projectId: 'PVT_kwDOTest123',
@@ -560,7 +575,7 @@ describe('Project Linking Tools', () => {
         });
 
         await expect(executeLinkProjectToTeam(input))
-          .rejects.toThrow('GITHUB_TOKEN environment variable is required');
+          .rejects.toThrow(/No GitHub token available/);
       });
     });
 
@@ -594,7 +609,7 @@ describe('Project Linking Tools', () => {
       });
 
       it('returns error when GITHUB_TOKEN is missing', async () => {
-        delete process.env.GITHUB_TOKEN;
+        vi.stubEnv('GITHUB_TOKEN', undefined as unknown as string);
 
         const input = UnlinkProjectFromTeamInputSchema.parse({
           projectId: 'PVT_kwDOTest123',
@@ -603,7 +618,7 @@ describe('Project Linking Tools', () => {
         });
 
         await expect(executeUnlinkProjectFromTeam(input))
-          .rejects.toThrow('GITHUB_TOKEN environment variable is required');
+          .rejects.toThrow(/No GitHub token available/);
       });
     });
 
@@ -724,14 +739,14 @@ describe('Project Linking Tools', () => {
       });
 
       it('returns error when GITHUB_TOKEN is missing', async () => {
-        delete process.env.GITHUB_TOKEN;
+        vi.stubEnv('GITHUB_TOKEN', undefined as unknown as string);
 
         const input = ListLinkedRepositoriesInputSchema.parse({
           projectId: 'PVT_kwDOTest123',
         });
 
         await expect(executeListLinkedRepositories(input))
-          .rejects.toThrow('GITHUB_TOKEN environment variable is required');
+          .rejects.toThrow(/No GitHub token available/);
       });
     });
 
@@ -850,14 +865,14 @@ describe('Project Linking Tools', () => {
       });
 
       it('returns error when GITHUB_TOKEN is missing', async () => {
-        delete process.env.GITHUB_TOKEN;
+        vi.stubEnv('GITHUB_TOKEN', undefined as unknown as string);
 
         const input = ListLinkedTeamsInputSchema.parse({
           projectId: 'PVT_kwDOTest123',
         });
 
         await expect(executeListLinkedTeams(input))
-          .rejects.toThrow('GITHUB_TOKEN environment variable is required');
+          .rejects.toThrow(/No GitHub token available/);
       });
     });
   });

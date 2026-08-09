@@ -1,5 +1,5 @@
-import { PRDDocument } from '../../domain/ai-types';
-import { ValidationRuleEngine, ValidationResults, ValidationRule } from './ValidationRuleEngine';
+import type { PRDDocument } from '../../domain/ai-types';
+import { ValidationRuleEngine, type ValidationResults, type ValidationRule } from './ValidationRuleEngine';
 import { COMPLETENESS_RULES } from './rules/CompletenessRules';
 import { CLARITY_RULES } from './rules/ClarityRules';
 

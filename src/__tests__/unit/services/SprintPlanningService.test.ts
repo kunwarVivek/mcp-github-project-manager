@@ -1,22 +1,22 @@
-import { beforeEach, describe, expect, it, jest } from '@jest/globals';
-import { SprintPlanningService, SprintMetrics } from '../../../services/SprintPlanningService';
-import { GitHubRepositoryFactory } from '../../../infrastructure/github/GitHubRepositoryFactory';
-import { GitHubSprintRepository } from '../../../infrastructure/github/repositories/GitHubSprintRepository';
-import { GitHubIssueRepository } from '../../../infrastructure/github/repositories/GitHubIssueRepository';
-import { ResourceStatus, ResourceType } from '../../../domain/resource-types';
-import { Sprint, Issue } from '../../../domain/types';
+import { beforeEach, describe, expect, it, vi, type Mocked, } from 'vitest';
+import { SprintPlanningService, } from '../../../services/SprintPlanningService';
+import type { GitHubRepositoryFactory } from '../../../infrastructure/github/GitHubRepositoryFactory';
+import type { GitHubSprintRepository } from '../../../infrastructure/github/repositories/GitHubSprintRepository';
+import type { GitHubIssueRepository } from '../../../infrastructure/github/repositories/GitHubIssueRepository';
+import { ResourceStatus, } from '../../../domain/resource-types';
+import type { Sprint, Issue } from '../../../domain/types';
 
 // Mock tsyringe decorators
-jest.mock('tsyringe', () => ({
+vi.mock('tsyringe', () => ({
   injectable: () => (target: any) => target,
   inject: () => () => undefined,
 }));
 
 describe('SprintPlanningService', () => {
   let service: SprintPlanningService;
-  let mockFactory: jest.Mocked<GitHubRepositoryFactory>;
-  let mockSprintRepo: jest.Mocked<GitHubSprintRepository>;
-  let mockIssueRepo: jest.Mocked<GitHubIssueRepository>;
+  let mockFactory: Mocked<GitHubRepositoryFactory>;
+  let mockSprintRepo: Mocked<GitHubSprintRepository>;
+  let mockIssueRepo: Mocked<GitHubIssueRepository>;
 
   const mockSprint: Sprint = {
     id: 'sprint-1',
@@ -53,35 +53,35 @@ describe('SprintPlanningService', () => {
   };
 
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
 
     // Create mock repositories
     mockSprintRepo = {
-      findAll: jest.fn(),
-      findById: jest.fn(),
-      findCurrent: jest.fn(),
-      create: jest.fn(),
-      update: jest.fn(),
-      delete: jest.fn(),
-      addIssue: jest.fn(),
-      removeIssue: jest.fn(),
-      getIssues: jest.fn()
-    } as unknown as jest.Mocked<GitHubSprintRepository>;
+      findAll: vi.fn(),
+      findById: vi.fn(),
+      findCurrent: vi.fn(),
+      create: vi.fn(),
+      update: vi.fn(),
+      delete: vi.fn(),
+      addIssue: vi.fn(),
+      removeIssue: vi.fn(),
+      getIssues: vi.fn()
+    } as unknown as Mocked<GitHubSprintRepository>;
 
     mockIssueRepo = {
-      findAll: jest.fn(),
-      findById: jest.fn(),
-      create: jest.fn(),
-      update: jest.fn(),
-      delete: jest.fn()
-    } as unknown as jest.Mocked<GitHubIssueRepository>;
+      findAll: vi.fn(),
+      findById: vi.fn(),
+      create: vi.fn(),
+      update: vi.fn(),
+      delete: vi.fn()
+    } as unknown as Mocked<GitHubIssueRepository>;
 
     // Create mock factory
     mockFactory = {
-      createSprintRepository: jest.fn().mockReturnValue(mockSprintRepo),
-      createIssueRepository: jest.fn().mockReturnValue(mockIssueRepo),
-      getConfig: jest.fn().mockReturnValue({ owner: 'test-owner', repo: 'test-repo' })
-    } as unknown as jest.Mocked<GitHubRepositoryFactory>;
+      createSprintRepository: vi.fn().mockReturnValue(mockSprintRepo),
+      createIssueRepository: vi.fn().mockReturnValue(mockIssueRepo),
+      getConfig: vi.fn().mockReturnValue({ owner: 'test-owner', repo: 'test-repo' })
+    } as unknown as Mocked<GitHubRepositoryFactory>;
 
     // Create service with mock factory
     service = new SprintPlanningService(mockFactory);
@@ -387,7 +387,7 @@ describe('SprintPlanningService', () => {
     it('should convert status strings to ResourceStatus', async () => {
       mockSprintRepo.update.mockResolvedValue({
         ...mockSprint,
-        status: ResourceStatus.CLOSED
+        status: ResourceStatus.COMPLETED
       });
 
       await service.updateSprint({
@@ -397,7 +397,7 @@ describe('SprintPlanningService', () => {
 
       expect(mockSprintRepo.update).toHaveBeenCalledWith(
         'sprint-1',
-        expect.objectContaining({ status: ResourceStatus.CLOSED })
+        expect.objectContaining({ status: ResourceStatus.COMPLETED })
       );
     });
   });

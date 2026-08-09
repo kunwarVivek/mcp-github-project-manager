@@ -1,5 +1,5 @@
-import { Resource, ResourceType, RelationshipType, Relationship, ResourceStatus } from "../../domain/resource-types";
-import { ResourceCache } from "../cache/ResourceCache";
+import { type Resource, ResourceType, RelationshipType, type Relationship, ResourceStatus } from "../../domain/resource-types";
+import type { ResourceCache } from "../cache/ResourceCache";
 
 export class ResourceRelationshipManager {
   private static RELATIONSHIP_NAMESPACE = "relationships";
@@ -15,8 +15,7 @@ export class ResourceRelationshipManager {
     sourceType: ResourceType,
     targetId: string,
     targetType: ResourceType,
-    relationshipType: RelationshipType,
-    metadata?: Record<string, unknown>
+    relationshipType: RelationshipType
   ): Promise<Relationship> {
     // Create a unique ID for the relationship
     const id = `rel_${sourceId}_${targetId}_${relationshipType}`;

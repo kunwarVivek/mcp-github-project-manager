@@ -8,6 +8,13 @@
  */
 
 import { z } from 'zod';
+import {
+  AgentRoleSchema,
+  AgentRuntimeSchema,
+  AgentOperationalStatusSchema,
+  CheckoutStrategySchema,
+  BudgetResetPeriodSchema,
+} from '../../../domain/agent-orchestration-types';
 
 // ============================================================================
 // 1. manage_project — 22+ granular project tools
@@ -381,6 +388,12 @@ export type ManageStatusUpdatesArgs = z.infer<typeof manageStatusUpdatesSchema>;
 // ============================================================================
 
 export const aiGenerateSchema = z.object({
+  /**
+   * Agent this call is made on behalf of. When present, the server debits
+   * the tokens it spends to that agent's budget. Optional: these tools are
+   * also called directly by humans, where there is nothing to debit.
+   */
+  agentId: z.string().optional(),
   action: z.enum([
     'generate_prd', 'enhance_prd', 'parse_prd', 'add_feature',
     'get_next_task', 'analyze_complexity', 'expand_task',
@@ -486,6 +499,12 @@ export type AiGenerateArgs = z.infer<typeof aiGenerateSchema>;
 // ============================================================================
 
 export const aiAnalyzeSchema = z.object({
+  /**
+   * Agent this call is made on behalf of. When present, the server debits
+   * the tokens it spends to that agent's budget. Optional: these tools are
+   * also called directly by humans, where there is nothing to debit.
+   */
+  agentId: z.string().optional(),
   action: z.enum([
     'enrich_issue', 'enrich_bulk', 'triage_issue', 'triage_all',
     'schedule_triaging', 'suggest_labels', 'detect_duplicates', 'find_related',
@@ -561,6 +580,12 @@ export type AiAnalyzeArgs = z.infer<typeof aiAnalyzeSchema>;
 // ============================================================================
 
 export const aiPlanSchema = z.object({
+  /**
+   * Agent this call is made on behalf of. When present, the server debits
+   * the tokens it spends to that agent's budget. Optional: these tools are
+   * also called directly by humans, where there is nothing to debit.
+   */
+  agentId: z.string().optional(),
   action: z.enum([
     'calculate_capacity', 'prioritize_backlog', 'assess_risk',
     'suggest_composition', 'generate_roadmap', 'generate_visualization',
@@ -672,23 +697,26 @@ export const agentWorkSchema = z.object({
   action: z.enum([
     'register', 'checkout_task', 'release_task', 'complete_task',
     'heartbeat', 'check_work_status', 'get_task_context',
+    'submit_for_review', 'approve_task', 'reject_task',
   ]).describe('The agent work operation to perform'),
   // Common
   agentId: z.string().optional(),
   taskId: z.string().optional(),
   // Register
   name: z.string().optional(),
-  role: z.enum(['engineer', 'reviewer', 'pm', 'designer', 'qa', 'devops', 'general']).optional(),
-  runtime: z.enum(['claude-code', 'codex', 'cursor', 'cli', 'http', 'custom']).optional(),
+  role: AgentRoleSchema.optional(),
+  runtime: AgentRuntimeSchema.optional(),
   capabilities: z.array(z.string()).optional(),
   budgetTokens: z.number().optional(),
   metadata: z.record(z.string(), z.unknown()).optional(),
   parentAgentId: z.string().optional(),
   // Checkout task
   projectId: z.string().optional(),
-  strategy: z.enum(['highest_priority', 'oldest_first', 'skills_match', 'milestone_deadline']).optional(),
+  strategy: CheckoutStrategySchema.optional(),
   labels: z.array(z.string()).optional(),
   milestone: z.string().optional(),
+  skipBlocked: z.boolean().optional(),
+  reviewQueue: z.boolean().optional(),
   // Release task
   reason: z.string().optional(),
   // Complete task
@@ -705,7 +733,10 @@ export const agentWorkSchema = z.object({
   blockerDescription: z.string().optional(),
   // Get task context
   issueNumber: z.number().optional(),
-}).describe('Agent Work — register, checkout/release/complete tasks, heartbeat, work status');
+  // Review
+  reviewerId: z.string().optional(),
+  feedback: z.string().optional(),
+}).describe('Agent Work — register, checkout/release/complete tasks, heartbeat, review, work status');
 
 export type AgentWorkArgs = z.infer<typeof agentWorkSchema>;
 
@@ -717,12 +748,14 @@ export const agentManageSchema = z.object({
   action: z.enum([
     'list', 'deregister', 'get_activity',
     'submit_work_product', 'get_budget', 'set_budget',
+    'reclaim_stale', 'record_usage', 'get_metrics', 'setup_fields',
   ]).describe('The agent management operation to perform'),
   // Common
   agentId: z.string().optional(),
+  projectId: z.string().optional(),
   // List
-  role: z.enum(['engineer', 'reviewer', 'pm', 'designer', 'qa', 'devops', 'general']).optional(),
-  status: z.enum(['idle', 'working', 'blocked', 'needs_review', 'offline', 'budget_exhausted']).optional(),
+  role: AgentRoleSchema.optional(),
+  status: AgentOperationalStatusSchema.optional(),
   // Deregister — just agentId
   // Get activity
   includeOffline: z.boolean().optional(),
@@ -741,8 +774,14 @@ export const agentManageSchema = z.object({
   totalTokens: z.number().optional(),
   warningThreshold: z.number().optional(),
   hardStop: z.boolean().optional(),
-  resetPeriod: z.enum(['daily', 'weekly', 'monthly', 'never']).optional(),
-}).describe('Agent Management — list, deregister, activity, work products, and budget');
+  resetPeriod: BudgetResetPeriodSchema.optional(),
+  // Reclaim stale
+  timeoutMinutes: z.number().optional(),
+  // Record usage
+  tokensUsed: z.number().optional(),
+  // Metrics
+  staleAfterMinutes: z.number().optional(),
+}).describe('Agent Management — list, deregister, activity, work products, budget, reclaim, usage, metrics');
 
 export type AgentManageArgs = z.infer<typeof agentManageSchema>;
 

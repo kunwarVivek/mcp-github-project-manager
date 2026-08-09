@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { ToolDefinition, ToolSchema } from "../ToolValidator";
+import type { ToolDefinition, ToolSchema } from "../ToolValidator";
 import { ANNOTATION_PATTERNS } from "../annotations/tool-annotations";
 import {
   ProjectOutputSchema,

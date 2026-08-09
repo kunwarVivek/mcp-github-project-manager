@@ -5,14 +5,14 @@
  * historical data, and confidence scoring.
  */
 
-import { SprintCapacityAnalyzer, CapacityParams } from '../../src/services/ai/SprintCapacityAnalyzer';
-import { SprintMetrics, TeamMember } from '../../src/domain/sprint-planning-types';
+import { SprintCapacityAnalyzer, } from '../../src/services/ai/SprintCapacityAnalyzer';
+import type { SprintMetrics, TeamMember } from '../../src/domain/sprint-planning-types';
 
 describe('SprintCapacityAnalyzer', () => {
   let analyzer: SprintCapacityAnalyzer;
 
   beforeEach(() => {
-    jest.resetAllMocks();
+    vi.resetAllMocks();
     analyzer = new SprintCapacityAnalyzer();
   });
 

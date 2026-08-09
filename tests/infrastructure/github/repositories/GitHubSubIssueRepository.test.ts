@@ -1,3 +1,4 @@
+import { vi } from 'vitest';
 /**
  * Unit tests for GitHubSubIssueRepository
  *
@@ -14,7 +15,7 @@ import { GitHubConfig } from '../../../../src/infrastructure/github/GitHubConfig
 import type { Octokit } from '@octokit/rest';
 
 // Mock Octokit graphql method
-const mockGraphql = jest.fn();
+const mockGraphql = vi.fn();
 
 const mockOctokit = {
   graphql: mockGraphql,
@@ -28,7 +29,7 @@ describe('GitHubSubIssueRepository', () => {
   let repository: GitHubSubIssueRepository;
 
   beforeEach(() => {
-    jest.resetAllMocks();
+    vi.resetAllMocks();
     repository = new GitHubSubIssueRepository(mockOctokit, mockConfig);
   });
 

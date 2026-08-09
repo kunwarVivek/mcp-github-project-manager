@@ -1,18 +1,33 @@
-import { beforeEach, describe, expect, it, jest } from '@jest/globals';
+import { beforeEach, describe, expect, it, vi, type Mocked, } from 'vitest';
 import { DependencyContextGenerator } from '../../../services/context/DependencyContextGenerator';
 import { AIServiceFactory } from '../../../services/ai/AIServiceFactory';
-import { AITask, TaskStatus, TaskPriority, TaskDependency } from '../../../domain/ai-types';
+import { type AITask, TaskStatus, TaskPriority, type TaskDependency } from '../../../domain/ai-types';
+import { generateObject } from 'ai';
 
 // Mock the AI modules
-jest.mock('ai', () => ({
-  generateObject: jest.fn()
+vi.mock('ai', () => ({
+  generateObject: vi.fn()
 }));
 
-jest.mock('../../../services/ai/AIServiceFactory');
+vi.mock('../../../services/ai/AIServiceFactory', () => {
+  const mockFactory = {
+    getMainModel: vi.fn(),
+    getFallbackModel: vi.fn(),
+    getModel: vi.fn(),
+    getBestAvailableModel: vi.fn(),
+    getPRDModel: vi.fn(),
+    getResearchModel: vi.fn(),
+  };
+  return {
+    AIServiceFactory: {
+      getInstance: vi.fn().mockReturnValue(mockFactory),
+    },
+  };
+});
 
 describe('DependencyContextGenerator', () => {
   let generator: DependencyContextGenerator;
-  let mockAIServiceFactory: jest.Mocked<AIServiceFactory>;
+  let mockAIServiceFactory: Mocked<AIServiceFactory>;
 
   // Sample task for testing
   const createMockTask = (overrides?: Partial<AITask>): AITask => ({
@@ -52,17 +67,17 @@ describe('DependencyContextGenerator', () => {
   });
 
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
 
     // Setup mock AIServiceFactory
     mockAIServiceFactory = {
-      getBestAvailableModel: jest.fn(),
-      getAvailableProviders: jest.fn(),
-      createProvider: jest.fn(),
-      createLanguageModel: jest.fn()
-    } as unknown as jest.Mocked<AIServiceFactory>;
+      getBestAvailableModel: vi.fn(),
+      getAvailableProviders: vi.fn(),
+      createProvider: vi.fn(),
+      createLanguageModel: vi.fn()
+    } as unknown as Mocked<AIServiceFactory>;
 
-    (AIServiceFactory.getInstance as jest.Mock).mockReturnValue(mockAIServiceFactory);
+    (AIServiceFactory.getInstance as Mock).mockReturnValue(mockAIServiceFactory);
 
     generator = new DependencyContextGenerator();
   });
@@ -156,7 +171,7 @@ describe('DependencyContextGenerator', () => {
         const allTasks = [task, depTask];
 
         // Mock generateObject to return valid dependency context
-        const mockGenerateObject = require('ai').generateObject;
+        const mockGenerateObject = vi.mocked(generateObject);
         mockGenerateObject.mockResolvedValue({
           object: {
             dependencies: [{
@@ -193,7 +208,7 @@ describe('DependencyContextGenerator', () => {
         const allTasks = [task, depTask];
 
         // Mock generateObject to throw error
-        const mockGenerateObject = require('ai').generateObject;
+        const mockGenerateObject = vi.mocked(generateObject);
         mockGenerateObject.mockRejectedValue(new Error('AI service unavailable'));
 
         const result = await generator.generateDependencyContext(task, allTasks);

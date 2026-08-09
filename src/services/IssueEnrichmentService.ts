@@ -1,8 +1,9 @@
-import { generateText } from 'ai';
+import { generateObject } from 'ai';
+import { z } from 'zod';
 import { InputSanitizer } from './utils/InputSanitizer';
-import { AIServiceFactory } from "./ai/AIServiceFactory";
-import { ProjectManagementService } from "./ProjectManagementService";
-import { Logger } from "../infrastructure/logger";
+import type { AIServiceFactory } from "./ai/AIServiceFactory";
+import type { ProjectManagementService } from "./ProjectManagementService";
+import { type ILogger, Logger } from "../infrastructure/logger";
 import { isProjectItem } from "../domain/type-guards";
 
 export interface IssueEnrichmentResult {
@@ -19,13 +20,14 @@ export interface IssueEnrichmentResult {
 }
 
 export class IssueEnrichmentService {
-  private logger: Logger;
+  private readonly logger: ILogger;
 
   constructor(
     private aiFactory: AIServiceFactory,
-    private projectService: ProjectManagementService
+    private projectService: ProjectManagementService,
+    logger?: ILogger
   ) {
-    this.logger = Logger.getInstance();
+    this.logger = logger ?? Logger.getInstance();
   }
 
   async enrichIssue(params: {
@@ -50,22 +52,27 @@ export class IssueEnrichmentService {
         throw new Error('AI service is not available');
       }
 
-      const prompt = `You are an expert project manager. Analyze this issue and provide enrichment as JSON: {"suggestedLabels":[],"suggestedPriority":"medium","suggestedType":"task","complexity":"moderate","estimatedEffort":"2 hours","relatedIssues":[],"reasoning":"..."}`;
+      const EnrichmentSchema = z.object({
+        suggestedLabels: z.array(z.string()),
+        suggestedPriority: z.enum(['critical', 'high', 'medium', 'low']),
+        suggestedType: z.enum(['bug', 'feature', 'enhancement', 'documentation', 'task']),
+        complexity: z.enum(['simple', 'moderate', 'complex']),
+        estimatedEffort: z.string(),
+        relatedIssues: z.array(z.string()),
+        milestone: z.string().optional(),
+        sprint: z.string().optional(),
+        reasoning: z.string(),
+      });
 
-      const response = await generateText({
+      const result = await generateObject({
         model,
-        prompt: `${prompt}\n\nIssue: ${issueTitle}\nDescription: ${issueDescription || 'None'}`,
+        prompt: `You are an expert project manager. Analyze this issue and provide enrichment.\n\nIssue: ${issueTitle}\nDescription: ${issueDescription || 'None'}`,
+        schema: EnrichmentSchema,
         temperature: 0.5,
         maxOutputTokens: 1000
       });
 
-      const jsonMatch = response.text.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) {
-        throw new Error('Failed to parse AI response');
-      }
-
-      const enrichment = JSON.parse(jsonMatch[0]);
-      return { issueId: params.issueId, ...enrichment };
+      return { issueId: params.issueId, ...result.object };
     } catch (error) {
       this.logger.error(`Failed to enrich issue ${params.issueId}`, error);
       throw error;
@@ -107,9 +114,5 @@ export class IssueEnrichmentService {
       applied.push('labels');
     }
     return { applied };
-  }
-
-  private getLabelColor(label: string): string {
-    return label.includes('bug') ? 'D73A4A' : '0E8A16';
   }
 }

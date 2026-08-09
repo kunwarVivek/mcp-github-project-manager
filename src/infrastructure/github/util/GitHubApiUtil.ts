@@ -1,5 +1,5 @@
-import { Octokit } from "@octokit/rest";
-import { OctokitInstance } from "../types";
+
+import type { OctokitInstance } from "../types";
 
 export interface RateLimitInfo {
   limit: number;
@@ -36,7 +36,7 @@ export class GitHubApiUtil {
   public async getRateLimit(octokit: OctokitInstance): Promise<RateLimitInfo> {
     try {
       // Check if octokit.rest exists before trying to use it
-      if (octokit.rest && octokit.rest.rateLimit) {
+      if (octokit.rest?.rateLimit) {
         const response = await octokit.rest.rateLimit.get();
         const { limit, remaining, reset, used } = response.data.rate;
         

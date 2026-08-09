@@ -1,12 +1,12 @@
-import { GitHubRepositoryFactory } from "../infrastructure/github/GitHubRepositoryFactory";
-import { GitHubIssueRepository } from "../infrastructure/github/repositories/GitHubIssueRepository";
-import { GitHubMilestoneRepository } from "../infrastructure/github/repositories/GitHubMilestoneRepository";
+import type { GitHubRepositoryFactory } from "../infrastructure/github/GitHubRepositoryFactory";
+import type { GitHubIssueRepository } from "../infrastructure/github/repositories/GitHubIssueRepository";
+import type { GitHubMilestoneRepository } from "../infrastructure/github/repositories/GitHubMilestoneRepository";
 import { ResourceStatus, ResourceType } from "../domain/resource-types";
-import { Issue } from "../domain/types";
+import type { Issue } from "../domain/types";
 import {
   ResourceNotFoundError,
 } from "../domain/errors";
-import { mapErrorToMCPError } from './utils/ErrorMapper';
+import { safeCall } from './utils/safeCall';
 
 /**
  * Represents a dependency relationship between issues.
@@ -61,16 +61,16 @@ export class SubIssueService {
    * @throws ResourceNotFoundError if the issue doesn't exist
    */
   async updateIssueStatus(issueId: string, status: ResourceStatus): Promise<Issue> {
-    try {
+    return safeCall(async () => {
       const issue = await this.issueRepo.findById(issueId);
       if (!issue) {
         throw new ResourceNotFoundError(ResourceType.ISSUE, issueId);
       }
 
-      return await this.issueRepo.update(issueId, { status });
-    } catch (error) {
-      throw mapErrorToMCPError(error);
-    }
+      const updatedIssue = await this.issueRepo.update(issueId, { status });
+      // Return plain object for MCP compatibility
+      return updatedIssue;
+    });
   }
 
   /**
@@ -84,7 +84,7 @@ export class SubIssueService {
    * @throws ResourceNotFoundError if either issue doesn't exist
    */
   async addIssueDependency(issueId: string, dependsOnId: string): Promise<void> {
-    try {
+    return safeCall(async () => {
       // Verify the dependent issue exists
       const issue = await this.issueRepo.findById(issueId);
       if (!issue) {
@@ -103,9 +103,7 @@ export class SubIssueService {
         labels.push(`depends-on:${dependsOnId}`);
         await this.issueRepo.update(issueId, { labels });
       }
-    } catch (error) {
-      throw mapErrorToMCPError(error);
-    }
+    });
   }
 
   /**
@@ -116,7 +114,7 @@ export class SubIssueService {
    * @throws ResourceNotFoundError if the issue doesn't exist
    */
   async getIssueDependencies(issueId: string): Promise<string[]> {
-    try {
+    return safeCall(async () => {
       const issue = await this.issueRepo.findById(issueId);
       if (!issue) {
         throw new ResourceNotFoundError(ResourceType.ISSUE, issueId);
@@ -131,9 +129,7 @@ export class SubIssueService {
       });
 
       return dependencies;
-    } catch (error) {
-      throw mapErrorToMCPError(error);
-    }
+    });
   }
 
   /**
@@ -145,7 +141,7 @@ export class SubIssueService {
    * @throws ResourceNotFoundError if either the issue or milestone doesn't exist
    */
   async assignIssueToMilestone(issueId: string, milestoneId: string): Promise<Issue> {
-    try {
+    return safeCall(async () => {
       const issue = await this.issueRepo.findById(issueId);
       if (!issue) {
         throw new ResourceNotFoundError(ResourceType.ISSUE, issueId);
@@ -156,10 +152,10 @@ export class SubIssueService {
         throw new ResourceNotFoundError(ResourceType.MILESTONE, milestoneId);
       }
 
-      return await this.issueRepo.update(issueId, { milestoneId });
-    } catch (error) {
-      throw mapErrorToMCPError(error);
-    }
+      const updatedIssue = await this.issueRepo.update(issueId, { milestoneId });
+      // Return plain object for MCP compatibility
+      return updatedIssue;
+    });
   }
 
   /**
@@ -173,7 +169,7 @@ export class SubIssueService {
    * @throws ResourceNotFoundError if the issue doesn't exist
    */
   async getIssueHistory(issueId: string): Promise<IssueHistoryEntry[]> {
-    try {
+    return safeCall(async () => {
       const issue = await this.issueRepo.findById(issueId);
       if (!issue) {
         throw new ResourceNotFoundError(ResourceType.ISSUE, issueId);
@@ -202,8 +198,6 @@ export class SubIssueService {
           }
         }
       ];
-    } catch (error) {
-      throw mapErrorToMCPError(error);
-    }
+    });
   }
 }

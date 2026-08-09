@@ -1,4 +1,4 @@
-import { ViewLayout, FieldType } from "../../domain/types";
+import type { ViewLayout, FieldType } from "../../domain/types";
 
 export interface GraphQLResponse<T> {
   data?: T;
