@@ -165,8 +165,8 @@ export class ProjectManagementService {
   async getSprintMetrics(id: string, includeIssues = false): Promise<SprintMetrics> {
     return this.sprintPlanningService.getSprintMetrics(id, includeIssues);
   }
-  async createSprint(data: { title: string; description?: string; startDate: string; endDate: string; issues?: string[] }): Promise<Sprint> {
-    return this.sprintPlanningService.createSprint({ title: data.title, description: data.description || '', startDate: data.startDate, endDate: data.endDate, issueIds: data.issues });
+  async createSprint(data: { title: string; description?: string; startDate: string; endDate: string; issues?: string[]; projectId?: string }): Promise<Sprint> {
+    return this.sprintPlanningService.createSprint({ title: data.title, description: data.description || '', startDate: data.startDate, endDate: data.endDate, issueIds: data.issues, projectId: data.projectId });
   }
   async listSprints(status = 'all'): Promise<Sprint[]> {
     return this.sprintPlanningService.listSprints(status);

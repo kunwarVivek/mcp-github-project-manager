@@ -723,6 +723,7 @@ async function executeMaterializeTasks(args: {
         startDate: sprintStart.toISOString(),
         endDate: sprintEnd.toISOString(),
         issues: [],
+        projectId,
       });
       sprintId = sprint.id;
       createdSprints.push({ id: sprint.id, title: sprint.title, phase: phaseIdx });
@@ -819,6 +820,21 @@ async function executeMaterializeTasks(args: {
         createdIssues.push({ id: issue.id, number: issue.number, title: issue.title, phase: phaseIdx, milestone: phaseName });
       } catch (createErr) {
         errors.push({ title: task.title, error: createErr instanceof Error ? createErr.message : String(createErr) });
+      }
+    }
+
+    // Assign this phase's issues to the sprint
+    const phaseIssueIds = createdIssues
+      .filter(i => i.phase === phaseIdx)
+      .map(i => i.id);
+    if (sprintId && phaseIssueIds.length > 0) {
+      try {
+        await svc.addIssuesToSprint({
+          sprintId,
+          issueIds: phaseIssueIds,
+        });
+      } catch (sprintErr) {
+        errors.push({ title: `Sprint assignment: ${phaseName}`, error: sprintErr instanceof Error ? sprintErr.message : String(sprintErr) });
       }
     }
   }

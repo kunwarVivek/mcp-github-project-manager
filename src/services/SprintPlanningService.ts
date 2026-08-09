@@ -316,20 +316,20 @@ export class SprintPlanningService {
     startDate: string;
     endDate: string;
     issueIds?: string[];
+    projectId?: string;
   }): Promise<Sprint> {
     return safeCall(async () => {
-      // Create data object that matches the expected type
-      const sprintData: Omit<Sprint, "id" | "createdAt" | "updatedAt"> = {
+      const sprintData: Omit<Sprint, "id" | "createdAt" | "updatedAt"> & { projectId?: string } = {
         title: data.title,
         description: data.description,
         startDate: data.startDate,
         endDate: data.endDate,
         status: ResourceStatus.PLANNED,
-        issues: data.issueIds?.map(id => id.toString()) || []
+        issues: data.issueIds?.map(id => id.toString()) || [],
+        projectId: data.projectId,
       };
 
       const createdSprint = await this.sprintRepo.create(sprintData);
-      // Return plain object for MCP compatibility (not SprintEntity class instance)
       return createdSprint;
     });
   }

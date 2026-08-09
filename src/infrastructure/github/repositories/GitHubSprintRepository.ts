@@ -45,9 +45,9 @@ export class GitHubSprintRepository extends BaseGitHubRepository implements Spri
     };
   }
 
-  async create(data: Omit<Sprint, "id" | "createdAt" | "updatedAt" | "type">): Promise<Sprint> {
-    // Find the first project and its iteration field, creating one if needed
-    const { fieldId, projectId, existingIterations } = await this.ensureIterationField();
+  async create(data: Omit<Sprint, "id" | "createdAt" | "updatedAt" | "type"> & { projectId?: string }): Promise<Sprint> {
+    // Find the target project's iteration field, creating one if needed
+    const { fieldId, projectId, existingIterations } = await this.ensureIterationField(data.projectId);
 
     // Calculate duration in days (GitHub stores as weeks but the input is days)
     const startDate = new Date(data.startDate);
@@ -132,20 +132,23 @@ export class GitHubSprintRepository extends BaseGitHubRepository implements Spri
   }
 
   /**
-   * Find or create the iteration field on the first project.
-   * Returns the field ID, project ID, and current iterations.
+   * Find or create the iteration field on a project.
+   * If targetProjectId is provided, queries that specific project.
+   * Otherwise falls back to the most recently created project.
    */
-  private async ensureIterationField(): Promise<{
+  private async ensureIterationField(targetProjectId?: string): Promise<{
     fieldId: string;
     projectId: string;
     existingIterations: Array<{ id: string; title: string; startDate: string; duration: number }>;
   }> {
-    // Check if an iteration field already exists
-    const query = `
-      query($owner: String!, $repo: String!) {
-        repository(owner: $owner, name: $repo) {
-          projectsV2(first: 1) {
-            nodes {
+    let projectNode: { id: string; fields: { nodes: any[] } } | undefined;
+
+    if (targetProjectId) {
+      // Query the specific project by node ID
+      const query = `
+        query($id: ID!) {
+          node(id: $id) {
+            ... on ProjectV2 {
               id
               fields(first: 100) {
                 nodes {
@@ -163,28 +166,52 @@ export class GitHubSprintRepository extends BaseGitHubRepository implements Spri
             }
           }
         }
-      }
-    `;
+      `;
+      const result = await this.graphql<{ node: { id: string; fields: { nodes: any[] } } | null }>(query, { id: targetProjectId });
+      projectNode = result.node || undefined;
+    } else {
+      // Fallback: most recent project
+      const query = `
+        query($owner: String!, $repo: String!) {
+          repository(owner: $owner, name: $repo) {
+            projectsV2(first: 1, orderBy: { field: CREATED_AT, direction: DESC }) {
+              nodes {
+                id
+                fields(first: 100) {
+                  nodes {
+                    ... on ProjectV2IterationField {
+                      id
+                      name
+                      configuration {
+                        ... on ProjectV2IterationFieldConfiguration {
+                          iterations { id title startDate duration }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      `;
+      const result = await this.graphql<ListIterationFieldsResponse>(query, { owner: this.owner, repo: this.repo });
+      projectNode = result.repository?.projectsV2?.nodes?.[0];
+    }
 
-    const result = await this.graphql<ListIterationFieldsResponse>(query, {
-      owner: this.owner,
-      repo: this.repo,
-    });
-
-    const project = result.repository?.projectsV2?.nodes?.[0];
-    if (!project) {
-      throw new Error('No GitHub Project V2 found for this repository. Create a project first.');
+    if (!projectNode) {
+      throw new Error('No GitHub Project V2 found. Create a project first.');
     }
 
     // Look for an existing iteration field
-    const iterField = project.fields.nodes.find(
+    const iterField = projectNode.fields.nodes.find(
       (f: any) => f.configuration?.iterations !== undefined
     );
 
     if (iterField) {
       return {
         fieldId: iterField.id!,
-        projectId: project.id,
+        projectId: projectNode.id,
         existingIterations: iterField.configuration?.iterations || [],
       };
     }
@@ -216,7 +243,7 @@ export class GitHubSprintRepository extends BaseGitHubRepository implements Spri
       };
     }>(createMutation, {
       input: {
-        projectId: project.id,
+        projectId: projectNode.id,
         dataType: 'ITERATION',
         name: 'Sprint',
         iterationConfiguration: {
@@ -229,7 +256,7 @@ export class GitHubSprintRepository extends BaseGitHubRepository implements Spri
 
     return {
       fieldId: createResult.createProjectV2Field.projectV2Field.id,
-      projectId: project.id,
+      projectId: projectNode.id,
       existingIterations: createResult.createProjectV2Field.projectV2Field.configuration?.iterations || [],
     };
   }
@@ -449,27 +476,93 @@ export class GitHubSprintRepository extends BaseGitHubRepository implements Spri
     return ResourceStatus.ACTIVE;
   }
 
-  private async addIssuesToSprint(sprintId: string, issueIds: IssueId[]): Promise<void> {
-    const addItemQuery = `
+  /**
+   * Assign issues to a sprint iteration.
+   *
+   * Requires three distinct IDs:
+   * - projectId: the project node ID (PVT_...)
+   * - iterationFieldId: the iteration FIELD id (PVTIF_...) — NOT the instance id
+   * - iterationId: the specific iteration instance id (e.g. "dfd5195e")
+   * - itemId: the ProjectV2Item id (PVTI_...) — NOT the issue id
+   *
+   * The caller must provide iterationFieldId and projectId. issueIds are
+   * resolved to project item IDs by querying the project.
+   */
+  async addIssuesToSprint(
+    sprintId: string,
+    issueIds: IssueId[],
+    iterationFieldId?: string,
+    projectId?: string,
+  ): Promise<void> {
+    // Resolve the iteration field ID and project ID if not provided
+    if (!iterationFieldId || !projectId) {
+      const fieldInfo = await this.ensureIterationField();
+      iterationFieldId = iterationFieldId || fieldInfo.fieldId;
+      projectId = projectId || fieldInfo.projectId;
+    }
+
+    // Resolve issue node IDs → project item IDs by querying the project
+    const itemIds = await this.resolveProjectItemIds(projectId, issueIds);
+
+    const mutation = `
       mutation($input: UpdateProjectV2ItemFieldValueInput!) {
         updateProjectV2ItemFieldValue(input: $input) {
-          projectV2Item {
-            id
+          projectV2Item { id }
+        }
+      }
+    `;
+
+    for (const { itemId } of itemIds) {
+      await this.graphql(mutation, {
+        input: {
+          projectId,
+          itemId,                          // PVTI_... (project item, not issue)
+          fieldId: iterationFieldId,       // PVTIF_... (iteration field, not instance)
+          value: { iterationId: sprintId }, // iteration instance ID
+        },
+      });
+    }
+  }
+
+  /**
+   * Resolve issue IDs to their ProjectV2Item IDs within a project.
+   * An issue must have been added to the project via addProjectItem first.
+   */
+  private async resolveProjectItemIds(
+    projectId: string,
+    issueIds: string[],
+  ): Promise<Array<{ issueId: string; itemId: string }>> {
+    const query = `
+      query($projectId: ID!) {
+        node(id: $projectId) {
+          ... on ProjectV2 {
+            items(first: 100) {
+              nodes {
+                id
+                content {
+                  ... on Issue { id }
+                }
+              }
+            }
           }
         }
       }
     `;
 
-    for (const issueId of issueIds) {
-      await this.graphql(addItemQuery, {
-        input: {
-          projectId: this.config.projectId,
-          itemId: `Issue_${issueId}`,
-          fieldId: sprintId,
-          value: "ITERATION",
-        },
-      });
+    const response = await this.graphql<{
+      node: { items: { nodes: Array<{ id: string; content: { id: string } | null }> } } | null;
+    }>(query, { projectId });
+
+    const issueSet = new Set(issueIds);
+    const results: Array<{ issueId: string; itemId: string }> = [];
+
+    for (const item of response.node?.items?.nodes || []) {
+      if (item.content && issueSet.has(item.content.id)) {
+        results.push({ issueId: item.content.id, itemId: item.id });
+      }
     }
+
+    return results;
   }
 
   private async updateSprintIssues(sprintId: string, issueIds: IssueId[]): Promise<void> {
