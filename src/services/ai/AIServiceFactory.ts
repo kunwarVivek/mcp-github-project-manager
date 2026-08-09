@@ -22,34 +22,49 @@ import {
 } from '../../infrastructure/resilience/AIResiliencePolicy.js';
 
 /**
- * Middleware that records server-side token spend against the acting agent.
+ * Middleware that meters token spend and applies resilience protection.
  *
- * Wrapping the model is what makes metering INVOLUNTARY: every `generateText` /
- * `generateObject` call site in the codebase (33 of them across 22 files)
- * receives its model from `AIServiceFactory.getModel`, so instrumenting here
- * covers all of them without touching one.
+ * Wrapping the model is what makes BOTH metering and resilience INVOLUNTARY:
+ * every `generateText`/`generateObject` call site receives its model from
+ * `AIServiceFactory.getModel`, so instrumenting here covers all of them
+ * without touching one.
  *
- * It only accumulates in memory — the actual budget debit happens once per tool
- * call in the dispatcher. This function must never fail an AI call, so it does
- * no I/O and swallows nothing it could throw on.
+ * Metering: accumulates tokens in the trace context's usage sink. The actual
+ * budget debit happens once per tool call in the dispatcher.
  *
- * SCOPE, stated plainly: this meters tokens *this server* spends on an agent's
- * behalf. It does NOT see tokens the agent's own runtime spends talking to its
- * own model — that traffic never reaches this process and is unobservable here.
- * `record_usage` remains the only channel for agent-side spend.
+ * Resilience (when enabled via `enableResilience()`): wraps each call with
+ * retry + circuit breaker + timeout via cockatiel. Failures throw — each
+ * service's existing try/catch provides the domain-specific fallback.
+ *
+ * SCOPE: this meters tokens *this server* spends. Agent-side spend reaches
+ * this process only via `record_usage`.
  */
 export const usageMeteringMiddleware: LanguageModelMiddleware = {
   wrapGenerate: async ({ doGenerate }) => {
-    const result = await doGenerate();
-    const sink = getTraceContext()?.usage;
-    if (sink) {
-      // `inputTokens`/`outputTokens` are objects with a `total`, not numbers —
-      // reading them as numbers yields NaN and silently poisons the budget.
-      const input = result.usage?.inputTokens?.total ?? 0;
-      const output = result.usage?.outputTokens?.total ?? 0;
-      sink.tokens += input + output;
+    const doGenerateWithMetering = async () => {
+      const result = await doGenerate();
+      const sink = getTraceContext()?.usage;
+      if (sink) {
+        // `inputTokens`/`outputTokens` are objects with a `total`, not numbers —
+        // reading them as numbers yields NaN and silently poisons the budget.
+        const input = result.usage?.inputTokens?.total ?? 0;
+        const output = result.usage?.outputTokens?.total ?? 0;
+        sink.tokens += input + output;
+      }
+      return result;
+    };
+
+    // If resilience is enabled, wrap with retry + circuit breaker + timeout.
+    // Failures throw (no fallback here) — each service's existing try/catch
+    // provides the fallback. This is transparent: all 31 generateObject/
+    // generateText call sites get resilience without code changes.
+    const factory = AIServiceFactory.getInstance();
+    const policy = factory.getResiliencePolicy();
+    if (policy) {
+      return policy.executeRaw(doGenerateWithMetering);
     }
-    return result;
+
+    return doGenerateWithMetering();
   },
 };
 
