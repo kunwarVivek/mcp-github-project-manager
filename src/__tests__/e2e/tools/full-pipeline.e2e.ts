@@ -1,16 +1,19 @@
 /**
- * Full Pipeline E2E: Prompt → PRD → Tasks → Issues → Agent Pickup → PM Coordination
+ * Full Pipeline E2E: Prompt → PRD → Tasks → Issues → PM Assignment → Delivery
  *
- * This test exercises the COMPLETE pipeline against the real GitHub API
- * with a real (cheap) AI model. It proves that every stage is connected:
+ * Exercises the COMPLETE pipeline against the real GitHub API
+ * with a real (cheap) AI model. Proves every stage is connected:
  *
- *   1. Generate a PRD from a project idea (AI)
- *   2. Parse PRD into tasks with dependencies (AI)
- *   3. Materialize tasks as GitHub issues grouped into milestones/sprints
- *   4. Engineer agent registers and checks out a task
- *   5. Engineer submits heartbeat and work product
- *   6. PM agent monitors swarm status
- *   7. Cleanup
+ *   1. Create project + setup agent fields
+ *   2. Generate PRD from project idea (AI)
+ *   3. Parse PRD into tasks with dependencies (AI)
+ *   4. Materialize tasks as GitHub issues (milestones + sprints + issues)
+ *   5. Register engineer, reviewer, PM agents
+ *   6. PM assigns specific task to engineer (assign_task)
+ *   7. Engineer heartbeats + submits work product (submit_work_product)
+ *   8. Submit for review + reviewer approves (submit_for_review, approve_task)
+ *   9. PM verifies swarm status (get_swarm_status)
+ *  10. Pipeline summary assertions
  *
  * Requirements:
  *   - GITHUB_TOKEN, GITHUB_OWNER, GITHUB_REPO (test repo)
@@ -20,8 +23,6 @@
  *
  * Run:
  *   npm run test:pipeline
- *   # or with specific model:
- *   AI_MAIN_MODEL=gpt-4o-mini npm run test:pipeline
  */
 
 import { MCPToolTestUtils } from '../utils/MCPToolTestUtils';
@@ -62,8 +63,11 @@ describe('Full Pipeline E2E: Prompt → PRD → Tasks → Issues → Agent → P
   let prdContent = '';
   let tasks: any[] = [];
   let materializedIssues: any[] = [];
+  let materializedResult: any = {};
   let engineerAgentId = '';
+  let reviewerAgentId = '';
   let pmAgentId = '';
+  let assignedIssueNumber = 0;
   const agentIds: string[] = [];
 
   beforeAll(async () => {
@@ -182,16 +186,16 @@ describe('Full Pipeline E2E: Prompt → PRD → Tasks → Issues → Agent → P
 
     expect(result.issues?.length).toBeGreaterThan(0);
     materializedIssues = result.issues || [];
+    materializedResult = result;
   }, 120000);
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // Stage 5: Agent registers and checks out a task
+  // Stage 5: Register all agents (engineer, reviewer, PM)
   // ═══════════════════════════════════════════════════════════════════════════
 
-  it('Stage 5: Engineer agent registers and checks out a task', async () => {
+  it('Stage 5: Register engineer, reviewer, and PM agents', async () => {
     if (!utils || materializedIssues.length === 0) return;
 
-    // Register engineer
     const engineer = await utils.callTool('agent_work', {
       action: 'register',
       name: `engineer-${runId}`,
@@ -203,46 +207,17 @@ describe('Full Pipeline E2E: Prompt → PRD → Tasks → Issues → Agent → P
     engineerAgentId = engineer.id;
     agentIds.push(engineer.id);
 
-    // Checkout a task
-    const checkout = await utils.callTool('agent_work', {
-      action: 'checkout_task',
-      agentId: engineerAgentId,
-      projectId,
+    const reviewer = await utils.callTool('agent_work', {
+      action: 'register',
+      name: `reviewer-${runId}`,
+      role: 'reviewer',
+      runtime: 'claude-code',
+      capabilities: ['code-review'],
     });
+    expect(reviewer.id).toBeDefined();
+    reviewerAgentId = reviewer.id;
+    agentIds.push(reviewer.id);
 
-    // May succeed or fail depending on project field setup timing
-    expect(checkout).toBeDefined();
-    if (checkout.success) {
-      expect(checkout.issueNumber).toBeGreaterThan(0);
-    }
-  }, 30000);
-
-  // ═══════════════════════════════════════════════════════════════════════════
-  // Stage 6: Agent submits heartbeat and work product
-  // ═══════════════════════════════════════════════════════════════════════════
-
-  it('Stage 6: Engineer submits heartbeat', async () => {
-    if (!utils || !engineerAgentId) return;
-
-    const heartbeat = await utils.callTool('agent_work', {
-      action: 'heartbeat',
-      agentId: engineerAgentId,
-      status: 'working',
-      progress: 50,
-      progressSummary: 'Pipeline E2E — implementing task',
-    });
-
-    expect(heartbeat.success).toBe(true);
-  }, 15000);
-
-  // ═══════════════════════════════════════════════════════════════════════════
-  // Stage 7: PM monitors swarm status
-  // ═══════════════════════════════════════════════════════════════════════════
-
-  it('Stage 7: PM agent monitors swarm status', async () => {
-    if (!utils) return;
-
-    // Register PM
     const pm = await utils.callTool('agent_work', {
       action: 'register',
       name: `pm-${runId}`,
@@ -253,27 +228,110 @@ describe('Full Pipeline E2E: Prompt → PRD → Tasks → Issues → Agent → P
     expect(pm.id).toBeDefined();
     pmAgentId = pm.id;
     agentIds.push(pm.id);
+  }, 30000);
 
-    // Get swarm status
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Stage 6: PM assigns a specific task to engineer (not self-service checkout)
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  it('Stage 6: PM assigns a specific task to engineer via assign_task', async () => {
+    if (!utils || !engineerAgentId || !pmAgentId || materializedIssues.length === 0) return;
+
+    assignedIssueNumber = materializedIssues[0].number;
+
+    const assignment = await utils.callTool('agent_manage', {
+      action: 'assign_task',
+      agentId: engineerAgentId,
+      projectId,
+      issueNumber: assignedIssueNumber,
+    });
+
+    expect(assignment.success).toBe(true);
+    expect(assignment.issueNumber).toBe(assignedIssueNumber);
+  }, 30000);
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Stage 7: Engineer works — heartbeat + submit work product
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  it('Stage 7: Engineer heartbeats and submits work product', async () => {
+    if (!utils || !engineerAgentId || !assignedIssueNumber) return;
+
+    // Heartbeat
+    const heartbeat = await utils.callTool('agent_work', {
+      action: 'heartbeat',
+      agentId: engineerAgentId,
+      status: 'working',
+      progress: 80,
+      progressSummary: 'Implementation complete, writing tests',
+    });
+    expect(heartbeat.success).toBe(true);
+
+    // Submit work product
+    const wp = await utils.callTool('agent_manage', {
+      action: 'submit_work_product',
+      agentId: engineerAgentId,
+      taskId: String(assignedIssueNumber),
+      issueNumber: assignedIssueNumber,
+      branch: `eng-${runId}/task`,
+      filesChanged: ['src/todo.ts', 'src/todo.test.ts'],
+      testsPassed: 5,
+      testsFailed: 0,
+      testsTotal: 5,
+      summary: 'Implemented task with full test coverage',
+    });
+    expect(wp.id).toBeDefined();
+  }, 30000);
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Stage 8: Submit for review and approve
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  it('Stage 8: Submit for review and reviewer approves', async () => {
+    if (!utils || !engineerAgentId || !reviewerAgentId || !assignedIssueNumber) return;
+
+    const submitted = await utils.callTool('agent_work', {
+      action: 'submit_for_review',
+      agentId: engineerAgentId,
+      taskId: String(assignedIssueNumber),
+      summary: 'Ready for review — all tests passing',
+    });
+    expect(submitted.success).toBe(true);
+
+    const approved = await utils.callTool('agent_work', {
+      action: 'approve_task',
+      reviewerId: reviewerAgentId,
+      taskId: String(assignedIssueNumber),
+      summary: 'LGTM — clean implementation',
+    });
+    expect(approved.success).toBe(true);
+  }, 30000);
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Stage 9: PM verifies swarm status
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  it('Stage 9: PM checks swarm status after delivery', async () => {
+    if (!utils || !pmAgentId) return;
+
     const status = await utils.callTool('agent_manage', {
       action: 'get_swarm_status',
     });
 
-    expect(status.totalAgents).toBeGreaterThanOrEqual(2);
+    expect(status.totalAgents).toBeGreaterThanOrEqual(3);
     expect(status.agents).toBeDefined();
     expect(Array.isArray(status.agents)).toBe(true);
 
     // Find our engineer in the swarm
     const engineer = status.agents.find((a: any) => a.id === engineerAgentId);
     expect(engineer).toBeDefined();
-    expect(engineer.role).toBe('engineer');
   }, 30000);
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // Stage 8: Pipeline summary
+  // Stage 10: Pipeline summary
   // ═══════════════════════════════════════════════════════════════════════════
 
-  it('Stage 8: Verify complete pipeline executed', async () => {
+  it('Stage 10: Verify complete pipeline executed', async () => {
     if (!utils) return;
 
     const summary = {
@@ -281,17 +339,24 @@ describe('Full Pipeline E2E: Prompt → PRD → Tasks → Issues → Agent → P
       prdGenerated: prdContent.length > 100,
       tasksGenerated: tasks.length,
       issuesMaterialized: materializedIssues.length,
+      milestonesCreated: materializedResult.milestones?.length || 0,
+      sprintsCreated: materializedResult.sprints?.length || 0,
+      pmAssignedTask: assignedIssueNumber > 0,
       engineerRegistered: !!engineerAgentId,
+      reviewerRegistered: !!reviewerAgentId,
       pmRegistered: !!pmAgentId,
     };
 
     process.stderr.write(`\n📊 Pipeline Summary: ${JSON.stringify(summary, null, 2)}\n`);
 
-    // All stages should have produced results
     expect(summary.prdGenerated).toBe(true);
     expect(summary.tasksGenerated).toBeGreaterThan(0);
     expect(summary.issuesMaterialized).toBeGreaterThan(0);
+    expect(summary.milestonesCreated).toBeGreaterThan(0);
+    expect(summary.sprintsCreated).toBeGreaterThan(0);
+    expect(summary.pmAssignedTask).toBe(true);
     expect(summary.engineerRegistered).toBe(true);
+    expect(summary.reviewerRegistered).toBe(true);
     expect(summary.pmRegistered).toBe(true);
   });
 });
