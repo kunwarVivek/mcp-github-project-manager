@@ -271,6 +271,12 @@ class GitHubProjectManagerServer {
     this.enrichmentService = di.resolve("IssueEnrichmentService");
     this.triagingService = di.resolve("IssueTriagingService");
 
+    // Enable AI resilience (circuit breaker + retry + timeout) for all
+    // executeWithResilience() calls. Opt-in: existing direct generateText/
+    // generateObject calls are unaffected; services must explicitly wrap
+    // via factory.executeWithResilience() to benefit.
+    this.aiFactory.enableResilience();
+
     // Auto-reclaim scheduler: server-side self-healing for the agent swarm
     this.reclaimScheduler = di.resolve("AgentReclaimScheduler");
     this.reclaimScheduler.start();
