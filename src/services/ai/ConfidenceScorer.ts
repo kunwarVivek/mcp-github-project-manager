@@ -68,7 +68,7 @@ export function calculateInputCompleteness(input: {
  * Calculate confidence tier from score
  */
 export function getConfidenceTier(score: number, config: ConfidenceConfig = DEFAULT_CONFIDENCE_CONFIG): ConfidenceTier {
-  if (score >= config.warningThreshold) return 'high';
+  if (score >= config.warningScore) return 'high';
   if (score >= config.errorThreshold) return 'medium';
   return 'low';
 }
@@ -168,7 +168,7 @@ export class ConfidenceScorer {
 
     const score = calculateWeightedScore(factors);
     const tier = getConfidenceTier(score, this.config);
-    const needsReview = score < this.config.warningThreshold;
+    const needsReview = score < this.config.warningScore;
 
     const clarifyingQuestions = tier === 'low'
       ? generateClarifyingQuestions(params.sectionName, factors, params.uncertainAreas)

@@ -19,18 +19,18 @@ export class TokenCounter {
     return TokenCounter.estimate(JSON.stringify(obj));
   }
 
-  /** Check if content fits within a token budget. */
-  static fitsInBudget(text: string, budget: number): boolean {
-    return TokenCounter.estimate(text) <= budget;
+  /** Check if content fits within a token limit. */
+  static fitsInLimit(text: string, limit: number): boolean {
+    return TokenCounter.estimate(text) <= limit;
   }
 
-  /** Truncate text to fit within a token budget. */
-  static truncateToFit(text: string, budget: number): string {
+  /** Truncate text to fit within a token limit. */
+  static truncateToLimit(text: string, limit: number): string {
     const estimated = TokenCounter.estimate(text);
-    if (estimated <= budget) return text;
-    // Estimate character count for budget
-    const targetChars = Math.floor((budget / estimated) * text.length * 0.95);
-    return `${text.substring(0, targetChars)}\n[...truncated to fit token budget]`;
+    if (estimated <= limit) return text;
+    // Estimate character count for limit
+    const targetChars = Math.floor((limit / estimated) * text.length * 0.95);
+    return `${text.substring(0, targetChars)}\n[...truncated to fit token limit]`;
   }
 }
 

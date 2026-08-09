@@ -136,7 +136,7 @@ export type GetBudgetStatusArgs = z.infer<typeof getBudgetStatusSchema>;
 export const setAgentBudgetSchema = z.object({
   agentId: z.string().min(1),
   totalTokens: z.number().positive(),
-  warningThreshold: z.number().min(0).max(1).default(0.8),
+  warningFraction: z.number().min(0).max(1).default(0.8),
   hardStop: z.boolean().default(true),
   resetPeriod: BudgetResetPeriodSchema.optional(),
 });

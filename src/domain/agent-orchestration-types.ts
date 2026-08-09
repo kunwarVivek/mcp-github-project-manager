@@ -193,8 +193,10 @@ export const TestResultsSchema = z.object({
 /** Per-agent token budget. */
 export interface AgentBudget {
   totalTokens: number;
+  meteredTokens: number;
+  reportedTokens: number;
   usedTokens: number;
-  warningThreshold: number;
+  warningFraction: number;
   hardStop: boolean;
   resetPeriod?: 'daily' | 'weekly' | 'monthly' | 'never';
   lastResetAt?: string;
@@ -202,8 +204,10 @@ export interface AgentBudget {
 
 export const AgentBudgetSchema = z.object({
   totalTokens: z.number().positive(),
+  meteredTokens: z.number().nonnegative().default(0),
+  reportedTokens: z.number().nonnegative().default(0),
   usedTokens: z.number().nonnegative(),
-  warningThreshold: z.number().min(0).max(1).default(0.8),
+  warningFraction: z.number().min(0).max(1).default(0.8),
   hardStop: z.boolean().default(true),
   resetPeriod: z.enum(['daily', 'weekly', 'monthly', 'never']).optional(),
   lastResetAt: z.string().optional(),
@@ -214,6 +218,8 @@ export interface BudgetStatus {
   agentId: string;
   agentName: string;
   totalTokens: number;
+  meteredTokens: number;
+  reportedTokens: number;
   usedTokens: number;
   remainingTokens: number;
   usagePercent: number;
@@ -227,6 +233,8 @@ export const BudgetStatusSchema = z.object({
   agentId: z.string(),
   agentName: z.string(),
   totalTokens: z.number(),
+  meteredTokens: z.number(),
+  reportedTokens: z.number(),
   usedTokens: z.number(),
   remainingTokens: z.number(),
   usagePercent: z.number(),

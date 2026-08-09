@@ -29,14 +29,14 @@ export interface SectionConfidence {
   factors: ConfidenceFactors;
   reasoning?: string;         // AI's explanation for the score
   clarifyingQuestions?: string[];  // Generated when confidence is low
-  needsReview: boolean;       // true if score < warning threshold
+  needsReview: boolean;       // true if score < warningScore
 }
 
 /**
  * Configuration for confidence thresholds
  */
 export interface ConfidenceConfig {
-  warningThreshold: number;   // Default 70 - below this shows warning
+  warningScore: number;       // Default 70 - below this shows warning
   errorThreshold: number;     // Default 50 - below this requires action
   enableIterativeRefinement: boolean;  // Auto-fetch more context when low
   maxRefinementAttempts: number;       // Default 3
@@ -46,7 +46,7 @@ export interface ConfidenceConfig {
  * Default confidence configuration
  */
 export const DEFAULT_CONFIDENCE_CONFIG: ConfidenceConfig = {
-  warningThreshold: 70,
+  warningScore: 70,
   errorThreshold: 50,
   enableIterativeRefinement: true,
   maxRefinementAttempts: 3
@@ -73,7 +73,7 @@ export const SectionConfidenceSchema = z.object({
 });
 
 export const ConfidenceConfigSchema = z.object({
-  warningThreshold: z.number().min(0).max(100).default(70),
+  warningScore: z.number().min(0).max(100).default(70),
   errorThreshold: z.number().min(0).max(100).default(50),
   enableIterativeRefinement: z.boolean().default(true),
   maxRefinementAttempts: z.number().min(1).max(10).default(3)

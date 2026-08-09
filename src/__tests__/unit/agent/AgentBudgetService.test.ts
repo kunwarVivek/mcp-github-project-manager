@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest';;
+import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 import { AgentBudgetService } from '../../../services/agent/AgentBudgetService';
 import type { AgentStore } from '../../../infrastructure/agent/AgentStore';
 import type { Agent } from '../../../domain/agent-orchestration-types';
@@ -38,13 +38,18 @@ describe('AgentBudgetService', () => {
 
       expect(status.totalTokens).toBe(500_000);
       expect(status.usedTokens).toBe(0);
+      expect(status.meteredTokens).toBe(0);
+      expect(status.reportedTokens).toBe(0);
       expect(status.isWarning).toBe(false);
       expect(status.isExhausted).toBe(false);
     });
 
     it('flags warning at the threshold', async () => {
       mockStore.getAgent.mockResolvedValue(makeAgent('agent-1', {
-        budget: { totalTokens: 1000, usedTokens: 850, warningThreshold: 0.8, hardStop: true },
+        budget: {
+          totalTokens: 1000, meteredTokens: 850, reportedTokens: 0,
+          usedTokens: 850, warningFraction: 0.8, hardStop: true,
+        },
       }));
 
       const status = await service.getBudgetStatus('agent-1');
@@ -54,10 +59,13 @@ describe('AgentBudgetService', () => {
     });
 
     it('delegates to the parent budget for subagents', async () => {
-      mockStore.getAgent.mockImplementation(async (id: string) => {
+      mockStore.getAgent.mockImplementation(async (id) => {
         if (id === 'child') return makeAgent('child', { parentAgentId: 'parent' });
         return makeAgent('parent', {
-          budget: { totalTokens: 2000, usedTokens: 500, warningThreshold: 0.8, hardStop: true },
+          budget: {
+            totalTokens: 2000, meteredTokens: 300, reportedTokens: 200,
+            usedTokens: 500, warningFraction: 0.8, hardStop: true,
+          },
         });
       });
 
@@ -65,6 +73,59 @@ describe('AgentBudgetService', () => {
 
       expect(status.agentId).toBe('parent');
       expect(status.remainingTokens).toBe(1500);
+    });
+
+    it('calls resetBudgetIfDue lazily', async () => {
+      const lastReset = new Date(Date.now() - 2 * 86_400_000).toISOString();
+      const agent = makeAgent('agent-1', {
+        budget: {
+          totalTokens: 1000, meteredTokens: 500, reportedTokens: 300,
+          usedTokens: 800, warningFraction: 0.8, hardStop: true,
+          resetPeriod: 'daily', lastResetAt: lastReset,
+        },
+      });
+      mockStore.getAgent.mockResolvedValue(agent);
+
+      const status = await service.getBudgetStatus('agent-1');
+
+      // After lazy reset, counters should be zeroed
+      expect(status.usedTokens).toBe(0);
+      expect(status.meteredTokens).toBe(0);
+      expect(status.reportedTokens).toBe(0);
+      // upsertAgent should have been called (reset persisted)
+      expect(mockStore.upsertAgent).toHaveBeenCalledWith(
+        expect.objectContaining({
+          budget: expect.objectContaining({
+            meteredTokens: 0,
+            reportedTokens: 0,
+            usedTokens: 0,
+          }),
+        }),
+      );
+    });
+
+    it('warning status correctly uses warningFraction', async () => {
+      // 70% usage with 0.75 warning fraction → not warning
+      mockStore.getAgent.mockResolvedValue(makeAgent('a', {
+        budget: {
+          totalTokens: 1000, meteredTokens: 500, reportedTokens: 200,
+          usedTokens: 700, warningFraction: 0.75, hardStop: true,
+        },
+      }));
+
+      const belowStatus = await service.getBudgetStatus('a');
+      expect(belowStatus.isWarning).toBe(false);
+
+      // 80% usage with 0.75 warning fraction → warning
+      mockStore.getAgent.mockResolvedValue(makeAgent('b', {
+        budget: {
+          totalTokens: 1000, meteredTokens: 500, reportedTokens: 300,
+          usedTokens: 800, warningFraction: 0.75, hardStop: true,
+        },
+      }));
+
+      const aboveStatus = await service.getBudgetStatus('b');
+      expect(aboveStatus.isWarning).toBe(true);
     });
   });
 
@@ -82,41 +143,132 @@ describe('AgentBudgetService', () => {
         }),
       );
     });
-  });
 
-  describe('recordUsage', () => {
-    it('accumulates usage and flips status at hard stop', async () => {
+    it('updates hardStop', async () => {
       mockStore.getAgent.mockResolvedValue(makeAgent('agent-1', {
-        budget: { totalTokens: 1000, usedTokens: 900, warningThreshold: 0.8, hardStop: true },
+        budget: {
+          totalTokens: 1000, meteredTokens: 0, reportedTokens: 0,
+          usedTokens: 0, warningFraction: 0.8, hardStop: true,
+        },
       }));
 
-      const status = await service.recordUsage('agent-1', 150);
+      await service.setBudget('agent-1', 1000, undefined, undefined, false);
+
+      expect(mockStore.upsertAgent).toHaveBeenCalledWith(
+        expect.objectContaining({
+          budget: expect.objectContaining({ hardStop: false }),
+        }),
+      );
+    });
+  });
+
+  describe('recordMeteredUsage', () => {
+    it('accumulates metered usage and flips status at hard stop', async () => {
+      mockStore.getAgent.mockResolvedValue(makeAgent('agent-1', {
+        budget: {
+          totalTokens: 1000, meteredTokens: 900, reportedTokens: 0,
+          usedTokens: 900, warningFraction: 0.8, hardStop: true,
+        },
+      }));
+
+      const status = await service.recordMeteredUsage('agent-1', 150);
 
       expect(status.usedTokens).toBe(1050);
+      expect(status.meteredTokens).toBe(1050);
+      expect(status.reportedTokens).toBe(0);
       expect(status.isExhausted).toBe(true);
       expect(status.remainingTokens).toBe(0);
     });
 
     it('records against the parent budget for subagents', async () => {
-      // Same object reference for parent so in-place budget mutation persists
       const parent = makeAgent('parent', {
-        budget: { totalTokens: 1000, usedTokens: 0, warningThreshold: 0.8, hardStop: true },
+        budget: {
+          totalTokens: 1000, meteredTokens: 0, reportedTokens: 0,
+          usedTokens: 0, warningFraction: 0.8, hardStop: true,
+        },
       });
-      mockStore.getAgent.mockImplementation(async (id: string) => {
+      mockStore.getAgent.mockImplementation(async (id) => {
         if (id === 'child') return makeAgent('child', { parentAgentId: 'parent' });
         return parent;
       });
 
-      const status = await service.recordUsage('child', 200);
+      const status = await service.recordMeteredUsage('child', 200);
 
       expect(status.usedTokens).toBe(200);
+      expect(status.meteredTokens).toBe(200);
+    });
+  });
+
+  describe('recordReportedUsage', () => {
+    it('accumulates reported usage separately', async () => {
+      mockStore.getAgent.mockResolvedValue(makeAgent('agent-1', {
+        budget: {
+          totalTokens: 1000, meteredTokens: 100, reportedTokens: 200,
+          usedTokens: 300, warningFraction: 0.8, hardStop: true,
+        },
+      }));
+
+      const status = await service.recordReportedUsage('agent-1', 50);
+
+      expect(status.reportedTokens).toBe(250);
+      expect(status.meteredTokens).toBe(100);
+      expect(status.usedTokens).toBe(350);
+    });
+  });
+
+  describe('metered vs reported isolation', () => {
+    it('metered and reported usage tracked independently', async () => {
+      const agent = makeAgent('agent-1', {
+        budget: {
+          totalTokens: 10000, meteredTokens: 0, reportedTokens: 0,
+          usedTokens: 0, warningFraction: 0.8, hardStop: true,
+        },
+      });
+      mockStore.getAgent.mockResolvedValue(agent);
+
+      await service.recordMeteredUsage('agent-1', 300);
+      // Agent state was mutated in-place by the service
+      await service.recordReportedUsage('agent-1', 100);
+
+      const status = await service.getBudgetStatus('agent-1');
+      expect(status.meteredTokens).toBe(300);
+      expect(status.reportedTokens).toBe(100);
+      expect(status.usedTokens).toBe(400);
+    });
+
+    it('record_usage cannot double-count with metered spend', async () => {
+      // Start with some metered spend
+      const agent = makeAgent('agent-1', {
+        budget: {
+          totalTokens: 10000, meteredTokens: 500, reportedTokens: 0,
+          usedTokens: 500, warningFraction: 0.8, hardStop: true,
+        },
+      });
+      mockStore.getAgent.mockResolvedValue(agent);
+
+      // recordReportedUsage (what record_usage tool calls) only touches reportedTokens
+      await service.recordReportedUsage('agent-1', 200);
+
+      expect(agent.budget!.reportedTokens).toBe(200);
+      expect(agent.budget!.meteredTokens).toBe(500); // unchanged
+      expect(agent.budget!.usedTokens).toBe(700); // sum
+
+      // recordMeteredUsage only touches meteredTokens
+      await service.recordMeteredUsage('agent-1', 100);
+
+      expect(agent.budget!.meteredTokens).toBe(600);
+      expect(agent.budget!.reportedTokens).toBe(200); // unchanged
+      expect(agent.budget!.usedTokens).toBe(800); // sum
     });
   });
 
   describe('canAfford / resetBudgetIfDue', () => {
     it('canAfford respects remaining budget', async () => {
       mockStore.getAgent.mockResolvedValue(makeAgent('agent-1', {
-        budget: { totalTokens: 1000, usedTokens: 900, warningThreshold: 0.8, hardStop: true },
+        budget: {
+          totalTokens: 1000, meteredTokens: 500, reportedTokens: 400,
+          usedTokens: 900, warningFraction: 0.8, hardStop: true,
+        },
       }));
 
       expect(await service.canAfford('agent-1', 50)).toBe(true);
@@ -127,7 +279,8 @@ describe('AgentBudgetService', () => {
       const lastReset = new Date(Date.now() - 2 * 86_400_000).toISOString();
       mockStore.getAgent.mockResolvedValue(makeAgent('agent-1', {
         budget: {
-          totalTokens: 1000, usedTokens: 800, warningThreshold: 0.8, hardStop: true,
+          totalTokens: 1000, meteredTokens: 500, reportedTokens: 300,
+          usedTokens: 800, warningFraction: 0.8, hardStop: true,
           resetPeriod: 'daily', lastResetAt: lastReset,
         },
       }));
@@ -136,14 +289,21 @@ describe('AgentBudgetService', () => {
 
       expect(reset).toBe(true);
       expect(mockStore.upsertAgent).toHaveBeenCalledWith(
-        expect.objectContaining({ budget: expect.objectContaining({ usedTokens: 0 }) }),
+        expect.objectContaining({
+          budget: expect.objectContaining({
+            meteredTokens: 0,
+            reportedTokens: 0,
+            usedTokens: 0,
+          }),
+        }),
       );
     });
 
     it('does not reset when the period has not elapsed', async () => {
       mockStore.getAgent.mockResolvedValue(makeAgent('agent-1', {
         budget: {
-          totalTokens: 1000, usedTokens: 800, warningThreshold: 0.8, hardStop: true,
+          totalTokens: 1000, meteredTokens: 500, reportedTokens: 300,
+          usedTokens: 800, warningFraction: 0.8, hardStop: true,
           resetPeriod: 'weekly', lastResetAt: new Date().toISOString(),
         },
       }));
@@ -163,9 +323,9 @@ describe('resolveBudgetOwner (hierarchy walk)', () => {
   beforeEach(() => {
     agents = new Map();
     store = {
-      getAgent: vi.fn(async (id: string) => agents.get(id)),
-      upsertAgent: vi.fn(async (a: Agent) => {
-        agents.set(a.id, a);
+      getAgent: vi.fn(async (id) => agents.get(id as string)),
+      upsertAgent: vi.fn(async (a) => {
+        agents.set((a as Agent).id, a as Agent);
       }),
     };
     service = new AgentBudgetService(store as unknown as AgentStore);
@@ -175,21 +335,28 @@ describe('resolveBudgetOwner (hierarchy walk)', () => {
   // rather than the root and budget isolation broke below depth 1.
   it('a grandchild debits the ROOT budget, not its immediate parent', async () => {
     agents.set('root', makeAgent('root', {
-      budget: { totalTokens: 1000, usedTokens: 0, warningThreshold: 0.8, hardStop: true },
+      budget: {
+        totalTokens: 1000, meteredTokens: 0, reportedTokens: 0,
+        usedTokens: 0, warningFraction: 0.8, hardStop: true,
+      },
     }));
     agents.set('child', makeAgent('child', { parentAgentId: 'root' }));
     agents.set('grandchild', makeAgent('grandchild', { parentAgentId: 'child' }));
 
-    const status = await service.recordUsage('grandchild', 250);
+    const status = await service.recordMeteredUsage('grandchild', 250);
 
     expect(status.agentId).toBe('root');
+    expect(agents.get('root')!.budget!.meteredTokens).toBe(250);
     expect(agents.get('root')!.budget!.usedTokens).toBe(250);
     expect(agents.get('child')!.budget).toBeUndefined();
   });
 
   it('reports the root budget for a deeply nested agent', async () => {
     agents.set('root', makeAgent('root', {
-      budget: { totalTokens: 900, usedTokens: 600, warningThreshold: 0.5, hardStop: true },
+      budget: {
+        totalTokens: 900, meteredTokens: 400, reportedTokens: 200,
+        usedTokens: 600, warningFraction: 0.5, hardStop: true,
+      },
     }));
     agents.set('a', makeAgent('a', { parentAgentId: 'root' }));
     agents.set('b', makeAgent('b', { parentAgentId: 'a' }));

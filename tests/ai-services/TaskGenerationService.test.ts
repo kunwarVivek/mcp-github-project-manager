@@ -331,9 +331,7 @@ describe('TaskGenerationService', () => {
         }
       ];
 
-      vi.mocked(generateText).mockResolvedValue({
-        text: 'Subtasks: 1. Design dashboard layout 2. Implement dashboard components'
-      });
+      vi.mocked(generateObject).mockRejectedValue(new Error('mock not configured'));
 
       const complexTask = {
         id: 'task-1',
@@ -364,7 +362,7 @@ describe('TaskGenerationService', () => {
       expect(result[0].title).toContain('Setup');
       expect(result[0].complexity).toBeLessThan(complexTask.complexity);
       expect(result[1].title).toContain('Implementation');
-      expect(vi.mocked(generateText)).toHaveBeenCalledTimes(1);
+      expect(vi.mocked(generateObject)).toHaveBeenCalled();
     });
   });
 

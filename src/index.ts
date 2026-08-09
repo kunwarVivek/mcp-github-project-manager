@@ -628,6 +628,7 @@ class GitHubProjectManagerServer {
           ? ((validatedArgs as { agentId: string }).agentId)
           : undefined;
       const usage = { tokens: 0 };
+      let budgetWarningLine: string | undefined;
 
       const result = await traceContext.run(
         {
@@ -645,14 +646,20 @@ class GitHubProjectManagerServer {
       // a round trip per LLM call and would lose updates under concurrency.
       // Never let a budget write failure fail a tool call that already ran.
       if (agentId && usage.tokens > 0) {
-        await this.agentBudgetService
-          .recordUsage(agentId, usage.tokens)
-          .catch((error) =>
+        const budgetStatus = await this.agentBudgetService
+          .recordMeteredUsage(agentId, usage.tokens)
+          .catch((error) => {
             this.logger.warn(
               `Failed to debit ${usage.tokens} tokens to agent ${agentId}`,
               error,
-            ),
-          );
+            );
+            return undefined;
+          });
+
+        // Surface budget warnings inline so the model learns to slow down
+        if (budgetStatus?.isWarning) {
+          budgetWarningLine = `⚠️ Agent budget at ${budgetStatus.usagePercent.toFixed(1)}% — consider wrapping up.`;
+        }
       }
 
       const mcpResponse = ToolResultFormatter.formatSuccess(toolName, result, {
@@ -675,13 +682,18 @@ class GitHubProjectManagerServer {
           ? (JSON.parse(JSON.stringify(result)) as Record<string, unknown>)
           : undefined;
 
+      const content: Array<{ type: 'text'; text: string }> = [
+        {
+          type: "text" as const,
+          text: mcpResponse.output.content ?? JSON.stringify(result),
+        },
+      ];
+      if (budgetWarningLine) {
+        content.push({ type: "text" as const, text: budgetWarningLine });
+      }
+
       return {
-        content: [
-          {
-            type: "text" as const,
-            text: mcpResponse.output.content ?? JSON.stringify(result),
-          },
-        ],
+        content,
         ...(structuredContent ? { structuredContent } : {}),
       };
     } catch (error) {
@@ -1074,6 +1086,12 @@ class GitHubProjectManagerServer {
       if (this.webhookServer) {
         await this.webhookServer.stop();
         this.logger.info("Webhook server stopped");
+      }
+
+      // Close stdio transport
+      if (this.stdioHandle) {
+        await this.stdioHandle.close();
+        this.logger.info("Stdio transport closed");
       }
 
       // Cleanup event store

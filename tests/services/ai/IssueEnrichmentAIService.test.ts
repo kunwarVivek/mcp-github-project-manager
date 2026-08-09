@@ -165,6 +165,9 @@ describe('IssueEnrichmentAIService', () => {
       });
 
       it('should include suggested assignees when available', async () => {
+        // Create service with suggestAssignees enabled (default is false)
+        const assigneeService = new IssueEnrichmentAIService(undefined, { suggestAssignees: true });
+
         mockGenerateObject.mockResolvedValue({
           object: {
             enrichedBody: 'Content',
@@ -175,7 +178,7 @@ describe('IssueEnrichmentAIService', () => {
           }
         } as any);
 
-        const result = await service.enrichIssue({
+        const result = await assigneeService.enrichIssue({
           issueTitle: 'Test',
           issueDescription: 'Description'
         });

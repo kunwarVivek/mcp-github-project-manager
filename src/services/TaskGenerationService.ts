@@ -656,6 +656,7 @@ export class TaskGenerationService {
     confidenceConfig?: Partial<ConfidenceConfig>;
   }): Promise<TaskGenerationResult> {
     const config = { ...DEFAULT_CONFIDENCE_CONFIG, ...params.confidenceConfig };
+    const scorer = new ConfidenceScorer(config);
 
     // Generate enhanced tasks using existing method
     const enhancedTasks = await this.generateEnhancedTasksFromPRD({
@@ -697,7 +698,7 @@ export class TaskGenerationService {
         ? params.prd
         : JSON.stringify(params.prd);
 
-      const taskConfidence = this.confidenceScorer.calculateSectionConfidence({
+      const taskConfidence = scorer.calculateSectionConfidence({
         sectionId: task.id,
         sectionName: task.title,
         inputData: {
@@ -730,7 +731,7 @@ export class TaskGenerationService {
 
     // Calculate overall confidence
     const confidenceScores = tasksWithEstimates.map(t => t.taskConfidence);
-    const aggregated = this.confidenceScorer.aggregateConfidence(confidenceScores);
+    const aggregated = scorer.aggregateConfidence(confidenceScores);
 
     // Find low confidence tasks
     const lowConfidenceTasks = tasksWithEstimates.filter(

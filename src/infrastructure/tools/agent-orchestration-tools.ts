@@ -407,7 +407,7 @@ export const setAgentBudgetTool: ToolDefinition<
   title: 'Set Agent Budget',
   description:
     'Set or update the token budget for an agent. ' +
-    'Configure total tokens, warning threshold, hard stop behavior, and reset period. ' +
+    'Configure total tokens, warning fraction (0-1), hard stop behavior, and reset period. ' +
     'Use this to control agent spending and prevent runaway costs.',
   schema: setAgentBudgetSchema as unknown as ToolSchema<SetAgentBudgetArgs>,
   outputSchema: BudgetStatusSchema,
@@ -419,7 +419,7 @@ export const setAgentBudgetTool: ToolDefinition<
       args: {
         agentId: 'agent-abc123',
         totalTokens: 500000,
-        warningThreshold: 0.8,
+        warningFraction: 0.8,
         hardStop: true,
         resetPeriod: 'daily',
       },
@@ -724,8 +724,10 @@ export async function executeRegisterAgent(
       budget: args.budgetTokens
         ? {
             totalTokens: args.budgetTokens,
+            meteredTokens: 0,
+            reportedTokens: 0,
             usedTokens: 0,
-            warningThreshold: 0.8,
+            warningFraction: 0.8,
             hardStop: true,
           }
         : undefined,
@@ -1033,6 +1035,7 @@ export async function executeGetAgentActivity(
   try {
     const factory = createGitHubFactory();
     const store = new AgentStore(factory);
+    const budgetService = new AgentBudgetService(store);
 
     let agents = await store.listAgents();
 
@@ -1041,10 +1044,22 @@ export async function executeGetAgentActivity(
     }
 
     const now = new Date();
-    const entries: AgentActivityEntry[] = agents.map((agent) => {
+    const entries: AgentActivityEntry[] = await Promise.all(agents.map(async (agent) => {
       const lastHb = agent.lastHeartbeat ? new Date(agent.lastHeartbeat) : undefined;
       const ageMs = lastHb ? now.getTime() - lastHb.getTime() : undefined;
       const isStale = ageMs != null && ageMs > 30 * 60 * 1000;
+
+      let budgetStatus: AgentActivityEntry['budgetStatus'];
+      try {
+        const status = await budgetService.getBudgetStatus(agent.id);
+        budgetStatus = {
+          usagePercent: status.usagePercent,
+          isWarning: status.isWarning,
+          isExhausted: status.isExhausted,
+        };
+      } catch {
+        // Budget status is optional; leave undefined on failure
+      }
 
       return {
         agent: {
@@ -1064,17 +1079,7 @@ export async function executeGetAgentActivity(
         lastHeartbeat: agent.lastHeartbeat,
         heartbeatAge: ageMs != null ? `${Math.round(ageMs / 60000)}m` : undefined,
         isStale,
-        budgetStatus: agent.budget
-          ? {
-              usagePercent: agent.budget.totalTokens > 0
-                ? (agent.budget.usedTokens / agent.budget.totalTokens) * 100
-                : 0,
-              isWarning: agent.budget.totalTokens > 0
-                ? agent.budget.usedTokens / agent.budget.totalTokens >= agent.budget.warningThreshold
-                : false,
-              isExhausted: agent.budget.hardStop && agent.budget.usedTokens >= agent.budget.totalTokens,
-            }
-          : undefined,
+        budgetStatus,
         completedToday: 0, // Requires additional query; populated by service layer
         heartbeatHistory: Array.isArray(agent.metadata?.heartbeatHistory)
           ? (agent.metadata.heartbeatHistory as Array<{
@@ -1085,7 +1090,7 @@ export async function executeGetAgentActivity(
             }>).slice(0, 10)
           : undefined,
       };
-    });
+    }));
 
     const result = {
       agents: entries,
@@ -1151,8 +1156,9 @@ export async function executeSetAgentBudget(
     await service.setBudget(
       args.agentId,
       args.totalTokens,
-      args.warningThreshold,
+      args.warningFraction,
       args.resetPeriod,
+      args.hardStop,
     );
 
     const status = await service.getBudgetStatus(args.agentId);
@@ -1340,7 +1346,7 @@ export async function executeRecordUsage(
     const store = new AgentStore(factory);
     const service = new AgentBudgetService(store);
 
-    const status = await service.recordUsage(args.agentId, args.tokensUsed);
+    const status = await service.recordReportedUsage(args.agentId, args.tokensUsed);
 
     return {
       content: [{

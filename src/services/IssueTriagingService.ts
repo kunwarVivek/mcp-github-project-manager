@@ -59,7 +59,7 @@ export class IssueTriagingService {
 
       const response = await generateText({
         model,
-        prompt: `${prompt}\n\nIssue: ${issueTitle}`,
+        prompt: `${prompt}\n\nIssue Title: ${issueTitle}${issueDescription ? `\nDescription: ${issueDescription}` : ''}`,
         temperature: 0.5,
         maxOutputTokens: 1000
       });

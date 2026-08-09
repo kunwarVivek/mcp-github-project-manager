@@ -484,11 +484,18 @@ Return an empty array if no relationships are detected.`;
       const candidateLabels = candidate.labels || [];
       if (candidateLabels.length === 0) continue;
 
-      const overlapScore = this.calculateLabelOverlap(sourceLabels, candidateLabels);
+      // Filter candidate labels through the same component prefix filter
+      const candidateComponentLabels = candidateLabels.filter(label =>
+        componentPrefixes.some(prefix => label.toLowerCase().startsWith(prefix)) ||
+        !['bug', 'feature', 'enhancement', 'documentation', 'help wanted', 'good first issue'].includes(label.toLowerCase())
+      );
+      if (candidateComponentLabels.length === 0) continue;
+
+      const overlapScore = this.calculateLabelOverlap(sourceComponentLabels, candidateComponentLabels);
 
       if (overlapScore >= COMPONENT_LABEL_THRESHOLD) {
-        // Find the common labels for reasoning
-        const commonLabels = sourceLabels.filter(l => candidateLabels.includes(l));
+        // Find the common component labels for reasoning
+        const commonLabels = sourceComponentLabels.filter(l => candidateComponentLabels.includes(l));
 
         relationships.push({
           sourceIssueId: sourceId,

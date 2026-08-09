@@ -112,26 +112,9 @@
 <!-- project-manual:end -->
 
 <!-- gitnexus:start -->
-## Agent skills
-
-### Issue tracker
-
-Issues live in **beads** (`bd`), not GitHub Issues — GitHub Issues remains a separate
-external reporting surface. See `docs/agents/issue-tracker.md`.
-
-### Triage labels
-
-The five canonical roles, default strings (`needs-triage`, `needs-info`, `ready-for-agent`,
-`ready-for-human`, `wontfix`). See `docs/agents/triage-labels.md`.
-
-### Domain docs
-
-Single-context: `CONTEXT.md` + `docs/adr/` at the repo root (neither exists yet; created
-lazily by `/domain-modeling`). See `docs/agents/domain.md`.
-
 # GitNexus — Code Intelligence
 
-This project is indexed by GitNexus as **mcp-github-project-manager** (5924 symbols, 15595 relationships, 300 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+This project is indexed by GitNexus as **mcp-github-project-manager** (5952 symbols, 15760 relationships, 300 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
 
 > Index stale? Run `node .gitnexus/run.cjs analyze` from the project root — it auto-selects an available runner. No `.gitnexus/run.cjs` yet? `npx gitnexus analyze` (npm 11 crash → `npm i -g gitnexus`; #1939).
 

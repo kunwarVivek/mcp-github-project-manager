@@ -159,7 +159,7 @@ describe('ContextQualityValidator', () => {
   const createQualityMetrics = (overrides?: Partial<ContextQualityMetrics>): ContextQualityMetrics => ({
     completenessScore: 95,
     generationTime: 10,
-    tokenUsage: 1500,
+    estimatedTokens: 1500,
     cacheHit: false,
     aiEnhanced: true,
     errors: [],
@@ -451,7 +451,7 @@ describe('ContextQualityValidator', () => {
     it('should pass for good performance metrics', () => {
       const metrics = createQualityMetrics({
         generationTime: 10,
-        tokenUsage: 1000
+        estimatedTokens: 1000
       });
 
       const result = validator.validatePerformance(metrics);
@@ -483,7 +483,7 @@ describe('ContextQualityValidator', () => {
 
     it('should fail when token usage exceeds limit', () => {
       const metrics = createQualityMetrics({
-        tokenUsage: 2500 // > 2000
+        estimatedTokens: 2500 // > 2000
       });
 
       const result = validator.validatePerformance(metrics);
@@ -494,7 +494,7 @@ describe('ContextQualityValidator', () => {
 
     it('should warn when token usage approaches limit', () => {
       const metrics = createQualityMetrics({
-        tokenUsage: 1700 // > 80% of 2000
+        estimatedTokens: 1700 // > 80% of 2000
       });
 
       const result = validator.validatePerformance(metrics);
@@ -527,7 +527,7 @@ describe('ContextQualityValidator', () => {
     it('should provide optimization suggestions', () => {
       const metrics = createQualityMetrics({
         generationTime: 35,
-        tokenUsage: 2500
+        estimatedTokens: 2500
       });
 
       const result = validator.validatePerformance(metrics);
@@ -724,7 +724,7 @@ describe('ContextQualityValidator', () => {
     it('should handle metrics with edge values', () => {
       const metrics = createQualityMetrics({
         generationTime: 30, // Exactly at limit
-        tokenUsage: 2000 // Exactly at limit
+        estimatedTokens: 2000 // Exactly at limit
       });
 
       const result = validator.validatePerformance(metrics);
@@ -762,7 +762,7 @@ describe('ContextQualityValidator', () => {
     it('should pass overall when all checks pass with good inputs', () => {
       const context = createValidContext();
       const task = createMockTask();
-      const metrics = createQualityMetrics({ generationTime: 5, tokenUsage: 500 });
+      const metrics = createQualityMetrics({ generationTime: 5, estimatedTokens: 500 });
 
       const report = validator.generateQualityReport(task, context, metrics);
 
@@ -801,7 +801,7 @@ describe('ContextQualityValidator', () => {
       const task = createMockTask({ title: 'Completely Unrelated Xyzzyx Task', description: 'Nothing to do with auth' });
       const metrics = createQualityMetrics({
         generationTime: 60,
-        tokenUsage: 5000,
+        estimatedTokens: 5000,
         errors: ['AI provider timeout', 'Retry failed']
       });
 
@@ -840,7 +840,7 @@ describe('ContextQualityValidator', () => {
       const task = createMockTask();
       const metrics = createQualityMetrics({
         generationTime: 60,
-        tokenUsage: 5000,
+        estimatedTokens: 5000,
         errors: ['Timeout']
       });
 
@@ -856,7 +856,7 @@ describe('ContextQualityValidator', () => {
     it('should aggregate individual check scores into overall score using correct weights', () => {
       const context = createValidContext();
       const task = createMockTask();
-      const metrics = createQualityMetrics({ generationTime: 5, tokenUsage: 500 });
+      const metrics = createQualityMetrics({ generationTime: 5, estimatedTokens: 500 });
 
       const report = validator.generateQualityReport(task, context, metrics);
 
@@ -888,7 +888,7 @@ describe('ContextQualityValidator', () => {
       const task = createMockTask();
       const metrics = createQualityMetrics({
         generationTime: 60,
-        tokenUsage: 5000,
+        estimatedTokens: 5000,
         errors: ['Timeout']
       });
 
@@ -906,7 +906,7 @@ describe('ContextQualityValidator', () => {
         businessObjective: 'Enable authentication - this is a placeholder for now',
       });
       const task = createMockTask();
-      const metrics = createQualityMetrics({ generationTime: 5, tokenUsage: 500 });
+      const metrics = createQualityMetrics({ generationTime: 5, estimatedTokens: 500 });
 
       const report = validator.generateQualityReport(task, context, metrics);
 
@@ -924,12 +924,12 @@ describe('ContextQualityValidator', () => {
       const task = createMockTask();
 
       // At limit (30s, 2000 tokens) — should pass (not exceeding)
-      const atLimitMetrics = createQualityMetrics({ generationTime: 30, tokenUsage: 2000 });
+      const atLimitMetrics = createQualityMetrics({ generationTime: 30, estimatedTokens: 2000 });
       const atLimitReport = validator.generateQualityReport(task, context, atLimitMetrics);
       expect(atLimitReport.validation.performance.issues.filter(i => i.includes('exceeds'))).toHaveLength(0);
 
       // Just over limit — should fail
-      const overLimitMetrics = createQualityMetrics({ generationTime: 31, tokenUsage: 2001 });
+      const overLimitMetrics = createQualityMetrics({ generationTime: 31, estimatedTokens: 2001 });
       const overLimitReport = validator.generateQualityReport(task, context, overLimitMetrics);
       expect(overLimitReport.validation.performance.issues.filter(i => i.includes('exceeds'))).not.toHaveLength(0);
       expect(overLimitReport.validation.performance.passes).toBe(false);

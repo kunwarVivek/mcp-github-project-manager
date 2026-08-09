@@ -111,7 +111,7 @@ describe('ConfidenceScorer', () => {
     it('respects custom thresholds', () => {
       const customConfig = {
         ...DEFAULT_CONFIDENCE_CONFIG,
-        warningThreshold: 80,
+        warningScore: 80,
         errorThreshold: 60
       };
 

@@ -31,7 +31,12 @@ export class AgentBudgetService {
       // Subagents delegate to parent's budget
       const budgetOwner = await this.resolveBudgetOwner(agent);
 
-      const budget = budgetOwner.budget ?? defaultBudget();
+      // Lazy reset on every read
+      await this.resetBudgetIfDue(budgetOwner.id);
+      // Re-read after potential reset
+      const freshOwner = await this.agentStore.getAgent(budgetOwner.id);
+      const budget = normalizeBudget(freshOwner?.budget ?? budgetOwner.budget ?? defaultBudget());
+
       const remainingTokens = Math.max(0, budget.totalTokens - budget.usedTokens);
       const usagePercent = budget.totalTokens > 0
         ? (budget.usedTokens / budget.totalTokens) * 100
@@ -41,10 +46,12 @@ export class AgentBudgetService {
         agentId: budgetOwner.id,
         agentName: budgetOwner.name,
         totalTokens: budget.totalTokens,
+        meteredTokens: budget.meteredTokens,
+        reportedTokens: budget.reportedTokens,
         usedTokens: budget.usedTokens,
         remainingTokens,
         usagePercent: Math.round(usagePercent * 100) / 100,
-        isWarning: usagePercent / 100 >= budget.warningThreshold,
+        isWarning: usagePercent / 100 >= budget.warningFraction,
         isExhausted: budget.hardStop && budget.usedTokens >= budget.totalTokens,
         resetPeriod: budget.resetPeriod,
         lastResetAt: budget.lastResetAt,
@@ -56,8 +63,9 @@ export class AgentBudgetService {
   async setBudget(
     agentId: string,
     totalTokens: number,
-    warningThreshold?: number,
+    warningFraction?: number,
     resetPeriod?: 'daily' | 'weekly' | 'monthly' | 'never',
+    hardStop?: boolean,
   ): Promise<BudgetStatus> {
     return safeCall(async () => {
       const agent = await this.agentStore.getAgent(agentId);
@@ -65,12 +73,14 @@ export class AgentBudgetService {
         throw new Error(`Agent not found: ${agentId}`);
       }
 
-      const existing = agent.budget ?? defaultBudget();
+      const existing = normalizeBudget(agent.budget ?? defaultBudget());
       const updated: AgentBudget = {
         ...existing,
         totalTokens,
-        warningThreshold: warningThreshold ?? existing.warningThreshold,
+        warningFraction: warningFraction ?? existing.warningFraction,
         resetPeriod: resetPeriod ?? existing.resetPeriod,
+        hardStop: hardStop ?? existing.hardStop,
+        usedTokens: existing.meteredTokens + existing.reportedTokens,
       };
 
       agent.budget = updated;
@@ -80,8 +90,11 @@ export class AgentBudgetService {
     });
   }
 
-  /** Record token usage. Subagents debit from parent's budget. Returns updated status. */
-  async recordUsage(agentId: string, tokensUsed: number): Promise<BudgetStatus> {
+  /**
+   * Record metered token usage (measured at provider boundary).
+   * Subagents debit from parent's budget. Returns updated status.
+   */
+  async recordMeteredUsage(agentId: string, tokensUsed: number): Promise<BudgetStatus> {
     return safeCall(async () => {
       const agent = await this.agentStore.getAgent(agentId);
       if (!agent) {
@@ -91,8 +104,38 @@ export class AgentBudgetService {
       // Subagents debit from parent's budget
       const budgetOwner = await this.resolveBudgetOwner(agent);
 
-      const budget = budgetOwner.budget ?? defaultBudget();
-      budget.usedTokens += tokensUsed;
+      const budget = normalizeBudget(budgetOwner.budget ?? defaultBudget());
+      budget.meteredTokens += tokensUsed;
+      budget.usedTokens = budget.meteredTokens + budget.reportedTokens;
+      budgetOwner.budget = budget;
+
+      // Flip status when budget is exhausted
+      if (budget.hardStop && budget.usedTokens >= budget.totalTokens) {
+        budgetOwner.status = 'budget_exhausted';
+      }
+
+      await this.agentStore.upsertAgent(budgetOwner);
+      return this.getBudgetStatus(budgetOwner.id);
+    });
+  }
+
+  /**
+   * Record reported token usage (asserted by agent via record_usage tool).
+   * Subagents debit from parent's budget. Returns updated status.
+   */
+  async recordReportedUsage(agentId: string, tokensUsed: number): Promise<BudgetStatus> {
+    return safeCall(async () => {
+      const agent = await this.agentStore.getAgent(agentId);
+      if (!agent) {
+        throw new Error(`Agent not found: ${agentId}`);
+      }
+
+      // Subagents debit from parent's budget
+      const budgetOwner = await this.resolveBudgetOwner(agent);
+
+      const budget = normalizeBudget(budgetOwner.budget ?? defaultBudget());
+      budget.reportedTokens += tokensUsed;
+      budget.usedTokens = budget.meteredTokens + budget.reportedTokens;
       budgetOwner.budget = budget;
 
       // Flip status when budget is exhausted
@@ -128,7 +171,7 @@ export class AgentBudgetService {
         throw new Error(`Agent not found: ${agentId}`);
       }
 
-      const budget = agent.budget ?? defaultBudget();
+      const budget = normalizeBudget(agent.budget ?? defaultBudget());
       if (!budget.resetPeriod || budget.resetPeriod === 'never') {
         return false;
       }
@@ -142,6 +185,8 @@ export class AgentBudgetService {
         return false;
       }
 
+      budget.meteredTokens = 0;
+      budget.reportedTokens = 0;
       budget.usedTokens = 0;
       budget.lastResetAt = now.toISOString();
       agent.budget = budget;
@@ -193,11 +238,31 @@ export class AgentBudgetService {
 function defaultBudget(): AgentBudget {
   return {
     totalTokens: DEFAULT_AGENT_BUDGET_TOKENS,
+    meteredTokens: 0,
+    reportedTokens: 0,
     usedTokens: 0,
-    warningThreshold: 0.8,
+    warningFraction: 0.8,
     hardStop: true,
     resetPeriod: 'never',
   };
+}
+
+/**
+ * Coalesce fields that may be missing from legacy persisted data.
+ * AgentStore does raw JSON.parse — Zod defaults never run on reads.
+ */
+function normalizeBudget(raw: AgentBudget): AgentBudget {
+  const hadSplitFields = raw.meteredTokens != null || raw.reportedTokens != null;
+  raw.meteredTokens ??= 0;
+  raw.reportedTokens ??= 0;
+  raw.warningFraction ??= 0.8;
+  // Legacy data has all spend in usedTokens with no metered/reported split.
+  // Attribute existing spend to meteredTokens so the sum stays correct.
+  if (!hadSplitFields && raw.usedTokens > 0 && raw.meteredTokens === 0 && raw.reportedTokens === 0) {
+    raw.meteredTokens = raw.usedTokens;
+  }
+  raw.usedTokens = raw.meteredTokens + raw.reportedTokens;
+  return raw;
 }
 
 function resetPeriodToMs(period: 'daily' | 'weekly' | 'monthly'): number {

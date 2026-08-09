@@ -10,6 +10,7 @@ import {
   type PRDDocument,
   type FeatureRequirement,
   TaskPriority,
+  TaskPrioritySchema,
   TaskStatus,
   type AIGenerationMetadata,
   type SectionConfidence,
@@ -132,6 +133,7 @@ export class AITaskProcessor {
     lowConfidenceSections: SectionConfidence[];
   }> {
     const config = { ...DEFAULT_CONFIDENCE_CONFIG, ...params.confidenceConfig };
+    const scorer = new ConfidenceScorer(config);
 
     // Generate PRD with confidence request
     const prdConfig = PRD_PROMPT_CONFIGS.generateFromIdea;
@@ -164,7 +166,7 @@ export class AITaskProcessor {
       const sectionConfidence: SectionConfidence[] = [];
 
       // Overview section
-      sectionConfidence.push(this.confidenceScorer.calculateSectionConfidence({
+      sectionConfidence.push(scorer.calculateSectionConfidence({
         sectionId: 'overview',
         sectionName: 'Overview',
         inputData: { description: params.projectIdea },
@@ -174,7 +176,7 @@ export class AITaskProcessor {
       }));
 
       // Features section
-      sectionConfidence.push(this.confidenceScorer.calculateSectionConfidence({
+      sectionConfidence.push(scorer.calculateSectionConfidence({
         sectionId: 'features',
         sectionName: 'Features',
         inputData: {
@@ -189,7 +191,7 @@ export class AITaskProcessor {
       }));
 
       // Technical requirements section
-      sectionConfidence.push(this.confidenceScorer.calculateSectionConfidence({
+      sectionConfidence.push(scorer.calculateSectionConfidence({
         sectionId: 'technicalRequirements',
         sectionName: 'Technical Requirements',
         inputData: {
@@ -201,7 +203,7 @@ export class AITaskProcessor {
       }));
 
       // Aggregate confidence
-      const aggregated = this.confidenceScorer.aggregateConfidence(sectionConfidence);
+      const aggregated = scorer.aggregateConfidence(sectionConfidence);
 
       // Build PRD without confidence field
       const prd: PRDDocument = {
@@ -422,16 +424,31 @@ export class AITaskProcessor {
     });
 
     try {
-      await generateText({
+      const SubtaskSchema = z.object({
+        subtasks: z.array(z.object({
+          title: z.string(),
+          description: z.string(),
+          complexity: z.number().min(1).max(10),
+          estimatedHours: z.number().positive(),
+        }))
+      });
+
+      const result = await generateObject({
         model,
         system: config.systemPrompt,
         prompt,
+        schema: SubtaskSchema,
         maxOutputTokens: config.maxTokens,
         temperature: config.temperature
       });
 
-      // For now, return a simple subtask structure
-      // In a real implementation, you'd use structured output
+      return result.object.subtasks.map(subtask => ({
+        id: uuidv4(),
+        ...subtask
+      }));
+    } catch (error) {
+      this.logger.error('Error expanding task into subtasks, using fallback', error);
+      // Fallback to hardcoded structure
       return [
         {
           id: uuidv4(),
@@ -455,9 +472,6 @@ export class AITaskProcessor {
           estimatedHours: 2
         }
       ];
-    } catch (error) {
-      this.logger.error('Error expanding task into subtasks', error);
-      throw new Error(`Failed to expand task: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 
@@ -481,26 +495,40 @@ export class AITaskProcessor {
     });
 
     try {
-      await generateText({
+      const PrioritySchema = z.object({
+        priorities: z.array(z.object({
+          taskId: z.string(),
+          priority: TaskPrioritySchema,
+        }))
+      });
+
+      const result = await generateObject({
         model,
         system: config.systemPrompt,
         prompt,
+        schema: PrioritySchema,
         maxOutputTokens: config.maxTokens,
         temperature: config.temperature
       });
 
-      // In a real implementation, you'd use structured output to get priority assignments
-      // For now, we'll apply a simple priority assignment based on the analysis
-      const prioritizedTasks = params.tasks.map((task, index) => ({
+      // Map AI-assigned priorities onto input tasks by taskId
+      const priorityMap = new Map(
+        result.object.priorities.map(p => [p.taskId, p.priority])
+      );
+
+      return params.tasks.map((task, index) => ({
+        ...task,
+        priority: priorityMap.get(task.id) ?? this.assignPriorityBasedOnIndex(index, params.tasks.length),
+        updatedAt: new Date().toISOString()
+      }));
+    } catch (error) {
+      this.logger.error('Error prioritizing tasks, using fallback', error);
+      // Fallback to index-based priority assignment
+      return params.tasks.map((task, index) => ({
         ...task,
         priority: this.assignPriorityBasedOnIndex(index, params.tasks.length),
         updatedAt: new Date().toISOString()
       }));
-
-      return prioritizedTasks;
-    } catch (error) {
-      this.logger.error('Error prioritizing tasks', error);
-      throw new Error(`Failed to prioritize tasks: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 

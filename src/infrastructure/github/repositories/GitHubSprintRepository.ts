@@ -77,8 +77,8 @@ export class GitHubSprintRepository extends BaseGitHubRepository implements Spri
       throw new Error("Sprint not found");
     }
 
-    // GitHub Projects V2 doesn't support updating individual iterations via API
-    // For now, we'll return an updated mock sprint
+    // GitHub Projects V2 doesn't support updating iteration metadata (title/dates) via API
+    // but issue assignments ARE supported via updateSprintIssues()
     const updatedSprint: Sprint = {
       ...sprint,
       ...(data.title && { title: data.title }),
@@ -89,6 +89,11 @@ export class GitHubSprintRepository extends BaseGitHubRepository implements Spri
       ...(data.issues && { issues: data.issues }),
       updatedAt: new Date().toISOString(),
     };
+
+    // Write issue assignments to GitHub via GraphQL mutations
+    if (data.issues) {
+      await this.updateSprintIssues(id, data.issues);
+    }
 
     return updatedSprint;
   }

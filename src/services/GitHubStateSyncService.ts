@@ -98,24 +98,33 @@ export class GitHubStateSyncService {
    * Sync specific resource type
    */
   async syncResourceType(type: ResourceType, forceSync = false): Promise<void> {
-    this.logger.info(`Syncing resource type: ${type}`);
+    this.logger.info(`Syncing resource type: ${type} (forceSync=${forceSync})`);
 
     try {
-      switch (type) {
-        case ResourceType.PROJECT:
-          await this.syncProjects(forceSync);
-          break;
-        case ResourceType.MILESTONE:
-          await this.syncMilestones(forceSync);
-          break;
-        case ResourceType.ISSUE:
-          await this.syncIssues(forceSync);
-          break;
-        case ResourceType.SPRINT:
-          await this.syncSprints(forceSync);
-          break;
-        default:
-          this.logger.warn(`Unknown resource type for sync: ${type}`);
+      if (forceSync) {
+        // Brute-force: re-fetch everything regardless of freshness
+        switch (type) {
+          case ResourceType.PROJECT:
+            await this.syncProjects(forceSync);
+            break;
+          case ResourceType.MILESTONE:
+            await this.syncMilestones(forceSync);
+            break;
+          case ResourceType.ISSUE:
+            await this.syncIssues(forceSync);
+            break;
+          case ResourceType.SPRINT:
+            await this.syncSprints(forceSync);
+            break;
+          default:
+            this.logger.warn(`Unknown resource type for sync: ${type}`);
+        }
+      } else {
+        // Incremental: use metadata freshness checks to skip up-to-date resources
+        const allMetadata = await this.persistence.loadMetadata();
+        const typeMetadata = allMetadata.filter(m => m.resourceType === type);
+        const result = await this.syncResourceTypeWithMetadata(type, typeMetadata);
+        this.logger.info(`Incremental sync for ${type}: ${result.synced} synced, ${result.skipped} skipped`);
       }
     } catch (error) {
       this.logger.error(`Failed to sync resource type ${type}:`, error);

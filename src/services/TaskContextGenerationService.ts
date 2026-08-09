@@ -75,7 +75,7 @@ export class TaskContextGenerationService {
     features?: FeatureRequirement[]
   ): Promise<{ context: TaskExecutionContext; metrics: ContextQualityMetrics }> {
     const startTime = Date.now();
-    let tokenUsage = 0;
+    let estimatedTokens = 0;
     const errors: string[] = [];
     const warnings: string[] = [];
 
@@ -99,7 +99,7 @@ export class TaskContextGenerationService {
             features
           );
           aiEnhancedContext = aiResult.context;
-          tokenUsage = aiResult.tokenUsage;
+          estimatedTokens = aiResult.estimatedTokens;
           aiEnhanced = true;
         } catch (error) {
           errors.push(`AI enhancement failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -117,7 +117,7 @@ export class TaskContextGenerationService {
       const metrics: ContextQualityMetrics = {
         completenessScore: this.calculateContextCompleteness(context),
         generationTime,
-        tokenUsage,
+        estimatedTokens,
         cacheHit: false, // TODO: Implement caching
         aiEnhanced,
         errors,
@@ -136,7 +136,7 @@ export class TaskContextGenerationService {
       const metrics: ContextQualityMetrics = {
         completenessScore: this.calculateContextCompleteness(fallbackContext),
         generationTime,
-        tokenUsage: 0,
+        estimatedTokens: 0,
         cacheHit: false,
         aiEnhanced: false,
         errors,
@@ -200,7 +200,7 @@ export class TaskContextGenerationService {
     config: EnhancedTaskGenerationConfig,
     allTasks?: AITask[],
     features?: FeatureRequirement[]
-  ): Promise<{ context: Partial<TaskExecutionContext>; tokenUsage: number }> {
+  ): Promise<{ context: Partial<TaskExecutionContext>; estimatedTokens: number }> {
     const enhancedContext: Partial<TaskExecutionContext> = {};
     let totalTokens = 0;
 
@@ -277,12 +277,12 @@ export class TaskContextGenerationService {
 
       return {
         context: enhancedContext,
-        tokenUsage: totalTokens
+        estimatedTokens: totalTokens
       };
 
     } catch (error) {
       this.logger.error('Error generating AI-enhanced context', error);
-      return { context: {}, tokenUsage: totalTokens };
+      return { context: {}, estimatedTokens: totalTokens };
     }
   }
 
