@@ -8,7 +8,7 @@ import { vi } from 'vitest';
 
 import { FeatureAnalysisService } from '../../../src/services/feature/FeatureAnalysisService';
 import { AIServiceFactory } from '../../../src/services/ai/AIServiceFactory';
-import { generateText } from 'ai';
+import { generateObject } from 'ai';
 import { TaskPriority, } from '../../../src/domain/ai-types';
 
 // Mock dependencies
@@ -32,10 +32,28 @@ vi.mock('../../../src/services/ai/AIServiceFactory', () => {
   };
 });
 vi.mock('ai', () => ({
-  generateText: vi.fn()
+  generateObject: vi.fn()
 }));
 
-const mockGenerateText = generateText as MockedFunction<typeof generateText>;
+const mockGenerateObject = generateObject as MockedFunction<typeof generateObject>;
+
+/** Helper: build a generateObject response with defaults. */
+function aiResponse(overrides: Partial<{
+  analysis: string; recommendation: string; priority: string;
+  complexity: number; estimatedEffort: number; risks: string[]; dependencies: string[];
+}> = {}) {
+  return {
+    object: {
+      analysis: overrides.analysis ?? 'Feature analysis text',
+      recommendation: overrides.recommendation ?? 'modify',
+      priority: overrides.priority ?? 'medium',
+      complexity: overrides.complexity ?? 5,
+      estimatedEffort: overrides.estimatedEffort ?? 40,
+      risks: overrides.risks ?? ['Technical complexity', 'Integration challenges'],
+      dependencies: overrides.dependencies ?? [],
+    }
+  } as unknown as ReturnType<typeof generateObject>;
+}
 const mockGetMainModel = vi.fn();
 const mockGetBestAvailableModel = vi.fn();
 
@@ -80,9 +98,10 @@ describe('FeatureAnalysisService', () => {
       });
 
       it('should return analysis with all required fields', async () => {
-        mockGenerateText.mockResolvedValue({
-          text: 'This feature should be approved. It has high priority and complexity 7.'
-        } as any);
+        mockGenerateObject.mockResolvedValue(aiResponse({
+          recommendation: 'approve', priority: 'high', complexity: 7, estimatedEffort: 56,
+          risks: ['risk1'], dependencies: ['dep1']
+        }));
 
         const result = await service.analyzeFeatureRequest(validParams);
 
@@ -95,112 +114,73 @@ describe('FeatureAnalysisService', () => {
         expect(result).toHaveProperty('dependencies');
       });
 
-      it('should extract "approve" recommendation', async () => {
-        mockGenerateText.mockResolvedValue({
-          text: 'This feature should be approved for implementation.'
-        } as any);
+      it('should return "approve" recommendation from schema', async () => {
+        mockGenerateObject.mockResolvedValue(aiResponse({ recommendation: 'approve' }));
 
         const result = await service.analyzeFeatureRequest(validParams);
 
         expect(result.recommendation).toBe('approve');
       });
 
-      it('should extract "reject" recommendation', async () => {
-        mockGenerateText.mockResolvedValue({
-          text: 'This feature should be rejected due to resource constraints.'
-        } as any);
+      it('should return "reject" recommendation from schema', async () => {
+        mockGenerateObject.mockResolvedValue(aiResponse({ recommendation: 'reject' }));
 
         const result = await service.analyzeFeatureRequest(validParams);
 
         expect(result.recommendation).toBe('reject');
       });
 
-      it('should extract "modify" recommendation as default', async () => {
-        mockGenerateText.mockResolvedValue({
-          text: 'This feature needs some changes before implementation.'
-        } as any);
+      it('should return "modify" recommendation from schema', async () => {
+        mockGenerateObject.mockResolvedValue(aiResponse({ recommendation: 'modify' }));
 
         const result = await service.analyzeFeatureRequest(validParams);
 
         expect(result.recommendation).toBe('modify');
       });
 
-      it('should extract critical priority', async () => {
-        mockGenerateText.mockResolvedValue({
-          text: 'This is a critical feature that must be implemented immediately.'
-        } as any);
+      it('should map critical priority', async () => {
+        mockGenerateObject.mockResolvedValue(aiResponse({ priority: 'critical' }));
 
         const result = await service.analyzeFeatureRequest(validParams);
 
         expect(result.priority).toBe(TaskPriority.CRITICAL);
       });
 
-      it('should extract high priority', async () => {
-        mockGenerateText.mockResolvedValue({
-          text: 'This is a high priority feature for the next release.'
-        } as any);
+      it('should map high priority', async () => {
+        mockGenerateObject.mockResolvedValue(aiResponse({ priority: 'high' }));
 
         const result = await service.analyzeFeatureRequest(validParams);
 
         expect(result.priority).toBe(TaskPriority.HIGH);
       });
 
-      it('should extract low priority', async () => {
-        mockGenerateText.mockResolvedValue({
-          text: 'This is a low priority feature that can wait.'
-        } as any);
+      it('should map low priority', async () => {
+        mockGenerateObject.mockResolvedValue(aiResponse({ priority: 'low' }));
 
         const result = await service.analyzeFeatureRequest(validParams);
 
         expect(result.priority).toBe(TaskPriority.LOW);
       });
 
-      it('should default to medium priority', async () => {
-        mockGenerateText.mockResolvedValue({
-          text: 'This feature should be implemented.'
-        } as any);
+      it('should map medium priority', async () => {
+        mockGenerateObject.mockResolvedValue(aiResponse({ priority: 'medium' }));
 
         const result = await service.analyzeFeatureRequest(validParams);
 
         expect(result.priority).toBe(TaskPriority.MEDIUM);
       });
 
-      it('should extract complexity from analysis', async () => {
-        mockGenerateText.mockResolvedValue({
-          text: 'The complexity of this feature is 8 out of 10.'
-        } as any);
+      it('should use complexity and estimatedEffort from schema', async () => {
+        mockGenerateObject.mockResolvedValue(aiResponse({ complexity: 8, estimatedEffort: 64 }));
 
         const result = await service.analyzeFeatureRequest(validParams);
 
         expect(result.complexity).toBe(8);
-        expect(result.estimatedEffort).toBe(64); // 8 * 8 hours
-      });
-
-      it('should default complexity to 5 when not found', async () => {
-        mockGenerateText.mockResolvedValue({
-          text: 'This feature needs implementation.'
-        } as any);
-
-        const result = await service.analyzeFeatureRequest(validParams);
-
-        expect(result.complexity).toBe(5);
-        expect(result.estimatedEffort).toBe(40); // 5 * 8 hours
-      });
-
-      it('should clamp complexity between 1 and 10', async () => {
-        mockGenerateText.mockResolvedValue({
-          text: 'The complexity is 15 out of 10.'
-        } as any);
-
-        const result = await service.analyzeFeatureRequest(validParams);
-
-        expect(result.complexity).toBe(10);
+        expect(result.estimatedEffort).toBe(64);
       });
 
       it('should pass existing PRD to AI when provided', async () => {
-        mockGenerateText.mockResolvedValue({
-          text: 'Feature approved.'
-        } as any);
+        mockGenerateObject.mockResolvedValue(aiResponse({ recommendation: 'approve' }));
 
         const existingPRD = {
           id: 'prd-1',
@@ -229,7 +209,7 @@ describe('FeatureAnalysisService', () => {
           existingPRD
         });
 
-        expect(mockGenerateText).toHaveBeenCalledWith(
+        expect(mockGenerateObject).toHaveBeenCalledWith(
           expect.objectContaining({
             prompt: expect.stringContaining('Existing PRD')
           })
@@ -237,16 +217,14 @@ describe('FeatureAnalysisService', () => {
       });
 
       it('should pass business justification to AI', async () => {
-        mockGenerateText.mockResolvedValue({
-          text: 'Feature approved.'
-        } as any);
+        mockGenerateObject.mockResolvedValue(aiResponse({ recommendation: 'approve' }));
 
         await service.analyzeFeatureRequest({
           ...validParams,
           businessJustification: 'Required for Q1 compliance'
         });
 
-        expect(mockGenerateText).toHaveBeenCalledWith(
+        expect(mockGenerateObject).toHaveBeenCalledWith(
           expect.objectContaining({
             prompt: expect.stringContaining('Q1 compliance')
           })
@@ -254,16 +232,14 @@ describe('FeatureAnalysisService', () => {
       });
 
       it('should pass target users to AI', async () => {
-        mockGenerateText.mockResolvedValue({
-          text: 'Feature approved.'
-        } as any);
+        mockGenerateObject.mockResolvedValue(aiResponse({ recommendation: 'approve' }));
 
         await service.analyzeFeatureRequest({
           ...validParams,
           targetUsers: ['admin', 'end-user']
         });
 
-        expect(mockGenerateText).toHaveBeenCalledWith(
+        expect(mockGenerateObject).toHaveBeenCalledWith(
           expect.objectContaining({
             prompt: expect.stringContaining('admin, end-user')
           })
@@ -285,9 +261,7 @@ describe('FeatureAnalysisService', () => {
       it('should fall back to best available model', async () => {
         mockGetMainModel.mockReturnValue(null);
         mockGetBestAvailableModel.mockReturnValue({ id: 'backup-model' });
-        mockGenerateText.mockResolvedValue({
-          text: 'Feature approved.'
-        } as any);
+        mockGenerateObject.mockResolvedValue(aiResponse({ recommendation: 'approve' }));
 
         const result = await service.analyzeFeatureRequest(validParams);
 
@@ -302,7 +276,7 @@ describe('FeatureAnalysisService', () => {
       });
 
       it('should handle AI generation errors gracefully', async () => {
-        mockGenerateText.mockRejectedValue(new Error('API rate limit'));
+        mockGenerateObject.mockRejectedValue(new Error('API rate limit'));
 
         await expect(service.analyzeFeatureRequest(validParams))
           .rejects.toThrow();

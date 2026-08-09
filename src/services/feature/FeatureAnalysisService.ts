@@ -1,4 +1,5 @@
-import { generateText } from 'ai';
+import { generateObject } from 'ai';
+import { z } from 'zod';
 import { AIServiceFactory } from '../ai/AIServiceFactory.js';
 import { type ILogger, Logger } from '../../infrastructure/logger';
 import {
@@ -54,6 +55,16 @@ export class FeatureAnalysisService {
     risks: string[];
     dependencies: string[];
   }> {
+    const FeatureAnalysisSchema = z.object({
+      analysis: z.string().describe('Full analysis text'),
+      recommendation: z.enum(['approve', 'reject', 'modify']),
+      priority: z.enum(['critical', 'high', 'medium', 'low']),
+      complexity: z.number().min(1).max(10),
+      estimatedEffort: z.number().positive().describe('Estimated effort in hours'),
+      risks: z.array(z.string()),
+      dependencies: z.array(z.string()),
+    });
+
     return safeCall(async () => {
       const config = FEATURE_PROMPT_CONFIGS.analyzeRequest;
       const model = this.aiFactory.getMainModel() || this.aiFactory.getBestAvailableModel();
@@ -72,26 +83,38 @@ export class FeatureAnalysisService {
         targetUsers: params.targetUsers?.join(', ') || 'General users'
       });
 
-      const result = await generateText({
+      const result = await generateObject({
         model,
         system: config.systemPrompt,
         prompt,
+        schema: FeatureAnalysisSchema,
         maxOutputTokens: config.maxTokens,
         temperature: config.temperature
       });
 
-      const analysis = result.text;
-
       return {
-        analysis,
-        recommendation: this.extractRecommendation(analysis),
-        priority: this.extractPriority(analysis),
-        complexity: this.extractComplexity(analysis),
-        estimatedEffort: this.extractComplexity(analysis) * 8,
-        risks: this.extractRisks(analysis),
-        dependencies: this.extractDependencies(analysis)
+        analysis: result.object.analysis,
+        recommendation: result.object.recommendation,
+        priority: this.mapPriority(result.object.priority),
+        complexity: result.object.complexity as TaskComplexity,
+        estimatedEffort: result.object.estimatedEffort,
+        risks: result.object.risks,
+        dependencies: result.object.dependencies,
       };
     });
+  }
+
+  /**
+   * Map a priority string from the AI schema to TaskPriority enum.
+   */
+  private mapPriority(priority: string): TaskPriority {
+    const map: Record<string, TaskPriority> = {
+      critical: TaskPriority.CRITICAL,
+      high: TaskPriority.HIGH,
+      medium: TaskPriority.MEDIUM,
+      low: TaskPriority.LOW,
+    };
+    return map[priority] ?? TaskPriority.MEDIUM;
   }
 
   // ---------------------------------------------------------------------------

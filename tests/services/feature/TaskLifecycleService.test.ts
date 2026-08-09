@@ -8,7 +8,7 @@ import { vi } from 'vitest';
 
 import { TaskLifecycleService } from '../../../src/services/feature/TaskLifecycleService';
 import { AIServiceFactory } from '../../../src/services/ai/AIServiceFactory';
-import { generateText } from 'ai';
+import { generateObject } from 'ai';
 import type {
   TaskLifecycleState,
   TaskPhaseStatus
@@ -36,10 +36,10 @@ vi.mock('../../../src/services/ai/AIServiceFactory', () => {
   };
 });
 vi.mock('ai', () => ({
-  generateText: vi.fn()
+  generateObject: vi.fn()
 }));
 
-const mockGenerateText = generateText as MockedFunction<typeof generateText>;
+const mockGenerateObject = generateObject as MockedFunction<typeof generateObject>;
 const mockGetMainModel = vi.fn();
 const mockGetBestAvailableModel = vi.fn();
 
@@ -450,9 +450,11 @@ describe('TaskLifecycleService', () => {
     describe('AI Path', () => {
       beforeEach(() => {
         mockGetMainModel.mockReturnValue({ id: 'test-model' });
-        mockGenerateText.mockResolvedValue({
-          text: 'Focus on core functionality first. Implement comprehensive testing.'
-        } as any);
+        // partial mock — only fields consumed by getNextTaskActions
+        mockGenerateObject.mockResolvedValue({ object: {
+          nextActions: ['Focus on core functionality first', 'Implement comprehensive testing'],
+          recommendations: ['Focus on core functionality first', 'Implement comprehensive testing'],
+        }} as unknown as Parameters<typeof mockGenerateObject.mockResolvedValue>[0]);
       });
 
       it('should return actions with all required fields', async () => {
@@ -481,7 +483,7 @@ describe('TaskLifecycleService', () => {
       it('should pass lifecycle data to AI prompt', async () => {
         await service.getNextTaskActions(mockLifecycle);
 
-        expect(mockGenerateText).toHaveBeenCalledWith(
+        expect(mockGenerateObject).toHaveBeenCalledWith(
           expect.objectContaining({
             prompt: expect.stringContaining('task-1')
           })
@@ -503,9 +505,11 @@ describe('TaskLifecycleService', () => {
       it('should fall back to best available model', async () => {
         mockGetMainModel.mockReturnValue(null);
         mockGetBestAvailableModel.mockReturnValue({ id: 'backup-model' });
-        mockGenerateText.mockResolvedValue({
-          text: 'Continue with current tasks.'
-        } as any);
+        // partial mock — only fields consumed by getNextTaskActions
+        mockGenerateObject.mockResolvedValue({ object: {
+          nextActions: ['Continue with current tasks'],
+          recommendations: ['Continue with current tasks'],
+        }} as unknown as Parameters<typeof mockGenerateObject.mockResolvedValue>[0]);
 
         const result = await service.getNextTaskActions(mockLifecycle);
 

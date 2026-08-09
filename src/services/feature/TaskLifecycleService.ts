@@ -1,4 +1,5 @@
-import { generateText } from 'ai';
+import { generateObject } from 'ai';
+import { z } from 'zod';
 import { AIServiceFactory } from '../ai/AIServiceFactory.js';
 import { type ILogger, Logger } from '../../infrastructure/logger';
 import {
@@ -158,20 +159,24 @@ export class TaskLifecycleService {
         teamContext: 'Standard development team'
       });
 
-      const result = await generateText({
+      const LifecycleAnalysisSchema = z.object({
+        nextActions: z.array(z.string()).describe('Ordered list of next actions to take'),
+        recommendations: z.array(z.string()).describe('Strategic recommendations'),
+      });
+
+      const result = await generateObject({
         model,
         system: config.systemPrompt,
         prompt,
+        schema: LifecycleAnalysisSchema,
         maxOutputTokens: config.maxTokens,
         temperature: config.temperature
       });
 
-      const analysis = result.text;
-
       return {
-        nextActions: this.extractNextActions(analysis),
+        nextActions: result.object.nextActions,
         blockers: taskLifecycle.blockers.map(b => b.description),
-        recommendations: this.extractRecommendations(analysis),
+        recommendations: result.object.recommendations,
         estimatedCompletion: this.calculateEstimatedCompletion(taskLifecycle)
       };
     });
