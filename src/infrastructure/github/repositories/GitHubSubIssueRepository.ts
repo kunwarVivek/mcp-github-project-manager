@@ -1,5 +1,5 @@
 import { BaseGitHubRepository } from "./BaseRepository";
-import {
+import type {
   SubIssueListItem,
   SubIssueListResult,
   SubIssueResult,

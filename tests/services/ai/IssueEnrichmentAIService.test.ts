@@ -1,4 +1,4 @@
-import { vi, Mock } from 'vitest';
+import { vi, type Mock } from 'vitest';
 /**
  * Unit tests for IssueEnrichmentAIService
  *
@@ -106,7 +106,7 @@ describe('IssueEnrichmentAIService', () => {
       });
 
       it('should preserve original when description is substantial (>200 chars)', async () => {
-        const longDescription = 'A'.repeat(250) + ' This is a very detailed issue description.';
+        const longDescription = `${'A'.repeat(250)} This is a very detailed issue description.`;
 
         mockGenerateObject.mockResolvedValue({
           object: {
@@ -406,7 +406,7 @@ describe('IssueEnrichmentAIService', () => {
 
   describe('Configuration', () => {
     it('should accept custom configuration', () => {
-      const customService = new IssueEnrichmentAIService({
+      const customService = new IssueEnrichmentAIService(undefined, {
         preserveOriginal: false,
         suggestLabels: false
       });
@@ -415,7 +415,7 @@ describe('IssueEnrichmentAIService', () => {
     });
 
     it('should merge custom config with defaults', () => {
-      const customService = new IssueEnrichmentAIService({
+      const customService = new IssueEnrichmentAIService(undefined, {
         suggestLabels: false
       });
 
@@ -425,7 +425,7 @@ describe('IssueEnrichmentAIService', () => {
     it('should handle includeSections config', async () => {
       mockGetModel.mockReturnValue(null);
 
-      const customService = new IssueEnrichmentAIService({
+      const customService = new IssueEnrichmentAIService(undefined, {
         includeSections: ['problem', 'solution']
       });
 

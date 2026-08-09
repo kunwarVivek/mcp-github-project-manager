@@ -1,7 +1,7 @@
 import { ResourceManager } from "./ResourceManager";
 import { ResourceCache } from "../cache/ResourceCache";
 import { ResourceRelationshipManager } from "./ResourceRelationshipManager";
-import { Resource, ResourceType, RelationshipType } from "../../domain/resource-types";
+import { type Resource, type ResourceType, RelationshipType } from "../../domain/resource-types";
 
 /**
  * Factory class for accessing the MCP Resource system

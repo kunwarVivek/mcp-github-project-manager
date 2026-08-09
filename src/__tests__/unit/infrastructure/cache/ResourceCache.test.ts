@@ -1,6 +1,5 @@
 import { vi } from 'vitest';
-import { ResourceCache } from '../../../../infrastructure/cache/ResourceCache';
-import { Resource, ResourceType } from '../../../../domain/resource-types';
+import { type Resource, ResourceType } from '../../../../domain/resource-types';
 
 // Create a manual mock instead of using jest.mock
 describe('ResourceCache', () => {

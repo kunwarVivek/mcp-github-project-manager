@@ -1,17 +1,16 @@
 import { BaseGitHubRepository } from "./BaseRepository";
-import { Project, CreateProject, ProjectRepository, ProjectId, ProjectView, CustomField, ViewLayout } from "../../../domain/types";
+import type { Project, CreateProject, ProjectRepository, ProjectId, ProjectView, CustomField, ViewLayout } from "../../../domain/types";
 import { ResourceType, ResourceStatus } from "../../../domain/resource-types";
-import { GitHubTypeConverter } from "../util/conversion";
 import {
   mapToGraphQLFieldType,
   mapFromGraphQLFieldType,
-  CreateProjectV2FieldResponse,
-  UpdateProjectV2FieldResponse
+  type CreateProjectV2FieldResponse,
+  type UpdateProjectV2FieldResponse
 } from "../util/graphql-helpers";
 import {
-  GraphQLFieldType,
-  CreateProjectV2ViewResponse,
-  UpdateProjectV2ViewResponse,
+  type GraphQLFieldType,
+  type CreateProjectV2ViewResponse,
+  type UpdateProjectV2ViewResponse,
   mapToGraphQLViewLayout
 } from "../graphql-types";
 
@@ -139,8 +138,8 @@ export class GitHubProjectRepository extends BaseGitHubRepository implements Pro
       title: project.title,
       description: project.shortDescription || "",
       owner: this.owner,
-      number: parseInt(project.id.split('_').pop() || '0'),
-      url: `https://github.com/orgs/${this.owner}/projects/${parseInt(project.id.split('_').pop() || '0')}`,
+      number: parseInt(project.id.split('_').pop() || '0', 10),
+      url: `https://github.com/orgs/${this.owner}/projects/${parseInt(project.id.split('_').pop() || '0', 10)}`,
       status: project.closed ? ResourceStatus.CLOSED : ResourceStatus.ACTIVE,
       visibility: data.visibility || "private",
       views: data.views || [],
@@ -183,8 +182,8 @@ export class GitHubProjectRepository extends BaseGitHubRepository implements Pro
       title: project.title,
       description: project.shortDescription || "",
       owner: this.owner,
-      number: parseInt(project.id.split('_').pop() || '0'),
-      url: `https://github.com/orgs/${this.owner}/projects/${parseInt(project.id.split('_').pop() || '0')}`,
+      number: parseInt(project.id.split('_').pop() || '0', 10),
+      url: `https://github.com/orgs/${this.owner}/projects/${parseInt(project.id.split('_').pop() || '0', 10)}`,
       status: project.closed ? ResourceStatus.CLOSED : ResourceStatus.ACTIVE,
       visibility: "private",
       views: [],
@@ -239,8 +238,8 @@ export class GitHubProjectRepository extends BaseGitHubRepository implements Pro
       title: project.title,
       description: project.shortDescription || "",
       owner: this.owner,
-      number: parseInt(project.id.split('_').pop() || '0'),
-      url: `https://github.com/orgs/${this.owner}/projects/${parseInt(project.id.split('_').pop() || '0')}`,
+      number: parseInt(project.id.split('_').pop() || '0', 10),
+      url: `https://github.com/orgs/${this.owner}/projects/${parseInt(project.id.split('_').pop() || '0', 10)}`,
       status: project.closed ? ResourceStatus.CLOSED : ResourceStatus.ACTIVE,
       visibility: "private",
       views: [],
@@ -280,8 +279,8 @@ export class GitHubProjectRepository extends BaseGitHubRepository implements Pro
       title: project.title,
       description: project.shortDescription || "",
       owner: this.owner,
-      number: parseInt(project.id.split('_').pop() || '0'),
-      url: `https://github.com/orgs/${this.owner}/projects/${parseInt(project.id.split('_').pop() || '0')}`,
+      number: parseInt(project.id.split('_').pop() || '0', 10),
+      url: `https://github.com/orgs/${this.owner}/projects/${parseInt(project.id.split('_').pop() || '0', 10)}`,
       status: project.closed ? ResourceStatus.CLOSED : ResourceStatus.ACTIVE,
       visibility: "private",
       views: [],
@@ -335,8 +334,8 @@ export class GitHubProjectRepository extends BaseGitHubRepository implements Pro
         title: project.title,
         description: project.shortDescription || "",
         owner: owner,
-        number: parseInt(project.id.split('_').pop() || '0'),
-        url: `https://github.com/${owner}/projects/${parseInt(project.id.split('_').pop() || '0')}`,
+        number: parseInt(project.id.split('_').pop() || '0', 10),
+        url: `https://github.com/${owner}/projects/${parseInt(project.id.split('_').pop() || '0', 10)}`,
         status: project.closed ? ResourceStatus.CLOSED : ResourceStatus.ACTIVE,
         visibility: "private",
         views: [],
@@ -621,7 +620,7 @@ export class GitHubProjectRepository extends BaseGitHubRepository implements Pro
           // Update existing options (color changes)
           for (const option of optionsToUpdate) {
             const currOpt = currentOptions.find(c => c.name === option.name);
-            if (currOpt && currOpt.id) {
+            if (currOpt?.id) {
               const updateMutation = `
                 mutation($input: UpdateProjectV2SingleSelectOptionInput!) {
                   updateProjectV2SingleSelectOption(input: $input) {

@@ -8,7 +8,7 @@
  * ts-node scripts/generate-openapi.ts
  */
 
-import { writeFileSync } from 'fs';
+import { writeFileSync } from 'node:fs';
 import { ToolRegistry } from '../src/infrastructure/tools/ToolRegistry.js';
 
 // Simple conversion of Zod schema to OpenAPI schema

@@ -1,10 +1,10 @@
 import { generateText } from 'ai';
 import { AIServiceFactory } from '../ai/AIServiceFactory.js';
-import { ILogger, Logger } from '../../infrastructure/logger';
+import { type ILogger, Logger } from '../../infrastructure/logger';
 import {
   TaskPriority,
-  TaskComplexity,
-  PRDDocument
+  type TaskComplexity,
+  type PRDDocument
 } from '../../domain/ai-types.js';
 import {
   FEATURE_PROMPT_CONFIGS,
@@ -114,17 +114,17 @@ export class FeatureAnalysisService {
   extractComplexity(analysis: string): TaskComplexity {
     const match = analysis.match(/complexity.*?(\d+)/i);
     if (match) {
-      const complexity = parseInt(match[1]);
+      const complexity = parseInt(match[1], 10);
       return Math.min(Math.max(complexity, 1), 10) as TaskComplexity;
     }
     return 5;
   }
 
-  extractRisks(analysis: string): string[] {
+  extractRisks(_analysis: string): string[] {
     return ['Technical complexity', 'Integration challenges', 'Resource constraints'];
   }
 
-  extractDependencies(analysis: string): string[] {
+  extractDependencies(_analysis: string): string[] {
     return [];
   }
 }

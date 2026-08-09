@@ -1,19 +1,13 @@
-import zodToJsonSchema from "zod-to-json-schema";
-import {
-  ErrorCode,
-  McpError,
-} from "@modelcontextprotocol/sdk/types.js";
-import {
-  ZodOptional,
-  ZodString,
-  ZodNumber,
-  ZodBoolean,
-  ZodArray,
-  ZodObject,
-  ZodEnum,
-  type ZodTypeAny,
+import { z } from "zod";
+import { ProtocolError, INTERNAL_ERROR, METHOD_NOT_FOUND } from "@modelcontextprotocol/server";
+
+/** v2 compatibility aliases (McpError -> ProtocolError, ErrorCode enum -> constants). */
+const McpError = ProtocolError;
+const ErrorCode = { InternalError: INTERNAL_ERROR, MethodNotFound: METHOD_NOT_FOUND } as const;
+import type {
+  ZodTypeAny,
 } from "zod";
-import { ToolDefinition, ToolAnnotations } from "./ToolValidator";
+import type { ToolDefinition, ToolAnnotations } from "./ToolValidator";
 import {
   // Original tools
   createRoadmapTool,
@@ -149,14 +143,6 @@ import {
   listOrganizationTemplatesTool,
 } from "./ToolSchemas";
 
-// Sub-issue tool executors
-import {
-  executeAddSubIssue,
-  executeListSubIssues,
-  executeGetParentIssue,
-  executeReprioritizeSubIssue,
-  executeRemoveSubIssue,
-} from "./sub-issue-tools";
 
 // Health check tool
 import { healthCheckTool } from "./health-tools";
@@ -169,12 +155,6 @@ import {
   unlinkProjectFromTeamTool,
   listLinkedRepositoriesTool,
   listLinkedTeamsTool,
-  executeLinkProjectToRepository,
-  executeUnlinkProjectFromRepository,
-  executeLinkProjectToTeam,
-  executeUnlinkProjectFromTeam,
-  executeListLinkedRepositories,
-  executeListLinkedTeams,
 } from "./project-linking-tools";
 
 // Project lifecycle tools
@@ -193,7 +173,6 @@ import {
 
 // Sprint AI tools (Phase 10)
 import {
-  sprintAITools,
   calculateSprintCapacityTool,
   prioritizeBacklogTool,
   assessSprintRiskTool,
@@ -202,7 +181,6 @@ import {
 
 // Roadmap AI tools (Phase 10)
 import {
-  roadmapAITools,
   generateRoadmapTool as generateAIRoadmapTool,
   generateRoadmapVisualizationTool,
 } from "./roadmap-ai-tools";
@@ -263,18 +241,23 @@ import {
 /**
  * Convert a Zod schema to JSON Schema.
  *
- * `zodToJsonSchema`'s generic return type recurses infinitely when applied to a
- * broad `ZodType<unknown>` (TS2589). Binding it once to a concrete
- * `(schema: ZodTypeAny) => Record<string, unknown>` signature severs the deep
- * generic instantiation without changing runtime behavior.
+ * Uses zod 4's native `z.toJSONSchema()`.
+ *
+ * `zod-to-json-schema` silently produces an EMPTY schema for zod 4 types — it
+ * returns `{ type: "object" }` with no `properties` at all rather than
+ * throwing. Since the zod 3 -> 4 upgrade every tool has therefore advertised a
+ * parameterless input schema, so no MCP client could discover a single tool
+ * argument. The native converter emits the full schema.
+ *
+ * `io: "input"` matters: schemas carry `.default()`s, and the input view is
+ * what a caller must satisfy (the output view marks defaulted fields required).
  */
-const zodToJson = zodToJsonSchema as unknown as (
-  schema: ZodTypeAny,
-  options?: { $refStrategy?: string },
-) => Record<string, unknown>;
-
 const toJsonSchema = (schema: ZodTypeAny): Record<string, unknown> =>
-  zodToJson(schema, { $refStrategy: "none" });
+  z.toJSONSchema(schema as never, {
+    io: "input",
+    // Inline definitions: MCP clients expect a self-contained schema per tool.
+    unrepresentable: "any",
+  }) as Record<string, unknown>;
 
 /**
  * Capability groups for compound tools.

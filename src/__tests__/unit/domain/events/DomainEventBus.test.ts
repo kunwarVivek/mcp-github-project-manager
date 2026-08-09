@@ -2,8 +2,6 @@ import { vi } from 'vitest';
 import { DomainEventBus } from '../../../../domain/events/DomainEventBus';
 import {
   IssueCreatedEvent,
-  IssueStatusChangedEvent,
-  SprintCreatedEvent,
 } from '../../../../domain/events/DomainEvent';
 
 describe('DomainEventBus', () => {

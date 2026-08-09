@@ -1,4 +1,4 @@
-import { GitHubRepositoryFactory } from '../github/GitHubRepositoryFactory.js';
+import type { GitHubRepositoryFactory } from '../github/GitHubRepositoryFactory.js';
 import { AGENT_FIELDS, AGENT_STATUS_OPTIONS } from '../../domain/agent-orchestration-types.js';
 import type { CustomField, FieldType } from '../../domain/types.js';
 

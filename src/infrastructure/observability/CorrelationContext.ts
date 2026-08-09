@@ -36,6 +36,23 @@ export interface TraceContext {
    * Name of the operation being traced
    */
   operation: string;
+
+  /**
+   * The agent this operation is being performed on behalf of, when the calling
+   * tool declared one. Absent for human-initiated and webhook-initiated calls.
+   */
+  agentId?: string;
+
+  /**
+   * Server-side token spend accumulated during this operation.
+   *
+   * Mutable on purpose: AI middleware increments it in-process as calls happen,
+   * and the tool dispatcher debits the agent's budget ONCE at the end. Debiting
+   * per AI call would mean a GitHub read-modify-write round trip per LLM call
+   * (AgentStore is GitHub-backed and does not lock), which is both slow and
+   * prone to lost updates under concurrency.
+   */
+  usage?: { tokens: number };
 }
 
 /**

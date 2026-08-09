@@ -1,6 +1,6 @@
 import { BaseGitHubRepository } from "./BaseRepository";
-import { Milestone, CreateMilestone, MilestoneRepository, MilestoneId, Issue } from "../../../domain/types";
-import { ResourceType, ResourceStatus } from "../../../domain/resource-types";
+import type { Milestone, CreateMilestone, MilestoneRepository, MilestoneId, Issue } from "../../../domain/types";
+import { ResourceStatus } from "../../../domain/resource-types";
 import { GitHubIssueRepository } from "./GitHubIssueRepository";
 import { parseResourceStatus, toStatusString } from '../../../domain/utils/StatusParser';
 
@@ -19,18 +19,6 @@ interface GitHubMilestone {
     openIssues: number;
     closedIssues: number;
     completionPercentage: number;
-  };
-}
-
-interface CreateMilestoneResponse {
-  createMilestone: {
-    milestone: GitHubMilestone;
-  };
-}
-
-interface UpdateMilestoneResponse {
-  updateMilestone: {
-    milestone: GitHubMilestone;
   };
 }
 
@@ -64,7 +52,7 @@ export class GitHubMilestoneRepository extends BaseGitHubRepository implements M
   private mapGitHubMilestoneToMilestone(githubMilestone: GitHubMilestone): Milestone {
     return {
       id: githubMilestone.id,
-      number: parseInt(githubMilestone.number.toString()),
+      number: parseInt(githubMilestone.number.toString(), 10),
       title: githubMilestone.title,
       description: githubMilestone.description || "",
       dueDate: githubMilestone.dueOn || undefined,
@@ -119,7 +107,7 @@ export class GitHubMilestoneRepository extends BaseGitHubRepository implements M
     const response = await this.rest(
       (params) => this.octokit.rest.issues.updateMilestone(params),
       {
-        milestone_number: parseInt(id),
+        milestone_number: parseInt(id, 10),
         title: data.title,
         description: data.description,
         due_on: data.dueDate,
@@ -135,7 +123,7 @@ export class GitHubMilestoneRepository extends BaseGitHubRepository implements M
     await this.rest(
       (params) => this.octokit.rest.issues.deleteMilestone(params),
       {
-        milestone_number: parseInt(id)
+        milestone_number: parseInt(id, 10)
       }
     );
   }
@@ -161,7 +149,7 @@ export class GitHubMilestoneRepository extends BaseGitHubRepository implements M
     const response = await this.graphql<GetMilestoneResponse>(query, {
       owner: this.owner,
       repo: this.repo,
-      number: parseInt(id),
+      number: parseInt(id, 10),
     });
 
     const milestone = response.repository.milestone;

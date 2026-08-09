@@ -11,7 +11,7 @@
  * with proper annotations, input/output schemas, and executors.
  */
 
-import { ToolDefinition, ToolSchema } from "./ToolValidator";
+import type { ToolDefinition, ToolSchema } from "./ToolValidator";
 import { ANNOTATION_PATTERNS } from "./annotations/tool-annotations";
 import { IssueEnrichmentAIService } from "../../services/ai/IssueEnrichmentAIService";
 import { LabelSuggestionService } from "../../services/ai/LabelSuggestionService";
@@ -19,21 +19,21 @@ import { DuplicateDetectionService } from "../../services/ai/DuplicateDetectionS
 import { RelatedIssueLinkingService } from "../../services/ai/RelatedIssueLinkingService";
 import {
   EnrichIssueInputSchema,
-  EnrichIssueInput,
+  type EnrichIssueInput,
   EnrichIssueOutputSchema,
-  EnrichIssueOutput,
+  type EnrichIssueOutput,
   SuggestLabelsInputSchema,
-  SuggestLabelsInput,
+  type SuggestLabelsInput,
   SuggestLabelsOutputSchema,
-  SuggestLabelsOutput,
+  type SuggestLabelsOutput,
   DetectDuplicatesInputSchema,
-  DetectDuplicatesInput,
+  type DetectDuplicatesInput,
   DetectDuplicatesOutputSchema,
-  DetectDuplicatesOutput,
+  type DetectDuplicatesOutput,
   FindRelatedIssuesInputSchema,
-  FindRelatedIssuesInput,
+  type FindRelatedIssuesInput,
   FindRelatedIssuesOutputSchema,
-  FindRelatedIssuesOutput,
+  type FindRelatedIssuesOutput,
 } from "./schemas/issue-intelligence-schemas";
 
 // ============================================================================

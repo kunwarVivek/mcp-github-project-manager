@@ -1,7 +1,7 @@
-import { ResourceType } from '../../domain/resource-types';
-import { ResourceEvent } from './GitHubWebhookHandler';
-import { ILogger, Logger } from '../logger/index';
-import { EventEmitter } from 'events';
+import type { ResourceType } from '../../domain/resource-types';
+import type { ResourceEvent } from './GitHubWebhookHandler';
+import { type ILogger, Logger } from '../logger/index';
+import { EventEmitter } from 'node:events';
 
 export interface EventFilter {
   resourceType?: ResourceType;
@@ -192,24 +192,30 @@ export class EventSubscriptionManager extends EventEmitter {
     // Add subscriptions that match resource type
     const resourceTypeMatches = this.resourceTypeIndex.get(event.resourceType);
     if (resourceTypeMatches) {
-      resourceTypeMatches.forEach(id => potentialMatches.add(id));
+      resourceTypeMatches.forEach((id) => {
+        potentialMatches.add(id);
+      });
     }
 
     // Add subscriptions that match event type
     const eventTypeMatches = this.eventTypeIndex.get(event.type);
     if (eventTypeMatches) {
-      eventTypeMatches.forEach(id => potentialMatches.add(id));
+      eventTypeMatches.forEach((id) => {
+        potentialMatches.add(id);
+      });
     }
 
     // If no index matches, check all subscriptions (for subscriptions with no filters)
     if (potentialMatches.size === 0) {
-      this.subscriptions.forEach((_, id) => potentialMatches.add(id));
+      this.subscriptions.forEach((_, id) => {
+        potentialMatches.add(id);
+      });
     }
 
     // Filter potential matches
     for (const subscriptionId of potentialMatches) {
       const subscription = this.subscriptions.get(subscriptionId);
-      if (subscription && subscription.active && this.eventMatchesSubscription(event, subscription)) {
+      if (subscription?.active && this.eventMatchesSubscription(event, subscription)) {
         matchingSubscriptions.push(subscription);
       }
     }

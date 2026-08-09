@@ -3,8 +3,8 @@
 // Migration script: Jest → Vitest
 // Replaces @jest/globals imports with vitest, jest.fn → vi.fn, jest.mock → vi.mock
 
-import { readFileSync, writeFileSync, readdirSync, statSync } from 'fs';
-import { join } from 'path';
+import { readFileSync, writeFileSync, readdirSync, statSync } from 'node:fs';
+import { join } from 'node:path';
 
 function findTestFiles(dir) {
   const results = [];

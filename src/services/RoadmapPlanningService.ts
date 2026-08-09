@@ -1,7 +1,7 @@
 import { generateText } from 'ai';
-import { AIServiceFactory } from "./ai/AIServiceFactory";
-import { ProjectManagementService } from "./ProjectManagementService";
-import { ILogger, Logger } from "../infrastructure/logger";
+import type { AIServiceFactory } from "./ai/AIServiceFactory";
+import type { ProjectManagementService } from "./ProjectManagementService";
+import { type ILogger, Logger } from "../infrastructure/logger";
 
 /**
  * AI-powered roadmap planning service
@@ -196,7 +196,7 @@ Return ONLY valid JSON. Start sprints from today's date (${new Date().toISOStrin
   }> {
     try {
       let createdMilestones = 0;
-      let updatedIssues = 0;
+      const updatedIssues = 0;
 
       // Create milestones
       for (const milestone of params.roadmap.milestones) {

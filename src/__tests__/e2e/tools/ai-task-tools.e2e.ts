@@ -1,4 +1,4 @@
-import { MCPToolTestUtils, MCPTestHelpers } from '../utils/MCPToolTestUtils';
+import { MCPToolTestUtils, } from '../utils/MCPToolTestUtils';
 
 /**
  * Comprehensive E2E tests for AI Task Management Tools

@@ -158,7 +158,7 @@ describe('GitHub Project Management Tools E2E', () => {
         console.log('Skipping: utils not initialized (missing credentials)');
         return;
       }
-      const tools = await utils.listTools();
+      await utils.listTools();
 
       const milestoneTools = ['create_milestone', 'list_milestones', 'update_milestone', 'delete_milestone'];
 
@@ -225,7 +225,7 @@ describe('GitHub Project Management Tools E2E', () => {
         console.log('Skipping: utils not initialized (missing credentials)');
         return;
       }
-      const tools = await utils.listTools();
+      await utils.listTools();
 
       const issueTools = ['create_issue', 'list_issues', 'get_issue', 'update_issue'];
 
@@ -308,7 +308,7 @@ describe('GitHub Project Management Tools E2E', () => {
         console.log('Skipping: utils not initialized (missing credentials)');
         return;
       }
-      const tools = await utils.listTools();
+      await utils.listTools();
 
       const sprintTools = [
         'create_sprint', 'list_sprints', 'get_current_sprint', 'update_sprint',
@@ -374,7 +374,7 @@ describe('GitHub Project Management Tools E2E', () => {
         console.log('Skipping: utils not initialized (missing credentials)');
         return;
       }
-      const tools = await utils.listTools();
+      await utils.listTools();
 
       const roadmapTools = [
         'create_roadmap', 'plan_sprint', 'get_milestone_metrics', 'get_sprint_metrics',
@@ -453,7 +453,7 @@ describe('GitHub Project Management Tools E2E', () => {
         console.log('Skipping: utils not initialized (missing credentials)');
         return;
       }
-      const tools = await utils.listTools();
+      await utils.listTools();
 
       const labelTools = ['create_label', 'list_labels'];
 

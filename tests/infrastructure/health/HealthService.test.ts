@@ -9,7 +9,7 @@ import { vi } from 'vitest';
  * - AI availability and circuit state
  */
 
-import { HealthService, type HealthServiceDependencies, type HealthStatus } from '../../../src/infrastructure/health/HealthService.js';
+import { HealthService, } from '../../../src/infrastructure/health/HealthService.js';
 import type { AIServiceFactory } from '../../../src/services/ai/AIServiceFactory.js';
 import type { ResourceCache, CacheStats } from '../../../src/infrastructure/cache/ResourceCache.js';
 import type { AIResiliencePolicy } from '../../../src/infrastructure/resilience/AIResiliencePolicy.js';

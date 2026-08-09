@@ -1,18 +1,17 @@
 import { AITaskProcessor } from './ai/AITaskProcessor';
-import { AIServiceFactory } from './ai/AIServiceFactory';
+import type { AIServiceFactory } from './ai/AIServiceFactory';
 import { InputSanitizer } from './utils/InputSanitizer';
 import {
-  AITask,
-  SubTask,
-  PRDDocument,
-  MockPRD,
-  TaskPriority,
+  type AITask,
+  type SubTask,
+  type PRDDocument,
+  type MockPRD,
   TaskStatus,
-  TaskComplexity,
-  TaskDependency,
-  AcceptanceCriteria,
-  SectionConfidence,
-  ConfidenceConfig,
+  type TaskComplexity,
+  type TaskDependency,
+  type AcceptanceCriteria,
+  type SectionConfidence,
+  type ConfidenceConfig,
   DEFAULT_CONFIDENCE_CONFIG
 } from '../domain/ai-types';
 import {
@@ -29,7 +28,7 @@ import {
   INCLUDE_TECHNICAL_CONTEXT,
   INCLUDE_IMPLEMENTATION_GUIDANCE
 } from '../env';
-import {
+import type {
   EnhancedTaskGenerationConfig,
   EnhancedTaskGenerationParams,
   EnhancedAITask
@@ -37,11 +36,11 @@ import {
 import { RequirementsTraceabilityService } from './RequirementsTraceabilityService';
 import { TaskContextGenerationService } from './TaskContextGenerationService';
 import { v4 as uuidv4 } from 'uuid';
-import { DependencyGraph, DetectedDependency, GraphAnalysisResult } from '../analysis/DependencyGraph';
-import { EstimationCalibrator, EffortEstimate } from '../analysis/EstimationCalibrator';
+import { DependencyGraph, type DetectedDependency, type GraphAnalysisResult } from '../analysis/DependencyGraph';
+import { EstimationCalibrator, type EffortEstimate } from '../analysis/EstimationCalibrator';
 import { ConfidenceScorer } from './ai/ConfidenceScorer';
 import { safeCall } from './utils/safeCall';
-import { ILogger, Logger } from '../infrastructure/logger';
+import { type ILogger, Logger } from '../infrastructure/logger';
 
 /**
  * Task with effort estimate and dependency analysis
@@ -137,7 +136,11 @@ export class TaskGenerationService {
       const basicTasks = await this.generateBasicTasksFromPRD(params);
 
       // Create traceability matrix if enabled
-      let traceabilityMatrix;
+      // Explicit `any`: this holds an unvalidated AI response. Properly typing
+      // it is real work (the shape varies by prompt); making the `any` explicit
+      // at least removes the *implicit* one so the gap is visible.
+      // biome-ignore lint/suspicious/noExplicitAny: unvalidated AI response shape
+      let traceabilityMatrix: any;
       if (config.createTraceabilityMatrix) {
         // Create mock PRD for traceability
         const mockPRD: MockPRD = {
@@ -269,7 +272,7 @@ export class TaskGenerationService {
         }
 
         // Generate comprehensive context
-        const { context: executionContext, metrics: contextMetrics } = await this.contextGenerationService.generateTaskContext(
+        const { context: executionContext } = await this.contextGenerationService.generateTaskContext(
           task,
           prdContent,
           config

@@ -3,8 +3,8 @@
 // Fix vi.mock() calls to provide explicit mock factories
 // Vitest's auto-mocking doesn't work properly for ESM modules with static methods
 
-import { readFileSync, writeFileSync, readdirSync, statSync } from 'fs';
-import { join } from 'path';
+import { readFileSync, writeFileSync, readdirSync, statSync } from 'node:fs';
+import { join } from 'node:path';
 
 function findTestFiles(dir) {
   const results = [];

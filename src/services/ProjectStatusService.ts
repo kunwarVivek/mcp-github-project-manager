@@ -1,8 +1,8 @@
 import { injectable, inject } from "tsyringe";
-import { GitHubRepositoryFactory } from "../infrastructure/github/GitHubRepositoryFactory";
-import { GitHubProjectRepository } from "../infrastructure/github/repositories/GitHubProjectRepository";
-import { Project, CreateProject } from "../domain/types";
-import { ResourceStatus } from "../domain/resource-types";
+import type { GitHubRepositoryFactory } from "../infrastructure/github/GitHubRepositoryFactory";
+import type { GitHubProjectRepository } from "../infrastructure/github/repositories/GitHubProjectRepository";
+import type { Project, CreateProject } from "../domain/types";
+import type { ResourceStatus } from "../domain/resource-types";
 import { safeCall } from './utils/safeCall';
 import { parseResourceStatus, filterByStatus } from '../domain/utils/StatusParser';
 

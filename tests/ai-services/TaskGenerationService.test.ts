@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { TaskGenerationService } from '../../src/services/TaskGenerationService';
 import { AIServiceFactory } from '../../src/services/ai/AIServiceFactory';
-import { TaskStatus, TaskPriority, TaskComplexity } from '../../src/domain/ai-types';
+import { TaskStatus, TaskPriority, type TaskComplexity } from '../../src/domain/ai-types';
 import { generateObject, generateText } from 'ai';
 
 // Mock the AI service factory

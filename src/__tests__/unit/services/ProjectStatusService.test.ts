@@ -1,9 +1,9 @@
-import { beforeEach, describe, expect, it, vi, Mocked, MockedClass, MockedFunction } from 'vitest';
+import { beforeEach, describe, expect, it, vi, type Mocked, } from 'vitest';
 import { ProjectStatusService } from '../../../services/ProjectStatusService';
-import { GitHubRepositoryFactory } from '../../../infrastructure/github/GitHubRepositoryFactory';
-import { GitHubProjectRepository } from '../../../infrastructure/github/repositories/GitHubProjectRepository';
+import type { GitHubRepositoryFactory } from '../../../infrastructure/github/GitHubRepositoryFactory';
+import type { GitHubProjectRepository } from '../../../infrastructure/github/repositories/GitHubProjectRepository';
 import { ResourceStatus, ResourceType } from '../../../domain/resource-types';
-import { Project } from '../../../domain/types';
+import type { Project } from '../../../domain/types';
 
 // Mock tsyringe decorators
 vi.mock('tsyringe', () => ({

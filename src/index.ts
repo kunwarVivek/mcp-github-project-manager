@@ -1,15 +1,35 @@
 #!/usr/bin/env node
-import { Server } from "@modelcontextprotocol/sdk/server/index.js";
-import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { readFileSync } from "node:fs";
+import { randomUUID } from "node:crypto";
+import { traceContext } from "./infrastructure/observability/CorrelationContext";
+import { AgentBudgetService } from "./services/agent/AgentBudgetService";
+import { AgentStore } from "./infrastructure/agent/AgentStore";
+import { createGitHubFactory } from "./infrastructure/tools/tool-factory";
+import { McpServer, fromJsonSchema } from "@modelcontextprotocol/server";
+import { serveStdio } from "@modelcontextprotocol/server/stdio";
 import {
-  CallToolRequestSchema,
-  CallToolRequest,
-  CallToolResult,
-  ErrorCode,
-  ListToolsRequestSchema,
-  McpError,
-} from "@modelcontextprotocol/sdk/types.js";
-import { ProjectManagementService } from "./services/ProjectManagementService";
+  ProtocolError,
+  INTERNAL_ERROR,
+  METHOD_NOT_FOUND,
+  INVALID_PARAMS,
+  type CallToolResult,
+} from "@modelcontextprotocol/server";
+
+/**
+ * v2 compatibility aliases.
+ *
+ * The v2 SDK renames `McpError` to `ProtocolError` (identical
+ * `(code, message, data)` shape) and replaces the `ErrorCode` enum with plain
+ * numeric constants. Aliasing keeps the ~20 existing throw sites intact rather
+ * than churning them all in a migration commit.
+ */
+const McpError = ProtocolError;
+const ErrorCode = {
+  InternalError: INTERNAL_ERROR,
+  MethodNotFound: METHOD_NOT_FOUND,
+  InvalidParams: INVALID_PARAMS,
+} as const;
+import type { ProjectManagementService } from "./services/ProjectManagementService";
 import { configureContainer } from "./container";
 import { GitHubStateSyncService } from "./services/GitHubStateSyncService";
 import {
@@ -141,7 +161,7 @@ import {
 } from "./infrastructure/tools/compound/compound-executors";
 
 import { ToolResultFormatter } from "./infrastructure/tools/ToolResultFormatter";
-import { MCPContentType, MCPErrorCode } from "./domain/mcp-types";
+import { MCPContentType, } from "./domain/mcp-types";
 import { ResourceCache } from "./infrastructure/cache/ResourceCache";
 
 /**
@@ -149,23 +169,41 @@ import { ResourceCache } from "./infrastructure/cache/ResourceCache";
  * The MCP SDK handles version negotiation, but we track supported versions
  * for error messaging and compatibility checks.
  */
-const SUPPORTED_PROTOCOL_VERSIONS = ["2024-11-05"];
-const PREFERRED_PROTOCOL_VERSION = "2024-11-05";
+/**
+ * Server version, read from package.json so `serverInfo.version` cannot drift
+ * from the published package (it was hardcoded to "0.1.0" against a 1.1.0 package).
+ *
+ * Protocol version constants are gone: the v2 SDK negotiates the protocol
+ * revision per connection, so a hand-maintained list here could only ever be
+ * wrong.
+ */
+const SERVER_VERSION: string = (() => {
+  try {
+    const pkgPath = new URL("../package.json", import.meta.url);
+    return JSON.parse(readFileSync(pkgPath, "utf8")).version ?? "0.0.0";
+  } catch {
+    return "0.0.0";
+  }
+})();
 import { FilePersistenceAdapter } from "./infrastructure/persistence/FilePersistenceAdapter";
 import { GitHubWebhookHandler } from "./infrastructure/events/GitHubWebhookHandler";
 import { EventSubscriptionManager } from "./infrastructure/events/EventSubscriptionManager";
 import { EventStore } from "./infrastructure/events/EventStore";
 import { WebhookServer } from "./infrastructure/http/WebhookServer";
-import { ILogger, Logger, logger } from "./infrastructure/logger/index";
-import { AIServiceFactory } from "./services/ai/AIServiceFactory";
-import { RoadmapPlanningService } from "./services/RoadmapPlanningService";
-import { IssueEnrichmentService } from "./services/IssueEnrichmentService";
-import { IssueTriagingService } from "./services/IssueTriagingService";
+import { type ILogger, logger } from "./infrastructure/logger/index";
+import type { AIServiceFactory } from "./services/ai/AIServiceFactory";
+import type { RoadmapPlanningService } from "./services/RoadmapPlanningService";
+import type { IssueEnrichmentService } from "./services/IssueEnrichmentService";
+import type { IssueTriagingService } from "./services/IssueTriagingService";
 import { GracefulShutdown } from "./infrastructure/lifecycle/GracefulShutdown";
 import type { AgentReclaimScheduler } from "./services/agent/AgentReclaimScheduler";
 
 class GitHubProjectManagerServer {
-  private server: Server;
+  private server: McpServer;
+  /** Handle from serveStdio; kept so shutdown can close the transport. */
+  private stdioHandle?: ReturnType<typeof serveStdio>;
+  /** Built lazily — only tool calls that declare an agentId ever debit. */
+  private _agentBudgetService?: AgentBudgetService;
   private service: ProjectManagementService;
   private toolRegistry: ToolRegistry;
   private logger: ILogger;
@@ -194,10 +232,12 @@ class GitHubProjectManagerServer {
   constructor() {
     this.logger = logger;
 
-    this.server = new Server(
+    // Handle returned by serveStdio; retained so shutdown can close the
+    // transport deterministically.
+    this.server = new McpServer(
       {
         name: "github-project-manager",
-        version: "0.1.0",
+        version: SERVER_VERSION,
       },
       {
         capabilities: {
@@ -242,8 +282,7 @@ class GitHubProjectManagerServer {
     this.setupEventHandlers();
     this.logAIServiceStatus();
     this.logToolRegistrationStatus();
-
-    this.server.onerror = (error) => this.logger.error("[MCP Error]", error);
+    // Transport errors are reported via serveStdio's `onerror` callback in run().
 
     // Install graceful shutdown with in-flight draining
     this.gracefulShutdown = new GracefulShutdown({ logger: this.logger });
@@ -276,7 +315,7 @@ class GitHubProjectManagerServer {
         this.logger.info("🎯 AI-powered tools are ready: generate_prd, enhance_prd, parse_prd, add_feature, get_next_task, analyze_task_complexity, expand_task, create_traceability_matrix");
       } else {
         this.logger.warn("⚠️  No AI providers configured - AI features will be unavailable");
-        this.logger.warn("🔑 Missing API Keys: " + validation.missing.join(', '));
+        this.logger.warn(`🔑 Missing API Keys: ${validation.missing.join(', ')}`);
         this.logger.info("💡 To enable AI features, set at least one of these environment variables:");
         this.logger.info("   - ANTHROPIC_API_KEY (recommended)");
         this.logger.info("   - OPENAI_API_KEY");
@@ -521,119 +560,143 @@ class GitHubProjectManagerServer {
   }
 
   private setupToolHandlers() {
-    // Handle list_tools request by returning registered tools from the registry
-    this.server.setRequestHandler(ListToolsRequestSchema, async () => ({
-      tools: this.toolRegistry.getToolsForMCP(),
-    }));
+    // v2 registers each tool individually rather than serving one CallTool
+    // handler. The registry stays the source of truth; every tool shares the
+    // dispatcher below, which carries the shutdown gate, in-flight tracking,
+    // and result formatting that used to live in the single CallTool handler.
+    for (const tool of this.toolRegistry.getToolsForMCP()) {
+      this.server.registerTool(
+        tool.name,
+        {
+          title: tool.title,
+          description: tool.description,
+          // The registry already emits JSON Schema; `fromJsonSchema` adapts it
+          // to the StandardSchema surface v2 expects. Going through JSON Schema
+          // rather than handing over the raw Zod types also sidesteps the
+          // TS2589 "excessively deep" instantiation that forced an `as any`
+          // cast on the v1 handler.
+          inputSchema: fromJsonSchema(tool.inputSchema as Record<string, unknown>),
+          ...(tool.outputSchema
+            ? { outputSchema: fromJsonSchema(tool.outputSchema as Record<string, unknown>) }
+            : {}),
+          ...(tool.annotations ? { annotations: tool.annotations } : {}),
+        },
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (async (args: unknown) => this.dispatchTool(tool.name, args)) as any,
+      );
+    }
+  }
 
-    /**
-     * SDK LIMITATION: MCP SDK 1.25+ Type Instantiation Depth Error
-     *
-     * The MCP SDK's generic types cause TypeScript error TS2589:
-     * "Type instantiation is excessively deep and possibly infinite"
-     *
-     * This occurs because:
-     * 1. CallToolRequestSchema has deeply nested ZodObject types
-     * 2. Combined with our complex inputSchema definitions (84 tools)
-     * 3. TypeScript's type instantiation limit (50 levels) is exceeded
-     *
-     * Workaround: Use type assertion with explicit request/result types.
-     * The handler still receives properly typed CallToolRequest and
-     * returns properly typed CallToolResult - only the generic binding
-     * is bypassed, not the runtime type safety.
-     *
-     * Tracked: This is a known SDK limitation, not a codebase type safety gap.
-     * The SDK's RequestHandlerExtra type creates exponential type expansion
-     * when combined with complex Zod schemas.
-     *
-     * Review: Check if future SDK versions (>1.25.3) resolve this.
-     * @see https://github.com/modelcontextprotocol/typescript-sdk
-     */
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (this.server.setRequestHandler as any)(
-      CallToolRequestSchema,
-      async (request: CallToolRequest): Promise<CallToolResult> => {
-        // Reject new requests during shutdown
-        if (this.gracefulShutdown.shuttingDown) {
-          throw new McpError(
-            ErrorCode.InternalError,
-            "Server is shutting down — no new requests accepted",
-          );
-        }
-
-        this.gracefulShutdown.trackStart();
-        try {
-          const { name: toolName, arguments: args } = request.params;
-          const tool = this.toolRegistry.getTool(toolName);
-
-          if (!tool) {
-            throw new McpError(
-              ErrorCode.MethodNotFound,
-              `Unknown tool: ${toolName}`
-            );
-          }
-
-          // Validate tool arguments against the schema
-          const validatedArgs = ToolValidator.validate(toolName, args, tool.schema);
-
-          // Execute the tool based on its name
-          const result = await this.toolRegistry.execute(toolName, validatedArgs);
-
-          // Format the result as an MCP response
-          const mcpResponse = ToolResultFormatter.formatSuccess(toolName, result, {
-            contentType: MCPContentType.JSON,
-          });
-
-          // Convert our custom MCPResponse to the format expected by the SDK
-          // SDK 1.25+ expects { content: [...], structuredContent?: {...}, isError?: boolean }
-          if (mcpResponse.status === "success") {
-            // Prepare structuredContent if result is a non-null, non-array object.
-            // Arrays are excluded because most tool outputSchemas expect a record;
-            // array results (e.g., list actions) are still fully accessible via the
-            // text content. Class instances are serialized via JSON round-trip to
-            // produce plain records the MCP SDK can validate.
-            const structuredContent = (
-              result !== null &&
-              typeof result === 'object' &&
-              !Array.isArray(result)
-            )
-              ? JSON.parse(JSON.stringify(result)) as Record<string, unknown>
-              : undefined;
-
-            return {
-              content: [
-                {
-                  type: "text" as const,
-                  text: mcpResponse.output.content ?? JSON.stringify(result)
-                }
-              ],
-              // Include structuredContent for MCP 2025-11-25 compliance
-              // This allows clients to access typed data matching the tool's outputSchema
-              structuredContent,
-            };
-          } else {
-            // Handle error case (though this shouldn't happen in the success formatter)
-            throw new McpError(
-              ErrorCode.InternalError,
-              "Unexpected response format from tool execution"
-            );
-          }
-
-        } catch (error) {
-          if (error instanceof McpError) {
-            throw error; // Re-throw MCP errors directly
-          }
-
-          // Log and convert other errors to MCP errors
-          this.logger.error("Tool execution error:", error);
-          const message =
-            error instanceof Error ? error.message : "An unknown error occurred";
-          throw new McpError(ErrorCode.InternalError, message);
-        } finally {
-          this.gracefulShutdown.trackEnd();
-        }
-      }
+  /**
+   * Execute one tool call and shape it into an MCP result.
+   *
+   * Execution failures return `{ isError: true }` rather than throwing a
+   * protocol error. Per spec, a JSON-RPC error means the *request* was
+   * malformed; a tool that ran and failed is a successful call with a failed
+   * result, and only that form is visible to the model so it can recover.
+   */
+  private get agentBudgetService(): AgentBudgetService {
+    this._agentBudgetService ??= new AgentBudgetService(
+      new AgentStore(createGitHubFactory()),
     );
+    return this._agentBudgetService;
+  }
+
+  private async dispatchTool(toolName: string, args: unknown): Promise<CallToolResult> {
+    if (this.gracefulShutdown.shuttingDown) {
+      throw new McpError(
+        ErrorCode.InternalError,
+        "Server is shutting down — no new requests accepted",
+      );
+    }
+
+    this.gracefulShutdown.trackStart();
+    try {
+      const tool = this.toolRegistry.getTool(toolName);
+      if (!tool) {
+        // Unknown tool is a protocol-level fault, not a tool failure.
+        throw new McpError(ErrorCode.MethodNotFound, `Unknown tool: ${toolName}`);
+      }
+
+      const validatedArgs = ToolValidator.validate(toolName, args, tool.schema);
+
+      // Run the tool inside a trace context so AI middleware can attribute
+      // server-side token spend to the acting agent. `agentId` is present only
+      // on tools that declare one; otherwise there is simply nothing to debit.
+      const agentId =
+        typeof (validatedArgs as { agentId?: unknown })?.agentId === "string"
+          ? ((validatedArgs as { agentId: string }).agentId)
+          : undefined;
+      const usage = { tokens: 0 };
+
+      const result = await traceContext.run(
+        {
+          correlationId: randomUUID(),
+          startTime: Date.now(),
+          operation: toolName,
+          agentId,
+          usage,
+        },
+        () => this.toolRegistry.execute(toolName, validatedArgs),
+      );
+
+      // Debit once per tool call, not per AI call: AgentStore is GitHub-backed
+      // and does read-modify-write without locking, so per-call debits would be
+      // a round trip per LLM call and would lose updates under concurrency.
+      // Never let a budget write failure fail a tool call that already ran.
+      if (agentId && usage.tokens > 0) {
+        await this.agentBudgetService
+          .recordUsage(agentId, usage.tokens)
+          .catch((error) =>
+            this.logger.warn(
+              `Failed to debit ${usage.tokens} tokens to agent ${agentId}`,
+              error,
+            ),
+          );
+      }
+
+      const mcpResponse = ToolResultFormatter.formatSuccess(toolName, result, {
+        contentType: MCPContentType.JSON,
+      });
+      if (mcpResponse.status !== "success") {
+        throw new McpError(
+          ErrorCode.InternalError,
+          "Unexpected response format from tool execution",
+        );
+      }
+
+      // structuredContent is only meaningful against a declared outputSchema —
+      // emitting it without one gives clients data they cannot validate.
+      const structuredContent =
+        tool.outputSchema &&
+        result !== null &&
+        typeof result === "object" &&
+        !Array.isArray(result)
+          ? (JSON.parse(JSON.stringify(result)) as Record<string, unknown>)
+          : undefined;
+
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text: mcpResponse.output.content ?? JSON.stringify(result),
+          },
+        ],
+        ...(structuredContent ? { structuredContent } : {}),
+      };
+    } catch (error) {
+      if (error instanceof McpError) {
+        throw error;
+      }
+      this.logger.error(`Tool execution error (${toolName}):`, error);
+      const message = error instanceof Error ? error.message : "An unknown error occurred";
+      return {
+        content: [{ type: "text" as const, text: message }],
+        isError: true,
+      };
+    } finally {
+      this.gracefulShutdown.trackEnd();
+    }
   }
 
   /**
@@ -913,14 +976,14 @@ class GitHubProjectManagerServer {
    */
   private setupEventHandlers(): void {
     // Handle events from subscription manager
-    this.subscriptionManager.on('internalEvent', ({ subscriptions, event }) => {
+    this.subscriptionManager.on('internalEvent', ({ event }) => {
       this.logger.debug(`Internal event notification: ${event.type} ${event.resourceType} ${event.resourceId}`);
       // Handle internal events (e.g., cache invalidation)
       this.handleInternalEvent(event);
     });
 
     // Store events when they're processed
-    this.subscriptionManager.on('sseEvent', async ({ subscriptions, event }) => {
+    this.subscriptionManager.on('sseEvent', async ({ event }) => {
       try {
         await this.eventStore.storeEvent(event);
       } catch (error) {
@@ -1038,35 +1101,17 @@ class GitHubProjectManagerServer {
       // Initialize webhook server
       await this.initializeWebhookServer();
 
-      // Connect MCP server with protocol version handling
-      const transport = new StdioServerTransport();
-      try {
-        await this.server.connect(transport);
-        this.logger.info(`MCP server connected (protocol version: ${PREFERRED_PROTOCOL_VERSION})`);
-      } catch (connectError) {
-        // Check if this is a version mismatch error
-        if (connectError instanceof McpError &&
-            connectError.message &&
-            (connectError.message.includes("version") || connectError.message.includes("protocol"))) {
-          throw new McpError(
-            MCPErrorCode.PROTOCOL_VERSION_MISMATCH,
-            `Protocol version mismatch. Supported versions: ${SUPPORTED_PROTOCOL_VERSIONS.join(", ")}`,
-            {
-              protocol: {
-                supported: SUPPORTED_PROTOCOL_VERSIONS,
-                preferred: PREFERRED_PROTOCOL_VERSION,
-                requested: "unknown", // Would be extracted from error if available
-              }
-            }
-          );
-        }
-        throw connectError;
-      }
+      // Serve over stdio. `serveStdio` owns the transport and negotiates the
+      // protocol revision per connection (including 2025-era clients), so the
+      // hand-rolled version-mismatch handling this replaced is no longer needed.
+      this.stdioHandle = serveStdio(() => this.server, {
+        onerror: (error) => this.logger.error("MCP transport error:", error),
+      });
+      this.logger.info("MCP server connected over stdio");
 
       // Display configuration information if verbose mode is enabled
       if (CLI_OPTIONS.verbose) {
         process.stderr.write("GitHub Project Manager MCP server configuration:\n");
-        process.stderr.write(`- Protocol version: ${PREFERRED_PROTOCOL_VERSION}\n`);
         process.stderr.write(`- Owner: ${GITHUB_OWNER}\n`);
         process.stderr.write(`- Repository: ${GITHUB_REPO}\n`);
         process.stderr.write(`- Token: ${GITHUB_TOKEN.substring(0, 4)}...${GITHUB_TOKEN.substring(GITHUB_TOKEN.length - 4)}\n`);

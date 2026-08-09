@@ -1,4 +1,4 @@
-import { GitHubRepositoryFactory } from '../github/GitHubRepositoryFactory.js';
+import type { GitHubRepositoryFactory } from '../github/GitHubRepositoryFactory.js';
 import type { Agent } from '../../domain/agent-orchestration-types.js';
 import { AGENT_REGISTRY_LABEL } from '../../domain/agent-orchestration-types.js';
 

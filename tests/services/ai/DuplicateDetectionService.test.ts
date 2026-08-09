@@ -8,7 +8,6 @@ import { vi } from 'vitest';
 
 import { DuplicateDetectionService } from '../../../src/services/ai/DuplicateDetectionService';
 import { embed, embedMany, cosineSimilarity } from 'ai';
-import { embed, embedMany } from 'ai';
 
 // Mock dependencies
 vi.mock('ai', () => ({

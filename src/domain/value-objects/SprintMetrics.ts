@@ -30,7 +30,7 @@
  */
 
 import { ResourceStatus } from '../resource-types';
-import { Issue } from '../types';
+import type { Issue } from '../types';
 
 /**
  * Configuration for creating SprintMetrics

@@ -1,4 +1,4 @@
-import { GitHubRepositoryFactory } from "../infrastructure/github/GitHubRepositoryFactory";
+import type { GitHubRepositoryFactory } from "../infrastructure/github/GitHubRepositoryFactory";
 import { ResourceNotFoundError } from "../domain/resource-types";
 import { ResourceType } from "../domain/resource-types";
 import { ValidationError } from "../domain/errors";

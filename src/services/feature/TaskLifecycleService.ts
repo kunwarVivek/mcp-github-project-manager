@@ -1,13 +1,13 @@
 import { generateText } from 'ai';
 import { AIServiceFactory } from '../ai/AIServiceFactory.js';
-import { ILogger, Logger } from '../../infrastructure/logger';
+import { type ILogger, Logger } from '../../infrastructure/logger';
 import {
-  TaskLifecycleState,
-  TaskPhaseInfo,
-  TaskBlocker,
+  type TaskLifecycleState,
+  type TaskPhaseInfo,
+  type TaskBlocker,
   isTaskPhaseStatus
 } from '../../domain/feature-lifecycle-types.js';
-import { AITask, TaskPriority } from '../../domain/ai-types.js';
+import type { AITask, } from '../../domain/ai-types.js';
 import {
   FEATURE_PROMPT_CONFIGS,
   formatFeaturePrompt
@@ -212,11 +212,11 @@ export class TaskLifecycleService {
     return new Date(Date.now() + estimatedDays * 24 * 60 * 60 * 1000).toISOString();
   }
 
-  extractNextActions(analysis: string): string[] {
+  extractNextActions(_analysis: string): string[] {
     return ['Review requirements', 'Start implementation', 'Set up testing environment'];
   }
 
-  extractRecommendations(analysis: string): string[] {
+  extractRecommendations(_analysis: string): string[] {
     return [
       'Focus on core functionality first',
       'Implement comprehensive testing',

@@ -10,33 +10,32 @@
 import { generateObject } from 'ai';
 import { z } from 'zod';
 import { AIServiceFactory } from './AIServiceFactory';
-import { SprintCapacityAnalyzer, CapacityParams } from './SprintCapacityAnalyzer';
+import { SprintCapacityAnalyzer, } from './SprintCapacityAnalyzer';
 import { BacklogPrioritizer } from './BacklogPrioritizer';
 import { SprintRiskAssessor } from './SprintRiskAssessor';
-import { DependencyGraph, GraphAnalysisResult } from '../../analysis/DependencyGraph';
+import { DependencyGraph, type GraphAnalysisResult } from '../../analysis/DependencyGraph';
 import {
   calculateWeightedScore,
   getConfidenceTier
 } from './ConfidenceScorer';
 import {
-  SprintSuggestion,
-  SuggestedItem,
-  BacklogItem,
-  TeamMember,
-  SprintCapacity,
-  SprintRisk,
-  PrioritizedItem,
-  PriorityTier,
-  SprintMetrics,
+  type SprintSuggestion,
+  type SuggestedItem,
+  type BacklogItem,
+  type TeamMember,
+  type SprintCapacity,
+  type PrioritizedItem,
+  type PriorityTier,
+  type SprintMetrics,
   SPRINT_RISK_CATEGORIES,
   RISK_PROBABILITIES
 } from '../../domain/sprint-planning-types';
-import { SectionConfidence, ConfidenceFactors, AITask, TaskStatus, TaskPriority } from '../../domain/ai-types';
+import { type SectionConfidence, type ConfidenceFactors, type AITask, TaskStatus, TaskPriority } from '../../domain/ai-types';
 import {
   SPRINT_SUGGESTION_SYSTEM_PROMPT,
   formatSprintSuggestionPrompt
 } from './prompts/SprintPlanningPrompts';
-import { EstimationCalibrator } from '../../analysis/EstimationCalibrator';
+import type { EstimationCalibrator } from '../../analysis/EstimationCalibrator';
 
 // ============================================================================
 // Zod Schemas for AI Response Validation
@@ -139,7 +138,7 @@ export class SprintSuggestionService {
     });
 
     // 3. Build dependency graph for selection
-    const { dependencyGraph, graphAnalysis } = this.buildDependencyGraph(params.backlogItems);
+    const { graphAnalysis } = this.buildDependencyGraph(params.backlogItems);
 
     // 4. Select items that fit capacity, respecting dependencies
     const selectedItems = this.selectItemsForCapacity(
@@ -369,7 +368,7 @@ export class SprintSuggestionService {
    * Calculate confidence for the sprint suggestion.
    */
   private calculateConfidence(
-    params: SprintSuggestionParams,
+    _params: SprintSuggestionParams,
     utilization: number,
     capacity: SprintCapacity,
     prioritizationConfidence: SectionConfidence

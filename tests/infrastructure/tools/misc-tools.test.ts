@@ -35,7 +35,6 @@ import {
 import {
   healthCheckTool,
   healthCheckSchema,
-  executeHealthCheck,
   HealthStatusOutputSchema,
 } from '../../../src/infrastructure/tools/health-tools.js';
 import { GitHubRepositoryFactory } from '../../../src/infrastructure/github/GitHubRepositoryFactory.js';
@@ -43,7 +42,7 @@ import { GitHubRepositoryFactory } from '../../../src/infrastructure/github/GitH
 // Mock the repository factory
 vi.mock('../../../src/infrastructure/github/GitHubRepositoryFactory.js', () => {
   return {
-    GitHubRepositoryFactory: vi.fn().mockImplementation(function() { return ({
+    GitHubRepositoryFactory: vi.fn().mockImplementation(function () { return ({
       createIssueRepository: vi.fn(),
       createMilestoneRepository: vi.fn(),
       createProjectRepository: vi.fn(),
@@ -54,7 +53,7 @@ vi.mock('../../../src/infrastructure/github/GitHubRepositoryFactory.js', () => {
       getOctokit: vi.fn(),
       getConfig: vi.fn(),
       graphql: vi.fn(),
-    })),
+    }); }),
   };
 });
 

@@ -1,27 +1,27 @@
-import { beforeEach, describe, expect, it, jest } from '@jest/globals';
+import { type Mocked, type MockedFunction, beforeEach, describe, expect, it, vi } from 'vitest';
 import { FieldValueService } from '../../../services/FieldValueService';
-import { GitHubRepositoryFactory } from '../../../infrastructure/github/GitHubRepositoryFactory';
-import { DomainError, ValidationError } from '../../../domain/errors';
+import type { GitHubRepositoryFactory } from '../../../infrastructure/github/GitHubRepositoryFactory';
+import { DomainError, } from '../../../domain/errors';
 
-jest.mock('../../../infrastructure/github/GitHubRepositoryFactory');
+vi.mock('../../../infrastructure/github/GitHubRepositoryFactory');
 
 describe('FieldValueService', () => {
   let service: FieldValueService;
-  let mockFactory: jest.Mocked<GitHubRepositoryFactory>;
-  let mockGraphql: jest.MockedFunction<any>;
+  let mockFactory: Mocked<GitHubRepositoryFactory>;
+  let mockGraphql: MockedFunction<any>;
 
   const projectId = 'PVT_proj1';
   const itemId = 'PVTI_item1';
   const fieldId = 'PVTF_field1';
 
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
 
-    mockGraphql = jest.fn();
+    mockGraphql = vi.fn();
 
     mockFactory = {
       graphql: mockGraphql,
-    } as unknown as jest.Mocked<GitHubRepositoryFactory>;
+    } as unknown as Mocked<GitHubRepositoryFactory>;
 
     service = new FieldValueService(mockFactory);
   });

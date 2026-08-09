@@ -63,15 +63,18 @@ describe('E2E Test Infrastructure Validation', () => {
   });
 
   it('should validate tool argument schemas', async () => {
-    // Test that tools properly validate arguments
-    const invalidArgs = {};
+    // The granular tools were consolidated into compound tools, so validate
+    // against a live one: `manage_project` requires `action`.
+    // Under MCP SDK v2 the server validates arguments against the declared
+    // inputSchema and reports a violation as a tool result with isError: true
+    // — not as a JSON-RPC protocol error (that form is reserved for a
+    // malformed request, e.g. an unknown tool).
+    const result = await utils.callTool('manage_project', {});
 
-    try {
-      await utils.callTool('create_project', invalidArgs);
-      throw new Error('Should have thrown validation error');
-    } catch (error: any) {
-      expect(error.message).toContain('Invalid parameters');
-    }
+    expect(result.isError).toBe(true);
+    const message = result.content[0].text;
+    expect(message).toContain('validation error');
+    expect(message).toContain('action');
   });
 
   it('should handle unknown tools gracefully', async () => {

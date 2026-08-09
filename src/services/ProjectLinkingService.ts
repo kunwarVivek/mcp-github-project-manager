@@ -1,5 +1,5 @@
-import { GitHubRepositoryFactory } from "../infrastructure/github/GitHubRepositoryFactory";
-import { ProjectItem } from "../domain/types";
+import type { GitHubRepositoryFactory } from "../infrastructure/github/GitHubRepositoryFactory";
+import type { ProjectItem } from "../domain/types";
 import { ResourceType } from "../domain/resource-types";
 import { safeCall } from './utils/safeCall';
 
@@ -318,19 +318,18 @@ export class ProjectLinkingService {
       });
 
       // If project doesn't exist or has no items
-      if (!response.node || !response.node.items || !response.node.items.nodes) {
+      if (!response.node?.items?.nodes) {
         return [];
       }
 
       return response.node.items.nodes.map((item) => {
         // Build field values map
         const fieldValues: Record<string, any> = {};
-        if (item.fieldValues && item.fieldValues.nodes) {
+        if (item.fieldValues?.nodes) {
           item.fieldValues.nodes.forEach((fieldValue: any) => {
-            if (!fieldValue || !fieldValue.field) return;
+            if (!fieldValue?.field) return;
 
             const fieldId = fieldValue.field.id;
-            const fieldName = fieldValue.field.name;
 
             if ('text' in fieldValue) {
               fieldValues[fieldId] = fieldValue.text;
@@ -344,7 +343,7 @@ export class ProjectLinkingService {
 
         // Determine content type
         let contentType = ResourceType.ISSUE; // Default
-        if (item.content && item.content.__typename) {
+        if (item.content?.__typename) {
           contentType = item.content.__typename === 'Issue'
             ? ResourceType.ISSUE
             : ResourceType.PULL_REQUEST;

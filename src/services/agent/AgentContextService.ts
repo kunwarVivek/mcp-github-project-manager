@@ -132,7 +132,7 @@ export class AgentContextService {
   }
 
   /** Build a full AgentTaskContext for the given issue. */
-  async getTaskContext(issueId: string, issueNumber: number): Promise<AgentTaskContext> {
+  async getTaskContext(_issueId: string, issueNumber: number): Promise<AgentTaskContext> {
     return safeCall(async () => {
       const config = this.factory.getConfig();
 
@@ -372,6 +372,9 @@ function extractAcceptanceCriteria(body: string): string[] {
   if (criteria.length === 0) {
     const checkboxPattern = /^[\s]*[-*]\s*\[[ x]\]\s*(.+)$/gm;
     let match: RegExpExecArray | null;
+    // biome-ignore lint/suspicious/noAssignInExpressions: the assignment-in-condition
+    // is the canonical form for iterating a /g regex with exec(); splitting it
+    // would duplicate the exec call or drop the null check.
     while ((match = checkboxPattern.exec(body)) !== null) {
       const text = match[1]?.trim();
       if (text) {

@@ -12,33 +12,33 @@
  * All tools use GraphQL mutations/queries directly via the factory.
  */
 
-import { ToolDefinition, ToolSchema } from "./ToolValidator";
+import type { ToolDefinition, ToolSchema } from "./ToolValidator";
 import { ANNOTATION_PATTERNS } from "./annotations/tool-annotations";
-import { createGitHubFactory } from "./tool-factory";
+import { createGitHubFactory, requireToken } from "./tool-factory";
 import type { GitHubRepositoryFactory } from "../github/GitHubRepositoryFactory";
 import {
   LinkProjectToRepositoryInputSchema,
-  LinkProjectToRepositoryInput,
+  type LinkProjectToRepositoryInput,
   UnlinkProjectFromRepositoryInputSchema,
-  UnlinkProjectFromRepositoryInput,
+  type UnlinkProjectFromRepositoryInput,
   LinkProjectToTeamInputSchema,
-  LinkProjectToTeamInput,
+  type LinkProjectToTeamInput,
   UnlinkProjectFromTeamInputSchema,
-  UnlinkProjectFromTeamInput,
+  type UnlinkProjectFromTeamInput,
   ListLinkedRepositoriesInputSchema,
-  ListLinkedRepositoriesInput,
+  type ListLinkedRepositoriesInput,
   ListLinkedTeamsInputSchema,
-  ListLinkedTeamsInput,
+  type ListLinkedTeamsInput,
   LinkedRepositoryOutputSchema,
-  LinkedRepositoryOutput,
+  type LinkedRepositoryOutput,
   LinkedTeamOutputSchema,
-  LinkedTeamOutput,
+  type LinkedTeamOutput,
   LinkedRepositoriesListOutputSchema,
-  LinkedRepositoriesListOutput,
+  type LinkedRepositoriesListOutput,
   LinkedTeamsListOutputSchema,
-  LinkedTeamsListOutput,
+  type LinkedTeamsListOutput,
   LinkOperationOutputSchema,
-  LinkOperationOutput,
+  type LinkOperationOutput,
 } from "./schemas/project-template-linking-schemas";
 
 // ============================================================================
@@ -552,7 +552,7 @@ export async function executeUnlinkProjectFromTeam(
 export async function executeListLinkedRepositories(
   args: ListLinkedRepositoriesInput
 ): Promise<{ content: Array<{ type: "text"; text: string }>; structuredContent: LinkedRepositoriesListOutput }> {
-  const token = process.env.GITHUB_TOKEN;
+  const token = requireToken();
   if (!token) {
     throw new Error("GITHUB_TOKEN environment variable is required");
   }
@@ -652,7 +652,7 @@ export async function executeListLinkedRepositories(
 export async function executeListLinkedTeams(
   args: ListLinkedTeamsInput
 ): Promise<{ content: Array<{ type: "text"; text: string }>; structuredContent: LinkedTeamsListOutput }> {
-  const token = process.env.GITHUB_TOKEN;
+  const token = requireToken();
   if (!token) {
     throw new Error("GITHUB_TOKEN environment variable is required");
   }

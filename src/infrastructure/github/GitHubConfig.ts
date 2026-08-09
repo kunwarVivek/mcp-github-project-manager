@@ -28,7 +28,9 @@ export class GitHubConfig {
       },
       token: {
         get: () => this.#token,
-        enumerable: true,
+        // Non-enumerable on purpose: keeps the PAT out of JSON.stringify,
+        // spreads, and anything else that walks own enumerable keys.
+        enumerable: false,
         configurable: false,
       },
       projectId: {

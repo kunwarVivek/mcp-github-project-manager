@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, } from 'vitest';
 import { GitHubConfig } from '../../infrastructure/github/GitHubConfig';
 
 // Skip these tests in CI environment unless credentials are available

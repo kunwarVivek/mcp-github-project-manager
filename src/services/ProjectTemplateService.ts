@@ -1,6 +1,6 @@
-import { GitHubRepositoryFactory } from "../infrastructure/github/GitHubRepositoryFactory";
-import { GitHubProjectRepository } from "../infrastructure/github/repositories/GitHubProjectRepository";
-import { CustomField, ProjectView } from "../domain/types";
+import type { GitHubRepositoryFactory } from "../infrastructure/github/GitHubRepositoryFactory";
+import type { GitHubProjectRepository } from "../infrastructure/github/repositories/GitHubProjectRepository";
+import type { CustomField, ProjectView } from "../domain/types";
 import {
   ResourceNotFoundError,
 } from "../domain/errors";

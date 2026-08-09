@@ -16,7 +16,7 @@
  *
  * To execute against a live server, pair this with scripts/mcp-test-client.js.
  */
-import { Server } from '@modelcontextprotocol/sdk/server/index.js';
+import type { Server } from '@modelcontextprotocol/sdk/server/index.js';
 
 interface AgentLoopConfig {
   agentName: string;
@@ -173,5 +173,5 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     skipBlocked: true,
     budgetTokens: 500_000,
   });
-  process.stderr.write(JSON.stringify(plan, null, 2) + '\n');
+  process.stderr.write(`${JSON.stringify(plan, null, 2)}\n`);
 }

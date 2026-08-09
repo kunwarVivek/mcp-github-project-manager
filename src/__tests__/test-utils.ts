@@ -1,9 +1,8 @@
 import { 
-  Resource,
   ResourceStatus, 
   ResourceType 
 } from "../domain/resource-types";
-import { 
+import type { 
   Issue, 
   Milestone, 
   Project, 
@@ -14,7 +13,6 @@ import {
   CreateSprint,
   ProjectView,
   CustomField,
-  createResource
 } from "../domain/types";
 
 export class TestFactory {
@@ -34,7 +32,7 @@ export class TestFactory {
     return {
       title: "Test Milestone",
       description: "A test milestone",
-      dueDate: this.futureDate(30),
+      dueDate: TestFactory.futureDate(30),
       ...overrides
     };
   }
@@ -88,7 +86,7 @@ export class TestFactory {
     };
   }
 
-  static completeProject(data: CreateProject = this.createProject()): Project {
+  static completeProject(data: CreateProject = TestFactory.createProject()): Project {
     return {
       id: `proj-${Date.now()}`,
       type: ResourceType.PROJECT,
@@ -108,7 +106,7 @@ export class TestFactory {
     };
   }
 
-  static completeMilestone(data: CreateMilestone = this.createMilestone()): Milestone {
+  static completeMilestone(data: CreateMilestone = TestFactory.createMilestone()): Milestone {
     return {
       id: `milestone-${Date.now()}`,
       number: 1,
@@ -127,7 +125,7 @@ export class TestFactory {
     };
   }
 
-  static completeIssue(data: CreateIssue = this.createIssue()): Issue {
+  static completeIssue(data: CreateIssue = TestFactory.createIssue()): Issue {
     return {
       id: `issue-${Date.now()}`,
       number: 1,
@@ -143,7 +141,7 @@ export class TestFactory {
     };
   }
 
-  static completeSprint(data: CreateSprint = this.createSprint()): Sprint {
+  static completeSprint(data: CreateSprint = TestFactory.createSprint()): Sprint {
     return {
       id: `sprint-${Date.now()}`,
       title: data.title,
@@ -232,7 +230,7 @@ export class TestFactory {
     };
 
     // Create the field value object based on type
-    let fieldValue: any = { field: baseField };
+    const fieldValue: any = { field: baseField };
 
     switch (fieldType) {
       case 'TEXT':

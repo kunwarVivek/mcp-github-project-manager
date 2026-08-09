@@ -1,8 +1,8 @@
-import { GitHubRepositoryFactory } from "../infrastructure/github/GitHubRepositoryFactory";
-import { GitHubIssueRepository } from "../infrastructure/github/repositories/GitHubIssueRepository";
-import { GitHubMilestoneRepository } from "../infrastructure/github/repositories/GitHubMilestoneRepository";
+import type { GitHubRepositoryFactory } from "../infrastructure/github/GitHubRepositoryFactory";
+import type { GitHubIssueRepository } from "../infrastructure/github/repositories/GitHubIssueRepository";
+import type { GitHubMilestoneRepository } from "../infrastructure/github/repositories/GitHubMilestoneRepository";
 import { ResourceStatus, ResourceType } from "../domain/resource-types";
-import { Issue, Milestone, CreateMilestone } from "../domain/types";
+import type { Issue, Milestone, CreateMilestone } from "../domain/types";
 import {
   ResourceNotFoundError,
 } from "../domain/errors";
@@ -73,18 +73,6 @@ export class MilestoneService {
       const closedIssues = issues.filter(
         issue => issue.status === ResourceStatus.CLOSED || issue.status === ResourceStatus.COMPLETED
       ).length;
-      const openIssues = totalIssues - closedIssues;
-      const completionPercentage = totalIssues > 0 ? Math.round((closedIssues / totalIssues) * 100) : 0;
-
-      const now = new Date();
-      let isOverdue = false;
-      let daysRemaining: number | undefined = undefined;
-
-      if (milestone.dueDate) {
-        const dueDate = new Date(milestone.dueDate);
-        isOverdue = now > dueDate;
-        daysRemaining = Math.ceil((dueDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-      }
 
       // Create immutable value object
       const metrics = MilestoneMetricsVO.create({

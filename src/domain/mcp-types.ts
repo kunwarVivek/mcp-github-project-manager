@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { ResourceType } from "./resource-types";
+import type { ResourceType } from "./resource-types";
 
 // Content Types
 export enum MCPContentType {

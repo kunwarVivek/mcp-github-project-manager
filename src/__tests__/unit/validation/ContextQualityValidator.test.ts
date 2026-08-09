@@ -2,10 +2,9 @@ import { describe, expect, it, beforeEach } from 'vitest';
 import {
   ContextQualityValidator,
   QUALITY_THRESHOLDS,
-  ValidationResult,
-  QualityReport
+  type QualityReport
 } from '../../../services/validation/ContextQualityValidator';
-import {
+import type {
   TaskExecutionContext,
   ContextQualityMetrics,
   FeatureContext,
@@ -14,7 +13,7 @@ import {
   ContextualReferences,
   EnhancedAcceptanceCriteria
 } from '../../../domain/task-context-schemas';
-import { AITask, TaskStatus, TaskPriority } from '../../../domain/ai-types';
+import { type AITask, TaskStatus, TaskPriority } from '../../../domain/ai-types';
 
 describe('ContextQualityValidator', () => {
   let validator: ContextQualityValidator;

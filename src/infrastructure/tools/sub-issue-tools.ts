@@ -12,28 +12,29 @@
  * Node ID resolution is handled internally.
  */
 
-import { ToolDefinition, ToolSchema } from "./ToolValidator";
+import type { ToolDefinition, ToolSchema } from "./ToolValidator";
 import { ANNOTATION_PATTERNS } from "./annotations/tool-annotations";
 import { GitHubRepositoryFactory } from "../github/GitHubRepositoryFactory";
+import { requireToken } from "./tool-factory";
 import {
   AddSubIssueInputSchema,
-  AddSubIssueInput,
+  type AddSubIssueInput,
   ListSubIssuesInputSchema,
-  ListSubIssuesInput,
+  type ListSubIssuesInput,
   GetParentIssueInputSchema,
-  GetParentIssueInput,
+  type GetParentIssueInput,
   ReprioritizeSubIssueInputSchema,
-  ReprioritizeSubIssueInput,
+  type ReprioritizeSubIssueInput,
   RemoveSubIssueInputSchema,
-  RemoveSubIssueInput,
+  type RemoveSubIssueInput,
   SubIssueOperationOutputSchema,
-  SubIssueOperationOutput,
+  type SubIssueOperationOutput,
   SubIssueListOutputSchema,
-  SubIssueListOutput,
+  type SubIssueListOutput,
   ParentIssueOutputSchema,
-  ParentIssueOutput,
+  type ParentIssueOutput,
   RemoveSubIssueOutputSchema,
-  RemoveSubIssueOutput,
+  type RemoveSubIssueOutput,
 } from "./schemas/sub-issue-schemas";
 
 // ============================================================================
@@ -44,7 +45,7 @@ import {
  * Creates a repository factory with the given credentials.
  */
 function createFactory(owner: string, repo: string): GitHubRepositoryFactory {
-  const token = process.env.GITHUB_TOKEN;
+  const token = requireToken();
   if (!token) {
     throw new Error("GITHUB_TOKEN environment variable is required");
   }

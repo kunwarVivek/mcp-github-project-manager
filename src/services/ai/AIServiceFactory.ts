@@ -1,8 +1,8 @@
-import { anthropic } from '@ai-sdk/anthropic';
-import { openai } from '@ai-sdk/openai';
-import { google } from '@ai-sdk/google';
-import { perplexity } from '@ai-sdk/perplexity';
-import { LanguageModel } from 'ai';
+import { createAnthropic } from '@ai-sdk/anthropic';
+import { createOpenAI } from '@ai-sdk/openai';
+import { createGoogleGenerativeAI } from '@ai-sdk/google';
+import { createPerplexity } from '@ai-sdk/perplexity';
+import { type LanguageModel, wrapLanguageModel, type LanguageModelMiddleware } from 'ai';
 import {
   ANTHROPIC_API_KEY,
   OPENAI_API_KEY,
@@ -11,18 +11,102 @@ import {
   AI_MAIN_MODEL,
   AI_RESEARCH_MODEL,
   AI_FALLBACK_MODEL,
-  AI_PRD_MODEL
+  AI_PRD_MODEL,
+  getOptionalConfigValue,
 } from '../../env';
-import { ILogger, Logger } from '../../infrastructure/logger';
+import { type ILogger, Logger } from '../../infrastructure/logger';
+import { getTraceContext } from '../../infrastructure/observability/CorrelationContext';
 import {
   AIResiliencePolicy,
   type DegradedResult,
 } from '../../infrastructure/resilience/AIResiliencePolicy.js';
 
 /**
+ * Middleware that records server-side token spend against the acting agent.
+ *
+ * Wrapping the model is what makes metering INVOLUNTARY: every `generateText` /
+ * `generateObject` call site in the codebase (33 of them across 22 files)
+ * receives its model from `AIServiceFactory.getModel`, so instrumenting here
+ * covers all of them without touching one.
+ *
+ * It only accumulates in memory — the actual budget debit happens once per tool
+ * call in the dispatcher. This function must never fail an AI call, so it does
+ * no I/O and swallows nothing it could throw on.
+ *
+ * SCOPE, stated plainly: this meters tokens *this server* spends on an agent's
+ * behalf. It does NOT see tokens the agent's own runtime spends talking to its
+ * own model — that traffic never reaches this process and is unobservable here.
+ * `record_usage` remains the only channel for agent-side spend.
+ */
+export const usageMeteringMiddleware: LanguageModelMiddleware = {
+  wrapGenerate: async ({ doGenerate }) => {
+    const result = await doGenerate();
+    const sink = getTraceContext()?.usage;
+    if (sink) {
+      // `inputTokens`/`outputTokens` are objects with a `total`, not numbers —
+      // reading them as numbers yields NaN and silently poisons the budget.
+      const input = result.usage?.inputTokens?.total ?? 0;
+      const output = result.usage?.outputTokens?.total ?? 0;
+      sink.tokens += input + output;
+    }
+    return result;
+  },
+};
+
+/**
  * AI Provider Types
  */
 export type AIProvider = 'anthropic' | 'openai' | 'google' | 'perplexity';
+
+/** The four model roles the server configures independently. */
+export type AIModelRole = 'main' | 'research' | 'fallback' | 'prd';
+
+export const SUPPORTED_PROVIDERS: readonly AIProvider[] = [
+  'anthropic',
+  'openai',
+  'google',
+  'perplexity',
+] as const;
+
+/**
+ * API key accessors, read at call time so a rotated secret is picked up.
+ */
+const PROVIDER_API_KEYS: Record<AIProvider, () => string> = {
+  anthropic: () => ANTHROPIC_API_KEY,
+  openai: () => OPENAI_API_KEY,
+  google: () => GOOGLE_API_KEY,
+  perplexity: () => PERPLEXITY_API_KEY,
+};
+
+/** Model-name prefixes used only as a fallback hint when no provider is set. */
+const PROVIDER_HINTS: ReadonlyArray<[AIProvider, (m: string) => boolean]> = [
+  ['anthropic', (m) => m.startsWith('claude-')],
+  ['openai', (m) => m.startsWith('gpt-') || m.startsWith('o1') || m.startsWith('o3')],
+  ['google', (m) => m.startsWith('gemini-')],
+  ['perplexity', (m) => m.includes('perplexity') || m.includes('sonar') || m.includes('llama')],
+];
+
+/**
+ * Resolve which provider serves a model.
+ *
+ * An explicit `AI_<ROLE>_PROVIDER` wins. Otherwise the model name is matched
+ * against known prefixes. An unrecognised name returns `undefined` — previously
+ * it silently fell back to Anthropic *and substituted a different model*, so a
+ * typo'd or newly-released model ID quietly ran somewhere else entirely.
+ */
+export function resolveProvider(
+  modelString: string,
+  role?: AIModelRole,
+): AIProvider | undefined {
+  if (role) {
+    const override = getOptionalConfigValue(`AI_${role.toUpperCase()}_PROVIDER`, '');
+    if (override) {
+      const normalized = override.trim().toLowerCase() as AIProvider;
+      return SUPPORTED_PROVIDERS.includes(normalized) ? normalized : undefined;
+    }
+  }
+  return PROVIDER_HINTS.find(([, matches]) => matches(modelString))?.[0];
+}
 
 /**
  * AI Model Configuration
@@ -72,57 +156,50 @@ export class AIServiceFactory {
    */
   private buildConfiguration(): AIServiceConfig {
     return {
-      main: this.parseModelConfig(AI_MAIN_MODEL),
-      research: this.parseModelConfig(AI_RESEARCH_MODEL),
-      fallback: this.parseModelConfig(AI_FALLBACK_MODEL),
-      prd: this.parseModelConfig(AI_PRD_MODEL)
+      main: this.parseModelConfig(AI_MAIN_MODEL, 'main'),
+      research: this.parseModelConfig(AI_RESEARCH_MODEL, 'research'),
+      fallback: this.parseModelConfig(AI_FALLBACK_MODEL, 'fallback'),
+      prd: this.parseModelConfig(AI_PRD_MODEL, 'prd')
     };
   }
 
   /**
    * Parse model configuration from model string
    */
-  private parseModelConfig(modelString: string): AIModelConfig | null {
-    // Extract provider from model name
-    let provider: AIProvider;
-    let model: string;
-    let apiKey: string;
+  private parseModelConfig(modelString: string, role?: AIModelRole): AIModelConfig | null {
+    const provider = resolveProvider(modelString, role);
 
-    if (modelString.startsWith('claude-')) {
-      provider = 'anthropic';
-      model = modelString;
-      apiKey = ANTHROPIC_API_KEY;
-    } else if (modelString.startsWith('gpt-') || modelString.startsWith('o1')) {
-      provider = 'openai';
-      model = modelString;
-      apiKey = OPENAI_API_KEY;
-    } else if (modelString.startsWith('gemini-')) {
-      provider = 'google';
-      model = modelString;
-      apiKey = GOOGLE_API_KEY;
-    } else if (modelString.includes('perplexity') || modelString.includes('llama') || modelString.includes('sonar')) {
-      provider = 'perplexity';
-      model = modelString;
-      apiKey = PERPLEXITY_API_KEY;
-    } else {
-      // Default to anthropic for unknown models
-      provider = 'anthropic';
-      model = 'claude-3-5-sonnet-20241022';
-      apiKey = ANTHROPIC_API_KEY;
-    }
-
-    if (!apiKey) {
-      this.logger.warn(`AI Provider Warning: No API key found for ${provider} provider. AI features using this provider will be disabled.`);
+    if (!provider) {
+      this.logger.warn(
+        `AI Model Warning: cannot determine a provider for model "${modelString}". ` +
+          `Set AI_${(role ?? 'MAIN').toUpperCase()}_PROVIDER to one of ` +
+          `${SUPPORTED_PROVIDERS.join(', ')}.`,
+      );
       return null;
     }
 
-    return { provider, model, apiKey };
+    const apiKey = PROVIDER_API_KEYS[provider]();
+    if (!apiKey) {
+      this.logger.warn(
+        `AI Provider Warning: No API key found for ${provider} provider. ` +
+          `AI features using this provider will be disabled.`,
+      );
+      return null;
+    }
+
+    return { provider, model: modelString, apiKey };
   }
 
   /**
    * Get AI model instance for specific use case
    */
   public getModel(type: 'main' | 'research' | 'fallback' | 'prd'): LanguageModel | null {
+    // Typed off wrapLanguageModel's own parameter: `LanguageModel` also admits
+    // the plain model-id string, which is not a wrappable model instance.
+    type WrappableModel = Parameters<typeof wrapLanguageModel>[0]['model'];
+    const meter = (model: WrappableModel): LanguageModel =>
+      wrapLanguageModel({ model, middleware: usageMeteringMiddleware });
+
     const config = this.config[type];
 
     if (!config) {
@@ -130,18 +207,22 @@ export class AIServiceFactory {
       return null;
     }
 
+    // Build a provider client bound to the resolved key. The default
+    // `anthropic(...)` / `openai(...)` singletons read process.env themselves,
+    // which meant a key supplied via CLI flag or SECRETS_DIR was resolved,
+    // stored, used as a truthiness gate — and then silently ignored.
     switch (config.provider) {
       case 'anthropic':
-        return anthropic(config.model);
+        return meter(createAnthropic({ apiKey: config.apiKey })(config.model));
 
       case 'openai':
-        return openai(config.model);
+        return meter(createOpenAI({ apiKey: config.apiKey })(config.model));
 
       case 'google':
-        return google(config.model);
+        return meter(createGoogleGenerativeAI({ apiKey: config.apiKey })(config.model));
 
       case 'perplexity':
-        return perplexity(config.model);
+        return meter(createPerplexity({ apiKey: config.apiKey })(config.model));
 
       default:
         throw new Error(`Unsupported AI provider: ${config.provider}`);
@@ -212,7 +293,16 @@ export class AIServiceFactory {
    * Get configuration for debugging
    */
   public getConfiguration(): AIServiceConfig {
-    return { ...this.config };
+    // Never hand out API keys — this is a debugging accessor and one
+    // `logger.debug(factory.getConfiguration())` away from printing every key.
+    const strip = (c: AIModelConfig | null): AIModelConfig | null =>
+      c ? { ...c, apiKey: c.apiKey ? '[REDACTED]' : '' } : null;
+    return {
+      main: strip(this.config.main),
+      research: strip(this.config.research),
+      fallback: strip(this.config.fallback),
+      prd: strip(this.config.prd),
+    };
   }
 
   /**

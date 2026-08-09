@@ -1,9 +1,9 @@
 import { generateText } from 'ai';
 import { InputSanitizer } from './utils/InputSanitizer';
-import { AIServiceFactory } from "./ai/AIServiceFactory";
-import { ProjectManagementService } from "./ProjectManagementService";
-import { IssueEnrichmentService } from "./IssueEnrichmentService";
-import { ILogger, Logger } from "../infrastructure/logger";
+import type { AIServiceFactory } from "./ai/AIServiceFactory";
+import type { ProjectManagementService } from "./ProjectManagementService";
+import type { IssueEnrichmentService } from "./IssueEnrichmentService";
+import { type ILogger, Logger } from "../infrastructure/logger";
 
 export interface TriageResult {
   issueId: string;
@@ -69,7 +69,11 @@ export class IssueTriagingService {
         throw new Error('Failed to extract JSON from AI triage response');
       }
 
-      let triage;
+      // Explicit `any`: this holds an unvalidated AI response. Properly typing
+      // it is real work (the shape varies by prompt); making the `any` explicit
+      // at least removes the *implicit* one so the gap is visible.
+      // biome-ignore lint/suspicious/noExplicitAny: unvalidated AI response shape
+      let triage: any;
       try {
         triage = JSON.parse(jsonMatch[0]);
       } catch (parseError) {
@@ -90,7 +94,7 @@ export class IssueTriagingService {
     }
   }
 
-  async triageAllIssues(params: {
+  async triageAllIssues(_params: {
     projectId: string;
     onlyUntriaged?: boolean;
     autoApply?: boolean;

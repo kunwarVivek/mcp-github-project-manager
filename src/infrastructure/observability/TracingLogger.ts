@@ -17,7 +17,7 @@
  */
 
 import { getCorrelationId, getTraceContext } from './CorrelationContext.js';
-import { type ILogger } from '../logger/index.js';
+import type { ILogger } from '../logger/index.js';
 
 /**
  * Structured log entry format

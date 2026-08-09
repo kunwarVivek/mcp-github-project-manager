@@ -24,9 +24,9 @@
  * | Automation | createAutomationRule, listAutomationRules, … | ProjectAutomationService |
  * | Iterations | getIterationConfiguration, getCurrentIteration, … | IterationService |
  */
-import { GitHubRepositoryFactory } from "../infrastructure/github/GitHubRepositoryFactory";
-import { ResourceStatus } from "../domain/resource-types";
-import {
+import type { GitHubRepositoryFactory } from "../infrastructure/github/GitHubRepositoryFactory";
+import type { ResourceStatus } from "../domain/resource-types";
+import type {
   Issue, CreateIssue, Milestone, CreateMilestone, Project, CreateProject,
   Sprint, CreateSprint, CustomField, ProjectView, ProjectItem
 } from "../domain/types";
@@ -35,9 +35,9 @@ import { safeCall } from './utils/safeCall';
 
 import { SubIssueService } from "./SubIssueService";
 import type { IssueDependency, IssueHistoryEntry } from "./SubIssueService";
-import { IssueService } from "./IssueService";
-import { RoadmapService } from "./RoadmapService";
-import { ProjectAutomationService, type CreateAutomationRuleInput, type UpdateAutomationRuleInput, type AutomationRuleDTO, type AutomationRuleSummary } from "./ProjectAutomationService";
+import type { IssueService } from "./IssueService";
+import type { RoadmapService } from "./RoadmapService";
+import type { ProjectAutomationService, CreateAutomationRuleInput, UpdateAutomationRuleInput, AutomationRuleDTO, AutomationRuleSummary } from "./ProjectAutomationService";
 import { MilestoneService } from "./MilestoneService";
 import type { MilestoneMetrics } from "./MilestoneService";
 import { SprintPlanningService } from "./SprintPlanningService";
@@ -45,10 +45,10 @@ import type { SprintMetrics } from "./SprintPlanningService";
 import { ProjectStatusService } from "./ProjectStatusService";
 import { ProjectTemplateService } from "./ProjectTemplateService";
 import { ProjectLinkingService } from "./ProjectLinkingService";
-import { PullRequestService } from "./PullRequestService";
-import { FieldValueService } from "./FieldValueService";
-import { LabelService } from "./LabelService";
-import { IterationService } from "./IterationService";
+import type { PullRequestService } from "./PullRequestService";
+import type { FieldValueService } from "./FieldValueService";
+import type { LabelService } from "./LabelService";
+import type { IterationService } from "./IterationService";
 
 export type { IssueDependency, IssueHistoryEntry, MilestoneMetrics, SprintMetrics };
 export { SubIssueService, MilestoneService, SprintPlanningService, ProjectStatusService, ProjectTemplateService, ProjectLinkingService };

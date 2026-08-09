@@ -1,8 +1,8 @@
-import { ProjectManagementService } from "../../services/ProjectManagementService";
+import type { ProjectManagementService } from "../../services/ProjectManagementService";
 import { createProjectManagementService } from "../../container";
 import { ResourceStatus } from "../../domain/resource-types";
 import { TestFactory } from "../test-utils";
-import { Issue, Milestone } from "../../domain/types";
+import type { Issue, Milestone } from "../../domain/types";
 
 const hasGitHubCredentials = !!(process.env.GITHUB_TOKEN && process.env.GITHUB_OWNER && process.env.GITHUB_REPO);
 
@@ -24,7 +24,7 @@ describe.skip("Resource Management E2E Tests", () => {
 
   describe("Issue Relationship Management", () => {
     let parentIssue: Issue;
-    let childIssues: Issue[] = [];
+    const childIssues: Issue[] = [];
 
     beforeAll(async () => {
       // Create a parent issue
@@ -85,7 +85,7 @@ describe.skip("Resource Management E2E Tests", () => {
 
   describe("Milestone Assignment Operations", () => {
     let testMilestone: Milestone;
-    let testIssues: Issue[] = [];
+    const testIssues: Issue[] = [];
 
     beforeAll(async () => {
       // Create a test milestone

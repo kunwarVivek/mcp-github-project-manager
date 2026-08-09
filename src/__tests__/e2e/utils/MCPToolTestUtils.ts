@@ -1,9 +1,6 @@
-import { spawn, ChildProcess } from 'child_process';
-import { join } from 'path';
-import { existsSync } from 'fs';
-import { CallToolRequestSchema } from '@modelcontextprotocol/sdk/types.js';
-import { MCPResponse, MCPSuccessResponse, MCPErrorResponse } from '../../../domain/mcp-types';
-import { testConfig } from '../setup';
+import { spawn, type ChildProcess } from 'node:child_process';
+import { join } from 'node:path';
+import { existsSync } from 'node:fs';
 
 /**
  * Utility class for testing MCP tools through the actual MCP interface
@@ -35,6 +32,10 @@ export class MCPToolTestUtils {
       GITHUB_TOKEN: process.env.GITHUB_TOKEN || 'test-token',
       GITHUB_OWNER: process.env.GITHUB_OWNER || 'test-owner',
       GITHUB_REPO: process.env.GITHUB_REPO || 'test-repo',
+      // These suites exercise the stdio protocol, not webhooks. Without this
+      // every spawned server binds WEBHOOK_PORT (default 3001); Vitest runs
+      // files in parallel, so they collided and failed nondeterministically.
+      SSE_ENABLED: 'false',
     };
 
     this.serverProcess = spawn('node', [MCPToolTestUtils.serverPath], {
@@ -117,7 +118,6 @@ export class MCPToolTestUtils {
 
     return new Promise((resolve, reject) => {
       let responseData = '';
-      let errorData = '';
 
       const timeout = setTimeout(() => {
         reject(new Error('Message timeout'));
@@ -138,21 +138,21 @@ export class MCPToolTestUtils {
               resolve(response);
               return;
             }
-          } catch (e) {
+          } catch {
             // Continue parsing other lines
           }
         }
       };
 
-      const onError = (data: Buffer) => {
-        errorData += data.toString();
+      const onError = (_data: Buffer) => {
+        // Drain stderr so the child process does not block on a full pipe.
       };
 
       this.serverProcess!.stdout!.on('data', onData);
       this.serverProcess!.stderr!.on('data', onError);
 
       // Send the message
-      this.serverProcess!.stdin!.write(JSON.stringify(message) + '\n');
+      this.serverProcess!.stdin!.write(`${JSON.stringify(message)}\n`);
     });
   }
 

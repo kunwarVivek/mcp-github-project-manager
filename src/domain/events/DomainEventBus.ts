@@ -31,7 +31,7 @@
  * ```
  */
 
-import { DomainEvent } from './DomainEvent';
+import type { DomainEvent } from './DomainEvent';
 
 /**
  * Event handler function type

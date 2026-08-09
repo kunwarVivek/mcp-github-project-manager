@@ -1,6 +1,6 @@
 import { generateObject } from 'ai';
 import { AIServiceFactory } from '../ai/AIServiceFactory';
-import {
+import type {
   ContextualReferences,
   PRDSectionReference,
   RelatedFeature,
@@ -8,8 +8,8 @@ import {
   CodeExample,
   ExternalReference
 } from '../../domain/task-context-schemas';
-import { AITask, PRDDocument, FeatureRequirement } from '../../domain/ai-types';
-import { ILogger, Logger } from '../../infrastructure/logger';
+import type { AITask, PRDDocument, FeatureRequirement } from '../../domain/ai-types';
+import { type ILogger, Logger } from '../../infrastructure/logger';
 import { CONTEXT_GENERATION_CONFIGS, formatContextPrompt } from '../ai/prompts/ContextGenerationPrompts';
 
 /**
@@ -96,7 +96,7 @@ export class ContextualReferenceGenerator {
    * Extract relevant PRD sections for the task
    */
   private extractPRDSections(
-    task: AITask,
+    _task: AITask,
     prd: PRDDocument | null
   ): PRDSectionReference[] {
     if (!prd) {
@@ -191,7 +191,7 @@ export class ContextualReferenceGenerator {
    */
   private extractTechnicalSpecs(
     task: AITask,
-    prd: PRDDocument | null
+    _prd: PRDDocument | null
   ): TechnicalSpecReference[] {
     const specs: TechnicalSpecReference[] = [];
 

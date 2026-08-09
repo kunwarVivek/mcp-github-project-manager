@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi, Mocked, MockedClass, MockedFunction } from 'vitest';
+import { beforeEach, describe, expect, it, vi, type MockedFunction } from 'vitest';
 import { ProjectLinkingService } from '../../../services/ProjectLinkingService';
 import { ResourceType } from '../../../domain/resource-types';
 

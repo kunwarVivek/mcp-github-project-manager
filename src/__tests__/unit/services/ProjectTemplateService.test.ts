@@ -1,6 +1,5 @@
-import { beforeEach, describe, expect, it, vi, Mocked, MockedClass, MockedFunction } from 'vitest';
+import { beforeEach, describe, expect, it, vi, type MockedFunction } from 'vitest';
 import { ProjectTemplateService } from '../../../services/ProjectTemplateService';
-import { ResourceType } from '../../../domain/resource-types';
 
 describe('ProjectTemplateService', () => {
   let service: ProjectTemplateService;

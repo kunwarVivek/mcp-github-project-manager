@@ -4,8 +4,8 @@
  * Verifies that services properly accept ILogger via constructor injection
  * and that mocked loggers work correctly for testing.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { ILogger, NoopLogger } from '../../../infrastructure/logger';
+import { describe, it, expect, vi, type Mock } from 'vitest';
+import { type ILogger, NoopLogger } from '../../../infrastructure/logger';
 import { TaskPriority, TaskStatus } from '../../../domain/ai-task-types';
 
 // ---------------------------------------------------------------------------
@@ -44,8 +44,14 @@ describe('Logger DI Injection', () => {
 
       const factory = AIServiceFactory.getInstance(mockLogger);
 
-      // The logger should be used when parsing model config
-      expect(mockLogger.calls.warn).toHaveBeenCalled();
+      // Config parsing only logs a warning when a provider cannot be resolved
+      // or its API key is missing; the shared test setup supplies a key for
+      // every provider, so construction is silent by design. Drive a path that
+      // always logs instead, to prove the injected logger is the one used.
+      factory.enableResilience();
+      expect(mockLogger.calls.info).toHaveBeenCalledWith(
+        '[AIServiceFactory] Resilience enabled'
+      );
     });
 
     it('falls back to Logger.getInstance() when no logger provided', async () => {

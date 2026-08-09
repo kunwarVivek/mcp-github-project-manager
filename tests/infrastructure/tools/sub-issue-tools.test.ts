@@ -32,7 +32,7 @@ import { GitHubRepositoryFactory } from '../../../src/infrastructure/github/GitH
 // Mock the repository factory
 vi.mock('../../../src/infrastructure/github/GitHubRepositoryFactory.js', () => {
   return {
-    GitHubRepositoryFactory: vi.fn().mockImplementation(function() { return ({
+    GitHubRepositoryFactory: vi.fn().mockImplementation(function () { return ({
       createIssueRepository: vi.fn(),
       createMilestoneRepository: vi.fn(),
       createProjectRepository: vi.fn(),
@@ -43,7 +43,7 @@ vi.mock('../../../src/infrastructure/github/GitHubRepositoryFactory.js', () => {
       getOctokit: vi.fn(),
       getConfig: vi.fn(),
       graphql: vi.fn(),
-    })),
+    }); }),
   };
 });
 
@@ -269,7 +269,6 @@ describe('Sub-issue Tools', () => {
   });
 
   describe('Executors', () => {
-    const originalEnv = process.env;
     let mockSubIssueRepo: Mocked<{
       addSubIssue: Mock;
       listSubIssues: Mock;
@@ -281,7 +280,7 @@ describe('Sub-issue Tools', () => {
 
     beforeEach(() => {
       vi.resetAllMocks();
-      process.env = { ...originalEnv, GITHUB_TOKEN: 'test-token' };
+      vi.stubEnv('GITHUB_TOKEN', 'test-token');
 
       mockSubIssueRepo = {
         addSubIssue: vi.fn(),
@@ -293,15 +292,15 @@ describe('Sub-issue Tools', () => {
 
       mockGraphql = vi.fn();
 
-      MockedFactory.mockImplementation(() => ({
+      MockedFactory.mockImplementation(function () { return ({
         createSubIssueRepository: vi.fn().mockReturnValue(mockSubIssueRepo),
         graphql: mockGraphql,
         getConfig: vi.fn().mockReturnValue({ owner: 'octocat', repo: 'hello-world' }),
-      } as unknown as GitHubRepositoryFactory));
+      } as unknown as GitHubRepositoryFactory); });
     });
 
     afterEach(() => {
-      process.env = originalEnv;
+      vi.unstubAllEnvs();
     });
 
     describe('executeAddSubIssue', () => {
@@ -337,7 +336,7 @@ describe('Sub-issue Tools', () => {
       });
 
       it('returns error when token is missing', async () => {
-        delete process.env.GITHUB_TOKEN;
+        vi.stubEnv('GITHUB_TOKEN', undefined as unknown as string);
 
         const input = AddSubIssueInputSchema.parse({
           owner: 'octocat',
@@ -347,7 +346,7 @@ describe('Sub-issue Tools', () => {
         });
 
         await expect(executeAddSubIssue(input))
-          .rejects.toThrow('GITHUB_TOKEN environment variable is required');
+          .rejects.toThrow(/No GitHub token available/);
       });
     });
 

@@ -8,7 +8,6 @@ import { vi } from 'vitest';
 
 import { RoadmapAIService } from '../../src/services/ai/RoadmapAIService';
 import { AIServiceFactory } from '../../src/services/ai/AIServiceFactory';
-import { GeneratedRoadmap, RoadmapGenerationInput, RequirementItem } from '../../src/domain/roadmap-planning-types';
 
 // Mock AIServiceFactory
 vi.mock('../../src/services/ai/AIServiceFactory', () => {

@@ -1,4 +1,4 @@
-import { MCPToolTestUtils, MCPTestHelpers } from '../utils/MCPToolTestUtils';
+import { MCPToolTestUtils, } from '../utils/MCPToolTestUtils';
 
 /**
  * Comprehensive E2E tests for Tool Integration and Workflows
@@ -9,7 +9,7 @@ describe('Tool Integration Workflows E2E', () => {
   let utils: MCPToolTestUtils | undefined;
   let workflowProjectId: string;
   let workflowMilestoneId: string;
-  let workflowIssueIds: string[] = [];
+  const workflowIssueIds: string[] = [];
   let workflowSprintId: string;
   let workflowPRDContent: string;
 

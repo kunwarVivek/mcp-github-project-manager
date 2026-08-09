@@ -6,7 +6,7 @@
  * Supports optional file persistence.
  */
 
-import * as crypto from 'crypto';
+import * as crypto from 'node:crypto';
 
 /**
  * Cached embedding entry with metadata.

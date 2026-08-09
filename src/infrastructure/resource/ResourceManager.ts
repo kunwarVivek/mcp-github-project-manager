@@ -1,23 +1,20 @@
-import { EventEmitter } from 'events';
+import { EventEmitter } from 'node:events';
 import { v4 as uuidv4 } from 'uuid';
 import {
-  Resource,
-  ResourceType,
+  type Resource,
+  type ResourceType,
   ResourceStatus,
-  ResourceEvent,
   ResourceEventType,
-  ResourceValidationRule,
+  type ResourceValidationRule,
   ResourceValidationError,
   ResourceNotFoundError,
   ResourceVersionError,
-  ResourceCacheOptions,
-  ResourceUpdateOptions,
-  RelationshipType,
+  type ResourceCacheOptions,
+  type ResourceUpdateOptions,
+  type RelationshipType,
 } from '../../domain/resource-types';
-import { ResourceCache } from '../cache/ResourceCache';
+import type { ResourceCache } from '../cache/ResourceCache';
 import {
-  ResourceSchema,
-  ResourceSchemaMap,
   validateResourceByType,
   resourceSchemas
 } from '../../domain/resource-schemas';

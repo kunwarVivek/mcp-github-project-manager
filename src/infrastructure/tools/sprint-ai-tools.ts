@@ -11,7 +11,7 @@
  * with proper annotations, input/output schemas, and executors.
  */
 
-import { ToolDefinition, ToolSchema } from "./ToolValidator";
+import type { ToolDefinition, ToolSchema } from "./ToolValidator";
 import { ANNOTATION_PATTERNS } from "./annotations/tool-annotations";
 import { SprintCapacityAnalyzer } from "../../services/ai/SprintCapacityAnalyzer";
 import { BacklogPrioritizer } from "../../services/ai/BacklogPrioritizer";
@@ -19,21 +19,21 @@ import { SprintRiskAssessor } from "../../services/ai/SprintRiskAssessor";
 import { SprintSuggestionService } from "../../services/ai/SprintSuggestionService";
 import {
   SprintCapacityInputSchema,
-  SprintCapacityInput,
+  type SprintCapacityInput,
   SprintCapacityOutputSchema,
-  SprintCapacityOutput,
+  type SprintCapacityOutput,
   BacklogPrioritizationInputSchema,
-  BacklogPrioritizationInput,
+  type BacklogPrioritizationInput,
   PrioritizationOutputSchema,
-  PrioritizationOutput,
+  type PrioritizationOutput,
   SprintRiskInputSchema,
-  SprintRiskInput,
+  type SprintRiskInput,
   SprintRiskOutputSchema,
-  SprintRiskOutput,
+  type SprintRiskOutput,
   SprintSuggestionInputSchema,
-  SprintSuggestionInput,
+  type SprintSuggestionInput,
   SprintSuggestionOutputSchema,
-  SprintSuggestionOutput,
+  type SprintSuggestionOutput,
 } from "./schemas/sprint-roadmap-schemas";
 
 // ============================================================================

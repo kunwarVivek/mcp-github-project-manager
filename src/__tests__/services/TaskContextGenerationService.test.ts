@@ -1,12 +1,12 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, } from 'vitest';
 import { TaskContextGenerationService } from '../../services/TaskContextGenerationService';
 import {
-  AITask,
-  PRDDocument,
-  EnhancedTaskGenerationConfig,
+  type AITask,
+  type PRDDocument,
+  type EnhancedTaskGenerationConfig,
   TaskStatus,
   TaskPriority,
-  TaskComplexity
+  type TaskComplexity
 } from '../../domain/ai-types';
 
 describe('TaskContextGenerationService', () => {

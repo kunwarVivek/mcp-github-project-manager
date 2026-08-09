@@ -1,16 +1,20 @@
 // filepath: /Users/vivek/grad-saas/mcp-github-project-manager/src/__tests__/unit/infrastructure/github/repositories/GitHubProjectRepository.test.ts
-import { beforeEach, describe, expect, it, vi, Mocked, MockedClass, MockedFunction } from 'vitest';
+import { beforeEach, describe, expect, it, vi, type Mocked, type MockedClass, } from 'vitest';
 import { Octokit } from "@octokit/rest";
-import { CreateProject, ProjectId } from "../../../../../domain/types";
+import type { CreateProject, } from "../../../../../domain/types";
 import { ResourceStatus } from "../../../../../domain/resource-types";
 import { GitHubConfig } from "../../../../../infrastructure/github/GitHubConfig";
 import { GitHubProjectRepository } from "../../../../../infrastructure/github/repositories/GitHubProjectRepository";
-import { mockData } from "../../../../setup";
 
 // Mock Octokit
 vi.mock("@octokit/rest");
 
 describe("GitHubProjectRepository", () => {
+  // createProjectV2 takes GraphQL node IDs, not the owner login / repo name, so
+  // `create()` resolves them first via GetUserNodeId + GetRepositoryNodeId.
+  const OWNER_NODE_ID = "U_kgDOtest-owner";
+  const REPO_NODE_ID = "R_kgDOtest-repo";
+
   let repository: GitHubProjectRepository;
   let mockOctokit: Mocked<Octokit>;
   let config: GitHubConfig;
@@ -65,14 +69,18 @@ describe("GitHubProjectRepository", () => {
         updatedAt: '2023-01-01T00:00:00Z',
       };
 
-      // Mock the create mutation (first call)
       mockOctokit.graphql
+        // Owner login -> node ID
+        .mockResolvedValueOnce({ user: { id: OWNER_NODE_ID } })
+        // Repo name -> node ID
+        .mockResolvedValueOnce({ repository: { id: REPO_NODE_ID } })
+        // Create mutation
         .mockResolvedValueOnce({
           createProjectV2: {
             projectV2: mockCreateResponse
           }
         })
-        // Mock the update mutation (second call for description)
+        // Update mutation (description)
         .mockResolvedValueOnce({
           updateProjectV2: {
             projectV2: mockUpdateResponse
@@ -89,8 +97,8 @@ describe("GitHubProjectRepository", () => {
         title: mockUpdateResponse.title,
         description: mockUpdateResponse.shortDescription,
         owner: config.owner,
-        number: parseInt(mockUpdateResponse.id.split('_').pop() || '0'),
-        url: `https://github.com/orgs/${config.owner}/projects/${parseInt(mockUpdateResponse.id.split('_').pop() || '0')}`,
+        number: parseInt(mockUpdateResponse.id.split('_').pop() || '0', 10),
+        url: `https://github.com/orgs/${config.owner}/projects/${parseInt(mockUpdateResponse.id.split('_').pop() || '0', 10)}`,
         status: ResourceStatus.ACTIVE,
         visibility: projectData.visibility,
         views: projectData.views,
@@ -100,20 +108,30 @@ describe("GitHubProjectRepository", () => {
         closed: mockUpdateResponse.closed
       });
 
-      // Verify first call - create project (without description)
+      // Verify node-ID resolution happens before the mutation
       expect(mockOctokit.graphql).toHaveBeenNthCalledWith(1,
+        expect.stringContaining("query GetUserNodeId"),
+        expect.objectContaining({ login: config.owner })
+      );
+      expect(mockOctokit.graphql).toHaveBeenNthCalledWith(2,
+        expect.stringContaining("query GetRepositoryNodeId"),
+        expect.objectContaining({ owner: config.owner, repo: config.repo })
+      );
+
+      // Verify third call - create project with resolved node IDs (no description)
+      expect(mockOctokit.graphql).toHaveBeenNthCalledWith(3,
         expect.stringContaining("mutation($input: CreateProjectV2Input!)"),
         expect.objectContaining({
           input: expect.objectContaining({
-            ownerId: config.owner,
+            ownerId: OWNER_NODE_ID,
             title: projectData.title,
-            repositoryId: config.repo,
+            repositoryId: REPO_NODE_ID,
           })
         })
       );
 
       // Verify the input does NOT contain description (schema compliance)
-      expect(mockOctokit.graphql).toHaveBeenNthCalledWith(1,
+      expect(mockOctokit.graphql).toHaveBeenNthCalledWith(3,
         expect.stringContaining("mutation($input: CreateProjectV2Input!)"),
         expect.objectContaining({
           input: expect.not.objectContaining({
@@ -123,8 +141,8 @@ describe("GitHubProjectRepository", () => {
         })
       );
 
-      // Verify second call - update project with description
-      expect(mockOctokit.graphql).toHaveBeenNthCalledWith(2,
+      // Verify fourth call - update project with description
+      expect(mockOctokit.graphql).toHaveBeenNthCalledWith(4,
         expect.stringContaining("mutation($input: UpdateProjectV2Input!)"),
         expect.objectContaining({
           input: expect.objectContaining({
@@ -134,7 +152,7 @@ describe("GitHubProjectRepository", () => {
         })
       );
 
-      expect(mockOctokit.graphql).toHaveBeenCalledTimes(2);
+      expect(mockOctokit.graphql).toHaveBeenCalledTimes(4);
     });
 
     it("should create a project successfully without description", async () => {
@@ -156,11 +174,14 @@ describe("GitHubProjectRepository", () => {
         updatedAt: '2023-01-01T00:00:00Z',
       };
 
-      mockOctokit.graphql.mockResolvedValueOnce({
-        createProjectV2: {
-          projectV2: mockCreateResponse
-        }
-      });
+      mockOctokit.graphql
+        .mockResolvedValueOnce({ user: { id: OWNER_NODE_ID } })
+        .mockResolvedValueOnce({ repository: { id: REPO_NODE_ID } })
+        .mockResolvedValueOnce({
+          createProjectV2: {
+            projectV2: mockCreateResponse
+          }
+        });
 
       // Act
       const result = await repository.create(projectData);
@@ -172,8 +193,8 @@ describe("GitHubProjectRepository", () => {
         title: mockCreateResponse.title,
         description: "", // Empty when no description provided
         owner: config.owner,
-        number: parseInt(mockCreateResponse.id.split('_').pop() || '0'),
-        url: `https://github.com/orgs/${config.owner}/projects/${parseInt(mockCreateResponse.id.split('_').pop() || '0')}`,
+        number: parseInt(mockCreateResponse.id.split('_').pop() || '0', 10),
+        url: `https://github.com/orgs/${config.owner}/projects/${parseInt(mockCreateResponse.id.split('_').pop() || '0', 10)}`,
         status: ResourceStatus.ACTIVE,
         visibility: projectData.visibility,
         views: projectData.views,
@@ -183,15 +204,15 @@ describe("GitHubProjectRepository", () => {
         closed: mockCreateResponse.closed
       });
 
-      // Verify only one call (no description update needed)
-      expect(mockOctokit.graphql).toHaveBeenCalledTimes(1);
-      expect(mockOctokit.graphql).toHaveBeenCalledWith(
+      // Two node-ID lookups + the create mutation; no description update needed
+      expect(mockOctokit.graphql).toHaveBeenCalledTimes(3);
+      expect(mockOctokit.graphql).toHaveBeenNthCalledWith(3,
         expect.stringContaining("mutation($input: CreateProjectV2Input!)"),
         expect.objectContaining({
           input: expect.objectContaining({
-            ownerId: config.owner,
+            ownerId: OWNER_NODE_ID,
             title: projectData.title,
-            repositoryId: config.repo,
+            repositoryId: REPO_NODE_ID,
           })
         })
       );
@@ -275,8 +296,8 @@ describe("GitHubProjectRepository", () => {
         title: mockProjectResponse.title,
         description: mockProjectResponse.shortDescription || "",
         owner: config.owner,
-        number: parseInt(projectId.split('_').pop() || '0'),
-        url: `https://github.com/orgs/${config.owner}/projects/${parseInt(projectId.split('_').pop() || '0')}`,
+        number: parseInt(projectId.split('_').pop() || '0', 10),
+        url: `https://github.com/orgs/${config.owner}/projects/${parseInt(projectId.split('_').pop() || '0', 10)}`,
         status: ResourceStatus.ACTIVE,
         visibility: "private", // Default value when not provided
         views: [],

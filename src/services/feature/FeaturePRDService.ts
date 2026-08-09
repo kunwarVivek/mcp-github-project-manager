@@ -1,12 +1,11 @@
-import { z } from 'zod';
-import { v4 as uuidv4 } from 'uuid';
-import { ILogger, Logger } from '../../infrastructure/logger';
 
-import {
+import { v4 as uuidv4 } from 'uuid';
+import { type ILogger, Logger } from '../../infrastructure/logger';
+
+import type {
   FeatureAdditionRequest,
   FeatureRequirement,
   PRDDocument,
-  TaskPriority
 } from '../../domain/ai-types.js';
 import { safeCall } from '../utils/safeCall';
 import { FeatureAnalysisService } from './FeatureAnalysisService.js';
@@ -105,7 +104,7 @@ export class FeaturePRDService {
   incrementVersion(version: string): string {
     const parts = version.split('.');
     if (parts.length === 3) {
-      const minor = parseInt(parts[1]) + 1;
+      const minor = parseInt(parts[1], 10) + 1;
       return `${parts[0]}.${minor}.0`;
     }
     return version;

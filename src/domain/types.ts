@@ -1,5 +1,5 @@
 // Domain types for GitHub Project Manager
-import { ResourceStatus, ResourceType } from "./resource-types";
+import type { ResourceStatus, ResourceType } from "./resource-types";
 
 // Project-related types
 export type ProjectId = string;

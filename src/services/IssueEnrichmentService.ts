@@ -1,8 +1,8 @@
 import { generateText } from 'ai';
 import { InputSanitizer } from './utils/InputSanitizer';
-import { AIServiceFactory } from "./ai/AIServiceFactory";
-import { ProjectManagementService } from "./ProjectManagementService";
-import { ILogger, Logger } from "../infrastructure/logger";
+import type { AIServiceFactory } from "./ai/AIServiceFactory";
+import type { ProjectManagementService } from "./ProjectManagementService";
+import { type ILogger, Logger } from "../infrastructure/logger";
 import { isProjectItem } from "../domain/type-guards";
 
 export interface IssueEnrichmentResult {
@@ -108,9 +108,5 @@ export class IssueEnrichmentService {
       applied.push('labels');
     }
     return { applied };
-  }
-
-  private getLabelColor(label: string): string {
-    return label.includes('bug') ? 'D73A4A' : '0E8A16';
   }
 }

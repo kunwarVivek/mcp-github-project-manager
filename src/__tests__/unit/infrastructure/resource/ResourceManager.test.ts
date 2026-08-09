@@ -1,18 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ResourceManager } from '../../../../infrastructure/resource/ResourceManager';
 import {
-  Resource,
   ResourceType,
   ResourceStatus,
   ResourceNotFoundError,
-  ResourceCacheOptions
 } from '../../../../domain/resource-types';
 
 // Mock the ResourceCache class
 vi.mock('../../../../infrastructure/cache/ResourceCache', () => {
   return {
-    ResourceCache: vi.fn().mockImplementation(function() { return {
-      return {
+    ResourceCache: vi.fn().mockImplementation(function () { return ({
         set: vi.fn(),
         get: vi.fn(),
         getByType: vi.fn(),
@@ -23,8 +20,7 @@ vi.mock('../../../../infrastructure/cache/ResourceCache', () => {
         invalidateByTags: vi.fn(),
         invalidateByType: vi.fn(),
         invalidateByNamespace: vi.fn()
-      };
-    })
+      }); })
   };
 });
 

@@ -1,6 +1,6 @@
-import { beforeEach, describe, expect, it, vi, Mock } from 'vitest';;
+import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest';;
 import { AgentBudgetService } from '../../../services/agent/AgentBudgetService';
-import { AgentStore } from '../../../infrastructure/agent/AgentStore';
+import type { AgentStore } from '../../../infrastructure/agent/AgentStore';
 import type { Agent } from '../../../domain/agent-orchestration-types';
 
 function makeAgent(id: string, overrides: Partial<Agent> = {}): Agent {
@@ -152,5 +152,67 @@ describe('AgentBudgetService', () => {
 
       expect(reset).toBe(false);
     });
+  });
+});
+
+describe('resolveBudgetOwner (hierarchy walk)', () => {
+  let service: AgentBudgetService;
+  let agents: Map<string, Agent>;
+  let store: { getAgent: Mock<any>; upsertAgent: Mock<any> };
+
+  beforeEach(() => {
+    agents = new Map();
+    store = {
+      getAgent: vi.fn(async (id: string) => agents.get(id)),
+      upsertAgent: vi.fn(async (a: Agent) => {
+        agents.set(a.id, a);
+      }),
+    };
+    service = new AgentBudgetService(store as unknown as AgentStore);
+  });
+
+  // Regression: this walked a single hop, so a grandchild debited its parent
+  // rather than the root and budget isolation broke below depth 1.
+  it('a grandchild debits the ROOT budget, not its immediate parent', async () => {
+    agents.set('root', makeAgent('root', {
+      budget: { totalTokens: 1000, usedTokens: 0, warningThreshold: 0.8, hardStop: true },
+    }));
+    agents.set('child', makeAgent('child', { parentAgentId: 'root' }));
+    agents.set('grandchild', makeAgent('grandchild', { parentAgentId: 'child' }));
+
+    const status = await service.recordUsage('grandchild', 250);
+
+    expect(status.agentId).toBe('root');
+    expect(agents.get('root')!.budget!.usedTokens).toBe(250);
+    expect(agents.get('child')!.budget).toBeUndefined();
+  });
+
+  it('reports the root budget for a deeply nested agent', async () => {
+    agents.set('root', makeAgent('root', {
+      budget: { totalTokens: 900, usedTokens: 600, warningThreshold: 0.5, hardStop: true },
+    }));
+    agents.set('a', makeAgent('a', { parentAgentId: 'root' }));
+    agents.set('b', makeAgent('b', { parentAgentId: 'a' }));
+
+    const status = await service.getBudgetStatus('b');
+
+    expect(status.agentId).toBe('root');
+    expect(status.totalTokens).toBe(900);
+    expect(status.usedTokens).toBe(600);
+  });
+
+  it('terminates on a parent cycle instead of looping forever', async () => {
+    agents.set('x', makeAgent('x', { parentAgentId: 'y' }));
+    agents.set('y', makeAgent('y', { parentAgentId: 'x' }));
+
+    await expect(service.getBudgetStatus('x')).resolves.toBeDefined();
+  });
+
+  it('tolerates a dangling parent reference', async () => {
+    agents.set('orphan', makeAgent('orphan', { parentAgentId: 'missing' }));
+
+    const status = await service.getBudgetStatus('orphan');
+
+    expect(status.agentId).toBe('orphan');
   });
 });

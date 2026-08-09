@@ -1,7 +1,6 @@
 import { injectable, inject } from "tsyringe";
-import { 
+import type { 
   AutomationRule, 
-  AutomationRuleRepository, 
   AutomationTrigger,
   AutomationAction,
   AutomationTriggerType,
@@ -78,14 +77,17 @@ function mapActions(actions: Array<{ type: string; parameters: Record<string, un
 function mapActionsForUpdate(actions?: Array<{ type: string; parameters: Record<string, unknown> }>): AutomationAction[] | undefined {
   return actions?.map(a => ({ id: '', type: a.type as AutomationActionType, parameters: a.parameters }));
 }
-import { 
+import type { 
   CustomField, 
   FieldId, 
   ProjectId, 
-  ProjectRepository 
 } from "../domain/types";
+// Decorated constructor params: `emitDecoratorMetadata` references these types
+// at runtime, so `isolatedModules` requires an explicit type-only import.
+import type { AutomationRuleRepository } from "../domain/automation-types";
+import type { ProjectRepository } from "../domain/types";
 import { ResourceNotFoundError } from "../domain/errors";
-import { ILogger, Logger } from "../infrastructure/logger";
+import type { ILogger } from "../infrastructure/logger";
 import { ResourceType } from "../domain/resource-types";
 import { safeCall } from './utils/safeCall';
 

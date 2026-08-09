@@ -1,7 +1,7 @@
-import { spawn, ChildProcess } from 'child_process';
+import { spawn, type ChildProcess } from 'node:child_process';
 import { describe, it, expect, beforeAll, afterEach, vi } from 'vitest';
-import { join } from 'path';
-import { existsSync } from 'fs';
+import { join } from 'node:path';
+import { existsSync } from 'node:fs';
 
 const projectRoot = process.cwd();
 
@@ -40,11 +40,14 @@ describe('Stdio Transport Layer Tests', () => {
     it('should never mix log messages with JSON protocol messages on stdout', async () => {
       const stdoutBuffer: Buffer[] = [];
       const stderrBuffer: Buffer[] = [];
-      let protocolViolations: string[] = [];
+      const protocolViolations: string[] = [];
 
       serverProcess = spawn('node', [serverPath], {
         env: {
           ...process.env,
+          // stdio suites don't test webhooks; without this every spawned
+          // server binds WEBHOOK_PORT 3001 and parallel files collide.
+          SSE_ENABLED: 'false',
           GITHUB_TOKEN: 'test-token',
           GITHUB_OWNER: 'test-owner', 
           GITHUB_REPO: 'test-repo',
@@ -101,7 +104,7 @@ describe('Stdio Transport Layer Tests', () => {
       ];
 
       for (const request of requests) {
-        serverProcess.stdin?.write(JSON.stringify(request) + '\n');
+        serverProcess.stdin?.write(`${JSON.stringify(request)}\n`);
         await new Promise(resolve => setTimeout(resolve, 500));
       }
 
@@ -157,13 +160,16 @@ describe('Stdio Transport Layer Tests', () => {
     }, testTimeout);
 
     it('should handle rapid message exchange without stdout corruption', async () => {
-      let jsonMessages: any[] = [];
-      let parseErrors: string[] = [];
+      const jsonMessages: any[] = [];
+      const parseErrors: string[] = [];
       let stdoutBuffer = '';
 
       serverProcess = spawn('node', [serverPath], {
         env: {
           ...process.env,
+          // stdio suites don't test webhooks; without this every spawned
+          // server binds WEBHOOK_PORT 3001 and parallel files collide.
+          SSE_ENABLED: 'false',
           GITHUB_TOKEN: 'test-token',
           GITHUB_OWNER: 'test-owner',
           GITHUB_REPO: 'test-repo'
@@ -184,11 +190,11 @@ describe('Stdio Transport Layer Tests', () => {
             try {
               const parsed = JSON.parse(trimmed);
               jsonMessages.push(parsed);
-            } catch (error) {
+            } catch {
               // Try to see if this is part of a multi-line JSON
               if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
                 // This might be the start of a multi-line JSON, keep it for later
-                stdoutBuffer = trimmed + '\n' + stdoutBuffer;
+                stdoutBuffer = `${trimmed}\n${stdoutBuffer}`;
               } else {
                 parseErrors.push(trimmed);
               }
@@ -228,14 +234,14 @@ describe('Stdio Transport Layer Tests', () => {
 
       // Send all requests rapidly
       for (const request of requests) {
-        serverProcess.stdin?.write(JSON.stringify(request) + '\n');
+        serverProcess.stdin?.write(`${JSON.stringify(request)}\n`);
       }
 
       // Send initialized notification
-      serverProcess.stdin?.write(JSON.stringify({
+      serverProcess.stdin?.write(`${JSON.stringify({
         jsonrpc: "2.0",
         method: "notifications/initialized"
-      }) + '\n');
+      })}\n`);
 
       // Wait for all responses
       await new Promise(resolve => setTimeout(resolve, 3000));
@@ -245,7 +251,7 @@ describe('Stdio Transport Layer Tests', () => {
         try {
           const parsed = JSON.parse(stdoutBuffer.trim());
           jsonMessages.push(parsed);
-        } catch (error) {
+        } catch {
           parseErrors.push(stdoutBuffer.trim());
         }
       }
@@ -275,6 +281,9 @@ describe('Stdio Transport Layer Tests', () => {
       serverProcess = spawn('node', [serverPath], {
         env: {
           ...process.env,
+          // stdio suites don't test webhooks; without this every spawned
+          // server binds WEBHOOK_PORT 3001 and parallel files collide.
+          SSE_ENABLED: 'false',
           GITHUB_TOKEN: 'test-token',
           GITHUB_OWNER: 'test-owner',
           GITHUB_REPO: 'test-repo',
@@ -296,7 +305,7 @@ describe('Stdio Transport Layer Tests', () => {
       await waitForContent(() => stderrData, 'GitHub Project Manager MCP server running on stdio');
 
       // Send a request that might trigger logging
-      serverProcess.stdin?.write(JSON.stringify({
+      serverProcess.stdin?.write(`${JSON.stringify({
         jsonrpc: "2.0",
         id: 1,
         method: "initialize",
@@ -305,12 +314,12 @@ describe('Stdio Transport Layer Tests', () => {
           capabilities: {},
           clientInfo: { name: "log-test", version: "1.0.0" }
         }
-      }) + '\n');
+      })}\n`);
 
       await new Promise(resolve => setTimeout(resolve, 1000));
 
       // Send tool call that might trigger warnings/errors
-      serverProcess.stdin?.write(JSON.stringify({
+      serverProcess.stdin?.write(`${JSON.stringify({
         jsonrpc: "2.0",
         id: 2,
         method: "tools/call",
@@ -320,7 +329,7 @@ describe('Stdio Transport Layer Tests', () => {
             requirements: "Test requirement"
           }
         }
-      }) + '\n');
+      })}\n`);
 
       await new Promise(resolve => setTimeout(resolve, 2000));
 
@@ -364,6 +373,9 @@ describe('Stdio Transport Layer Tests', () => {
       serverProcess = spawn('node', [serverPath], {
         env: {
           ...process.env,
+          // stdio suites don't test webhooks; without this every spawned
+          // server binds WEBHOOK_PORT 3001 and parallel files collide.
+          SSE_ENABLED: 'false',
           GITHUB_TOKEN: '', // Invalid token should trigger warnings
           GITHUB_OWNER: 'test-owner',
           GITHUB_REPO: 'test-repo'
@@ -383,7 +395,7 @@ describe('Stdio Transport Layer Tests', () => {
       await new Promise(resolve => setTimeout(resolve, 3000));
 
       // Try to send requests
-      serverProcess.stdin?.write(JSON.stringify({
+      serverProcess.stdin?.write(`${JSON.stringify({
         jsonrpc: "2.0",
         id: 1,
         method: "tools/call",
@@ -393,7 +405,7 @@ describe('Stdio Transport Layer Tests', () => {
             title: "Test Roadmap"
           }
         }
-      }) + '\n');
+      })}\n`);
 
       await new Promise(resolve => setTimeout(resolve, 2000));
 

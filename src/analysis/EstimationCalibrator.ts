@@ -1,4 +1,4 @@
-import { TaskComplexity } from '../domain/ai-types';
+import type { TaskComplexity } from '../domain/ai-types';
 
 /**
  * Estimation record for tracking accuracy
@@ -234,7 +234,7 @@ export class EstimationCalibrator {
     // Calculate variance in estimate accuracy
     const ratios = completed.map(r => r.actualPoints! / r.estimatedPoints);
     const mean = ratios.reduce((a, b) => a + b, 0) / ratios.length;
-    const variance = ratios.reduce((sum, r) => sum + Math.pow(r - mean, 2), 0) / ratios.length;
+    const variance = ratios.reduce((sum, r) => sum + (r - mean) ** 2, 0) / ratios.length;
     const stdDev = Math.sqrt(variance);
 
     // Lower variance = higher confidence

@@ -1,8 +1,8 @@
-import { GitHubRepositoryFactory } from "../infrastructure/github/GitHubRepositoryFactory";
-import { GitHubIssueRepository } from "../infrastructure/github/repositories/GitHubIssueRepository";
-import { GitHubMilestoneRepository } from "../infrastructure/github/repositories/GitHubMilestoneRepository";
+import type { GitHubRepositoryFactory } from "../infrastructure/github/GitHubRepositoryFactory";
+import type { GitHubIssueRepository } from "../infrastructure/github/repositories/GitHubIssueRepository";
+import type { GitHubMilestoneRepository } from "../infrastructure/github/repositories/GitHubMilestoneRepository";
 import { ResourceStatus, ResourceType } from "../domain/resource-types";
-import { Issue } from "../domain/types";
+import type { Issue } from "../domain/types";
 import {
   ResourceNotFoundError,
 } from "../domain/errors";

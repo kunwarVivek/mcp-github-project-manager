@@ -1,4 +1,4 @@
-import { ResourceType } from "./resource-types";
+import type { ResourceType } from "./resource-types";
 
 export enum AutomationTriggerType {
   RESOURCE_CREATED = "resource_created",

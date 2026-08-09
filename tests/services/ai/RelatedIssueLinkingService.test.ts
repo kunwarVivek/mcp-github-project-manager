@@ -1,4 +1,4 @@
-import { vi, Mock } from 'vitest';
+import { vi, type Mock } from 'vitest';
 /**
  * Unit tests for RelatedIssueLinkingService
  *
@@ -292,7 +292,7 @@ describe('RelatedIssueLinkingService', () => {
     it('should toggle semantic similarity', async () => {
       mockCosineSimilarity.mockReturnValue(0.9);
 
-      const customService = new RelatedIssueLinkingService({
+      const customService = new RelatedIssueLinkingService(undefined, {
         includeSemanticSimilarity: false
       });
 
@@ -308,7 +308,7 @@ describe('RelatedIssueLinkingService', () => {
     });
 
     it('should toggle dependency detection', async () => {
-      const customService = new RelatedIssueLinkingService({
+      const customService = new RelatedIssueLinkingService(undefined, {
         includeDependencies: false
       });
 
@@ -324,7 +324,7 @@ describe('RelatedIssueLinkingService', () => {
     });
 
     it('should toggle component grouping', async () => {
-      const customService = new RelatedIssueLinkingService({
+      const customService = new RelatedIssueLinkingService(undefined, {
         includeComponentGrouping: false
       });
 
@@ -488,7 +488,7 @@ describe('RelatedIssueLinkingService', () => {
       });
 
       // Only one strategy
-      const limitedService = new RelatedIssueLinkingService({
+      const limitedService = new RelatedIssueLinkingService(undefined, {
         includeDependencies: false,
         includeComponentGrouping: false
       });

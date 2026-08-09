@@ -27,7 +27,7 @@ import { StatusUpdateStatus } from '../../../src/infrastructure/github/repositor
 // Mock the repository factory
 vi.mock('../../../src/infrastructure/github/GitHubRepositoryFactory.js', () => {
   return {
-    GitHubRepositoryFactory: vi.fn().mockImplementation(function() { return ({
+    GitHubRepositoryFactory: vi.fn().mockImplementation(function () { return ({
       createIssueRepository: vi.fn(),
       createMilestoneRepository: vi.fn(),
       createProjectRepository: vi.fn(),
@@ -38,7 +38,7 @@ vi.mock('../../../src/infrastructure/github/GitHubRepositoryFactory.js', () => {
       getOctokit: vi.fn(),
       getConfig: vi.fn(),
       graphql: vi.fn(),
-    })),
+    }); }),
   };
 });
 
@@ -224,7 +224,6 @@ describe('Status Update Tools', () => {
   });
 
   describe('Executors', () => {
-    const originalEnv = process.env;
     let mockStatusUpdateRepo: Mocked<{
       createStatusUpdate: Mock;
       listStatusUpdates: Mock;
@@ -233,7 +232,7 @@ describe('Status Update Tools', () => {
 
     beforeEach(() => {
       vi.resetAllMocks();
-      process.env = { ...originalEnv, GITHUB_TOKEN: 'test-token' };
+      vi.stubEnv('GITHUB_TOKEN', 'test-token');
 
       mockStatusUpdateRepo = {
         createStatusUpdate: vi.fn(),
@@ -241,13 +240,13 @@ describe('Status Update Tools', () => {
         getStatusUpdate: vi.fn(),
       };
 
-      MockedFactory.mockImplementation(() => ({
+      MockedFactory.mockImplementation(function () { return ({
         createStatusUpdateRepository: vi.fn().mockReturnValue(mockStatusUpdateRepo),
-      } as unknown as GitHubRepositoryFactory));
+      } as unknown as GitHubRepositoryFactory); });
     });
 
     afterEach(() => {
-      process.env = originalEnv;
+      vi.unstubAllEnvs();
     });
 
     describe('executeCreateStatusUpdate', () => {
@@ -300,14 +299,14 @@ describe('Status Update Tools', () => {
       });
 
       it('returns error when token is missing', async () => {
-        delete process.env.GITHUB_TOKEN;
+        vi.stubEnv('GITHUB_TOKEN', undefined as unknown as string);
 
         await expect(
           executeCreateStatusUpdate({
             projectId: 'PVT_123',
             body: 'Test',
           })
-        ).rejects.toThrow('GITHUB_TOKEN environment variable is required');
+        ).rejects.toThrow(/No GitHub token available/);
       });
     });
 

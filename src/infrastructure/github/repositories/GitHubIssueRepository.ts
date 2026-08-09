@@ -1,6 +1,6 @@
 import { BaseGitHubRepository } from "./BaseRepository";
-import { Issue, CreateIssue, IssueRepository, IssueId } from "../../../domain/types";
-import { ResourceType, ResourceStatus } from "../../../domain/resource-types";
+import type { Issue, CreateIssue, IssueRepository, IssueId } from "../../../domain/types";
+import { ResourceStatus } from "../../../domain/resource-types";
 import { parseResourceStatus, toStatusString } from '../../../domain/utils/StatusParser';
 
 interface GitHubIssue {
@@ -57,7 +57,7 @@ export class GitHubIssueRepository extends BaseGitHubRepository implements Issue
   private mapGitHubIssueToIssue(githubIssue: GitHubIssue): Issue {
     return {
       id: githubIssue.id,
-      number: parseInt(githubIssue.number.toString()),
+      number: parseInt(githubIssue.number.toString(), 10),
       title: githubIssue.title,
       description: githubIssue.body || "",
       status: parseResourceStatus(githubIssue.state, 'githubIssue'),
@@ -205,7 +205,7 @@ export class GitHubIssueRepository extends BaseGitHubRepository implements Issue
     const response = await this.graphql<GetIssueResponse>(query, {
       owner: this.owner,
       repo: this.repo,
-      number: parseInt(id),
+      number: parseInt(id, 10),
     });
 
     const issue = response.repository.issue;

@@ -1,5 +1,5 @@
 import Handlebars from 'handlebars';
-import { ParsedTemplate, TemplateSection } from '../../domain/template-types';
+import type { ParsedTemplate, } from '../../domain/template-types';
 import { TemplateParser } from './TemplateParser';
 
 /**
@@ -35,24 +35,22 @@ export class TemplateEngine {
     });
 
     // Conditional with default
-    Handlebars.registerHelper('default', function(value: unknown, defaultValue: unknown) {
-      return value !== undefined && value !== null && value !== '' ? value : defaultValue;
-    });
+    Handlebars.registerHelper('default', (value: unknown, defaultValue: unknown) => value !== undefined && value !== null && value !== '' ? value : defaultValue);
 
     // Format as list
-    Handlebars.registerHelper('list', function(items: string[]) {
+    Handlebars.registerHelper('list', (items: string[]) => {
       if (!items || !Array.isArray(items)) return '';
       return items.map(item => `- ${item}`).join('\n');
     });
 
     // Format as numbered list
-    Handlebars.registerHelper('numbered_list', function(items: string[]) {
+    Handlebars.registerHelper('numbered_list', (items: string[]) => {
       if (!items || !Array.isArray(items)) return '';
       return items.map((item, i) => `${i + 1}. ${item}`).join('\n');
     });
 
     // Join array with separator
-    Handlebars.registerHelper('join', function(items: string[], separator: string) {
+    Handlebars.registerHelper('join', (items: string[], separator: string) => {
       if (!items || !Array.isArray(items)) return '';
       return items.join(typeof separator === 'string' ? separator : ', ');
     });

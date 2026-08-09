@@ -1,4 +1,4 @@
-import { vi, Mock } from 'vitest';
+import { vi, type Mock } from 'vitest';
 /**
  * Unit tests for BacklogPrioritizer
  *
@@ -8,7 +8,7 @@ import { vi, Mock } from 'vitest';
 
 import { BacklogPrioritizer } from '../../src/services/ai/BacklogPrioritizer';
 import { AIServiceFactory } from '../../src/services/ai/AIServiceFactory';
-import { BacklogItem } from '../../src/domain/sprint-planning-types';
+import type { BacklogItem } from '../../src/domain/sprint-planning-types';
 
 // Mock AIServiceFactory
 vi.mock('../../src/services/ai/AIServiceFactory', () => {
@@ -391,7 +391,7 @@ describe('BacklogPrioritizer', () => {
 
   describe('custom weights', () => {
     it('should accept custom weights', async () => {
-      const customPrioritizer = new BacklogPrioritizer({
+      const customPrioritizer = new BacklogPrioritizer(undefined, {
         businessValue: 0.6,
         dependencies: 0.15
       });

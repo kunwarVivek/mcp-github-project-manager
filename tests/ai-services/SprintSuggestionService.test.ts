@@ -6,9 +6,9 @@ import { vi } from 'vitest';
  * and risk assessment.
  */
 
-import { SprintSuggestionService, SprintSuggestionParams } from '../../src/services/ai/SprintSuggestionService';
+import { SprintSuggestionService, } from '../../src/services/ai/SprintSuggestionService';
 import { AIServiceFactory } from '../../src/services/ai/AIServiceFactory';
-import { BacklogItem, TeamMember, SprintMetrics } from '../../src/domain/sprint-planning-types';
+import type { BacklogItem, } from '../../src/domain/sprint-planning-types';
 
 // Mock AIServiceFactory
 vi.mock('../../src/services/ai/AIServiceFactory', () => {

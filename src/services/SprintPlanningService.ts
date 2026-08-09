@@ -1,17 +1,16 @@
 import { injectable, inject } from "tsyringe";
 import { z } from "zod";
-import { GitHubRepositoryFactory } from "../infrastructure/github/GitHubRepositoryFactory";
-import { GitHubSprintRepository } from "../infrastructure/github/repositories/GitHubSprintRepository";
-import { GitHubIssueRepository } from "../infrastructure/github/repositories/GitHubIssueRepository";
-import { Sprint, CreateSprint, Issue } from "../domain/types";
+import type { GitHubRepositoryFactory } from "../infrastructure/github/GitHubRepositoryFactory";
+import type { GitHubSprintRepository } from "../infrastructure/github/repositories/GitHubSprintRepository";
+import type { GitHubIssueRepository } from "../infrastructure/github/repositories/GitHubIssueRepository";
+import type { Sprint, CreateSprint, Issue } from "../domain/types";
 import { ResourceStatus, ResourceType } from "../domain/resource-types";
 import {
-  ValidationError,
   ResourceNotFoundError,
 } from "../domain/errors";
 import { safeCall } from './utils/safeCall';
 import { SprintEntity } from '../domain/entities/SprintEntity';
-import { parseResourceStatus } from '../domain/utils/StatusParser';
+import { parseResourceStatus, toStatusString } from '../domain/utils/StatusParser';
 import { SprintMetrics as SprintMetricsVO } from '../domain/value-objects/SprintMetrics';
 
 /**
@@ -270,12 +269,6 @@ export class SprintPlanningService {
       const completedIssues = issues.filter(
         issue => issue.status === ResourceStatus.CLOSED || issue.status === ResourceStatus.COMPLETED
       ).length;
-      const remainingIssues = totalIssues - completedIssues;
-      const completionPercentage = totalIssues > 0 ? Math.round((completedIssues / totalIssues) * 100) : 0;
-
-      // Use entity computed properties
-      const daysRemaining = sprint.daysRemaining;
-      const isActive = sprint.isCurrent;
 
       // Create immutable value object
       const metrics = SprintMetricsVO.create({
@@ -351,10 +344,17 @@ export class SprintPlanningService {
     return safeCall(async () => {
       const sprints = await this.sprintRepo.findAll();
 
-      // Filter by status if needed
+      // Filter by status if needed.
+      // Compare on the sprint-facing status STRING, not a parsed enum:
+      // parseResourceStatus('completed', 'sprint') yields ResourceStatus.CLOSED
+      // (documented in StatusParser.test.ts), while the sprint repository
+      // produces ResourceStatus.COMPLETED — so an enum comparison never matched
+      // and status='completed' always returned an empty list.
       if (status !== 'all') {
-        const resourceStatus = parseResourceStatus(status, 'sprint');
-        return sprints.filter(sprint => sprint.status === resourceStatus);
+        const wanted = status.toLowerCase();
+        return sprints.filter(
+          sprint => toStatusString(sprint.status, 'sprint') === wanted
+        );
       }
 
       // Return plain objects for MCP compatibility
@@ -377,6 +377,16 @@ export class SprintPlanningService {
 
       if (!currentSprintData) {
         return null;
+      }
+
+      if (includeIssues) {
+        // `get_current_sprint` advertises includeIssues (default true), so the
+        // resolved issues have to come back with the sprint.
+        const issues = await this.sprintRepo.getIssues(currentSprintData.id);
+        return {
+          ...currentSprintData,
+          issueDetails: issues
+        } as Sprint & { issueDetails?: Issue[] };
       }
 
       // Return plain object for MCP compatibility

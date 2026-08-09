@@ -1,23 +1,20 @@
 import { z } from "zod";
-import { GitHubRepositoryFactory } from "../infrastructure/github/GitHubRepositoryFactory";
-import { GitHubProjectRepository } from "../infrastructure/github/repositories/GitHubProjectRepository";
-import { GitHubMilestoneRepository } from "../infrastructure/github/repositories/GitHubMilestoneRepository";
-import { GitHubIssueRepository } from "../infrastructure/github/repositories/GitHubIssueRepository";
+import type { GitHubRepositoryFactory } from "../infrastructure/github/GitHubRepositoryFactory";
+import type { GitHubProjectRepository } from "../infrastructure/github/repositories/GitHubProjectRepository";
+import type { GitHubMilestoneRepository } from "../infrastructure/github/repositories/GitHubMilestoneRepository";
+import type { GitHubIssueRepository } from "../infrastructure/github/repositories/GitHubIssueRepository";
 import { ResourceStatus, ResourceType } from "../domain/resource-types";
 import {
-  Project,
-  Milestone,
-  Issue,
-  CreateProject,
-  CreateMilestone,
-  CreateIssue,
-  ProjectView,
-  CustomField,
+  type Project,
+  type Milestone,
+  type Issue,
+  type CreateProject,
+  type CreateMilestone,
+  type CreateIssue,
+  type ProjectView,
+  type CustomField,
   createResource,
 } from "../domain/types";
-import {
-  ValidationError,
-} from "../domain/errors";
 import { safeCall } from './utils/safeCall';
 
 const CreateRoadmapSchema = z.object({

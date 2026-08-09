@@ -8,9 +8,9 @@
  * - Entity serialization/deserialization roundtrips correctly
  * - Cross-entity interactions work as expected
  */
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { ResourceStatus } from '../../domain/resource-types';
-import { Issue, Milestone, Sprint } from '../../domain/types';
+import type { Issue, Milestone, Sprint } from '../../domain/types';
 import {
   IssueEntity,
   IssuePriority,
@@ -20,6 +20,16 @@ import {
 } from '../../domain/entities';
 
 describe('Domain Entities Integration', () => {
+  // The global setup file (src/__tests__/e2e/setup.ts) is registered as a vitest
+  // `setupFiles` entry, so its `beforeEach` installs fake timers pinned to
+  // 2025-03-01 for EVERY test file. These entity tests build fixtures from the
+  // real clock at collection time, so a frozen `Date.now()` makes every
+  // date-derived computed property (daysUntilDue, isCurrent, velocity, ...)
+  // nonsense. Opt back into the real clock.
+  beforeEach(() => {
+    vi.useRealTimers();
+  });
+
   // =========================================================================
   // IssueEntity Integration Tests
   // =========================================================================
@@ -654,18 +664,6 @@ describe('Domain Entities Integration', () => {
     });
 
     it('should track blocked issues in sprint context', () => {
-      const sprint = SprintEntity.fromData({
-        id: 'sprint-1',
-        title: 'Sprint 1',
-        description: 'Test sprint',
-        startDate: new Date().toISOString(),
-        endDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
-        status: ResourceStatus.ACTIVE,
-        issues: ['issue-1', 'issue-2'],
-        createdAt: '2024-01-01T00:00:00Z',
-        updatedAt: '2024-01-01T00:00:00Z'
-      });
-
       const issue1 = IssueEntity.fromData({
         id: 'issue-1',
         number: 1,

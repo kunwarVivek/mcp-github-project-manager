@@ -1,5 +1,5 @@
-import { FieldType } from '../../../domain/types';
-import { GraphQLFieldType } from '../graphql-types';
+import type { FieldType } from '../../../domain/types';
+import type { GraphQLFieldType } from '../graphql-types';
 
 /**
  * Maps a domain field type to a GraphQL field type

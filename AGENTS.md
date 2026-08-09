@@ -1,7 +1,122 @@
+<!-- project-manual:start -->
+## Commands
+
+| Task | Command |
+|------|---------|
+| Build | `npm run build` (tsc → `fix-imports.js` → chmod) |
+| Dev (watch) | `npm run dev` (tsx — `ts-node` cannot load under TS 7) |
+| Unit tests | `npm test` · core only `npm run test:core` · AI `npm run test:ai` |
+| E2E (mock) | `npm run test:e2e` · tools `npm run test:e2e:tools` |
+| E2E (live API) | `E2E_REAL_API=true npm run test:e2e:tools:real` |
+| Coverage | `npm run test:coverage` |
+| Lint / format | `npm run lint` (Biome) · `npm run format` |
+| Inspect MCP server | `npm run inspect` |
+
+## Architecture (DDD, MCP stdio server)
+
+- `src/index.ts` — entry; boots an `McpServer` (`@modelcontextprotocol/server`
+  v2, 2026-07-28 spec) via `serveStdio`, which negotiates the protocol revision
+  per connection. Each tool is registered with `registerTool`; all of them share
+  one `dispatchTool` carrying the shutdown gate, in-flight tracking and result
+  formatting. Wires `ToolRegistry` + `ProjectManagementService` through
+  `src/container.ts` (tsyringe DI).
+- Tool errors: an execution failure returns `{content, isError: true}` so the
+  model can see and recover from it. A JSON-RPC error is reserved for protocol
+  faults (unknown tool). Note v2 validates arguments against the declared
+  `inputSchema` *before* the handler runs, so `ToolValidator` never sees a
+  missing required field.
+- `src/domain/` — types, zod schemas, errors. No logic.
+- `src/services/` — business logic. `ProjectManagementService` orchestrates
+  per-feature services; `services/ai/` holds AI SDK providers.
+- `src/infrastructure/` — `github/` (Octokit GraphQL/REST), `tools/` (MCP tool
+  defs + registry + validators), plus cache, persistence, resilience, events.
+- `src/env.ts` + `src/cli.ts` — config. CLI flags override env vars.
+
+## Environment (`.env` or CLI flags; CLI wins)
+
+- Required: `GITHUB_TOKEN`, `GITHUB_OWNER`, `GITHUB_REPO`.
+- GitHub credential chain, first hit wins:
+  `--token` CLI flag → `$SECRETS_DIR/GITHUB_TOKEN` file → `GITHUB_TOKEN` env →
+  `gh auth token`. The `gh` fallback means a developer with a working `gh` login
+  needs no configuration at all; disable it with `GH_CLI_TOKEN_FALLBACK=false`
+  (it is also off automatically under `NODE_ENV=test`, so tests never shell out).
+- GitHub App installation auth (optional, outranks the PAT when all three are
+  set): `GITHUB_APP_ID`, `GITHUB_APP_PRIVATE_KEY`, `GITHUB_APP_INSTALLATION_ID`.
+  A partial App config falls back to the PAT rather than failing, so a half-set
+  environment cannot lock the server out.
+- Every credential read goes through `getSecret()`/`requireToken()`. Do NOT read
+  `process.env.GITHUB_TOKEN` directly — that bypasses the whole chain, which is
+  exactly how `SECRETS_DIR` and `--token` were silently broken before.
+- AI (optional, unlocks AI tools): `ANTHROPIC_API_KEY`, `GOOGLE_API_KEY`,
+  `OPENAI_API_KEY`, `PERPLEXITY_API_KEY`; model overrides `AI_MAIN_MODEL`,
+  `AI_PRD_MODEL`, `AI_RESEARCH_MODEL`, `AI_FALLBACK_MODEL`.
+- Optional: `SYNC_ENABLED`, `SYNC_TIMEOUT_MS`, `CACHE_DIRECTORY`,
+  `WEBHOOK_SECRET`, `WEBHOOK_PORT`, `SSE_ENABLED`.
+- Webhook security: signature validation fails closed. With no `WEBHOOK_SECRET`,
+  webhooks are rejected unless `WEBHOOK_ALLOW_UNSIGNED=true` (trusted dev only).
+- Secrets: set `SECRETS_DIR` (e.g. `/run/secrets`) to load any config/secret from
+  a file named after it (Docker/k8s secret convention), checked before env vars.
+  `getSecret(name)` in `env.ts` reads fresh (rotation-aware). Vault/AWS SM are an
+  extension point via `SecretProvider` (`src/infrastructure/secrets/`).
+- Startup validation runs against the *resolved* config, not raw `process.env` —
+  validating the environment directly meant a token supplied by file or CLI flag
+  failed the required-field check and the process exited before the resolver ran.
+- Logs are redacted: `redactSecrets()` in `infrastructure/logger` strips
+  token/secret/password/apiKey/authorization-shaped keys from anything the logger
+  stringifies, and `GitHubConfig.token` is non-enumerable so `JSON.stringify`
+  cannot emit the PAT.
+
+## Gotchas
+
+- ESM extensions: source omits `.js` in imports; `postbuild` runs
+  `scripts/fix-imports.js` to add them. Never ship raw `tsc` output — always
+  `npm run build`.
+- `zod` is on v4 (`^4.4.3`), paired with `ai`@^7 / `@ai-sdk/*`@^4 (peer-accept
+  `^4.1.8`) and `@modelcontextprotocol/server`@^2. Tool JSON Schema is generated
+  by **zod 4's native `z.toJSONSchema({io:'input'})`** in `ToolRegistry`.
+  Do NOT reintroduce `zod-to-json-schema`: it does not support zod 4 and returns
+  `{type:'object'}` with no `properties` — silently, with no error — which left
+  every tool advertising a parameterless schema. Guarded by
+  `src/__tests__/unit/infrastructure/tools/schema-generation.test.ts`.
+  zod-4 gotchas:
+  `z.record` needs an explicit key schema (`z.record(z.string(), v)`);
+  `ZodError.errors` → `.issues`; `.nonstrict()` removed (objects strip by default).
+- Tests run on **Vitest 4** (not Jest). Vitest rejects Jest-only CLI flags
+  outright — `--testPathPattern` / `--testPathIgnorePatterns` exit with
+  `CACError: Unknown option`, which silently broke 17 npm scripts. Filter by
+  positional pattern (`vitest run ai-services`) and exclude with
+  `--exclude='**/tests/x/**'`.
+- Test mocks must use `function`, not an arrow, wherever the code under test
+  calls `new` — `mockImplementation(() => ({...}))` fails with
+  "is not a constructor". Likewise a `beforeEach(() => x.mockReset())` with an
+  *implicit return* hands the mock back to Vitest, which treats a returned
+  function as a teardown callback and calls it; always use a block body.
+- E2E tool tests mock GitHub by default; `E2E_REAL_API=true` hits the live API
+  and consumes rate limit.
+- `isolatedModules` is ON. Every file must transpile independently, so a type
+  re-exported as a value is an error. `tsc` elides those; `tsx`/esbuild/bundlers
+  emit a real runtime import that then fails to resolve. Use `export type` /
+  `import type` — including for **decorated constructor params**, whose types
+  `emitDecoratorMetadata` references at runtime.
+- Agent token budgets are metered server-side: `AIServiceFactory.getModel`
+  wraps every model with middleware that accumulates provider-reported usage
+  into `CorrelationContext`'s AsyncLocalStorage, and `dispatchTool` debits the
+  agent's budget **once per tool call** (never per AI call — `AgentStore` is
+  GitHub-backed and does unlocked read-modify-write). This covers only what the
+  *server* spends; an agent's own runtime spend never reaches this process, so
+  `record_usage` remains the channel for that.
+- `ai`@7 reports usage as `inputTokens: {total,...}` / `outputTokens: {total,...}`
+  — **objects, not numbers**. Reading them as numbers yields `NaN`.
+
+> `AGENTS.md` and `CLAUDE.md` are kept identical. Edit both together.
+<!-- project-manual:end -->
+
+<!-- gitnexus:start -->
+
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 
-This project is indexed by GitNexus as **mcp-github-project-manager** (4951 symbols, 11995 relationships, 300 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+This project is indexed by GitNexus as **mcp-github-project-manager** (5924 symbols, 15595 relationships, 300 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
 
 > Index stale? Run `node .gitnexus/run.cjs analyze` from the project root — it auto-selects an available runner. No `.gitnexus/run.cjs` yet? `npx gitnexus analyze` (npm 11 crash → `npm i -g gitnexus`; #1939).
 

@@ -1,11 +1,11 @@
-import { beforeEach, describe, expect, it, vi, Mocked, MockedClass, MockedFunction } from 'vitest';
+import { beforeEach, describe, expect, it, vi, type Mocked, } from 'vitest';
 import { WorkProductService } from '../../../services/agent/WorkProductService';
-import { GitHubRepositoryFactory } from '../../../infrastructure/github/GitHubRepositoryFactory';
-import { WorkProductStore } from '../../../infrastructure/agent/WorkProductStore';
+import type { GitHubRepositoryFactory } from '../../../infrastructure/github/GitHubRepositoryFactory';
+import type { WorkProductStore } from '../../../infrastructure/agent/WorkProductStore';
 import type { WorkProduct } from '../../../domain/agent-orchestration-types';
 
 vi.mock('../../../infrastructure/github/GitHubRepositoryFactory', () => {
-  const mockFactory = vi.fn().mockImplementation(function() { return ({
+  const mockFactory = vi.fn().mockImplementation(function () { return ({
     createIssueRepository: vi.fn(),
     createMilestoneRepository: vi.fn(),
     createProjectRepository: vi.fn(),
@@ -13,7 +13,7 @@ vi.mock('../../../infrastructure/github/GitHubRepositoryFactory', () => {
     createAutomationRuleRepository: vi.fn(),
     createSubIssueRepository: vi.fn(),
     createStatusUpdateRepository: vi.fn(),
-  }));
+  }); });
   return { GitHubRepositoryFactory: mockFactory };
 });
 

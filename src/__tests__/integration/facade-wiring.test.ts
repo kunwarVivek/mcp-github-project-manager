@@ -6,15 +6,9 @@
  * - ProjectManagementService delegates to extracted services
  * - Service dependencies are properly wired
  */
-import { vi, describe, beforeEach, it, expect } from 'vitest';
+import { describe, beforeEach, it, expect } from 'vitest';
 import { configureContainer, container, createProjectManagementService } from '../../container';
 import { ProjectManagementService } from '../../services/ProjectManagementService';
-import { SubIssueService } from '../../services/SubIssueService';
-import { MilestoneService } from '../../services/MilestoneService';
-import { SprintPlanningService } from '../../services/SprintPlanningService';
-import { ProjectStatusService } from '../../services/ProjectStatusService';
-import { ProjectTemplateService } from '../../services/ProjectTemplateService';
-import { ProjectLinkingService } from '../../services/ProjectLinkingService';
 
 describe('Facade Wiring Integration', () => {
   beforeEach(() => {

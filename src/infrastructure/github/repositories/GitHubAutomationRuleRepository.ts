@@ -1,27 +1,27 @@
 import { BaseGitHubRepository } from "./BaseRepository";
 import { 
-  AutomationAction, 
-  AutomationCondition, 
-  AutomationRule, 
-  AutomationRuleRepository, 
-  AutomationTrigger,
-  CreateAutomationRule,
+  type AutomationAction, 
+  type AutomationCondition, 
+  type AutomationRule, 
+  type AutomationRuleRepository, 
+  type AutomationTrigger,
+  type CreateAutomationRule,
   AutomationTriggerType,
   AutomationActionType
 } from "../../../domain/automation-types";
 import { 
-  CreateProjectRuleResponse, 
-  DeleteProjectRuleResponse, 
-  GetProjectRuleResponse, 
-  GitHubProjectRuleNode, 
-  ListProjectRulesResponse, 
-  UpdateProjectRuleResponse, 
+  type CreateProjectRuleResponse, 
+  type DeleteProjectRuleResponse, 
+  type GetProjectRuleResponse, 
+  type GitHubProjectRuleNode, 
+  type ListProjectRulesResponse, 
+  type UpdateProjectRuleResponse, 
   mapFromGitHubActionType, 
   mapFromGitHubTriggerType, 
   mapToGitHubActionType, 
   mapToGitHubTriggerType 
 } from "../automation-types";
-import { ProjectId } from "../../../domain/types";
+import type { ProjectId } from "../../../domain/types";
 
 export class GitHubAutomationRuleRepository extends BaseGitHubRepository implements AutomationRuleRepository {
   

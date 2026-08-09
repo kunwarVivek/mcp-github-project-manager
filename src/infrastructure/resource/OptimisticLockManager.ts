@@ -1,4 +1,4 @@
-import { ResourceType, ResourceVersionError } from "../../domain/resource-types";
+import { type ResourceType, ResourceVersionError } from "../../domain/resource-types";
 
 /**
  * Manages optimistic locking for resources to handle concurrent modifications

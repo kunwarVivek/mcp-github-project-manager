@@ -25,7 +25,10 @@ import { AgentBudgetService } from '../../services/agent/AgentBudgetService';
 import { AgentMetricsService } from '../../services/agent/AgentMetricsService';
 
 import type { Agent, AgentActivityEntry, AgentMetrics, BudgetStatus, WorkProduct } from '../../domain/agent-orchestration-types';
-import { AgentSchema, TaskCheckoutResultSchema, AgentTaskContextSchema, WorkProductSchema, BudgetStatusSchema, AgentActivityEntrySchema, AgentMetricsSchema } from '../../domain/agent-orchestration-types';
+import { AgentSchema, TaskCheckoutResultSchema, AgentTaskContextSchema, WorkProductSchema, BudgetStatusSchema, AgentActivityEntrySchema, AgentMetricsSchema,
+  MAX_AGENT_HIERARCHY_DEPTH,
+  MAX_AGENT_CHILDREN,
+} from '../../domain/agent-orchestration-types';
 
 import {
   registerAgentSchema,
@@ -645,6 +648,29 @@ export const getAgentMetricsTool: ToolDefinition<
 // ============================================================================
 
 /**
+ * Depth of an agent in the hierarchy (a root agent is depth 0).
+ *
+ * Walks toward the root, bounded by MAX_AGENT_HIERARCHY_DEPTH and a visited set
+ * so a cyclic or malformed registry terminates instead of looping.
+ */
+async function resolveAgentDepth(store: AgentStore, agent: Agent): Promise<number> {
+  const seen = new Set<string>([agent.id]);
+  let depth = 0;
+  let current = agent;
+
+  while (current.parentAgentId && depth < MAX_AGENT_HIERARCHY_DEPTH) {
+    if (seen.has(current.parentAgentId)) break;
+    const parent = await store.getAgent(current.parentAgentId);
+    if (!parent) break;
+    seen.add(parent.id);
+    current = parent;
+    depth++;
+  }
+
+  return depth;
+}
+
+/**
  * Execute the register_agent tool.
  * Creates a new agent record in the registry.
  */
@@ -658,12 +684,30 @@ export async function executeRegisterAgent(
     const factory = createGitHubFactory();
     const store = new AgentStore(factory);
 
-    // If registering as a child agent, verify the parent exists
+    // If registering as a child agent, verify the parent exists and that the
+    // new agent stays inside the hierarchy's depth and fan-out limits. Without
+    // these caps, subagents can be nested and spawned without bound.
     let parentAgent: Agent | undefined;
     if (args.parentAgentId) {
       parentAgent = await store.getAgent(args.parentAgentId);
       if (!parentAgent) {
         throw new Error(`Parent agent not found: ${args.parentAgentId}`);
+      }
+
+      const parentDepth = await resolveAgentDepth(store, parentAgent);
+      if (parentDepth + 1 >= MAX_AGENT_HIERARCHY_DEPTH) {
+        throw new Error(
+          `Cannot nest deeper than ${MAX_AGENT_HIERARCHY_DEPTH} levels: ` +
+            `"${parentAgent.name}" is already at depth ${parentDepth}`,
+        );
+      }
+
+      const siblings = await store.getChildren(parentAgent.id);
+      if (siblings.length >= MAX_AGENT_CHILDREN) {
+        throw new Error(
+          `Agent "${parentAgent.name}" already has the maximum ` +
+            `${MAX_AGENT_CHILDREN} subagents`,
+        );
       }
     }
 

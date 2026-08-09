@@ -23,7 +23,7 @@
  * ```
  */
 
-import { ResourceType, ResourceStatus } from '../resource-types';
+import { ResourceType, } from '../resource-types';
 import { DomainEvent } from './DomainEvent';
 
 // =============================================================================

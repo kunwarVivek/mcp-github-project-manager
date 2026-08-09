@@ -1,7 +1,7 @@
 import { z } from 'zod';
-import { ToolDefinition, ToolSchema } from '../ToolValidator.js';
+import type { ToolDefinition, ToolSchema } from '../ToolValidator.js';
 import { PRDGenerationService } from '../../../services/PRDGenerationService.js';
-import { MCPResponse } from '../../../domain/mcp-types.js';
+import type { MCPResponse } from '../../../domain/mcp-types.js';
 import { ToolResultFormatter } from '../ToolResultFormatter.js';
 import { ANNOTATION_PATTERNS } from '../annotations/tool-annotations.js';
 import { PRDEnhanceOutputSchema } from '../schemas/ai-schemas.js';
@@ -44,7 +44,8 @@ async function executeEnhancePRD(args: EnhancePRDArgs): Promise<MCPResponse> {
     });
 
     // Validate the enhanced PRD if requested
-    let validation;
+    // biome-ignore lint/suspicious/noExplicitAny: unvalidated AI response shape
+    let validation: any;
     if (args.validateQuality) {
       validation = await prdService.validatePRDCompleteness(enhancedPRD);
     }
@@ -91,7 +92,7 @@ async function executeEnhancePRD(args: EnhancePRDArgs): Promise<MCPResponse> {
  * Generate enhancement summary comparing before and after
  */
 function generateEnhancementSummary(
-  originalPRD: string,
+  _originalPRD: string,
   enhancedPRD: any,
   enhancementType: string,
   focusAreas?: string[]

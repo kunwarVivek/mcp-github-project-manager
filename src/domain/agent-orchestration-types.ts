@@ -417,6 +417,23 @@ export const DEFAULT_HEARTBEAT_TIMEOUT_MINUTES = 30;
 /** Default agent budget in tokens. */
 export const DEFAULT_AGENT_BUDGET_TOKENS = 500_000;
 
+/**
+ * Maximum depth of the agent hierarchy (root = depth 0).
+ *
+ * Bounds two things: how far `resolveBudgetOwner` will walk toward the root, and
+ * how deep `register_agent` will let a caller nest. Without a cap, a chain of
+ * subagents can be nested indefinitely, and each level costs a registry read.
+ */
+export const MAX_AGENT_HIERARCHY_DEPTH = 5;
+
+/**
+ * Maximum number of direct children a single agent may have.
+ *
+ * Fan-out limit for `register_agent`. Combined with MAX_AGENT_HIERARCHY_DEPTH
+ * this bounds the total swarm size a single root can spawn.
+ */
+export const MAX_AGENT_CHILDREN = 20;
+
 /** Label used to identify the agent registry issue. */
 export const AGENT_REGISTRY_LABEL = 'agent-registry';
 

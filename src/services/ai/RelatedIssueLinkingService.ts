@@ -14,22 +14,20 @@ import { generateObject } from 'ai';
 import { z } from 'zod';
 import { openai } from '@ai-sdk/openai';
 import { AIServiceFactory } from './AIServiceFactory.js';
-import { ConfidenceScorer, calculateWeightedScore, getConfidenceTier } from './ConfidenceScorer.js';
+import { calculateWeightedScore, getConfidenceTier } from './ConfidenceScorer.js';
 import { EmbeddingCache } from '../../cache/EmbeddingCache.js';
-import { ILogger, Logger } from '../../infrastructure/logger';
+import { type ILogger, Logger } from '../../infrastructure/logger';
 import {
   RELATED_ISSUE_SYSTEM_PROMPT,
-  formatRelatedIssuePrompt
 } from './prompts/IssueIntelligencePrompts.js';
-import {
+import type {
   IssueRelationship,
   RelatedIssueResult,
   RelatedIssueLinkingConfig,
-  RelationshipType,
   DependencySubType,
   IssueInput
 } from '../../domain/issue-intelligence-types.js';
-import { SectionConfidence, ConfidenceFactors } from '../../domain/ai-types.js';
+import type { SectionConfidence, ConfidenceFactors } from '../../domain/ai-types.js';
 
 // ============================================================================
 // Constants
@@ -82,8 +80,6 @@ const AIDependencySchema = z.object({
   }))
 });
 
-type AIDependencyResult = z.infer<typeof AIDependencySchema>;
-
 // ============================================================================
 // RelatedIssueLinkingService
 // ============================================================================
@@ -100,7 +96,6 @@ type AIDependencyResult = z.infer<typeof AIDependencySchema>;
 export class RelatedIssueLinkingService {
   private aiFactory: AIServiceFactory;
   private embeddingCache: EmbeddingCache;
-  private confidenceScorer: ConfidenceScorer;
   private config: Required<Pick<RelatedIssueLinkingConfig, 'includeSemanticSimilarity' | 'includeDependencies' | 'includeComponentGrouping'>>;
   private readonly logger: ILogger;
 
@@ -112,7 +107,6 @@ export class RelatedIssueLinkingService {
   constructor(aiFactory?: AIServiceFactory, config?: Partial<RelatedIssueLinkingConfig>, logger?: ILogger) {
     this.aiFactory = aiFactory ?? AIServiceFactory.getInstance();
     this.embeddingCache = new EmbeddingCache();
-    this.confidenceScorer = new ConfidenceScorer();
     this.config = { ...DEFAULT_CONFIG, ...config };
     this.logger = logger ?? Logger.getInstance();
   }
@@ -574,7 +568,7 @@ Return an empty array if no relationships are detected.`;
 
     const merged: IssueRelationship[] = [];
 
-    for (const [targetId, rels] of byTarget) {
+    for (const [, rels] of byTarget) {
       // Sort by confidence descending
       rels.sort((a, b) => b.confidence - a.confidence);
 

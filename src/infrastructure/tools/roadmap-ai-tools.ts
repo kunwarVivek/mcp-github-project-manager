@@ -9,16 +9,16 @@
  * with proper annotations, input/output schemas, and executors.
  */
 
-import { ToolDefinition, ToolSchema } from "./ToolValidator";
+import type { ToolDefinition, ToolSchema } from "./ToolValidator";
 import { ANNOTATION_PATTERNS } from "./annotations/tool-annotations";
 import { RoadmapAIService } from "../../services/ai/RoadmapAIService";
 import {
   RoadmapGenerationInputSchema,
-  RoadmapGenerationInput,
+  type RoadmapGenerationInput,
   RoadmapOutputSchema,
-  RoadmapOutput,
+  type RoadmapOutput,
   RoadmapVisualizationOutputSchema,
-  RoadmapVisualizationOutput,
+  type RoadmapVisualizationOutput,
 } from "./schemas/sprint-roadmap-schemas";
 
 // ============================================================================

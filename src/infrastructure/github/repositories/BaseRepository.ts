@@ -1,10 +1,10 @@
-import { Octokit } from "@octokit/rest";
-import { GitHubError, OctokitInstance } from "../types";
+
+import type { GitHubError, OctokitInstance } from "../types";
 import { GitHubErrorHandler } from "../GitHubErrorHandler";
-import { GitHubConfig } from "../GitHubConfig"; // Fixed import path
-import { Resource, ResourceStatus } from "../../../domain/resource-types";
-import { GitHubApiUtil, PaginationOptions } from "../util/GitHubApiUtil";
-import { ILogger, getLogger } from "../../logger";
+import type { GitHubConfig } from "../GitHubConfig"; // Fixed import path
+import { ResourceStatus } from "../../../domain/resource-types";
+import { GitHubApiUtil, type PaginationOptions } from "../util/GitHubApiUtil";
+import { type ILogger, getLogger } from "../../logger";
 
 export interface IGitHubRepository {
   readonly octokit: OctokitInstance;

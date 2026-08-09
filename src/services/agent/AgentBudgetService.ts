@@ -1,6 +1,9 @@
 import type { AgentStore } from '../../infrastructure/agent/AgentStore';
 import type { Agent, BudgetStatus, AgentBudget } from '../../domain/agent-orchestration-types';
-import { DEFAULT_AGENT_BUDGET_TOKENS } from '../../domain/agent-orchestration-types';
+import {
+  DEFAULT_AGENT_BUDGET_TOKENS,
+  MAX_AGENT_HIERARCHY_DEPTH,
+} from '../../domain/agent-orchestration-types';
 import { safeCall } from '../utils/safeCall';
 
 /**
@@ -154,12 +157,32 @@ export class AgentBudgetService {
   }
 
   /** Resolve the agent whose budget should be used. Subagents delegate to parent. */
+  /**
+   * Walk to the root of the agent hierarchy — the agent that actually owns the
+   * budget.
+   *
+   * This previously resolved a single hop, so in root -> child -> grandchild the
+   * grandchild debited the *child* rather than the root, and budget isolation
+   * silently broke for any hierarchy deeper than one level.
+   *
+   * Guarded against cycles (A.parent=B, B.parent=A) with a visited set, and
+   * against runaway chains with MAX_AGENT_HIERARCHY_DEPTH, so a malformed
+   * registry can never hang a caller.
+   */
   private async resolveBudgetOwner(agent: Agent): Promise<Agent> {
-    if (agent.parentAgentId) {
-      const parent = await this.agentStore.getAgent(agent.parentAgentId);
-      if (parent) return parent;
+    const seen = new Set<string>([agent.id]);
+    let current = agent;
+
+    for (let hops = 0; hops < MAX_AGENT_HIERARCHY_DEPTH; hops++) {
+      const parentId = current.parentAgentId;
+      if (!parentId || seen.has(parentId)) break;
+      const parent = await this.agentStore.getAgent(parentId);
+      if (!parent) break;
+      seen.add(parent.id);
+      current = parent;
     }
-    return agent;
+
+    return current;
   }
 }
 

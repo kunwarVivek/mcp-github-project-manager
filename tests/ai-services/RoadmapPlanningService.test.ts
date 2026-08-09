@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { RoadmapPlanningService } from '../../src/services/RoadmapPlanningService';
 import { AIServiceFactory } from '../../src/services/ai/AIServiceFactory';
 import { ProjectManagementService } from '../../src/services/ProjectManagementService';
-import { generateText, generateObject } from 'ai';
+import { generateText, } from 'ai';
 
 // Mock the AI service factory
 vi.mock('../../src/services/ai/AIServiceFactory', () => {
@@ -29,12 +29,12 @@ vi.mock('ai', () => ({
 
 // Mock ProjectManagementService
 vi.mock('../../src/services/ProjectManagementService', () => ({
-  ProjectManagementService: vi.fn().mockImplementation(function() { return ({
+  ProjectManagementService: vi.fn().mockImplementation(function () { return ({
     listProjectItems: vi.fn(),
     updateProjectItem: vi.fn(),
     createIssue: vi.fn(),
     createAutomationRule: vi.fn(),
-  })),
+  }); }),
 }));
 
 describe('RoadmapPlanningService', () => {

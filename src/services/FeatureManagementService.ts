@@ -1,13 +1,12 @@
 import { v4 as uuidv4 } from 'uuid';
 import { AIServiceFactory } from './ai/AIServiceFactory.js';
-import { ILogger, Logger } from '../infrastructure/logger';
-import {
+import { type ILogger, Logger } from '../infrastructure/logger';
+import type {
   FeatureAdditionRequest,
   FeatureExpansionResult,
   TaskLifecycleState,
   ProjectFeatureRoadmap,
   FeatureRequirement,
-  TaskPriority,
   PRDDocument
 } from '../domain/ai-types.js';
 import { FeatureAnalysisService } from './feature/FeatureAnalysisService.js';

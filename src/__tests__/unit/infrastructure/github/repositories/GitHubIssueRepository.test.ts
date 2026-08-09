@@ -1,9 +1,7 @@
-import { beforeEach, describe, expect, it, vi, Mocked, MockedClass, MockedFunction } from 'vitest';
+import { beforeEach, describe, expect, it, vi, type Mocked, type MockedClass, } from 'vitest';
 import { Octokit } from "@octokit/rest";
 import { GitHubConfig } from "../../../../../infrastructure/github/GitHubConfig";
 import { GitHubIssueRepository } from "../../../../../infrastructure/github/repositories/GitHubIssueRepository";
-import { ResourceType, ResourceStatus } from "../../../../../domain/resource-types";
-import { Issue } from "../../../../../domain/types";
 
 // Mock Octokit
 vi.mock("@octokit/rest");

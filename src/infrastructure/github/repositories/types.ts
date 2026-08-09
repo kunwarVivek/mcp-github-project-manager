@@ -1,7 +1,7 @@
-import { Octokit } from "@octokit/rest";
-import { BaseGitHubRepository } from "./BaseRepository";
-import { GitHubConfig } from "../config";
-import { 
+import type { Octokit } from "@octokit/rest";
+import type { BaseGitHubRepository } from "./BaseRepository";
+import type { GitHubConfig } from "../GitHubConfig";
+import type { 
   IssueRepository, 
   MilestoneRepository, 
   ProjectRepository, 

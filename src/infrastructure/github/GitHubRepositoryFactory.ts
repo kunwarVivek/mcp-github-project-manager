@@ -1,7 +1,8 @@
 import { Octokit } from "@octokit/rest";
-import { IGitHubRepository } from "./repositories/BaseRepository";
+import { createAppAuth } from "@octokit/auth-app";
+import type { IGitHubRepository } from "./repositories/BaseRepository";
 import { GitHubErrorHandler } from "./GitHubErrorHandler";
-import { OctokitInstance } from "./types";
+import type { OctokitInstance } from "./types";
 import { GitHubConfig } from "./GitHubConfig";
 import { GitHubIssueRepository } from "./repositories/GitHubIssueRepository";
 import { GitHubMilestoneRepository } from "./repositories/GitHubMilestoneRepository";
@@ -15,6 +16,19 @@ import { RateLimitManager } from "./RateLimitManager";
 export interface RepositoryFactoryOptions {
   baseUrl?: string;
   previews?: string[];
+  /**
+   * GitHub App installation credentials. When supplied, the factory
+   * authenticates as the App installation instead of using `token` as a PAT.
+   * A PAT remains the default and documented path.
+   */
+  app?: GitHubAppCredentials;
+}
+
+/** Credentials for authenticating as a GitHub App installation. */
+export interface GitHubAppCredentials {
+  appId: string | number;
+  privateKey: string;
+  installationId: string | number;
 }
 
 export class GitHubRepositoryFactory {
@@ -32,11 +46,25 @@ export class GitHubRepositoryFactory {
     this.config = GitHubConfig.create(owner, repo, token);
     this.errorHandler = new GitHubErrorHandler();
 
-    this.octokit = new Octokit({
-      auth: token,
+    // GitHub App installation auth when configured, otherwise a PAT. This is
+    // the single Octokit construction site in the codebase, so the branch here
+    // covers every repository the factory hands out.
+    const baseOptions = {
       baseUrl: options.baseUrl || "https://api.github.com",
       previews: options.previews || ["inertia-preview"],
-    });
+    };
+
+    this.octokit = options.app
+      ? new Octokit({
+          ...baseOptions,
+          authStrategy: createAppAuth,
+          auth: {
+            appId: options.app.appId,
+            privateKey: options.app.privateKey,
+            installationId: options.app.installationId,
+          },
+        })
+      : new Octokit({ ...baseOptions, auth: token });
 
     this.rateLimitManager = new RateLimitManager(this.octokit as Octokit);
   }

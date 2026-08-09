@@ -10,6 +10,10 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
+    // Guarantees every file can be transpiled independently: catches types
+    // re-exported as values, which tsc elides but esbuild/tsx/bundlers emit as
+    // real runtime imports that then fail to resolve.
+    "isolatedModules": true,
     "allowJs": true,
     "declaration": true,
     "sourceMap": true,

@@ -4,12 +4,12 @@ import { AITaskProcessor } from '../../src/services/ai/AITaskProcessor';
 
 // Mock the AITaskProcessor directly
 vi.mock('../../src/services/ai/AITaskProcessor', () => ({
-  AITaskProcessor: vi.fn().mockImplementation(function() { return ({
+  AITaskProcessor: vi.fn().mockImplementation(function () { return ({
     generatePRDFromIdea: vi.fn(),
     enhancePRD: vi.fn(),
     extractFeaturesFromPRD: vi.fn(),
     testConnection: vi.fn(),
-  })),
+  }); }),
 }));
 
 describe('PRDGenerationService', () => {
@@ -27,7 +27,7 @@ describe('PRDGenerationService', () => {
       testConnection: vi.fn()
     };
 
-    (AITaskProcessor as Mock).mockImplementation(() => mockAITaskProcessor);
+    (AITaskProcessor as Mock).mockImplementation(function () { return mockAITaskProcessor; });
     mockAIService = mockAITaskProcessor;
 
     service = new PRDGenerationService();

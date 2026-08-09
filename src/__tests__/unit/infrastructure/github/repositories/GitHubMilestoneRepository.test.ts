@@ -1,10 +1,9 @@
-import { beforeEach, describe, expect, it, vi, Mocked, MockedClass, MockedFunction } from 'vitest';
+import { beforeEach, describe, expect, it, vi, type Mocked, type MockedClass, } from 'vitest';
 import { Octokit } from "@octokit/rest";
 import { GitHubConfig } from "../../../../../infrastructure/github/GitHubConfig";
 import { GitHubMilestoneRepository } from "../../../../../infrastructure/github/repositories/GitHubMilestoneRepository";
-import { mockData } from "../../../../setup";
-import { ResourceType, ResourceStatus } from "../../../../../domain/resource-types";
-import { CreateMilestone, MilestoneId, Issue } from "../../../../../domain/types";
+import { ResourceStatus } from "../../../../../domain/resource-types";
+import type { CreateMilestone, Issue } from "../../../../../domain/types";
 
 // Mock Octokit and GraphQL response
 vi.mock("@octokit/rest");
@@ -200,8 +199,7 @@ describe("GitHubMilestoneRepository", () => {
     it("should get issues for a milestone", async () => {
       // Arrange - need to mock the factory.createIssueRepository method
       const mockIssueRepository = {
-        findByMilestone: vi.fn().mockImplementation(function() { return {
-          return Promise.resolve([
+        findByMilestone: vi.fn().mockImplementation(() => Promise.resolve([
             {
               id: "issue-123",
               number: 42,
@@ -215,8 +213,7 @@ describe("GitHubMilestoneRepository", () => {
               url: "https://github.com/test-owner/test-repo/issues/42",
               milestoneId: "milestone-123"
             } as Issue
-          ]);
-        })
+          ]))
       };
 
       // Mock the private factory field using reflection or replace it directly

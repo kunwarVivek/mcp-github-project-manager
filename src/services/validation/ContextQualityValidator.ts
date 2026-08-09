@@ -1,11 +1,10 @@
 import {
-  TaskExecutionContext,
-  ContextQualityMetrics,
+  type TaskExecutionContext,
+  type ContextQualityMetrics,
   calculateCompletenessScore,
-  meetsQualityThresholds,
   getMissingFields
 } from '../../domain/task-context-schemas';
-import { AITask } from '../../domain/ai-types';
+import type { AITask } from '../../domain/ai-types';
 
 /**
  * Quality thresholds from PRD requirements
@@ -142,7 +141,7 @@ export class ContextQualityValidator {
     if (context.businessObjective) {
       const hasTaskKeywords = this.containsKeywords(
         context.businessObjective.toLowerCase(),
-        this.extractKeywords(taskTitleLower + ' ' + taskDescLower)
+        this.extractKeywords(`${taskTitleLower} ${taskDescLower}`)
       );
 
       if (!hasTaskKeywords) {

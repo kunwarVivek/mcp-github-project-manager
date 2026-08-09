@@ -1,12 +1,12 @@
-import { beforeEach, describe, expect, it, vi, Mocked, MockedClass, MockedFunction } from 'vitest';
+import { beforeEach, describe, expect, it, vi, type Mocked, } from 'vitest';
 import { TaskCheckoutService } from '../../../services/agent/TaskCheckoutService';
-import { GitHubRepositoryFactory } from '../../../infrastructure/github/GitHubRepositoryFactory';
-import { AgentStore } from '../../../infrastructure/agent/AgentStore';
-import { AgentContextService } from '../../../services/agent/AgentContextService';
+import type { GitHubRepositoryFactory } from '../../../infrastructure/github/GitHubRepositoryFactory';
+import type { AgentStore } from '../../../infrastructure/agent/AgentStore';
+import type { AgentContextService } from '../../../services/agent/AgentContextService';
 import type { Agent } from '../../../domain/agent-orchestration-types';
 
 vi.mock('../../../infrastructure/github/GitHubRepositoryFactory', () => {
-  const mockFactory = vi.fn().mockImplementation(function() { return ({
+  const mockFactory = vi.fn().mockImplementation(function () { return ({
     createIssueRepository: vi.fn(),
     createMilestoneRepository: vi.fn(),
     createProjectRepository: vi.fn(),
@@ -14,7 +14,7 @@ vi.mock('../../../infrastructure/github/GitHubRepositoryFactory', () => {
     createAutomationRuleRepository: vi.fn(),
     createSubIssueRepository: vi.fn(),
     createStatusUpdateRepository: vi.fn(),
-  }));
+  }); });
   return { GitHubRepositoryFactory: mockFactory };
 });
 
@@ -411,12 +411,10 @@ describe('TaskCheckoutService', () => {
       // Simulate a claim that landed between the candidate list fetch and
       // the claim write: the fresh claim-time item read shows the issue has
       // been claimed by another agent (TOCTOU window).
-      let itemReads = 0;
       graphqlMock.mockImplementation(
         async (query: string, vars: Record<string, any>) => {
           // The pre-write check sees another agent's claim → abort.
           if (vars.itemId && query.includes('node(')) {
-            itemReads++;
             return {
               node: {
                 project: { id: 'project-1' },

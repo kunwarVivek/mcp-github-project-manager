@@ -6,7 +6,7 @@
  * - Entity business logic is accessible through the facade
  * - Typed sub-service accessors work correctly with domain entities
  */
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, } from 'vitest';
 import { ResourceStatus, ResourceType } from '../../domain/resource-types';
 import {
   IssueEntity,

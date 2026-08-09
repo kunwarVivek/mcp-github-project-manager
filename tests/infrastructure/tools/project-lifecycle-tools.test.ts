@@ -26,7 +26,7 @@ import { GitHubRepositoryFactory } from '../../../src/infrastructure/github/GitH
 // Mock the repository factory
 vi.mock('../../../src/infrastructure/github/GitHubRepositoryFactory.js', () => {
   return {
-    GitHubRepositoryFactory: vi.fn().mockImplementation(function() { return ({
+    GitHubRepositoryFactory: vi.fn().mockImplementation(function () { return ({
       createIssueRepository: vi.fn(),
       createMilestoneRepository: vi.fn(),
       createProjectRepository: vi.fn(),
@@ -37,7 +37,7 @@ vi.mock('../../../src/infrastructure/github/GitHubRepositoryFactory.js', () => {
       getOctokit: vi.fn(),
       getConfig: vi.fn(),
       graphql: vi.fn(),
-    })),
+    }); }),
   };
 });
 
@@ -267,23 +267,22 @@ describe('Project Lifecycle Tools', () => {
   });
 
   describe('Executors', () => {
-    const originalEnv = process.env;
     let mockGraphql: Mock;
 
     beforeEach(() => {
       vi.resetAllMocks();
-      process.env = { ...originalEnv, GITHUB_TOKEN: 'test-token' };
+      vi.stubEnv('GITHUB_TOKEN', 'test-token');
 
       mockGraphql = vi.fn();
 
-      MockedFactory.mockImplementation(() => ({
+      MockedFactory.mockImplementation(function () { return ({
         graphql: mockGraphql,
         getConfig: vi.fn().mockReturnValue({ owner: 'placeholder', repo: 'placeholder' }),
-      } as unknown as GitHubRepositoryFactory));
+      } as unknown as GitHubRepositoryFactory); });
     });
 
     afterEach(() => {
-      process.env = originalEnv;
+      vi.unstubAllEnvs();
     });
 
     describe('executeCloseProject', () => {
@@ -341,14 +340,14 @@ describe('Project Lifecycle Tools', () => {
       });
 
       it('throws error when GITHUB_TOKEN is missing', async () => {
-        delete process.env.GITHUB_TOKEN;
+        vi.stubEnv('GITHUB_TOKEN', undefined as unknown as string);
 
         const input = CloseProjectInputSchema.parse({
           projectId: 'PVT_kwDOTest123',
         });
 
         await expect(executeCloseProject(input))
-          .rejects.toThrow('GITHUB_TOKEN environment variable is required');
+          .rejects.toThrow(/No GitHub token available/);
       });
 
       it('propagates GraphQL errors', async () => {
@@ -418,14 +417,14 @@ describe('Project Lifecycle Tools', () => {
       });
 
       it('throws error when GITHUB_TOKEN is missing', async () => {
-        delete process.env.GITHUB_TOKEN;
+        vi.stubEnv('GITHUB_TOKEN', undefined as unknown as string);
 
         const input = ReopenProjectInputSchema.parse({
           projectId: 'PVT_kwDOTest456',
         });
 
         await expect(executeReopenProject(input))
-          .rejects.toThrow('GITHUB_TOKEN environment variable is required');
+          .rejects.toThrow(/No GitHub token available/);
       });
 
       it('propagates GraphQL errors', async () => {
@@ -542,7 +541,7 @@ describe('Project Lifecycle Tools', () => {
       });
 
       it('throws error when GITHUB_TOKEN is missing', async () => {
-        delete process.env.GITHUB_TOKEN;
+        vi.stubEnv('GITHUB_TOKEN', undefined as unknown as string);
 
         const input = ConvertDraftIssueInputSchema.parse({
           itemId: 'PVTI_lADOTest123',
@@ -551,7 +550,7 @@ describe('Project Lifecycle Tools', () => {
         });
 
         await expect(executeConvertDraftIssue(input))
-          .rejects.toThrow('GITHUB_TOKEN environment variable is required');
+          .rejects.toThrow(/No GitHub token available/);
       });
 
       it('propagates conversion mutation errors', async () => {

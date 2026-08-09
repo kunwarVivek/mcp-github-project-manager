@@ -1,15 +1,28 @@
-import { Server } from "@modelcontextprotocol/sdk/server/index.js";
-import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { McpError, ErrorCode } from "@modelcontextprotocol/sdk/types.js";
+
+import {
+  ProtocolError,
+  INTERNAL_ERROR,
+  INVALID_PARAMS,
+  METHOD_NOT_FOUND,
+  PARSE_ERROR,
+} from "@modelcontextprotocol/server";
+
 import { ToolRegistry } from "../../infrastructure/tools/ToolRegistry";
-import { ProjectManagementService } from "../../services/ProjectManagementService";
 import { createProjectManagementService } from "../../container";
-import { ResourceStatus } from "../../domain/resource-types";
-import { TestFactory } from "../test-utils";
-import { GitHubProjectManagerServer } from "../../index";
+
+// MCP SDK v2 renamed `McpError` to `ProtocolError` (same (code, message, data)
+// shape) and replaced the `ErrorCode` enum with plain numeric constants.
+// These aliases mirror the ones in src/index.ts.
+const McpError = ProtocolError;
+const ErrorCode = {
+  InternalError: INTERNAL_ERROR,
+  MethodNotFound: METHOD_NOT_FOUND,
+  InvalidParams: INVALID_PARAMS,
+  ParseError: PARSE_ERROR,
+} as const;
+
 
 describe("MCP Server E2E Tests", () => {
-  let service: any;
   let toolRegistry: any;
 
   beforeAll(() => {
@@ -17,7 +30,7 @@ describe("MCP Server E2E Tests", () => {
     const owner = process.env.GITHUB_OWNER || "test-owner";
     const repo = process.env.GITHUB_REPO || "test-repo";
 
-    service = createProjectManagementService(owner, repo, token);
+    createProjectManagementService(owner, repo, token);
     toolRegistry = ToolRegistry.getInstance();
   });
 
@@ -72,7 +85,7 @@ describe("MCP Server E2E Tests", () => {
         // Verify conversion
         expect(mcpError).toBeInstanceOf(McpError);
         expect(mcpError.code).toBe(ErrorCode.ParseError);
-      } catch (error) {
+      } catch {
         throw new Error("Should have converted the rate limit error to an MCP error");
       }
     });

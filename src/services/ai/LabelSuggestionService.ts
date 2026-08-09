@@ -19,14 +19,13 @@ import {
   calculateWeightedScore,
   getConfidenceTier
 } from './ConfidenceScorer';
-import {
+import type {
   LabelSuggestion,
   LabelSuggestionResult,
   LabelSuggestionConfig,
   NewLabelProposal,
-  RepositoryLabel
 } from '../../domain/issue-intelligence-types';
-import { SectionConfidence, ConfidenceFactors, ConfidenceTier } from '../../domain/ai-types';
+import type { SectionConfidence, ConfidenceFactors, ConfidenceTier } from '../../domain/ai-types';
 import {
   LABEL_SUGGESTION_SYSTEM_PROMPT,
   formatLabelPrompt

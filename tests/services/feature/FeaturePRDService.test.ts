@@ -7,15 +7,15 @@ import { vi } from 'vitest';
  */
 
 import { FeaturePRDService } from '../../../src/services/feature/FeaturePRDService';
-import { FeatureAnalysisService } from '../../../src/services/feature/FeatureAnalysisService';
-import { FeatureAdditionRequest, PRDDocument, TaskPriority } from '../../../src/domain/ai-types';
+import type { FeatureAnalysisService } from '../../../src/services/feature/FeatureAnalysisService';
+import { type FeatureAdditionRequest, type PRDDocument, TaskPriority } from '../../../src/domain/ai-types';
 
 // Mock FeatureAnalysisService
 vi.mock('../../../src/services/feature/FeatureAnalysisService', () => ({
-      FeatureAnalysisService: vi.fn().mockImplementation(function() { return ({
+      FeatureAnalysisService: vi.fn().mockImplementation(function () { return ({
         analyzeFeature: vi.fn(),
         getFeatureContext: vi.fn(),
-      })),
+      }); }),
     }));
 
 const mockAnalyzeFeatureRequest = vi.fn();

@@ -1,4 +1,4 @@
-import { vi, Mock } from 'vitest';
+import { vi, type Mock } from 'vitest';
 /**
  * Unit tests for LabelSuggestionService
  *
@@ -314,7 +314,7 @@ describe('LabelSuggestionService', () => {
         }
       } as any);
 
-      const customService = new LabelSuggestionService({ maxSuggestions: 5 });
+      const customService = new LabelSuggestionService(undefined, { maxSuggestions: 5 });
       const result = await customService.suggestLabels({
         issueTitle: 'Test',
         issueDescription: 'Description',
@@ -337,7 +337,7 @@ describe('LabelSuggestionService', () => {
       } as any);
 
       // Higher threshold means fewer in high tier
-      const customService = new LabelSuggestionService({
+      const customService = new LabelSuggestionService(undefined, {
         confidenceThresholds: { high: 0.9, medium: 0.7 }
       });
 
@@ -362,7 +362,7 @@ describe('LabelSuggestionService', () => {
         }
       } as any);
 
-      const customService = new LabelSuggestionService({ includeNewProposals: false });
+      const customService = new LabelSuggestionService(undefined, { includeNewProposals: false });
       const result = await customService.suggestLabels({
         issueTitle: 'Test',
         issueDescription: 'Description',
@@ -373,7 +373,7 @@ describe('LabelSuggestionService', () => {
     });
 
     it('should use preferExisting config', () => {
-      const customService = new LabelSuggestionService({ preferExisting: false });
+      const customService = new LabelSuggestionService(undefined, { preferExisting: false });
       expect(customService).toBeDefined();
     });
   });

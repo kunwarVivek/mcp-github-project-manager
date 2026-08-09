@@ -1,7 +1,7 @@
 import graphlib from 'graphlib';
 import type { Graph as GraphType } from 'graphlib';
 const { Graph, alg } = graphlib;
-import { AITask, TaskDependency } from '../domain/ai-types';
+import type { AITask, } from '../domain/ai-types';
 import { extractKeywords, checkKeywordDependency } from './KeywordExtractor';
 
 /**

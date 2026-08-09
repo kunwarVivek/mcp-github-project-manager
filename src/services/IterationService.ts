@@ -1,10 +1,10 @@
-import { GitHubRepositoryFactory } from "../infrastructure/github/GitHubRepositoryFactory";
+import type { GitHubRepositoryFactory } from "../infrastructure/github/GitHubRepositoryFactory";
 import { ResourceNotFoundError, ResourceType } from "../domain/resource-types";
-import { CustomField, ProjectItem } from "../domain/types";
+import type { CustomField, ProjectItem } from "../domain/types";
 import { safeCall } from './utils/safeCall';
-import { FieldValueService } from "./FieldValueService";
-import { ProjectTemplateService } from "./ProjectTemplateService";
-import { ProjectLinkingService } from "./ProjectLinkingService";
+import type { FieldValueService } from "./FieldValueService";
+import type { ProjectTemplateService } from "./ProjectTemplateService";
+import type { ProjectLinkingService } from "./ProjectLinkingService";
 
 /**
  * Service for managing GitHub Projects v2 iterations (sprints/cycles).

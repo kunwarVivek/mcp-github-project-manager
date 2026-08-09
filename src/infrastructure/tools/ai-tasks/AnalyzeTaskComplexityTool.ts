@@ -1,8 +1,8 @@
 import { z } from 'zod';
-import { ToolDefinition, ToolSchema } from '../ToolValidator.js';
+import type { ToolDefinition, ToolSchema } from '../ToolValidator.js';
 import { TaskGenerationService } from '../../../services/TaskGenerationService.js';
-import { TaskStatus, TaskPriority, TaskComplexity } from '../../../domain/ai-types.js';
-import { MCPResponse } from '../../../domain/mcp-types.js';
+import { TaskStatus, TaskPriority, type TaskComplexity } from '../../../domain/ai-types.js';
+import type { MCPResponse } from '../../../domain/mcp-types.js';
 import { ToolResultFormatter } from '../ToolResultFormatter.js';
 import { ANNOTATION_PATTERNS } from '../annotations/tool-annotations.js';
 import { TaskComplexityOutputSchema } from '../schemas/ai-schemas.js';

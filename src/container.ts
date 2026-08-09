@@ -42,7 +42,7 @@
  *   or value-object-like classes with optional config params. No DI deps.
  */
 import "reflect-metadata";
-import { container, DependencyContainer } from "tsyringe";
+import { container, type DependencyContainer } from "tsyringe";
 import { GitHubRepositoryFactory } from "./infrastructure/github/GitHubRepositoryFactory";
 import { SubIssueService } from "./services/SubIssueService";
 import { MilestoneService } from "./services/MilestoneService";
@@ -57,7 +57,7 @@ import { PullRequestService } from "./services/PullRequestService";
 import { FieldValueService } from "./services/FieldValueService";
 import { LabelService } from "./services/LabelService";
 import { IterationService } from "./services/IterationService";
-import { ILogger, Logger, logger } from "./infrastructure/logger";
+import { type ILogger, Logger, logger } from "./infrastructure/logger";
 import { ProjectManagementService } from "./services/ProjectManagementService";
 import { AIServiceFactory } from "./services/ai/AIServiceFactory";
 import { RoadmapPlanningService } from "./services/RoadmapPlanningService";

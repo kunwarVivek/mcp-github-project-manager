@@ -1,8 +1,8 @@
 import {
-  SectionConfidence,
-  ConfidenceConfig,
-  ConfidenceFactors,
-  ConfidenceTier,
+  type SectionConfidence,
+  type ConfidenceConfig,
+  type ConfidenceFactors,
+  type ConfidenceTier,
   DEFAULT_CONFIDENCE_CONFIG
 } from '../../domain/ai-types';
 

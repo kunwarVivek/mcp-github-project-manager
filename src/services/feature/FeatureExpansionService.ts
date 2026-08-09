@@ -2,15 +2,15 @@ import { generateObject } from 'ai';
 import { z } from 'zod';
 import { v4 as uuidv4 } from 'uuid';
 import { AIServiceFactory } from '../ai/AIServiceFactory.js';
-import { ILogger, Logger } from '../../infrastructure/logger';
+import { type ILogger, Logger } from '../../infrastructure/logger';
 import {
-  FeatureRequirement,
-  FeatureExpansionResult,
-  AITask,
+  type FeatureRequirement,
+  type FeatureExpansionResult,
+  type AITask,
   AITaskSchema,
   TaskStatus,
   TaskPriority,
-  TaskDependency
+  type TaskDependency
 } from '../../domain/ai-types.js';
 import {
   FEATURE_PROMPT_CONFIGS,

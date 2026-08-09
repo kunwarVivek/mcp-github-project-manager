@@ -1,7 +1,6 @@
-import { GitHubRepositoryFactory } from "../infrastructure/github/GitHubRepositoryFactory";
-import { GitHubIssueRepository } from "../infrastructure/github/repositories/GitHubIssueRepository";
-import { ResourceStatus } from "../domain/resource-types";
-import { Issue, CreateIssue } from "../domain/types";
+import type { GitHubRepositoryFactory } from "../infrastructure/github/GitHubRepositoryFactory";
+import type { GitHubIssueRepository } from "../infrastructure/github/repositories/GitHubIssueRepository";
+import type { Issue, CreateIssue } from "../domain/types";
 import { safeCall } from './utils/safeCall';
 import { parseResourceStatus, filterByStatus } from '../domain/utils/StatusParser';
 
@@ -107,7 +106,8 @@ export class IssueService {
       }
 
       issues.sort((a, b) => {
-        let valueA, valueB;
+        let valueA: string | number | undefined;
+        let valueB: string | number | undefined;
         switch(sort) {
           case 'updated':
             valueA = a.updatedAt;

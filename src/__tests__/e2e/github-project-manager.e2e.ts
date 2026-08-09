@@ -1,7 +1,7 @@
-import { ProjectManagementService } from "../../services/ProjectManagementService";
+import type { ProjectManagementService } from "../../services/ProjectManagementService";
 import { createProjectManagementService } from "../../container";
 import { ResourceStatus } from "../../domain/resource-types";
-import { Sprint } from "../../domain/types";
+import type { Sprint } from "../../domain/types";
 import { TestFactory } from "../test-utils";
 import { GitHubTypeConverter } from "../../infrastructure/github/util/conversion";
 
@@ -116,7 +116,7 @@ describe.skip("GitHub Project Manager E2E Tests", () => {
       testIssueId = issue.id;
 
       await service.updateIssueStatus(testIssueId, ResourceStatus.CLOSED);
-      let closedIssue = await service.getIssue(testIssueId);
+      const closedIssue = await service.getIssue(testIssueId);
       expect(closedIssue?.status).toBe(ResourceStatus.CLOSED);
 
       await service.updateIssueStatus(testIssueId, ResourceStatus.ACTIVE);

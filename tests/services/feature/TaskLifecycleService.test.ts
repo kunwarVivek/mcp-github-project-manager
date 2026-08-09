@@ -9,11 +9,11 @@ import { vi } from 'vitest';
 import { TaskLifecycleService } from '../../../src/services/feature/TaskLifecycleService';
 import { AIServiceFactory } from '../../../src/services/ai/AIServiceFactory';
 import { generateText } from 'ai';
-import {
+import type {
   TaskLifecycleState,
   TaskPhaseStatus
 } from '../../../src/domain/feature-lifecycle-types';
-import { AITask, TaskPriority, TaskStatus, TaskComplexity } from '../../../src/domain/ai-types';
+import { type AITask, TaskPriority, TaskStatus, type TaskComplexity } from '../../../src/domain/ai-types';
 
 // Mock dependencies
 vi.mock('../../../src/services/ai/AIServiceFactory', () => {

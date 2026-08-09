@@ -18,13 +18,13 @@ import {
   calculateWeightedScore,
   getConfidenceTier
 } from './ConfidenceScorer';
-import {
+import type {
   EnrichedIssue,
   EnrichedIssueSections,
   EnrichedSection,
   IssueEnrichmentConfig
 } from '../../domain/issue-intelligence-types';
-import { SectionConfidence, ConfidenceFactors, ConfidenceTier } from '../../domain/ai-types';
+import type { SectionConfidence, ConfidenceFactors, ConfidenceTier } from '../../domain/ai-types';
 import {
   ENRICHMENT_SYSTEM_PROMPT,
   formatEnrichmentPrompt

@@ -8,14 +8,14 @@ import { vi } from 'vitest';
 
 import { FeatureExpansionService } from '../../../src/services/feature/FeatureExpansionService';
 import { AIServiceFactory } from '../../../src/services/ai/AIServiceFactory';
-import { TaskGenerationService } from '../../../src/services/TaskGenerationService';
+import type { TaskGenerationService } from '../../../src/services/TaskGenerationService';
 import { generateObject } from 'ai';
 import {
-  FeatureRequirement,
-  AITask,
+  type FeatureRequirement,
+  type AITask,
   TaskStatus,
   TaskPriority,
-  TaskComplexity
+  type TaskComplexity
 } from '../../../src/domain/ai-types';
 
 // Mock dependencies
@@ -39,10 +39,10 @@ vi.mock('../../../src/services/ai/AIServiceFactory', () => {
   };
 });
 vi.mock('../../../src/services/TaskGenerationService', () => ({
-      TaskGenerationService: vi.fn().mockImplementation(function() { return ({
+      TaskGenerationService: vi.fn().mockImplementation(function () { return ({
         generateTasksFromPRD: vi.fn(),
         generateSubtasks: vi.fn(),
-      })),
+      }); }),
     }));
 vi.mock('ai', () => ({
   generateObject: vi.fn()

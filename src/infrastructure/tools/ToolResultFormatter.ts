@@ -1,5 +1,5 @@
 import { MCPResponseFormatter } from "../mcp/MCPResponseFormatter";
-import { MCPContentType, MCPResponse } from "../../domain/mcp-types";
+import { MCPContentType, type MCPResponse } from "../../domain/mcp-types";
 
 export interface FormattingOptions {
   contentType?: MCPContentType;
@@ -21,17 +21,17 @@ export class ToolResultFormatter {
     // Determine the right content format based on the result type and requested content type
     switch (contentType) {
       case MCPContentType.MARKDOWN:
-        return this.formatAsMarkdown(toolName, result, options);
+        return ToolResultFormatter.formatAsMarkdown(toolName, result, options);
 
       case MCPContentType.HTML:
-        return this.formatAsHtml(toolName, result, options);
+        return ToolResultFormatter.formatAsHtml(toolName, result, options);
 
       case MCPContentType.TEXT:
-        return this.formatAsText(toolName, result, options);
+        return ToolResultFormatter.formatAsText(toolName, result, options);
 
       case MCPContentType.JSON:
       default:
-        return this.formatAsJson(toolName, result, options);
+        return ToolResultFormatter.formatAsJson(toolName, result, options);
     }
   }
 
@@ -62,7 +62,7 @@ export class ToolResultFormatter {
     options: FormattingOptions
   ): MCPResponse {
     // Add a title based on the tool name
-    let markdown = `# ${this.formatToolName(toolName)} Result\n\n`;
+    let markdown = `# ${ToolResultFormatter.formatToolName(toolName)} Result\n\n`;
 
     // Handle different types of results
     if (Array.isArray(result)) {
@@ -95,7 +95,7 @@ export class ToolResultFormatter {
 
     // Include raw JSON data if requested
     if (options.includeRawData) {
-      markdown += '\n\n## Raw Data\n\n```json\n' + JSON.stringify(result) + '\n```';
+      markdown += `\n\n## Raw Data\n\n\`\`\`json\n${JSON.stringify(result)}\n\`\`\``;
     }
 
     // Create MCP response with markdown content
@@ -122,7 +122,7 @@ export class ToolResultFormatter {
     const htmlTemplate = (data: T) => {
       let html = `
         <div class="tool-result">
-          <h1 class="tool-name">${this.formatToolName(toolName)} Result</h1>
+          <h1 class="tool-name">${ToolResultFormatter.formatToolName(toolName)} Result</h1>
           <div class="tool-content">
       `;
 
@@ -164,7 +164,7 @@ export class ToolResultFormatter {
                 <div class="tool-property">
                   <h2 class="tool-property-name">${formattedKey}</h2>
                   <div class="tool-property-value">
-                    ${this.formatHtmlValue(value)}
+                    ${ToolResultFormatter.formatHtmlValue(value)}
                   </div>
                 </div>
               `;
@@ -213,7 +213,7 @@ export class ToolResultFormatter {
     options: FormattingOptions
   ): MCPResponse {
     // Format as simple text representation
-    let text = `${this.formatToolName(toolName)} Result:\n\n`;
+    let text = `${ToolResultFormatter.formatToolName(toolName)} Result:\n\n`;
 
     if (typeof result === 'string') {
       text += result;

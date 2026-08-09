@@ -1,4 +1,4 @@
-import { vi } from 'vitest';
+import { vi, type MockInstance } from 'vitest';
 /**
  * Unit tests for AIResiliencePolicy
  *
@@ -13,9 +13,14 @@ import { vi } from 'vitest';
 import { AIResiliencePolicy, type DegradedResult } from '../../../src/infrastructure/resilience/AIResiliencePolicy.js';
 
 describe('AIResiliencePolicy', () => {
-  let stderrSpy: jest.SpyInstance;
+  let stderrSpy: MockInstance;
 
   beforeEach(() => {
+    // The global setup file (src/__tests__/e2e/setup.ts) runs as a vitest
+    // `setupFiles` entry, so its beforeEach installs fake timers for EVERY test
+    // file. This suite needs real timers: retry backoff / setTimeout never fire
+    // under fake timers and the tests hang until the 10s vitest timeout.
+    vi.useRealTimers();
     // Suppress stderr output during tests
     stderrSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
   });

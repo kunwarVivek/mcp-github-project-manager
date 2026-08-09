@@ -1,5 +1,6 @@
 import type { GitHubRepositoryFactory } from '../../infrastructure/github/GitHubRepositoryFactory';
 import type { AgentStore } from '../../infrastructure/agent/AgentStore';
+import { AgentBudgetService } from './AgentBudgetService';
 import type { AgentContextService } from './AgentContextService';
 import type {
   Agent,
@@ -192,6 +193,7 @@ export class TaskCheckoutService {
   private readonly agentStore: AgentStore;
   private readonly contextService: AgentContextService;
   private readonly aiFactory: AIServiceFactory;
+  private readonly budgetService: AgentBudgetService;
 
   /**
    * @param factory - GitHub repository factory for API access.
@@ -199,17 +201,21 @@ export class TaskCheckoutService {
    * @param contextService - Service for building enriched task context.
    * @param aiFactory - AI service factory for AI-assisted checkout strategies.
    *     When omitted, defaults to the global singleton via `AIServiceFactory.getInstance()`.
+   * @param budgetService - Budget gate for checkout. When omitted, one is built
+   *     over the same agent store.
    */
   constructor(
     factory: GitHubRepositoryFactory,
     agentStore: AgentStore,
     contextService: AgentContextService,
     aiFactory?: AIServiceFactory,
+    budgetService?: AgentBudgetService,
   ) {
     this.factory = factory;
     this.agentStore = agentStore;
     this.contextService = contextService;
     this.aiFactory = aiFactory ?? AIServiceFactory.getInstance();
+    this.budgetService = budgetService ?? new AgentBudgetService(agentStore);
   }
 
   /**
@@ -236,6 +242,21 @@ export class TaskCheckoutService {
         return {
           success: false,
           message: `Agent already has a task checked out: ${agent.currentTaskTitle ?? agent.currentTaskId}`,
+        };
+      }
+
+      // Budget gate. Without this, an agent flipped to 'budget_exhausted' by
+      // recordUsage could simply check out again: step 4 below sets
+      // `agent.status = 'working'` unconditionally, silently clearing the
+      // exhausted state. `hardStop` defaults to true and enforced nothing.
+      const budgetStatus = await this.budgetService.getBudgetStatus(agentId);
+      if (budgetStatus.isExhausted) {
+        return {
+          success: false,
+          message:
+            `Budget exhausted for ${budgetStatus.agentName}: ` +
+            `${budgetStatus.usedTokens}/${budgetStatus.totalTokens} tokens used. ` +
+            `Raise or reset the budget with set_agent_budget before checking out more work.`,
         };
       }
 
@@ -774,7 +795,7 @@ export class TaskCheckoutService {
    */
   private async releaseTaskOwner(
     taskId: string,
-    reviewerId: string,
+    _reviewerId: string,
     reviewer: Agent,
   ): Promise<void> {
     // The reviewer may have claimed the task from the review queue (in which
@@ -1159,7 +1180,7 @@ export class TaskCheckoutService {
 
   /** Read the current field values of a project item (used for claim verification). */
   private async readItemFields(
-    projectId: string,
+    _projectId: string,
     itemId: string,
   ): Promise<ProjectItemFieldValue[]> {
     // Only $itemId is used by the operation — GitHub rejects anonymous

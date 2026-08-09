@@ -441,8 +441,6 @@ export function calculateCompletenessScore(context: Partial<TaskExecutionContext
     'dependencyContext'
   ];
 
-  const allFields = [...requiredFields, ...optionalButValuableFields];
-
   const populatedRequired = requiredFields.filter(field => {
     const value = context[field as keyof TaskExecutionContext];
     return value !== undefined && value !== null && (

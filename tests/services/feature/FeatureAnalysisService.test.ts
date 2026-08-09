@@ -9,7 +9,7 @@ import { vi } from 'vitest';
 import { FeatureAnalysisService } from '../../../src/services/feature/FeatureAnalysisService';
 import { AIServiceFactory } from '../../../src/services/ai/AIServiceFactory';
 import { generateText } from 'ai';
-import { TaskPriority, TaskComplexity } from '../../../src/domain/ai-types';
+import { TaskPriority, } from '../../../src/domain/ai-types';
 
 // Mock dependencies
 vi.mock('../../../src/services/ai/AIServiceFactory', () => {

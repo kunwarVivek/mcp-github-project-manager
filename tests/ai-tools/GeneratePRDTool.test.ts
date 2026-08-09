@@ -1,7 +1,7 @@
-import { describe, it, expect, beforeEach, vi, Mocked, MockedClass, MockedFunction } from 'vitest';
+import { describe, it, expect, beforeEach, vi, type Mocked, } from 'vitest';
 import { executeGeneratePRD } from '../../src/infrastructure/tools/ai-tasks/GeneratePRDTool';
 import { PRDGenerationService } from '../../src/services/PRDGenerationService';
-import { MCPResponse, MCPSuccessResponse } from '../../src/domain/mcp-types';
+import type { MCPResponse, MCPSuccessResponse } from '../../src/domain/mcp-types';
 
 // Helper function to extract content from MCP response
 function extractContentFromMCPResponse(response: MCPResponse): string {
@@ -42,12 +42,12 @@ function extractContentFromMCPResponse(response: MCPResponse): string {
 
 // Mock the PRD generation service
 vi.mock('../../src/services/PRDGenerationService', () => ({
-  PRDGenerationService: vi.fn().mockImplementation(function() { return ({
+  PRDGenerationService: vi.fn().mockImplementation(function () { return ({
     generatePRDFromIdea: vi.fn(),
     enhancePRD: vi.fn(),
     extractFeaturesFromPRD: vi.fn(),
     validatePRDCompleteness: vi.fn(),
-  })),
+  }); }),
 }));
 
 describe('GeneratePRDTool', () => {
@@ -65,7 +65,7 @@ describe('GeneratePRDTool', () => {
     } as any;
 
     // Mock the constructor
-    (PRDGenerationService as Mock).mockImplementation(() => mockPRDService);
+    (PRDGenerationService as Mock).mockImplementation(function () { return mockPRDService; });
   });
 
   describe('executeGeneratePRD', () => {

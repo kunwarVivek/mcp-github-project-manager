@@ -119,7 +119,6 @@ describe('Agent Orchestration Tools E2E', () => {
   // Happy-path lifecycle state
   let happyTaskId = '';
   let happyIssueNumber = 0;
-  let happyIssueId = '';
 
   // Reclaim lifecycle state
   let reclaimTaskId = '';
@@ -157,7 +156,6 @@ describe('Agent Orchestration Tools E2E', () => {
     if (!utils) { console.log('Skipping: utils not initialized (missing credentials)'); return; }
 
     const tools = await utils.listTools();
-    const names = tools.map(t => t.name);
 
     // Compound tools are listed with full schema
     for (const toolName of AGENT_COMPOUND_TOOLS) {
@@ -308,7 +306,6 @@ describe('Agent Orchestration Tools E2E', () => {
 
     expect(issue.id).toBeDefined();
     expect(issue.number).toBeGreaterThan(0);
-    happyIssueId = issue.id;
     happyIssueNumber = issue.number;
 
     const added = data(await utils.callTool('manage_project', {

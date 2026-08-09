@@ -1,7 +1,6 @@
 import { vi } from 'vitest';
 import { ResourceType, ResourceStatus } from "../domain/resource-types";
-import { Project, Milestone, Issue } from "../domain/types";
-import { TestFactory } from "./test-utils";
+import type { Project, Milestone, Issue } from "../domain/types";
 
 export const mockCache = {
   set: vi.fn(),
@@ -115,7 +114,7 @@ vi.mock("../infrastructure/cache/ResourceCache", () => ({
 }));
 
 vi.mock("@octokit/rest", () => ({
-  Octokit: vi.fn().mockImplementation(() => ({
+  Octokit: vi.fn().mockImplementation(function () { return ({
     graphql: vi.fn(),
     rest: {
       issues: {
@@ -131,5 +130,5 @@ vi.mock("@octokit/rest", () => ({
         list: vi.fn(),
       },
     },
-  })),
+  }); }),
 }));

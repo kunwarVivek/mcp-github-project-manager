@@ -1,10 +1,10 @@
-import { beforeEach, describe, expect, it, vi, Mocked, MockedClass, MockedFunction } from 'vitest';
-import { SprintPlanningService, SprintMetrics } from '../../../services/SprintPlanningService';
-import { GitHubRepositoryFactory } from '../../../infrastructure/github/GitHubRepositoryFactory';
-import { GitHubSprintRepository } from '../../../infrastructure/github/repositories/GitHubSprintRepository';
-import { GitHubIssueRepository } from '../../../infrastructure/github/repositories/GitHubIssueRepository';
-import { ResourceStatus, ResourceType } from '../../../domain/resource-types';
-import { Sprint, Issue } from '../../../domain/types';
+import { beforeEach, describe, expect, it, vi, type Mocked, } from 'vitest';
+import { SprintPlanningService, } from '../../../services/SprintPlanningService';
+import type { GitHubRepositoryFactory } from '../../../infrastructure/github/GitHubRepositoryFactory';
+import type { GitHubSprintRepository } from '../../../infrastructure/github/repositories/GitHubSprintRepository';
+import type { GitHubIssueRepository } from '../../../infrastructure/github/repositories/GitHubIssueRepository';
+import { ResourceStatus, } from '../../../domain/resource-types';
+import type { Sprint, Issue } from '../../../domain/types';
 
 // Mock tsyringe decorators
 vi.mock('tsyringe', () => ({

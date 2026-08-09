@@ -1,6 +1,6 @@
 import { Command } from 'commander';
-import fs from 'fs';
-import path from 'path';
+import fs from 'node:fs';
+import path from 'node:path';
 
 // Read version from package.json
 let VERSION = '0.1.0';
@@ -11,7 +11,7 @@ try {
     const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
     VERSION = packageJson.version || VERSION;
   }
-} catch (error) {
+} catch {
   // Fallback to default version if there's an error
   process.stderr.write('Warning: Could not read version from package.json');
 }

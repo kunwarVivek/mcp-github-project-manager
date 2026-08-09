@@ -1,19 +1,19 @@
 import { generateObject, generateText } from 'ai';
 import { z } from 'zod';
 import { AIServiceFactory } from './AIServiceFactory';
-import { ILogger, Logger } from '../../infrastructure/logger';
+import { type ILogger, Logger } from '../../infrastructure/logger';
 import {
   PRDDocumentSchema,
   AITaskSchema,
   FeatureRequirementSchema,
-  AITask,
-  PRDDocument,
-  FeatureRequirement,
+  type AITask,
+  type PRDDocument,
+  type FeatureRequirement,
   TaskPriority,
   TaskStatus,
-  AIGenerationMetadata,
-  SectionConfidence,
-  ConfidenceConfig,
+  type AIGenerationMetadata,
+  type SectionConfidence,
+  type ConfidenceConfig,
   DEFAULT_CONFIDENCE_CONFIG
 } from '../../domain/ai-types';
 import {
@@ -26,13 +26,9 @@ import {
 } from './prompts/TaskGenerationPrompts';
 import {
   CONFIDENCE_PROMPT_CONFIGS,
-  AIConfidenceAssessmentSchema,
   withConfidenceAssessment
 } from './prompts/ConfidencePrompts';
-import {
-  ConfidenceScorer,
-  calculateInputCompleteness
-} from './ConfidenceScorer';
+import { ConfidenceScorer } from './ConfidenceScorer';
 import { v4 as uuidv4 } from 'uuid';
 
 /**
@@ -136,13 +132,6 @@ export class AITaskProcessor {
     lowConfidenceSections: SectionConfidence[];
   }> {
     const config = { ...DEFAULT_CONFIDENCE_CONFIG, ...params.confidenceConfig };
-
-    // Calculate input completeness
-    const inputCompleteness = calculateInputCompleteness({
-      description: params.projectIdea,
-      context: params.targetUsers,
-      constraints: params.timeline ? [params.timeline] : []
-    });
 
     // Generate PRD with confidence request
     const prdConfig = PRD_PROMPT_CONFIGS.generateFromIdea;
@@ -395,10 +384,10 @@ export class AITaskProcessor {
 
       // Extract complexity score (simplified - in practice, use structured output)
       const complexityMatch = analysis.match(/complexity.*?(\d+)/i);
-      const complexity = complexityMatch ? parseInt(complexityMatch[1]) : 5;
+      const complexity = complexityMatch ? parseInt(complexityMatch[1], 10) : 5;
 
       const hoursMatch = analysis.match(/(\d+)\s*hours?/i);
-      const estimatedHours = hoursMatch ? parseInt(hoursMatch[1]) : complexity * 4;
+      const estimatedHours = hoursMatch ? parseInt(hoursMatch[1], 10) : complexity * 4;
 
       return {
         complexity: Math.min(Math.max(complexity, 1), 10),
@@ -433,7 +422,7 @@ export class AITaskProcessor {
     });
 
     try {
-      const result = await generateText({
+      await generateText({
         model,
         system: config.systemPrompt,
         prompt,
@@ -492,7 +481,7 @@ export class AITaskProcessor {
     });
 
     try {
-      const result = await generateText({
+      await generateText({
         model,
         system: config.systemPrompt,
         prompt,

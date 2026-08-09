@@ -6,15 +6,19 @@
 
 export {
   SprintMetrics,
-  SprintMetricsConfig,
 } from './SprintMetrics';
 
 export {
   MilestoneMetrics,
-  MilestoneMetricsConfig,
 } from './MilestoneMetrics';
 
 export {
   AgentMetrics,
-  AgentMetricsConfig,
 } from './AgentMetrics';
+
+// Type-only re-exports. Required by `isolatedModules`: these are types, and a
+// per-file transpiler (tsx/esbuild/bundlers) would otherwise emit them as real
+// runtime imports that fail to resolve.
+export type { AgentMetricsConfig } from './AgentMetrics';
+export type { MilestoneMetricsConfig } from './MilestoneMetrics';
+export type { SprintMetricsConfig } from './SprintMetrics';

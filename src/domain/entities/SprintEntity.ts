@@ -22,7 +22,7 @@
  * ```
  */
 import { ResourceStatus } from '../resource-types';
-import { Sprint, CreateSprint, IssueId } from '../types';
+import type { Sprint, CreateSprint, IssueId } from '../types';
 
 /**
  * Sprint states

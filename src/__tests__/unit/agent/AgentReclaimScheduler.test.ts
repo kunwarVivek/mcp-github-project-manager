@@ -1,5 +1,5 @@
-import { beforeEach, describe, expect, it, vi, Mock } from 'vitest';;
-import { AgentReclaimScheduler, AgentReclaimSchedulerConfig } from '../../../services/agent/AgentReclaimScheduler';
+import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest';;
+import { AgentReclaimScheduler, type AgentReclaimSchedulerConfig } from '../../../services/agent/AgentReclaimScheduler';
 import type { TaskCheckoutService } from '../../../services/agent/TaskCheckoutService';
 
 function makeConfig(overrides: Partial<AgentReclaimSchedulerConfig> = {}): AgentReclaimSchedulerConfig {

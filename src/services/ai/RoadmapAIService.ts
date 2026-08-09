@@ -22,7 +22,7 @@ import {
   calculateWeightedScore,
   getConfidenceTier
 } from './ConfidenceScorer';
-import {
+import type {
   GeneratedRoadmap,
   RoadmapPhase,
   RoadmapMilestone,
@@ -31,7 +31,7 @@ import {
   RequirementItem,
   RoadmapVisualizationData
 } from '../../domain/roadmap-planning-types';
-import { SectionConfidence, TaskComplexity } from '../../domain/ai-types';
+import type { SectionConfidence, TaskComplexity } from '../../domain/ai-types';
 import {
   ROADMAP_GENERATION_SYSTEM_PROMPT,
   REQUIREMENTS_PARSING_PROMPT,
@@ -255,7 +255,7 @@ export class RoadmapAIService {
         estimatedPoints: complexityToPoints(r.estimatedComplexity as TaskComplexity),
         category: r.category
       }));
-    } catch (error) {
+    } catch {
       // Fallback on error
       return this.fallbackParseRequirements(text);
     }
@@ -351,7 +351,7 @@ IMPORTANT: Follow phase sequencing rules - foundation first, then core, then adv
       });
 
       return result.object;
-    } catch (error) {
+    } catch {
       return this.getFallbackRoadmapStructure(requirements, totalWeeks);
     }
   }

@@ -3,6 +3,25 @@ import { z } from 'zod';
 /** Validates a non-empty string (trims whitespace). */
 const nonEmptyString = z.string().min(1, 'must not be empty');
 
+/**
+ * Parse a boolean-valued environment variable.
+ *
+ * Zod's coercing boolean applies JS truthiness, so the *string* "false" becomes
+ * `true` — a fail-open default for flags like WEBHOOK_ALLOW_UNSIGNED. This
+ * matches the runtime getter in `env.ts`: only "true"/"1" are true.
+ */
+const booleanFlag = (defaultValue: boolean) =>
+  z
+    .union([z.string(), z.boolean()])
+    .optional()
+    .transform((value) => {
+      if (value === undefined) return defaultValue;
+      if (typeof value === 'boolean') return value;
+      const normalized = value.trim().toLowerCase();
+      if (normalized === '') return defaultValue;
+      return normalized === 'true' || normalized === '1';
+    });
+
 /** GitHub configuration — required for all operations. */
 export const GitHubConfigSchema = z.object({
   GITHUB_TOKEN: nonEmptyString,
@@ -20,7 +39,7 @@ export const AIConfigSchema = z.object({
 
 /** Sync/cache configuration. */
 export const SyncConfigSchema = z.object({
-  SYNC_ENABLED: z.coerce.boolean().default(true),
+  SYNC_ENABLED: booleanFlag(true),
   SYNC_TIMEOUT_MS: z.coerce.number().int().positive().default(30000),
   SYNC_INTERVAL_MS: z.coerce.number().int().nonnegative().default(0),
   CACHE_DIRECTORY: z.string().default('.mcp-cache'),
@@ -30,17 +49,17 @@ export const SyncConfigSchema = z.object({
 /** Webhook configuration. */
 export const WebhookConfigSchema = z.object({
   WEBHOOK_SECRET: z.string().default(''),
-  WEBHOOK_ALLOW_UNSIGNED: z.coerce.boolean().default(false),
+  WEBHOOK_ALLOW_UNSIGNED: booleanFlag(false),
   WEBHOOK_PORT: z.coerce.number().int().min(1).max(65535).default(3001),
   WEBHOOK_TIMEOUT_MS: z.coerce.number().int().positive().default(5000),
 });
 
 /** AI model configuration. */
 export const AIModelConfigSchema = z.object({
-  AI_MAIN_MODEL: z.string().default('claude-3-5-sonnet-20241022'),
-  AI_RESEARCH_MODEL: z.string().default('perplexity-llama-3.1-sonar-large-128k-online'),
-  AI_FALLBACK_MODEL: z.string().default('gpt-4o'),
-  AI_PRD_MODEL: z.string().default('claude-3-5-sonnet-20241022'),
+  AI_MAIN_MODEL: z.string().default('claude-opus-5'),
+  AI_RESEARCH_MODEL: z.string().default('sonar-pro'),
+  AI_FALLBACK_MODEL: z.string().default('claude-sonnet-5'),
+  AI_PRD_MODEL: z.string().default('claude-opus-5'),
 });
 
 /** Numeric bounds for AI task generation. */

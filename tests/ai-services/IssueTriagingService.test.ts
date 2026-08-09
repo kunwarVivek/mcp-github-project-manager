@@ -3,7 +3,7 @@ import { IssueTriagingService } from '../../src/services/IssueTriagingService';
 import { AIServiceFactory } from '../../src/services/ai/AIServiceFactory';
 import { ProjectManagementService } from '../../src/services/ProjectManagementService';
 import { IssueEnrichmentService } from '../../src/services/IssueEnrichmentService';
-import { generateText, generateObject } from 'ai';
+import { generateText, } from 'ai';
 
 // Mock the AI service factory
 vi.mock('../../src/services/ai/AIServiceFactory', () => {
@@ -30,20 +30,20 @@ vi.mock('ai', () => ({
 
 // Mock ProjectManagementService
 vi.mock('../../src/services/ProjectManagementService', () => ({
-  ProjectManagementService: vi.fn().mockImplementation(function() { return ({
+  ProjectManagementService: vi.fn().mockImplementation(function () { return ({
     listProjectItems: vi.fn(),
     updateProjectItem: vi.fn(),
     createIssue: vi.fn(),
     createAutomationRule: vi.fn(),
-  })),
+  }); }),
 }));
 
 // Mock IssueEnrichmentService
 vi.mock('../../src/services/IssueEnrichmentService', () => ({
-  IssueEnrichmentService: vi.fn().mockImplementation(function() { return ({
+  IssueEnrichmentService: vi.fn().mockImplementation(function () { return ({
     enrichIssue: vi.fn(),
     getEnrichmentContext: vi.fn(),
-  })),
+  }); }),
 }));
 
 describe('IssueTriagingService', () => {

@@ -388,6 +388,12 @@ export type ManageStatusUpdatesArgs = z.infer<typeof manageStatusUpdatesSchema>;
 // ============================================================================
 
 export const aiGenerateSchema = z.object({
+  /**
+   * Agent this call is made on behalf of. When present, the server debits
+   * the tokens it spends to that agent's budget. Optional: these tools are
+   * also called directly by humans, where there is nothing to debit.
+   */
+  agentId: z.string().optional(),
   action: z.enum([
     'generate_prd', 'enhance_prd', 'parse_prd', 'add_feature',
     'get_next_task', 'analyze_complexity', 'expand_task',
@@ -493,6 +499,12 @@ export type AiGenerateArgs = z.infer<typeof aiGenerateSchema>;
 // ============================================================================
 
 export const aiAnalyzeSchema = z.object({
+  /**
+   * Agent this call is made on behalf of. When present, the server debits
+   * the tokens it spends to that agent's budget. Optional: these tools are
+   * also called directly by humans, where there is nothing to debit.
+   */
+  agentId: z.string().optional(),
   action: z.enum([
     'enrich_issue', 'enrich_bulk', 'triage_issue', 'triage_all',
     'schedule_triaging', 'suggest_labels', 'detect_duplicates', 'find_related',
@@ -568,6 +580,12 @@ export type AiAnalyzeArgs = z.infer<typeof aiAnalyzeSchema>;
 // ============================================================================
 
 export const aiPlanSchema = z.object({
+  /**
+   * Agent this call is made on behalf of. When present, the server debits
+   * the tokens it spends to that agent's budget. Optional: these tools are
+   * also called directly by humans, where there is nothing to debit.
+   */
+  agentId: z.string().optional(),
   action: z.enum([
     'calculate_capacity', 'prioritize_backlog', 'assess_risk',
     'suggest_composition', 'generate_roadmap', 'generate_visualization',

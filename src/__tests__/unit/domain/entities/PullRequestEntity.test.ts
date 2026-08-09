@@ -1,9 +1,8 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, } from 'vitest';
 import {
   PullRequestEntity,
   PullRequestState,
   ReviewState,
-  MergeMethod
 } from '../../../../domain/entities/PullRequestEntity';
 
 describe('PullRequestEntity', () => {

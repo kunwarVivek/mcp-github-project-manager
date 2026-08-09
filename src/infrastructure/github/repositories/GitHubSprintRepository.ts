@@ -1,30 +1,9 @@
 import { BaseGitHubRepository } from "./BaseRepository";
-import { IssueId, Sprint, SprintId, SprintRepository, Issue } from "../../../domain/types";
-import { ResourceStatus, ResourceType } from "../../../domain/resource-types";
+import { logger } from "../../logger";
+import type { IssueId, Sprint, SprintId, SprintRepository, Issue } from "../../../domain/types";
+import { ResourceStatus, } from "../../../domain/resource-types";
 import { GitHubIssueRepository } from "./GitHubIssueRepository";
-import { GitHubConfig } from "../GitHubConfig"; // Import the class, not the interface
-import {
-  CreateProjectV2FieldResponse,
-  GraphQLResponse,
-} from "../util/graphql-helpers";
-
-interface GetIterationFieldResponse {
-  node: {
-    iteration: {
-      id: string;
-      title: string;
-      startDate: string;
-      duration: number;
-      items?: {
-        nodes?: Array<{
-          content: {
-            number: number;
-          };
-        }>;
-      };
-    };
-  };
-}
+import type { GitHubConfig } from "../GitHubConfig"; // Import the class, not the interface
 
 interface ListIterationFieldsResponse {
   repository: {
@@ -118,7 +97,9 @@ export class GitHubSprintRepository extends BaseGitHubRepository implements Spri
     // GitHub Projects V2 doesn't support deleting individual iterations via API
     // Iterations are managed through the project's iteration field configuration
     // For now, this is a no-op
-    console.log(`Sprint ${id} deletion requested - not supported by GitHub Projects V2 API`);
+    // MUST NOT be console.log: this server speaks JSON-RPC over stdout, so any
+    // stray stdout write corrupts the protocol stream and drops the client.
+    logger.warn(`Sprint ${id} deletion requested - not supported by GitHub Projects V2 API`);
   }
 
   async findById(id: SprintId): Promise<Sprint | null> {
@@ -353,10 +334,5 @@ export class GitHubSprintRepository extends BaseGitHubRepository implements Spri
 
     // Add new issues
     await this.addIssuesToSprint(sprintId, issueIds);
-  }
-
-  private toISODate(date: string | Date): string {
-    const d = typeof date === 'string' ? new Date(date) : date;
-    return d.toISOString().split('T')[0]; // YYYY-MM-DD format
   }
 }

@@ -1,24 +1,22 @@
 import {
-  Requirement,
+  type Requirement,
   RequirementType,
   RequirementStatus,
-  TraceabilityLink,
+  type TraceabilityLink,
   TraceabilityLinkType,
-  UseCase,
-  EnhancedFeatureRequirement,
-  EnhancedAITask,
-  TraceabilityMatrix,
-  PRDDocument,
-  MockPRD,
-  FeatureRequirement,
-  AITask,
+  type UseCase,
+  type EnhancedFeatureRequirement,
+  type EnhancedAITask,
+  type TraceabilityMatrix,
+  type PRDDocument,
+  type MockPRD,
+  type FeatureRequirement,
+  type AITask,
   TaskPriority,
-  TaskComplexity,
-  UseCaseStep,
-  AlternativeScenario,
-  ExceptionScenario
+  type UseCaseStep,
+  type AlternativeScenario,
+  type ExceptionScenario
 } from '../domain/ai-types';
-import { v4 as uuidv4 } from 'uuid';
 
 /**
  * Service for managing comprehensive requirements traceability
@@ -441,7 +439,6 @@ export class RequirementsTraceabilityService {
   // Helper methods for relationship detection
   private isTaskRelatedToUseCase(task: AITask, useCase: UseCase): boolean {
     const taskText = `${task.title} ${task.description}`.toLowerCase();
-    const useCaseText = `${useCase.title} ${useCase.goal}`.toLowerCase();
 
     // Simple keyword matching - in production, use more sophisticated NLP
     const keywords = useCase.goal.toLowerCase().split(' ').filter(word => word.length > 3);
@@ -450,7 +447,6 @@ export class RequirementsTraceabilityService {
 
   private isTaskRelatedToFeature(task: AITask, feature: FeatureRequirement): boolean {
     const taskText = `${task.title} ${task.description}`.toLowerCase();
-    const featureText = `${feature.title} ${feature.description}`.toLowerCase();
 
     const keywords = feature.title.toLowerCase().split(' ').filter(word => word.length > 3);
     return keywords.some(keyword => taskText.includes(keyword));

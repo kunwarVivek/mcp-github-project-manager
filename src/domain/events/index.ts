@@ -10,57 +10,33 @@ export {
 
   // Issue events
   IssueCreatedEvent,
-  IssueCreatedEventData,
   IssueStatusChangedEvent,
-  IssueStatusChangedEventData,
   IssueAssignedEvent,
-  IssueAssignedEventData,
   IssueLabelChangedEvent,
-  IssueLabelChangedEventData,
-
   // Sprint events
   SprintCreatedEvent,
-  SprintCreatedEventData,
   SprintStatusChangedEvent,
-  SprintStatusChangedEventData,
   SprintIssuesChangedEvent,
-  SprintIssuesChangedEventData,
-
   // Milestone events
   MilestoneCreatedEvent,
-  MilestoneCreatedEventData,
   MilestoneStatusChangedEvent,
-  MilestoneStatusChangedEventData,
-
   // Project events
   ProjectCreatedEvent,
-  ProjectCreatedEventData,
   ProjectStatusChangedEvent,
-  ProjectStatusChangedEventData,
 } from './DomainEvent';
 
 export {
   // Agent events
   AgentRegisteredEvent,
-  AgentRegisteredEventData,
   AgentDeregisteredEvent,
-  AgentDeregisteredEventData,
   TaskCheckedOutEvent,
-  TaskCheckedOutEventData,
   TaskReleasedEvent,
-  TaskReleasedEventData,
   TaskCompletedEvent,
-  TaskCompletedEventData,
   TaskSubmittedForReviewEvent,
-  TaskSubmittedForReviewEventData,
   TaskApprovedEvent,
-  TaskApprovedEventData,
   TaskRejectedEvent,
-  TaskRejectedEventData,
   AgentHeartbeatEvent,
-  AgentHeartbeatEventData,
   TaskReclaimedEvent,
-  TaskReclaimedEventData,
 } from './AgentEvents';
 
 export {
@@ -69,7 +45,33 @@ export {
   domainEventBus,
 
   // Types
-  EventHandler,
+} from './DomainEventBus';
+
+// Type-only re-exports. Required by `isolatedModules`: these are types, and a
+// per-file transpiler (tsx/esbuild/bundlers) would otherwise emit them as real
+// runtime imports that fail to resolve.
+export type {
+  AgentDeregisteredEventData,
+  AgentHeartbeatEventData,
+  AgentRegisteredEventData,
+  TaskReclaimedEventData,
+  TaskReleasedEventData,
+} from './AgentEvents';
+export type {
+  IssueAssignedEventData,
+  IssueCreatedEventData,
+  IssueLabelChangedEventData,
+  IssueStatusChangedEventData,
+  MilestoneCreatedEventData,
+  MilestoneStatusChangedEventData,
+  ProjectCreatedEventData,
+  ProjectStatusChangedEventData,
+  SprintCreatedEventData,
+  SprintIssuesChangedEventData,
+  SprintStatusChangedEventData,
+} from './DomainEvent';
+export type {
   AsyncEventHandler,
+  EventHandler,
   SubscriptionOptions,
 } from './DomainEventBus';

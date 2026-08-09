@@ -4,8 +4,6 @@
  * More accurate than hardcoded constants, no external dependency needed.
  */
 export class TokenCounter {
-  /** Average characters per token (English text, GPT-family models). */
-  private static readonly CHARS_PER_TOKEN = 4;
 
   /** Estimate token count from text. */
   static estimate(text: string): number {
@@ -32,52 +30,7 @@ export class TokenCounter {
     if (estimated <= budget) return text;
     // Estimate character count for budget
     const targetChars = Math.floor((budget / estimated) * text.length * 0.95);
-    return text.substring(0, targetChars) + '\n[...truncated to fit token budget]';
+    return `${text.substring(0, targetChars)}\n[...truncated to fit token budget]`;
   }
 }
 
-/**
- * Manages token budget for AI requests.
- */
-export class TokenBudgetManager {
-  private readonly maxInputTokens: number;
-  private readonly maxOutputTokens: number;
-  private totalInputTokensUsed = 0;
-  private totalOutputTokensUsed = 0;
-  private requestCount = 0;
-
-  constructor(options?: { maxInputTokens?: number; maxOutputTokens?: number }) {
-    this.maxInputTokens = options?.maxInputTokens ?? 100_000;
-    this.maxOutputTokens = options?.maxOutputTokens ?? 16_000;
-  }
-
-  /** Check if a request fits within remaining budget. */
-  canAfford(estimatedInputTokens: number): boolean {
-    return this.totalInputTokensUsed + estimatedInputTokens <= this.maxInputTokens;
-  }
-
-  /** Record token usage for a request. */
-  recordUsage(inputTokens: number, outputTokens: number): void {
-    this.totalInputTokensUsed += inputTokens;
-    this.totalOutputTokensUsed += outputTokens;
-    this.requestCount++;
-  }
-
-  /** Get usage statistics. */
-  getStats(): { inputUsed: number; outputUsed: number; inputBudget: number; outputBudget: number; requests: number } {
-    return {
-      inputUsed: this.totalInputTokensUsed,
-      outputUsed: this.totalOutputTokensUsed,
-      inputBudget: this.maxInputTokens,
-      outputBudget: this.maxOutputTokens,
-      requests: this.requestCount,
-    };
-  }
-
-  /** Reset usage counters. */
-  reset(): void {
-    this.totalInputTokensUsed = 0;
-    this.totalOutputTokensUsed = 0;
-    this.requestCount = 0;
-  }
-}

@@ -1,4 +1,5 @@
 import { GitHubRepositoryFactory } from "../github/GitHubRepositoryFactory";
+import { getSecret, getGitHubAppCredentials } from "../../env";
 
 /**
  * Sentinel owner/repo used only when neither an explicit value nor the
@@ -11,12 +12,36 @@ import { GitHubRepositoryFactory } from "../github/GitHubRepositoryFactory";
  */
 const UNUSED_REPO_CONTEXT = "placeholder";
 
-function requireToken(): string {
-  const token = process.env.GITHUB_TOKEN;
+/**
+ * Resolve the GitHub token through the full credential chain
+ * (CLI flag -> SECRETS_DIR file -> env var -> `gh auth token`).
+ *
+ * This used to read `process.env.GITHUB_TOKEN` directly, which meant a token
+ * supplied by any mechanism other than an environment variable never reached
+ * the tool layer at all.
+ *
+ * Exported so the handful of tool modules that build their own Octokit share
+ * one accessor rather than re-reading the environment.
+ */
+export function requireToken(): string {
+  const token = getSecret("GITHUB_TOKEN");
   if (!token) {
-    throw new Error("GITHUB_TOKEN environment variable is required");
+    throw new Error(
+      "No GitHub token available. Provide one via --token, GITHUB_TOKEN, " +
+        "a SECRETS_DIR-mounted file, or an authenticated `gh` CLI.",
+    );
   }
   return token;
+}
+
+/** Resolve the configured repository owner, or undefined when unset. */
+export function resolveOwner(): string | undefined {
+  return getSecret("GITHUB_OWNER");
+}
+
+/** Resolve the configured repository name, or undefined when unset. */
+export function resolveRepo(): string | undefined {
+  return getSecret("GITHUB_REPO");
 }
 
 /**
@@ -31,9 +56,13 @@ function requireToken(): string {
  * @param repo  Explicit repository name (optional).
  */
 export function createGitHubFactory(owner?: string, repo?: string): GitHubRepositoryFactory {
+  // A fully configured GitHub App outranks the PAT. When the App is configured
+  // the token is unused, so an App-only deployment needs no PAT at all.
+  const app = getGitHubAppCredentials();
   return new GitHubRepositoryFactory(
-    requireToken(),
-    owner || process.env.GITHUB_OWNER || UNUSED_REPO_CONTEXT,
-    repo || process.env.GITHUB_REPO || UNUSED_REPO_CONTEXT,
+    app ? "" : requireToken(),
+    owner || resolveOwner() || UNUSED_REPO_CONTEXT,
+    repo || resolveRepo() || UNUSED_REPO_CONTEXT,
+    app ? { app } : {},
   );
 }
