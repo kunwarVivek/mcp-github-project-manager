@@ -204,14 +204,15 @@ describe('GitHub Project Management Tools E2E', () => {
         console.log('Skipping: utils not initialized (missing credentials)');
         return;
       }
-      if (!createdMilestoneNumber) {
+      if (!createdMilestoneId) {
         console.log('Skipping: No milestone created to test with');
         return;
       }
       const updatedTitle = `Updated-MS-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+      // Pass node ID directly — repository resolves to number for REST API
       const response = await utils.callTool('manage_milestones', {
         action: 'update',
-        milestoneId: String(createdMilestoneNumber),
+        milestoneId: createdMilestoneId,
         title: updatedTitle,
         description: 'Updated milestone description',
       });
@@ -261,11 +262,12 @@ describe('GitHub Project Management Tools E2E', () => {
       const response = await utils.callTool('manage_issues', { action: 'list' });
 
       expect(Array.isArray(response)).toBe(true);
-      // The test repo accumulates issues from prior runs; verify the list
-      // is non-empty and each entry has the expected shape.
       expect(response.length).toBeGreaterThan(0);
-      expect(response[0]).toHaveProperty('id');
-      expect(response[0]).toHaveProperty('title');
+      // With orderBy DESC, the just-created issue should be in the first page
+      if (createdIssueNumber) {
+        const found = response.some((i: Record<string, unknown>) => i.number === createdIssueNumber);
+        expect(found).toBe(true);
+      }
     });
 
     it('should get a specific issue', async () => {
@@ -273,14 +275,14 @@ describe('GitHub Project Management Tools E2E', () => {
         console.log('Skipping: utils not initialized (missing credentials)');
         return;
       }
-      if (!createdIssueNumber) {
+      if (!createdIssueId) {
         console.log('Skipping: No issue created to test with');
         return;
       }
-      // findById does parseInt(id, 10) — it needs the numeric issue number, not the node ID
+      // Pass node ID directly — findById now handles both node IDs and numbers
       const response = await utils.callTool('manage_issues', {
         action: 'get',
-        issueId: String(createdIssueNumber),
+        issueId: createdIssueId,
       });
 
       MCPTestHelpers.validateToolResponse(response, ['id', 'title', 'number']);
@@ -429,10 +431,7 @@ describe('GitHub Project Management Tools E2E', () => {
       MCPTestHelpers.validateToolResponse(response, ['id', 'title', 'totalIssues', 'completionPercentage']);
     });
 
-    // Blocked on hb8.36: getUpcomingMilestones calls findAll which internally
-    // uses findById(nodeId) → parseInt(nodeId) → NaN → GraphQL "$number Int!
-    // was provided invalid value". Same root cause as issue/milestone ID confusion.
-    it.skip('should get upcoming milestones /* hb8.36 */', async () => {
+    it('should get upcoming milestones', async () => {
       if (!utils) {
         console.log('Skipping: utils not initialized (missing credentials)');
         return;
