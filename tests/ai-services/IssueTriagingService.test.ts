@@ -3,7 +3,7 @@ import { IssueTriagingService } from '../../src/services/IssueTriagingService';
 import { AIServiceFactory } from '../../src/services/ai/AIServiceFactory';
 import { ProjectManagementService } from '../../src/services/ProjectManagementService';
 import { IssueEnrichmentService } from '../../src/services/IssueEnrichmentService';
-import { generateText, } from 'ai';
+import { generateObject, } from 'ai';
 
 // Mock the AI service factory
 vi.mock('../../src/services/ai/AIServiceFactory', () => {
@@ -131,9 +131,9 @@ describe('IssueTriagingService', () => {
         reasoning: 'Critical security vulnerability affecting production users'
       };
 
-      
-      generateText.mockResolvedValue({
-        text: JSON.stringify(mockTriageResult)
+
+      vi.mocked(generateObject).mockResolvedValue({
+        object: mockTriageResult
       });
 
       const result = await service.triageIssue({
@@ -152,7 +152,7 @@ describe('IssueTriagingService', () => {
       expect(result.actions[0].type).toBe('add_label');
       expect(result.actions[0].applied).toBe(false);
       expect(result.reasoning).toBeDefined();
-      expect(generateText).toHaveBeenCalledTimes(1);
+      expect(generateObject).toHaveBeenCalledTimes(1);
     });
 
     it('should triage a feature request appropriately', async () => {
@@ -180,9 +180,9 @@ describe('IssueTriagingService', () => {
         reasoning: 'Valid feature request that aligns with product roadmap'
       };
 
-      
-      generateText.mockResolvedValue({
-        text: JSON.stringify(mockTriageResult)
+
+      vi.mocked(generateObject).mockResolvedValue({
+        object: mockTriageResult
       });
 
       const result = await service.triageIssue({
@@ -223,9 +223,9 @@ describe('IssueTriagingService', () => {
         reasoning: 'User question that should be answered in discussions'
       };
 
-      
-      generateText.mockResolvedValue({
-        text: JSON.stringify(mockTriageResult)
+
+      vi.mocked(generateObject).mockResolvedValue({
+        object: mockTriageResult
       });
 
       const result = await service.triageIssue({
@@ -267,9 +267,9 @@ describe('IssueTriagingService', () => {
         reasoning: 'Simple documentation fix suitable for new contributors'
       };
 
-      
-      generateText.mockResolvedValue({
-        text: JSON.stringify(mockTriageResult)
+
+      vi.mocked(generateObject).mockResolvedValue({
+        object: mockTriageResult
       });
 
       const result = await service.triageIssue({
@@ -309,10 +309,10 @@ describe('IssueTriagingService', () => {
 
       mockProjectService.listProjectItems.mockResolvedValue(mockIssues.items);
 
-      
-      generateText
+
+      vi.mocked(generateObject)
         .mockResolvedValueOnce({
-          text: JSON.stringify({
+          object: {
             classification: {
               category: 'bug',
               priority: 'critical',
@@ -328,10 +328,10 @@ describe('IssueTriagingService', () => {
               }
             ],
             reasoning: 'Critical bug'
-          })
+          }
         })
         .mockResolvedValueOnce({
-          text: JSON.stringify({
+          object: {
             classification: {
               category: 'feature',
               priority: 'medium',
@@ -347,7 +347,7 @@ describe('IssueTriagingService', () => {
               }
             ],
             reasoning: 'Valid feature'
-          })
+          }
         });
 
       const result = await service.triageAllIssues({
@@ -393,9 +393,9 @@ describe('IssueTriagingService', () => {
 
       mockProjectService.listProjectItems.mockResolvedValue(mockIssues.items);
 
-      
-      generateText.mockResolvedValue({
-        text: JSON.stringify({
+
+      vi.mocked(generateObject).mockResolvedValue({
+        object: {
           classification: {
             category: 'feature',
             priority: 'medium',
@@ -404,7 +404,7 @@ describe('IssueTriagingService', () => {
           },
           actions: [],
           reasoning: 'Feature request'
-        })
+        }
       });
 
       const result = await service.triageAllIssues({
@@ -503,10 +503,10 @@ describe('IssueTriagingService', () => {
     });
 
     it('should handle malformed AI responses', async () => {
-      
-      (generateText as any).mockResolvedValue({
-        text: 'This is not valid JSON'
-      });
+
+      vi.mocked(generateObject).mockResolvedValue({
+        object: { invalid: true } as unknown as Record<string, unknown>
+      } as never);
 
       await expect(
         service.triageIssue({
@@ -519,8 +519,8 @@ describe('IssueTriagingService', () => {
     });
 
     it('should handle AI generation errors', async () => {
-      
-      (generateText as any).mockRejectedValue(new Error('AI timeout'));
+
+      vi.mocked(generateObject).mockRejectedValue(new Error('AI timeout'));
 
       await expect(
         service.triageIssue({
@@ -585,9 +585,9 @@ describe('IssueTriagingService', () => {
         reasoning: 'Critical production bug'
       };
 
-      
-      generateText.mockResolvedValue({
-        text: JSON.stringify(mockTriageResult)
+
+      vi.mocked(generateObject).mockResolvedValue({
+        object: mockTriageResult
       });
 
       const result = await service.triageIssue({
@@ -619,9 +619,9 @@ describe('IssueTriagingService', () => {
         reasoning: 'Data loss bug'
       };
 
-      
-      generateText.mockResolvedValue({
-        text: JSON.stringify(mockTriageResult)
+
+      vi.mocked(generateObject).mockResolvedValue({
+        object: mockTriageResult
       });
 
       const result = await service.triageIssue({
@@ -648,9 +648,9 @@ describe('IssueTriagingService', () => {
         reasoning: 'Minor UI alignment issue'
       };
 
-      
-      generateText.mockResolvedValue({
-        text: JSON.stringify(mockTriageResult)
+
+      vi.mocked(generateObject).mockResolvedValue({
+        object: mockTriageResult
       });
 
       const result = await service.triageIssue({

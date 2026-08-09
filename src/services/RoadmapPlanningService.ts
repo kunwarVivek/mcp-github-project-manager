@@ -1,4 +1,5 @@
-import { generateText } from 'ai';
+import { generateObject } from 'ai';
+import { z } from 'zod';
 import type { AIServiceFactory } from "./ai/AIServiceFactory";
 import type { ProjectManagementService } from "./ProjectManagementService";
 import { type ILogger, Logger } from "../infrastructure/logger";
@@ -129,59 +130,41 @@ REQUIREMENTS:
 - Prioritize based on dependencies and logical order
 - Create meaningful milestone descriptions
 - Suggest realistic timelines
+- Start sprints from today's date (${new Date().toISOString().split('T')[0]}).`;
 
-OUTPUT FORMAT (JSON):
-{
-  "roadmap": {
-    "phases": [
-      {
-        "name": "Phase Name",
-        "description": "What this phase accomplishes",
-        "duration": "X weeks",
-        "milestones": ["Milestone 1", "Milestone 2"]
-      }
-    ]
-  },
-  "milestones": [
-    {
-      "title": "Milestone Title",
-      "description": "Milestone description",
-      "dueDate": "2025-03-15",
-      "issueIds": ["issue-id-1", "issue-id-2"]
-    }
-  ],
-  "sprints": [
-    {
-      "title": "Sprint 1: Theme",
-      "description": "Sprint focus and goals",
-      "startDate": "2025-01-13",
-      "endDate": "2025-01-26",
-      "issueIds": ["issue-id-1", "issue-id-2"]
-    }
-  ]
-}
+    const RoadmapAnalysisSchema = z.object({
+      roadmap: z.object({
+        phases: z.array(z.object({
+          name: z.string(),
+          description: z.string(),
+          duration: z.string(),
+          milestones: z.array(z.string()),
+        }))
+      }),
+      milestones: z.array(z.object({
+        title: z.string(),
+        description: z.string(),
+        dueDate: z.string(),
+        issueIds: z.array(z.string()),
+      })),
+      sprints: z.array(z.object({
+        title: z.string(),
+        description: z.string(),
+        startDate: z.string(),
+        endDate: z.string(),
+        issueIds: z.array(z.string()),
+      })),
+    });
 
-Return ONLY valid JSON. Start sprints from today's date (${new Date().toISOString().split('T')[0]}).`;
-
-    const response = await generateText({
+    const result = await generateObject({
       model,
       prompt,
+      schema: RoadmapAnalysisSchema,
       temperature: 0.7,
       maxOutputTokens: 4000
     });
 
-    // Parse JSON response
-    const jsonMatch = response.text.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      throw new Error('Failed to extract JSON from AI response for roadmap');
-    }
-
-    try {
-      return JSON.parse(jsonMatch[0]);
-    } catch (parseError) {
-      const message = parseError instanceof Error ? parseError.message : String(parseError);
-      throw new Error(`Failed to parse roadmap JSON: ${message}`);
-    }
+    return result.object;
   }
 
   /**

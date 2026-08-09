@@ -387,7 +387,7 @@ describe('SprintPlanningService', () => {
     it('should convert status strings to ResourceStatus', async () => {
       mockSprintRepo.update.mockResolvedValue({
         ...mockSprint,
-        status: ResourceStatus.CLOSED
+        status: ResourceStatus.COMPLETED
       });
 
       await service.updateSprint({
@@ -397,7 +397,7 @@ describe('SprintPlanningService', () => {
 
       expect(mockSprintRepo.update).toHaveBeenCalledWith(
         'sprint-1',
-        expect.objectContaining({ status: ResourceStatus.CLOSED })
+        expect.objectContaining({ status: ResourceStatus.COMPLETED })
       );
     });
   });

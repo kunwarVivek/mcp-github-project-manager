@@ -10,7 +10,7 @@ import {
 } from "../domain/errors";
 import { safeCall } from './utils/safeCall';
 import { SprintEntity } from '../domain/entities/SprintEntity';
-import { parseResourceStatus, toStatusString } from '../domain/utils/StatusParser';
+import { parseResourceStatus } from '../domain/utils/StatusParser';
 import { SprintMetrics as SprintMetricsVO } from '../domain/value-objects/SprintMetrics';
 
 /**
@@ -344,17 +344,9 @@ export class SprintPlanningService {
     return safeCall(async () => {
       const sprints = await this.sprintRepo.findAll();
 
-      // Filter by status if needed.
-      // Compare on the sprint-facing status STRING, not a parsed enum:
-      // parseResourceStatus('completed', 'sprint') yields ResourceStatus.CLOSED
-      // (documented in StatusParser.test.ts), while the sprint repository
-      // produces ResourceStatus.COMPLETED — so an enum comparison never matched
-      // and status='completed' always returned an empty list.
       if (status !== 'all') {
-        const wanted = status.toLowerCase();
-        return sprints.filter(
-          sprint => toStatusString(sprint.status, 'sprint') === wanted
-        );
+        const targetStatus = parseResourceStatus(status, 'sprint');
+        return sprints.filter(sprint => sprint.status === targetStatus);
       }
 
       // Return plain objects for MCP compatibility

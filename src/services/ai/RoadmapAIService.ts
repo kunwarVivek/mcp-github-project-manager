@@ -160,11 +160,9 @@ export class RoadmapAIService {
       roadmapStructure,
       startDate,
       velocity,
-      sprintWeeks
+      sprintWeeks,
+      requirements
     );
-
-    // 6. Add confidence scoring
-    roadmap.confidence = this.calculateConfidence(requirements, roadmapStructure);
 
     return roadmap;
   }
@@ -437,7 +435,8 @@ IMPORTANT: Follow phase sequencing rules - foundation first, then core, then adv
     structure: RoadmapStructure,
     startDate: Date,
     _velocity: number,
-    _sprintWeeks: number
+    _sprintWeeks: number,
+    requirements: RequirementItem[]
   ): GeneratedRoadmap {
     // Build phases with calculated start/end weeks
     let currentWeek = 1;
@@ -501,19 +500,7 @@ IMPORTANT: Follow phase sequencing rules - foundation first, then core, then adv
         endDate: endDate.toISOString().split('T')[0],
         totalWeeks
       },
-      confidence: {
-        sectionId: 'roadmap',
-        sectionName: 'Roadmap',
-        score: 70,
-        tier: 'medium',
-        factors: {
-          inputCompleteness: 0.7,
-          aiSelfAssessment: 0.7,
-          patternMatch: 0.7
-        },
-        reasoning: 'Generated from requirements with velocity-based dates',
-        needsReview: false
-      },
+      confidence: this.calculateConfidence(requirements, structure),
       reasoning: structure.reasoning
     };
   }

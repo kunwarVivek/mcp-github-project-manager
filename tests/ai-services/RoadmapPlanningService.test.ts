@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { RoadmapPlanningService } from '../../src/services/RoadmapPlanningService';
 import { AIServiceFactory } from '../../src/services/ai/AIServiceFactory';
 import { ProjectManagementService } from '../../src/services/ProjectManagementService';
-import { generateText, } from 'ai';
+import { generateObject, } from 'ai';
 
 // Mock the AI service factory
 vi.mock('../../src/services/ai/AIServiceFactory', () => {
@@ -143,8 +143,8 @@ describe('RoadmapPlanningService', () => {
       mockProjectService.listProjectItems.mockResolvedValue(mockIssues.items);
 
       
-      generateText.mockResolvedValue({
-        text: JSON.stringify(mockRoadmapResponse)
+      (generateObject as Mock).mockResolvedValue({
+        object: mockRoadmapResponse
       });
 
       const result = await service.generateRoadmap({
@@ -164,7 +164,7 @@ describe('RoadmapPlanningService', () => {
         projectId: 'project-123',
         limit: 200
       });
-      expect(generateText).toHaveBeenCalledTimes(1);
+      expect(generateObject).toHaveBeenCalledTimes(1);
     });
 
     it('should throw error when project has no issues', async () => {
@@ -193,8 +193,8 @@ describe('RoadmapPlanningService', () => {
       };
 
       
-      generateText.mockResolvedValue({
-        text: JSON.stringify(mockRoadmap)
+      (generateObject as Mock).mockResolvedValue({
+        object: mockRoadmap
       });
 
       await service.generateRoadmap({
@@ -203,8 +203,8 @@ describe('RoadmapPlanningService', () => {
         sprintDurationWeeks: 3
       });
 
-      const generateTextCall = generateText.mock.calls[0][0];
-      expect(generateTextCall.prompt).toContain('3-week sprints');
+      const generateObjectCall = (generateObject as Mock).mock.calls[0][0];
+      expect(generateObjectCall.prompt).toContain('3-week sprints');
     });
 
     it('should handle complex projects with many issues', async () => {
@@ -237,8 +237,8 @@ describe('RoadmapPlanningService', () => {
       };
 
       
-      generateText.mockResolvedValue({
-        text: JSON.stringify(mockComplexRoadmap)
+      (generateObject as Mock).mockResolvedValue({
+        object: mockComplexRoadmap
       });
 
       const result = await service.generateRoadmap({
@@ -356,8 +356,8 @@ describe('RoadmapPlanningService', () => {
       };
 
       
-      generateText.mockResolvedValue({
-        text: `Here's the roadmap analysis:\n\n${JSON.stringify(mockResponse)}\n\nThis roadmap covers all key aspects.`
+      (generateObject as Mock).mockResolvedValue({
+        object: mockResponse
       });
 
       mockProjectService.listProjectItems.mockResolvedValue([
@@ -375,9 +375,9 @@ describe('RoadmapPlanningService', () => {
 
     it('should handle malformed JSON in AI response', async () => {
       
-      generateText.mockResolvedValue({
-        text: 'This is not valid JSON { invalid syntax'
-      });
+      (generateObject as Mock).mockRejectedValue(
+        new Error('Failed to parse structured response')
+      );
 
       mockProjectService.listProjectItems.mockResolvedValue({
         items: []
@@ -429,7 +429,7 @@ describe('RoadmapPlanningService', () => {
       ]);
 
       
-      generateText.mockRejectedValue(new Error('AI model timeout'));
+      (generateObject as Mock).mockRejectedValue(new Error('AI model timeout'));
 
       await expect(
         service.generateRoadmap({
@@ -447,12 +447,12 @@ describe('RoadmapPlanningService', () => {
       ]);
 
       
-      generateText.mockResolvedValue({
-        text: JSON.stringify({
+      (generateObject as Mock).mockResolvedValue({
+        object: {
           roadmap: { phases: [] },
           milestones: [],
           sprints: []
-        })
+        }
       });
 
       const result = await service.generateRoadmap({
@@ -462,7 +462,7 @@ describe('RoadmapPlanningService', () => {
       });
 
       expect(result).toBeDefined();
-      expect(generateText).toHaveBeenCalled();
+      expect(generateObject).toHaveBeenCalled();
     });
 
     it('should use default values for optional parameters', async () => {
@@ -471,12 +471,12 @@ describe('RoadmapPlanningService', () => {
       ]);
 
       
-      generateText.mockResolvedValue({
-        text: JSON.stringify({
+      (generateObject as Mock).mockResolvedValue({
+        object: {
           roadmap: { phases: [] },
           milestones: [],
           sprints: []
-        })
+        }
       });
 
       await service.generateRoadmap({
@@ -484,10 +484,10 @@ describe('RoadmapPlanningService', () => {
         projectTitle: 'Test'
       });
 
-      const generateTextCall = generateText.mock.calls[0][0];
+      const generateObjectCall = (generateObject as Mock).mock.calls[0][0];
       // Should use default sprint duration (2 weeks) and milestones (4)
-      expect(generateTextCall.prompt).toContain('2-week sprints');
-      expect(generateTextCall.prompt).toContain('4 milestones');
+      expect(generateObjectCall.prompt).toContain('2-week sprints');
+      expect(generateObjectCall.prompt).toContain('4 milestones');
     });
   });
 
@@ -513,12 +513,12 @@ describe('RoadmapPlanningService', () => {
       mockProjectService.listProjectItems.mockResolvedValue(mockIssues.items);
 
       
-      generateText.mockResolvedValue({
-        text: JSON.stringify({
+      (generateObject as Mock).mockResolvedValue({
+        object: {
           roadmap: { phases: [] },
           milestones: [],
           sprints: []
-        })
+        }
       });
 
       await service.generateRoadmap({
@@ -529,13 +529,13 @@ describe('RoadmapPlanningService', () => {
         targetMilestones: 5
       });
 
-      const generateTextCall = generateText.mock.calls[0][0];
-      expect(generateTextCall.prompt).toContain('My Awesome Project');
-      expect(generateTextCall.prompt).toContain('Building the future of task management');
-      expect(generateTextCall.prompt).toContain('3-week sprints');
-      expect(generateTextCall.prompt).toContain('5 milestones');
-      expect(generateTextCall.prompt).toContain('Critical bug');
-      expect(generateTextCall.prompt).toContain('New feature');
+      const generateObjectCall = (generateObject as Mock).mock.calls[0][0];
+      expect(generateObjectCall.prompt).toContain('My Awesome Project');
+      expect(generateObjectCall.prompt).toContain('Building the future of task management');
+      expect(generateObjectCall.prompt).toContain('3-week sprints');
+      expect(generateObjectCall.prompt).toContain('5 milestones');
+      expect(generateObjectCall.prompt).toContain('Critical bug');
+      expect(generateObjectCall.prompt).toContain('New feature');
     });
   });
 });

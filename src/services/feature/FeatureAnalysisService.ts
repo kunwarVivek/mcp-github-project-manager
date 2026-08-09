@@ -120,11 +120,40 @@ export class FeatureAnalysisService {
     return 5;
   }
 
-  extractRisks(_analysis: string): string[] {
-    return ['Technical complexity', 'Integration challenges', 'Resource constraints'];
+  extractRisks(analysis: string): string[] {
+    const riskPatterns = /(?:risk|concern|challenge|potential issue|caveat|danger|threat)s?[:\-]?\s*([^.\n]+)/gi;
+    const risks: string[] = [];
+    let match;
+    while ((match = riskPatterns.exec(analysis)) !== null) {
+      const risk = match[1].trim();
+      if (risk.length > 5 && risk.length < 200) risks.push(risk);
+    }
+    // Fall back to section extraction: look for "Risks:" or "Risk Factors:" sections
+    if (risks.length === 0) {
+      const sectionMatch = analysis.match(/(?:risks?|risk factors?)[:\s]*\n([\s\S]*?)(?:\n\n|$)/i);
+      if (sectionMatch) {
+        const lines = sectionMatch[1].split('\n').map(l => l.replace(/^[-*•\d.]+\s*/, '').trim()).filter(l => l.length > 5);
+        risks.push(...lines);
+      }
+    }
+    return risks.length > 0 ? risks : ['Technical complexity', 'Integration challenges', 'Resource constraints'];
   }
 
-  extractDependencies(_analysis: string): string[] {
-    return [];
+  extractDependencies(analysis: string): string[] {
+    const depPatterns = /(?:depend(?:s|ency|encies)|requires?|prerequisite|blocked by|needs)[:\-]?\s*([^.\n]+)/gi;
+    const deps: string[] = [];
+    let match;
+    while ((match = depPatterns.exec(analysis)) !== null) {
+      const dep = match[1].trim();
+      if (dep.length > 3 && dep.length < 200) deps.push(dep);
+    }
+    if (deps.length === 0) {
+      const sectionMatch = analysis.match(/(?:dependenc(?:y|ies)|prerequisites?)[:\s]*\n([\s\S]*?)(?:\n\n|$)/i);
+      if (sectionMatch) {
+        const lines = sectionMatch[1].split('\n').map(l => l.replace(/^[-*•\d.]+\s*/, '').trim()).filter(l => l.length > 3);
+        deps.push(...lines);
+      }
+    }
+    return deps;
   }
 }

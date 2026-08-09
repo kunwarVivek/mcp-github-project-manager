@@ -66,8 +66,8 @@ describe('StatusParser', () => {
         expect(parseResourceStatus('active', 'sprint')).toBe(ResourceStatus.ACTIVE);
       });
 
-      it('should parse "completed" to CLOSED (completed maps to closed)', () => {
-        expect(parseResourceStatus('completed', 'sprint')).toBe(ResourceStatus.CLOSED);
+      it('should parse "completed" to COMPLETED', () => {
+        expect(parseResourceStatus('completed', 'sprint')).toBe(ResourceStatus.COMPLETED);
       });
     });
 
@@ -149,8 +149,8 @@ describe('StatusParser', () => {
         expect(toStatusString(ResourceStatus.COMPLETED, 'sprint')).toBe('completed');
       });
 
-      it('should convert CLOSED to "completed"', () => {
-        expect(toStatusString(ResourceStatus.CLOSED, 'sprint')).toBe('completed');
+      it('should convert CLOSED to "closed"', () => {
+        expect(toStatusString(ResourceStatus.CLOSED, 'sprint')).toBe('closed');
       });
     });
 

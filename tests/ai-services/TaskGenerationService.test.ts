@@ -225,9 +225,14 @@ describe('TaskGenerationService', () => {
         ]
       };
 
-      
-      generateText.mockResolvedValue({
-        text: 'Task complexity analysis: complexity 7, estimated 16 hours. Real-time functionality adds complexity. Consider breaking into smaller tasks.'
+      vi.mocked(generateObject).mockResolvedValue({
+        object: {
+          complexity: 7,
+          estimatedHours: 16,
+          analysis: 'Task complexity analysis shows increased complexity due to real-time features',
+          riskFactors: ['WebSocket complexity'],
+          recommendations: []
+        }
       });
 
       const task = {
@@ -253,7 +258,7 @@ describe('TaskGenerationService', () => {
       expect(result.estimatedHours).toBe(16);
       expect(result.analysis).toBeDefined();
       expect(result.recommendations).toEqual([]); // AITaskProcessor returns empty array for now
-      expect(vi.mocked(generateText)).toHaveBeenCalledTimes(1);
+      expect(vi.mocked(generateObject)).toHaveBeenCalled();
     });
 
     it('should handle simple tasks with low complexity', async () => {
@@ -265,8 +270,14 @@ describe('TaskGenerationService', () => {
         recommendations: ['Straightforward implementation', 'Good starter task']
       };
 
-      vi.mocked(generateText).mockResolvedValue({
-        text: 'Task complexity analysis: complexity 2, estimated 3 hours. Straightforward implementation.'
+      vi.mocked(generateObject).mockResolvedValue({
+        object: {
+          complexity: 2,
+          estimatedHours: 3,
+          analysis: 'Simple task with low complexity',
+          riskFactors: [],
+          recommendations: []
+        }
       });
 
       const simpleTask = {

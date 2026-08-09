@@ -212,15 +212,37 @@ export class TaskLifecycleService {
     return new Date(Date.now() + estimatedDays * 24 * 60 * 60 * 1000).toISOString();
   }
 
-  extractNextActions(_analysis: string): string[] {
-    return ['Review requirements', 'Start implementation', 'Set up testing environment'];
+  extractNextActions(analysis: string): string[] {
+    // Look for numbered/bulleted action items or "next steps" section
+    const sectionMatch = analysis.match(/(?:next (?:steps|actions)|action items?|to.?do|immediate actions?)[:\s]*\n([\s\S]*?)(?:\n\n|$)/i);
+    if (sectionMatch) {
+      const lines = sectionMatch[1].split('\n').map(l => l.replace(/^[-*•\d.]+\s*/, '').trim()).filter(l => l.length > 5);
+      if (lines.length > 0) return lines.slice(0, 5);
+    }
+    // Fallback: look for imperative sentences
+    const imperativePattern = /(?:^|\n)\s*[-*•\d.]+\s*((?:Review|Implement|Create|Set up|Configure|Test|Deploy|Document|Fix|Update|Add|Remove|Refactor)\s[^.\n]+)/gi;
+    const actions: string[] = [];
+    let match;
+    while ((match = imperativePattern.exec(analysis)) !== null) {
+      actions.push(match[1].trim());
+    }
+    return actions.length > 0 ? actions.slice(0, 5) : ['Review requirements', 'Start implementation', 'Set up testing environment'];
   }
 
-  extractRecommendations(_analysis: string): string[] {
-    return [
-      'Focus on core functionality first',
-      'Implement comprehensive testing',
-      'Plan for gradual rollout'
-    ];
+  extractRecommendations(analysis: string): string[] {
+    const sectionMatch = analysis.match(/(?:recommend(?:ation)?s?|suggest(?:ion)?s?|best practices?|advice)[:\s]*\n([\s\S]*?)(?:\n\n|$)/i);
+    if (sectionMatch) {
+      const lines = sectionMatch[1].split('\n').map(l => l.replace(/^[-*•\d.]+\s*/, '').trim()).filter(l => l.length > 5);
+      if (lines.length > 0) return lines.slice(0, 5);
+    }
+    // Fallback: look for sentences with recommendation language
+    const recPattern = /(?:recommend|suggest|advise|consider|should|best practice)s?[:\-]?\s*([^.\n]+[.]?)/gi;
+    const recs: string[] = [];
+    let match;
+    while ((match = recPattern.exec(analysis)) !== null) {
+      const rec = match[1].trim();
+      if (rec.length > 10) recs.push(rec);
+    }
+    return recs.length > 0 ? recs.slice(0, 5) : ['Focus on core functionality first', 'Implement comprehensive testing', 'Plan for gradual rollout'];
   }
 }

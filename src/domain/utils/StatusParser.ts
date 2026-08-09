@@ -41,8 +41,9 @@ const STATUS_MAPPINGS: Record<string, StatusMapping> = {
   /** Sprints have more status options */
   sprint: {
     active: 'active',
-    closed: 'completed',
+    closed: 'closed',
     planned: 'planned',
+    completed: 'completed',
   },
   /** GitHub API uses uppercase for issues */
   githubIssue: {
@@ -89,6 +90,11 @@ export function parseResourceStatus(
     return ResourceStatus.ACTIVE;
   }
 
+  // Check for completed state (if defined)
+  if (mapping.completed && normalizedStatus === mapping.completed.toLowerCase()) {
+    return ResourceStatus.COMPLETED;
+  }
+
   // Check for closed state
   if (normalizedStatus === mapping.closed.toLowerCase()) {
     return ResourceStatus.CLOSED;
@@ -102,12 +108,6 @@ export function parseResourceStatus(
   // Check for in-progress state (if defined)
   if (mapping.inProgress && normalizedStatus === mapping.inProgress.toLowerCase()) {
     return ResourceStatus.IN_PROGRESS;
-  }
-
-  // Check for completed state (if defined, otherwise use closed)
-  const completedStr = mapping.completed || mapping.closed;
-  if (normalizedStatus === completedStr.toLowerCase()) {
-    return ResourceStatus.COMPLETED;
   }
 
   // Default fallback: try to match any ResourceStatus value

@@ -373,34 +373,33 @@ export class AITaskProcessor {
     });
 
     try {
-      const result = await generateText({
+      const ComplexitySchema = z.object({
+        complexity: z.number().min(1).max(10),
+        estimatedHours: z.number().positive(),
+        analysis: z.string(),
+        riskFactors: z.array(z.string()),
+        recommendations: z.array(z.string()),
+      });
+
+      const result = await generateObject({
         model,
         system: config.systemPrompt,
         prompt,
+        schema: ComplexitySchema,
         maxOutputTokens: config.maxTokens,
         temperature: config.temperature
       });
 
-      // Parse the response (in a real implementation, you'd want structured output)
-      const analysis = result.text;
-
-      // Extract complexity score (simplified - in practice, use structured output)
-      const complexityMatch = analysis.match(/complexity.*?(\d+)/i);
-      const complexity = complexityMatch ? parseInt(complexityMatch[1], 10) : 5;
-
-      const hoursMatch = analysis.match(/(\d+)\s*hours?/i);
-      const estimatedHours = hoursMatch ? parseInt(hoursMatch[1], 10) : complexity * 4;
-
-      return {
-        complexity: Math.min(Math.max(complexity, 1), 10),
-        estimatedHours,
-        analysis,
-        riskFactors: [], // Would extract from structured response
-        recommendations: [] // Would extract from structured response
-      };
+      return result.object;
     } catch (error) {
       this.logger.error('Error analyzing task complexity', error);
-      throw new Error(`Failed to analyze complexity: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      return {
+        complexity: 5,
+        estimatedHours: 20,
+        analysis: 'Fallback: AI analysis unavailable',
+        riskFactors: [],
+        recommendations: [],
+      };
     }
   }
 

@@ -23,6 +23,8 @@ import { AgentContextService } from '../../services/agent/AgentContextService';
 import { WorkProductService } from '../../services/agent/WorkProductService';
 import { AgentBudgetService } from '../../services/agent/AgentBudgetService';
 import { AgentMetricsService } from '../../services/agent/AgentMetricsService';
+import { DomainEventBus } from '../../domain/events/DomainEventBus';
+import { AgentRegisteredEvent, AgentDeregisteredEvent } from '../../domain/events/AgentEvents';
 
 import type { Agent, AgentActivityEntry, AgentMetrics, BudgetStatus, WorkProduct } from '../../domain/agent-orchestration-types';
 import { AgentSchema, TaskCheckoutResultSchema, AgentTaskContextSchema, WorkProductSchema, BudgetStatusSchema, AgentActivityEntrySchema, AgentMetricsSchema,
@@ -741,6 +743,16 @@ export async function executeRegisterAgent(
 
     await store.upsertAgent(agent);
 
+    const eventBus = DomainEventBus.getInstance();
+    eventBus.publish(AgentRegisteredEvent.create({
+      agentId: agent.id,
+      agentName: agent.name,
+      role: agent.role,
+      runtime: agent.runtime,
+      capabilities: agent.capabilities,
+      parentAgentId: agent.parentAgentId,
+    }));
+
     return {
       content: [{ type: 'text', text: `Registered agent "${agent.name}" (${agent.id})` }],
       structuredContent: agent,
@@ -798,7 +810,17 @@ export async function executeDeregisterAgent(
     const factory = createGitHubFactory();
     const store = new AgentStore(factory);
 
+    const agent = await store.getAgent(args.agentId);
     const removedCount = await store.removeAgentCascade(args.agentId);
+
+    if (removedCount > 0 && agent) {
+      const eventBus = DomainEventBus.getInstance();
+      eventBus.publish(AgentDeregisteredEvent.create({
+        agentId: args.agentId,
+        agentName: agent.name,
+        reason: 'deregistered',
+      }));
+    }
 
     const result = {
       success: removedCount > 0,
@@ -837,6 +859,8 @@ export async function executeCheckoutTask(
       projectId: args.projectId,
       strategy: args.strategy,
       labels: args.labels,
+      skipBlocked: args.skipBlocked,
+      reviewQueue: args.reviewQueue,
     });
 
     const text = result.success
@@ -1073,6 +1097,8 @@ export async function executeGetAgentActivity(
           ? {
               issueId: agent.currentTaskId,
               title: agent.currentTaskTitle ?? 'Unknown',
+              // Approximation: no dedicated claimedAt on Agent; lastHeartbeat
+              // is updated on claim, so it's the closest available timestamp.
               claimedAt: agent.lastHeartbeat ?? agent.registeredAt,
             }
           : undefined,
@@ -1080,7 +1106,7 @@ export async function executeGetAgentActivity(
         heartbeatAge: ageMs != null ? `${Math.round(ageMs / 60000)}m` : undefined,
         isStale,
         budgetStatus,
-        completedToday: 0, // Requires additional query; populated by service layer
+        completedToday: 0, // Not populated: requires scanning all work products per agent per day
         heartbeatHistory: Array.isArray(agent.metadata?.heartbeatHistory)
           ? (agent.metadata.heartbeatHistory as Array<{
               timestamp: string;
