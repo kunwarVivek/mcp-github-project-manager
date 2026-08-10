@@ -6,6 +6,26 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [2.1.0] - 2026-08-10
+
+### Added
+- **Per-role AI provider configuration** — each model role (main, research, fallback, prd) independently configurable with provider, API key, model, and base URL. `openai-compatible` provider type works with OpenRouter, Together, Groq, Ollama, LM Studio, Azure OpenAI, or any OpenAI-protocol endpoint. No hardcoded vendor defaults.
+- **MCP sampling as zero-config AI fallback** — when no AI keys configured and client supports sampling, the server routes completions back to the calling agent (Claude, Codex, Pi). The client IS the model.
+- **`validate_work_product`** (agent_work action) — reviewer inspects work product against acceptance criteria: checks test results, files changed, summary quality. Returns findings + recommendation (approve/reject/needs_work). Replaces rubber-stamp approval.
+- **`decompose_task`** (agent_manage action) — PM splits a rejected task into subtasks linked as GitHub sub-issues. Enables the reject→decompose→re-assign failure recovery loop.
+- **`smart_assign`** (agent_manage action) — capability-matched, budget-aware task routing. Scores agents by capability overlap with issue labels/title, role bonuses, skips stale/exhausted agents. Optional `agentIds[]` and `roleFilter` params.
+- **`converge_project`** (agent_manage action) — PM drives project toward completion: iterates open issues, auto-approves passing work, auto-rejects failing, auto-decomposes fix subtasks. Project-scoped (only touches issues in the target project).
+- **`converge_until_done`** (agent_manage action) — multi-iteration convergence: reports progress + next actions per iteration, returns done when all issues closed or max iterations reached.
+- **`get_handoff_context`** (agent_work action) — cross-agent context for subtasks: parent issue, prior work product, rejection feedback, acceptance criteria.
+- **`cleanup_registry`** (agent_manage action) — removes stale agents (no heartbeat in N minutes). Working agents never removed.
+- **Human-readable work product comments** — issue comments now include agent, branch, PR, files changed list, test results table, and summary above the machine-readable JSON.
+
+### Fixed
+- **`smart_assign` stale agent scoring** — skips agents with no heartbeat in 60min, requires capability match score > 0.
+- **`converge_project` scoping** — queries project items via GraphQL `node(id:)` instead of `listForRepo`, preventing unrelated issues from being closed.
+- **Sprint create requires `projectId`** — fails fast with clear error instead of guessing via `projectsV2(first:1)` which targeted the wrong project.
+- **AI error messages** — when provider key exists but no model configured, error now says "set AI_MAIN_MODEL" instead of misleading "set API key".
+
 ## [2.0.0] - 2026-08-09
 
 ### Added
