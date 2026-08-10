@@ -710,6 +710,7 @@ export const agentWorkSchema = z.object({
     'register', 'checkout_task', 'release_task', 'complete_task',
     'heartbeat', 'check_work_status', 'get_task_context',
     'submit_for_review', 'approve_task', 'reject_task', 'validate_work_product',
+    'get_handoff_context',
   ]).describe('The agent work operation to perform'),
   // Common
   agentId: z.string().optional(),
@@ -762,7 +763,7 @@ export const agentManageSchema = z.object({
     'submit_work_product', 'get_budget', 'set_budget',
     'reclaim_stale', 'record_usage', 'get_metrics', 'setup_fields',
     // PM coordination
-    'assign_task', 'get_swarm_status', 'rebalance_workload', 'decompose_task',
+    'assign_task', 'get_swarm_status', 'rebalance_workload', 'decompose_task', 'smart_assign', 'converge_project',
   ]).describe('The agent management operation to perform'),
   // Common
   agentId: z.string().optional(),
@@ -795,6 +796,8 @@ export const agentManageSchema = z.object({
   tokensUsed: z.number().optional(),
   // Metrics
   staleAfterMinutes: z.number().optional(),
+  // Smart assign
+  maxAssignments: z.number().optional(),
   // Decompose task
   subtasks: z.array(z.object({
     title: z.string(),

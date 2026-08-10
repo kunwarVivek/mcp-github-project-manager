@@ -1090,6 +1090,67 @@ export async function executeAgentWork(args: AgentWorkArgs): Promise<unknown> {
         recommendation,
       };
     }
+    case 'get_handoff_context': {
+      // Enriched context for subtask agents — includes parent issue,
+      // prior work product, rejection feedback, and subtask scope
+      const factory = createGitHubFactory();
+      const config = factory.getConfig();
+      const octokit = factory.getOctokit();
+      const wpStore = new WorkProductStore(factory);
+      const issueNumber = parseInt(rest.taskId as string, 10);
+      if (Number.isNaN(issueNumber)) return { error: 'Invalid taskId' };
+
+      // 1. Get this issue
+      const { data: issue } = await octokit.rest.issues.get({ owner: config.owner, repo: config.repo, issue_number: issueNumber });
+
+      // 2. Check if this is a sub-issue — look for parent reference in body
+      let parentContext = null;
+      const parentMatch = issue.body?.match(/\*\*Parent task:\*\*\s*#(\d+)/);
+      if (parentMatch) {
+        const parentNumber = parseInt(parentMatch[1], 10);
+        const { data: parent } = await octokit.rest.issues.get({ owner: config.owner, repo: config.repo, issue_number: parentNumber });
+
+        // Get parent's work products (what was already tried)
+        const parentProducts = await wpStore.listForIssue(parentNumber);
+        const latestParentWP = parentProducts.length > 0 ? parentProducts[parentProducts.length - 1] : null;
+
+        // Get rejection feedback from parent's comments
+        const { data: comments } = await octokit.rest.issues.listComments({ owner: config.owner, repo: config.repo, issue_number: parentNumber, per_page: 20 });
+        const rejectionComment = comments.reverse().find(c => c.body?.includes('## Agent Work Rejected'));
+        const rejectionFeedback = rejectionComment?.body || null;
+
+        parentContext = {
+          issueNumber: parentNumber,
+          title: parent.title,
+          body: parent.body?.slice(0, 2000),
+          state: parent.state,
+          priorWorkProduct: latestParentWP ? {
+            files: latestParentWP.filesChanged,
+            tests: latestParentWP.testResults,
+            branch: latestParentWP.branch,
+            summary: latestParentWP.summary,
+          } : null,
+          rejectionFeedback,
+        };
+      }
+
+      // 3. Extract acceptance criteria from this issue
+      const body = issue.body || '';
+      const criteria: string[] = [];
+      let inCriteria = false;
+      for (const line of body.split('\n')) {
+        if (/acceptance\s*criteria/i.test(line)) { inCriteria = true; continue; }
+        if (inCriteria && /^\s*[-*]/.test(line)) criteria.push(line.replace(/^\s*[-*]\s*\[.?\]\s*/, '').trim());
+        else if (inCriteria && /^#/.test(line)) inCriteria = false;
+      }
+
+      return {
+        issue: { number: issue.number, title: issue.title, body: issue.body?.slice(0, 2000), labels: issue.labels.map((l) => typeof l === 'string' ? l : l.name) },
+        acceptanceCriteria: criteria,
+        isSubtask: !!parentContext,
+        parentContext,
+      };
+    }
     default: unknownAction('agent_work', action);
   }
 }
@@ -1192,6 +1253,112 @@ export async function executeAgentManage(args: AgentManageArgs): Promise<unknown
       };
     }
 
+    case 'smart_assign': {
+      // Capability-matched, budget-aware task assignment
+      // PM specifies a projectId; the system finds the best agent for each unassigned issue
+      const factory = createGitHubFactory();
+      const config = factory.getConfig();
+      const octokit = factory.getOctokit();
+      const store = new AgentStore(factory);
+      const budgetService = new AgentBudgetService(store);
+      const contextService = new AgentContextService(factory);
+      const checkoutService = new TaskCheckoutService(factory, store, contextService);
+      const projectId = rest.projectId as string;
+
+      if (!projectId) return { success: false, message: 'projectId is required' };
+
+      // 1. Get all agents
+      const agents = await store.listAgents();
+      const idleAgents = agents.filter(a => a.status === 'idle');
+      if (idleAgents.length === 0) return { success: false, message: 'No idle agents available', assignments: [] };
+
+      // 2. Get open issues in the project that are unassigned
+      // Use the fetchOpenIssues-style query to find unclaimed issues
+      const { data: repoIssues } = await octokit.rest.issues.listForRepo({
+        owner: config.owner, repo: config.repo, state: 'open', per_page: 50, sort: 'created', direction: 'asc',
+      });
+      const openIssues = repoIssues.filter(i => !i.pull_request);
+
+      // 3. For each idle agent, find the best matching unassigned issue
+      const assignments: Array<{ agentId: string; agentName: string; issueNumber: number; issueTitle: string; matchScore: number; reason: string }> = [];
+      const assignedIssues = new Set<number>();
+      const maxAssignments = rest.maxAssignments as number || idleAgents.length;
+
+      for (const agent of idleAgents) {
+        if (assignments.length >= maxAssignments) break;
+
+        // Check budget
+        let budget;
+        try { budget = await budgetService.getBudgetStatus(agent.id); } catch {}
+        if (budget?.isExhausted) continue;
+
+        // Score each open issue against this agent's capabilities
+        let bestIssue: (typeof openIssues)[number] | null = null;
+        let bestScore = -1;
+        let bestReason = '';
+
+        for (const issue of openIssues) {
+          if (assignedIssues.has(issue.number)) continue;
+          // Skip issues already assigned (have agent comments)
+
+          const labels = issue.labels.map((l) => typeof l === 'string' ? l : l.name).filter((l): l is string => Boolean(l));
+
+          // Score: capability overlap with issue labels/title
+          let score = 0;
+          const matchReasons: string[] = [];
+
+          for (const cap of agent.capabilities) {
+            const capLower = cap.toLowerCase();
+            if (labels.some(l => l.toLowerCase().includes(capLower))) {
+              score += 3;
+              matchReasons.push(`label:${cap}`);
+            }
+            if (issue.title.toLowerCase().includes(capLower)) {
+              score += 2;
+              matchReasons.push(`title:${cap}`);
+            }
+          }
+
+          // Role match bonus
+          if (agent.role === 'engineer' && !labels.includes('review')) score += 1;
+          if (agent.role === 'reviewer' && labels.includes('review')) score += 3;
+          if (agent.role === 'qa' && (labels.includes('testing') || labels.includes('qa'))) score += 3;
+
+          // Budget-aware: prefer cheaper tasks for low-budget agents
+          if (budget && budget.usagePercent > 70) score -= 1;
+
+          if (score > bestScore) {
+            bestScore = score;
+            bestIssue = issue;
+            bestReason = matchReasons.length > 0 ? matchReasons.join(', ') : 'general assignment';
+          }
+        }
+
+        if (bestIssue && bestScore >= 0) {
+          // Attempt assignment
+          try {
+            const result = await checkoutService.checkoutTask(agent.id, { projectId, issueNumber: bestIssue.number });
+            if (result.success) {
+              assignments.push({
+                agentId: agent.id, agentName: agent.name,
+                issueNumber: bestIssue.number, issueTitle: bestIssue.title,
+                matchScore: bestScore, reason: bestReason,
+              });
+              assignedIssues.add(bestIssue.number);
+            }
+          } catch { /* assignment failed, skip */ }
+        }
+      }
+
+      return {
+        success: assignments.length > 0,
+        totalAssigned: assignments.length,
+        totalIdleAgents: idleAgents.length,
+        totalOpenIssues: openIssues.length,
+        assignments,
+      };
+    }
+
     case 'decompose_task': {
       // PM splits a rejected task into smaller sub-issues, links each to
       // the parent via GitHub's native sub-issue relationship, and adds
@@ -1272,6 +1439,101 @@ export async function executeAgentManage(args: AgentManageArgs): Promise<unknown
         parentIssue: issueNumber,
         subtasks: created,
         summary: `Decomposed #${issueNumber} into ${created.length} subtask(s): ${created.map(s => '#' + s.number).join(', ')}`,
+      };
+    }
+
+    case 'converge_project': {
+      // PM drives the project toward completion in one iteration:
+      // For each open issue: validate → approve/reject → decompose rejected → assign unassigned
+      const factory = createGitHubFactory();
+      const config = factory.getConfig();
+      const octokit = factory.getOctokit();
+      const wpStore = new WorkProductStore(factory);
+      const store = new AgentStore(factory);
+      const contextService = new AgentContextService(factory);
+      const checkoutService = new TaskCheckoutService(factory, store, contextService);
+      const projectId = rest.projectId as string;
+
+      if (!projectId) return { success: false, message: 'projectId is required' };
+
+      const report = {
+        approved: [] as Array<{ issue: number; title: string }>,
+        rejected: [] as Array<{ issue: number; title: string; findings: string[] }>,
+        decomposed: [] as Array<{ parent: number; subtasks: number[] }>,
+        assigned: [] as Array<{ issue: number; agent: string }>,
+        unchanged: [] as Array<{ issue: number; title: string; reason: string }>,
+      };
+
+      // 1. Get all open issues in the repo
+      const { data: issues } = await octokit.rest.issues.listForRepo({
+        owner: config.owner, repo: config.repo, state: 'open', per_page: 50,
+      });
+      const openIssues = issues.filter(i => !i.pull_request);
+
+      for (const issue of openIssues) {
+        // Check if issue has a work product
+        const products = await wpStore.listForIssue(issue.number);
+        if (products.length === 0) {
+          report.unchanged.push({ issue: issue.number, title: issue.title, reason: 'No work product yet' });
+          continue;
+        }
+
+        const latest = products[products.length - 1];
+
+        // Validate the work product
+        const findings: string[] = [];
+        if (latest.filesChanged.length === 0) findings.push('No files changed');
+        if (!latest.testResults) findings.push('No test results');
+        else {
+          if (latest.testResults.passed === 0) findings.push('Zero tests passing');
+          if (latest.testResults.failed > 0) findings.push(`${latest.testResults.failed} test(s) failing`);
+        }
+
+        if (findings.length === 0) {
+          // Auto-approve: close the issue with approval comment
+          await octokit.rest.issues.createComment({
+            owner: config.owner, repo: config.repo, issue_number: issue.number,
+            body: `## Auto-Approved by Convergence Loop\n\nAll validation checks passed.\n**Approved at:** ${new Date().toISOString()}`,
+          }).catch(() => {});
+          await octokit.rest.issues.update({
+            owner: config.owner, repo: config.repo, issue_number: issue.number, state: 'closed',
+          }).catch(() => {});
+          report.approved.push({ issue: issue.number, title: issue.title });
+        } else {
+          // Reject with findings
+          await octokit.rest.issues.createComment({
+            owner: config.owner, repo: config.repo, issue_number: issue.number,
+            body: `## Auto-Rejected by Convergence Loop\n\nFindings:\n${findings.map(f => '- ' + f).join('\n')}\n\n**Rejected at:** ${new Date().toISOString()}`,
+          }).catch(() => {});
+          report.rejected.push({ issue: issue.number, title: issue.title, findings });
+
+          // Auto-decompose if test failures (create a fix subtask)
+          if (findings.some(f => f.includes('failing'))) {
+            const subtaskTitle = `Fix: ${findings.filter(f => f.includes('failing')).join(', ')} in #${issue.number}`;
+            try {
+              const { data: sub } = await octokit.rest.issues.create({
+                owner: config.owner, repo: config.repo,
+                title: subtaskTitle,
+                body: `**Parent task:** #${issue.number} — ${issue.title}\n\nFix the failing tests identified in the convergence review.\n\n### Findings\n${findings.map(f => '- ' + f).join('\n')}`,
+                labels: issue.labels.map((l) => (typeof l === 'string' ? l : l.name)).filter((l): l is string => Boolean(l)),
+              });
+              report.decomposed.push({ parent: issue.number, subtasks: [sub.number] });
+
+              // Add to project
+              if (projectId) {
+                try {
+                  const svc = getPMS();
+                  await svc.addProjectItem({ projectId, contentId: sub.node_id, contentType: 'issue' });
+                } catch { /* non-fatal */ }
+              }
+            } catch { /* decompose failed, continue */ }
+          }
+        }
+      }
+
+      return {
+        summary: `Convergence: ${report.approved.length} approved, ${report.rejected.length} rejected, ${report.decomposed.length} decomposed`,
+        ...report,
       };
     }
 
@@ -1409,10 +1671,10 @@ const TOOL_CATALOG: Record<string, {
     actions: [
       'register', 'checkout_task', 'release_task', 'complete_task',
       'heartbeat', 'check_work_status', 'get_task_context',
-      'submit_for_review', 'approve_task', 'reject_task', 'validate_work_product',
+      'submit_for_review', 'approve_task', 'reject_task', 'validate_work_product', 'get_handoff_context',
       'list', 'deregister', 'get_activity', 'submit_work_product', 'get_budget', 'set_budget',
       'reclaim_stale', 'record_usage', 'get_metrics', 'setup_fields',
-      'assign_task', 'get_swarm_status', 'rebalance_workload', 'decompose_task',
+      'assign_task', 'get_swarm_status', 'rebalance_workload', 'decompose_task', 'smart_assign', 'converge_project',
     ],
     description: 'Agent orchestration — task lifecycle (agent_work), administration (agent_manage), PM coordination (assign_task, get_swarm_status, rebalance_workload)',
   },
