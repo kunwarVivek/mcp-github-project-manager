@@ -1,6 +1,6 @@
 # MCP GitHub Project Manager
 
-A comprehensive Model Context Protocol (MCP) server that provides advanced GitHub project management capabilities with **AI-powered task management** and **complete requirements traceability**. Transform your project ideas into actionable tasks with full end-to-end tracking from business requirements to implementation.
+A comprehensive Model Context Protocol (MCP) server that provides advanced GitHub project management capabilities with **AI-powered task management** and **complete requirements traceability**. Transform your project ideas into actionable tasks with a full end-to-end pipeline from project ideas to GitHub issues, sprints, and milestones.
 
 [![npm version](https://img.shields.io/npm/v/mcp-github-project-manager.svg)](https://www.npmjs.com/package/mcp-github-project-manager)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -12,9 +12,10 @@ This server implements the [Model Context Protocol](https://modelcontextprotocol
 
 ### What Makes This Special
 
-- **16 Compound Tools (134 actions)**: Progressive-disclosure API — AI agents see 16 tools instead of 131, with `discover_tools` for runtime exploration
+- **16 Compound Tools (138 actions)**: Progressive-disclosure API — AI agents see 16 tools instead of 131, with `discover_tools` for runtime exploration
 - **AI-Powered**: Transform project ideas into comprehensive PRDs and actionable tasks using multiple AI providers
 - **Agent Orchestration**: Autonomous AI agent task assignment, heartbeat monitoring, budget enforcement, and work product tracking
+- **PRD-to-Issues Pipeline**: Materialize AI-generated tasks into GitHub milestones, sprints, and issues with dependency-driven sequencing
 - **Complete Traceability**: Full end-to-end tracking from business requirements → features → use cases → tasks
 - **Intelligent Analysis**: AI-powered complexity analysis, effort estimation, and task recommendations
 - **Professional Standards**: IEEE 830 compliant requirements documentation with enterprise-grade change management
@@ -86,6 +87,7 @@ docker run -it \
 - **Next Task Recommendations** (`get_next_task`): AI-powered recommendations for optimal task prioritization
 - **Task Expansion** (`expand_task`): Break down complex tasks into manageable subtasks automatically
 - **PRD Enhancement** (`enhance_prd`): Improve existing PRDs with AI-powered gap analysis and improvements
+- **Task Materialization** (`materialize_tasks`): Convert generated tasks into real GitHub issues grouped into milestones and sprints with dependency-driven phase ordering
 
 ### 🎯 Enhanced Task Context Generation
 - **Traceability-Based Context** (Default): Rich context from requirements traceability without AI dependency
@@ -129,7 +131,7 @@ docker run -it \
 - **Event System**: Track and replay project events
 
 ### Agent Orchestration (16 compound tools)
-- **Compound Tool API**: 16 tools with `action` routing replace 131 individual tools — simpler for AI agents
+- **Compound Tool API**: 16 tools with `action` routing replace 138 individual actions — simpler for AI agents
 - **Agent Registry**: Register, list, and deregister autonomous AI agents
 - **Task Checkout**: Claim tasks with configurable selection strategies (priority, age, skills, deadline)
 - **Heartbeat Monitoring**: Periodic liveness and progress reporting with stale-agent detection
@@ -138,6 +140,8 @@ docker run -it \
 - **Activity Dashboard**: Real-time view of all agent statuses, tasks, and budget consumption
 - **Subagent Hierarchy**: Parent-child agent relationships with cascade deregistration
 - **Runtime Discovery**: `discover_tools` meta-tool for exploring available actions and schemas
+- **PM Coordination**: Project managers can assign specific tasks, monitor swarm status, and rebalance workloads
+- **Task Materialization**: Bridge from PRD tasks to GitHub issues with milestones, sprints, and project assignment
 
 ## Installation
 

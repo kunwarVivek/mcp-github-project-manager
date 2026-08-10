@@ -5,8 +5,8 @@
 | Metric | Value |
 |--------|-------|
 | Phases Complete | 12/12 (phase 11 scope changed: Analytics deferred, AI Issue Intelligence delivered) |
-| Current Phase | Post-v1.1.0 remediation (see below) |
-| Last Updated | 2026-08-05 |
+| Current Phase | v2.0.0 released (see CHANGELOG.md) |
+| Last Updated | 2026-08-09 |
 
 > **Reconciliation note (2026-07-15, updated 2026-08-05):** This file previously
 > froze at "9/12, phase 10 not started" while `REQUIREMENTS.md` claimed "99/99
@@ -17,6 +17,18 @@
 > proposal G6-01). Live remediation status is authoritative in
 > [`docs/remediation/GAP-TRACKER.md`](../docs/remediation/GAP-TRACKER.md);
 > `docs/GAP-ANALYSIS-LIVE.md` is superseded.
+
+## v2.0.0 (2026-08-09)
+
+| Feature | Status |
+|---------|--------|
+| `materialize_tasks` (PRD→issues pipeline) | Shipped, live-verified |
+| PM `assign_task` | Shipped, live-verified |
+| PM `get_swarm_status` | Shipped, live-verified |
+| PM `rebalance_workload` | Shipped |
+| Sprint-issue assignment fix | Shipped, live-verified |
+| `ensureIterationField` project targeting | Shipped, live-verified |
+| Full pipeline E2E test (10 stages) | Shipped |
 
 ## Phase Completion Status
 
@@ -99,4 +111,4 @@
 
 ---
 
-*Last updated: 2026-08-05*
+*Last updated: 2026-08-09*

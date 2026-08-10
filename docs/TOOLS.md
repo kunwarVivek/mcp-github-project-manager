@@ -1,13 +1,13 @@
 # MCP Tools Reference
 
-This document provides comprehensive documentation for the 16 compound MCP tools exposed by the MCP GitHub Project Manager. Each compound tool groups related actions behind a single `action` parameter, reducing tool-selection overhead for AI agents while preserving full access to all 135 underlying operations.
+This document provides comprehensive documentation for the 16 compound MCP tools exposed by the MCP GitHub Project Manager. Each compound tool groups related actions behind a single `action` parameter, reducing tool-selection overhead for AI agents while preserving full access to all 138 underlying operations.
 
 ## Overview
 
 | Metric | Value |
 |--------|-------|
 | Compound Tools | 16 |
-| Total Actions | 135 |
+| Total Actions | 138 |
 | SDK Version | 1.29 |
 | All tools have | Behavior annotations, Output schemas |
 
@@ -56,11 +56,11 @@ MCP_TOOL_GROUPS=all
 8. [manage_iterations](#manage_iterations) (5 actions)
 9. [manage_events](#manage_events) (3 actions)
 10. [manage_status_updates](#manage_status_updates) (3 actions)
-11. [ai_generate](#ai_generate) (8 actions)
+11. [ai_generate](#ai_generate) (9 actions)
 12. [ai_analyze](#ai_analyze) (8 actions)
 13. [ai_plan](#ai_plan) (6 actions)
 14. [agent_work](#agent_work) (10 actions)
-15. [agent_manage](#agent_manage) (10 actions)
+15. [agent_manage](#agent_manage) (13 actions)
 16. [discover_tools](#discover_tools) (meta-tool)
 
 ---
@@ -438,7 +438,7 @@ Create and manage project status updates.
 
 AI-powered generation: PRDs, task breakdowns, feature addition, and traceability matrices.
 
-**Action enum:** `generate_prd` | `enhance_prd` | `parse_prd` | `add_feature` | `get_next_task` | `analyze_complexity` | `expand_task` | `create_traceability_matrix`
+**Action enum:** `generate_prd` | `enhance_prd` | `parse_prd` | `add_feature` | `get_next_task` | `analyze_complexity` | `expand_task` | `create_traceability_matrix` | `materialize_tasks`
 
 ### Per-Action Parameters
 
@@ -452,6 +452,7 @@ AI-powered generation: PRDs, task breakdowns, feature addition, and traceability
 | `analyze_complexity` | `taskTitle` (req), `taskDescription`, `teamExperience`, `includeBreakdown`, `includeRisks` | Analyze task complexity |
 | `expand_task` | `taskTitle` (req), `taskDescription`, `currentComplexity`, `targetComplexity`, `includeEstimates`, `includeDependencies` | Break down complex task |
 | `create_traceability_matrix` | `projectId` (req), `prdContent`, `features`, `tasks`, `validateCompleteness` | Create requirements traceability matrix |
+| `materialize_tasks` | `projectId` (req), `labelPrefix`, `prdContent`, `tasks` (array of {id, title, description, complexity, estimatedHours, priority, dependencies, acceptanceCriteria, tags}) | Materialize AI-generated tasks into GitHub issues grouped into milestones/sprints with dependency-driven phase ordering |
 
 ### Examples
 
@@ -464,6 +465,11 @@ AI-powered generation: PRDs, task breakdowns, feature addition, and traceability
 
 // Analyze task complexity
 {"tool": "ai_generate", "arguments": {"action": "analyze_complexity", "taskTitle": "Implement WebSocket collaboration", "includeRisks": true}}
+```
+
+```json
+// Materialize tasks into project hierarchy
+{"tool": "ai_generate", "arguments": {"action": "materialize_tasks", "projectId": "PVT_...", "labelPrefix": "sprint-1", "tasks": [{"id": "t1", "title": "Setup project", "description": "Initialize", "priority": "high", "dependencies": []}]}}
 ```
 
 ---
@@ -574,7 +580,7 @@ Agent task lifecycle: register, check out tasks, report progress, and complete w
 
 Agent administration: list agents, manage budgets, view activity, and submit work products.
 
-**Action enum:** `list` | `deregister` | `get_activity` | `submit_work_product` | `get_budget` | `set_budget` | `reclaim_stale` | `record_usage` | `get_metrics` | `setup_fields`
+**Action enum:** `list` | `deregister` | `get_activity` | `submit_work_product` | `get_budget` | `set_budget` | `reclaim_stale` | `record_usage` | `get_metrics` | `setup_fields` | `assign_task` | `get_swarm_status` | `rebalance_workload`
 
 ### Per-Action Parameters
 
@@ -590,6 +596,9 @@ Agent administration: list agents, manage budgets, view activity, and submit wor
 | `record_usage` | `agentId` (req), `tokensUsed` (req) | Report token usage against an agent's budget |
 | `get_metrics` | `staleAfterMinutes` | Aggregate + per-agent metrics (throughput, cycle time, budget burn, staleness) |
 | `setup_fields` | `projectId` (req) | Idempotently provision the agent orchestration fields (`agent_claimed_by`, `agent_claimed_at`, `agent_status`, `agent_work_branch`, `agent_pr_number`) on a project |
+| `assign_task` | `agentId` (req), `projectId` (req), `issueNumber` (req) | PM assigns a specific issue to a specific agent, bypassing self-service checkout |
+| `get_swarm_status` | `staleAfterMinutes` | Dashboard of all agents: tasks, heartbeats, budgets, blocked/stale detection |
+| `rebalance_workload` | — | Redistribute tasks from overloaded agents to idle ones |
 
 > **Auto-reclaim scheduler:** the server runs a background sweep every
 > `AGENT_RECLAIM_INTERVAL_MS` (default 5 min, enabled by default) that reclaims
@@ -610,6 +619,14 @@ Agent administration: list agents, manage budgets, view activity, and submit wor
 
 // Set agent budget
 {"tool": "agent_manage", "arguments": {"action": "set_budget", "agentId": "agent-abc123", "totalTokens": 500000, "warningThreshold": 0.8, "hardStop": true, "resetPeriod": "daily"}}
+```
+
+```json
+// PM assigns issue #42 to an agent
+{"tool": "agent_manage", "arguments": {"action": "assign_task", "agentId": "agent-abc123", "projectId": "PVT_...", "issueNumber": 42}}
+
+// Check swarm status
+{"tool": "agent_manage", "arguments": {"action": "get_swarm_status"}}
 ```
 
 ---

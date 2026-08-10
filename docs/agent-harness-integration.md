@@ -15,6 +15,7 @@ agentic harness — Claude Code, Codex, Cursor, or a custom agent loop — with
 │  · task discovery + claiming  · state transitions  · work intake    │
 │  · budget enforcement        · liveness (heartbeats)  · subagents   │
 │  · review workflow           · dependency awareness  · metrics      │
+│  · PM coordination (assign, swarm status, rebalance)                │
 ├─────────────────────────────────────────────────────────────────────┤
 │  GitHub = the task substrate (source of truth, human-visible)       │
 │  · issues = tasks   · project v2 custom fields = claim state        │
@@ -47,6 +48,56 @@ reference):
 6. **Reviewer agents** claim from the queue with `checkout_task { reviewQueue: true }` and either **`approve_task`** (completes + closes) or **`reject_task`** (returns to the pool with feedback recorded on the issue).
 7. **`agent_manage/record_usage`** — report token spend so budgets stay accurate and hard stops trigger.
 8. **`agent_manage/get_metrics`** — observe swarm health (throughput, cycle time, budget burn, staleness).
+
+
+## PM coordination
+
+A project-manager agent (or a human using MCP tools) can orchestrate the swarm
+without relying on self-service checkout:
+
+### Task materialization
+
+The `ai_generate/materialize_tasks` action bridges PRD→GitHub:
+
+1. **`ai_generate/generate_prd`** — produce a PRD from a project idea.
+2. **`ai_generate/parse_prd`** — break the PRD into tasks with dependencies.
+3. **`ai_generate/materialize_tasks`** — create milestones, sprints, and issues
+   on the target project, sequenced bottom-up by the dependency graph.
+
+Each phase gets its own milestone and sprint (GitHub Projects V2 iteration).
+Issues are added to the project and assigned to their phase's sprint.
+
+### Direct task assignment
+
+Instead of letting agents self-select, a PM can assign a specific issue:
+
+```json
+{"tool": "agent_manage", "arguments": {
+  "action": "assign_task",
+  "agentId": "agent-abc123",
+  "projectId": "PVT_...",
+  "issueNumber": 42
+}}
+```
+
+This bypasses checkout strategies and atomically claims the issue for the agent.
+
+### Swarm monitoring
+
+```json
+{"tool": "agent_manage", "arguments": {"action": "get_swarm_status"}}
+```
+
+Returns every agent's current task, heartbeat age, budget status, and
+blocked/stale flags.
+
+### Workload rebalancing
+
+```json
+{"tool": "agent_manage", "arguments": {"action": "rebalance_workload"}}
+```
+
+Redistributes tasks from overloaded agents to idle ones.
 
 ## Harness setup
 
