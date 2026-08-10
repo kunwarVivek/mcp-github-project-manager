@@ -197,47 +197,47 @@ The GitHub token requires these permissions:
 - `write:org` (Organization access)
 
 #### AI Provider Configuration
-At least one AI provider is required for AI-powered features:
+AI keys are **optional** — without them, non-AI tools (project management, issues, sprints, agents) work fine. AI-powered features (`ai_generate`, `ai_analyze`, `ai_plan`) need at least one key.
 
 ```env
-# Primary AI providers (at least one required)
+# Global AI provider keys (set the ones you have)
 ANTHROPIC_API_KEY=your_anthropic_api_key_here
 OPENAI_API_KEY=your_openai_api_key_here
 GOOGLE_API_KEY=your_google_api_key_here
 PERPLEXITY_API_KEY=your_perplexity_api_key_here
 
-# AI Model Configuration (optional - uses defaults if not specified)
-AI_MAIN_MODEL=claude-3-5-sonnet-20241022
-AI_RESEARCH_MODEL=perplexity-llama-3.1-sonar-large-128k-online
-AI_FALLBACK_MODEL=gpt-4o
-AI_PRD_MODEL=claude-3-5-sonnet-20241022
-
-# AI Task Generation Configuration (optional)
-MAX_TASKS_PER_PRD=50
-DEFAULT_COMPLEXITY_THRESHOLD=7
-MAX_SUBTASK_DEPTH=3
-AUTO_DEPENDENCY_DETECTION=true
-AUTO_EFFORT_ESTIMATION=true
-
-# Enhanced Task Context Generation Configuration (optional)
-ENHANCED_TASK_GENERATION=true
-AUTO_CREATE_TRACEABILITY=true
-AUTO_GENERATE_USE_CASES=true
-AUTO_CREATE_LIFECYCLE=true
-ENHANCED_CONTEXT_LEVEL=standard
-INCLUDE_BUSINESS_CONTEXT=false
-INCLUDE_TECHNICAL_CONTEXT=false
-INCLUDE_IMPLEMENTATION_GUIDANCE=false
-
-# Security, secrets, webhooks & cache (optional)
-SECRETS_DIR=/run/secrets          # load secrets from mounted files (Docker/k8s); takes precedence over env vars
-WEBHOOK_SECRET=your_webhook_secret
-WEBHOOK_ALLOW_UNSIGNED=false       # fail closed: reject unsigned webhooks unless explicitly enabled (dev only)
-WEBHOOK_PORT=3001
-MAX_CACHE_ENTRIES=10000            # in-memory cache cap before oldest-first eviction
+# AI Model Configuration (no defaults — configure what you want to use)
+AI_MAIN_MODEL=claude-sonnet-4-20250514    # general tasks
+AI_PRD_MODEL=claude-opus-5                # PRD generation
+AI_RESEARCH_MODEL=sonar-pro               # research
+AI_FALLBACK_MODEL=gpt-4o-mini             # fallback
 ```
 
-See the [Configuration Guide](docs/CONFIGURATION.md) for the complete list.
+#### Per-Role Provider Configuration (optional)
+Each model role can independently use a different provider, API key, and endpoint.
+Use `openai-compatible` for OpenRouter, Together, Groq, Ollama, or any OpenAI-protocol endpoint:
+
+```env
+# OpenRouter for cheap daily tasks
+AI_MAIN_PROVIDER=openai-compatible
+AI_MAIN_BASE_URL=https://openrouter.ai/api/v1
+AI_MAIN_API_KEY=sk-or-v1-your-key
+AI_MAIN_MODEL=deepseek/deepseek-chat
+
+# Direct Anthropic for PRD generation
+AI_PRD_PROVIDER=anthropic
+AI_PRD_API_KEY=sk-ant-your-key
+AI_PRD_MODEL=claude-opus-5
+
+# Local Ollama as fallback
+AI_FALLBACK_PROVIDER=openai-compatible
+AI_FALLBACK_BASE_URL=http://localhost:11434/v1
+AI_FALLBACK_API_KEY=ollama
+AI_FALLBACK_MODEL=llama3.1
+```
+
+See the [Configuration Guide](docs/CONFIGURATION.md) for full per-role documentation.
+
 
 ### AI Provider Setup
 
@@ -587,10 +587,29 @@ To install the MCP server in Claude Desktop:
         "GITHUB_TOKEN": "your_github_token",
         "GITHUB_OWNER": "your_username",
         "GITHUB_REPO": "your_repo",
-        "ANTHROPIC_API_KEY": "your_anthropic_api_key",
-        "OPENAI_API_KEY": "your_openai_api_key",
-        "GOOGLE_API_KEY": "your_google_api_key",
-        "PERPLEXITY_API_KEY": "your_perplexity_api_key"
+        "AI_MAIN_PROVIDER": "openai-compatible",
+        "AI_MAIN_BASE_URL": "https://openrouter.ai/api/v1",
+        "AI_MAIN_API_KEY": "sk-or-v1-your-key",
+        "AI_MAIN_MODEL": "deepseek/deepseek-chat"
+      }
+    }
+  }
+}
+```
+
+Or with a direct provider key (simpler):
+
+```json
+{
+  "mcpServers": {
+    "github-project-manager": {
+      "command": "npx",
+      "args": ["-y", "mcp-github-project-manager"],
+      "env": {
+        "GITHUB_TOKEN": "your_github_token",
+        "GITHUB_OWNER": "your_username",
+        "GITHUB_REPO": "your_repo",
+        "ANTHROPIC_API_KEY": "your_anthropic_api_key"
       }
     }
   }

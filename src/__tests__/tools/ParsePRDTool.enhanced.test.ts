@@ -8,6 +8,10 @@ vi.hoisted(() => {
   process.env.OPENAI_API_KEY = 'sk-test-openai-key-12345';
   process.env.GOOGLE_API_KEY = 'test-google-key-12345';
   process.env.PERPLEXITY_API_KEY = 'pplx-test-perplexity-key-12345';
+  process.env.AI_MAIN_MODEL = 'claude-opus-5';
+  process.env.AI_PRD_MODEL = 'claude-opus-5';
+  process.env.AI_FALLBACK_MODEL = 'gpt-4o';
+  process.env.AI_RESEARCH_MODEL = 'sonar-pro';
 });
 
 // Mock the ai package

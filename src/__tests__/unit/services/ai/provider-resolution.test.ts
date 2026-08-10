@@ -22,15 +22,14 @@ describe('resolveProvider', () => {
     expect(resolveProvider('typo-cluade-opus')).toBeUndefined();
   });
 
-  it('exposes exactly the four supported providers', () => {
-    expect([...SUPPORTED_PROVIDERS]).toEqual(['anthropic', 'openai', 'google', 'perplexity']);
+  it('exposes the five supported providers', () => {
+    expect([...SUPPORTED_PROVIDERS]).toEqual(['anthropic', 'openai', 'google', 'perplexity', 'openai-compatible']);
   });
 
   describe('AI_<ROLE>_PROVIDER override', () => {
     it('an explicit provider wins over the model-name hint', () => {
       process.env.AI_MAIN_PROVIDER = 'openai';
       try {
-        // Name says Anthropic; the override says otherwise.
         expect(resolveProvider('claude-opus-5', 'main')).toBe('openai');
       } finally {
         delete process.env.AI_MAIN_PROVIDER;
@@ -46,10 +45,10 @@ describe('resolveProvider', () => {
       }
     });
 
-    it('rejects an unknown provider rather than guessing', () => {
+    it('routes an unknown provider name to openai-compatible', () => {
       process.env.AI_MAIN_PROVIDER = 'cohere';
       try {
-        expect(resolveProvider('claude-opus-5', 'main')).toBeUndefined();
+        expect(resolveProvider('claude-opus-5', 'main')).toBe('openai-compatible');
       } finally {
         delete process.env.AI_MAIN_PROVIDER;
       }

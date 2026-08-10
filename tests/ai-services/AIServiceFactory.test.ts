@@ -74,17 +74,17 @@ describe('AIServiceFactory', () => {
       }
     });
 
-    it('should reject an unsupported AI_<ROLE>_PROVIDER override', () => {
+    it('should route an unknown provider name to openai-compatible', () => {
       process.env.AI_MAIN_PROVIDER = 'not-a-provider';
       try {
-        expect(resolveProvider('claude-opus-5', 'main')).toBeUndefined();
+        expect(resolveProvider('claude-opus-5', 'main')).toBe('openai-compatible');
       } finally {
         delete process.env.AI_MAIN_PROVIDER;
       }
     });
 
     it('should expose the supported providers', () => {
-      expect([...SUPPORTED_PROVIDERS]).toEqual(['anthropic', 'openai', 'google', 'perplexity']);
+      expect([...SUPPORTED_PROVIDERS]).toEqual(['anthropic', 'openai', 'google', 'perplexity', 'openai-compatible']);
     });
   });
 

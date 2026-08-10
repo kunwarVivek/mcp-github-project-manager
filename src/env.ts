@@ -36,6 +36,7 @@ const RESOLVED_CONFIG_KEYS = [
   'GITHUB_TOKEN', 'GITHUB_OWNER', 'GITHUB_REPO',
   'GITHUB_APP_ID', 'GITHUB_APP_PRIVATE_KEY', 'GITHUB_APP_INSTALLATION_ID',
   'ANTHROPIC_API_KEY', 'OPENAI_API_KEY', 'GOOGLE_API_KEY', 'PERPLEXITY_API_KEY',
+  'AI_MAIN_API_KEY', 'AI_RESEARCH_API_KEY', 'AI_FALLBACK_API_KEY', 'AI_PRD_API_KEY',
   'WEBHOOK_SECRET',
 ] as const;
 
@@ -238,10 +239,28 @@ export const GOOGLE_API_KEY = getOptionalConfigValue("GOOGLE_API_KEY", "");
 export const PERPLEXITY_API_KEY = getOptionalConfigValue("PERPLEXITY_API_KEY", "");
 
 // AI Model configuration
-export const AI_MAIN_MODEL = getOptionalConfigValue("AI_MAIN_MODEL", "claude-opus-5");
-export const AI_RESEARCH_MODEL = getOptionalConfigValue("AI_RESEARCH_MODEL", "sonar-pro");
-export const AI_FALLBACK_MODEL = getOptionalConfigValue("AI_FALLBACK_MODEL", "claude-sonnet-5");
-export const AI_PRD_MODEL = getOptionalConfigValue("AI_PRD_MODEL", "claude-opus-5");
+export const AI_MAIN_MODEL = getOptionalConfigValue("AI_MAIN_MODEL", "");
+export const AI_RESEARCH_MODEL = getOptionalConfigValue("AI_RESEARCH_MODEL", "");
+export const AI_FALLBACK_MODEL = getOptionalConfigValue("AI_FALLBACK_MODEL", "");
+export const AI_PRD_MODEL = getOptionalConfigValue("AI_PRD_MODEL", "");
+
+// Per-role AI provider configuration (overrides globals)
+// Each role can independently use a different provider, API key, and endpoint.
+// Provider types: anthropic, openai, google, perplexity, openai-compatible
+// "openai-compatible" works with any OpenAI-protocol endpoint:
+// OpenRouter, Together, Groq, Ollama, LM Studio, Azure OpenAI, etc.
+export const AI_MAIN_PROVIDER = getOptionalConfigValue('AI_MAIN_PROVIDER', '');
+export const AI_MAIN_API_KEY = getOptionalConfigValue('AI_MAIN_API_KEY', '');
+export const AI_MAIN_BASE_URL = getOptionalConfigValue('AI_MAIN_BASE_URL', '');
+export const AI_RESEARCH_PROVIDER = getOptionalConfigValue('AI_RESEARCH_PROVIDER', '');
+export const AI_RESEARCH_API_KEY = getOptionalConfigValue('AI_RESEARCH_API_KEY', '');
+export const AI_RESEARCH_BASE_URL = getOptionalConfigValue('AI_RESEARCH_BASE_URL', '');
+export const AI_FALLBACK_PROVIDER = getOptionalConfigValue('AI_FALLBACK_PROVIDER', '');
+export const AI_FALLBACK_API_KEY = getOptionalConfigValue('AI_FALLBACK_API_KEY', '');
+export const AI_FALLBACK_BASE_URL = getOptionalConfigValue('AI_FALLBACK_BASE_URL', '');
+export const AI_PRD_PROVIDER = getOptionalConfigValue('AI_PRD_PROVIDER', '');
+export const AI_PRD_API_KEY = getOptionalConfigValue('AI_PRD_API_KEY', '');
+export const AI_PRD_BASE_URL = getOptionalConfigValue('AI_PRD_BASE_URL', '');
 
 // AI Task Generation configuration
 export const MAX_TASKS_PER_PRD = getNumericConfigValue("MAX_TASKS_PER_PRD", 50);

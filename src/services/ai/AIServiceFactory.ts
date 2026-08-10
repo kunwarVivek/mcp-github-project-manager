@@ -4,14 +4,12 @@ import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import { createPerplexity } from '@ai-sdk/perplexity';
 import { type LanguageModel, wrapLanguageModel, type LanguageModelMiddleware } from 'ai';
 import {
-  ANTHROPIC_API_KEY,
-  OPENAI_API_KEY,
-  GOOGLE_API_KEY,
-  PERPLEXITY_API_KEY,
-  AI_MAIN_MODEL,
-  AI_RESEARCH_MODEL,
-  AI_FALLBACK_MODEL,
-  AI_PRD_MODEL,
+  ANTHROPIC_API_KEY, OPENAI_API_KEY, GOOGLE_API_KEY, PERPLEXITY_API_KEY,
+  AI_MAIN_MODEL, AI_RESEARCH_MODEL, AI_FALLBACK_MODEL, AI_PRD_MODEL,
+  AI_MAIN_PROVIDER, AI_MAIN_API_KEY, AI_MAIN_BASE_URL,
+  AI_RESEARCH_PROVIDER, AI_RESEARCH_API_KEY, AI_RESEARCH_BASE_URL,
+  AI_FALLBACK_PROVIDER, AI_FALLBACK_API_KEY, AI_FALLBACK_BASE_URL,
+  AI_PRD_PROVIDER, AI_PRD_API_KEY, AI_PRD_BASE_URL,
   getOptionalConfigValue,
 } from '../../env';
 import { type ILogger, Logger } from '../../infrastructure/logger';
@@ -71,16 +69,13 @@ export const usageMeteringMiddleware: LanguageModelMiddleware = {
 /**
  * AI Provider Types
  */
-export type AIProvider = 'anthropic' | 'openai' | 'google' | 'perplexity';
+export type AIProvider = 'anthropic' | 'openai' | 'google' | 'perplexity' | 'openai-compatible';
 
 /** The four model roles the server configures independently. */
 export type AIModelRole = 'main' | 'research' | 'fallback' | 'prd';
 
 export const SUPPORTED_PROVIDERS: readonly AIProvider[] = [
-  'anthropic',
-  'openai',
-  'google',
-  'perplexity',
+  'anthropic', 'openai', 'google', 'perplexity', 'openai-compatible',
 ] as const;
 
 /**
@@ -91,6 +86,9 @@ const PROVIDER_API_KEYS: Record<AIProvider, () => string> = {
   openai: () => OPENAI_API_KEY,
   google: () => GOOGLE_API_KEY,
   perplexity: () => PERPLEXITY_API_KEY,
+  // No single global key for generic OpenAI-compatible endpoints — always
+  // resolved per-role (AI_<ROLE>_API_KEY); this entry is never invoked.
+  'openai-compatible': () => '',
 };
 
 /** Model-name prefixes used only as a fallback hint when no provider is set. */
@@ -100,6 +98,18 @@ const PROVIDER_HINTS: ReadonlyArray<[AIProvider, (m: string) => boolean]> = [
   ['google', (m) => m.startsWith('gemini-')],
   ['perplexity', (m) => m.includes('perplexity') || m.includes('sonar') || m.includes('llama')],
 ];
+
+/** Per-role configuration accessors — read at call time so tests and rotation work. */
+const PER_ROLE_CONFIG: Record<AIModelRole, {
+  provider: () => string;
+  apiKey: () => string;
+  baseURL: () => string;
+}> = {
+  main:     { provider: () => getOptionalConfigValue('AI_MAIN_PROVIDER', ''),     apiKey: () => getOptionalConfigValue('AI_MAIN_API_KEY', ''),     baseURL: () => getOptionalConfigValue('AI_MAIN_BASE_URL', '') },
+  research: { provider: () => getOptionalConfigValue('AI_RESEARCH_PROVIDER', ''), apiKey: () => getOptionalConfigValue('AI_RESEARCH_API_KEY', ''), baseURL: () => getOptionalConfigValue('AI_RESEARCH_BASE_URL', '') },
+  fallback: { provider: () => getOptionalConfigValue('AI_FALLBACK_PROVIDER', ''), apiKey: () => getOptionalConfigValue('AI_FALLBACK_API_KEY', ''), baseURL: () => getOptionalConfigValue('AI_FALLBACK_BASE_URL', '') },
+  prd:      { provider: () => getOptionalConfigValue('AI_PRD_PROVIDER', ''),      apiKey: () => getOptionalConfigValue('AI_PRD_API_KEY', ''),      baseURL: () => getOptionalConfigValue('AI_PRD_BASE_URL', '') },
+};
 
 /**
  * Resolve which provider serves a model.
@@ -113,13 +123,19 @@ export function resolveProvider(
   modelString: string,
   role?: AIModelRole,
 ): AIProvider | undefined {
+  // 1. Explicit per-role provider (AI_MAIN_PROVIDER, etc.)
   if (role) {
-    const override = getOptionalConfigValue(`AI_${role.toUpperCase()}_PROVIDER`, '');
-    if (override) {
-      const normalized = override.trim().toLowerCase() as AIProvider;
-      return SUPPORTED_PROVIDERS.includes(normalized) ? normalized : undefined;
+    const explicit = PER_ROLE_CONFIG[role].provider();
+    if (explicit) {
+      const normalized = explicit.trim().toLowerCase() as AIProvider;
+      if (SUPPORTED_PROVIDERS.includes(normalized)) return normalized;
+      // Unrecognized name ("together", "groq", etc.) with a base URL → openai-compatible
+      return 'openai-compatible';
     }
   }
+  // 2. Legacy: AI_<ROLE>_PROVIDER via getOptionalConfigValue (already checked above)
+  // 3. Model-name prefix detection
+  if (!modelString) return undefined;
   return PROVIDER_HINTS.find(([, matches]) => matches(modelString))?.[0];
 }
 
@@ -130,6 +146,7 @@ export interface AIModelConfig {
   provider: AIProvider;
   model: string;
   apiKey: string;
+  baseURL?: string;
 }
 
 /**
@@ -182,6 +199,11 @@ export class AIServiceFactory {
    * Parse model configuration from model string
    */
   private parseModelConfig(modelString: string, role?: AIModelRole): AIModelConfig | null {
+    if (!modelString) {
+      // No model configured for this role — skip silently
+      return null;
+    }
+
     const provider = resolveProvider(modelString, role);
 
     if (!provider) {
@@ -193,16 +215,29 @@ export class AIServiceFactory {
       return null;
     }
 
-    const apiKey = PROVIDER_API_KEYS[provider]();
+    // Resolve API key: per-role key overrides global provider key
+    let apiKey = '';
+    let baseURL: string | undefined;
+    if (role) {
+      const roleConfig = PER_ROLE_CONFIG[role];
+      apiKey = roleConfig.apiKey();
+      const url = roleConfig.baseURL();
+      if (url) baseURL = url;
+    }
+    // Fall back to global provider key
+    if (!apiKey && provider !== 'openai-compatible') {
+      apiKey = PROVIDER_API_KEYS[provider]();
+    }
+
     if (!apiKey) {
       this.logger.warn(
-        `AI Provider Warning: No API key found for ${provider} provider. ` +
-          `AI features using this provider will be disabled.`,
+        `AI Provider Warning: No API key for ${provider} (role: ${role ?? 'unknown'}). ` +
+          `Set AI_${(role ?? 'MAIN').toUpperCase()}_API_KEY or the global provider key.`,
       );
       return null;
     }
 
-    return { provider, model: modelString, apiKey };
+    return { provider, model: modelString, apiKey, baseURL };
   }
 
   /**
@@ -228,16 +263,23 @@ export class AIServiceFactory {
     // stored, used as a truthiness gate — and then silently ignored.
     switch (config.provider) {
       case 'anthropic':
-        return meter(createAnthropic({ apiKey: config.apiKey })(config.model));
+        return meter(createAnthropic({ apiKey: config.apiKey, ...(config.baseURL && { baseURL: config.baseURL }) })(config.model));
 
       case 'openai':
-        return meter(createOpenAI({ apiKey: config.apiKey })(config.model));
+        return meter(createOpenAI({ apiKey: config.apiKey, ...(config.baseURL && { baseURL: config.baseURL }) })(config.model));
 
       case 'google':
-        return meter(createGoogleGenerativeAI({ apiKey: config.apiKey })(config.model));
+        return meter(createGoogleGenerativeAI({ apiKey: config.apiKey, ...(config.baseURL && { baseURL: config.baseURL }) })(config.model));
 
       case 'perplexity':
-        return meter(createPerplexity({ apiKey: config.apiKey })(config.model));
+        return meter(createPerplexity({ apiKey: config.apiKey, ...(config.baseURL && { baseURL: config.baseURL }) })(config.model));
+
+      case 'openai-compatible':
+        // Any OpenAI-protocol endpoint: OpenRouter, Together, Groq, Ollama, Azure, etc.
+        return meter(createOpenAI({
+          apiKey: config.apiKey,
+          ...(config.baseURL && { baseURL: config.baseURL }),
+        })(config.model));
 
       default:
         throw new Error(`Unsupported AI provider: ${config.provider}`);
@@ -471,7 +513,8 @@ export class AIServiceFactory {
       anthropic: false,
       openai: false,
       google: false,
-      perplexity: false
+      perplexity: false,
+      'openai-compatible': false
     };
 
     // Test each provider if API key is available

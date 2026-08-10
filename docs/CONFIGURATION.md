@@ -73,12 +73,84 @@ At least one AI API key is required for AI-powered features (PRD generation, tas
 
 ### AI Model Configuration
 
+No models are configured by default — set the ones you want to use. If a
+role has an API key but no model configured, the server warns instead of
+silently picking a default model.
+
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `AI_MAIN_MODEL` | `claude-3-5-sonnet-20241022` | Primary model for complex tasks |
-| `AI_RESEARCH_MODEL` | `perplexity-llama-3.1-sonar-large-128k-online` | Model for research tasks |
-| `AI_FALLBACK_MODEL` | `gpt-4o` | Fallback when primary unavailable |
-| `AI_PRD_MODEL` | `claude-3-5-sonnet-20241022` | Model for PRD generation |
+| `AI_MAIN_MODEL` | _(none)_ | Primary model for complex tasks |
+| `AI_RESEARCH_MODEL` | _(none)_ | Model for research tasks |
+| `AI_FALLBACK_MODEL` | _(none)_ | Fallback when primary unavailable |
+| `AI_PRD_MODEL` | _(none)_ | Model for PRD generation |
+
+### Per-Role AI Provider Configuration
+
+Beyond the global `*_API_KEY` variables and `AI_*_MODEL` names above, each AI
+model role can be configured **independently** — its own provider, API key,
+base URL, and model. This lets you mix providers per task: e.g. a cheap
+OpenRouter model for everyday work, direct Anthropic for PRD generation, and
+a local Ollama instance as an offline fallback.
+
+The pattern is `AI_<ROLE>_<SETTING>`, where `<ROLE>` is one of `MAIN`,
+`RESEARCH`, `FALLBACK`, or `PRD`:
+
+| Variable | Description |
+|----------|-------------|
+| `AI_MAIN_PROVIDER` / `AI_RESEARCH_PROVIDER` / `AI_FALLBACK_PROVIDER` / `AI_PRD_PROVIDER` | Provider for this role: `anthropic`, `openai`, `google`, `perplexity`, or `openai-compatible` |
+| `AI_MAIN_API_KEY` / `AI_RESEARCH_API_KEY` / `AI_FALLBACK_API_KEY` / `AI_PRD_API_KEY` | API key for this role, overrides the global `*_API_KEY` |
+| `AI_MAIN_BASE_URL` / `AI_RESEARCH_BASE_URL` / `AI_FALLBACK_BASE_URL` / `AI_PRD_BASE_URL` | Custom endpoint for this role (required for `openai-compatible`) |
+| `AI_MAIN_MODEL` / `AI_RESEARCH_MODEL` / `AI_FALLBACK_MODEL` / `AI_PRD_MODEL` | Model name for this role |
+
+**Resolution order** for each role:
+1. **API key:** the role-specific `AI_<ROLE>_API_KEY` if set, otherwise the
+   global key for that provider (e.g. `ANTHROPIC_API_KEY`).
+2. **Provider:** the role-specific `AI_<ROLE>_PROVIDER` if set, otherwise
+   inferred from the role's model name prefix (e.g. a model starting with
+   `claude-` resolves to `anthropic`, `gpt-`/`o1-` to `openai`, `gemini-` to
+   `google`, `sonar-` to `perplexity`).
+3. If neither a role-specific nor a matching global key is configured, that
+   role is left unconfigured — AI features for it degrade gracefully instead
+   of falling back to a hardcoded default model.
+
+**The `openai-compatible` provider** uses the OpenAI wire protocol against a
+custom `AI_<ROLE>_BASE_URL`, so it works with any OpenAI-protocol endpoint:
+OpenRouter, Together AI, Groq, Ollama, LM Studio, Azure OpenAI, and others.
+
+**Example 1 — OpenRouter for daily tasks, direct Anthropic for PRDs:**
+
+```env
+AI_MAIN_PROVIDER=openai-compatible
+AI_MAIN_BASE_URL=https://openrouter.ai/api/v1
+AI_MAIN_API_KEY=sk-or-v1-your-openrouter-key
+AI_MAIN_MODEL=deepseek/deepseek-chat
+
+AI_PRD_PROVIDER=anthropic
+AI_PRD_API_KEY=sk-ant-your-anthropic-key
+AI_PRD_MODEL=claude-opus-5
+```
+
+**Example 2 — Local Ollama as an offline fallback:**
+
+```env
+ANTHROPIC_API_KEY=sk-ant-your-anthropic-key
+AI_MAIN_MODEL=claude-sonnet-4-20250514
+
+AI_FALLBACK_PROVIDER=openai-compatible
+AI_FALLBACK_BASE_URL=http://localhost:11434/v1
+AI_FALLBACK_API_KEY=ollama
+AI_FALLBACK_MODEL=llama3.1
+```
+
+**Example 3 — Single provider (minimal, backward-compatible):**
+
+```env
+ANTHROPIC_API_KEY=sk-ant-your-anthropic-key
+AI_MAIN_MODEL=claude-opus-5
+```
+
+No per-role variables are required — every role that has no `AI_<ROLE>_*`
+overrides falls back to the global key and its model-prefix-detected provider.
 
 ### AI Task Generation Configuration
 

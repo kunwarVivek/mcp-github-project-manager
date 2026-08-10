@@ -56,6 +56,11 @@ beforeEach(() => {
   if (!process.env.OPENAI_API_KEY) process.env.OPENAI_API_KEY = "sk-test-openai-key";
   if (!process.env.GOOGLE_API_KEY) process.env.GOOGLE_API_KEY = "test-google-key";
   if (!process.env.PERPLEXITY_API_KEY) process.env.PERPLEXITY_API_KEY = "pplx-test-key";
+  // AI model defaults for tests (no hardcoded defaults in production)
+  if (!process.env.AI_MAIN_MODEL) process.env.AI_MAIN_MODEL = "claude-opus-5";
+  if (!process.env.AI_PRD_MODEL) process.env.AI_PRD_MODEL = "claude-opus-5";
+  if (!process.env.AI_FALLBACK_MODEL) process.env.AI_FALLBACK_MODEL = "gpt-4o";
+  if (!process.env.AI_RESEARCH_MODEL) process.env.AI_RESEARCH_MODEL = "sonar-pro";
 
   // Fake timers are E2E-ONLY and must not leak into unit/integration suites.
   //

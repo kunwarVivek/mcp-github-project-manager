@@ -56,10 +56,23 @@ export const WebhookConfigSchema = z.object({
 
 /** AI model configuration. */
 export const AIModelConfigSchema = z.object({
-  AI_MAIN_MODEL: z.string().default('claude-opus-5'),
-  AI_RESEARCH_MODEL: z.string().default('sonar-pro'),
-  AI_FALLBACK_MODEL: z.string().default('claude-sonnet-5'),
-  AI_PRD_MODEL: z.string().default('claude-opus-5'),
+  AI_MAIN_MODEL: z.string().default(''),
+  AI_RESEARCH_MODEL: z.string().default(''),
+  AI_FALLBACK_MODEL: z.string().default(''),
+  AI_PRD_MODEL: z.string().default(''),
+  // Per-role provider overrides
+  AI_MAIN_PROVIDER: z.string().default(''),
+  AI_MAIN_API_KEY: z.string().default(''),
+  AI_MAIN_BASE_URL: z.string().default(''),
+  AI_RESEARCH_PROVIDER: z.string().default(''),
+  AI_RESEARCH_API_KEY: z.string().default(''),
+  AI_RESEARCH_BASE_URL: z.string().default(''),
+  AI_FALLBACK_PROVIDER: z.string().default(''),
+  AI_FALLBACK_API_KEY: z.string().default(''),
+  AI_FALLBACK_BASE_URL: z.string().default(''),
+  AI_PRD_PROVIDER: z.string().default(''),
+  AI_PRD_API_KEY: z.string().default(''),
+  AI_PRD_BASE_URL: z.string().default(''),
 });
 
 /** Numeric bounds for AI task generation. */
@@ -117,6 +130,18 @@ export function validateConfig(env: Record<string, string | undefined>): ServerC
       AI_RESEARCH_MODEL: env.AI_RESEARCH_MODEL,
       AI_FALLBACK_MODEL: env.AI_FALLBACK_MODEL,
       AI_PRD_MODEL: env.AI_PRD_MODEL,
+      AI_MAIN_PROVIDER: env.AI_MAIN_PROVIDER,
+      AI_MAIN_API_KEY: env.AI_MAIN_API_KEY,
+      AI_MAIN_BASE_URL: env.AI_MAIN_BASE_URL,
+      AI_RESEARCH_PROVIDER: env.AI_RESEARCH_PROVIDER,
+      AI_RESEARCH_API_KEY: env.AI_RESEARCH_API_KEY,
+      AI_RESEARCH_BASE_URL: env.AI_RESEARCH_BASE_URL,
+      AI_FALLBACK_PROVIDER: env.AI_FALLBACK_PROVIDER,
+      AI_FALLBACK_API_KEY: env.AI_FALLBACK_API_KEY,
+      AI_FALLBACK_BASE_URL: env.AI_FALLBACK_BASE_URL,
+      AI_PRD_PROVIDER: env.AI_PRD_PROVIDER,
+      AI_PRD_API_KEY: env.AI_PRD_API_KEY,
+      AI_PRD_BASE_URL: env.AI_PRD_BASE_URL,
     },
     aiTasks: {
       MAX_TASKS_PER_PRD: env.MAX_TASKS_PER_PRD,
@@ -142,9 +167,11 @@ export function validateConfig(env: Record<string, string | undefined>): ServerC
  */
 export function validateConfigWarnings(env: Record<string, string | undefined>): string[] {
   const warnings: string[] = [];
-  const aiKeys = [env.ANTHROPIC_API_KEY, env.OPENAI_API_KEY, env.GOOGLE_API_KEY, env.PERPLEXITY_API_KEY];
-  if (!aiKeys.some(k => k && k.length > 0)) {
-    warnings.push('No AI provider API key configured — AI features will be unavailable');
+  const globalKeys = [env.ANTHROPIC_API_KEY, env.OPENAI_API_KEY, env.GOOGLE_API_KEY, env.PERPLEXITY_API_KEY];
+  const perRoleKeys = [env.AI_MAIN_API_KEY, env.AI_RESEARCH_API_KEY, env.AI_FALLBACK_API_KEY, env.AI_PRD_API_KEY];
+  const allKeys = [...globalKeys, ...perRoleKeys];
+  if (!allKeys.some(k => k && k.length > 0)) {
+    warnings.push('No AI provider API key configured — AI features will be unavailable. Set a global key (e.g. ANTHROPIC_API_KEY) or per-role keys (e.g. AI_MAIN_API_KEY).');
   }
   return warnings;
 }
