@@ -91,6 +91,15 @@ export class SamplingLanguageModel implements LanguageModelV4 {
     if (messages.length === 0) {
       messages.push({ role: 'user', content: { type: 'text', text: 'Hello' } });
     }
+    // When responseFormat requests JSON, reinforce in the system prompt.
+    // The AI SDK injects the schema into the user prompt; we add a system-level
+    // instruction to return raw JSON without markdown fences.
+    if (options.responseFormat?.type === 'json') {
+      const jsonInstruction = 'IMPORTANT: Respond with valid JSON only. No markdown fences, no explanation, no text before or after the JSON object.';
+      systemPrompt = systemPrompt
+        ? `${systemPrompt}\n\n${jsonInstruction}`
+        : jsonInstruction;
+    }
 
     const result = await this.samplingFn({
       messages,
@@ -104,10 +113,20 @@ export class SamplingLanguageModel implements LanguageModelV4 {
       },
     });
 
-    const text =
+    let text =
       typeof result.content === 'string'
         ? result.content
         : (result.content?.text ?? '');
+
+    // Strip markdown JSON fences that clients commonly wrap around JSON responses
+    if (options.responseFormat?.type === 'json') {
+      text = text.trim();
+      // Strip ```json ... ``` or ``` ... ```
+      const fenceMatch = text.match(/^```(?:json)?\s*\n?([\s\S]*?)\n?\s*```$/);
+      if (fenceMatch) {
+        text = fenceMatch[1].trim();
+      }
+    }
 
     return {
       content: [{ type: 'text' as const, text }],
