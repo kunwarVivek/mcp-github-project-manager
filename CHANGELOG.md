@@ -5,6 +5,34 @@ All notable changes to the MCP GitHub Project Manager will be documented in this
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+
+## [2.0.0] - 2026-08-09
+
+### Added
+- **PRD-to-Issues pipeline (`materialize_tasks`)** — converts AI-generated tasks into real GitHub project hierarchies:
+  - Creates milestones, sprints (GitHub Projects V2 iterations), and issues per phase
+  - Bottom-up dependency sequencing via `DependencyGraph.analyze()` — tasks with no dependencies execute first
+  - Issues automatically added to project and assigned to their phase's sprint
+  - Label prefixing for traceability (`ai-generated`, `phase:N`, `priority:*`)
+  - Acceptance criteria and dependency context embedded in issue bodies
+- **PM coordination actions** — three new `agent_manage` actions for project-manager-role orchestration:
+  - `assign_task` — PM explicitly assigns a specific issue (by number) to a specific agent, bypassing self-service checkout
+  - `get_swarm_status` — dashboard of all agents with tasks, heartbeats, budgets, blocked/stale detection
+  - `rebalance_workload` — redistributes tasks across idle agents when workload is uneven
+- **Full pipeline E2E test** — 10-stage test covering PRD generation → task parsing → materialize → agent registration → PM assign_task → heartbeat + submit_work_product → submit_for_review + approve_task → get_swarm_status → summary assertions
+- **Pipeline npm scripts** — `test:pipeline`, `test:pipeline:openai`, `test:pipeline:google`
+
+### Fixed
+- **Sprint-issue assignment (`addIssuesToSprint`)** — three bugs fixed:
+  - `itemId` was garbage string `Issue_${id}` — now resolves to `PVTI_...` (ProjectV2Item node ID) via `resolveProjectItemIds`
+  - `fieldId` passed iteration instance ID — now uses iteration FIELD ID (`PVTIF_...`) from `ensureIterationField`
+  - `value` was string `"ITERATION"` — now `{ iterationId: instanceId }`
+- **`ensureIterationField` project targeting** — now accepts `targetProjectId` and queries that specific project via `node(id:)`, instead of always getting the oldest project via `projectsV2(first:1)`
+- **`projectId` threading** — `materialize_tasks` → `PMS.createSprint` → `SprintPlanningService` → `SprintRepo.create` → `ensureIterationField(projectId)` now correctly targets the operating project
+- **Sprint create on GitHub Projects V2** — wired to real iteration field API (`updateProjectV2Field` with `iterationConfiguration`), replacing the fabricated no-op
+- **`findAll` ordering** — issues, milestones return newest first (matching GitHub default), fixing the "created is NOT in the first 100" bug
+- **`findById` dual format** — accepts both numeric IDs and GraphQL node IDs (`I_kwDO...`)
+
 ## [Unreleased]
 
 ### Added
