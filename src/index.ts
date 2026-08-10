@@ -1131,6 +1131,45 @@ class GitHubProjectManagerServer {
       this.stdioHandle = serveStdio(() => this.server, {
         onerror: (error) => this.logger.error("MCP transport error:", error),
       });
+
+      // Register MCP sampling as zero-config AI fallback.
+      // The calling agent (Claude, Codex, Pi) IS the LLM — no API keys needed.
+      // Registered lazily: the sampling function checks client capabilities at
+      // call time because the client hasn't connected yet at this point.
+      // Only works on 2025-era connections where createMessage is available.
+      if (!this.aiFactory.isAIAvailable()) {
+        const server = this.server.server;
+        this.aiFactory.setSamplingProvider(async (params) => {
+          // Check client capabilities at call time (not at registration)
+          const clientCaps = server.getClientCapabilities();
+          if (!clientCaps?.sampling) {
+            throw new Error(
+              'MCP client does not support sampling. ' +
+              'Configure AI_MAIN_MODEL + provider key, or use ' +
+              'AI_MAIN_PROVIDER=openai-compatible with a base URL. ' +
+              'See docs/CONFIGURATION.md for examples.',
+            );
+          }
+
+          const result = await server.createMessage({
+            messages: params.messages.map((m) => ({
+              role: m.role as 'user' | 'assistant',
+              content: m.content,
+            })),
+            systemPrompt: params.systemPrompt,
+            maxTokens: params.maxTokens ?? 4096,
+            modelPreferences: params.modelPreferences,
+          });
+
+          return {
+            role: result.role,
+            content: typeof result.content === 'string'
+              ? result.content
+              : { type: 'text', text: 'text' in result.content ? String(result.content.text) : String(result.content) },
+            model: result.model,
+          };
+        });
+      }
       this.logger.info("MCP server connected over stdio");
 
       // Display configuration information if verbose mode is enabled

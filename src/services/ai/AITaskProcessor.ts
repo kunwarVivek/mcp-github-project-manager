@@ -67,7 +67,19 @@ export class AITaskProcessor {
     }
 
     if (!model) {
-      throw new Error('AI service is not available. Please configure at least one AI provider (ANTHROPIC_API_KEY, OPENAI_API_KEY, GOOGLE_API_KEY, or PERPLEXITY_API_KEY).');
+      const { hasAnyProvider } = this.aiFactory.validateConfiguration();
+      if (hasAnyProvider) {
+        throw new Error(
+          'AI provider key found but no model configured. ' +
+          'Set AI_MAIN_MODEL (e.g. "claude-sonnet-4-20250514", "gpt-4o-mini", "gemini-2.0-flash") ' +
+          'or per-role models (AI_PRD_MODEL, AI_RESEARCH_MODEL, AI_FALLBACK_MODEL).',
+        );
+      }
+      throw new Error(
+        'No AI provider configured. Set an API key (ANTHROPIC_API_KEY, OPENAI_API_KEY, GOOGLE_API_KEY, PERPLEXITY_API_KEY) ' +
+        'and a model (AI_MAIN_MODEL), or use per-role config (AI_MAIN_PROVIDER + AI_MAIN_API_KEY + AI_MAIN_MODEL). ' +
+        'See docs/CONFIGURATION.md for OpenRouter, Ollama, and other provider examples.',
+      );
     }
 
     return model;

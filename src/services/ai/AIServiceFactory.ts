@@ -2,6 +2,8 @@ import { createAnthropic } from '@ai-sdk/anthropic';
 import { createOpenAI } from '@ai-sdk/openai';
 import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import { createPerplexity } from '@ai-sdk/perplexity';
+import type { SamplingRequestFn } from './SamplingLanguageModel';
+import { SamplingLanguageModel } from './SamplingLanguageModel';
 import { type LanguageModel, wrapLanguageModel, type LanguageModelMiddleware } from 'ai';
 import {
   ANTHROPIC_API_KEY, OPENAI_API_KEY, GOOGLE_API_KEY, PERPLEXITY_API_KEY,
@@ -166,6 +168,7 @@ export class AIServiceFactory {
   private static instance: AIServiceFactory;
   private config: AIServiceConfig;
   private resiliencePolicy?: AIResiliencePolicy;
+  private samplingModel: LanguageModel | null = null;
   private readonly logger: ILogger;
 
   private constructor(logger?: ILogger) {
@@ -319,24 +322,33 @@ export class AIServiceFactory {
    * Tries models in order of preference: main -> fallback -> any available
    */
   public getBestAvailableModel(): LanguageModel | null {
-    // Try main model first
     const mainModel = this.getMainModel();
     if (mainModel) return mainModel;
 
-    // Try fallback model
     const fallbackModel = this.getFallbackModel();
     if (fallbackModel) return fallbackModel;
 
-    // Try PRD model
     const prdModel = this.getPRDModel();
     if (prdModel) return prdModel;
 
-    // Try research model
     const researchModel = this.getResearchModel();
     if (researchModel) return researchModel;
 
-    // No models available
+    // Last resort: MCP sampling (the calling agent does the completion)
+    if (this.samplingModel) return this.samplingModel;
+
     return null;
+  }
+
+  /**
+   * Register the MCP client's own LLM as a zero-config fallback.
+   * Called after MCP handshake when the client declares sampling capability.
+   * This lets all AI tools work without any API keys — the calling agent
+   * (Claude, Codex, Pi) IS the model.
+   */
+  public setSamplingProvider(samplingFn: SamplingRequestFn): void {
+    this.samplingModel = new SamplingLanguageModel(samplingFn) as unknown as LanguageModel;
+    this.logger.info('🔗 MCP sampling registered as zero-config AI fallback (client LLM)');
   }
 
   /**
