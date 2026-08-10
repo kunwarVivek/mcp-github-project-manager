@@ -1272,12 +1272,13 @@ export async function executeAgentManage(args: AgentManageArgs): Promise<unknown
       const idleAgents = agents.filter(a => a.status === 'idle');
       if (idleAgents.length === 0) return { success: false, message: 'No idle agents available', assignments: [] };
 
-      // 2. Get open issues in the project that are unassigned
-      // Use the fetchOpenIssues-style query to find unclaimed issues
-      const { data: repoIssues } = await octokit.rest.issues.listForRepo({
-        owner: config.owner, repo: config.repo, state: 'open', per_page: 50, sort: 'created', direction: 'asc',
-      });
-      const openIssues = repoIssues.filter(i => !i.pull_request);
+      // 2. Get open issues that belong to THIS project (not all repo issues)
+      const projectItemsResp = await factory.graphql<{
+        node: { items: { nodes: Array<{ content: { number: number; title: string; state: string; labels: { nodes: Array<{ name: string }> } } | null }> } } | null;
+      }>(`query($id: ID!) { node(id: $id) { ... on ProjectV2 { items(first: 100) { nodes { content { ... on Issue { number title state labels(first: 10) { nodes { name } } } } } } } } }`, { id: projectId });
+      const openIssues = (projectItemsResp.node?.items?.nodes || [])
+        .map(n => n.content)
+        .filter((c): c is NonNullable<typeof c> => c !== null && c.state === 'OPEN');
 
       // 3. For each idle agent, find the best matching unassigned issue
       const assignments: Array<{ agentId: string; agentName: string; issueNumber: number; issueTitle: string; matchScore: number; reason: string }> = [];
@@ -1301,7 +1302,7 @@ export async function executeAgentManage(args: AgentManageArgs): Promise<unknown
           if (assignedIssues.has(issue.number)) continue;
           // Skip issues already assigned (have agent comments)
 
-          const labels = issue.labels.map((l) => typeof l === 'string' ? l : l.name).filter((l): l is string => Boolean(l));
+          const labels = issue.labels.nodes.map(l => l.name);
 
           // Score: capability overlap with issue labels/title
           let score = 0;
@@ -1464,11 +1465,13 @@ export async function executeAgentManage(args: AgentManageArgs): Promise<unknown
         unchanged: [] as Array<{ issue: number; title: string; reason: string }>,
       };
 
-      // 1. Get all open issues in the repo
-      const { data: issues } = await octokit.rest.issues.listForRepo({
-        owner: config.owner, repo: config.repo, state: 'open', per_page: 50,
-      });
-      const openIssues = issues.filter(i => !i.pull_request);
+      // 1. Get open issues that belong to THIS project (not all repo issues)
+      const projectItemsResp = await factory.graphql<{
+        node: { items: { nodes: Array<{ content: { number: number; title: string; state: string; body: string; labels: { nodes: Array<{ name: string }> } } | null }> } } | null;
+      }>(`query($id: ID!) { node(id: $id) { ... on ProjectV2 { items(first: 100) { nodes { content { ... on Issue { number title state body labels(first: 10) { nodes { name } } } } } } } } }`, { id: projectId });
+      const openIssues = (projectItemsResp.node?.items?.nodes || [])
+        .map(n => n.content)
+        .filter((c): c is NonNullable<typeof c> => c !== null && c.state === 'OPEN');
 
       for (const issue of openIssues) {
         // Check if issue has a work product
@@ -1515,7 +1518,7 @@ export async function executeAgentManage(args: AgentManageArgs): Promise<unknown
                 owner: config.owner, repo: config.repo,
                 title: subtaskTitle,
                 body: `**Parent task:** #${issue.number} — ${issue.title}\n\nFix the failing tests identified in the convergence review.\n\n### Findings\n${findings.map(f => '- ' + f).join('\n')}`,
-                labels: issue.labels.map((l) => (typeof l === 'string' ? l : l.name)).filter((l): l is string => Boolean(l)),
+                labels: issue.labels.nodes.map(l => l.name),
               });
               report.decomposed.push({ parent: issue.number, subtasks: [sub.number] });
 
