@@ -99,6 +99,26 @@ blocked/stale flags.
 
 Redistributes tasks from overloaded agents to idle ones.
 
+### Convergence loop
+
+Drive the project toward completion in one call:
+
+```json
+{"tool": "agent_manage", "arguments": {"action": "converge_project", "projectId": "PVT_..."}}
+```
+
+Iterates all open issues in the project: validates work products, auto-approves
+passing work, auto-rejects failing, auto-decomposes fix subtasks.
+
+For multi-iteration convergence:
+
+```json
+{"tool": "agent_manage", "arguments": {"action": "converge_until_done", "projectId": "PVT_...", "iteration": 1}}
+```
+
+Returns progress report + suggested next actions. Call in a loop, incrementing
+`iteration`, until `done: true`.
+
 ## Harness setup
 
 The server is a plain MCP server — any harness that speaks MCP works. Install it

@@ -1,13 +1,13 @@
 # MCP Tools Reference
 
-This document provides comprehensive documentation for the 16 compound MCP tools exposed by the MCP GitHub Project Manager. Each compound tool groups related actions behind a single `action` parameter, reducing tool-selection overhead for AI agents while preserving full access to all 138 underlying operations.
+This document provides comprehensive documentation for the 16 compound MCP tools exposed by the MCP GitHub Project Manager. Each compound tool groups related actions behind a single `action` parameter, reducing tool-selection overhead for AI agents while preserving full access to all 152 underlying operations.
 
 ## Overview
 
 | Metric | Value |
 |--------|-------|
 | Compound Tools | 16 |
-| Total Actions | 138 |
+| Total Actions | 152 |
 | SDK Version | 1.29 |
 | All tools have | Behavior annotations, Output schemas |
 
@@ -59,8 +59,8 @@ MCP_TOOL_GROUPS=all
 11. [ai_generate](#ai_generate) (9 actions)
 12. [ai_analyze](#ai_analyze) (8 actions)
 13. [ai_plan](#ai_plan) (6 actions)
-14. [agent_work](#agent_work) (10 actions)
-15. [agent_manage](#agent_manage) (13 actions)
+14. [agent_work](#agent_work) (12 actions)
+15. [agent_manage](#agent_manage) (18 actions)
 16. [discover_tools](#discover_tools) (meta-tool)
 
 ---
@@ -544,7 +544,7 @@ AI-powered planning: capacity analysis, backlog prioritization, risk assessment,
 
 Agent task lifecycle: register, check out tasks, report progress, and complete work.
 
-**Action enum:** `register` | `checkout_task` | `release_task` | `complete_task` | `heartbeat` | `check_work_status` | `get_task_context` | `submit_for_review` | `approve_task` | `reject_task`
+**Action enum:** `register` | `checkout_task` | `release_task` | `complete_task` | `heartbeat` | `check_work_status` | `get_task_context` | `submit_for_review` | `approve_task` | `reject_task` | `validate_work_product` | `get_handoff_context`
 
 ### Per-Action Parameters
 
@@ -560,6 +560,8 @@ Agent task lifecycle: register, check out tasks, report progress, and complete w
 | `submit_for_review` | `agentId` (req), `taskId` (req), `summary` | Move a task into the review queue |
 | `approve_task` | `reviewerId` (req), `taskId` (req), `summary` | Approve a reviewed task (completes + closes) |
 | `reject_task` | `reviewerId` (req), `taskId` (req), `feedback` | Reject a reviewed task (returns to pool with feedback) |
+| `validate_work_product` | `agentId` (req), `taskId` (req) | Inspect work product against acceptance criteria — returns findings + recommendation (approve/reject/needs_work) |
+| `get_handoff_context` | `taskId` (req) | Cross-agent context for subtasks: parent issue, prior work product, rejection feedback, acceptance criteria |
 
 ### Examples
 
@@ -572,6 +574,12 @@ Agent task lifecycle: register, check out tasks, report progress, and complete w
 
 // Send a heartbeat
 {"tool": "agent_work", "arguments": {"action": "heartbeat", "agentId": "agent-abc123", "status": "working", "taskId": "issue-42", "progress": 60, "progressSummary": "Tests passing, working on edge cases"}}
+
+// Validate a work product against acceptance criteria
+{"tool": "agent_work", "arguments": {"action": "validate_work_product", "agentId": "reviewer-agent-1", "taskId": "issue-42"}}
+
+// Get handoff context for a subtask
+{"tool": "agent_work", "arguments": {"action": "get_handoff_context", "taskId": "issue-43"}}
 ```
 
 ---
@@ -580,7 +588,7 @@ Agent task lifecycle: register, check out tasks, report progress, and complete w
 
 Agent administration: list agents, manage budgets, view activity, and submit work products.
 
-**Action enum:** `list` | `deregister` | `get_activity` | `submit_work_product` | `get_budget` | `set_budget` | `reclaim_stale` | `record_usage` | `get_metrics` | `setup_fields` | `assign_task` | `get_swarm_status` | `rebalance_workload`
+**Action enum:** `list` | `deregister` | `get_activity` | `submit_work_product` | `get_budget` | `set_budget` | `reclaim_stale` | `record_usage` | `get_metrics` | `setup_fields` | `assign_task` | `get_swarm_status` | `rebalance_workload` | `decompose_task` | `smart_assign` | `converge_project` | `converge_until_done` | `cleanup_registry`
 
 ### Per-Action Parameters
 
@@ -599,6 +607,11 @@ Agent administration: list agents, manage budgets, view activity, and submit wor
 | `assign_task` | `agentId` (req), `projectId` (req), `issueNumber` (req) | PM assigns a specific issue to a specific agent, bypassing self-service checkout |
 | `get_swarm_status` | `staleAfterMinutes` | Dashboard of all agents: tasks, heartbeats, budgets, blocked/stale detection |
 | `rebalance_workload` | — | Redistribute tasks from overloaded agents to idle ones |
+| `decompose_task` | `projectId` (req), `issueNumber` (req), `subtasks` (req: array of {title, description, acceptanceCriteria?}) | PM splits a rejected task into sub-issues linked to parent |
+| `smart_assign` | `projectId` (req), `agentIds`, `roleFilter`, `maxAssignments` | Capability-matched, budget-aware task assignment |
+| `converge_project` | `projectId` (req) | Auto-approve passing work, auto-reject failing, auto-decompose fix subtasks |
+| `converge_until_done` | `projectId` (req), `iteration`, `maxIterations` | Multi-iteration convergence: progress report + next actions |
+| `cleanup_registry` | `staleAfterMinutes` | Remove stale agents with no heartbeat |
 
 > **Auto-reclaim scheduler:** the server runs a background sweep every
 > `AGENT_RECLAIM_INTERVAL_MS` (default 5 min, enabled by default) that reclaims
@@ -627,6 +640,14 @@ Agent administration: list agents, manage budgets, view activity, and submit wor
 
 // Check swarm status
 {"tool": "agent_manage", "arguments": {"action": "get_swarm_status"}}
+```
+
+```json
+// Capability-matched, budget-aware assignment
+{"tool": "agent_manage", "arguments": {"action": "smart_assign", "projectId": "PVT_kwDOAB...", "roleFilter": "engineer", "maxAssignments": 5}}
+
+// Converge a project: auto-approve, auto-reject, auto-decompose
+{"tool": "agent_manage", "arguments": {"action": "converge_project", "projectId": "PVT_kwDOAB..."}}
 ```
 
 ---

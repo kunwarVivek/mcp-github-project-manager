@@ -12,7 +12,7 @@ This server implements the [Model Context Protocol](https://modelcontextprotocol
 
 ### What Makes This Special
 
-- **16 Compound Tools (138 actions)**: Progressive-disclosure API — AI agents see 16 tools instead of 131, with `discover_tools` for runtime exploration
+- **16 Compound Tools (152 actions)**: Progressive-disclosure API — AI agents see 16 tools instead of 131, with `discover_tools` for runtime exploration
 - **AI-Powered**: Transform project ideas into comprehensive PRDs and actionable tasks using multiple AI providers
 - **Agent Orchestration**: Autonomous AI agent task assignment, heartbeat monitoring, budget enforcement, and work product tracking
 - **PRD-to-Issues Pipeline**: Materialize AI-generated tasks into GitHub milestones, sprints, and issues with dependency-driven sequencing
@@ -131,16 +131,21 @@ docker run -it \
 - **Event System**: Track and replay project events
 
 ### Agent Orchestration (16 compound tools)
-- **Compound Tool API**: 16 tools with `action` routing replace 138 individual actions — simpler for AI agents
+- **Compound Tool API**: 16 tools with `action` routing replace 152 individual actions — simpler for AI agents
 - **Agent Registry**: Register, list, and deregister autonomous AI agents
 - **Task Checkout**: Claim tasks with configurable selection strategies (priority, age, skills, deadline)
 - **Heartbeat Monitoring**: Periodic liveness and progress reporting with stale-agent detection
 - **Work Product Tracking**: Submit code changes, PRs, test results, and review artifacts
+- **Work Product Validation**: Reviewers inspect work against acceptance criteria — not rubber stamps
 - **Budget Enforcement**: Per-agent token budgets with warning thresholds and hard stops
 - **Activity Dashboard**: Real-time view of all agent statuses, tasks, and budget consumption
 - **Subagent Hierarchy**: Parent-child agent relationships with cascade deregistration
 - **Runtime Discovery**: `discover_tools` meta-tool for exploring available actions and schemas
 - **PM Coordination**: Project managers can assign specific tasks, monitor swarm status, and rebalance workloads
+- **Failure Recovery**: PM decomposes rejected tasks into subtasks, re-assigns to agents
+- **Smart Task Routing**: Capability-matched, budget-aware assignment (`smart_assign`)
+- **Project Convergence**: Auto-approve/reject/decompose in one call (`converge_project`)
+- **Registry Cleanup**: Remove stale agents automatically
 - **Task Materialization**: Bridge from PRD tasks to GitHub issues with milestones, sprints, and project assignment
 
 ## Installation
