@@ -113,6 +113,7 @@ import {
 
 // PM coordination services
 import { AgentStore } from '../../agent/AgentStore';
+import { WorkProductStore } from '../../agent/WorkProductStore';
 import { AgentBudgetService } from '../../../services/agent/AgentBudgetService';
 import { AgentContextService } from '../../../services/agent/AgentContextService';
 import { TaskCheckoutService } from '../../../services/agent/TaskCheckoutService';
@@ -1029,6 +1030,66 @@ export async function executeAgentWork(args: AgentWorkArgs): Promise<unknown> {
     case 'submit_for_review': return route(executeSubmitForReview, rest);
     case 'approve_task':      return route(executeApproveTask, rest);
     case 'reject_task':       return route(executeRejectTask, rest);
+    case 'validate_work_product': {
+      const factory = createGitHubFactory();
+      const wpStore = new WorkProductStore(factory);
+      const issueNumber = parseInt(rest.taskId as string, 10);
+      if (Number.isNaN(issueNumber)) return { valid: false, findings: ['Invalid taskId — expected issue number'] };
+
+      // 1. Get work products for this issue
+      const products = await wpStore.listForIssue(issueNumber);
+      if (products.length === 0) {
+        return { valid: false, findings: ['No work product submitted for this task'], recommendation: 'reject' };
+      }
+      const latest = products[products.length - 1];
+
+      // 2. Get issue body for acceptance criteria
+      const config = factory.getConfig();
+      const octokit = factory.getOctokit();
+      const { data: issue } = await octokit.rest.issues.get({ owner: config.owner, repo: config.repo, issue_number: issueNumber });
+
+      // 3. Extract acceptance criteria from issue body
+      const body = issue.body || '';
+      const criteriaLines: string[] = [];
+      let inCriteria = false;
+      for (const line of body.split('\n')) {
+        if (/acceptance\s*criteria/i.test(line)) { inCriteria = true; continue; }
+        if (inCriteria && /^\s*[-*]/.test(line)) {
+          criteriaLines.push(line.replace(/^\s*[-*]\s*\[.?\]\s*/, '').trim());
+        } else if (inCriteria && line.trim() === '') {
+          // blank line after criteria section ends it
+        } else if (inCriteria && /^#/.test(line)) {
+          inCriteria = false;
+        }
+      }
+
+      // 4. Validate
+      const findings: string[] = [];
+      if (latest.filesChanged.length === 0) findings.push('No files changed in work product');
+      if (!latest.testResults) findings.push('No test results attached');
+      else {
+        if (latest.testResults.passed === 0) findings.push('Zero tests passing');
+        if (latest.testResults.failed > 0) findings.push(`${latest.testResults.failed} test(s) failing`);
+      }
+      if (!latest.summary || latest.summary.length < 10) findings.push('Work product summary is too brief');
+
+      const valid = findings.length === 0;
+      const recommendation = valid ? 'approve' : (latest.testResults?.failed ?? 0) > 0 ? 'reject' : 'needs_work';
+
+      return {
+        valid,
+        findings,
+        workProduct: {
+          id: latest.id,
+          files: latest.filesChanged,
+          tests: latest.testResults,
+          branch: latest.branch,
+          summary: latest.summary,
+        },
+        acceptanceCriteria: criteriaLines,
+        recommendation,
+      };
+    }
     default: unknownAction('agent_work', action);
   }
 }
@@ -1128,6 +1189,89 @@ export async function executeAgentManage(args: AgentManageArgs): Promise<unknown
         message: result.reclaimed > 0
           ? `Reclaimed ${result.reclaimed} task(s) from stale agents. Tasks are now available for checkout.`
           : 'No stale agents found. All active agents have recent heartbeats.',
+      };
+    }
+
+    case 'decompose_task': {
+      // PM splits a rejected task into smaller sub-issues, links each to
+      // the parent via GitHub's native sub-issue relationship, and adds
+      // them to the project.
+      const factory = createGitHubFactory();
+      const config = factory.getConfig();
+      const octokit = factory.getOctokit();
+      const issueNumber = rest.issueNumber as number;
+      const subtaskDefs = rest.subtasks as Array<{ title: string; description: string; acceptanceCriteria?: string }>;
+      const projectId = rest.projectId as string;
+
+      if (!issueNumber || !subtaskDefs?.length) {
+        return { success: false, message: 'issueNumber and subtasks[] are required' };
+      }
+
+      // Read parent issue for context
+      const { data: parent } = await octokit.rest.issues.get({ owner: config.owner, repo: config.repo, issue_number: issueNumber });
+
+      // Create sub-issues, link each to the parent, and add to the project
+      const created: Array<{ number: number; title: string; linkedAsSubIssue: boolean }> = [];
+      for (const sub of subtaskDefs) {
+        const body = [
+          sub.description,
+          '',
+          `**Parent task:** #${issueNumber} — ${parent.title}`,
+          '',
+          sub.acceptanceCriteria ? `### Acceptance Criteria\n\n- [ ] ${sub.acceptanceCriteria}` : '',
+          '',
+          `---`,
+          `*Decomposed from #${issueNumber} by PM after review rejection.*`,
+        ].filter(l => l !== undefined).join('\n');
+
+        const { data: newIssue } = await octokit.rest.issues.create({
+          owner: config.owner,
+          repo: config.repo,
+          title: sub.title,
+          body,
+          labels: parent.labels
+            .map((l) => (typeof l === 'string' ? l : l.name))
+            .filter((l): l is string => Boolean(l)),
+        });
+
+        // Link as a real GitHub sub-issue of the parent (non-fatal — some
+        // plans/repos don't have the sub-issues API enabled).
+        let linkedAsSubIssue = false;
+        try {
+          await executeAddSubIssue({
+            owner: config.owner,
+            repo: config.repo,
+            parentIssueNumber: issueNumber,
+            subIssueNumber: newIssue.number,
+            replaceParent: false,
+          });
+          linkedAsSubIssue = true;
+        } catch { /* non-fatal — issue is still created and comment-linked below */ }
+
+        created.push({ number: newIssue.number, title: newIssue.title, linkedAsSubIssue });
+
+        // Add to project if projectId provided
+        if (projectId) {
+          try {
+            const svc = getPMS();
+            await svc.addProjectItem({ projectId, contentId: newIssue.node_id, contentType: 'issue' });
+          } catch { /* non-fatal */ }
+        }
+      }
+
+      // Comment on parent
+      const subtaskList = created.map(s => `- #${s.number} ${s.title}`).join('\n');
+      await octokit.rest.issues.createComment({
+        owner: config.owner,
+        repo: config.repo,
+        issue_number: issueNumber,
+        body: `## Task Decomposed by PM\n\nThis task has been split into ${created.length} subtask(s) after review rejection:\n\n${subtaskList}\n\n**Decomposed at:** ${new Date().toISOString()}`,
+      });
+
+      return {
+        parentIssue: issueNumber,
+        subtasks: created,
+        summary: `Decomposed #${issueNumber} into ${created.length} subtask(s): ${created.map(s => '#' + s.number).join(', ')}`,
       };
     }
 
@@ -1265,10 +1409,10 @@ const TOOL_CATALOG: Record<string, {
     actions: [
       'register', 'checkout_task', 'release_task', 'complete_task',
       'heartbeat', 'check_work_status', 'get_task_context',
-      'submit_for_review', 'approve_task', 'reject_task',
+      'submit_for_review', 'approve_task', 'reject_task', 'validate_work_product',
       'list', 'deregister', 'get_activity', 'submit_work_product', 'get_budget', 'set_budget',
       'reclaim_stale', 'record_usage', 'get_metrics', 'setup_fields',
-      'assign_task', 'get_swarm_status', 'rebalance_workload',
+      'assign_task', 'get_swarm_status', 'rebalance_workload', 'decompose_task',
     ],
     description: 'Agent orchestration — task lifecycle (agent_work), administration (agent_manage), PM coordination (assign_task, get_swarm_status, rebalance_workload)',
   },

@@ -5,8 +5,9 @@ import { WORK_PRODUCT_MARKER } from '../../domain/agent-orchestration-types.js';
 /**
  * Stores work products as structured JSON comments on GitHub issues.
  *
- * Each comment begins with a hidden marker containing the full JSON payload,
- * followed by a human-readable summary.
+ * Each comment leads with a human-readable summary (files changed, test
+ * results, agent summary) followed by a hidden marker containing the full
+ * JSON payload for machine-parseable retrieval.
  */
 export class WorkProductStore {
   private readonly factory: GitHubRepositoryFactory;
@@ -20,25 +21,34 @@ export class WorkProductStore {
     const octokit = this.factory.getOctokit();
     const config = this.factory.getConfig();
 
-    const testLine = product.testResults
-      ? `- Tests: ${product.testResults.passed}/${product.testResults.total} passed\n`
-      : '';
-
-    const body = [
-      `${WORK_PRODUCT_MARKER} ${JSON.stringify(product)} -->`,
+    const humanReadable = [
+      `## Agent Work Product`,
       '',
-      `**Work Product** submitted by \`${product.agentId}\``,
+      `**Agent:** \`${product.agentId}\``,
+      `**Branch:** ${product.branch || '_(none)_'}`,
+      product.prNumber ? `**PR:** #${product.prNumber}` : null,
       '',
-      `- Branch: \`${product.branch || 'N/A'}\``,
-      `- PR: ${product.prNumber ? `#${product.prNumber}` : 'N/A'}`,
-      `- Commits: ${product.commitShas?.join(', ') || 'N/A'}`,
-      `- Files: ${product.filesChanged.length} changed`,
-      testLine ? testLine.trimEnd() : null,
+      `### Files Changed`,
+      ...product.filesChanged.map((f) => `- \`${f}\``),
       '',
+      product.testResults
+        ? [
+            `### Test Results`,
+            `| Passed | Failed | Skipped | Total | Coverage |`,
+            `|--------|--------|---------|-------|----------|`,
+            `| ${product.testResults.passed} | ${product.testResults.failed} | ${product.testResults.skipped} | ${product.testResults.total} | ${product.testResults.coverage != null ? `${product.testResults.coverage}%` : 'N/A'} |`,
+          ].join('\n')
+        : null,
+      '',
+      `### Summary`,
       product.summary,
+      '',
+      `**Submitted:** ${product.submittedAt}`,
     ]
       .filter((line): line is string => line !== null)
       .join('\n');
+
+    const body = `${humanReadable}\n\n${WORK_PRODUCT_MARKER} ${JSON.stringify(product)} -->\n`;
 
     await octokit.rest.issues.createComment({
       owner: config.owner,
@@ -63,12 +73,18 @@ export class WorkProductStore {
     const products: WorkProduct[] = [];
     for (const comment of comments) {
       const body = comment.body;
-      if (!body?.startsWith(WORK_PRODUCT_MARKER)) continue;
+      if (!body) continue;
 
-      const endIdx = body.indexOf('-->');
+      // The marker may be preceded by a human-readable summary, so search
+      // for it anywhere in the body rather than requiring it at the start.
+      const markerIdx = body.indexOf(WORK_PRODUCT_MARKER);
+      if (markerIdx < 0) continue;
+
+      const jsonStart = markerIdx + WORK_PRODUCT_MARKER.length;
+      const endIdx = body.indexOf('-->', jsonStart);
       if (endIdx < 0) continue;
 
-      const jsonStr = body.substring(WORK_PRODUCT_MARKER.length, endIdx).trim();
+      const jsonStr = body.substring(jsonStart, endIdx).trim();
       try {
         products.push(JSON.parse(jsonStr) as WorkProduct);
       } catch {

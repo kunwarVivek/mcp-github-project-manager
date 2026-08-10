@@ -709,7 +709,7 @@ export const agentWorkSchema = z.object({
   action: z.enum([
     'register', 'checkout_task', 'release_task', 'complete_task',
     'heartbeat', 'check_work_status', 'get_task_context',
-    'submit_for_review', 'approve_task', 'reject_task',
+    'submit_for_review', 'approve_task', 'reject_task', 'validate_work_product',
   ]).describe('The agent work operation to perform'),
   // Common
   agentId: z.string().optional(),
@@ -762,7 +762,7 @@ export const agentManageSchema = z.object({
     'submit_work_product', 'get_budget', 'set_budget',
     'reclaim_stale', 'record_usage', 'get_metrics', 'setup_fields',
     // PM coordination
-    'assign_task', 'get_swarm_status', 'rebalance_workload',
+    'assign_task', 'get_swarm_status', 'rebalance_workload', 'decompose_task',
   ]).describe('The agent management operation to perform'),
   // Common
   agentId: z.string().optional(),
@@ -795,6 +795,12 @@ export const agentManageSchema = z.object({
   tokensUsed: z.number().optional(),
   // Metrics
   staleAfterMinutes: z.number().optional(),
+  // Decompose task
+  subtasks: z.array(z.object({
+    title: z.string(),
+    description: z.string(),
+    acceptanceCriteria: z.string().optional(),
+  })).optional().describe('Subtasks for decompose_task — PM splits a rejected task into smaller pieces'),
 }).describe('Agent Management — list, deregister, activity, work products, budget, reclaim, usage, metrics, PM coordination');
 
 export type AgentManageArgs = z.infer<typeof agentManageSchema>;
