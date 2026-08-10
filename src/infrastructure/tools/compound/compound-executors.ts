@@ -1267,10 +1267,29 @@ export async function executeAgentManage(args: AgentManageArgs): Promise<unknown
 
       if (!projectId) return { success: false, message: 'projectId is required' };
 
-      // 1. Get all agents
+      // 1. Get all agents, filtering to eligible ones only
       const agents = await store.listAgents();
-      const idleAgents = agents.filter(a => a.status === 'idle');
-      if (idleAgents.length === 0) return { success: false, message: 'No idle agents available', assignments: [] };
+      const agentIdFilter = rest.agentIds as string[] | undefined;
+      const roleFilter = rest.roleFilter as string | undefined;
+      const staleMs = 60 * 60 * 1000; // 1 hour
+      const now = Date.now();
+
+      const eligibleAgents = agents.filter(a => {
+        if (a.status !== 'idle') return false;
+        if (agentIdFilter && !agentIdFilter.includes(a.id)) return false;
+        if (roleFilter && a.role !== roleFilter) return false;
+        // Skip stale agents — no heartbeat in last hour means they're likely dead
+        if (a.lastHeartbeat) {
+          const hbAge = now - new Date(a.lastHeartbeat).getTime();
+          if (hbAge > staleMs) return false;
+        } else {
+          // Never heartbeated — only include if registered in the last hour
+          const regAge = now - new Date(a.registeredAt).getTime();
+          if (regAge > staleMs) return false;
+        }
+        return true;
+      });
+      if (eligibleAgents.length === 0) return { success: false, message: 'No eligible idle agents (check agentIds, roleFilter, or agent freshness)', assignments: [] };
 
       // 2. Get open issues that belong to THIS project (not all repo issues)
       const projectItemsResp = await factory.graphql<{
@@ -1283,9 +1302,9 @@ export async function executeAgentManage(args: AgentManageArgs): Promise<unknown
       // 3. For each idle agent, find the best matching unassigned issue
       const assignments: Array<{ agentId: string; agentName: string; issueNumber: number; issueTitle: string; matchScore: number; reason: string }> = [];
       const assignedIssues = new Set<number>();
-      const maxAssignments = rest.maxAssignments as number || idleAgents.length;
+      const maxAssignments = rest.maxAssignments as number || eligibleAgents.length;
 
-      for (const agent of idleAgents) {
+      for (const agent of eligibleAgents) {
         if (assignments.length >= maxAssignments) break;
 
         // Check budget
@@ -1335,7 +1354,7 @@ export async function executeAgentManage(args: AgentManageArgs): Promise<unknown
           }
         }
 
-        if (bestIssue && bestScore >= 0) {
+        if (bestIssue && bestScore > 0) {
           // Attempt assignment
           try {
             const result = await checkoutService.checkoutTask(agent.id, { projectId, issueNumber: bestIssue.number });
@@ -1354,7 +1373,7 @@ export async function executeAgentManage(args: AgentManageArgs): Promise<unknown
       return {
         success: assignments.length > 0,
         totalAssigned: assignments.length,
-        totalIdleAgents: idleAgents.length,
+        totalIdleAgents: eligibleAgents.length,
         totalOpenIssues: openIssues.length,
         assignments,
       };
@@ -1540,6 +1559,127 @@ export async function executeAgentManage(args: AgentManageArgs): Promise<unknown
       };
     }
 
+    case 'cleanup_registry': {
+      // Remove stale/dead agents from the registry
+      const factory = createGitHubFactory();
+      const store = new AgentStore(factory);
+      const agents = await store.listAgents();
+      const staleThreshold = (rest.staleAfterMinutes as number || 60) * 60 * 1000;
+      const now = Date.now();
+
+      const staleAgents = agents.filter(a => {
+        // Keep agents that are actively working
+        if (a.status === 'working') return false;
+        // Remove agents that haven't heartbeated in staleThreshold
+        if (a.lastHeartbeat) {
+          return (now - new Date(a.lastHeartbeat).getTime()) > staleThreshold;
+        }
+        // No heartbeat ever — stale if registered more than staleThreshold ago
+        return (now - new Date(a.registeredAt).getTime()) > staleThreshold;
+      });
+
+      const removed: Array<{ id: string; name: string; role: string; lastSeen: string }> = [];
+      for (const agent of staleAgents) {
+        try {
+          await store.removeAgent(agent.id);
+          removed.push({
+            id: agent.id,
+            name: agent.name,
+            role: agent.role,
+            lastSeen: agent.lastHeartbeat || agent.registeredAt,
+          });
+        } catch { /* continue with others */ }
+      }
+
+      return {
+        cleaned: removed.length,
+        remaining: agents.length - removed.length,
+        removed,
+        summary: `Removed ${removed.length} stale agent(s), ${agents.length - removed.length} remaining`,
+      };
+    }
+
+    case 'converge_until_done': {
+      // Multi-iteration convergence: loop converge → smart_assign → wait for signal
+      // Returns after ONE iteration with a plan for what to do next.
+      // The calling agent runs this in a loop until all issues are closed.
+      const factory = createGitHubFactory();
+      const wpStore = new WorkProductStore(factory);
+      const projectId = rest.projectId as string;
+      const iteration = rest.iteration as number || 1;
+      const maxIterations = rest.maxIterations as number || 10;
+
+      if (!projectId) return { success: false, message: 'projectId is required' };
+      if (iteration > maxIterations) return { done: true, reason: 'Max iterations reached', iteration };
+
+      // Get project issues
+      const projectItemsResp = await factory.graphql<{
+        node: { items: { nodes: Array<{ content: { number: number; title: string; state: string } | null }> } } | null;
+      }>(`query($id: ID!) { node(id: $id) { ... on ProjectV2 { items(first: 100) { nodes { content { ... on Issue { number title state } } } } } } }`, { id: projectId });
+
+      const allItems = (projectItemsResp.node?.items?.nodes || []).map(n => n.content).filter((c): c is NonNullable<typeof c> => c !== null);
+      const openIssues = allItems.filter(i => i.state === 'OPEN');
+      const closedIssues = allItems.filter(i => i.state === 'CLOSED');
+
+      if (openIssues.length === 0) {
+        return {
+          done: true,
+          reason: 'All issues closed',
+          iteration,
+          summary: `Project complete: ${closedIssues.length} issues closed in ${iteration} iteration(s)`,
+          closedCount: closedIssues.length,
+        };
+      }
+
+      // Categorize open issues
+      const withWorkProduct: Array<{ number: number; title: string; hasFailures: boolean }> = [];
+      const withoutWorkProduct: Array<{ number: number; title: string }> = [];
+
+      for (const issue of openIssues) {
+        const products = await wpStore.listForIssue(issue.number);
+        if (products.length > 0) {
+          const latest = products[products.length - 1];
+          const hasFailures = (latest.testResults?.failed ?? 0) > 0;
+          withWorkProduct.push({ number: issue.number, title: issue.title, hasFailures });
+        } else {
+          withoutWorkProduct.push({ number: issue.number, title: issue.title });
+        }
+      }
+
+      // Build the next action plan for the calling agent
+      const nextActions: string[] = [];
+
+      if (withWorkProduct.some(i => !i.hasFailures)) {
+        nextActions.push(`Run converge_project to auto-approve ${withWorkProduct.filter(i => !i.hasFailures).length} passing issue(s)`);
+      }
+      if (withWorkProduct.some(i => i.hasFailures)) {
+        nextActions.push(`Run converge_project to auto-reject ${withWorkProduct.filter(i => i.hasFailures).length} failing issue(s) and decompose fix subtasks`);
+      }
+      if (withoutWorkProduct.length > 0) {
+        nextActions.push(`Run smart_assign to assign ${withoutWorkProduct.length} unassigned issue(s) to idle agents`);
+      }
+      if (nextActions.length === 0) {
+        nextActions.push('All issues have work products but none are ready — wait for agents to submit updates');
+      }
+
+      return {
+        done: false,
+        iteration,
+        maxIterations,
+        progress: {
+          total: allItems.length,
+          closed: closedIssues.length,
+          open: openIssues.length,
+          withWorkProduct: withWorkProduct.length,
+          withoutWorkProduct: withoutWorkProduct.length,
+          passing: withWorkProduct.filter(i => !i.hasFailures).length,
+          failing: withWorkProduct.filter(i => i.hasFailures).length,
+        },
+        nextActions,
+        hint: `Call converge_until_done again with iteration=${iteration + 1} after executing the suggested actions`,
+      };
+    }
+
     default: unknownAction('agent_manage', action);
   }
 }
@@ -1677,7 +1817,7 @@ const TOOL_CATALOG: Record<string, {
       'submit_for_review', 'approve_task', 'reject_task', 'validate_work_product', 'get_handoff_context',
       'list', 'deregister', 'get_activity', 'submit_work_product', 'get_budget', 'set_budget',
       'reclaim_stale', 'record_usage', 'get_metrics', 'setup_fields',
-      'assign_task', 'get_swarm_status', 'rebalance_workload', 'decompose_task', 'smart_assign', 'converge_project',
+      'assign_task', 'get_swarm_status', 'rebalance_workload', 'decompose_task', 'smart_assign', 'converge_project', 'converge_until_done', 'cleanup_registry',
     ],
     description: 'Agent orchestration — task lifecycle (agent_work), administration (agent_manage), PM coordination (assign_task, get_swarm_status, rebalance_workload)',
   },

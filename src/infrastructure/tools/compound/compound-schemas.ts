@@ -763,7 +763,7 @@ export const agentManageSchema = z.object({
     'submit_work_product', 'get_budget', 'set_budget',
     'reclaim_stale', 'record_usage', 'get_metrics', 'setup_fields',
     // PM coordination
-    'assign_task', 'get_swarm_status', 'rebalance_workload', 'decompose_task', 'smart_assign', 'converge_project',
+    'assign_task', 'get_swarm_status', 'rebalance_workload', 'decompose_task', 'smart_assign', 'converge_project', 'converge_until_done', 'cleanup_registry',
   ]).describe('The agent management operation to perform'),
   // Common
   agentId: z.string().optional(),
@@ -798,6 +798,11 @@ export const agentManageSchema = z.object({
   staleAfterMinutes: z.number().optional(),
   // Smart assign
   maxAssignments: z.number().optional(),
+  agentIds: z.array(z.string()).optional().describe('Filter smart_assign to specific agent IDs'),
+  roleFilter: z.string().optional().describe('Filter smart_assign to agents with this role'),
+  // Converge until done
+  iteration: z.number().optional().describe('Current iteration number for converge_until_done loop (starts at 1)'),
+  maxIterations: z.number().optional().describe('Maximum iterations before converge_until_done gives up (default 10)'),
   // Decompose task
   subtasks: z.array(z.object({
     title: z.string(),
