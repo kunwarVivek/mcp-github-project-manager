@@ -224,6 +224,7 @@ export const manageSprintsSchema = z.object({
   ]).describe('The sprint operation to perform'),
   // Common
   sprintId: z.string().optional(),
+  projectId: z.string().optional().describe('Project ID (required for create — sprints are iteration fields on a specific project)'),
   // Create
   title: z.string().optional(),
   description: z.string().optional(),

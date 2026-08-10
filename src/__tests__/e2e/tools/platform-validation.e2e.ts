@@ -519,7 +519,8 @@ describe('Platform Validation E2E', () => {
         title: `Platform Sprint ${runId}`,
         description: 'Sprint for platform validation',
         startDate: new Date().toISOString(),
-        endDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(), // 14 days
+        endDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
+        projectId,
       }));
 
       expect(sprint.id).toBeDefined();

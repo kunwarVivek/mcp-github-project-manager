@@ -333,6 +333,7 @@ describe('GitHub Project Management Tools E2E', () => {
       const response = await utils.callTool('manage_sprints', {
         action: 'create',
         ...sprintData,
+        projectId: createdProjectId,
       });
 
       MCPTestHelpers.validateToolResponse(response, ['id', 'title']);

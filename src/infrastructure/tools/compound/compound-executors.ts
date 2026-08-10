@@ -431,7 +431,12 @@ export async function executeManageSprints(args: ManageSprintsArgs): Promise<unk
 
   switch (action) {
     // ── PMS passthrough — serialize entity results ────────────────
-    case 'create':        return toPlain(await pms(svc, 'createSprint', rest));
+    case 'create': {
+      if (!rest.projectId) {
+        throw new Error('projectId is required for sprint create — sprints are iteration fields on a specific GitHub project');
+      }
+      return toPlain(await pms(svc, 'createSprint', rest));
+    }
     case 'update':        return toPlain(await pms(svc, 'updateSprint', rest));
     case 'add_issues':    return toPlain(await pms(svc, 'addIssuesToSprint', rest));
     case 'remove_issues': return toPlain(await pms(svc, 'removeIssuesFromSprint', rest));
