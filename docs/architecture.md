@@ -142,7 +142,7 @@ External integrations and technical concerns. 16 subdirectories:
 | Directory | Purpose |
 |-----------|---------|
 | `github/` | GitHub REST/GraphQL API integration — repositories, `GitHubRepositoryFactory`, `RateLimitManager`, error handling |
-| `tools/` | MCP tool definitions: 16 compound tools (134 actions) exposed to MCP clients, with `CompoundExecutor` routing to internal granular executors. `ToolRegistry`, `ToolValidator`, schemas |
+| `tools/` | MCP tool definitions: 16 compound tools (138 actions) exposed to MCP clients, with `CompoundExecutor` routing to internal granular executors. `ToolRegistry`, `ToolValidator`, schemas |
 | `cache/` | In-memory caching with TTL and LRU eviction (`ResourceCache`), persistence adapter |
 | `resilience/` | Circuit breaker (`CircuitBreakerService`), retry policies, `AIResiliencePolicy` |
 | `events/` | Webhook handling (`GitHubWebhookHandler`), `EventStore` with persistence, `EventSubscriptionManager` |
@@ -262,7 +262,7 @@ console.log(issue.canBeAddedToSprint()); // true if open with priority
 ### MCP Layer (`src/index.ts`)
 
 Model Context Protocol integration:
-- **Compound tool API** — 16 compound tools (134 actions) registered via `ToolRegistry`; each routes through `CompoundExecutor` to internal granular executors
+- **Compound tool API** — 16 compound tools (138 actions) registered via `ToolRegistry`; each routes through `CompoundExecutor` to internal granular executors
 - **Progressive disclosure** — `discover_tools` meta-tool lets agents explore available actions and schemas at runtime
 - **Capability profiles** — `MCP_TOOL_GROUPS` env var controls which compound tools are exposed (default: `all`)
 - Resource exposure
@@ -643,11 +643,11 @@ Existing execute* functions (unchanged)
 | `manage_iterations` | 5 | Iteration field management |
 | `manage_events` | 3 | Event subscription, replay |
 | `manage_status_updates` | 3 | Project status updates |
-| `ai_generate` | 8 | PRD generation, task breakdown, traceability |
+| `ai_generate` | 9 | PRD generation, task breakdown, traceability, task materialization |
 | `ai_analyze` | 8 | Issue enrichment, triage, duplicates |
 | `ai_plan` | 6 | Capacity, backlog, risk, roadmap |
 | `agent_work` | 10 | Agent registration, task lifecycle, review workflow |
-| `agent_manage` | 9 | Agent admin, budgets, work products, reclaim, usage, metrics |
+| `agent_manage` | 13 | Agent admin, budgets, work products, reclaim, metrics, PM coordination |
 | `discover_tools` | — | Runtime tool/action/schema discovery (meta-tool) |
 
 ### Capability Profiles
@@ -683,7 +683,9 @@ GitHub project without human dispatch. All state is stored natively in GitHub
 │                approve_task · reject_task                           │
 │  agent_manage: list · deregister · get_activity ·                   │
 │                submit_work_product · get_budget · set_budget ·      │
-│                reclaim_stale · record_usage · get_metrics           │
+│                reclaim_stale · record_usage · get_metrics ·         │
+│                setup_fields · assign_task · get_swarm_status ·      │
+│                rebalance_workload                                   │
 └───────────────────────────┬─────────────────────────────────────────┘
                             │
 ┌───────────────────────────▼─────────────────────────────────────────┐
@@ -772,6 +774,7 @@ checkout_task ──── repeat with next task
 Recovery: agent_manage/reclaim_stale returns tasks from stale agents to the pool
 Accounting: agent_manage/record_usage keeps budgets accurate; hard stops block draws
 Observability: agent_manage/get_metrics (throughput, cycle time, budget burn, staleness)
+PM coordination: agent_manage/assign_task, get_swarm_status, rebalance_workload
 ```
 
 ### Domain Types
