@@ -14,6 +14,7 @@ import { generateObject } from 'ai';
 import { z } from 'zod';
 import { DependencyGraph, type GraphAnalysisResult } from '../../analysis/DependencyGraph';
 import { AIServiceFactory } from './AIServiceFactory';
+import { InputSanitizer } from '../utils/InputSanitizer';
 import {
   calculateWeightedScore,
   getConfidenceTier
@@ -210,7 +211,7 @@ export class BacklogPrioritizer {
       const result = await generateObject({
         model,
         system: SPRINT_PRIORITIZATION_SYSTEM_PROMPT,
-        prompt: formatPrioritizationPrompt(items, goals),
+        prompt: formatPrioritizationPrompt(items.map(item => ({ ...item, title: InputSanitizer.sanitizeText(item.title) })), goals?.map(g => InputSanitizer.sanitizeText(g)) ?? []),
         schema: AIBusinessValueSchema,
         temperature: 0.3
       });

@@ -30,6 +30,12 @@ export default defineConfig({
         'src/__tests__/**',
       ],
       reporter: ['text', 'lcov', 'clover'],
+      thresholds: {
+        lines: 55,
+        functions: 57,
+        branches: 45,
+        statements: 54,
+      },
     },
     // Mock configuration
     clearMocks: true,

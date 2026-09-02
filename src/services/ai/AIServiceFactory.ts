@@ -477,6 +477,30 @@ export class AIServiceFactory {
   }
 
   /**
+   * Get structured availability status for all providers.
+   * Used by discover_tools to surface AI degradation indicators to MCP clients.
+   */
+  public getAvailabilityStatus(): {
+    available: boolean;
+    providers: Array<{ name: string; configured: boolean; healthy: boolean }>;
+  } {
+    const circuitState = this.getCircuitState();
+    const circuitHealthy = circuitState === 'closed' || circuitState === 'disabled';
+
+    const providers: Array<{ name: string; configured: boolean; healthy: boolean }> = (
+      ['anthropic', 'openai', 'google', 'perplexity'] as const
+    ).map((name) => {
+      const configured = !!PROVIDER_API_KEYS[name]();
+      return { name, configured, healthy: configured && circuitHealthy };
+    });
+
+    return {
+      available: this.isAIAvailable(),
+      providers,
+    };
+  }
+
+  /**
    * Execute an AI operation with resilience protection.
    *
    * Wraps the operation with:

@@ -15,6 +15,7 @@
 import { generateObject } from 'ai';
 import { z } from 'zod';
 import { AIServiceFactory } from './AIServiceFactory';
+import { InputSanitizer } from '../utils/InputSanitizer';
 import {
   calculateWeightedScore,
   getConfidenceTier
@@ -136,8 +137,8 @@ export class LabelSuggestionService {
         model,
         system: LABEL_SUGGESTION_SYSTEM_PROMPT,
         prompt: formatLabelPrompt({
-          issueTitle: params.issueTitle,
-          issueDescription: params.issueDescription,
+          issueTitle: InputSanitizer.sanitizeIssueContent(params.issueTitle),
+          issueDescription: InputSanitizer.sanitizeIssueContent(params.issueDescription),
           existingLabels: params.existingLabels,
           issueHistory: params.issueHistory
         }),

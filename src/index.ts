@@ -48,6 +48,7 @@ import {
   AGENT_STALE_AFTER_MINUTES
 } from "./env";
 import { ToolRegistry } from "./infrastructure/tools/ToolRegistry";
+import { ToolTelemetry } from "./infrastructure/tools/ToolTelemetry";
 import { ToolValidator } from "./infrastructure/tools/ToolValidator";
 import {
   executeAddFeature,
@@ -617,6 +618,7 @@ class GitHubProjectManagerServer {
     }
 
     this.gracefulShutdown.trackStart();
+    const telemetryStart = Date.now();
     try {
       const tool = this.toolRegistry.getTool(toolName);
       if (!tool) {
@@ -646,6 +648,8 @@ class GitHubProjectManagerServer {
         },
         () => this.toolRegistry.execute(toolName, validatedArgs),
       );
+      const telemetryLatency = Date.now() - telemetryStart;
+      ToolTelemetry.getInstance().recordCall(toolName, telemetryLatency, false);
 
       // Debit once per tool call, not per AI call: AgentStore is GitHub-backed
       // and does read-modify-write without locking, so per-call debits would be
@@ -703,6 +707,8 @@ class GitHubProjectManagerServer {
         ...(structuredContent ? { structuredContent } : {}),
       };
     } catch (error) {
+      const telemetryCatchLatency = Date.now() - telemetryStart;
+      ToolTelemetry.getInstance().recordCall(toolName, telemetryCatchLatency, true);
       if (error instanceof McpError) {
         throw error;
       }

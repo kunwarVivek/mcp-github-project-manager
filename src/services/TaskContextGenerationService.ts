@@ -1,6 +1,7 @@
 import { generateObject } from 'ai';
 import { AIServiceFactory } from './ai/AIServiceFactory';
 import { type ILogger, Logger } from '../infrastructure/logger';
+import { InputSanitizer } from './utils/InputSanitizer';
 import {
   CONTEXT_GENERATION_CONFIGS,
   formatContextPrompt,
@@ -296,9 +297,9 @@ export class TaskContextGenerationService {
 
       const config = CONTEXT_GENERATION_CONFIGS.businessContext;
       const prompt = formatContextPrompt(config.userPrompt, {
-        prdContent,
-        taskTitle: task.title,
-        taskDescription: task.description,
+        prdContent: InputSanitizer.sanitizePRDContent(prdContent),
+        taskTitle: InputSanitizer.sanitizeTaskContent(task.title),
+        taskDescription: InputSanitizer.sanitizeTaskContent(task.description),
         taskPriority: task.priority
       });
 
@@ -328,9 +329,9 @@ export class TaskContextGenerationService {
 
       const config = CONTEXT_GENERATION_CONFIGS.technicalContext;
       const prompt = formatContextPrompt(config.userPrompt, {
-        prdContent,
-        taskTitle: task.title,
-        taskDescription: task.description,
+        prdContent: InputSanitizer.sanitizePRDContent(prdContent),
+        taskTitle: InputSanitizer.sanitizeTaskContent(task.title),
+        taskDescription: InputSanitizer.sanitizeTaskContent(task.description),
         taskComplexity: task.complexity
       });
 
@@ -391,8 +392,8 @@ export class TaskContextGenerationService {
 
       const config = CONTEXT_GENERATION_CONFIGS.implementationGuidance;
       const prompt = formatContextPrompt(config.userPrompt, {
-        taskTitle: task.title,
-        taskDescription: task.description,
+        taskTitle: InputSanitizer.sanitizeTaskContent(task.title),
+        taskDescription: InputSanitizer.sanitizeTaskContent(task.description),
         taskComplexity: task.complexity,
         taskPriority: task.priority,
         businessContext: businessContext ? JSON.stringify(businessContext, null, 2) : 'Not available',

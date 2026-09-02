@@ -231,6 +231,9 @@ export const SSE_ENABLED = getBooleanConfigValue("SSE_ENABLED", true);
 export const EVENT_RETENTION_DAYS = getNumericConfigValue("EVENT_RETENTION_DAYS", 7);
 export const MAX_EVENTS_IN_MEMORY = getNumericConfigValue("MAX_EVENTS_IN_MEMORY", 1000);
 export const WEBHOOK_TIMEOUT_MS = getNumericConfigValue("WEBHOOK_TIMEOUT_MS", 5000);
+export const WEBHOOK_ALLOWED_ORIGINS = getOptionalConfigValue("WEBHOOK_ALLOWED_ORIGINS", "");
+export const WEBHOOK_RATE_LIMIT = getNumericConfigValue("WEBHOOK_RATE_LIMIT", 100);
+export const WEBHOOK_RATE_WINDOW_MS = getNumericConfigValue("WEBHOOK_RATE_WINDOW_MS", 60000);
 
 // AI Provider configuration
 export const ANTHROPIC_API_KEY = getOptionalConfigValue("ANTHROPIC_API_KEY", "");

@@ -21,6 +21,12 @@ export class AgentMetricsService {
   private readonly agentStore: AgentStore;
   private readonly workProductStore: WorkProductStore;
 
+  private static readonly CACHE_TTL_MS = 5 * 60_000; // 5 minutes
+  private workProductCache: {
+    data: { completedByAgent: Map<string, number>; cycleTimesByAgent: Map<string, number[]> } | null;
+    fetchedAt: number;
+  } = { data: null, fetchedAt: 0 };
+
   constructor(
     factory: GitHubRepositoryFactory,
     agentStore: AgentStore,
@@ -119,6 +125,11 @@ export class AgentMetricsService {
     });
   }
 
+  /** Clear the work-product cache (useful for testing). */
+  clearCache(): void {
+    this.workProductCache = { data: null, fetchedAt: 0 };
+  }
+
   /**
    * Best-effort: collect work products for ALL agents from a single bounded
    * issue scan (first 100 issues), bucketed by agent. Avoids the N+1 pattern
@@ -128,9 +139,13 @@ export class AgentMetricsService {
     completedByAgent: Map<string, number>;
     cycleTimesByAgent: Map<string, number[]>;
   }> {
+    const now = Date.now();
+    if (this.workProductCache.data && now - this.workProductCache.fetchedAt < AgentMetricsService.CACHE_TTL_MS) {
+      return this.workProductCache.data;
+    }
+
     const config = this.factory.getConfig();
     const octokit = this.factory.getOctokit();
-    const now = Date.now();
     const productsByAgent = new Map<string, WorkProduct[]>();
 
     try {
@@ -173,6 +188,8 @@ export class AgentMetricsService {
       }
     }
 
-    return { completedByAgent, cycleTimesByAgent };
+    const result = { completedByAgent, cycleTimesByAgent };
+    this.workProductCache = { data: result, fetchedAt: Date.now() };
+    return result;
   }
 }

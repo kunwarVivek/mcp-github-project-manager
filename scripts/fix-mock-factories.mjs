@@ -72,13 +72,13 @@ for (const file of files) {
   // Pattern: vi.mock('...', () => ({ AIServiceFactory: { getInstance: vi.fn() } }));
   content = content.replace(
     /vi\.mock\('([^']*AIServiceFactory[^']*)',\s*\(\)\s*=>\s*\(\{\s*AIServiceFactory:\s*\{\s*getInstance:\s*vi\.fn\(\),?\s*\},?\s*\}\)\);/g,
-    (match, path) => aiServiceFactoryMock.replace(/\$PATH/g, path)
+    (_match, path) => aiServiceFactoryMock.replace(/\$PATH/g, path)
   );
 
   // Also fix multi-line patterns
   content = content.replace(
     /vi\.mock\('([^']*AIServiceFactory[^']*)',\s*\(\)\s*=>\s*\(\{[\s\S]*?getInstance:\s*vi\.fn\(\)[\s\S]*?\}\)\);/g,
-    (match, path) => aiServiceFactoryMock.replace(/\$PATH/g, path)
+    (_match, path) => aiServiceFactoryMock.replace(/\$PATH/g, path)
   );
 
   // Fix GitHubRepositoryFactory mock factories

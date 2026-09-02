@@ -1,6 +1,7 @@
 import { generateObject, generateText } from 'ai';
 import { z } from 'zod';
 import { AIServiceFactory } from './AIServiceFactory';
+import { InputSanitizer } from '../utils/InputSanitizer';
 import { type ILogger, Logger } from '../../infrastructure/logger';
 import {
   PRDDocumentSchema,
@@ -98,10 +99,10 @@ export class AITaskProcessor {
     const model = this.getModelWithFallback('prd');
 
     const prompt = formatPrompt(config.userPrompt, {
-      projectIdea: params.projectIdea,
-      targetUsers: params.targetUsers || 'General users',
-      timeline: params.timeline || '3-6 months',
-      complexity: params.complexity || 'medium'
+      projectIdea: InputSanitizer.sanitizePRDContent(params.projectIdea),
+      targetUsers: InputSanitizer.sanitizeText(params.targetUsers || 'General users'),
+      timeline: InputSanitizer.sanitizeText(params.timeline || '3-6 months'),
+      complexity: InputSanitizer.sanitizeText(params.complexity || 'medium')
     });
 
     try {
@@ -152,10 +153,10 @@ export class AITaskProcessor {
     const model = this.getModelWithFallback('prd');
 
     const prompt = formatPrompt(prdConfig.userPrompt, {
-      projectIdea: params.projectIdea,
-      targetUsers: params.targetUsers || 'General users',
-      timeline: params.timeline || '3-6 months',
-      complexity: params.complexity || 'medium'
+      projectIdea: InputSanitizer.sanitizePRDContent(params.projectIdea),
+      targetUsers: InputSanitizer.sanitizeText(params.targetUsers || 'General users'),
+      timeline: InputSanitizer.sanitizeText(params.timeline || '3-6 months'),
+      complexity: InputSanitizer.sanitizeText(params.complexity || 'medium')
     }) + CONFIDENCE_PROMPT_CONFIGS.selfAssessmentSuffix;
 
     // Use schema with confidence assessment
@@ -255,8 +256,8 @@ export class AITaskProcessor {
     const model = this.getModelWithFallback('prd');
 
     const prompt = formatPrompt(config.userPrompt, {
-      currentPRD: params.currentPRD,
-      enhancementType: params.enhancementType,
+      currentPRD: InputSanitizer.sanitizePRDContent(params.currentPRD),
+      enhancementType: InputSanitizer.sanitizeText(params.enhancementType),
       focusAreas: params.focusAreas?.join(', ') || 'general improvements'
     });
 
@@ -290,7 +291,7 @@ export class AITaskProcessor {
     const model = this.getModelWithFallback('main');
 
     const prompt = formatPrompt(config.userPrompt, {
-      prdContent
+      prdContent: InputSanitizer.sanitizePRDContent(prdContent)
     });
 
     try {
@@ -326,12 +327,11 @@ export class AITaskProcessor {
     const model = this.getModelWithFallback('main');
 
     const prompt = formatTaskPrompt(config.userPrompt, {
-      prdContent: params.prdContent,
+      prdContent: InputSanitizer.sanitizePRDContent(params.prdContent),
       maxTasks: params.maxTasks || 30,
       includeSubtasks: params.includeSubtasks || true,
       autoEstimate: params.autoEstimate || true
     });
-
     try {
       const result = await generateObject({
         model,
@@ -379,8 +379,8 @@ export class AITaskProcessor {
     const model = this.getModelWithFallback('main');
 
     const prompt = formatTaskPrompt(config.userPrompt, {
-      taskTitle: params.taskTitle,
-      taskDescription: params.taskDescription,
+      taskTitle: InputSanitizer.sanitizeTaskContent(params.taskTitle),
+      taskDescription: InputSanitizer.sanitizeTaskContent(params.taskDescription),
       currentEstimate: params.currentEstimate || 'not provided'
     });
 
@@ -428,8 +428,8 @@ export class AITaskProcessor {
     const model = this.getModelWithFallback('main');
 
     const prompt = formatTaskPrompt(config.userPrompt, {
-      taskTitle: params.taskTitle,
-      taskDescription: params.taskDescription,
+      taskTitle: InputSanitizer.sanitizeTaskContent(params.taskTitle),
+      taskDescription: InputSanitizer.sanitizeTaskContent(params.taskDescription),
       currentComplexity: params.currentComplexity,
       maxDepth: params.maxDepth
     });
@@ -499,9 +499,9 @@ export class AITaskProcessor {
     const model = this.getModelWithFallback('main');
 
     const prompt = formatTaskPrompt(config.userPrompt, {
-      taskList: params.tasks.map(t => ({ id: t.id, title: t.title, description: t.description })),
-      projectGoals: params.projectGoals || 'Deliver MVP quickly',
-      timeline: params.timeline || '3 months',
+      taskList: params.tasks.map(t => ({ id: t.id, title: InputSanitizer.sanitizeTaskContent(t.title), description: InputSanitizer.sanitizeTaskContent(t.description) })),
+      projectGoals: InputSanitizer.sanitizeText(params.projectGoals || 'Deliver MVP quickly'),
+      timeline: InputSanitizer.sanitizeText(params.timeline || '3 months'),
       teamSize: params.teamSize || 3
     });
 

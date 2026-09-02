@@ -3,6 +3,7 @@ import { z } from 'zod';
 import type { AIServiceFactory } from "./ai/AIServiceFactory";
 import type { ProjectManagementService } from "./ProjectManagementService";
 import { type ILogger, Logger } from "../infrastructure/logger";
+import { InputSanitizer } from './utils/InputSanitizer';
 
 /**
  * AI-powered roadmap planning service
@@ -111,11 +112,11 @@ export class RoadmapPlanningService {
     const prompt = `You are a product roadmap planning expert. Analyze the following project and its issues to create a comprehensive roadmap.
 
 PROJECT INFORMATION:
-Title: ${params.projectTitle}
-Description: ${params.projectDescription}
+Title: ${InputSanitizer.sanitizeText(params.projectTitle)}
+Description: ${InputSanitizer.sanitizeIssueContent(params.projectDescription)}
 
 EXISTING ISSUES (${params.issues.length} total):
-${params.issues.map((issue, idx) => `${idx + 1}. [${issue.type}] ${issue.title} (ID: ${issue.id})`).join('\n')}
+${params.issues.map((issue, idx) => `${idx + 1}. [${issue.type}] ${InputSanitizer.sanitizeText(issue.title)} (ID: ${issue.id})`).join('\n')}
 
 YOUR TASK:
 Create a comprehensive project roadmap with the following structure:

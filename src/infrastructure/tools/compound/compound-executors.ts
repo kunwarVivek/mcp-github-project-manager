@@ -1833,6 +1833,25 @@ const TOOL_CATALOG: Record<string, {
   },
 };
 
+/** AI-powered tool names that degrade when AI is unavailable. */
+const AI_TOOL_NAMES = ['ai_generate', 'ai_analyze', 'ai_plan'] as const;
+
+/** Domains whose tools are AI-powered. */
+const AI_DOMAINS: Record<string, true> = { ai_generation: true, ai_analysis: true, ai_planning: true };
+
+function buildAiStatus(): {
+  available: boolean;
+  providers: Array<{ name: string; configured: boolean; healthy: boolean }>;
+  degradedTools: string[];
+} {
+  const factory = AIServiceFactory.getInstance();
+  const status = factory.getAvailabilityStatus();
+  return {
+    ...status,
+    degradedTools: status.available ? [] : [...AI_TOOL_NAMES],
+  };
+}
+
 export async function executeDiscoverTools(args: DiscoverToolsArgs): Promise<unknown> {
   const { domain, query } = args;
 
@@ -1844,6 +1863,10 @@ export async function executeDiscoverTools(args: DiscoverToolsArgs): Promise<unk
         available_domains: Object.keys(TOOL_CATALOG),
       };
     }
+    // Include aiStatus when querying an AI domain
+    if (domain in AI_DOMAINS) {
+      return { ...entry, aiStatus: buildAiStatus() };
+    }
     return entry;
   }
 
@@ -1854,8 +1877,14 @@ export async function executeDiscoverTools(args: DiscoverToolsArgs): Promise<unk
         v.description.toLowerCase().includes(q) ||
         v.actions.some((a) => a.includes(q)),
     );
-    return Object.fromEntries(matches);
+    const result = Object.fromEntries(matches);
+    // Include aiStatus when any AI domain matched
+    const hasAiDomain = matches.some(([k]) => k in AI_DOMAINS);
+    if (hasAiDomain) {
+      return { ...result, aiStatus: buildAiStatus() };
+    }
+    return result;
   }
 
-  return TOOL_CATALOG;
+  return { ...TOOL_CATALOG, aiStatus: buildAiStatus() };
 }

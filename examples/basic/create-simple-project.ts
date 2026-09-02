@@ -13,8 +13,8 @@
  * 2. Run: ts-node examples/basic/create-simple-project.ts
  */
 
-import { ProjectManagementService } from '../../src/services/ProjectManagementService.js';
 import dotenv from 'dotenv';
+import { ProjectManagementService } from '../../src/services/ProjectManagementService.js';
 
 // Load environment variables
 dotenv.config();
@@ -32,9 +32,9 @@ async function createSimpleProject() {
   try {
     // Initialize the service
     const service = new ProjectManagementService(
-      process.env.GITHUB_OWNER!,
-      process.env.GITHUB_REPO!,
-      process.env.GITHUB_TOKEN!
+      process.env.GITHUB_OWNER ?? '',
+      process.env.GITHUB_REPO ?? '',
+      process.env.GITHUB_TOKEN ?? ''
     );
 
     console.log('Creating a simple project...');
@@ -44,7 +44,7 @@ async function createSimpleProject() {
       project: {
         title: "Sample Project",
         shortDescription: "A sample project created via the MCP API",
-        owner: process.env.GITHUB_OWNER!,
+        owner: process.env.GITHUB_OWNER ?? '',
         visibility: "private"
       },
       milestones: [

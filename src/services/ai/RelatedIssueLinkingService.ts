@@ -16,6 +16,7 @@ import { openai } from '@ai-sdk/openai';
 import { AIServiceFactory } from './AIServiceFactory.js';
 import { calculateWeightedScore, getConfidenceTier } from './ConfidenceScorer.js';
 import { EmbeddingCache } from '../../cache/EmbeddingCache.js';
+import { InputSanitizer } from '../utils/InputSanitizer';
 import { type ILogger, Logger } from '../../infrastructure/logger';
 import {
   RELATED_ISSUE_SYSTEM_PROMPT,
@@ -208,7 +209,7 @@ export class RelatedIssueLinkingService {
     const { sourceId, sourceTitle, sourceDescription, candidateIssues } = params;
 
     // Get embedding for source issue
-    const sourceText = `${sourceTitle}\n\n${sourceDescription || ''}`;
+    const sourceText = `${InputSanitizer.sanitizeIssueContent(sourceTitle)}\n\n${InputSanitizer.sanitizeIssueContent(sourceDescription || '')}`;
     const { embedding: sourceEmbedding } = await embed({
       model: openai.embedding('text-embedding-3-small'),
       value: sourceText
@@ -258,7 +259,7 @@ export class RelatedIssueLinkingService {
         result.set(issue.id, cached);
       } else {
         uncachedIssues.push(issue);
-        uncachedTexts.push(`${issue.title}\n\n${issue.body || ''}`);
+        uncachedTexts.push(`${InputSanitizer.sanitizeIssueContent(issue.title)}\n\n${InputSanitizer.sanitizeIssueContent(issue.body || '')}`);
       }
     }
 

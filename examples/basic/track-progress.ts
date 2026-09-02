@@ -34,9 +34,9 @@ async function trackSprintProgress() {
   try {
     // Initialize the service
     const service = new ProjectManagementService(
-      process.env.GITHUB_OWNER!,
-      process.env.GITHUB_REPO!,
-      process.env.GITHUB_TOKEN!
+      process.env.GITHUB_OWNER ?? '',
+      process.env.GITHUB_REPO ?? '',
+      process.env.GITHUB_TOKEN ?? ''
     );
 
     console.log('Tracking sprint progress...');

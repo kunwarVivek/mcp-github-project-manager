@@ -2,6 +2,7 @@ import { generateObject } from 'ai';
 import { z } from 'zod';
 import { v4 as uuidv4 } from 'uuid';
 import { AIServiceFactory } from '../ai/AIServiceFactory.js';
+import { InputSanitizer } from '../utils/InputSanitizer';
 import { type ILogger, Logger } from '../../infrastructure/logger';
 import {
   type FeatureRequirement,
@@ -65,8 +66,8 @@ export class FeatureExpansionService {
       }
 
       const prompt = formatFeaturePrompt(config.userPrompt, {
-        featureTitle: params.feature.title,
-        featureDescription: params.feature.description,
+        featureTitle: InputSanitizer.sanitizeText(params.feature.title),
+        featureDescription: InputSanitizer.sanitizeIssueContent(params.feature.description),
         userStories: params.feature.userStories.join('\n'),
         acceptanceCriteria: params.feature.acceptanceCriteria.join('\n'),
         systemContext: params.systemContext ? JSON.stringify(params.systemContext) : 'No system context provided',

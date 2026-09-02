@@ -7,6 +7,7 @@ import {
   type TaskComplexity,
   type PRDDocument
 } from '../../domain/ai-types.js';
+import { InputSanitizer } from '../utils/InputSanitizer';
 import {
   FEATURE_PROMPT_CONFIGS,
   formatFeaturePrompt
@@ -75,11 +76,11 @@ export class FeatureAnalysisService {
       }
 
       const prompt = formatFeaturePrompt(config.userPrompt, {
-        featureIdea: params.featureIdea,
-        description: params.description,
+        featureIdea: InputSanitizer.sanitizeText(params.featureIdea),
+        description: InputSanitizer.sanitizeIssueContent(params.description),
         existingPRD: params.existingPRD ? JSON.stringify(params.existingPRD, null, 2) : 'No existing PRD provided',
         projectState: params.projectState ? JSON.stringify(params.projectState) : 'No project state provided',
-        businessJustification: params.businessJustification || 'No business justification provided',
+        businessJustification: InputSanitizer.sanitizeText(params.businessJustification || 'No business justification provided'),
         targetUsers: params.targetUsers?.join(', ') || 'General users'
       });
 

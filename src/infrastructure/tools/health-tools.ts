@@ -7,6 +7,7 @@
 
 import { z } from 'zod';
 import type { ToolDefinition, ToolSchema } from './ToolValidator.js';
+import { ToolTelemetry } from './ToolTelemetry.js';
 import { HealthService } from '../health/index.js';
 import { AIServiceFactory } from '../../services/ai/AIServiceFactory.js';
 import { ResourceCache } from '../cache/ResourceCache.js';
@@ -23,6 +24,15 @@ export type HealthCheckArgs = z.infer<typeof healthCheckSchema>;
 /**
  * Zod schema for health status output - matches HealthStatus interface
  */
+export const ToolMetricsSchema = z.object({
+  toolName: z.string(),
+  totalCalls: z.number(),
+  errorCount: z.number(),
+  avgLatencyMs: z.number(),
+  p95LatencyMs: z.number(),
+  lastCalledAt: z.string().optional(),
+});
+
 export const HealthStatusOutputSchema = z.object({
   status: z.enum(['healthy', 'degraded', 'unhealthy']),
   timestamp: z.string(),
@@ -49,6 +59,7 @@ export const HealthStatusOutputSchema = z.object({
       lastPersist: z.string().optional(),
     }),
   }),
+  toolTelemetry: z.array(ToolMetricsSchema).optional(),
 });
 
 export type HealthStatusOutput = z.infer<typeof HealthStatusOutputSchema>;
@@ -95,9 +106,13 @@ export async function executeHealthCheck(): Promise<HealthStatusOutput> {
     aiFactory: AIServiceFactory.getInstance(),
     cache: ResourceCache.getInstance(),
     githubFactory: new GitHubRepositoryFactory(GITHUB_TOKEN, GITHUB_OWNER, GITHUB_REPO),
-    // Note: aiResilience is not wired here as it requires explicit enablement
-    // The health check will show circuitState: 'disabled' in this case
   });
 
-  return healthService.check();
+  const baseHealth = await healthService.check();
+  const telemetryMetrics = ToolTelemetry.getInstance().getMetrics();
+
+  return {
+    ...baseHealth,
+    ...(telemetryMetrics.length > 0 ? { toolTelemetry: telemetryMetrics } : {}),
+  };
 }

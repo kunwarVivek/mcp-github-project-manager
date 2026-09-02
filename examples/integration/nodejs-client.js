@@ -5,10 +5,10 @@
  * as a module in a Node.js application.
  */
 
-import { Server } from "../../build/index.js";
+import { spawn } from "node:child_process";
 import { McpClient } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
-import { spawn } from "node:child_process";
+import { Server } from "../../build/index.js";
 
 // Example 1: Direct usage within the same process
 async function directUsageExample() {

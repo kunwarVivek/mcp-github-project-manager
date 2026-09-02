@@ -4,7 +4,8 @@ import type { GitHubWebhookHandler, ResourceEvent } from '../events/GitHubWebhoo
 import type { EventSubscriptionManager, EventSubscription, } from '../events/EventSubscriptionManager';
 import type { EventStore } from '../events/EventStore';
 import { type ILogger, Logger } from '../logger/index';
-import { WEBHOOK_PORT, SSE_ENABLED, WEBHOOK_TIMEOUT_MS } from '../../env';
+import { SecurityAuditLog } from '../observability/SecurityAuditLog';
+import { WEBHOOK_PORT, SSE_ENABLED, WEBHOOK_TIMEOUT_MS, WEBHOOK_ALLOWED_ORIGINS, WEBHOOK_RATE_LIMIT, WEBHOOK_RATE_WINDOW_MS } from '../../env';
 
 export interface SSEConnection {
   id: string;
@@ -31,15 +32,23 @@ export class WebhookServer {
   private server?: http.Server;
   private sseConnections = new Map<string, SSEConnection>();
   private isRunning = false;
+  private readonly rateLimitMap = new Map<string, { count: number; windowStart: number }>();
+  private readonly securityLog: SecurityAuditLog;
+  private readonly processedDeliveries = new Set<string>();
+  private readonly processedDeliveriesOrder: string[] = [];
+  private static readonly MAX_DELIVERY_CACHE = 10_000;
+  private static readonly MAX_WEBHOOK_BODY_SIZE = 1_048_576; // 1 MB
 
   constructor(
     webhookHandler: GitHubWebhookHandler,
     subscriptionManager: EventSubscriptionManager,
     eventStore: EventStore,
     options?: Partial<WebhookServerOptions>,
-    logger?: ILogger
+    logger?: ILogger,
+    securityLog?: SecurityAuditLog,
   ) {
     this.logger = logger ?? Logger.getInstance();
+    this.securityLog = securityLog ?? new SecurityAuditLog(this.logger);
     this.options = {
       port: options?.port || WEBHOOK_PORT,
       enableSSE: options?.enableSSE ?? SSE_ENABLED,
@@ -126,13 +135,29 @@ export class WebhookServer {
     const pathname = parsedUrl.pathname || '';
     const method = req.method || 'GET';
 
-    // Set CORS headers
-    this.setCORSHeaders(res);
+    // Security headers on every response
+    this.setSecurityHeaders(res);
+
+    // CORS headers
+    this.setCORSHeaders(req, res);
 
     // Handle preflight requests
     if (method === 'OPTIONS') {
       res.writeHead(200);
       res.end();
+      return;
+    }
+
+    // Rate limiting
+    const clientIp = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.socket.remoteAddress || 'unknown';
+    if (this.isRateLimited(clientIp)) {
+      this.securityLog.record({
+        type: 'rate_limit_exceeded',
+        source: clientIp,
+        details: { path: pathname, method },
+        severity: 'medium',
+      });
+      this.sendErrorResponse(res, 429, 'Too Many Requests');
       return;
     }
 
@@ -162,9 +187,19 @@ export class WebhookServer {
         default:
           this.sendErrorResponse(res, 404, "Not found");
       }
-    } catch (error) {
+    } catch (error: unknown) {
+      const statusCode = (error instanceof Error && 'statusCode' in error && typeof (error as Record<string, unknown>).statusCode === 'number') ? (error as Record<string, unknown>).statusCode as number : 500;
+      if (statusCode === 413) {
+        this.securityLog.record({
+          type: 'payload_too_large',
+          source: clientIp,
+          details: { path: pathname, method },
+          severity: 'medium',
+        });
+      }
+      const message = statusCode === 413 ? 'Payload Too Large' : 'Internal server error';
       this.logger.error(`Error handling ${method} ${pathname}:`, error);
-      this.sendErrorResponse(res, 500, "Internal server error");
+      this.sendErrorResponse(res, statusCode, message);
     }
   }
 
@@ -172,6 +207,19 @@ export class WebhookServer {
    * Handle GitHub webhook
    */
   private async handleGitHubWebhook(req: http.IncomingMessage, res: http.ServerResponse): Promise<void> {
+    // Content-Type validation
+    const contentType = req.headers['content-type'] || '';
+    if (!contentType.startsWith('application/json')) {
+      this.securityLog.record({
+        type: 'content_type_invalid',
+        source: req.socket.remoteAddress ?? 'unknown',
+        details: { contentType },
+        severity: 'low',
+      });
+      this.sendErrorResponse(res, 415, 'Unsupported Media Type: expected application/json');
+      return;
+    }
+
     const body = await this.readRequestBody(req);
     const signature = req.headers['x-hub-signature-256'] as string;
     const eventType = req.headers['x-github-event'] as string;
@@ -182,9 +230,21 @@ export class WebhookServer {
       return;
     }
 
+    // Idempotency: deduplicate by delivery ID
+    if (delivery && this.processedDeliveries.has(delivery)) {
+      this.sendJSONResponse(res, 200, { success: true, deduplicated: true });
+      return;
+    }
+
     // Validate signature
     const isValidSignature = await this.webhookHandler.validateSignature(body, signature);
     if (!isValidSignature) {
+      this.securityLog.record({
+        type: signature ? 'webhook_signature_invalid' : 'webhook_signature_missing',
+        source: req.socket.remoteAddress ?? 'unknown',
+        details: { eventType, delivery },
+        severity: 'high',
+      });
       this.sendErrorResponse(res, 401, "Invalid signature");
       return;
     }
@@ -203,6 +263,11 @@ export class WebhookServer {
 
       // Process webhook
       const result = await this.webhookHandler.processWebhookEvent(webhookEvent);
+
+      // Track delivery as processed
+      if (delivery) {
+        this.trackDelivery(delivery);
+      }
 
       if (result.success) {
         // Store events
@@ -247,12 +312,12 @@ export class WebhookServer {
     const lastEventId = req.headers['last-event-id'] as string;
 
     // Set SSE headers
+    const allowedOrigin = this.resolveAllowedOrigin(req);
     res.writeHead(200, {
       'Content-Type': 'text/event-stream',
       'Cache-Control': 'no-cache',
       'Connection': 'keep-alive',
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Headers': 'Cache-Control'
+      ...(allowedOrigin ? { 'Access-Control-Allow-Origin': allowedOrigin, 'Access-Control-Allow-Headers': 'Cache-Control' } : {}),
     });
 
     // Create SSE connection
@@ -436,14 +501,19 @@ export class WebhookServer {
    * Read request body
    */
   private async readRequestBody(req: http.IncomingMessage): Promise<string> {
-    return new Promise((resolve, reject) => {
+    return new Promise<string>((resolve, reject) => {
       let body = '';
-      req.on('data', chunk => {
+      let size = 0;
+      req.on('data', (chunk: Buffer) => {
+        size += chunk.length;
+        if (size > WebhookServer.MAX_WEBHOOK_BODY_SIZE) {
+          req.destroy();
+          reject(Object.assign(new Error('Payload Too Large'), { statusCode: 413 }));
+          return;
+        }
         body += chunk.toString();
       });
-      req.on('end', () => {
-        resolve(body);
-      });
+      req.on('end', () => resolve(body));
       req.on('error', reject);
     });
   }
@@ -451,10 +521,72 @@ export class WebhookServer {
   /**
    * Set CORS headers
    */
-  private setCORSHeaders(res: http.ServerResponse): void {
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Hub-Signature-256, X-GitHub-Event, X-GitHub-Delivery');
+  private setCORSHeaders(req: http.IncomingMessage, res: http.ServerResponse): void {
+    const allowedOrigin = this.resolveAllowedOrigin(req);
+    if (allowedOrigin) {
+      res.setHeader('Access-Control-Allow-Origin', allowedOrigin);
+      res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
+      res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Hub-Signature-256, X-GitHub-Event, X-GitHub-Delivery');
+      res.setHeader('Vary', 'Origin');
+    } else if (req.headers['origin']) {
+      this.securityLog.record({
+        type: 'cors_origin_rejected',
+        source: req.socket.remoteAddress ?? 'unknown',
+        details: { origin: req.headers['origin'] },
+        severity: 'medium',
+      });
+    }
+  }
+
+  /**
+   * Resolve the allowed origin from request against the allowlist.
+   * Returns the reflected origin, '*', or undefined (no CORS headers).
+   */
+  private resolveAllowedOrigin(req: http.IncomingMessage): string | undefined {
+    const cfg = WEBHOOK_ALLOWED_ORIGINS;
+    if (!cfg) return undefined; // empty = reject cross-origin
+    if (cfg === '*') return '*';
+    const allowed = cfg.split(',').map(o => o.trim()).filter(Boolean);
+    const origin = req.headers['origin'];
+    if (origin && allowed.includes(origin)) return origin;
+    return undefined;
+  }
+
+  /**
+   * Set security response headers
+   */
+  private setSecurityHeaders(res: http.ServerResponse): void {
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-Frame-Options', 'DENY');
+    res.setHeader('X-XSS-Protection', '0');
+  }
+
+  /**
+   * Simple in-memory per-IP rate limiter (sliding window).
+   */
+  private isRateLimited(ip: string): boolean {
+    const now = Date.now();
+    const limit = WEBHOOK_RATE_LIMIT;
+    const window = WEBHOOK_RATE_WINDOW_MS;
+    const entry = this.rateLimitMap.get(ip);
+    if (!entry || now - entry.windowStart >= window) {
+      this.rateLimitMap.set(ip, { count: 1, windowStart: now });
+      return false;
+    }
+    entry.count++;
+    return entry.count > limit;
+  }
+
+  /**
+   * Track a processed delivery ID with bounded FIFO eviction.
+   */
+  private trackDelivery(delivery: string): void {
+    this.processedDeliveries.add(delivery);
+    this.processedDeliveriesOrder.push(delivery);
+    while (this.processedDeliveriesOrder.length > WebhookServer.MAX_DELIVERY_CACHE) {
+      const oldest = this.processedDeliveriesOrder.shift()!;
+      this.processedDeliveries.delete(oldest);
+    }
   }
 
   /**
@@ -471,5 +603,9 @@ export class WebhookServer {
   private sendErrorResponse(res: http.ServerResponse, statusCode: number, message: string): void {
     res.writeHead(statusCode, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ error: message }));
+  }
+
+  getSecurityLog(): SecurityAuditLog {
+    return this.securityLog;
   }
 }

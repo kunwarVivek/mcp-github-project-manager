@@ -13,6 +13,7 @@
 import { embed, embedMany, cosineSimilarity } from 'ai';
 import { openai } from '@ai-sdk/openai';
 import { calculateWeightedScore, getConfidenceTier } from './ConfidenceScorer.js';
+import { InputSanitizer } from '../utils/InputSanitizer';
 import { EmbeddingCache } from '../../cache/EmbeddingCache.js';
 import { type ILogger, Logger } from '../../infrastructure/logger';
 import type {
@@ -110,7 +111,7 @@ export class DuplicateDetectionService {
     }
 
     // Prepare the new issue text
-    const newIssueText = `${issueTitle}\n\n${issueDescription || ''}`;
+    const newIssueText = `${InputSanitizer.sanitizeIssueContent(issueTitle)}\n\n${InputSanitizer.sanitizeIssueContent(issueDescription || '')}`;
 
     try {
       // Try embedding-based detection

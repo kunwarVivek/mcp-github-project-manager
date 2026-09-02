@@ -2,6 +2,7 @@ import { generateObject } from 'ai';
 import { z } from 'zod';
 import { AIServiceFactory } from '../ai/AIServiceFactory.js';
 import { type ILogger, Logger } from '../../infrastructure/logger';
+import { InputSanitizer } from '../utils/InputSanitizer';
 import {
   type TaskLifecycleState,
   type TaskPhaseInfo,
@@ -152,7 +153,7 @@ export class TaskLifecycleService {
       }
 
       const prompt = formatFeaturePrompt(config.userPrompt, {
-        taskTitle: `Task ${taskLifecycle.taskId}`,
+        taskTitle: InputSanitizer.sanitizeTaskContent(`Task ${taskLifecycle.taskId}`),
         currentPhase: taskLifecycle.currentPhase,
         progressData: JSON.stringify(taskLifecycle.phases),
         blockers: JSON.stringify(taskLifecycle.blockers),

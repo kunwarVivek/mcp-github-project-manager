@@ -15,8 +15,8 @@
  * 3. Run: ts-node examples/basic/plan-sprint.ts
  */
 
-import { ProjectManagementService } from '../../src/services/ProjectManagementService.js';
 import dotenv from 'dotenv';
+import { ProjectManagementService } from '../../src/services/ProjectManagementService.js';
 
 // Load environment variables
 dotenv.config();
@@ -34,9 +34,9 @@ async function planSprint() {
   try {
     // Initialize the service
     const service = new ProjectManagementService(
-      process.env.GITHUB_OWNER!,
-      process.env.GITHUB_REPO!,
-      process.env.GITHUB_TOKEN!
+      process.env.GITHUB_OWNER ?? '',
+      process.env.GITHUB_REPO ?? '',
+      process.env.GITHUB_TOKEN ?? ''
     );
 
     console.log('Planning a sprint...');

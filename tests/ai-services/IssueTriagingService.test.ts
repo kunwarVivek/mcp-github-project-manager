@@ -35,6 +35,9 @@ vi.mock('../../src/services/ProjectManagementService', () => ({
     updateProjectItem: vi.fn(),
     createIssue: vi.fn(),
     createAutomationRule: vi.fn(),
+    listIssues: vi.fn().mockResolvedValue([]),
+    updateIssue: vi.fn().mockResolvedValue({}),
+    createIssueComment: vi.fn().mockResolvedValue({ id: 1, body: '', user: '', createdAt: '', updatedAt: '' }),
   }); }),
 }));
 
@@ -78,7 +81,10 @@ describe('IssueTriagingService', () => {
     mockProjectService = {
       listProjectItems: vi.fn(),
       updateProjectItem: vi.fn(),
-      createAutomationRule: vi.fn()
+      createAutomationRule: vi.fn(),
+      listIssues: vi.fn().mockResolvedValue([]),
+      updateIssue: vi.fn().mockResolvedValue({}),
+      createIssueComment: vi.fn().mockResolvedValue({ id: 1, body: '', user: '', createdAt: '', updatedAt: '' }),
     };
 
     (ProjectManagementService as Mock).mockImplementation(() => mockProjectService);
@@ -290,62 +296,47 @@ describe('IssueTriagingService', () => {
 
   describe('triageAllIssues', () => {
     it('should triage multiple issues in bulk', async () => {
-      const mockIssues = {
-        items: [
-          {
-            id: 'issue-1',
-            number: 1,
-            title: 'Critical bug',
-            body: 'System crash'
-          },
-          {
-            id: 'issue-2',
-            number: 2,
-            title: 'Feature request',
-            body: 'Add export functionality'
-          }
-        ]
-      };
+      const mockIssues = [
+        {
+          id: 'issue-1',
+          number: 1,
+          title: 'Critical bug',
+          description: 'System crash',
+          labels: [],
+          assignees: [],
+          status: 'open',
+          createdAt: '2026-01-01',
+          updatedAt: '2026-01-01',
+          url: ''
+        },
+        {
+          id: 'issue-2',
+          number: 2,
+          title: 'Feature request',
+          description: 'Add export functionality',
+          labels: [],
+          assignees: [],
+          status: 'open',
+          createdAt: '2026-01-01',
+          updatedAt: '2026-01-01',
+          url: ''
+        }
+      ];
 
-      mockProjectService.listProjectItems.mockResolvedValue(mockIssues.items);
-
+      mockProjectService.listIssues.mockResolvedValue(mockIssues);
 
       vi.mocked(generateObject)
         .mockResolvedValueOnce({
           object: {
-            classification: {
-              category: 'bug',
-              priority: 'critical',
-              severity: 'high',
-              actionable: true
-            },
-            actions: [
-              {
-                type: 'add_label',
-                description: 'Add critical label',
-                value: 'critical',
-                applied: false
-              }
-            ],
+            classification: { category: 'bug', priority: 'critical', severity: 'high', actionable: true },
+            actions: [{ type: 'add_label', description: 'Add critical label', value: 'critical' }],
             reasoning: 'Critical bug'
           }
         })
         .mockResolvedValueOnce({
           object: {
-            classification: {
-              category: 'feature',
-              priority: 'medium',
-              severity: 'low',
-              actionable: true
-            },
-            actions: [
-              {
-                type: 'add_label',
-                description: 'Add enhancement',
-                value: 'enhancement',
-                applied: false
-              }
-            ],
+            classification: { category: 'feature', priority: 'medium', severity: 'low', actionable: true },
+            actions: [{ type: 'add_label', description: 'Add enhancement', value: 'enhancement' }],
             reasoning: 'Valid feature'
           }
         });
@@ -355,13 +346,12 @@ describe('IssueTriagingService', () => {
         onlyUntriaged: true
       });
 
-      expect(result.triaged).toBe(0);
-      expect(result.results).toBeDefined();
-      expect(Array.isArray(result.results)).toBe(true);
+      expect(result.triaged).toBe(2);
+      expect(result.results).toHaveLength(2);
     });
 
     it('should handle empty project gracefully', async () => {
-      mockProjectService.listProjectItems.mockResolvedValue({ items: [] });
+      mockProjectService.listIssues.mockResolvedValue([]);
 
       const result = await service.triageAllIssues({
         projectId: 'empty-project'
@@ -372,36 +362,24 @@ describe('IssueTriagingService', () => {
     });
 
     it('should skip already triaged issues when onlyUntriaged is true', async () => {
-      const mockIssues = {
-        items: [
-          {
-            id: 'issue-1',
-            number: 1,
-            title: 'Bug',
-            body: 'Test',
-            labels: ['bug', 'triaged']
-          },
-          {
-            id: 'issue-2',
-            number: 2,
-            title: 'Feature',
-            body: 'Test',
-            labels: []
-          }
-        ]
-      };
+      const mockIssues = [
+        {
+          id: 'issue-1', number: 1, title: 'Bug', description: 'Test',
+          labels: ['bug', 'triaged'], assignees: [], status: 'open',
+          createdAt: '2026-01-01', updatedAt: '2026-01-01', url: ''
+        },
+        {
+          id: 'issue-2', number: 2, title: 'Feature', description: 'Test',
+          labels: [], assignees: [], status: 'open',
+          createdAt: '2026-01-01', updatedAt: '2026-01-01', url: ''
+        }
+      ];
 
-      mockProjectService.listProjectItems.mockResolvedValue(mockIssues.items);
-
+      mockProjectService.listIssues.mockResolvedValue(mockIssues);
 
       vi.mocked(generateObject).mockResolvedValue({
         object: {
-          classification: {
-            category: 'feature',
-            priority: 'medium',
-            severity: 'low',
-            actionable: true
-          },
+          classification: { category: 'feature', priority: 'medium', severity: 'low', actionable: true },
           actions: [],
           reasoning: 'Feature request'
         }
@@ -412,9 +390,9 @@ describe('IssueTriagingService', () => {
         onlyUntriaged: true
       });
 
-      // Currently stubbed implementation
-      expect(result.triaged).toBe(0);
-      expect(result.results).toBeDefined();
+      // Only issue-2 should be triaged (issue-1 has 'triaged' label)
+      expect(result.triaged).toBe(1);
+      expect(result.results).toHaveLength(1);
     });
   });
 
@@ -519,7 +497,6 @@ describe('IssueTriagingService', () => {
     });
 
     it('should handle AI generation errors', async () => {
-
       vi.mocked(generateObject).mockRejectedValue(new Error('AI timeout'));
 
       await expect(
@@ -532,18 +509,16 @@ describe('IssueTriagingService', () => {
       ).rejects.toThrow('AI timeout');
     });
 
-    it('should return empty results for stub implementation', async () => {
-      mockProjectService.listProjectItems.mockRejectedValue(
-        new Error('Failed to fetch issues')
-      );
+    it('should return empty results when no open issues exist', async () => {
+      mockProjectService.listIssues.mockResolvedValue([]);
 
-      // triageAllIssues is currently a stub that returns empty results
       const result = await service.triageAllIssues({
         projectId: 'test'
       });
 
       expect(result.triaged).toBe(0);
       expect(result.results).toHaveLength(0);
+      expect(mockProjectService.listIssues).toHaveBeenCalled();
     });
   });
 

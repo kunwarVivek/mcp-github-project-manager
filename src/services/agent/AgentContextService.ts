@@ -2,6 +2,7 @@ import type { GitHubRepositoryFactory } from '../../infrastructure/github/GitHub
 import type { AgentTaskContext } from '../../domain/agent-orchestration-types';
 import { AIServiceFactory } from '../ai/AIServiceFactory';
 import { safeCall } from '../utils/safeCall';
+import { InputSanitizer } from '../utils/InputSanitizer';
 
 // ---------------------------------------------------------------------------
 // GraphQL response types (private to this module)
@@ -246,12 +247,12 @@ export class AgentContextService {
         system: 'You are an expert engineering advisor generating task context for an autonomous coding agent. ' +
           'Produce concise, actionable acceptance criteria, a complexity estimate, and implementation guidance. ' +
           'Do not invent repository facts; base everything on the provided task details.',
-        prompt: `Task title: ${context.issue.title}\n\n` +
-          `Task body:\n${(context.issue.body ?? '').slice(0, 4000)}\n\n` +
+        prompt: `Task title: ${InputSanitizer.sanitizeIssueContent(context.issue.title)}\n\n` +
+          `Task body:\n${InputSanitizer.sanitizeIssueContent((context.issue.body ?? '').slice(0, 4000))}\n\n` +
           `Labels: ${labels.join(', ') || 'none'}\n` +
           `Milestone: ${context.milestone?.title ?? 'none'} (due ${context.milestone?.dueDate ?? 'n/a'})\n` +
           `Existing acceptance criteria:\n${context.acceptanceCriteria.join('\n') || 'none'}\n\n` +
-          `Repository coding standards:\n${(context.codingStandards ?? 'none').slice(0, 3000)}\n`,
+          `Repository coding standards:\n${InputSanitizer.sanitizeText((context.codingStandards ?? 'none').slice(0, 3000))}\n`,
         maxOutputTokens: 800,
       });
 

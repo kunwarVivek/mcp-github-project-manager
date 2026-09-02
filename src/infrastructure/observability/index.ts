@@ -15,3 +15,9 @@ export {
   createTracingLogger,
   type LogEntry,
 } from './TracingLogger.js';
+
+export {
+  SecurityAuditLog,
+  type SecurityEvent,
+  type SecurityEventType,
+} from './SecurityAuditLog.js';

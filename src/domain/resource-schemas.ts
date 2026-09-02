@@ -25,37 +25,38 @@ export const ProjectSchema = BaseResourceSchema.extend({
 // Schema for Issue resources
 export const IssueSchema = BaseResourceSchema.extend({
   type: z.literal(ResourceType.ISSUE),
-  title: z.string().min(1),
+  title: z.string().min(1).optional(),
   description: z.string().optional(),
+  number: z.number().optional(),
   assignees: z.array(z.string()).optional(),
   labels: z.array(z.string()).optional(),
   status: z.string().optional(),
-  priority: z.string().optional(),
-  projectId: z.string().uuid(),
-  externalId: z.string().optional(),
-  externalUrl: z.string().url().optional()
+  milestoneId: z.string().optional(),
+  url: z.string().url().optional()
 });
 
 // Schema for Milestone resources
 export const MilestoneSchema = BaseResourceSchema.extend({
   type: z.literal(ResourceType.MILESTONE),
-  title: z.string().min(1),
+  title: z.string().min(1).optional(),
   description: z.string().optional(),
+  number: z.number().optional(),
+  state: z.string().optional(),
   dueDate: z.string().datetime().optional(),
-  projectId: z.string().uuid(),
-  externalId: z.string().optional(),
-  externalUrl: z.string().url().optional()
+  openIssues: z.number().optional(),
+  closedIssues: z.number().optional(),
+  url: z.string().url().optional()
 });
 
 // Schema for Sprint resources
 export const SprintSchema = BaseResourceSchema.extend({
   type: z.literal(ResourceType.SPRINT),
-  name: z.string().min(1),
+  title: z.string().min(1).optional(),
   description: z.string().optional(),
-  startDate: z.string().datetime(),
-  endDate: z.string().datetime(),
-  status: z.string(),
-  projectId: z.string().uuid()
+  startDate: z.string().datetime().optional(),
+  endDate: z.string().datetime().optional(),
+  status: z.string().optional(),
+  issues: z.array(z.string()).optional()
 });
 
 // Schema for Relationship resources
@@ -88,10 +89,10 @@ export enum GitHubFieldType {
 
 // GitHub Pull Request States
 export enum GitHubPRState {
-  OPEN = 'OPEN',
-  CLOSED = 'CLOSED',
-  MERGED = 'MERGED',
-  DRAFT = 'DRAFT'
+  OPEN = 'open',
+  CLOSED = 'closed',
+  MERGED = 'merged',
+  DRAFT = 'draft'
 }
 
 // GitHub Pull Request Review Decision
@@ -104,26 +105,25 @@ export enum GitHubPRReviewDecision {
 // Complete Pull Request schema matching GitHub PR fields
 export const PullRequestSchema = BaseResourceSchema.extend({
   type: z.literal(ResourceType.PULL_REQUEST),
-  title: z.string().min(1),
+  title: z.string().min(1).optional(),
   description: z.string().optional(),
-  state: z.nativeEnum(GitHubPRState),
-  isDraft: z.boolean(),
-  number: z.number().int().positive(),
-  url: z.string().url(),
-  author: z.string(),
+  state: z.nativeEnum(GitHubPRState).optional(),
+  isDraft: z.boolean().optional(),
+  number: z.number().int().positive().optional(),
+  url: z.string().url().optional(),
+  author: z.string().optional(),
   assignees: z.array(z.string()).optional(),
   reviewers: z.array(z.string()).optional(),
   labels: z.array(z.string()).optional(),
-  baseRef: z.string().describe('Base branch name'),
-  headRef: z.string().describe('Head branch name'),
+  baseRef: z.string().optional(),
+  headRef: z.string().optional(),
   reviewDecision: z.nativeEnum(GitHubPRReviewDecision).optional(),
   mergedAt: z.string().datetime().optional(),
   closedAt: z.string().datetime().optional(),
   additions: z.number().int().min(0).optional(),
   deletions: z.number().int().min(0).optional(),
   changedFiles: z.number().int().min(0).optional(),
-  repositoryId: z.string().uuid().optional(),
-  projectId: z.string().uuid().optional()
+  repositoryId: z.string().uuid().optional()
 });
 
 // Field Option schema for single-select fields

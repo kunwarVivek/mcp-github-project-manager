@@ -15,6 +15,7 @@ import {
 } from '../../domain/agent-orchestration-types';
 import { AIServiceFactory } from '../ai/AIServiceFactory';
 import { mapErrorToMCPError } from '../utils/ErrorMapper';
+import { InputSanitizer } from '../utils/InputSanitizer';
 import {
   TaskCheckedOutEvent,
   TaskReleasedEvent,
@@ -942,7 +943,7 @@ export class TaskCheckoutService {
         prompt: `Agent: ${agent?.name ?? 'unknown'} (role: ${agent?.role ?? 'general'})\n` +
           `Agent capabilities: ${agent?.capabilities?.join(', ') || 'none'}\n\n` +
           `Candidate issues:\n${pool.map(c =>
-            `- #${c.number} "${c.title}" [labels: ${c.labels.join(', ') || 'none'}] [milestone: ${c.milestone ?? 'none'}] [skillScore: ${c.skillScore}] [blocked: ${c.blocked}] [created: ${c.createdAt.slice(0, 10)}]`,
+            `- #${c.number} "${InputSanitizer.sanitizeText(c.title)}" [labels: ${c.labels.join(', ') || 'none'}] [milestone: ${c.milestone ?? 'none'}] [skillScore: ${c.skillScore}] [blocked: ${c.blocked}] [created: ${c.createdAt.slice(0, 10)}]`,
           ).join('\n')}`,
       });
 

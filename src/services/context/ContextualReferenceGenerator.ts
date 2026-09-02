@@ -8,6 +8,7 @@ import type {
   CodeExample,
   ExternalReference
 } from '../../domain/task-context-schemas';
+import { InputSanitizer } from '../utils/InputSanitizer';
 import type { AITask, PRDDocument, FeatureRequirement } from '../../domain/ai-types';
 import { type ILogger, Logger } from '../../infrastructure/logger';
 import { CONTEXT_GENERATION_CONFIGS, formatContextPrompt } from '../ai/prompts/ContextGenerationPrompts';
@@ -50,9 +51,9 @@ export class ContextualReferenceGenerator {
       const config = CONTEXT_GENERATION_CONFIGS.contextualReferences;
 
       const prompt = formatContextPrompt(config.userPrompt, {
-        prdContent,
-        taskTitle: task.title,
-        taskDescription: task.description
+        prdContent: InputSanitizer.sanitizePRDContent(prdContent),
+        taskTitle: InputSanitizer.sanitizeTaskContent(task.title),
+        taskDescription: InputSanitizer.sanitizeTaskContent(task.description)
       });
 
       const result = await generateObject({

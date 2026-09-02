@@ -165,22 +165,24 @@ Business logic coordination. 27 top-level services plus supporting subdirectorie
 `ProjectManagementService` is a thin facade that delegates to focused,
 independently-testable services.
 
-**Services return domain entities** — all CRUD services now return rich domain entities
-(`IssueEntity`, `MilestoneEntity`, `SprintEntity`, `ProjectEntity`) instead of plain interfaces.
-This enables consumers to use computed properties and business logic directly:
+**Services return plain interfaces** — CRUD services return plain domain interfaces
+(`Issue`, `Milestone`, `Sprint`, `Project`) for direct MCP serialization compatibility.
+Rich domain entities (`IssueEntity`, `MilestoneEntity`, `SprintEntity`, `ProjectEntity`)
+in `src/domain/entities/` are available for use cases that need computed properties
+and business logic, but service-layer consumers work with the lightweight interfaces:
 
 ```typescript
 const issue = await service.createIssue({ title: 'Bug', description: '...' });
-console.log(issue.priority);      // 'high' (computed from labels)
-console.log(issue.isStale);       // true if no update in 14+ days
-console.log(issue.canBeAddedToSprint()); // true if open with priority
+console.log(issue.title);        // plain interface field
+console.log(issue.labels);       // string[]
+// For business logic, wrap: const entity = IssueEntity.fromData(issue);
 ```
 
 **Facade**
 
 | Service | Responsibility |
 |---------|----------------|
-| `ProjectManagementService` | Facade — delegates to all services below; returns domain entities |
+| `ProjectManagementService` | Facade — delegates to all services below |
 
 **Core CRUD**
 

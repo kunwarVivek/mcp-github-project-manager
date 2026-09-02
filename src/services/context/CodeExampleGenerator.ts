@@ -3,6 +3,7 @@ import { AIServiceFactory } from '../ai/AIServiceFactory';
 import type { CodeExample } from '../../domain/task-context-schemas';
 import type { AITask } from '../../domain/ai-types';
 import { type ILogger, Logger } from '../../infrastructure/logger';
+import { InputSanitizer } from '../utils/InputSanitizer';
 import { z } from 'zod';
 
 /**
@@ -628,8 +629,8 @@ const data = await withRetry(() => fetchDataFromAPI(), 3, 1000);`,
     return `Generate relevant code examples for this development task:
 
 **Task:**
-- Title: ${task.title}
-- Description: ${task.description}
+- Title: ${InputSanitizer.sanitizeTaskContent(task.title)}
+- Description: ${InputSanitizer.sanitizeTaskContent(task.description)}
 - Complexity: ${task.complexity}/10
 
 **Technology Stack:** ${techStack.join(', ')}

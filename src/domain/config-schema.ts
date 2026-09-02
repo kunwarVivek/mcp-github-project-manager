@@ -52,6 +52,9 @@ export const WebhookConfigSchema = z.object({
   WEBHOOK_ALLOW_UNSIGNED: booleanFlag(false),
   WEBHOOK_PORT: z.coerce.number().int().min(1).max(65535).default(3001),
   WEBHOOK_TIMEOUT_MS: z.coerce.number().int().positive().default(5000),
+  WEBHOOK_ALLOWED_ORIGINS: z.string().default(''),
+  WEBHOOK_RATE_LIMIT: z.coerce.number().int().positive().default(100),
+  WEBHOOK_RATE_WINDOW_MS: z.coerce.number().int().positive().default(60000),
 });
 
 /** AI model configuration. */

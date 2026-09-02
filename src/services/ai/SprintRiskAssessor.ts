@@ -10,6 +10,7 @@
 import { generateObject } from 'ai';
 import { z } from 'zod';
 import { AIServiceFactory } from './AIServiceFactory';
+import { InputSanitizer } from '../utils/InputSanitizer';
 import {
   calculateWeightedScore,
   getConfidenceTier
@@ -163,7 +164,7 @@ export class SprintRiskAssessor {
     return formatRiskPrompt({
       sprintItems: params.sprintItems.map(item => ({
         id: item.id,
-        title: item.title,
+        title: InputSanitizer.sanitizeText(item.title),
         points: item.points,
         dependencies: item.dependencies
       })),

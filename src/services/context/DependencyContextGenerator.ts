@@ -7,6 +7,7 @@ import type {
 import type { AITask, TaskDependency, EnhancedTaskDependency } from '../../domain/ai-types';
 import { type ILogger, Logger } from '../../infrastructure/logger';
 import { z } from 'zod';
+import { InputSanitizer } from '../utils/InputSanitizer';
 
 /**
  * Schema for AI-generated dependency context
@@ -431,14 +432,14 @@ export class DependencyContextGenerator {
     const taskDeps = dependencies || task.dependencies || [];
     const depTasks = taskDeps.map(dep => {
       const t = allTasks.find(at => at.id === dep.id || at.title === dep.id);
-      return t ? `- ${t.title}: ${t.description}` : `- ${dep.id}`;
+      return t ? `- ${InputSanitizer.sanitizeTaskContent(t.title)}: ${InputSanitizer.sanitizeTaskContent(t.description)}` : `- ${dep.id}`;
     }).join('\n');
 
     return `Analyze the dependencies for this task and provide detailed context:
 
 **Current Task:**
-- Title: ${task.title}
-- Description: ${task.description}
+- Title: ${InputSanitizer.sanitizeTaskContent(task.title)}
+- Description: ${InputSanitizer.sanitizeTaskContent(task.description)}
 - Priority: ${task.priority}
 - Complexity: ${task.complexity}/10
 
@@ -446,7 +447,7 @@ export class DependencyContextGenerator {
 ${depTasks || 'No explicit dependencies listed'}
 
 **All Project Tasks:**
-${allTasks.map(t => `- ${t.title} (Priority: ${t.priority}, Complexity: ${t.complexity})`).join('\n')}
+${allTasks.map(t => `- ${InputSanitizer.sanitizeTaskContent(t.title)} (Priority: ${t.priority}, Complexity: ${t.complexity})`).join('\n')}
 
 Provide:
 1. For each dependency, explain WHY it exists and WHAT it provides

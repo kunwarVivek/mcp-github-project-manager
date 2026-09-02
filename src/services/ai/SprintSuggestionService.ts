@@ -10,6 +10,7 @@
 import { generateObject } from 'ai';
 import { z } from 'zod';
 import { AIServiceFactory } from './AIServiceFactory';
+import { InputSanitizer } from '../utils/InputSanitizer';
 import { SprintCapacityAnalyzer, } from './SprintCapacityAnalyzer';
 import { BacklogPrioritizer } from './BacklogPrioritizer';
 import { SprintRiskAssessor } from './SprintRiskAssessor';
@@ -514,12 +515,12 @@ export class SprintSuggestionService {
         prompt: formatSprintSuggestionPrompt({
           availableItems: params.backlogItems.map(item => ({
             id: item.id,
-            title: item.title,
+            title: InputSanitizer.sanitizeText(item.title),
             points: item.points,
             priority: item.priority
           })),
           capacity: capacity.recommendedLoad,
-          businessGoals: params.businessGoals,
+          businessGoals: params.businessGoals?.map(g => InputSanitizer.sanitizeText(g)),
           riskTolerance: params.riskTolerance || 'medium'
         }),
         schema: SprintSuggestionSchema,

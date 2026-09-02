@@ -18,6 +18,7 @@ import {
   calculateWeightedScore,
   getConfidenceTier
 } from './ConfidenceScorer';
+import { InputSanitizer } from '../utils/InputSanitizer';
 import type {
   EnrichedIssue,
   EnrichedIssueSections,
@@ -132,9 +133,9 @@ export class IssueEnrichmentAIService {
         model,
         system: ENRICHMENT_SYSTEM_PROMPT,
         prompt: formatEnrichmentPrompt({
-          issueTitle: params.issueTitle,
-          issueDescription: params.issueDescription,
-          projectContext: params.projectContext,
+          issueTitle: InputSanitizer.sanitizeIssueContent(params.issueTitle),
+          issueDescription: InputSanitizer.sanitizeIssueContent(params.issueDescription),
+          projectContext: params.projectContext ? InputSanitizer.sanitizeText(params.projectContext) : undefined,
           preserveOriginal,
           repositoryLabels: params.repositoryLabels
         }),

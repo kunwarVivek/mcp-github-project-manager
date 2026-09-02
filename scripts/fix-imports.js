@@ -52,13 +52,13 @@ function fixImports(filePath) {
     }
     
     // Fix 'from' imports
-    content = content.replace(fromImportRegex, (match, importPath) => {
+    content = content.replace(fromImportRegex, (_match, importPath) => {
       const fixedPath = processImportPath(importPath);
       return `from "${fixedPath}"`;
     });
     
     // Fix dynamic imports
-    content = content.replace(dynamicImportRegex, (match, importPath) => {
+    content = content.replace(dynamicImportRegex, (_match, importPath) => {
       const fixedPath = processImportPath(importPath);
       return `import("${fixedPath}")`;
     });

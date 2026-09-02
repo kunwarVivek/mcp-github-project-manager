@@ -14,6 +14,7 @@
 import { generateObject } from 'ai';
 import { z } from 'zod';
 import { AIServiceFactory } from './AIServiceFactory';
+import { InputSanitizer } from '../utils/InputSanitizer';
 import {
   EstimationCalibrator,
   complexityToPoints
@@ -240,7 +241,7 @@ export class RoadmapAIService {
       const result = await generateObject({
         model,
         system: REQUIREMENTS_PARSING_PROMPT,
-        prompt: text,
+        prompt: InputSanitizer.sanitizeText(text, InputSanitizer.MAX_ISSUE_CONTENT_LENGTH),
         schema: RequirementParseSchema,
         temperature: 0.3
       });
