@@ -1,6 +1,10 @@
 # MCP GitHub Project Manager
 
-A comprehensive Model Context Protocol (MCP) server that provides advanced GitHub project management capabilities with **AI-powered task management** and **complete requirements traceability**. Transform your project ideas into actionable tasks with a full end-to-end pipeline from project ideas to GitHub issues, sprints, and milestones.
+<!-- Keywords: mcp server, model context protocol, github project management, ai agent orchestration, multi-agent coordination, autonomous coding agents, prd generator, sprint planning ai, issue triage automation, github projects v2 api, claude mcp, codex mcp, cursor mcp, llm tools, agentic task management, ai project manager, swarm coordination -->
+
+**The agentic task substrate for AI coding agents.** An MCP server that turns GitHub Projects v2 into a fully autonomous project management platform — AI agents self-assign work, track progress, review each other, and ship code, all backed by GitHub-native storage.
+
+> **Use case**: You have AI agents (Claude Code, Codex, Cursor, Windsurf, Roo). They need a task backbone. This is it.
 
 [![npm version](https://img.shields.io/npm/v/mcp-github-project-manager.svg)](https://www.npmjs.com/package/mcp-github-project-manager)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -8,18 +12,46 @@ A comprehensive Model Context Protocol (MCP) server that provides advanced GitHu
 
 ## Overview
 
-This server implements the [Model Context Protocol](https://modelcontextprotocol.io) to provide comprehensive GitHub project management with advanced AI capabilities. Beyond traditional project management, it offers AI-powered task generation, requirements traceability, and intelligent project planning through GitHub's GraphQL API while maintaining state and handling errors according to MCP specifications.
+This MCP server implements the [Model Context Protocol](https://modelcontextprotocol.io) to provide a complete **agentic project management layer** over GitHub Projects v2. AI agents register, self-assign tasks, coordinate via heartbeats, submit work products for review, and operate within token budgets — all through 16 compound tools exposing 152 actions. Human project managers get AI-powered PRD generation, sprint planning, issue triage, and roadmap creation. Everything is backed by GitHub-native storage (issues, project fields, comments) — no external infrastructure required.
+
+## Why This Exists
+
+AI coding agents are powerful but stateless — they don't know what to work on next, can't coordinate with other agents, and have no persistent task memory. This MCP server solves that by turning GitHub Projects into an **agentic operating layer**:
+
+| Problem | Solution |
+|---------|----------|
+| Agents don't know what to work on | **Task checkout** with priority/skills/deadline strategies |
+| Multiple agents step on each other | **Atomic claims** with TOCTOU guards + review workflow |
+| No visibility into agent work | **Heartbeat monitoring** + activity dashboard + work product tracking |
+| Agents burn unlimited tokens | **Per-agent token budgets** with warning thresholds and hard stops |
+| Ideas don't become tasks | **PRD→Tasks→Issues pipeline** with AI-powered breakdown |
+| Sprint planning is manual | **AI sprint planning** with capacity analysis and risk assessment |
+| Issues pile up untriaged | **AI-powered triage** with auto-labeling and priority assignment |
+| Need external databases | **Zero infra** — all state in GitHub issues, projects, and comments |
+
+## Works With
+
+| Agent / Client | Integration |
+|---------------|-------------|
+| **Claude Desktop** | Native MCP client — add to `claude_desktop_config.json` |
+| **Claude Code** | MCP server via stdio transport |
+| **Codex** | MCP-compatible — register as tool provider |
+| **Cursor** | MCP server integration |
+| **Windsurf** | MCP server integration |
+| **Roo Code** | MCP server integration |
+| **VS Code + Copilot** | Via MCP extension |
+| **Custom harnesses** | Any MCP-compatible client — see `examples/basic/agent-loop.ts` |
 
 ### What Makes This Special
 
-- **16 Compound Tools (152 actions)**: Progressive-disclosure API — AI agents see 16 tools instead of 131, with `discover_tools` for runtime exploration
-- **AI-Powered**: Transform project ideas into comprehensive PRDs and actionable tasks using multiple AI providers
-- **Agent Orchestration**: Autonomous AI agent task assignment, heartbeat monitoring, budget enforcement, and work product tracking
-- **PRD-to-Issues Pipeline**: Materialize AI-generated tasks into GitHub milestones, sprints, and issues with dependency-driven sequencing
-- **Complete Traceability**: Full end-to-end tracking from business requirements → features → use cases → tasks
-- **Intelligent Analysis**: AI-powered complexity analysis, effort estimation, and task recommendations
-- **Professional Standards**: IEEE 830 compliant requirements documentation with enterprise-grade change management
-
+- **Agentic-First Design**: Built as a task substrate for AI agents, not a human-facing PM tool retrofitted with an API
+- **16 Compound Tools (152 actions)**: Progressive-disclosure API — agents see 16 tools, drill into 152 actions via `discover_tools`
+- **Multi-Agent Swarm**: Agents register, claim tasks atomically, heartbeat, review each other, and converge projects
+- **PRD→Production Pipeline**: Idea → PRD → tasks → GitHub issues → milestones → sprints — fully automated
+- **Zero External Infrastructure**: All state lives in GitHub (issues, projects, comments) — no database, no Redis, no S3
+- **AI-Powered Everything**: Triage, sprint planning, roadmap generation, complexity analysis, duplicate detection — all AI-augmented
+- **Token Budget Enforcement**: Per-agent spending limits prevent runaway AI costs
+- **Self-Healing**: Auto-reclaim tasks from crashed agents, stale heartbeat detection, registry cleanup
 
 ## Table of Contents
 
@@ -374,7 +406,7 @@ For more examples, see the [User Guide](docs/user-guide.md) and the [examples/](
 
 ### Compound Tool API Examples
 
-The MCP server exposes 16 compound tools (134 actions). Each tool accepts an `action` parameter that routes to the underlying operation. Use `discover_tools` to explore capabilities at runtime.
+The MCP server exposes 16 compound tools (152 actions). Each tool accepts an `action` parameter that routes to the underlying operation. Use `discover_tools` to explore capabilities at runtime.
 
 #### Quick Start Workflow
 ```json
@@ -1021,7 +1053,7 @@ See [.planning/STATUS.md](.planning/STATUS.md) for detailed implementation statu
 ### Recent Improvements
 
 - **Dependency & SDK modernization (2026-07-15)**:
-  - Migrated to Vercel AI SDK v5 and Zod v4 (coupled upgrade; MCP SDK 1.29 accepts Zod 4)
+  - Migrated to Vercel AI SDK v7 and Zod v4 (coupled upgrade; MCP SDK 1.29 accepts Zod 4)
   - Aligned Octokit type packages with `@octokit/rest` 22
   - Cleared the critical Handlebars vulnerability and all high-severity advisories
 
@@ -1083,7 +1115,7 @@ webhook signature check.
 - [Troubleshooting Guide](docs/TROUBLESHOOTING.md) - Common issues and solutions
 
 ### Reference
-- [Tool Reference](docs/TOOLS.md) - 16 compound tools (134 actions) documented
+- [Tool Reference](docs/TOOLS.md) - 16 compound tools (152 actions) documented
 - [Architecture](docs/architecture.md) - System design and patterns
 - [API Reference](docs/API.md) - Service and infrastructure APIs
 
