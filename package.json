@@ -1,11 +1,11 @@
 {
   "name": "mcp-github-project-manager",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "description": "A Model Context Protocol (MCP) server for managing GitHub Projects",
   "type": "module",
   "exports": "./build/index.js",
   "bin": {
-    "mcp-github-project-manager": "./build/index.js"
+    "mcp-github-project-manager": "build/index.js"
   },
   "main": "./build/index.js",
   "types": "./build/index.d.ts",
@@ -24,7 +24,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/kunwarVivek/mcp-github-project-manager.git"
+    "url": "git+https://github.com/kunwarVivek/mcp-github-project-manager.git"
   },
   "homepage": "https://github.com/kunwarVivek/mcp-github-project-manager#readme",
   "bugs": {
