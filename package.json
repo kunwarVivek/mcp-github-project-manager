@@ -1,6 +1,6 @@
 {
   "name": "mcp-github-project-manager",
-  "version": "2.2.0",
+  "version": "2.2.1",
   "description": "MCP server for AI-powered GitHub project management — agent orchestration, PRD-to-issues pipeline, sprint planning, and multi-agent swarm coordination over GitHub Projects v2",
   "type": "module",
   "exports": "./build/index.js",
