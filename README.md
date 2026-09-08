@@ -329,17 +329,17 @@ mcp-github-project-manager --help
 If you're developing or running from source:
 
 ```bash
-# Run directly with ts-node
-node --loader ts-node/esm src/index.ts
-
-# Run with command line arguments
-node --loader ts-node/esm src/index.ts --token=your_token --owner=your_username --repo=your_repo
-
-# Use the npm dev script (watches for changes)
+# Use the npm dev script (watches for changes) — recommended
 npm run dev
 
+# Run directly with tsx
+npx tsx src/index.ts
+
+# Run with command line arguments
+npx tsx src/index.ts --token=your_token --owner=your_username --repo=your_repo
+
 # Display help information
-node --loader ts-node/esm src/index.ts --help
+npx tsx src/index.ts --help
 ```
 
 #### Command Line Options
@@ -511,8 +511,8 @@ The enhanced context generation functionality includes comprehensive test covera
 npm run test:ai
 
 # Run specific context generation tests
-npm test -- --testPathPattern="TaskContextGeneration"
-npm test -- --testPathPattern="enhanced"
+npm test TaskContextGeneration
+npm test enhanced
 
 # Run all tests
 npm test
@@ -523,8 +523,8 @@ npm test
 The MCP GitHub Project Manager includes a comprehensive end-to-end testing suite that tests all MCP tools through the actual MCP interface with both mocked and real API calls.
 
 ### **Test Coverage:**
-- ✅ **40+ GitHub Project Management Tools** - Complete CRUD operations for projects, milestones, issues, sprints, labels, and more
-- ✅ **8 AI Task Management Tools** - PRD generation, task parsing, complexity analysis, feature management, and traceability
+- ✅ **16 Compound Tools (152 actions)** - Complete CRUD operations for projects, milestones, issues, sprints, labels, and more
+- ✅ **9 AI-Powered Actions** - PRD generation, task parsing, complexity analysis, feature management, and traceability
 - ✅ **Complex Workflow Integration** - Multi-tool workflows and real-world project management scenarios
 - ✅ **Real API Testing** - Optional testing with actual GitHub and AI APIs
 - ✅ **Schema Validation** - Comprehensive argument validation for all tools
