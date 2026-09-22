@@ -22,9 +22,13 @@ jest.*.cjs
 .git/
 .gitignore
 .claude/
+.agents/
 .mcp-cache/
 .planning/
+.gitnexus/
+.beads/
 handoffs/
+thoughts/
 
 # IDE files
 .idea/
@@ -59,3 +63,10 @@ Thumbs.db
 tmp/
 .tmp/
 *.log
+
+# Config files not needed in container
+vitest.config.ts
+biome.json
+.husky/
+AGENTS.md
+CLAUDE.md
