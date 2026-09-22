@@ -28,7 +28,11 @@ interface CapturedPrompt {
 function createCapturingServer(): { server: McpServer; prompts: Record<string, CapturedPrompt> } {
   const prompts: Record<string, CapturedPrompt> = {};
   const server = {
-    registerPrompt: (name: string, config: CapturedPrompt["config"], callback: CapturedPrompt["callback"]) => {
+    registerPrompt: (
+      name: string,
+      config: CapturedPrompt["config"],
+      callback: CapturedPrompt["callback"]
+    ) => {
       prompts[name] = { name, config, callback };
     },
   };
@@ -100,7 +104,10 @@ describe("registerPrompts", () => {
   describe("explain-task-complexity", () => {
     it("returns messages with the task title and description", () => {
       const { callback } = getPrompt("explain-task-complexity");
-      const result = callback({ taskTitle: "Add retry logic", taskDescription: "Retry failed webhooks" });
+      const result = callback({
+        taskTitle: "Add retry logic",
+        taskDescription: "Retry failed webhooks",
+      });
 
       expect(result.messages).toHaveLength(2);
       expect(result.messages[1].content.text).toContain("Task: Add retry logic");
@@ -127,7 +134,10 @@ describe("registerPrompts", () => {
   describe("suggest-issue-labels", () => {
     it("returns messages with the issue title and description", () => {
       const { callback } = getPrompt("suggest-issue-labels");
-      const result = callback({ issueTitle: "Crash on save", issueDescription: "Null pointer in save handler" });
+      const result = callback({
+        issueTitle: "Crash on save",
+        issueDescription: "Null pointer in save handler",
+      });
 
       expect(result.messages).toHaveLength(2);
       expect(result.messages[1].content.text).toContain("Issue title: Crash on save");
@@ -154,7 +164,11 @@ describe("registerPrompts", () => {
   describe("analyze-sprint-risk", () => {
     it("returns messages including provided issueCount and teamSize", () => {
       const { callback } = getPrompt("analyze-sprint-risk");
-      const result = callback({ sprintGoals: "Ship checkout redesign", issueCount: 12, teamSize: 4 });
+      const result = callback({
+        sprintGoals: "Ship checkout redesign",
+        issueCount: 12,
+        teamSize: 4,
+      });
 
       expect(result.messages).toHaveLength(2);
       expect(result.messages[1].content.text).toContain("Sprint goals:\nShip checkout redesign");
@@ -168,7 +182,10 @@ describe("registerPrompts", () => {
 
       const result = callback({ sprintGoals: "Ship checkout redesign" });
 
-      expect(spy).toHaveBeenCalledWith("Ship checkout redesign", InputSanitizer.MAX_ISSUE_CONTENT_LENGTH);
+      expect(spy).toHaveBeenCalledWith(
+        "Ship checkout redesign",
+        InputSanitizer.MAX_ISSUE_CONTENT_LENGTH
+      );
       expect(result.messages[1].content.text).toContain("Planned issue count: not provided");
       expect(result.messages[1].content.text).toContain("Team size: not provided");
     });
@@ -198,7 +215,10 @@ describe("registerPrompts", () => {
 
       const result = callback({ milestone: "v2.0: perf + bugfixes" });
 
-      expect(spy).toHaveBeenCalledWith("v2.0: perf + bugfixes", InputSanitizer.MAX_ISSUE_CONTENT_LENGTH);
+      expect(spy).toHaveBeenCalledWith(
+        "v2.0: perf + bugfixes",
+        InputSanitizer.MAX_ISSUE_CONTENT_LENGTH
+      );
       expect(result.messages[0].content.text).toContain("Do not add a metrics section.");
     });
 
@@ -206,7 +226,9 @@ describe("registerPrompts", () => {
       const { config } = getPrompt("generate-release-notes");
       expect(() => config.argsSchema!.parse({})).toThrow();
       expect(() => config.argsSchema!.parse({ milestone: "m", includeMetrics: "yes" })).toThrow();
-      expect(() => config.argsSchema!.parse({ milestone: "m", includeMetrics: "true" })).not.toThrow();
+      expect(() =>
+        config.argsSchema!.parse({ milestone: "m", includeMetrics: "true" })
+      ).not.toThrow();
     });
   });
 
@@ -232,7 +254,9 @@ describe("registerPrompts", () => {
       const result = callback({ issueTitle: "Login fails on Safari" });
 
       expect(spy).toHaveBeenCalledWith("Login fails on Safari");
-      expect(result.messages[1].content.text).toContain("Existing repository labels: (none provided)");
+      expect(result.messages[1].content.text).toContain(
+        "Existing repository labels: (none provided)"
+      );
     });
 
     it("enforces issueTitle as required while issueDescription/existingLabels stay optional", () => {

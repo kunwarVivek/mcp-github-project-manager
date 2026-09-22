@@ -2548,8 +2548,7 @@ export async function executeManageReleases(args: ManageReleasesArgs): Promise<u
  * ProjectManagementService facade counterpart, unlike the core PM tools.
  */
 export async function executeManageWorkflows(args: ManageWorkflowsArgs): Promise<unknown> {
-  const { action, owner, repo, workflowId, runId, ref, inputs, status, branch, limit, page } =
-    args;
+  const { action, owner, repo, workflowId, runId, ref, inputs, status, branch, limit, page } = args;
   const factory = createGitHubFactory(owner, repo);
   const octokit = factory.getOctokit();
   const { owner: repoOwner, repo: repoName } = factory.getConfig();

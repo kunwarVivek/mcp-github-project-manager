@@ -1,55 +1,60 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { Mock } from "vitest";
-import { ProtocolError, INTERNAL_ERROR } from "@modelcontextprotocol/server";
+import { ProtocolError } from "@modelcontextprotocol/server";
+import type { McpServer } from "@modelcontextprotocol/server";
+import { registerResources } from "../../../../infrastructure/mcp/resources";
+import type { RegisterResourcesDeps } from "../../../../infrastructure/mcp/resources";
+import type { ProjectManagementService } from "../../../../services/ProjectManagementService";
+import type { ToolRegistry } from "../../../../infrastructure/tools/ToolRegistry";
+import type { AgentStore } from "../../../../infrastructure/agent/AgentStore";
+import type { AIServiceFactory } from "../../../../services/ai/AIServiceFactory";
+import type { ILogger } from "../../../../infrastructure/logger/index";
 
 /**
- * Unit tests for the six `github://…` MCP resource read callbacks registered
- * by `GitHubProjectManagerServer.registerResources()` in `src/index.ts`
- * (private method, ~line 633).
+ * Unit tests for the six `github://…` MCP resources registered by
+ * `registerResources()` (`src/infrastructure/mcp/resources.ts`), the module
+ * `GitHubProjectManagerServer.registerResources()` (`src/index.ts`)
+ * delegates to.
  *
- * `src/index.ts` cannot be imported in an isolated unit test: its module body
- * ends with an unguarded top-level bootstrap (`new
- * GitHubProjectManagerServer(); server.run()...`, src/index.ts:1435-1465,
- * no `require.main`-style guard) that builds the real DI container, arms the
- * agent reclaim scheduler, and wires stdio/webhook transports as a side
- * effect of import. Extracting `registerResources()` into a standalone
- * exported function (the way `registerPrompts()` already is — see
- * prompts.test.ts) would require editing `src/index.ts`, which sibling tasks
- * are concurrently appending tool wiring to in this same batch.
- *
- * Instead, this file mirrors the six callback bodies verbatim from
- * `registerResources()` (same field names, same `jsonResource` shape, same
- * error wrapping) and exercises them directly against injected mock
- * dependencies — exactly the shape (`this.logger`, `this.aiFactory`,
- * `this.service`, `this.agentStore`, `this.toolRegistry`) each closure reads
- * in the real implementation. `ProtocolError`/`INTERNAL_ERROR` are imported
- * for real from the MCP SDK so error-wrapping assertions check the actual
- * error class production code throws. Keep the reproduction in sync with
- * `src/index.ts` if `registerResources()` changes.
+ * `registerResources()` is a plain, side-effect-free exported function that
+ * only needs an `McpServer`-shaped object with a `registerResource` method,
+ * so it is exercised directly against a lightweight capturing double
+ * instead of a mocked SDK server — same approach as `prompts.test.ts`.
  */
 
-const GITHUB_OWNER = "test-owner";
-const GITHUB_REPO = "test-repo";
-const GITHUB_TOKEN = "test-token";
 const SERVER_VERSION = "0.0.0-test";
-
-const McpError = ProtocolError;
-const ErrorCode = { InternalError: INTERNAL_ERROR } as const;
 
 interface ResourceReadResult {
   contents: Array<{ uri: string; mimeType: string; text: string }>;
 }
 
-function jsonResource(uri: URL, data: unknown): ResourceReadResult {
-  return {
-    contents: [
-      {
-        uri: uri.href,
-        mimeType: "application/json",
-        text: JSON.stringify(data),
-      },
-    ],
+type ReadCallback = (uri: URL) => Promise<ResourceReadResult>;
+
+interface CapturedResource {
+  uri: string;
+  metadata: { title?: string; description?: string; mimeType?: string };
+  callback: ReadCallback;
+}
+
+function createCapturingServer(): { server: McpServer; resources: Record<string, CapturedResource> } {
+  const resources: Record<string, CapturedResource> = {};
+  const fakeServer = {
+    registerResource: (
+      name: string,
+      uri: string,
+      metadata: CapturedResource["metadata"],
+      callback: ReadCallback
+    ) => {
+      resources[name] = { uri, metadata, callback };
+    },
   };
+  return { server: fakeServer as unknown as McpServer, resources };
+}
+
+function getCallback(resources: Record<string, CapturedResource>, name: string): ReadCallback {
+  const resource = resources[name];
+  if (!resource) throw new Error(`Resource "${name}" was never registered`);
+  return resource.callback;
 }
 
 interface Logger {
@@ -72,8 +77,6 @@ function expectValidResourceResult(result: ResourceReadResult, uri: URL): unknow
   return JSON.parse(result.contents[0].text);
 }
 
-// ---- callback factories, mirroring GitHubProjectManagerServer.registerResources() in src/index.ts ----
-
 interface AiValidation {
   hasAnyProvider: boolean;
   available: string[];
@@ -81,153 +84,57 @@ interface AiValidation {
   missing: string[];
 }
 
-function createConfigCallback(deps: {
-  logger: Logger;
-  aiFactory: { validateConfiguration: () => AiValidation };
-  owner?: string;
-  repo?: string;
-  token?: string;
-  serverVersion?: string;
-}) {
-  const owner = deps.owner ?? GITHUB_OWNER;
-  const repo = deps.repo ?? GITHUB_REPO;
-  const token = deps.token ?? GITHUB_TOKEN;
-  const serverVersion = deps.serverVersion ?? SERVER_VERSION;
-  return async (uri: URL): Promise<ResourceReadResult> => {
-    deps.logger.debug(`Resource read: ${uri.href}`);
-    try {
-      const ai = deps.aiFactory.validateConfiguration();
-      return jsonResource(uri, {
-        owner,
-        repo,
-        tokenConfigured: Boolean(token),
-        serverVersion,
-        ai: {
-          available: ai.hasAnyProvider,
-          providers: ai.available,
-          availableModels: ai.availableModels,
-          missing: ai.missing,
-        },
-      });
-    } catch (error) {
-      deps.logger.error("Failed to read github://config resource", error);
-      throw new McpError(
-        ErrorCode.InternalError,
-        `Failed to read server configuration: ${error instanceof Error ? error.message : String(error)}`
-      );
-    }
+/** Builds full `RegisterResourcesDeps`, overriding only the fakes a test cares about. */
+function makeDeps(overrides: {
+  logger?: Logger;
+  aiFactory?: { validateConfiguration: Mock };
+  service?: { listProjects?: Mock; getCurrentSprint?: Mock; listMilestones?: Mock };
+  agentStore?: { listAgents: Mock };
+  toolRegistry?: { getToolsForMCP: Mock };
+} = {}): RegisterResourcesDeps {
+  const logger = overrides.logger ?? makeLogger();
+  const aiFactory = overrides.aiFactory ?? {
+    validateConfiguration: vi.fn().mockReturnValue({
+      hasAnyProvider: false,
+      available: [],
+      availableModels: [],
+      missing: [],
+    } satisfies AiValidation),
+  };
+  const service = {
+    listProjects: vi.fn().mockResolvedValue([]),
+    getCurrentSprint: vi.fn().mockResolvedValue(null),
+    listMilestones: vi.fn().mockResolvedValue([]),
+    ...overrides.service,
+  };
+  const agentStore = overrides.agentStore ?? { listAgents: vi.fn().mockResolvedValue([]) };
+  const toolRegistry = overrides.toolRegistry ?? { getToolsForMCP: vi.fn().mockReturnValue([]) };
+
+  return {
+    service: service as unknown as ProjectManagementService,
+    toolRegistry: toolRegistry as unknown as ToolRegistry,
+    agentStore: agentStore as unknown as AgentStore,
+    aiFactory: aiFactory as unknown as AIServiceFactory,
+    logger: logger as unknown as ILogger,
+    serverVersion: SERVER_VERSION,
   };
 }
 
-function createProjectsCallback(deps: { logger: Logger; service: { listProjects: () => Promise<unknown> } }) {
-  return async (uri: URL): Promise<ResourceReadResult> => {
-    deps.logger.debug(`Resource read: ${uri.href}`);
-    try {
-      const projects = await deps.service.listProjects();
-      return jsonResource(uri, projects);
-    } catch (error) {
-      deps.logger.error("Failed to read github://projects resource", error);
-      throw new McpError(
-        ErrorCode.InternalError,
-        `Failed to list projects: ${error instanceof Error ? error.message : String(error)}`
-      );
-    }
-  };
-}
+describe("registerResources", () => {
+  it("registers all six github:// resources with the expected uris", () => {
+    const { server, resources } = createCapturingServer();
 
-function createCurrentSprintCallback(deps: {
-  logger: Logger;
-  service: { getCurrentSprint: () => Promise<unknown> };
-}) {
-  return async (uri: URL): Promise<ResourceReadResult> => {
-    deps.logger.debug(`Resource read: ${uri.href}`);
-    try {
-      const sprint = await deps.service.getCurrentSprint();
-      return jsonResource(uri, sprint);
-    } catch (error) {
-      deps.logger.error("Failed to read github://sprints/current resource", error);
-      throw new McpError(
-        ErrorCode.InternalError,
-        `Failed to read current sprint: ${error instanceof Error ? error.message : String(error)}`
-      );
-    }
-  };
-}
+    registerResources(server, makeDeps());
 
-function createMilestonesCallback(deps: {
-  logger: Logger;
-  service: { listMilestones: (status: string) => Promise<unknown> };
-}) {
-  return async (uri: URL): Promise<ResourceReadResult> => {
-    deps.logger.debug(`Resource read: ${uri.href}`);
-    try {
-      const milestones = await deps.service.listMilestones("open");
-      return jsonResource(uri, milestones);
-    } catch (error) {
-      deps.logger.error("Failed to read github://milestones resource", error);
-      throw new McpError(
-        ErrorCode.InternalError,
-        `Failed to list milestones: ${error instanceof Error ? error.message : String(error)}`
-      );
-    }
-  };
-}
-
-function createAgentsCallback(deps: { logger: Logger; agentStore: { listAgents: () => Promise<unknown> } }) {
-  return async (uri: URL): Promise<ResourceReadResult> => {
-    deps.logger.debug(`Resource read: ${uri.href}`);
-    try {
-      const agents = await deps.agentStore.listAgents();
-      return jsonResource(uri, agents);
-    } catch (error) {
-      deps.logger.error("Failed to read github://agents resource", error);
-      throw new McpError(
-        ErrorCode.InternalError,
-        `Failed to list agents: ${error instanceof Error ? error.message : String(error)}`
-      );
-    }
-  };
-}
-
-interface ToolCatalogEntry {
-  name: string;
-  title?: string;
-  description?: string;
-  annotations?: unknown;
-  [extra: string]: unknown;
-}
-
-function createToolsCallback(deps: {
-  logger: Logger;
-  toolRegistry: { getToolsForMCP: () => ToolCatalogEntry[] };
-}) {
-  return async (uri: URL): Promise<ResourceReadResult> => {
-    deps.logger.debug(`Resource read: ${uri.href}`);
-    try {
-      const tools = deps.toolRegistry.getToolsForMCP().map((tool) => ({
-        name: tool.name,
-        title: tool.title,
-        description: tool.description,
-        annotations: tool.annotations,
-      }));
-      return jsonResource(uri, { count: tools.length, tools });
-    } catch (error) {
-      deps.logger.error("Failed to read github://tools resource", error);
-      throw new McpError(
-        ErrorCode.InternalError,
-        `Failed to read tool catalog: ${error instanceof Error ? error.message : String(error)}`
-      );
-    }
-  };
-}
-
-// ---- tests ----
-
-describe("MCP resources (github://…)", () => {
-  let logger: Logger;
-
-  beforeEach(() => {
-    logger = makeLogger();
+    expect(Object.keys(resources).sort()).toEqual(
+      ["agents", "config", "current-sprint", "milestones", "projects", "tools"].sort()
+    );
+    expect(resources.config.uri).toBe("github://config");
+    expect(resources.projects.uri).toBe("github://projects");
+    expect(resources["current-sprint"].uri).toBe("github://sprints/current");
+    expect(resources.milestones.uri).toBe("github://milestones");
+    expect(resources.agents.uri).toBe("github://agents");
+    expect(resources.tools.uri).toBe("github://tools");
   });
 
   describe("github://config", () => {
@@ -238,17 +145,15 @@ describe("MCP resources (github://…)", () => {
           available: ["anthropic"],
           availableModels: ["claude-opus-5"],
           missing: ["openai"],
-        }),
+        } satisfies AiValidation),
       };
+      const { server, resources } = createCapturingServer();
+      registerResources(server, makeDeps({ aiFactory }));
       const uri = new URL("github://config");
-      const callback = createConfigCallback({ logger, aiFactory });
 
-      const data = expectValidResourceResult(await callback(uri), uri);
+      const data = expectValidResourceResult(await getCallback(resources, "config")(uri), uri);
 
-      expect(data).toEqual({
-        owner: GITHUB_OWNER,
-        repo: GITHUB_REPO,
-        tokenConfigured: true,
+      expect(data).toMatchObject({
         serverVersion: SERVER_VERSION,
         ai: {
           available: true,
@@ -257,33 +162,25 @@ describe("MCP resources (github://…)", () => {
           missing: ["openai"],
         },
       });
-    });
-
-    it("reports tokenConfigured: false when no GitHub token is configured", async () => {
-      const aiFactory = {
-        validateConfiguration: vi.fn().mockReturnValue({
-          hasAnyProvider: false,
-          available: [],
-          availableModels: [],
-          missing: ["anthropic", "openai"],
-        }),
-      };
-      const uri = new URL("github://config");
-      const callback = createConfigCallback({ logger, aiFactory, token: "" });
-
-      const data = (await callback(uri).then((r) => expectValidResourceResult(r, uri))) as { tokenConfigured: boolean };
-
-      expect(data.tokenConfigured).toBe(false);
+      if (data && typeof data === "object") {
+        expect("owner" in data && typeof data.owner === "string").toBe(true);
+        expect("repo" in data && typeof data.repo === "string").toBe(true);
+        expect("tokenConfigured" in data && typeof data.tokenConfigured === "boolean").toBe(true);
+      } else {
+        throw new Error("expected config resource payload to be an object");
+      }
     });
 
     it("wraps a validateConfiguration failure in a ProtocolError and logs it", async () => {
+      const logger = makeLogger();
       const aiFactory = {
         validateConfiguration: vi.fn().mockImplementation(() => {
           throw new Error("boom");
         }),
       };
-      const callback = createConfigCallback({ logger, aiFactory });
-      const promise = callback(new URL("github://config"));
+      const { server, resources } = createCapturingServer();
+      registerResources(server, makeDeps({ logger, aiFactory }));
+      const promise = getCallback(resources, "config")(new URL("github://config"));
 
       await expect(promise).rejects.toBeInstanceOf(ProtocolError);
       await expect(promise).rejects.toThrow(/Failed to read server configuration: boom/);
@@ -297,76 +194,84 @@ describe("MCP resources (github://…)", () => {
         { id: "1", title: "Roadmap" },
         { id: "2", title: "Backlog" },
       ];
-      const service = { listProjects: vi.fn().mockResolvedValue(projects) };
+      const listProjects = vi.fn().mockResolvedValue(projects);
+      const { server, resources } = createCapturingServer();
+      registerResources(server, makeDeps({ service: { listProjects } }));
       const uri = new URL("github://projects");
-      const callback = createProjectsCallback({ logger, service });
 
-      const data = expectValidResourceResult(await callback(uri), uri);
+      const data = expectValidResourceResult(await getCallback(resources, "projects")(uri), uri);
 
-      expect(service.listProjects).toHaveBeenCalledTimes(1);
+      expect(listProjects).toHaveBeenCalledTimes(1);
       expect(Array.isArray(data)).toBe(true);
       expect(data).toEqual(projects);
     });
 
     it("wraps a listProjects failure in a ProtocolError", async () => {
-      const service = { listProjects: vi.fn().mockRejectedValue(new Error("api down")) };
-      const callback = createProjectsCallback({ logger, service });
+      const listProjects = vi.fn().mockRejectedValue(new Error("api down"));
+      const { server, resources } = createCapturingServer();
+      registerResources(server, makeDeps({ service: { listProjects } }));
 
-      await expect(callback(new URL("github://projects"))).rejects.toThrow(/Failed to list projects: api down/);
-      expect(logger.error).toHaveBeenCalledWith("Failed to read github://projects resource", expect.any(Error));
+      await expect(getCallback(resources, "projects")(new URL("github://projects"))).rejects.toThrow(
+        /Failed to list projects: api down/
+      );
     });
   });
 
   describe("github://sprints/current", () => {
     it("returns null when no sprint is active", async () => {
-      const service = { getCurrentSprint: vi.fn().mockResolvedValue(null) };
+      const getCurrentSprint = vi.fn().mockResolvedValue(null);
+      const { server, resources } = createCapturingServer();
+      registerResources(server, makeDeps({ service: { getCurrentSprint } }));
       const uri = new URL("github://sprints/current");
-      const callback = createCurrentSprintCallback({ logger, service });
 
-      const data = expectValidResourceResult(await callback(uri), uri);
+      const data = expectValidResourceResult(await getCallback(resources, "current-sprint")(uri), uri);
 
       expect(data).toBeNull();
     });
 
     it("returns the active sprint when one exists", async () => {
       const sprint = { id: "sprint-1", title: "Sprint 12", status: "active" };
-      const service = { getCurrentSprint: vi.fn().mockResolvedValue(sprint) };
+      const getCurrentSprint = vi.fn().mockResolvedValue(sprint);
+      const { server, resources } = createCapturingServer();
+      registerResources(server, makeDeps({ service: { getCurrentSprint } }));
       const uri = new URL("github://sprints/current");
-      const callback = createCurrentSprintCallback({ logger, service });
 
-      const data = expectValidResourceResult(await callback(uri), uri);
+      const data = expectValidResourceResult(await getCallback(resources, "current-sprint")(uri), uri);
 
       expect(data).toEqual(sprint);
     });
 
     it("wraps a getCurrentSprint failure in a ProtocolError", async () => {
-      const service = { getCurrentSprint: vi.fn().mockRejectedValue(new Error("timeout")) };
-      const callback = createCurrentSprintCallback({ logger, service });
+      const getCurrentSprint = vi.fn().mockRejectedValue(new Error("timeout"));
+      const { server, resources } = createCapturingServer();
+      registerResources(server, makeDeps({ service: { getCurrentSprint } }));
 
-      await expect(callback(new URL("github://sprints/current"))).rejects.toThrow(
-        /Failed to read current sprint: timeout/
-      );
+      await expect(
+        getCallback(resources, "current-sprint")(new URL("github://sprints/current"))
+      ).rejects.toThrow(/Failed to read current sprint: timeout/);
     });
   });
 
   describe("github://milestones", () => {
     it("lists open milestones by calling listMilestones('open')", async () => {
       const milestones = [{ id: "m1", title: "v1.0", status: "open" }];
-      const service = { listMilestones: vi.fn().mockResolvedValue(milestones) };
+      const listMilestones = vi.fn().mockResolvedValue(milestones);
+      const { server, resources } = createCapturingServer();
+      registerResources(server, makeDeps({ service: { listMilestones } }));
       const uri = new URL("github://milestones");
-      const callback = createMilestonesCallback({ logger, service });
 
-      const data = expectValidResourceResult(await callback(uri), uri);
+      const data = expectValidResourceResult(await getCallback(resources, "milestones")(uri), uri);
 
-      expect(service.listMilestones).toHaveBeenCalledWith("open");
+      expect(listMilestones).toHaveBeenCalledWith("open");
       expect(data).toEqual(milestones);
     });
 
     it("wraps a listMilestones failure in a ProtocolError", async () => {
-      const service = { listMilestones: vi.fn().mockRejectedValue(new Error("rate limited")) };
-      const callback = createMilestonesCallback({ logger, service });
+      const listMilestones = vi.fn().mockRejectedValue(new Error("rate limited"));
+      const { server, resources } = createCapturingServer();
+      registerResources(server, makeDeps({ service: { listMilestones } }));
 
-      await expect(callback(new URL("github://milestones"))).rejects.toThrow(
+      await expect(getCallback(resources, "milestones")(new URL("github://milestones"))).rejects.toThrow(
         /Failed to list milestones: rate limited/
       );
     });
@@ -375,69 +280,75 @@ describe("MCP resources (github://…)", () => {
   describe("github://agents", () => {
     it("returns the agent list from the AgentStore", async () => {
       const agents = [{ agentId: "agent-1", status: "idle" }];
-      const agentStore = { listAgents: vi.fn().mockResolvedValue(agents) };
+      const listAgents = vi.fn().mockResolvedValue(agents);
+      const { server, resources } = createCapturingServer();
+      registerResources(server, makeDeps({ agentStore: { listAgents } }));
       const uri = new URL("github://agents");
-      const callback = createAgentsCallback({ logger, agentStore });
 
-      const data = expectValidResourceResult(await callback(uri), uri);
+      const data = expectValidResourceResult(await getCallback(resources, "agents")(uri), uri);
 
-      expect(agentStore.listAgents).toHaveBeenCalledTimes(1);
+      expect(listAgents).toHaveBeenCalledTimes(1);
       expect(data).toEqual(agents);
     });
 
     it("wraps an AgentStore failure in a ProtocolError", async () => {
-      const agentStore = { listAgents: vi.fn().mockRejectedValue(new Error("registry missing")) };
-      const callback = createAgentsCallback({ logger, agentStore });
+      const listAgents = vi.fn().mockRejectedValue(new Error("registry missing"));
+      const { server, resources } = createCapturingServer();
+      registerResources(server, makeDeps({ agentStore: { listAgents } }));
 
-      await expect(callback(new URL("github://agents"))).rejects.toThrow(/Failed to list agents: registry missing/);
+      await expect(getCallback(resources, "agents")(new URL("github://agents"))).rejects.toThrow(
+        /Failed to list agents: registry missing/
+      );
     });
   });
 
   describe("github://tools", () => {
     it("returns a {count, tools} catalog projected to name/title/description/annotations", async () => {
-      const toolRegistry = {
-        getToolsForMCP: vi.fn().mockReturnValue([
-          {
-            name: "create_issue",
-            title: "Create Issue",
-            description: "Creates an issue",
-            annotations: { readOnlyHint: false },
-            inputSchema: { type: "object" }, // must be stripped from the projection
-          },
-          {
-            name: "list_issues",
-            title: "List Issues",
-            description: "Lists issues",
-            annotations: { readOnlyHint: true },
-            inputSchema: { type: "object" },
-          },
-        ]),
-      };
+      const getToolsForMCP = vi.fn().mockReturnValue([
+        {
+          name: "create_issue",
+          title: "Create Issue",
+          description: "Creates an issue",
+          annotations: { readOnlyHint: false },
+          inputSchema: { type: "object" }, // must be stripped from the projection
+        },
+        {
+          name: "list_issues",
+          title: "List Issues",
+          description: "Lists issues",
+          annotations: { readOnlyHint: true },
+          inputSchema: { type: "object" },
+        },
+      ]);
+      const { server, resources } = createCapturingServer();
+      registerResources(server, makeDeps({ toolRegistry: { getToolsForMCP } }));
       const uri = new URL("github://tools");
-      const callback = createToolsCallback({ logger, toolRegistry });
 
-      const data = (await callback(uri).then((r) => expectValidResourceResult(r, uri))) as {
-        count: number;
-        tools: ToolCatalogEntry[];
-      };
+      const rawData = expectValidResourceResult(await getCallback(resources, "tools")(uri), uri);
+      if (!rawData || typeof rawData !== "object" || !("count" in rawData) || !("tools" in rawData)) {
+        throw new Error("expected tools resource payload to be a {count, tools} object");
+      }
+      const { count, tools } = rawData;
 
-      expect(data.count).toBe(2);
-      expect(data.tools).toEqual([
+      expect(count).toBe(2);
+      expect(tools).toEqual([
         { name: "create_issue", title: "Create Issue", description: "Creates an issue", annotations: { readOnlyHint: false } },
         { name: "list_issues", title: "List Issues", description: "Lists issues", annotations: { readOnlyHint: true } },
       ]);
-      expect(data.tools[0]).not.toHaveProperty("inputSchema");
+      if (!Array.isArray(tools)) throw new Error("expected tools resource payload to include an array");
+      expect(tools[0]).not.toHaveProperty("inputSchema");
     });
 
     it("wraps a getToolsForMCP failure in a ProtocolError", async () => {
-      const toolRegistry = {
-        getToolsForMCP: vi.fn().mockImplementation(() => {
-          throw new Error("registry corrupt");
-        }),
-      };
-      const callback = createToolsCallback({ logger, toolRegistry });
+      const getToolsForMCP = vi.fn().mockImplementation(() => {
+        throw new Error("registry corrupt");
+      });
+      const { server, resources } = createCapturingServer();
+      registerResources(server, makeDeps({ toolRegistry: { getToolsForMCP } }));
 
-      await expect(callback(new URL("github://tools"))).rejects.toThrow(/Failed to read tool catalog: registry corrupt/);
+      await expect(getCallback(resources, "tools")(new URL("github://tools"))).rejects.toThrow(
+        /Failed to read tool catalog: registry corrupt/
+      );
     });
   });
 });

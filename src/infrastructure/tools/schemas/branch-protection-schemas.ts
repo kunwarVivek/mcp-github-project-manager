@@ -37,7 +37,10 @@ export const manageBranchesSchema = z
       .string()
       .optional()
       .describe("Repository owner (defaults to the configured GITHUB_OWNER)"),
-    repo: z.string().optional().describe("Repository name (defaults to the configured GITHUB_REPO)"),
+    repo: z
+      .string()
+      .optional()
+      .describe("Repository name (defaults to the configured GITHUB_REPO)"),
     branch: z
       .string()
       .optional()

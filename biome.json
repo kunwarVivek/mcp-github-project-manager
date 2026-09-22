@@ -21,15 +21,12 @@
     "enabled": true,
     "indentStyle": "space",
     "indentWidth": 2,
-    "lineWidth": 100,
-    "includes": [
-      "**",
-      "!src/services/ProjectAutomationService.ts",
-      "!src/services/ProjectStatusService.ts",
-      "!src/services/SprintPlanningService.ts"
-    ]
+    "lineWidth": 100
   },
   "javascript": {
+    "parser": {
+      "unsafeParameterDecoratorsEnabled": true
+    },
     "formatter": {
       "quoteStyle": "double",
       "semicolons": "always",

@@ -64,9 +64,7 @@ export interface SprintMetrics {
  */
 @injectable()
 export class SprintPlanningService {
-  constructor(
-    @inject("GitHubRepositoryFactory") private factory: GitHubRepositoryFactory
-  ) {}
+  constructor(@inject("GitHubRepositoryFactory") private factory: GitHubRepositoryFactory) {}
 
   private get sprintRepo(): GitHubSprintRepository {
     return this.factory.createSprintRepository();

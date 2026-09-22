@@ -49,6 +49,8 @@ export const manageReleasesSchema = z
         "Whether GitHub should automatically generate release notes for this release (create only)"
       ),
   })
-  .describe("Manage GitHub Releases — create, list, get, update, delete, and get the latest release");
+  .describe(
+    "Manage GitHub Releases — create, list, get, update, delete, and get the latest release"
+  );
 
 export type ManageReleasesArgs = z.infer<typeof manageReleasesSchema>;

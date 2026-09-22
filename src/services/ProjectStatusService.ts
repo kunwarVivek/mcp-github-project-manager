@@ -18,9 +18,7 @@ import { parseResourceStatus, filterByStatus } from "../domain/utils/StatusParse
  */
 @injectable()
 export class ProjectStatusService {
-  constructor(
-    @inject("GitHubRepositoryFactory") private factory: GitHubRepositoryFactory
-  ) {}
+  constructor(@inject("GitHubRepositoryFactory") private factory: GitHubRepositoryFactory) {}
 
   private get projectRepo(): GitHubProjectRepository {
     return this.factory.createProjectRepository();
