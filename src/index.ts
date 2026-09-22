@@ -157,6 +157,9 @@ import {
   executeAgentManage,
   executeSystem,
   executeDiscoverTools,
+  executeManageBranches,
+  executeManageReleases,
+  executeManageWorkflows,
 } from "./infrastructure/tools/compound/compound-executors";
 
 import { ToolResultFormatter } from "./infrastructure/tools/ToolResultFormatter";
@@ -591,6 +594,9 @@ class GitHubProjectManagerServer {
     r.registerExecutor("agent_manage", executeAgentManage);
     r.registerExecutor("system", executeSystem);
     r.registerExecutor("discover_tools", executeDiscoverTools);
+    r.registerExecutor("manage_branches", executeManageBranches);
+    r.registerExecutor("manage_releases", executeManageReleases);
+    r.registerExecutor("manage_workflows", executeManageWorkflows);
   }
 
   private setupToolHandlers() {

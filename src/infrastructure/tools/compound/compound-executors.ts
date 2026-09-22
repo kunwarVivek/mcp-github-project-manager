@@ -149,6 +149,15 @@ import type {
   DiscoverToolsArgs,
 } from "./compound-schemas";
 
+// Type import — branch protection compound tool (schema lives in ../schemas)
+import type { ManageBranchesArgs } from "../schemas/branch-protection-schemas";
+
+// Type import — releases compound tool (schema lives in ../schemas)
+import type { ManageReleasesArgs } from "../schemas/release-schemas";
+
+// Type import — workflow compound tool (schema lives in ../schemas)
+import type { ManageWorkflowsArgs } from "../schemas/workflow-schemas";
+
 // ============================================================================
 // Dispatch Helpers
 // ============================================================================
@@ -2373,4 +2382,238 @@ export async function executeDiscoverTools(args: DiscoverToolsArgs): Promise<unk
   }
 
   return { ...TOOL_CATALOG, aiStatus: buildAiStatus() };
+}
+
+// ============================================================================
+// 18. manage_branches
+// ============================================================================
+
+/**
+ * Routes `manage_branches` compound-tool actions to the GitHub Branch
+ * Protection REST endpoints directly via Octokit — branch protection has no
+ * ProjectManagementService facade counterpart, unlike the other compound
+ * tools above.
+ */
+export async function executeManageBranches(args: ManageBranchesArgs): Promise<unknown> {
+  const { action, owner, repo, branch, ...rest } = args;
+  const factory = createGitHubFactory(owner, repo);
+  const octokit = factory.getOctokit();
+  const config = factory.getConfig();
+
+  switch (action) {
+    case "get_protection": {
+      if (!branch) throw new Error("branch is required for get_protection");
+      const { data } = await octokit.rest.repos.getBranchProtection({
+        owner: config.owner,
+        repo: config.repo,
+        branch,
+      });
+      return data;
+    }
+
+    case "update_protection": {
+      if (!branch) throw new Error("branch is required for update_protection");
+      const { data } = await octokit.rest.repos.updateBranchProtection({
+        owner: config.owner,
+        repo: config.repo,
+        branch,
+        // The endpoint requires these four fields on every call (nullable to
+        // disable the corresponding requirement), so an omitted field is
+        // sent as an explicit null rather than left out of the request body.
+        required_status_checks: rest.required_status_checks ?? null,
+        enforce_admins: rest.enforce_admins ?? null,
+        required_pull_request_reviews: rest.required_pull_request_reviews ?? null,
+        restrictions: rest.restrictions ?? null,
+        required_linear_history: rest.required_linear_history,
+        allow_force_pushes: rest.allow_force_pushes,
+        allow_deletions: rest.allow_deletions,
+        block_creations: rest.block_creations,
+        required_conversation_resolution: rest.required_conversation_resolution,
+        lock_branch: rest.lock_branch,
+        allow_fork_syncing: rest.allow_fork_syncing,
+      });
+      return data;
+    }
+
+    case "delete_protection": {
+      if (!branch) throw new Error("branch is required for delete_protection");
+      await octokit.rest.repos.deleteBranchProtection({
+        owner: config.owner,
+        repo: config.repo,
+        branch,
+      });
+      return { success: true, owner: config.owner, repo: config.repo, branch };
+    }
+
+    case "list_branches": {
+      const { data } = await octokit.rest.repos.listBranches({
+        owner: config.owner,
+        repo: config.repo,
+        protected: rest.protected,
+        per_page: rest.perPage,
+        page: rest.page,
+      });
+      return data;
+    }
+
+    default:
+      unknownAction("manage_branches", action);
+  }
+}
+
+// ============================================================================
+// 19. manage_releases
+// ============================================================================
+
+export async function executeManageReleases(args: ManageReleasesArgs): Promise<unknown> {
+  const { action, owner, repo, releaseId, ...rest } = args;
+  const factory = createGitHubFactory(owner, repo);
+  const octokit = factory.getOctokit();
+  const { owner: repoOwner, repo: repoName } = factory.getConfig();
+  const repoParams = { owner: repoOwner, repo: repoName };
+
+  switch (action) {
+    case "create": {
+      const { tag_name, target_commitish, name, body, draft, prerelease, generate_release_notes } =
+        rest;
+      if (!tag_name) {
+        throw new Error("tag_name is required for manage_releases create");
+      }
+      const { data } = await octokit.rest.repos.createRelease({
+        ...repoParams,
+        tag_name,
+        target_commitish,
+        name,
+        body,
+        draft,
+        prerelease,
+        generate_release_notes,
+      });
+      return toPlain(data);
+    }
+    case "list": {
+      const { data } = await octokit.rest.repos.listReleases(repoParams);
+      return toPlain(data);
+    }
+    case "get": {
+      if (!releaseId) {
+        throw new Error("releaseId is required for manage_releases get");
+      }
+      const { data } = await octokit.rest.repos.getRelease({
+        ...repoParams,
+        release_id: releaseId,
+      });
+      return toPlain(data);
+    }
+    case "update": {
+      if (!releaseId) {
+        throw new Error("releaseId is required for manage_releases update");
+      }
+      const { tag_name, target_commitish, name, body, draft, prerelease } = rest;
+      const { data } = await octokit.rest.repos.updateRelease({
+        ...repoParams,
+        release_id: releaseId,
+        tag_name,
+        target_commitish,
+        name,
+        body,
+        draft,
+        prerelease,
+      });
+      return toPlain(data);
+    }
+    case "delete": {
+      if (!releaseId) {
+        throw new Error("releaseId is required for manage_releases delete");
+      }
+      await octokit.rest.repos.deleteRelease({ ...repoParams, release_id: releaseId });
+      return { success: true, releaseId };
+    }
+    case "get_latest": {
+      const { data } = await octokit.rest.repos.getLatestRelease(repoParams);
+      return toPlain(data);
+    }
+    default:
+      unknownAction("manage_releases", action);
+  }
+}
+
+// ============================================================================
+// 20. manage_workflows
+// ============================================================================
+
+/**
+ * Routes `manage_workflows` compound-tool actions to the GitHub Actions REST
+ * endpoints directly via Octokit — workflow orchestration has no
+ * ProjectManagementService facade counterpart, unlike the core PM tools.
+ */
+export async function executeManageWorkflows(args: ManageWorkflowsArgs): Promise<unknown> {
+  const { action, owner, repo, workflowId, runId, ref, inputs, status, branch, limit, page } =
+    args;
+  const factory = createGitHubFactory(owner, repo);
+  const octokit = factory.getOctokit();
+  const { owner: repoOwner, repo: repoName } = factory.getConfig();
+  const repoParams = { owner: repoOwner, repo: repoName };
+
+  switch (action) {
+    case "list_workflows": {
+      const { data } = await octokit.rest.actions.listRepoWorkflows({
+        ...repoParams,
+        per_page: limit,
+        page,
+      });
+      return data;
+    }
+
+    case "trigger_dispatch": {
+      if (!workflowId) throw new Error("workflowId is required for trigger_dispatch");
+      if (!ref) throw new Error("ref is required for trigger_dispatch");
+      await octokit.rest.actions.createWorkflowDispatch({
+        ...repoParams,
+        workflow_id: workflowId,
+        ref,
+        inputs,
+      });
+      return { success: true, workflowId, ref };
+    }
+
+    case "get_run": {
+      if (!runId) throw new Error("runId is required for get_run");
+      const { data } = await octokit.rest.actions.getWorkflowRun({ ...repoParams, run_id: runId });
+      return data;
+    }
+
+    case "list_runs": {
+      if (!workflowId) throw new Error("workflowId is required for list_runs");
+      const { data } = await octokit.rest.actions.listWorkflowRuns({
+        ...repoParams,
+        workflow_id: workflowId,
+        status,
+        branch,
+        per_page: limit,
+        page,
+      });
+      return data;
+    }
+
+    case "get_run_logs": {
+      if (!runId) throw new Error("runId is required for get_run_logs");
+      const response = await octokit.rest.actions.downloadWorkflowRunLogs({
+        ...repoParams,
+        run_id: runId,
+      });
+      // GitHub responds with a redirect to a time-limited archive URL;
+      // Octokit follows it and exposes the resolved location as `response.url`.
+      return { url: response.url };
+    }
+
+    case "cancel_run": {
+      if (!runId) throw new Error("runId is required for cancel_run");
+      await octokit.rest.actions.cancelWorkflowRun({ ...repoParams, run_id: runId });
+      return { success: true, runId };
+    }
+
+    default:
+      unknownAction("manage_workflows", action);
+  }
 }

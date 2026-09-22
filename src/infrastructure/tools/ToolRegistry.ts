@@ -217,6 +217,15 @@ import {
   discoverToolsSchema,
 } from "./compound/compound-schemas";
 
+// Branch protection compound tool schema (lives outside compound/ per convention)
+import { manageBranchesSchema } from "./schemas/branch-protection-schemas";
+
+// Releases compound tool schema (lives outside compound/ per convention)
+import { manageReleasesSchema } from "./schemas/release-schemas";
+
+// Workflows compound tool schema (lives outside compound/ per convention)
+import { manageWorkflowsSchema } from "./schemas/workflow-schemas";
+
 /**
  * Convert a Zod schema to JSON Schema.
  *
@@ -838,6 +847,48 @@ export class ToolRegistry {
           openWorldHint: false,
         },
         group: "system",
+      },
+      {
+        name: "manage_branches",
+        title: "Manage Branches",
+        description:
+          "Manage GitHub Branch Protection: get, update, and delete a branch's protection rules; list repository branches. Use the `action` field to select the operation.",
+        schema: manageBranchesSchema,
+        annotations: {
+          readOnlyHint: false,
+          destructiveHint: true,
+          idempotentHint: false,
+          openWorldHint: true,
+        },
+        group: "core",
+      },
+      {
+        name: "manage_releases",
+        title: "Manage Releases",
+        description:
+          "Manage GitHub Releases: create, list, get, update, delete releases; get the latest release. Use the `action` field to select the operation.",
+        schema: manageReleasesSchema,
+        annotations: {
+          readOnlyHint: false,
+          destructiveHint: true,
+          idempotentHint: false,
+          openWorldHint: true,
+        },
+        group: "core",
+      },
+      {
+        name: "manage_workflows",
+        title: "Manage Workflows",
+        description:
+          "Manage GitHub Actions Workflows: list workflows, trigger dispatch events, inspect run status and logs, list runs, and cancel runs. Use the `action` field to select the operation.",
+        schema: manageWorkflowsSchema,
+        annotations: {
+          readOnlyHint: false,
+          destructiveHint: true,
+          idempotentHint: false,
+          openWorldHint: true,
+        },
+        group: "core",
       },
     ];
 
