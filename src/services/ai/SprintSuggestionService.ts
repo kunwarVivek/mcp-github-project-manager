@@ -11,6 +11,7 @@ import { generateObject } from 'ai';
 import { z } from 'zod';
 import { AIServiceFactory } from './AIServiceFactory';
 import { InputSanitizer } from '../utils/InputSanitizer';
+import { type ILogger, Logger } from '../../infrastructure/logger';
 import { SprintCapacityAnalyzer, } from './SprintCapacityAnalyzer';
 import { BacklogPrioritizer } from './BacklogPrioritizer';
 import { SprintRiskAssessor } from './SprintRiskAssessor';
@@ -103,6 +104,7 @@ export class SprintSuggestionService {
   private capacityAnalyzer: SprintCapacityAnalyzer;
   private prioritizer: BacklogPrioritizer;
   private riskAssessor: SprintRiskAssessor;
+  private logger: ILogger = Logger.getInstance();
 
   constructor(aiFactory?: AIServiceFactory, estimationCalibrator?: EstimationCalibrator) {
     this.aiFactory = aiFactory ?? AIServiceFactory.getInstance();
@@ -560,7 +562,7 @@ export class SprintSuggestionService {
         }
       };
     } catch (error) {
-      console.error('AI sprint suggestion failed:', error);
+      this.logger.warn('AI sprint suggestion failed', { error });
       return null;
     }
   }

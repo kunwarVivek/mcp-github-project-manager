@@ -311,7 +311,7 @@ describe('GeneratePRDTool', () => {
       expect(summary).toContain('Define target user personas');
     });
 
-    it('should handle service errors gracefully', async () => {
+    it('should propagate genuine (non-AI-unavailable) errors as a rejection so the MCP dispatcher can set isError', async () => {
       mockPRDService.generatePRDFromIdea.mockRejectedValue(new Error('AI service temporarily unavailable'));
 
       const args = {
@@ -322,27 +322,19 @@ describe('GeneratePRDTool', () => {
         includeResearch: false
       };
 
-      const result = await executeGeneratePRD(args);
-
-      const summary = extractContentFromMCPResponse(result);
-      expect(summary).toContain('# Failed to generate PRD');
-      expect(summary).toContain('AI service temporarily unavailable');
+      await expect(executeGeneratePRD(args)).rejects.toThrow('AI service temporarily unavailable');
     });
 
-    it('should validate input parameters', async () => {
+    it('propagates a rejection when the service response is malformed', async () => {
       const args = {
-        projectIdea: 'x', // Too short (minimum 10 characters)
+        projectIdea: 'x', // service mock is unconfigured, resolves to undefined
         projectName: 'TestApp',
         author: 'test-user',
         complexity: 'medium' as const,
         includeResearch: false
       };
 
-      const result = await executeGeneratePRD(args);
-
-      const summary = extractContentFromMCPResponse(result);
-      expect(summary).toContain('# Failed to generate PRD');
-      expect(summary).toContain('Cannot read properties of undefined');
+      await expect(executeGeneratePRD(args)).rejects.toThrow('Cannot read properties of undefined');
     });
 
     it('should include comprehensive PRD sections in output', async () => {

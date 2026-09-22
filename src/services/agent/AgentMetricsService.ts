@@ -6,7 +6,7 @@ import type {
   AgentMetricEntry,
   WorkProduct,
 } from '../../domain/agent-orchestration-types';
-import { DEFAULT_HEARTBEAT_TIMEOUT_MINUTES } from '../../domain/agent-orchestration-types';
+import { DEFAULT_HEARTBEAT_TIMEOUT_MINUTES, WORK_PRODUCT_MARKER } from '../../domain/agent-orchestration-types';
 import { safeCall } from '../utils/safeCall';
 
 /**
@@ -23,7 +23,11 @@ export class AgentMetricsService {
 
   private static readonly CACHE_TTL_MS = 5 * 60_000; // 5 minutes
   private workProductCache: {
-    data: { completedByAgent: Map<string, number>; cycleTimesByAgent: Map<string, number[]> } | null;
+    data: {
+      completedByAgent: Map<string, number>;
+      cycleTimesByAgent: Map<string, number[]>;
+      isTruncated: boolean;
+    } | null;
     fetchedAt: number;
   } = { data: null, fetchedAt: 0 };
 
@@ -51,7 +55,7 @@ export class AgentMetricsService {
       // we approximate cycle time as submission-recentcy (now − submittedAt).
       // A single bounded issue scan collects products for ALL agents at once
       // (no per-agent re-scan of the repo).
-      const { completedByAgent, cycleTimesByAgent } =
+      const { completedByAgent, cycleTimesByAgent, isTruncated } =
         await this.collectAllAgentWorkProducts();
 
       let totalTasksInProgress = 0;
@@ -121,6 +125,7 @@ export class AgentMetricsService {
           ? Math.round((totalTokensUsed / totalTokensBudget) * 1000) / 10
           : 0,
         agents: entries,
+        isTruncated,
       };
     });
   }
@@ -131,13 +136,15 @@ export class AgentMetricsService {
   }
 
   /**
-   * Best-effort: collect work products for ALL agents from a single bounded
-   * issue scan (first 100 issues), bucketed by agent. Avoids the N+1 pattern
-   * of re-scanning the repo once per registered agent.
+   * Best-effort: collect work products for ALL agents from a single
+   * repo-wide issue-comment search (newest 100 comments), bucketed by
+   * agent. Replaces the prior N+1 pattern (list issues, then re-scan
+   * every issue's comments) with one API call.
    */
   private async collectAllAgentWorkProducts(): Promise<{
     completedByAgent: Map<string, number>;
     cycleTimesByAgent: Map<string, number[]>;
+    isTruncated: boolean;
   }> {
     const now = Date.now();
     if (this.workProductCache.data && now - this.workProductCache.fetchedAt < AgentMetricsService.CACHE_TTL_MS) {
@@ -147,29 +154,35 @@ export class AgentMetricsService {
     const config = this.factory.getConfig();
     const octokit = this.factory.getOctokit();
     const productsByAgent = new Map<string, WorkProduct[]>();
+    let isTruncated = false;
 
     try {
-      // NOTE: bounded scan (first 100 issues) — metrics are approximate.
-      const { data: issues } = await octokit.rest.issues.listForRepo({
+      // Single repo-wide search for work-product comments, in place of
+      // listing issues then re-scanning each issue's comments (N+1).
+      const { data: comments } = await octokit.rest.issues.listCommentsForRepo({
         owner: config.owner,
         repo: config.repo,
-        state: 'all',
         per_page: 100,
+        sort: 'created',
+        direction: 'desc',
       });
 
-      for (const issue of issues) {
-        if (issue.pull_request) continue;
-        try {
-          const items = await this.workProductStore.listForIssue(issue.number);
-          for (const p of items) {
-            if (!p.agentId) continue;
-            const bucket = productsByAgent.get(p.agentId) ?? [];
-            bucket.push(p);
-            productsByAgent.set(p.agentId, bucket);
-          }
-        } catch {
-          /* skip issue */
-        }
+      // A full page means older work-product comments may exist beyond
+      // what we fetched — flag the result as approximate.
+      isTruncated = comments.length >= 100;
+
+      for (const comment of comments) {
+        const body = comment.body;
+        if (!body || !body.includes(WORK_PRODUCT_MARKER)) continue;
+        // Work products are submitted on task issues, not PR conversations.
+        if (comment.html_url?.includes('/pull/')) continue;
+
+        const product = this.parseWorkProductComment(body);
+        if (!product?.agentId) continue;
+
+        const bucket = productsByAgent.get(product.agentId) ?? [];
+        bucket.push(product);
+        productsByAgent.set(product.agentId, bucket);
       }
     } catch {
       /* metrics are best-effort */
@@ -188,8 +201,28 @@ export class AgentMetricsService {
       }
     }
 
-    const result = { completedByAgent, cycleTimesByAgent };
+    const result = { completedByAgent, cycleTimesByAgent, isTruncated };
     this.workProductCache = { data: result, fetchedAt: Date.now() };
     return result;
+  }
+
+  /**
+   * Parse a work-product comment body: the structured JSON payload trails
+   * a hidden `<!-- agent-work-product: ... -->` marker (see WorkProductStore).
+   */
+  private parseWorkProductComment(body: string): WorkProduct | null {
+    const markerIdx = body.indexOf(WORK_PRODUCT_MARKER);
+    if (markerIdx < 0) return null;
+
+    const jsonStart = markerIdx + WORK_PRODUCT_MARKER.length;
+    const endIdx = body.indexOf('-->', jsonStart);
+    if (endIdx < 0) return null;
+
+    const jsonStr = body.substring(jsonStart, endIdx).trim();
+    try {
+      return JSON.parse(jsonStr) as WorkProduct;
+    } catch {
+      return null;
+    }
   }
 }

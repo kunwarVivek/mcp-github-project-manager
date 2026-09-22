@@ -5,6 +5,9 @@ import type { MCPResponse } from '../../../domain/mcp-types.js';
 import { ToolResultFormatter } from '../ToolResultFormatter.js';
 import { ANNOTATION_PATTERNS } from '../annotations/tool-annotations.js';
 import { PRDOutputSchema } from '../schemas/ai-schemas.js';
+import { Logger } from '../../logger/index.js';
+
+const logger = Logger.getInstance();
 
 // Schema for generate_prd tool
 const generatePRDSchema = z.object({
@@ -54,7 +57,7 @@ async function executeGeneratePRD(args: GeneratePRDArgs): Promise<MCPResponse> {
     });
 
   } catch (error) {
-    process.stderr.write(`Error in generate_prd tool: ${error}\n`);
+    logger.error(`Error in generate_prd tool: ${error}`);
 
     // Check if this is an AI availability error
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -71,13 +74,12 @@ async function executeGeneratePRD(args: GeneratePRDArgs): Promise<MCPResponse> {
       });
     }
 
-    return ToolResultFormatter.formatSuccess('generate_prd', {
-      content: [{
-        type: 'text',
-        text: `# Failed to generate PRD\n\n**Error:** ${errorMessage}\n\nPlease check your input parameters and try again.`
-      }],
-      success: false
-    });
+    // Non-AI errors are genuine failures. Swallowing them into a
+    // formatSuccess({ success: false }) response hides the failure from
+    // MCP clients that check the protocol-level `isError` flag rather than
+    // parsing response text. Re-throw so the dispatcher surfaces this as
+    // `{ isError: true }` per the MCP spec.
+    throw error;
   }
 }
 

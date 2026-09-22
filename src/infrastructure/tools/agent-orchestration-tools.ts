@@ -1517,7 +1517,8 @@ export async function executeGetAgentMetrics(
     const text =
       `Agents: ${metrics.totalAgents} (${metrics.activeAgents} active, ${metrics.staleAgents} stale, ${metrics.budgetExhaustedAgents} budget-exhausted)\n` +
       `Tasks: ${metrics.totalTasksInProgress} in progress, ${metrics.totalTasksCompleted} completed\n` +
-      `Budget: ${metrics.totalTokensUsed}/${metrics.totalTokensBudget} tokens (${metrics.overallBudgetUsagePercent}%)`;
+      `Budget: ${metrics.totalTokensUsed}/${metrics.totalTokensBudget} tokens (${metrics.overallBudgetUsagePercent}%)` +
+      (metrics.isTruncated ? '\n(approximate — work-product comment scan hit its page limit)' : '');
 
     return {
       content: [{ type: 'text', text }],

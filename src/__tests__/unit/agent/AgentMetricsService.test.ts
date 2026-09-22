@@ -1,9 +1,16 @@
-import { beforeEach, describe, expect, it, vi, type Mocked, } from 'vitest';
+import { beforeEach, describe, expect, it, vi, type Mocked, type Mock } from 'vitest';
 import { AgentMetricsService } from '../../../services/agent/AgentMetricsService';
 import type { GitHubRepositoryFactory } from '../../../infrastructure/github/GitHubRepositoryFactory';
 import type { AgentStore } from '../../../infrastructure/agent/AgentStore';
 import type { WorkProductStore } from '../../../infrastructure/agent/WorkProductStore';
-import type { Agent } from '../../../domain/agent-orchestration-types';
+import { WORK_PRODUCT_MARKER, type Agent, type WorkProduct } from '../../../domain/agent-orchestration-types';
+
+function workProductComment(product: WorkProduct, htmlUrl: string): { html_url: string; body: string } {
+  return {
+    html_url: htmlUrl,
+    body: `${WORK_PRODUCT_MARKER} ${JSON.stringify(product)} -->`,
+  };
+}
 
 vi.mock('../../../infrastructure/github/GitHubRepositoryFactory', () => {
   const mockFactory = vi.fn().mockImplementation(function () { return ({
@@ -46,9 +53,7 @@ describe('AgentMetricsService', () => {
     octokit = {
       rest: {
         issues: {
-          listForRepo: vi.fn(async () => ({
-            data: [{ number: 1, pull_request: undefined }],
-          })),
+          listCommentsForRepo: vi.fn(async () => ({ data: [] })),
         },
       },
     };
@@ -93,9 +98,14 @@ describe('AgentMetricsService', () => {
       }),
     ]);
 
-    mockWpStore.listForIssue.mockResolvedValue([
-      { agentId: 'agent-busy', taskId: '42', commitShas: [], filesChanged: [], summary: 'x', submittedAt: new Date().toISOString(), id: 'wp-1' },
-    ]);
+    octokit.rest.issues.listCommentsForRepo.mockResolvedValue({
+      data: [
+        workProductComment(
+          { agentId: 'agent-busy', taskId: '42', commitShas: [], filesChanged: [], summary: 'x', submittedAt: new Date().toISOString(), id: 'wp-1' },
+          'https://github.com/o/r/issues/42#issuecomment-1',
+        ),
+      ],
+    });
 
     const metrics = await service.getMetrics(30);
 
@@ -117,13 +127,17 @@ describe('AgentMetricsService', () => {
 
   it('skips pull requests when scanning for work products', async () => {
     mockStore.listAgents.mockResolvedValue([makeAgent('agent-1')]);
-    octokit.rest.issues.listForRepo.mockResolvedValue({
-      data: [{ number: 5, pull_request: { url: 'x' } }],
+    octokit.rest.issues.listCommentsForRepo.mockResolvedValue({
+      data: [
+        workProductComment(
+          { agentId: 'agent-1', taskId: '5', commitShas: [], filesChanged: [], summary: 'x', submittedAt: new Date().toISOString(), id: 'wp-2' },
+          'https://github.com/o/r/pull/5#issuecomment-2',
+        ),
+      ],
     });
 
     const metrics = await service.getMetrics();
 
-    expect(mockWpStore.listForIssue).not.toHaveBeenCalled();
     expect(metrics.totalTasksCompleted).toBe(0);
   });
 });

@@ -6,6 +6,9 @@ import type { MCPResponse } from '../../../domain/mcp-types.js';
 import { ToolResultFormatter } from '../ToolResultFormatter.js';
 import { ANNOTATION_PATTERNS } from '../annotations/tool-annotations.js';
 import { TaskExpandOutputSchema } from '../schemas/ai-schemas.js';
+import { Logger } from '../../logger/index.js';
+
+const logger = Logger.getInstance();
 
 // Schema for expand_task tool
 const expandTaskSchema = z.object({
@@ -89,11 +92,27 @@ async function executeExpandTask(args: ExpandTaskArgs): Promise<MCPResponse> {
     });
 
   } catch (error) {
-    process.stderr.write(`Error in expand_task tool: ${error}\n`);
-    return ToolResultFormatter.formatSuccess('expand_task', {
-      error: `Failed to expand task: ${error instanceof Error ? error.message : 'Unknown error'}`,
-      success: false
-    });
+    logger.error(`Error in expand_task tool: ${error}`);
+
+    // Check if this is an AI availability error (same heuristic as
+    // GeneratePRDTool) so transient no-provider-configured failures still
+    // degrade gracefully instead of surfacing as a hard tool error.
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    const isAIUnavailable = errorMessage.includes('AI service is not available') ||
+                           errorMessage.includes('API key') ||
+                           errorMessage.includes('provider');
+
+    if (isAIUnavailable) {
+      return ToolResultFormatter.formatSuccess('expand_task', {
+        error: `Failed to expand task: ${errorMessage}`,
+        success: false,
+        aiAvailable: false
+      });
+    }
+
+    // Non-AI errors are genuine failures. Re-throw so the MCP dispatcher
+    // surfaces `{ isError: true }` instead of a disguised success response.
+    throw error;
   }
 }
 

@@ -134,6 +134,7 @@ export function generateClarifyingQuestions(
 export class ConfidenceScorer {
   private config: ConfidenceConfig;
   private patternCache: Map<string, number> = new Map();
+  private static readonly MAX_PATTERN_CACHE_SIZE = 1000;
 
   constructor(config: Partial<ConfidenceConfig> = {}) {
     this.config = { ...DEFAULT_CONFIDENCE_CONFIG, ...config };
@@ -227,6 +228,12 @@ export class ConfidenceScorer {
     }
 
     const finalScore = Math.min(1, score);
+    if (this.patternCache.size >= ConfidenceScorer.MAX_PATTERN_CACHE_SIZE) {
+      const oldestKey = this.patternCache.keys().next().value;
+      if (oldestKey !== undefined) {
+        this.patternCache.delete(oldestKey);
+      }
+    }
     this.patternCache.set(cacheKey, finalScore);
     return finalScore;
   }

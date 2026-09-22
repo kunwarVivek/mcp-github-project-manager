@@ -12,6 +12,9 @@ import { GITHUB_TOKEN, GITHUB_OWNER, GITHUB_REPO, CACHE_DIRECTORY } from '../../
 import { createGitHubFactory } from '../tool-factory';
 import { ProjectFieldSetup } from '../../agent/ProjectFieldSetup';
 import type { ProjectManagementService } from '../../../services/ProjectManagementService';
+import { Logger } from '../../logger';
+
+const logger = Logger.getInstance();
 
 // Standalone executors — project lifecycle & advanced
 import {
@@ -1212,7 +1215,11 @@ export async function executeAgentManage(args: AgentManageArgs): Promise<unknown
         const isStale = agent.status === 'working' && (now - lastHb) > staleThreshold;
         const isBlocked = agent.status === 'blocked';
         let budget;
-        try { budget = await budgetService.getBudgetStatus(agent.id); } catch { /* no budget */ }
+        try {
+          budget = await budgetService.getBudgetStatus(agent.id);
+        } catch (err) {
+          logger.debug('Budget fetch failed for agent', { agentId: agent.id, error: err });
+        }
 
         return {
           id: agent.id,
@@ -1521,17 +1528,17 @@ export async function executeAgentManage(args: AgentManageArgs): Promise<unknown
           await octokit.rest.issues.createComment({
             owner: config.owner, repo: config.repo, issue_number: issue.number,
             body: `## Auto-Approved by Convergence Loop\n\nAll validation checks passed.\n**Approved at:** ${new Date().toISOString()}`,
-          }).catch(() => {});
+          }).catch((err) => { logger.warn(`converge: failed to comment approval on issue #${issue.number}`, err); });
           await octokit.rest.issues.update({
             owner: config.owner, repo: config.repo, issue_number: issue.number, state: 'closed',
-          }).catch(() => {});
+          }).catch((err) => { logger.warn(`converge: failed to close issue #${issue.number}`, err); });
           report.approved.push({ issue: issue.number, title: issue.title });
         } else {
           // Reject with findings
           await octokit.rest.issues.createComment({
             owner: config.owner, repo: config.repo, issue_number: issue.number,
             body: `## Auto-Rejected by Convergence Loop\n\nFindings:\n${findings.map(f => '- ' + f).join('\n')}\n\n**Rejected at:** ${new Date().toISOString()}`,
-          }).catch(() => {});
+          }).catch((err) => { logger.warn(`converge: failed to comment rejection on issue #${issue.number}`, err); });
           report.rejected.push({ issue: issue.number, title: issue.title, findings });
 
           // Auto-decompose if test failures (create a fix subtask)

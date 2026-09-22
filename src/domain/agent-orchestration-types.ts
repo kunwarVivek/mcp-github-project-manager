@@ -513,6 +513,8 @@ export interface AgentMetrics {
   totalTokensUsed: number;
   overallBudgetUsagePercent: number;
   agents: AgentMetricEntry[];
+  /** True when the work-product comment scan hit its page limit — task/cycle-time counts may undercount older activity. */
+  isTruncated: boolean;
 }
 
 export const AgentMetricsSchema = z.object({
@@ -527,4 +529,5 @@ export const AgentMetricsSchema = z.object({
   totalTokensUsed: z.number(),
   overallBudgetUsagePercent: z.number(),
   agents: z.array(AgentMetricEntrySchema),
+  isTruncated: z.boolean(),
 });
