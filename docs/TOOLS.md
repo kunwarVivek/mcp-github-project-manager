@@ -1,19 +1,19 @@
 # MCP Tools Reference
 
-This document provides comprehensive documentation for the 16 compound MCP tools exposed by the MCP GitHub Project Manager. Each compound tool groups related actions behind a single `action` parameter, reducing tool-selection overhead for AI agents while preserving full access to all 152 underlying operations.
+This document provides comprehensive documentation for the 20 compound MCP tools exposed by the MCP GitHub Project Manager. Each compound tool groups related actions behind a single `action` parameter, reducing tool-selection overhead for AI agents while preserving full access to all 169 underlying operations.
 
 ## Overview
 
 | Metric | Value |
 |--------|-------|
-| Compound Tools | 16 |
-| Total Actions | 152 |
-| SDK Version | 1.29 |
+| Compound Tools | 20 |
+| Total Actions | 169 |
+| SDK Version | 2.0 |
 | All tools have | Behavior annotations, Output schemas |
 
 ### Design: Progressive Disclosure
 
-MCP clients see 16 tools instead of 131. Each tool accepts an `action` string that routes to the appropriate internal executor. Use `discover_tools` to explore available actions at runtime.
+MCP clients see 20 tools. Each tool accepts an `action` string that routes to the appropriate internal executor. Use `discover_tools` to explore available actions at runtime.
 
 ### Behavior Annotations
 
@@ -62,6 +62,9 @@ MCP_TOOL_GROUPS=all
 14. [agent_work](#agent_work) (12 actions)
 15. [agent_manage](#agent_manage) (18 actions)
 16. [discover_tools](#discover_tools) (meta-tool)
+17. [manage_workflows](#manage_workflows) (6 actions)
+18. [manage_releases](#manage_releases) (6 actions)
+19. [manage_branches](#manage_branches) (4 actions)
 
 ---
 
@@ -679,6 +682,107 @@ Meta-tool for runtime tool discovery. Returns available compound tools, their ac
 
 ---
 
+## manage_workflows
+
+Manage GitHub Actions workflows: list, trigger, monitor runs, and download logs.
+
+**Action enum:** `list_workflows` | `trigger_dispatch` | `get_run` | `list_runs` | `get_run_logs` | `cancel_run`
+
+### Per-Action Parameters
+
+| Action | Additional Parameters | Description |
+|--------|----------------------|-------------|
+| `list_workflows` | `owner`, `repo` | List repository workflows |
+| `trigger_dispatch` | `workflowId` (req), `ref` (req), `inputs` | Trigger a workflow dispatch |
+| `get_run` | `runId` (req) | Get workflow run details |
+| `list_runs` | `workflowId` (req), `status`, `branch` | List workflow runs |
+| `get_run_logs` | `runId` (req) | Download workflow run logs URL |
+| `cancel_run` | `runId` (req) | Cancel a running workflow (destructive) |
+
+### Examples
+
+```json
+// List repository workflows
+{"tool": "manage_workflows", "arguments": {"action": "list_workflows"}}
+
+// Trigger a workflow dispatch
+{"tool": "manage_workflows", "arguments": {"action": "trigger_dispatch", "workflowId": "ci.yml", "ref": "main", "inputs": {"environment": "staging"}}}
+
+// Get a workflow run's status
+{"tool": "manage_workflows", "arguments": {"action": "get_run", "runId": 123456789}}
+
+// List recent failed runs and cancel one
+{"tool": "manage_workflows", "arguments": {"action": "list_runs", "workflowId": "ci.yml", "status": "in_progress"}}
+{"tool": "manage_workflows", "arguments": {"action": "cancel_run", "runId": 123456789}}
+```
+
+---
+
+## manage_releases
+
+Manage GitHub releases: create, update, delete, and query releases.
+
+**Action enum:** `create` | `list` | `get` | `update` | `delete` | `get_latest`
+
+### Per-Action Parameters
+
+| Action | Additional Parameters | Description |
+|--------|----------------------|-------------|
+| `create` | `tag_name` (req), `name`, `body`, `draft`, `prerelease`, `target_commitish`, `generate_release_notes` | Create release |
+| `list` | `owner`, `repo` | List releases |
+| `get` | `releaseId` (req) | Get release details |
+| `update` | `releaseId` (req), `tag_name`, `name`, `body`, `draft`, `prerelease` | Update release |
+| `delete` | `releaseId` (req) | Delete release (destructive) |
+| `get_latest` | — | Get the latest release |
+
+### Examples
+
+```json
+// Create a release with auto-generated notes
+{"tool": "manage_releases", "arguments": {"action": "create", "tag_name": "v2.1.0", "name": "v2.1.0", "generate_release_notes": true}}
+
+// List releases
+{"tool": "manage_releases", "arguments": {"action": "list"}}
+
+// Update a release to remove draft status
+{"tool": "manage_releases", "arguments": {"action": "update", "releaseId": 123456, "draft": false}}
+
+// Get the latest release
+{"tool": "manage_releases", "arguments": {"action": "get_latest"}}
+```
+
+---
+
+## manage_branches
+
+Manage branches and branch protection rules.
+
+**Action enum:** `get_protection` | `update_protection` | `delete_protection` | `list_branches`
+
+### Per-Action Parameters
+
+| Action | Additional Parameters | Description |
+|--------|----------------------|-------------|
+| `get_protection` | `branch` (req) | Get branch protection rules |
+| `update_protection` | `branch` (req), `required_status_checks`, `enforce_admins`, `required_pull_request_reviews`, `restrictions` | Update protection |
+| `delete_protection` | `branch` (req) | Delete branch protection (destructive) |
+| `list_branches` | `owner`, `repo` | List repository branches |
+
+### Examples
+
+```json
+// Get branch protection rules
+{"tool": "manage_branches", "arguments": {"action": "get_protection", "branch": "main"}}
+
+// Require 2 approving reviews and admin enforcement
+{"tool": "manage_branches", "arguments": {"action": "update_protection", "branch": "main", "enforce_admins": true, "required_pull_request_reviews": {"required_approving_review_count": 2}}}
+
+// List repository branches
+{"tool": "manage_branches", "arguments": {"action": "list_branches"}}
+```
+
+---
+
 ## System Tools
 
 The `system` group provides infrastructure operations:
@@ -700,7 +804,7 @@ The `system` group provides infrastructure operations:
 ## Granular Tools (Internal)
 
 The compound API is the recommended interface for MCP clients:
-- **Fewer tools** — 16 instead of 131 reduces tool-selection overhead for AI agents
+- **Fewer tools** — 20 instead of 131 reduces tool-selection overhead for AI agents
 - **Progressive disclosure** — `discover_tools` lets agents explore capabilities at runtime
 - **Same underlying operations** — compound tools delegate directly to the same internal executors
 - **Configurable exposure** — `MCP_TOOL_GROUPS` (group tags: `core`, `ai`, `agents`, `events`, `system`) lets you limit which tool groups are visible
@@ -709,4 +813,4 @@ To restore granular tool exposure (not recommended), consult the `ToolRegistry` 
 
 ---
 
-*MCP SDK: 1.29*
+*MCP SDK: 2.0*

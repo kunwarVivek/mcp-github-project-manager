@@ -8,8 +8,8 @@ MCP GitHub Project Manager follows Clean Architecture principles with clear sepa
 ┌──────────────────────────────────────────────────────────────────┐
 │                         MCP Layer                                │
 │  ┌──────────────┐ ┌────────────┐ ┌──────────────┐ ┌───────────┐ │
-│  │ 16 Compound  │ │ Resources  │ │ Req Handling  │ │ Graceful  │ │
-│  │ Tools (152   │ │            │ │              │ │ Shutdown  │ │
+│  │ 20 Compound  │ │ Resources  │ │ Req Handling  │ │ Graceful  │ │
+│  │ Tools (169   │ │            │ │              │ │ Shutdown  │ │
 │  │ actions)     │ │            │ │              │ │           │ │
 │  └──────────────┘ └────────────┘ └──────────────┘ └───────────┘ │
 ├──────────────────────────────────────────────────────────────────┤
@@ -142,7 +142,7 @@ External integrations and technical concerns. 16 subdirectories:
 | Directory | Purpose |
 |-----------|---------|
 | `github/` | GitHub REST/GraphQL API integration — repositories, `GitHubRepositoryFactory`, `RateLimitManager`, error handling |
-| `tools/` | MCP tool definitions: 16 compound tools (152 actions) exposed to MCP clients, with `CompoundExecutor` routing to internal granular executors. `ToolRegistry`, `ToolValidator`, schemas |
+| `tools/` | MCP tool definitions: 20 compound tools (169 actions) exposed to MCP clients, with `CompoundExecutor` routing to internal granular executors. `ToolRegistry`, `ToolValidator`, schemas |
 | `cache/` | In-memory caching with TTL and LRU eviction (`ResourceCache`), persistence adapter |
 | `resilience/` | Circuit breaker (`CircuitBreakerService`), retry policies, `AIResiliencePolicy` |
 | `events/` | Webhook handling (`GitHubWebhookHandler`), `EventStore` with persistence, `EventSubscriptionManager` |
@@ -264,9 +264,11 @@ console.log(issue.labels);       // string[]
 ### MCP Layer (`src/index.ts`)
 
 Model Context Protocol integration:
-- **Compound tool API** — 16 compound tools (152 actions) registered via `ToolRegistry`; each routes through `CompoundExecutor` to internal granular executors
+- **Compound tool API** — 20 compound tools (169 actions) registered via `ToolRegistry`; each routes through `CompoundExecutor` to internal granular executors
 - **Progressive disclosure** — `discover_tools` meta-tool lets agents explore available actions and schemas at runtime
 - **Capability profiles** — `MCP_TOOL_GROUPS` env var controls which compound tools are exposed (default: `all`)
+- **Resources** — 6 registered resources (github://config, github://projects, github://sprints/current, github://milestones, github://agents, github://tools)
+- **Prompts** — 6 registered prompts for consistent AI interaction templates
 - Resource exposure
 - Request/response handling
 - Error formatting via `MCPErrorHandler`
@@ -615,12 +617,12 @@ See [CONFIGURATION.md](CONFIGURATION.md) for full details.
 ## Compound Tool Architecture
 
 The MCP server uses progressive disclosure to reduce tool-selection overhead
-for AI agents: 152 granular operations are grouped into 16 compound tools,
+for AI agents: 169 granular operations are grouped into 20 compound tools,
 each accepting an `action` parameter.
 
 ```
 MCP Client (Claude/Codex/Cursor)
-  │  sees only 16 compound tools
+  │  sees only 20 compound tools
   ▼
 ToolRegistry.getToolsForMCP()
   │  returns compound tools filtered by MCP_TOOL_GROUPS
@@ -659,7 +661,7 @@ exposed to MCP clients. This enables tailored profiles for different use cases:
 
 | Profile | `MCP_TOOL_GROUPS` value | Use case |
 |---------|------------------------|----------|
-| Full (default) | `all` | All 16 tools exposed |
+| Full (default) | `all` | All 20 tools exposed |
 | Project management | `core` | CRUD-only agents |
 | AI-powered | `core,ai` | Planning and analysis agents |
 | Agent orchestration | `agents` | Autonomous task agents |

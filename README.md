@@ -1,6 +1,6 @@
 # MCP GitHub Project Manager
 
-<!-- Keywords: mcp server, model context protocol, github project management, ai agent orchestration, multi-agent coordination, autonomous coding agents, prd generator, sprint planning ai, issue triage automation, github projects v2 api, claude mcp, codex mcp, cursor mcp, llm tools, agentic task management, ai project manager, swarm coordination -->
+<!-- Keywords: mcp server, model context protocol, github project management, ai agent orchestration, multi-agent coordination, autonomous coding agents, prd generator, sprint planning ai, issue triage automation, github projects v2 api, claude mcp, codex mcp, cursor mcp, llm tools, agentic task management, ai project manager, swarm coordination, github actions, github releases, branch protection, mcp resources, mcp prompts -->
 
 **The agentic task substrate for AI coding agents.** An MCP server that turns GitHub Projects v2 into a fully autonomous project management platform — AI agents self-assign work, track progress, review each other, and ship code, all backed by GitHub-native storage.
 
@@ -12,7 +12,7 @@
 
 ## Overview
 
-This MCP server implements the [Model Context Protocol](https://modelcontextprotocol.io) to provide a complete **agentic project management layer** over GitHub Projects v2. AI agents register, self-assign tasks, coordinate via heartbeats, submit work products for review, and operate within token budgets — all through 16 compound tools exposing 152 actions. Human project managers get AI-powered PRD generation, sprint planning, issue triage, and roadmap creation. Everything is backed by GitHub-native storage (issues, project fields, comments) — no external infrastructure required.
+This MCP server implements the [Model Context Protocol](https://modelcontextprotocol.io) to provide a complete **agentic project management layer** over GitHub Projects v2. AI agents register, self-assign tasks, coordinate via heartbeats, submit work products for review, and operate within token budgets — all through 20 compound tools exposing 169 actions. Human project managers get AI-powered PRD generation, sprint planning, issue triage, and roadmap creation. Everything is backed by GitHub-native storage (issues, project fields, comments) — no external infrastructure required.
 
 ## Why This Exists
 
@@ -41,11 +41,23 @@ AI coding agents are powerful but stateless — they don't know what to work on 
 | **Roo Code** | MCP server integration |
 | **VS Code + Copilot** | Via MCP extension |
 | **Custom harnesses** | Any MCP-compatible client — see `examples/basic/agent-loop.ts` |
+| **Oh My Pi / OpenCode** | Native MCP harness with stdio transport |
+
+### MCP v2 Protocol Support
+
+Beyond tools, this server implements the full MCP v2 capability surface:
+
+| Capability | Count | Examples |
+|------------|-------|----------|
+| **Tools** | 20 compound (169 actions) | manage_project, ai_generate, agent_work |
+| **Resources** | 6 | github://projects, github://agents, github://config |
+| **Prompts** | 6 | review-prd, triage-issue, analyze-sprint-risk |
+| **Sampling** | ✓ | Client-side LLM for AI features when no API keys |
 
 ### What Makes This Special
 
 - **Agentic-First Design**: Built as a task substrate for AI agents, not a human-facing PM tool retrofitted with an API
-- **16 Compound Tools (152 actions)**: Progressive-disclosure API — agents see 16 tools, drill into 152 actions via `discover_tools`
+- **20 Compound Tools (169 actions)**: Progressive-disclosure API — agents see 20 tools, drill into 169 actions via `discover_tools`
 - **Multi-Agent Swarm**: Agents register, claim tasks atomically, heartbeat, review each other, and converge projects
 - **PRD→Production Pipeline**: Idea → PRD → tasks → GitHub issues → milestones → sprints — fully automated
 - **Zero External Infrastructure**: All state lives in GitHub (issues, projects, comments) — no database, no Redis, no S3
@@ -162,8 +174,16 @@ docker run -it \
 - **Progress Tracking**: Comprehensive metrics and progress reporting
 - **Event System**: Track and replay project events
 
-### Agent Orchestration (16 compound tools)
-- **Compound Tool API**: 16 tools with `action` routing replace 152 individual actions — simpler for AI agents
+### 🔧 GitHub API Coverage
+- **GitHub Actions**: List workflows, trigger dispatches, monitor runs, download logs, cancel runs
+- **Releases**: Create, update, delete releases with auto-generated notes
+- **Branch Protection**: Get, update, delete branch protection rules; list branches
+- **Projects v2**: Full field/view/item management, templates, linking
+- **Issues & PRs**: CRUD, comments, sub-issues, advanced search, draft issues
+- **Milestones & Sprints**: Planning, metrics, velocity tracking
+
+### Agent Orchestration
+- **Compound Tool API**: 20 tools with `action` routing replace 169 individual actions — simpler for AI agents
 - **Agent Registry**: Register, list, and deregister autonomous AI agents
 - **Task Checkout**: Claim tasks with configurable selection strategies (priority, age, skills, deadline)
 - **Heartbeat Monitoring**: Periodic liveness and progress reporting with stale-agent detection
@@ -406,7 +426,7 @@ For more examples, see the [User Guide](docs/user-guide.md) and the [examples/](
 
 ### Compound Tool API Examples
 
-The MCP server exposes 16 compound tools (152 actions). Each tool accepts an `action` parameter that routes to the underlying operation. Use `discover_tools` to explore capabilities at runtime.
+The MCP server exposes 20 compound tools (169 actions). Each tool accepts an `action` parameter that routes to the underlying operation. Use `discover_tools` to explore capabilities at runtime.
 
 #### Quick Start Workflow
 ```json
@@ -457,7 +477,7 @@ The MCP server exposes 16 compound tools (152 actions). Each tool accepts an `ac
 
 #### Tool Discovery
 ```json
-// List all 16 compound tools
+// List all compound tools
 {"tool": "discover_tools", "arguments": {}}
 
 // Explore a specific tool's actions
@@ -523,7 +543,7 @@ npm test
 The MCP GitHub Project Manager includes a comprehensive end-to-end testing suite that tests all MCP tools through the actual MCP interface with both mocked and real API calls.
 
 ### **Test Coverage:**
-- ✅ **16 Compound Tools (152 actions)** - Complete CRUD operations for projects, milestones, issues, sprints, labels, and more
+- ✅ **20 Compound Tools (169 actions)** - Complete CRUD operations for projects, milestones, issues, sprints, labels, and more
 - ✅ **9 AI-Powered Actions** - PRD generation, task parsing, complexity analysis, feature management, and traceability
 - ✅ **Complex Workflow Integration** - Multi-tool workflows and real-world project management scenarios
 - ✅ **Real API Testing** - Optional testing with actual GitHub and AI APIs
@@ -1115,7 +1135,7 @@ webhook signature check.
 - [Troubleshooting Guide](docs/TROUBLESHOOTING.md) - Common issues and solutions
 
 ### Reference
-- [Tool Reference](docs/TOOLS.md) - 16 compound tools (152 actions) documented
+- [Tool Reference](docs/TOOLS.md) - 20 compound tools (169 actions) documented
 - [Architecture](docs/architecture.md) - System design and patterns
 - [API Reference](docs/API.md) - Service and infrastructure APIs
 
