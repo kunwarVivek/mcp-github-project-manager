@@ -1,0 +1,49 @@
+services:
+  mcp-server:
+    build: .
+    container_name: mcp-github-pm
+    restart: unless-stopped
+    environment:
+      # Required
+      - GITHUB_TOKEN=${GITHUB_TOKEN}
+      - GITHUB_OWNER=${GITHUB_OWNER}
+      - GITHUB_REPO=${GITHUB_REPO}
+      # Optional — AI providers (set the ones you have)
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY:-}
+      - PERPLEXITY_API_KEY=${PERPLEXITY_API_KEY:-}
+      # Optional — AI model overrides
+      - AI_MAIN_MODEL=${AI_MAIN_MODEL:-}
+      - AI_PRD_MODEL=${AI_PRD_MODEL:-}
+      - AI_RESEARCH_MODEL=${AI_RESEARCH_MODEL:-}
+      - AI_FALLBACK_MODEL=${AI_FALLBACK_MODEL:-}
+      # Optional — Webhook/SSE server
+      - WEBHOOK_SECRET=${WEBHOOK_SECRET:-}
+      - WEBHOOK_PORT=${WEBHOOK_PORT:-3000}
+      - WEBHOOK_ALLOWED_ORIGINS=${WEBHOOK_ALLOWED_ORIGINS:-}
+      - SSE_ENABLED=${SSE_ENABLED:-false}
+      # Optional — Sync and caching
+      - SYNC_ENABLED=${SYNC_ENABLED:-false}
+      - CACHE_DIRECTORY=/app/cache
+      - LOG_FORMAT=${LOG_FORMAT:-json}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+    ports:
+      # Webhook/SSE port (only needed if WEBHOOK_PORT is set)
+      - "${WEBHOOK_PORT:-3000}:${WEBHOOK_PORT:-3000}"
+    volumes:
+      # Persistent cache directory
+      - mcp-cache:/app/cache
+    # stdio transport — MCP clients connect via docker attach or exec
+    stdin_open: true
+    tty: false
+    healthcheck:
+      test: ["CMD", "node", "-e", "process.exit(0)"]
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
+
+volumes:
+  mcp-cache:
+    driver: local
