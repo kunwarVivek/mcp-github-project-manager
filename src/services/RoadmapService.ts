@@ -16,6 +16,7 @@ import {
   createResource,
 } from "../domain/types";
 import { safeCall } from './utils/safeCall';
+import { type ILogger, Logger } from '../infrastructure/logger';
 
 const CreateRoadmapSchema = z.object({
   project: z.object({
@@ -56,9 +57,11 @@ const CreateRoadmapSchema = z.object({
  */
 export class RoadmapService {
   private readonly factory: GitHubRepositoryFactory;
+  private readonly logger: ILogger;
 
-  constructor(factory: GitHubRepositoryFactory) {
+  constructor(factory: GitHubRepositoryFactory, logger?: ILogger) {
     this.factory = factory;
+    this.logger = logger ?? Logger.getInstance();
   }
 
   private get projectRepo(): GitHubProjectRepository {
@@ -111,14 +114,19 @@ export class RoadmapService {
 
         const createdMilestone = await this.milestoneRepo.create(milestoneWithRequiredFields);
 
-        const createdIssues = await Promise.all(
-          issues.map(async (issue) => {
-            return await this.issueRepo.create({
+        const createdIssues: Issue[] = [];
+        for (const issue of issues) {
+          try {
+            const created = await this.issueRepo.create({
               ...issue,
               milestoneId: createdMilestone.id,
             });
-          })
-        );
+            createdIssues.push(created);
+          } catch (issueError) {
+            this.logger.warn(`Failed to create issue "${issue.title}" for milestone "${milestone.title}"`, issueError);
+            // Continue with remaining issues — partial success is better than total failure
+          }
+        }
 
         milestones.push({
           ...createdMilestone,
