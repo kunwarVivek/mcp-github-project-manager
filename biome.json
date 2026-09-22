@@ -14,17 +14,20 @@
       "!.beads",
       "!**/*.test.ts.new",
       "!**/*.test.ts.fixed",
-      "!**/*.test.ts.bak",
-      "!src/services/ProjectAutomationService.ts",
-      "!src/services/ProjectStatusService.ts",
-      "!src/services/SprintPlanningService.ts"
+      "!**/*.test.ts.bak"
     ]
   },
   "formatter": {
     "enabled": true,
     "indentStyle": "space",
     "indentWidth": 2,
-    "lineWidth": 100
+    "lineWidth": 100,
+    "includes": [
+      "**",
+      "!src/services/ProjectAutomationService.ts",
+      "!src/services/ProjectStatusService.ts",
+      "!src/services/SprintPlanningService.ts"
+    ]
   },
   "javascript": {
     "formatter": {
