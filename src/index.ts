@@ -164,6 +164,7 @@ import {
 import { ToolResultFormatter } from "./infrastructure/tools/ToolResultFormatter";
 import { MCPContentType, } from "./domain/mcp-types";
 import { ResourceCache } from "./infrastructure/cache/ResourceCache";
+import { registerPrompts as registerPromptTemplates } from "./infrastructure/mcp/prompts";
 
 /**
  * Supported MCP protocol versions.
@@ -205,6 +206,8 @@ class GitHubProjectManagerServer {
   private stdioHandle?: ReturnType<typeof serveStdio>;
   /** Built lazily — only tool calls that declare an agentId ever debit. */
   private _agentBudgetService?: AgentBudgetService;
+  /** Built lazily — only the agents resource needs a registry reader. */
+  private _agentStore?: AgentStore;
   private service: ProjectManagementService;
   private toolRegistry: ToolRegistry;
   private logger: ILogger;
@@ -243,6 +246,8 @@ class GitHubProjectManagerServer {
       {
         capabilities: {
           tools: {},
+          resources: {},
+          prompts: {},
         },
       }
     );
@@ -286,6 +291,8 @@ class GitHubProjectManagerServer {
     this.toolRegistry = ToolRegistry.getInstance();
     this.registerToolExecutors();
     this.setupToolHandlers();
+    this.registerResources();
+    this.registerPrompts();
     this.setupEventHandlers();
     this.logAIServiceStatus();
     this.logToolRegistrationStatus();
@@ -595,6 +602,194 @@ class GitHubProjectManagerServer {
   }
 
   /**
+   * Register read-only MCP resources.
+   *
+   * Resources expose the same GitHub-backed state as the tools above but
+   * without an input schema — a client lists and reads them directly for
+   * "what's the current state" queries instead of shaping a tool call.
+   * Read failures are logged and re-thrown as a McpError so the client sees
+   * a clean message instead of a raw stack trace.
+   */
+  private registerResources(): void {
+    const jsonResource = (uri: URL, data: unknown) => ({
+      contents: [
+        {
+          uri: uri.href,
+          mimeType: "application/json",
+          text: JSON.stringify(data),
+        },
+      ],
+    });
+
+    this.server.registerResource(
+      "config",
+      "github://config",
+      {
+        title: "Server Configuration",
+        description:
+          "Target repository, GitHub token status, and AI provider availability.",
+        mimeType: "application/json",
+      },
+      async (uri) => {
+        this.logger.debug(`Resource read: ${uri.href}`);
+        try {
+          const ai = this.aiFactory.validateConfiguration();
+          return jsonResource(uri, {
+            owner: GITHUB_OWNER,
+            repo: GITHUB_REPO,
+            tokenConfigured: Boolean(GITHUB_TOKEN),
+            serverVersion: SERVER_VERSION,
+            ai: {
+              available: ai.hasAnyProvider,
+              providers: ai.available,
+              availableModels: ai.availableModels,
+              missing: ai.missing,
+            },
+          });
+        } catch (error) {
+          this.logger.error("Failed to read github://config resource", error);
+          throw new McpError(
+            ErrorCode.InternalError,
+            `Failed to read server configuration: ${error instanceof Error ? error.message : String(error)}`,
+          );
+        }
+      },
+    );
+
+    this.server.registerResource(
+      "projects",
+      "github://projects",
+      {
+        title: "Active Projects",
+        description: "Active GitHub Projects (v2) for the configured repository.",
+        mimeType: "application/json",
+      },
+      async (uri) => {
+        this.logger.debug(`Resource read: ${uri.href}`);
+        try {
+          const projects = await this.service.listProjects();
+          return jsonResource(uri, projects);
+        } catch (error) {
+          this.logger.error("Failed to read github://projects resource", error);
+          throw new McpError(
+            ErrorCode.InternalError,
+            `Failed to list projects: ${error instanceof Error ? error.message : String(error)}`,
+          );
+        }
+      },
+    );
+
+    this.server.registerResource(
+      "current-sprint",
+      "github://sprints/current",
+      {
+        title: "Current Sprint",
+        description: "The currently active sprint, or null when none is active.",
+        mimeType: "application/json",
+      },
+      async (uri) => {
+        this.logger.debug(`Resource read: ${uri.href}`);
+        try {
+          const sprint = await this.service.getCurrentSprint();
+          return jsonResource(uri, sprint);
+        } catch (error) {
+          this.logger.error("Failed to read github://sprints/current resource", error);
+          throw new McpError(
+            ErrorCode.InternalError,
+            `Failed to read current sprint: ${error instanceof Error ? error.message : String(error)}`,
+          );
+        }
+      },
+    );
+
+    this.server.registerResource(
+      "milestones",
+      "github://milestones",
+      {
+        title: "Open Milestones",
+        description: "Open milestones for the configured repository.",
+        mimeType: "application/json",
+      },
+      async (uri) => {
+        this.logger.debug(`Resource read: ${uri.href}`);
+        try {
+          const milestones = await this.service.listMilestones("open");
+          return jsonResource(uri, milestones);
+        } catch (error) {
+          this.logger.error("Failed to read github://milestones resource", error);
+          throw new McpError(
+            ErrorCode.InternalError,
+            `Failed to list milestones: ${error instanceof Error ? error.message : String(error)}`,
+          );
+        }
+      },
+    );
+
+    this.server.registerResource(
+      "agents",
+      "github://agents",
+      {
+        title: "Registered Agents",
+        description: "Agents registered in the orchestration swarm registry.",
+        mimeType: "application/json",
+      },
+      async (uri) => {
+        this.logger.debug(`Resource read: ${uri.href}`);
+        try {
+          const agents = await this.agentStore.listAgents();
+          return jsonResource(uri, agents);
+        } catch (error) {
+          this.logger.error("Failed to read github://agents resource", error);
+          throw new McpError(
+            ErrorCode.InternalError,
+            `Failed to list agents: ${error instanceof Error ? error.message : String(error)}`,
+          );
+        }
+      },
+    );
+
+    this.server.registerResource(
+      "tools",
+      "github://tools",
+      {
+        title: "Tool Catalog",
+        description: "Catalog of registered MCP tools, keyed by name.",
+        mimeType: "application/json",
+      },
+      async (uri) => {
+        this.logger.debug(`Resource read: ${uri.href}`);
+        try {
+          const tools = this.toolRegistry.getToolsForMCP().map((tool) => ({
+            name: tool.name,
+            title: tool.title,
+            description: tool.description,
+            annotations: tool.annotations,
+          }));
+          return jsonResource(uri, { count: tools.length, tools });
+        } catch (error) {
+          this.logger.error("Failed to read github://tools resource", error);
+          throw new McpError(
+            ErrorCode.InternalError,
+            `Failed to read tool catalog: ${error instanceof Error ? error.message : String(error)}`,
+          );
+        }
+      },
+    );
+  }
+
+  /**
+   * Register reusable MCP prompt templates.
+   *
+   * Prompts are self-contained AI message templates — see
+   * `infrastructure/mcp/prompts.ts`. They format their arguments into a
+   * message sequence and return it; they never call the GitHub API
+   * themselves.
+   */
+  private registerPrompts(): void {
+    registerPromptTemplates(this.server);
+  }
+
+  /**
    * Execute one tool call and shape it into an MCP result.
    *
    * Execution failures return `{ isError: true }` rather than throwing a
@@ -607,6 +802,11 @@ class GitHubProjectManagerServer {
       new AgentStore(createGitHubFactory()),
     );
     return this._agentBudgetService;
+  }
+
+  private get agentStore(): AgentStore {
+    this._agentStore ??= new AgentStore(createGitHubFactory());
+    return this._agentStore;
   }
 
   private async dispatchTool(toolName: string, args: unknown): Promise<CallToolResult> {
