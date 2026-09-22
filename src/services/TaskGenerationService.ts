@@ -1,6 +1,6 @@
-import { AITaskProcessor } from './ai/AITaskProcessor';
-import type { AIServiceFactory } from './ai/AIServiceFactory';
-import { InputSanitizer } from './utils/InputSanitizer';
+import { AITaskProcessor } from "./ai/AITaskProcessor";
+import type { AIServiceFactory } from "./ai/AIServiceFactory";
+import { InputSanitizer } from "./utils/InputSanitizer";
 import {
   type AITask,
   type SubTask,
@@ -12,8 +12,8 @@ import {
   type AcceptanceCriteria,
   type SectionConfidence,
   type ConfidenceConfig,
-  DEFAULT_CONFIDENCE_CONFIG
-} from '../domain/ai-types';
+  DEFAULT_CONFIDENCE_CONFIG,
+} from "../domain/ai-types";
 import {
   MAX_TASKS_PER_PRD,
   MAX_SUBTASK_DEPTH,
@@ -26,21 +26,25 @@ import {
   ENHANCED_CONTEXT_LEVEL,
   INCLUDE_BUSINESS_CONTEXT,
   INCLUDE_TECHNICAL_CONTEXT,
-  INCLUDE_IMPLEMENTATION_GUIDANCE
-} from '../env';
+  INCLUDE_IMPLEMENTATION_GUIDANCE,
+} from "../env";
 import type {
   EnhancedTaskGenerationConfig,
   EnhancedTaskGenerationParams,
-  EnhancedAITask
-} from '../domain/ai-types';
-import { RequirementsTraceabilityService } from './RequirementsTraceabilityService';
-import { TaskContextGenerationService } from './TaskContextGenerationService';
-import { v4 as uuidv4 } from 'uuid';
-import { DependencyGraph, type DetectedDependency, type GraphAnalysisResult } from '../analysis/DependencyGraph';
-import { EstimationCalibrator, type EffortEstimate } from '../analysis/EstimationCalibrator';
-import { ConfidenceScorer } from './ai/ConfidenceScorer';
-import { safeCall } from './utils/safeCall';
-import { type ILogger, Logger } from '../infrastructure/logger';
+  EnhancedAITask,
+} from "../domain/ai-types";
+import { RequirementsTraceabilityService } from "./RequirementsTraceabilityService";
+import { TaskContextGenerationService } from "./TaskContextGenerationService";
+import { v4 as uuidv4 } from "uuid";
+import {
+  DependencyGraph,
+  type DetectedDependency,
+  type GraphAnalysisResult,
+} from "../analysis/DependencyGraph";
+import { EstimationCalibrator, type EffortEstimate } from "../analysis/EstimationCalibrator";
+import { ConfidenceScorer } from "./ai/ConfidenceScorer";
+import { safeCall } from "./utils/safeCall";
+import { type ILogger, Logger } from "../infrastructure/logger";
 
 /**
  * Task with effort estimate and dependency analysis
@@ -57,7 +61,7 @@ export interface EnhancedTaskWithEstimate extends EnhancedAITask {
 export interface TaskGenerationResult {
   tasks: EnhancedTaskWithEstimate[];
   graphAnalysis: GraphAnalysisResult;
-  overallConfidence: { score: number; tier: 'high' | 'medium' | 'low' };
+  overallConfidence: { score: number; tier: "high" | "medium" | "low" };
   lowConfidenceTasks: EnhancedTaskWithEstimate[];
   estimationStats: {
     totalPoints: number;
@@ -104,32 +108,33 @@ export class TaskGenerationService {
       createTraceabilityMatrix: AUTO_CREATE_TRACEABILITY,
       generateUseCases: AUTO_GENERATE_USE_CASES,
       createLifecycleTracking: AUTO_CREATE_LIFECYCLE,
-      contextLevel: ENHANCED_CONTEXT_LEVEL as 'minimal' | 'standard' | 'full',
+      contextLevel: ENHANCED_CONTEXT_LEVEL as "minimal" | "standard" | "full",
       includeBusinessContext: INCLUDE_BUSINESS_CONTEXT,
       includeTechnicalContext: INCLUDE_TECHNICAL_CONTEXT,
       includeImplementationGuidance: INCLUDE_IMPLEMENTATION_GUIDANCE,
       enforceTraceability: AUTO_CREATE_TRACEABILITY,
       requireBusinessJustification: INCLUDE_BUSINESS_CONTEXT,
-      trackRequirementCoverage: AUTO_CREATE_TRACEABILITY
+      trackRequirementCoverage: AUTO_CREATE_TRACEABILITY,
     };
   }
 
   /**
    * Generate enhanced task list from PRD with full traceability and context
    */
-  async generateEnhancedTasksFromPRD(params: EnhancedTaskGenerationParams): Promise<EnhancedAITask[]> {
+  async generateEnhancedTasksFromPRD(
+    params: EnhancedTaskGenerationParams
+  ): Promise<EnhancedAITask[]> {
     const config = { ...this.getDefaultEnhancedConfig(), ...params.enhancedConfig };
 
     if (!config.enableEnhancedGeneration) {
       // Fall back to basic task generation
       const basicTasks = await this.generateBasicTasksFromPRD(params);
-      return basicTasks.map(task => ({ ...task } as EnhancedAITask));
+      return basicTasks.map((task) => ({ ...task }) as EnhancedAITask);
     }
 
     return safeCall(async () => {
-      let prdContent = typeof params.prd === 'string'
-        ? params.prd
-        : JSON.stringify(params.prd, null, 2);
+      let prdContent =
+        typeof params.prd === "string" ? params.prd : JSON.stringify(params.prd, null, 2);
       prdContent = InputSanitizer.sanitizePRDContent(prdContent);
 
       // Generate basic tasks first
@@ -145,26 +150,26 @@ export class TaskGenerationService {
         // Create mock PRD for traceability
         const mockPRD: MockPRD = {
           id: params.projectId || `prd-${Date.now()}`,
-          title: 'Generated PRD',
+          title: "Generated PRD",
           overview: prdContent.substring(0, 500),
-          objectives: params.businessObjectives || ['Deliver high-quality software solution'],
-          successMetrics: ['User satisfaction > 90%'],
+          objectives: params.businessObjectives || ["Deliver high-quality software solution"],
+          successMetrics: ["User satisfaction > 90%"],
           features: [],
-          author: 'system',
+          author: "system",
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
           aiGenerated: true,
           aiMetadata: {
-            generatedBy: 'enhanced-task-generation',
+            generatedBy: "enhanced-task-generation",
             generatedAt: new Date().toISOString(),
-            prompt: 'Enhanced task generation from PRD',
+            prompt: "Enhanced task generation from PRD",
             confidence: 0.8,
-            version: '1.0.0'
-          }
+            version: "1.0.0",
+          },
         };
 
         traceabilityMatrix = this.traceabilityService.createTraceabilityMatrix(
-          params.projectId || 'enhanced-project',
+          params.projectId || "enhanced-project",
           mockPRD,
           [], // Features will be extracted
           basicTasks
@@ -197,7 +202,7 @@ export class TaskGenerationService {
     if (ENHANCED_TASK_GENERATION) {
       const enhancedParams: EnhancedTaskGenerationParams = {
         ...params,
-        enhancedConfig: this.getDefaultEnhancedConfig()
+        enhancedConfig: this.getDefaultEnhancedConfig(),
       };
       const enhancedTasks = await this.generateEnhancedTasksFromPRD(enhancedParams);
       return enhancedTasks as AITask[]; // Return as basic tasks for backward compatibility
@@ -218,9 +223,8 @@ export class TaskGenerationService {
     autoPrioritize?: boolean;
   }): Promise<AITask[]> {
     return safeCall(async () => {
-      let prdContent = typeof params.prd === 'string'
-        ? params.prd
-        : JSON.stringify(params.prd, null, 2);
+      let prdContent =
+        typeof params.prd === "string" ? params.prd : JSON.stringify(params.prd, null, 2);
       prdContent = InputSanitizer.sanitizePRDContent(prdContent);
 
       // Generate initial tasks using AI
@@ -228,14 +232,15 @@ export class TaskGenerationService {
         prdContent,
         maxTasks: params.maxTasks || MAX_TASKS_PER_PRD,
         includeSubtasks: params.includeSubtasks ?? true,
-        autoEstimate: params.autoEstimate ?? AUTO_EFFORT_ESTIMATION
+        autoEstimate: params.autoEstimate ?? AUTO_EFFORT_ESTIMATION,
       });
 
       // Auto-prioritize if requested
       if (params.autoPrioritize) {
         tasks = await this.prioritizeTaskList({
           tasks,
-          projectGoals: typeof params.prd === 'object' ? params.prd.objectives.join(', ') : undefined
+          projectGoals:
+            typeof params.prd === "object" ? params.prd.objectives.join(", ") : undefined,
         });
       }
 
@@ -245,7 +250,7 @@ export class TaskGenerationService {
       }
 
       // Ensure all tasks have required metadata
-      return tasks.map(task => this.enrichTaskMetadata(task, params.prd));
+      return tasks.map((task) => this.enrichTaskMetadata(task, params.prd));
     });
   }
 
@@ -266,17 +271,14 @@ export class TaskGenerationService {
         let enhancedTask: EnhancedAITask;
         if (config.createTraceabilityMatrix && traceabilityMatrix) {
           const traceabilityTask = traceabilityMatrix.tasks.find((t: any) => t.id === task.id);
-          enhancedTask = traceabilityTask || { ...task } as EnhancedAITask;
+          enhancedTask = traceabilityTask || ({ ...task } as EnhancedAITask);
         } else {
           enhancedTask = { ...task } as EnhancedAITask;
         }
 
         // Generate comprehensive context
-        const { context: executionContext } = await this.contextGenerationService.generateTaskContext(
-          task,
-          prdContent,
-          config
-        );
+        const { context: executionContext } =
+          await this.contextGenerationService.generateTaskContext(task, prdContent, config);
 
         // Add execution context to the task
         enhancedTask.executionContext = executionContext;
@@ -285,16 +287,17 @@ export class TaskGenerationService {
 
         // Generate implementation guidance if enabled
         if (config.includeImplementationGuidance) {
-          const implementationGuidance = await this.contextGenerationService.generateImplementationGuidance(
-            task
-          );
+          const implementationGuidance =
+            await this.contextGenerationService.generateImplementationGuidance(task);
           if (implementationGuidance) {
             enhancedTask.implementationGuidance = implementationGuidance;
           }
         }
 
         // Enhance acceptance criteria
-        enhancedTask.enhancedAcceptanceCriteria = this.enhanceAcceptanceCriteria(task.acceptanceCriteria);
+        enhancedTask.enhancedAcceptanceCriteria = this.enhanceAcceptanceCriteria(
+          task.acceptanceCriteria
+        );
 
         enhancedTasks.push(enhancedTask);
       } catch {
@@ -313,11 +316,11 @@ export class TaskGenerationService {
     return basicCriteria.map((criterion, index) => ({
       id: criterion.id || `ac-${index + 1}`,
       description: criterion.description,
-      category: 'functional' as const,
-      verificationMethod: 'manual_test' as const,
+      category: "functional" as const,
+      verificationMethod: "manual_test" as const,
       verificationDetails: `Verify that: ${criterion.description}`,
-      priority: 'must_have' as const,
-      completed: criterion.completed || false
+      priority: "must_have" as const,
+      completed: criterion.completed || false,
     }));
   }
 
@@ -328,15 +331,15 @@ export class TaskGenerationService {
     description: string;
     projectType?: string;
     maxTasks?: number;
-    complexity?: 'low' | 'medium' | 'high';
+    complexity?: "low" | "medium" | "high";
   }): Promise<AITask[]> {
     return safeCall(async () => {
       // Create a minimal PRD-like structure from the description
       const simplePRD = {
         overview: params.description,
-        objectives: [`Implement ${params.projectType || 'project'} based on requirements`],
+        objectives: [`Implement ${params.projectType || "project"} based on requirements`],
         features: [],
-        timeline: '1-3 months'
+        timeline: "1-3 months",
       };
 
       return await this.generateTasksFromPRD({
@@ -344,7 +347,7 @@ export class TaskGenerationService {
         maxTasks: params.maxTasks || 20,
         includeSubtasks: true,
         autoEstimate: true,
-        autoPrioritize: true
+        autoPrioritize: true,
       });
     });
   }
@@ -358,13 +361,12 @@ export class TaskGenerationService {
     autoEstimate?: boolean;
   }): Promise<SubTask[]> {
     return safeCall(async () => {
-
       // Use AI to break down the task
       const subtasks = await this.aiProcessor.expandTaskIntoSubtasks({
         taskTitle: params.task.title,
         taskDescription: params.task.description,
         currentComplexity: params.task.complexity,
-        maxDepth: params.maxDepth || MAX_SUBTASK_DEPTH
+        maxDepth: params.maxDepth || MAX_SUBTASK_DEPTH,
       });
 
       // Convert to SubTask format and enrich with metadata
@@ -375,7 +377,7 @@ export class TaskGenerationService {
         status: TaskStatus.PENDING,
         aiGenerated: true,
         createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
+        updatedAt: new Date().toISOString(),
       }));
     });
   }
@@ -394,7 +396,7 @@ export class TaskGenerationService {
       const analysis = await this.aiProcessor.analyzeTaskComplexity({
         taskTitle: task.title,
         taskDescription: task.description,
-        currentEstimate: task.estimatedHours
+        currentEstimate: task.estimatedHours,
       });
 
       return {
@@ -402,7 +404,7 @@ export class TaskGenerationService {
         newComplexity: analysis.complexity as TaskComplexity,
         estimatedHours: analysis.estimatedHours,
         analysis: analysis.analysis,
-        recommendations: analysis.recommendations
+        recommendations: analysis.recommendations,
       };
     });
   }
@@ -421,7 +423,7 @@ export class TaskGenerationService {
         tasks: params.tasks,
         projectGoals: params.projectGoals,
         timeline: params.timeline,
-        teamSize: params.teamSize
+        teamSize: params.teamSize,
       });
     });
   }
@@ -434,31 +436,33 @@ export class TaskGenerationService {
       // For now, implement basic dependency detection logic
       // In a full implementation, you'd use AI to analyze dependencies
 
-      const tasksWithDependencies = tasks.map(task => {
+      const tasksWithDependencies = tasks.map((task) => {
         const dependencies: TaskDependency[] = [];
 
         // Simple heuristic: setup/infrastructure tasks should be dependencies for feature tasks
-        if (task.title.toLowerCase().includes('setup') ||
-            task.title.toLowerCase().includes('infrastructure') ||
-            task.title.toLowerCase().includes('configuration')) {
+        if (
+          task.title.toLowerCase().includes("setup") ||
+          task.title.toLowerCase().includes("infrastructure") ||
+          task.title.toLowerCase().includes("configuration")
+        ) {
           // This is a setup task - other tasks might depend on it
           return { ...task, dependencies };
         }
 
         // Feature tasks might depend on setup tasks
-        const setupTasks = tasks.filter(t =>
-          t.id !== task.id && (
-            t.title.toLowerCase().includes('setup') ||
-            t.title.toLowerCase().includes('infrastructure') ||
-            t.title.toLowerCase().includes('database')
-          )
+        const setupTasks = tasks.filter(
+          (t) =>
+            t.id !== task.id &&
+            (t.title.toLowerCase().includes("setup") ||
+              t.title.toLowerCase().includes("infrastructure") ||
+              t.title.toLowerCase().includes("database"))
         );
 
-        setupTasks.forEach(setupTask => {
+        setupTasks.forEach((setupTask) => {
           dependencies.push({
             id: setupTask.id,
-            type: 'depends_on',
-            description: `Requires ${setupTask.title} to be completed first`
+            type: "depends_on",
+            description: `Requires ${setupTask.title} to be completed first`,
           });
         });
 
@@ -467,7 +471,7 @@ export class TaskGenerationService {
 
       return tasksWithDependencies;
     } catch (error) {
-      this.logger.error('Dependency detection failed, returning original tasks', error);
+      this.logger.error("Dependency detection failed, returning original tasks", error);
       return tasks;
     }
   }
@@ -484,34 +488,37 @@ export class TaskGenerationService {
         {
           id: uuidv4(),
           description: `Task "${task.title}" is implemented according to specifications`,
-          completed: false
+          completed: false,
         },
         {
           id: uuidv4(),
-          description: 'All unit tests pass',
-          completed: false
+          description: "All unit tests pass",
+          completed: false,
         },
         {
           id: uuidv4(),
-          description: 'Code review is completed and approved',
-          completed: false
-        }
+          description: "Code review is completed and approved",
+          completed: false,
+        },
       ];
 
       // Add specific criteria based on task type
-      if (task.title.toLowerCase().includes('api')) {
+      if (task.title.toLowerCase().includes("api")) {
         criteria.push({
           id: uuidv4(),
-          description: 'API endpoints return correct responses and status codes',
-          completed: false
+          description: "API endpoints return correct responses and status codes",
+          completed: false,
         });
       }
 
-      if (task.title.toLowerCase().includes('ui') || task.title.toLowerCase().includes('frontend')) {
+      if (
+        task.title.toLowerCase().includes("ui") ||
+        task.title.toLowerCase().includes("frontend")
+      ) {
         criteria.push({
           id: uuidv4(),
-          description: 'UI is responsive and accessible',
-          completed: false
+          description: "UI is responsive and accessible",
+          completed: false,
         });
       }
 
@@ -530,7 +537,7 @@ export class TaskGenerationService {
       testing: number;
       documentation: number;
     };
-    confidence: 'high' | 'medium' | 'low';
+    confidence: "high" | "medium" | "low";
     factors: string[];
   }> {
     return safeCall(async () => {
@@ -539,9 +546,9 @@ export class TaskGenerationService {
 
       const breakdown = {
         analysis: Math.round(baseHours * 0.15),
-        implementation: Math.round(baseHours * 0.60),
-        testing: Math.round(baseHours * 0.20),
-        documentation: Math.round(baseHours * 0.05)
+        implementation: Math.round(baseHours * 0.6),
+        testing: Math.round(baseHours * 0.2),
+        documentation: Math.round(baseHours * 0.05),
       };
 
       const totalHours = Object.values(breakdown).reduce((sum, hours) => sum + hours, 0);
@@ -549,12 +556,12 @@ export class TaskGenerationService {
       return {
         estimatedHours: totalHours,
         breakdown,
-        confidence: task.complexity <= 5 ? 'high' : task.complexity <= 7 ? 'medium' : 'low',
+        confidence: task.complexity <= 5 ? "high" : task.complexity <= 7 ? "medium" : "low",
         factors: [
           `Complexity level: ${task.complexity}/10`,
           `Task type: ${this.getTaskType(task)}`,
-          `Dependencies: ${task.dependencies.length} identified`
-        ]
+          `Dependencies: ${task.dependencies.length} identified`,
+        ],
       };
     });
   }
@@ -569,10 +576,11 @@ export class TaskGenerationService {
     teamSkills?: string[];
   }): Promise<AITask[]> {
     return safeCall(async () => {
-      const availableTasks = params.allTasks.filter(task =>
-        !params.completedTaskIds.includes(task.id) &&
-        task.status !== TaskStatus.DONE &&
-        this.areTaskDependenciesMet(task, params.completedTaskIds)
+      const availableTasks = params.allTasks.filter(
+        (task) =>
+          !params.completedTaskIds.includes(task.id) &&
+          task.status !== TaskStatus.DONE &&
+          this.areTaskDependenciesMet(task, params.completedTaskIds)
       );
 
       // Sort by priority and complexity
@@ -607,8 +615,8 @@ export class TaskGenerationService {
    */
   private areTaskDependenciesMet(task: AITask, completedTaskIds: string[]): boolean {
     return task.dependencies
-      .filter(dep => dep.type === 'depends_on' || dep.type === 'blocks')
-      .every(dep => completedTaskIds.includes(dep.id));
+      .filter((dep) => dep.type === "depends_on" || dep.type === "blocks")
+      .every((dep) => completedTaskIds.includes(dep.id));
   }
 
   /**
@@ -617,13 +625,13 @@ export class TaskGenerationService {
   private enrichTaskMetadata(task: AITask, prd: PRDDocument | string): AITask {
     return {
       ...task,
-      sourcePRD: typeof prd === 'object' ? prd.id : 'external',
+      sourcePRD: typeof prd === "object" ? prd.id : "external",
       tags: [
         ...task.tags,
         this.getTaskType(task),
         `complexity-${task.complexity}`,
-        `priority-${task.priority}`
-      ].filter((tag, index, arr) => arr.indexOf(tag) === index) // Remove duplicates
+        `priority-${task.priority}`,
+      ].filter((tag, index, arr) => arr.indexOf(tag) === index), // Remove duplicates
     };
   }
 
@@ -634,15 +642,15 @@ export class TaskGenerationService {
     const title = task.title.toLowerCase();
     const description = task.description.toLowerCase();
 
-    if (title.includes('setup') || title.includes('config')) return 'setup';
-    if (title.includes('api') || description.includes('endpoint')) return 'backend';
-    if (title.includes('ui') || title.includes('frontend')) return 'frontend';
-    if (title.includes('test') || description.includes('testing')) return 'testing';
-    if (title.includes('deploy') || title.includes('infrastructure')) return 'devops';
-    if (title.includes('database') || title.includes('migration')) return 'database';
-    if (title.includes('documentation') || title.includes('docs')) return 'documentation';
+    if (title.includes("setup") || title.includes("config")) return "setup";
+    if (title.includes("api") || description.includes("endpoint")) return "backend";
+    if (title.includes("ui") || title.includes("frontend")) return "frontend";
+    if (title.includes("test") || description.includes("testing")) return "testing";
+    if (title.includes("deploy") || title.includes("infrastructure")) return "devops";
+    if (title.includes("database") || title.includes("migration")) return "database";
+    if (title.includes("documentation") || title.includes("docs")) return "documentation";
 
-    return 'feature';
+    return "feature";
   }
 
   /**
@@ -663,7 +671,7 @@ export class TaskGenerationService {
       prd: params.prd,
       projectId: params.projectId,
       maxTasks: params.maxTasks || MAX_TASKS_PER_PRD,
-      businessObjectives: params.businessObjectives
+      businessObjectives: params.businessObjectives,
     });
 
     // Reset graph for new analysis
@@ -681,7 +689,7 @@ export class TaskGenerationService {
         complexity: task.complexity,
         title: task.title,
         description: task.description,
-        tags: task.tags
+        tags: task.tags,
       });
 
       // Record for future calibration
@@ -690,13 +698,11 @@ export class TaskGenerationService {
         title: task.title,
         estimatedPoints: effortEstimate.points,
         complexity: task.complexity,
-        tags: task.tags
+        tags: task.tags,
       });
 
       // Calculate task confidence
-      const prdContent = typeof params.prd === 'string'
-        ? params.prd
-        : JSON.stringify(params.prd);
+      const prdContent = typeof params.prd === "string" ? params.prd : JSON.stringify(params.prd);
 
       const taskConfidence = scorer.calculateSectionConfidence({
         sectionId: task.id,
@@ -704,17 +710,17 @@ export class TaskGenerationService {
         inputData: {
           description: task.description,
           context: prdContent.substring(0, 500),
-          requirements: task.acceptanceCriteria.map(ac => ac.description)
+          requirements: task.acceptanceCriteria.map((ac) => ac.description),
         },
         aiSelfAssessment: 0.7, // Default - could be enhanced with AI assessment
-        patternMatchScore: this.calculateTaskPatternMatch(task)
+        patternMatchScore: this.calculateTaskPatternMatch(task),
       });
 
       tasksWithEstimates.push({
         ...task,
         effortEstimate,
         detectedDependencies: [],
-        taskConfidence
+        taskConfidence,
       });
     }
 
@@ -723,47 +729,43 @@ export class TaskGenerationService {
 
     // Assign detected dependencies to tasks
     for (const task of tasksWithEstimates) {
-      task.detectedDependencies = implicitDeps.filter(d => d.toTaskId === task.id);
+      task.detectedDependencies = implicitDeps.filter((d) => d.toTaskId === task.id);
     }
 
     // Run graph analysis
     const graphAnalysis = this.dependencyGraph.analyze();
 
     // Calculate overall confidence
-    const confidenceScores = tasksWithEstimates.map(t => t.taskConfidence);
+    const confidenceScores = tasksWithEstimates.map((t) => t.taskConfidence);
     const aggregated = scorer.aggregateConfidence(confidenceScores);
 
     // Find low confidence tasks
-    const lowConfidenceTasks = tasksWithEstimates.filter(
-      t => t.taskConfidence.tier === 'low'
-    );
+    const lowConfidenceTasks = tasksWithEstimates.filter((t) => t.taskConfidence.tier === "low");
 
     // Calculate estimation stats
-    const totalPoints = tasksWithEstimates.reduce(
-      (sum, t) => sum + t.effortEstimate.points,
-      0
-    );
-    const averageConfidence = tasksWithEstimates.length > 0
-      ? Math.round(
-          tasksWithEstimates.reduce((sum, t) => sum + t.effortEstimate.confidence, 0) /
-          tasksWithEstimates.length
-        )
-      : 0;
-    const calibrated = tasksWithEstimates.some(t => t.effortEstimate.calibrated);
+    const totalPoints = tasksWithEstimates.reduce((sum, t) => sum + t.effortEstimate.points, 0);
+    const averageConfidence =
+      tasksWithEstimates.length > 0
+        ? Math.round(
+            tasksWithEstimates.reduce((sum, t) => sum + t.effortEstimate.confidence, 0) /
+              tasksWithEstimates.length
+          )
+        : 0;
+    const calibrated = tasksWithEstimates.some((t) => t.effortEstimate.calibrated);
 
     return {
       tasks: tasksWithEstimates,
       graphAnalysis,
       overallConfidence: {
         score: aggregated.overallScore,
-        tier: aggregated.overallTier
+        tier: aggregated.overallTier,
       },
       lowConfidenceTasks,
       estimationStats: {
         totalPoints,
         averageConfidence,
-        calibrated
-      }
+        calibrated,
+      },
     };
   }
 
@@ -814,7 +816,9 @@ export class TaskGenerationService {
   /**
    * Import estimation records from persistence
    */
-  importEstimationRecords(records: Parameters<typeof EstimationCalibrator.prototype.importRecords>[0]): void {
+  importEstimationRecords(
+    records: Parameters<typeof EstimationCalibrator.prototype.importRecords>[0]
+  ): void {
     this.estimationCalibrator.importRecords(records);
   }
 }

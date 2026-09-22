@@ -1,19 +1,19 @@
-import { v4 as uuidv4 } from 'uuid';
-import { AIServiceFactory } from './ai/AIServiceFactory.js';
-import { type ILogger, Logger } from '../infrastructure/logger';
+import { v4 as uuidv4 } from "uuid";
+import { AIServiceFactory } from "./ai/AIServiceFactory.js";
+import { type ILogger, Logger } from "../infrastructure/logger";
 import type {
   FeatureAdditionRequest,
   FeatureExpansionResult,
   TaskLifecycleState,
   ProjectFeatureRoadmap,
   FeatureRequirement,
-  PRDDocument
-} from '../domain/ai-types.js';
-import { FeatureAnalysisService } from './feature/FeatureAnalysisService.js';
-import { FeaturePRDService } from './feature/FeaturePRDService.js';
-import { FeatureExpansionService } from './feature/FeatureExpansionService.js';
-import { TaskLifecycleService } from './feature/TaskLifecycleService.js';
-import { safeCall } from './utils/safeCall';
+  PRDDocument,
+} from "../domain/ai-types.js";
+import { FeatureAnalysisService } from "./feature/FeatureAnalysisService.js";
+import { FeaturePRDService } from "./feature/FeaturePRDService.js";
+import { FeatureExpansionService } from "./feature/FeatureExpansionService.js";
+import { TaskLifecycleService } from "./feature/TaskLifecycleService.js";
+import { safeCall } from "./utils/safeCall";
 
 /**
  * Thin orchestrator that composes the four feature-management sub-services.
@@ -143,7 +143,7 @@ export class FeatureManagementService {
         requestedBy: params.requestedBy,
         businessJustification: params.businessJustification,
         createdAt: new Date().toISOString(),
-        status: 'pending'
+        status: "pending",
       };
 
       // Step 2: Analyse the feature request
@@ -152,18 +152,18 @@ export class FeatureManagementService {
         description: params.description,
         existingPRD: params.targetPRD,
         businessJustification: params.businessJustification,
-        requestedBy: params.requestedBy
+        requestedBy: params.requestedBy,
       });
 
       // Step 3: Add to PRD if approved and PRD exists
       let updatedPRD: any | undefined;
       let newFeature: FeatureRequirement;
 
-      if (params.targetPRD && (params.autoApprove || analysis.recommendation === 'approve')) {
+      if (params.targetPRD && (params.autoApprove || analysis.recommendation === "approve")) {
         const prdResult = await this.prdService.addFeatureToPRD({
           featureRequest,
           targetPRD: params.targetPRD,
-          autoApprove: params.autoApprove
+          autoApprove: params.autoApprove,
         });
         updatedPRD = prdResult.updatedPRD;
         newFeature = prdResult.newFeature;
@@ -175,19 +175,19 @@ export class FeatureManagementService {
           description: params.description,
           priority: analysis.priority,
           userStories: [`As a user, I want ${params.featureIdea.toLowerCase()}`],
-          acceptanceCriteria: ['Feature meets requirements'],
+          acceptanceCriteria: ["Feature meets requirements"],
           estimatedComplexity: analysis.complexity,
-          dependencies: analysis.dependencies
+          dependencies: analysis.dependencies,
         };
       }
 
       // Step 4: Expand feature to tasks
       const expansionResult = await this.expansionService.expandFeatureToTasks({
-        feature: newFeature
+        feature: newFeature,
       });
 
       // Step 5: Create lifecycle states for all tasks
-      const lifecycleStates = expansionResult.tasks.map(task =>
+      const lifecycleStates = expansionResult.tasks.map((task) =>
         this.lifecycleService.createInitialTaskLifecycleState(task)
       );
 
@@ -197,7 +197,7 @@ export class FeatureManagementService {
         roadmapUpdate = this.createRoadmapUpdate({
           projectId: params.targetProject,
           newFeature,
-          estimatedEffort: expansionResult.estimatedEffort
+          estimatedEffort: expansionResult.estimatedEffort,
         });
       }
 
@@ -207,7 +207,7 @@ export class FeatureManagementService {
         updatedPRD,
         expansionResult,
         lifecycleStates,
-        roadmapUpdate
+        roadmapUpdate,
       };
     });
   }
@@ -226,18 +226,18 @@ export class FeatureManagementService {
       features: {
         current: [],
         planned: [params.newFeature],
-        backlog: []
+        backlog: [],
       },
       timeline: {
         quarters: {
-          'Q1-2024': {
+          "Q1-2024": {
             features: [params.newFeature.id],
-            themes: ['Feature Enhancement'],
-            goals: ['Implement new feature']
-          }
-        }
+            themes: ["Feature Enhancement"],
+            goals: ["Implement new feature"],
+          },
+        },
       },
-      dependencies: {}
+      dependencies: {},
     };
   }
 }

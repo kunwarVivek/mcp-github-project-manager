@@ -1,23 +1,27 @@
 import type { Octokit } from "@octokit/rest";
 import type { BaseGitHubRepository } from "./BaseRepository";
 import type { GitHubConfig } from "../GitHubConfig";
-import type { 
-  IssueRepository, 
-  MilestoneRepository, 
-  ProjectRepository, 
-  SprintRepository 
+import type {
+  IssueRepository,
+  MilestoneRepository,
+  ProjectRepository,
+  SprintRepository,
 } from "../../../domain/types";
 
 export type OctokitWithExtensions = InstanceType<typeof Octokit>;
 
 export interface GitHubRepositoryConstructor<T extends BaseGitHubRepository> {
-  new(octokit: OctokitWithExtensions, config: GitHubConfig): T;
+  new (octokit: OctokitWithExtensions, config: GitHubConfig): T;
 }
 
-export interface GitHubIssueRepositoryConstructor extends GitHubRepositoryConstructor<BaseGitHubRepository & IssueRepository> {}
-export interface GitHubMilestoneRepositoryConstructor extends GitHubRepositoryConstructor<BaseGitHubRepository & MilestoneRepository> {}
-export interface GitHubProjectRepositoryConstructor extends GitHubRepositoryConstructor<BaseGitHubRepository & ProjectRepository> {}
-export interface GitHubSprintRepositoryConstructor extends GitHubRepositoryConstructor<BaseGitHubRepository & SprintRepository> {}
+export interface GitHubIssueRepositoryConstructor
+  extends GitHubRepositoryConstructor<BaseGitHubRepository & IssueRepository> {}
+export interface GitHubMilestoneRepositoryConstructor
+  extends GitHubRepositoryConstructor<BaseGitHubRepository & MilestoneRepository> {}
+export interface GitHubProjectRepositoryConstructor
+  extends GitHubRepositoryConstructor<BaseGitHubRepository & ProjectRepository> {}
+export interface GitHubSprintRepositoryConstructor
+  extends GitHubRepositoryConstructor<BaseGitHubRepository & SprintRepository> {}
 
 export type GitHubRepository =
   | (BaseGitHubRepository & IssueRepository)
@@ -36,7 +40,7 @@ export interface SubIssueListItem {
   id: string;
   number: number;
   title: string;
-  state: 'OPEN' | 'CLOSED';
+  state: "OPEN" | "CLOSED";
   url: string;
   position?: number;
 }
@@ -81,7 +85,7 @@ export interface ParentIssueResult {
   id: string;
   number: number;
   title: string;
-  state: 'OPEN' | 'CLOSED';
+  state: "OPEN" | "CLOSED";
   url: string;
 }
 
@@ -93,11 +97,11 @@ export interface ParentIssueResult {
  * Status update status enum - matches GitHub's ProjectV2StatusUpdateStatus
  */
 export enum StatusUpdateStatus {
-  ON_TRACK = 'ON_TRACK',
-  AT_RISK = 'AT_RISK',
-  OFF_TRACK = 'OFF_TRACK',
-  COMPLETE = 'COMPLETE',
-  INACTIVE = 'INACTIVE',
+  ON_TRACK = "ON_TRACK",
+  AT_RISK = "AT_RISK",
+  OFF_TRACK = "OFF_TRACK",
+  COMPLETE = "COMPLETE",
+  INACTIVE = "INACTIVE",
 }
 
 /**
@@ -288,7 +292,7 @@ export interface SearchIssueResult {
   id: string;
   number: number;
   title: string;
-  state: 'OPEN' | 'CLOSED';
+  state: "OPEN" | "CLOSED";
   url: string;
   labels: string[];
   assignees: string[];
@@ -302,7 +306,7 @@ export interface SearchIssueResult {
  */
 export interface FilteredProjectItem {
   id: string;
-  type: 'Issue' | 'PullRequest' | 'DraftIssue';
+  type: "Issue" | "PullRequest" | "DraftIssue";
   contentId: string | null;
   title: string;
   state: string | null;

@@ -1,4 +1,4 @@
-import { vi, type MockInstance } from 'vitest';
+import { vi, type MockInstance } from "vitest";
 /**
  * Unit tests for CorrelationContext
  *
@@ -14,9 +14,9 @@ import {
   getCorrelationId,
   getTraceContext,
   traceContext,
-} from '../../../src/infrastructure/observability/CorrelationContext.js';
+} from "../../../src/infrastructure/observability/CorrelationContext.js";
 
-describe('CorrelationContext', () => {
+describe("CorrelationContext", () => {
   let stderrSpy: MockInstance;
 
   beforeEach(() => {
@@ -26,23 +26,23 @@ describe('CorrelationContext', () => {
     // under fake timers and the tests hang until the 10s vitest timeout.
     vi.useRealTimers();
     // Suppress stderr output during tests
-    stderrSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+    stderrSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
   });
 
   afterEach(() => {
     stderrSpy.mockRestore();
   });
 
-  describe('getCorrelationId()', () => {
-    it('returns undefined outside of trace', () => {
+  describe("getCorrelationId()", () => {
+    it("returns undefined outside of trace", () => {
       expect(getCorrelationId()).toBeUndefined();
     });
 
-    it('returns correlation ID within trace', async () => {
-      await startTrace('test-operation', async () => {
+    it("returns correlation ID within trace", async () => {
+      await startTrace("test-operation", async () => {
         const correlationId = getCorrelationId();
         expect(correlationId).toBeDefined();
-        expect(typeof correlationId).toBe('string');
+        expect(typeof correlationId).toBe("string");
         // UUID v4 format
         expect(correlationId).toMatch(
           /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
@@ -51,44 +51,44 @@ describe('CorrelationContext', () => {
     });
   });
 
-  describe('getTraceContext()', () => {
-    it('returns undefined outside of trace', () => {
+  describe("getTraceContext()", () => {
+    it("returns undefined outside of trace", () => {
       expect(getTraceContext()).toBeUndefined();
     });
 
-    it('returns full context within trace', async () => {
-      await startTrace('my-operation', async () => {
+    it("returns full context within trace", async () => {
+      await startTrace("my-operation", async () => {
         const context = getTraceContext();
         expect(context).toBeDefined();
         expect(context?.correlationId).toBeDefined();
-        expect(context?.operation).toBe('my-operation');
-        expect(typeof context?.startTime).toBe('number');
+        expect(context?.operation).toBe("my-operation");
+        expect(typeof context?.startTime).toBe("number");
         expect(context!.startTime).toBeLessThanOrEqual(Date.now());
       });
     });
   });
 
-  describe('startTrace()', () => {
-    it('creates correlation ID', async () => {
+  describe("startTrace()", () => {
+    it("creates correlation ID", async () => {
       let capturedId: string | undefined;
 
-      await startTrace('test', async () => {
+      await startTrace("test", async () => {
         capturedId = getCorrelationId();
       });
 
       expect(capturedId).toBeDefined();
     });
 
-    it('returns operation result', async () => {
-      const result = await startTrace('test', async () => {
-        return { data: 'test-value' };
+    it("returns operation result", async () => {
+      const result = await startTrace("test", async () => {
+        return { data: "test-value" };
       });
 
-      expect(result).toEqual({ data: 'test-value' });
+      expect(result).toEqual({ data: "test-value" });
     });
 
-    it('returns async operation result', async () => {
-      const result = await startTrace('test', async () => {
+    it("returns async operation result", async () => {
+      const result = await startTrace("test", async () => {
         await new Promise((resolve) => setTimeout(resolve, 10));
         return 42;
       });
@@ -96,30 +96,30 @@ describe('CorrelationContext', () => {
       expect(result).toBe(42);
     });
 
-    it('propagates errors', async () => {
+    it("propagates errors", async () => {
       await expect(
-        startTrace('test', async () => {
-          throw new Error('Test error');
+        startTrace("test", async () => {
+          throw new Error("Test error");
         })
-      ).rejects.toThrow('Test error');
+      ).rejects.toThrow("Test error");
     });
 
-    it('generates unique IDs for each trace', async () => {
+    it("generates unique IDs for each trace", async () => {
       const ids: string[] = [];
 
-      await startTrace('test1', async () => {
+      await startTrace("test1", async () => {
         ids.push(getCorrelationId()!);
       });
 
-      await startTrace('test2', async () => {
+      await startTrace("test2", async () => {
         ids.push(getCorrelationId()!);
       });
 
       expect(ids[0]).not.toBe(ids[1]);
     });
 
-    it('clears context after trace completes', async () => {
-      await startTrace('test', async () => {
+    it("clears context after trace completes", async () => {
+      await startTrace("test", async () => {
         expect(getCorrelationId()).toBeDefined();
       });
 
@@ -127,15 +127,15 @@ describe('CorrelationContext', () => {
     });
   });
 
-  describe('nested traces', () => {
-    it('maintains outer context in nested trace', async () => {
+  describe("nested traces", () => {
+    it("maintains outer context in nested trace", async () => {
       let outerId: string | undefined;
       let innerId: string | undefined;
 
-      await startTrace('outer', async () => {
+      await startTrace("outer", async () => {
         outerId = getCorrelationId();
 
-        await startTrace('inner', async () => {
+        await startTrace("inner", async () => {
           innerId = getCorrelationId();
         });
       });
@@ -146,14 +146,14 @@ describe('CorrelationContext', () => {
       expect(outerId).not.toBe(innerId);
     });
 
-    it('restores outer context after inner trace', async () => {
+    it("restores outer context after inner trace", async () => {
       let outerBefore: string | undefined;
       let outerAfter: string | undefined;
 
-      await startTrace('outer', async () => {
+      await startTrace("outer", async () => {
         outerBefore = getCorrelationId();
 
-        await startTrace('inner', async () => {
+        await startTrace("inner", async () => {
           // Different ID
           expect(getCorrelationId()).not.toBe(outerBefore);
         });
@@ -169,10 +169,10 @@ describe('CorrelationContext', () => {
     });
   });
 
-  describe('logging', () => {
-    it('logs trace start event', async () => {
-      await startTrace('test-op', async () => {
-        return 'result';
+  describe("logging", () => {
+    it("logs trace start event", async () => {
+      await startTrace("test-op", async () => {
+        return "result";
       });
 
       const calls = stderrSpy.mock.calls.map((c: unknown[]) => c[0] as string);
@@ -181,9 +181,9 @@ describe('CorrelationContext', () => {
       expect(startLog).toContain('"operation":"test-op"');
     });
 
-    it('logs trace success event', async () => {
-      await startTrace('test-op', async () => {
-        return 'result';
+    it("logs trace success event", async () => {
+      await startTrace("test-op", async () => {
+        return "result";
       });
 
       const calls = stderrSpy.mock.calls.map((c: unknown[]) => c[0] as string);
@@ -192,10 +192,10 @@ describe('CorrelationContext', () => {
       expect(successLog).toContain('"durationMs"');
     });
 
-    it('logs trace error event', async () => {
+    it("logs trace error event", async () => {
       try {
-        await startTrace('test-op', async () => {
-          throw new Error('Test failure');
+        await startTrace("test-op", async () => {
+          throw new Error("Test failure");
         });
       } catch {
         // Expected
@@ -208,11 +208,11 @@ describe('CorrelationContext', () => {
     });
   });
 
-  describe('traceContext export', () => {
-    it('is an AsyncLocalStorage instance', () => {
+  describe("traceContext export", () => {
+    it("is an AsyncLocalStorage instance", () => {
       expect(traceContext).toBeDefined();
-      expect(typeof traceContext.run).toBe('function');
-      expect(typeof traceContext.getStore).toBe('function');
+      expect(typeof traceContext.run).toBe("function");
+      expect(typeof traceContext.getStore).toBe("function");
     });
   });
 });

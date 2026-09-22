@@ -1,35 +1,27 @@
-import { defineConfig } from 'vitest/config';
+import { defineConfig } from "vitest/config";
 
 export default defineConfig({
   test: {
     globals: true, // Enable describe, it, expect, etc. globally (Jest parity)
-    environment: 'node',
+    environment: "node",
     include: [
-      'src/__tests__/**/*.test.ts',
-      'src/__tests__/**/*.spec.ts',
-      'src/__tests__/**/*.e2e.ts',
-      'tests/**/*.test.ts',
-      'tests/**/*.spec.ts',
+      "src/__tests__/**/*.test.ts",
+      "src/__tests__/**/*.spec.ts",
+      "src/__tests__/**/*.e2e.ts",
+      "tests/**/*.test.ts",
+      "tests/**/*.spec.ts",
     ],
-    exclude: [
-      'node_modules',
-      '**/build/**',
-    ],
+    exclude: ["node_modules", "**/build/**"],
     setupFiles: [
-      'reflect-metadata',
-      'src/__tests__/e2e/setup.ts', // E2E setup for environment variables
+      "reflect-metadata",
+      "src/__tests__/e2e/setup.ts", // E2E setup for environment variables
     ],
     testTimeout: 10000,
     coverage: {
-      provider: 'v8',
-      include: ['src/**/*.ts'],
-      exclude: [
-        'src/**/*.d.ts',
-        'src/**/*.test.ts',
-        'src/**/*.spec.ts',
-        'src/__tests__/**',
-      ],
-      reporter: ['text', 'lcov', 'clover'],
+      provider: "v8",
+      include: ["src/**/*.ts"],
+      exclude: ["src/**/*.d.ts", "src/**/*.test.ts", "src/**/*.spec.ts", "src/__tests__/**"],
+      reporter: ["text", "lcov", "clover"],
       thresholds: {
         lines: 55,
         functions: 57,
@@ -41,11 +33,11 @@ export default defineConfig({
     clearMocks: true,
     restoreMocks: false,
     // Reporter
-    reporters: ['default'],
+    reporters: ["default"],
   },
   resolve: {
     alias: {
-      '@': new URL('./src', import.meta.url).pathname,
+      "@": new URL("./src", import.meta.url).pathname,
     },
   },
 });

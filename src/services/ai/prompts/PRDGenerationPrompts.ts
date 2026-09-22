@@ -178,12 +178,12 @@ Return as a structured JSON array of user stories.`;
  */
 export function formatPrompt(template: string, variables: Record<string, string>): string {
   let formatted = template;
-  
+
   for (const [key, value] of Object.entries(variables)) {
     const placeholder = `{${key}}`;
-    formatted = formatted.replace(new RegExp(placeholder, 'g'), value);
+    formatted = formatted.replace(new RegExp(placeholder, "g"), value);
   }
-  
+
   return formatted;
 }
 
@@ -195,34 +195,34 @@ export const PRD_PROMPT_CONFIGS = {
     systemPrompt: PRD_GENERATION_SYSTEM_PROMPT,
     userPrompt: GENERATE_PRD_FROM_IDEA_PROMPT,
     maxTokens: 4000,
-    temperature: 0.7
+    temperature: 0.7,
   },
-  
+
   enhanceExisting: {
     systemPrompt: PRD_GENERATION_SYSTEM_PROMPT,
     userPrompt: ENHANCE_EXISTING_PRD_PROMPT,
     maxTokens: 3000,
-    temperature: 0.6
+    temperature: 0.6,
   },
-  
+
   extractFeatures: {
     systemPrompt: PRD_GENERATION_SYSTEM_PROMPT,
     userPrompt: EXTRACT_FEATURES_FROM_PRD_PROMPT,
     maxTokens: 2500,
-    temperature: 0.5
+    temperature: 0.5,
   },
-  
+
   validateCompleteness: {
     systemPrompt: PRD_GENERATION_SYSTEM_PROMPT,
     userPrompt: VALIDATE_PRD_COMPLETENESS_PROMPT,
     maxTokens: 2000,
-    temperature: 0.4
+    temperature: 0.4,
   },
-  
+
   generateUserStories: {
     systemPrompt: PRD_GENERATION_SYSTEM_PROMPT,
     userPrompt: GENERATE_USER_STORIES_PROMPT,
     maxTokens: 2000,
-    temperature: 0.6
-  }
+    temperature: 0.6,
+  },
 };

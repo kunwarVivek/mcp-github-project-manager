@@ -37,12 +37,7 @@ export class GitHubRepositoryFactory {
   private readonly config: GitHubConfig;
   private readonly rateLimitManager: RateLimitManager;
 
-  constructor(
-    token: string,
-    owner: string,
-    repo: string,
-    options: RepositoryFactoryOptions = {}
-  ) {
+  constructor(token: string, owner: string, repo: string, options: RepositoryFactoryOptions = {}) {
     this.config = GitHubConfig.create(owner, repo, token);
     this.errorHandler = new GitHubErrorHandler();
 
@@ -86,7 +81,7 @@ export class GitHubRepositoryFactory {
   public getOctokit(): OctokitInstance {
     return this.octokit;
   }
-  
+
   /**
    * Get the configuration
    */
@@ -105,7 +100,7 @@ export class GitHubRepositoryFactory {
         repo: this.config.repo,
       });
     } catch (error) {
-      throw this.errorHandler.handleError(error, 'GraphQL operation');
+      throw this.errorHandler.handleError(error, "GraphQL operation");
     }
   }
 
@@ -178,13 +173,16 @@ export class GitHubRepositoryFactory {
   /**
    * Creates a new factory instance from environment variables
    */
-  static create(env: {
-    GITHUB_TOKEN: string;
-    GITHUB_OWNER: string;
-    GITHUB_REPO: string;
-  }, options?: RepositoryFactoryOptions): GitHubRepositoryFactory {
+  static create(
+    env: {
+      GITHUB_TOKEN: string;
+      GITHUB_OWNER: string;
+      GITHUB_REPO: string;
+    },
+    options?: RepositoryFactoryOptions
+  ): GitHubRepositoryFactory {
     if (!env.GITHUB_TOKEN || !env.GITHUB_OWNER || !env.GITHUB_REPO) {
-      throw new Error('Missing required GitHub configuration');
+      throw new Error("Missing required GitHub configuration");
     }
 
     return new GitHubRepositoryFactory(

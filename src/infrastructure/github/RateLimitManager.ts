@@ -1,4 +1,4 @@
-import type { Octokit } from '@octokit/rest';
+import type { Octokit } from "@octokit/rest";
 
 export interface RateLimitInfo {
   limit: number;
@@ -43,7 +43,12 @@ export class RateLimitManager {
 
     const { data } = await this.octokit.rest.rateLimit.get();
 
-    const toInfo = (r: { limit: number; remaining: number; reset: number; used: number }): RateLimitInfo => ({
+    const toInfo = (r: {
+      limit: number;
+      remaining: number;
+      reset: number;
+      used: number;
+    }): RateLimitInfo => ({
       limit: r.limit,
       remaining: r.remaining,
       reset: new Date(r.reset * 1000),
@@ -55,10 +60,7 @@ export class RateLimitManager {
     const graphql = toInfo(data.resources.graphql ?? defaultResource);
     const search = toInfo(data.resources.search ?? defaultResource);
 
-    const minRatio = Math.min(
-      core.remaining / core.limit,
-      graphql.remaining / graphql.limit,
-    );
+    const minRatio = Math.min(core.remaining / core.limit, graphql.remaining / graphql.limit);
 
     this.cachedStatus = {
       core,
@@ -96,7 +98,7 @@ export class RateLimitManager {
   async waitIfNeeded(): Promise<void> {
     const backoff = await this.getBackoffMs();
     if (backoff > 0) {
-      await new Promise<void>(r => setTimeout(r, backoff));
+      await new Promise<void>((r) => setTimeout(r, backoff));
     }
   }
 
@@ -106,9 +108,9 @@ export class RateLimitManager {
    * without extra API calls.
    */
   updateFromHeaders(headers: Record<string, string | undefined>): void {
-    const remaining = headers['x-ratelimit-remaining'];
-    const limit = headers['x-ratelimit-limit'];
-    const reset = headers['x-ratelimit-reset'];
+    const remaining = headers["x-ratelimit-remaining"];
+    const limit = headers["x-ratelimit-limit"];
+    const reset = headers["x-ratelimit-reset"];
 
     if (remaining && limit && reset && this.cachedStatus) {
       this.cachedStatus.core = {
@@ -119,7 +121,7 @@ export class RateLimitManager {
       };
       const minRatio = Math.min(
         this.cachedStatus.core.remaining / this.cachedStatus.core.limit,
-        this.cachedStatus.graphql.remaining / this.cachedStatus.graphql.limit,
+        this.cachedStatus.graphql.remaining / this.cachedStatus.graphql.limit
       );
       this.cachedStatus.isLow = minRatio < 0.1;
       this.cachedStatus.isCritical = minRatio < 0.05;

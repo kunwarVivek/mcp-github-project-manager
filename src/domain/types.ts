@@ -10,21 +10,21 @@ export type MilestoneId = string;
 export type SprintId = string;
 
 // Field types supported by GitHub Projects v2
-export type FieldType = 
-  | 'text'
-  | 'number'
-  | 'date'
-  | 'single_select'
-  | 'iteration'
-  | 'milestone'
-  | 'assignees'
-  | 'labels'
-  | 'repository'
-  | 'tracked_by'
-  | 'tracks';
+export type FieldType =
+  | "text"
+  | "number"
+  | "date"
+  | "single_select"
+  | "iteration"
+  | "milestone"
+  | "assignees"
+  | "labels"
+  | "repository"
+  | "tracked_by"
+  | "tracks";
 
 // View layouts supported by GitHub Projects v2
-export type ViewLayout = 'board' | 'table' | 'timeline' | 'roadmap';
+export type ViewLayout = "board" | "table" | "timeline" | "roadmap";
 
 // Issue-related types
 export interface Issue {
@@ -194,7 +194,7 @@ export interface ProjectView {
   fields?: CustomField[];
   sortBy?: Array<{
     field: string;
-    direction: 'ASC' | 'DESC';
+    direction: "ASC" | "DESC";
   }>;
   groupBy?: string;
   filters?: Array<{
@@ -240,7 +240,7 @@ export interface CreateProject {
   shortDescription?: string; // Made optional since it's handled via update after creation
   description?: string;
   owner: string;
-  visibility?: 'private' | 'public';
+  visibility?: "private" | "public";
   views?: ProjectView[];
   fields?: CustomField[];
   teamId?: string; // Add support for team association (GitHub schema optional field)
@@ -257,14 +257,18 @@ export interface ProjectRepository {
   findById(id: ProjectId): Promise<Project | null>;
   findByOwner(owner: string): Promise<Project[]>;
   findAll(): Promise<Project[]>;
-  
+
   // Field operations
   createField(projectId: ProjectId, field: CreateField): Promise<CustomField>;
   updateField(projectId: ProjectId, fieldId: FieldId, data: UpdateField): Promise<CustomField>;
   deleteField(projectId: ProjectId, fieldId: FieldId): Promise<void>;
-  
+
   // View operations
   createView(projectId: ProjectId, name: string, layout: ViewLayout): Promise<ProjectView>;
-  updateView(projectId: ProjectId, viewId: string, data: Partial<ProjectView>): Promise<ProjectView>;
+  updateView(
+    projectId: ProjectId,
+    viewId: string,
+    data: Partial<ProjectView>
+  ): Promise<ProjectView>;
   deleteView(projectId: ProjectId, viewId: string): Promise<void>;
 }

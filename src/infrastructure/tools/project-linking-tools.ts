@@ -45,7 +45,6 @@ import {
 // Helper Functions
 // ============================================================================
 
-
 /**
  * Resolves a repository owner/name to its GitHub node ID.
  *
@@ -172,7 +171,8 @@ export const unlinkProjectFromRepositoryTool: ToolDefinition<
   name: "unlink_project_from_repository",
   title: "Unlink Project from Repository",
   description: "Removes a repository linkage from a project.",
-  schema: UnlinkProjectFromRepositoryInputSchema as unknown as ToolSchema<UnlinkProjectFromRepositoryInput>,
+  schema:
+    UnlinkProjectFromRepositoryInputSchema as unknown as ToolSchema<UnlinkProjectFromRepositoryInput>,
   outputSchema: LinkOperationOutputSchema,
   annotations: ANNOTATION_PATTERNS.delete,
   examples: [
@@ -193,14 +193,10 @@ export const unlinkProjectFromRepositoryTool: ToolDefinition<
  *
  * Links a GitHub project to a team. Team members will have access to the project.
  */
-export const linkProjectToTeamTool: ToolDefinition<
-  LinkProjectToTeamInput,
-  LinkedTeamOutput
-> = {
+export const linkProjectToTeamTool: ToolDefinition<LinkProjectToTeamInput, LinkedTeamOutput> = {
   name: "link_project_to_team",
   title: "Link Project to Team",
-  description:
-    "Links a GitHub project to a team. Team members will have access to the project.",
+  description: "Links a GitHub project to a team. Team members will have access to the project.",
   schema: LinkProjectToTeamInputSchema as unknown as ToolSchema<LinkProjectToTeamInput>,
   outputSchema: LinkedTeamOutputSchema,
   annotations: ANNOTATION_PATTERNS.updateIdempotent,
@@ -277,10 +273,7 @@ export const listLinkedRepositoriesTool: ToolDefinition<
  *
  * Lists all teams linked to a project.
  */
-export const listLinkedTeamsTool: ToolDefinition<
-  ListLinkedTeamsInput,
-  LinkedTeamsListOutput
-> = {
+export const listLinkedTeamsTool: ToolDefinition<ListLinkedTeamsInput, LinkedTeamsListOutput> = {
   name: "list_linked_teams",
   title: "List Linked Teams",
   description: "Lists all teams linked to a project.",
@@ -308,9 +301,10 @@ export const listLinkedTeamsTool: ToolDefinition<
  *
  * Resolves repository to node ID and calls the GraphQL mutation.
  */
-export async function executeLinkProjectToRepository(
-  args: LinkProjectToRepositoryInput
-): Promise<{ content: Array<{ type: "text"; text: string }>; structuredContent: LinkedRepositoryOutput }> {
+export async function executeLinkProjectToRepository(args: LinkProjectToRepositoryInput): Promise<{
+  content: Array<{ type: "text"; text: string }>;
+  structuredContent: LinkedRepositoryOutput;
+}> {
   const factory = createGitHubFactory(args.owner, args.repo);
 
   // Resolve repository to node ID
@@ -377,7 +371,10 @@ export async function executeLinkProjectToRepository(
  */
 export async function executeUnlinkProjectFromRepository(
   args: UnlinkProjectFromRepositoryInput
-): Promise<{ content: Array<{ type: "text"; text: string }>; structuredContent: LinkOperationOutput }> {
+): Promise<{
+  content: Array<{ type: "text"; text: string }>;
+  structuredContent: LinkOperationOutput;
+}> {
   const factory = createGitHubFactory(args.owner, args.repo);
 
   // Resolve repository to node ID
@@ -430,9 +427,10 @@ export async function executeUnlinkProjectFromRepository(
  *
  * Resolves team to node ID and calls the GraphQL mutation.
  */
-export async function executeLinkProjectToTeam(
-  args: LinkProjectToTeamInput
-): Promise<{ content: Array<{ type: "text"; text: string }>; structuredContent: LinkedTeamOutput }> {
+export async function executeLinkProjectToTeam(args: LinkProjectToTeamInput): Promise<{
+  content: Array<{ type: "text"; text: string }>;
+  structuredContent: LinkedTeamOutput;
+}> {
   const factory = createGitHubFactory(args.org);
 
   // Resolve team to node ID
@@ -494,9 +492,10 @@ export async function executeLinkProjectToTeam(
  *
  * Resolves team to node ID and calls the GraphQL mutation.
  */
-export async function executeUnlinkProjectFromTeam(
-  args: UnlinkProjectFromTeamInput
-): Promise<{ content: Array<{ type: "text"; text: string }>; structuredContent: LinkOperationOutput }> {
+export async function executeUnlinkProjectFromTeam(args: UnlinkProjectFromTeamInput): Promise<{
+  content: Array<{ type: "text"; text: string }>;
+  structuredContent: LinkOperationOutput;
+}> {
   const factory = createGitHubFactory(args.org);
 
   // Resolve team to node ID
@@ -549,9 +548,10 @@ export async function executeUnlinkProjectFromTeam(
  *
  * Queries the project's repositories connection.
  */
-export async function executeListLinkedRepositories(
-  args: ListLinkedRepositoriesInput
-): Promise<{ content: Array<{ type: "text"; text: string }>; structuredContent: LinkedRepositoriesListOutput }> {
+export async function executeListLinkedRepositories(args: ListLinkedRepositoriesInput): Promise<{
+  content: Array<{ type: "text"; text: string }>;
+  structuredContent: LinkedRepositoriesListOutput;
+}> {
   const token = requireToken();
   if (!token) {
     throw new Error("GITHUB_TOKEN environment variable is required");
@@ -649,9 +649,10 @@ export async function executeListLinkedRepositories(
  *
  * Queries the project's teams connection.
  */
-export async function executeListLinkedTeams(
-  args: ListLinkedTeamsInput
-): Promise<{ content: Array<{ type: "text"; text: string }>; structuredContent: LinkedTeamsListOutput }> {
+export async function executeListLinkedTeams(args: ListLinkedTeamsInput): Promise<{
+  content: Array<{ type: "text"; text: string }>;
+  structuredContent: LinkedTeamsListOutput;
+}> {
   const token = requireToken();
   if (!token) {
     throw new Error("GITHUB_TOKEN environment variable is required");

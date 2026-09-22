@@ -6,10 +6,14 @@ export const ProjectFieldSchema = z.object({
   id: z.string(),
   name: z.string(),
   dataType: z.string(),
-  options: z.array(z.object({
-    id: z.string(),
-    name: z.string(),
-  })).optional(),
+  options: z
+    .array(
+      z.object({
+        id: z.string(),
+        name: z.string(),
+      })
+    )
+    .optional(),
 });
 
 export const ProjectViewSchema = z.object({
@@ -17,10 +21,14 @@ export const ProjectViewSchema = z.object({
   name: z.string(),
   layout: z.string(),
   filter: z.string().optional(),
-  sortBy: z.array(z.object({
-    field: z.string(),
-    direction: z.enum(["asc", "desc"]),
-  })).optional(),
+  sortBy: z
+    .array(
+      z.object({
+        field: z.string(),
+        direction: z.enum(["asc", "desc"]),
+      })
+    )
+    .optional(),
 });
 
 export const ProjectItemSchema = z.object({
@@ -109,11 +117,13 @@ export const MilestoneOutputSchema = z.object({
   description: z.string().optional(),
   dueDate: z.string().optional(),
   state: z.enum(["open", "closed"]),
-  progress: z.object({
-    openIssues: z.number(),
-    closedIssues: z.number(),
-    completionPercentage: z.number(),
-  }).optional(),
+  progress: z
+    .object({
+      openIssues: z.number(),
+      closedIssues: z.number(),
+      completionPercentage: z.number(),
+    })
+    .optional(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
@@ -132,11 +142,15 @@ export const MilestoneMetricsOutputSchema = z.object({
   dueDate: z.string().optional(),
   isOverdue: z.boolean(),
   daysRemaining: z.number().optional(),
-  issues: z.array(z.object({
-    id: z.string(),
-    title: z.string(),
-    state: z.string(),
-  })).optional(),
+  issues: z
+    .array(
+      z.object({
+        id: z.string(),
+        title: z.string(),
+        state: z.string(),
+      })
+    )
+    .optional(),
 });
 
 // ===== Sprint Schemas =====
@@ -164,11 +178,15 @@ export const SprintMetricsOutputSchema = z.object({
   completionPercentage: z.number(),
   remainingDays: z.number(),
   velocity: z.number().optional(),
-  issues: z.array(z.object({
-    id: z.string(),
-    title: z.string(),
-    state: z.string(),
-  })).optional(),
+  issues: z
+    .array(
+      z.object({
+        id: z.string(),
+        title: z.string(),
+        state: z.string(),
+      })
+    )
+    .optional(),
 });
 
 // ===== Roadmap Schemas =====
@@ -176,11 +194,13 @@ export const SprintMetricsOutputSchema = z.object({
 export const RoadmapOutputSchema = z.object({
   projectId: z.string(),
   projectTitle: z.string(),
-  milestones: z.array(z.object({
-    milestoneId: z.string(),
-    title: z.string(),
-    issuesCreated: z.number(),
-  })),
+  milestones: z.array(
+    z.object({
+      milestoneId: z.string(),
+      title: z.string(),
+      issuesCreated: z.number(),
+    })
+  ),
   totalIssuesCreated: z.number(),
 });
 
@@ -228,19 +248,27 @@ export const AutomationRuleOutputSchema = z.object({
   description: z.string().optional(),
   projectId: z.string(),
   enabled: z.boolean(),
-  triggers: z.array(z.object({
-    type: z.string(),
-    resourceType: z.string().optional(),
-    conditions: z.array(z.object({
-      field: z.string(),
-      operator: z.string(),
-      value: z.unknown(),
-    })).optional(),
-  })),
-  actions: z.array(z.object({
-    type: z.string(),
-    parameters: z.record(z.string(), z.unknown()),
-  })),
+  triggers: z.array(
+    z.object({
+      type: z.string(),
+      resourceType: z.string().optional(),
+      conditions: z
+        .array(
+          z.object({
+            field: z.string(),
+            operator: z.string(),
+            value: z.unknown(),
+          })
+        )
+        .optional(),
+    })
+  ),
+  actions: z.array(
+    z.object({
+      type: z.string(),
+      parameters: z.record(z.string(), z.unknown()),
+    })
+  ),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
@@ -270,11 +298,13 @@ export const SubscriptionOutputSchema = z.object({
   subscriptionId: z.string(),
   clientId: z.string(),
   transport: z.string(),
-  filters: z.array(z.object({
-    resourceType: z.string().optional(),
-    eventType: z.string().optional(),
-    resourceId: z.string().optional(),
-  })),
+  filters: z.array(
+    z.object({
+      resourceType: z.string().optional(),
+      eventType: z.string().optional(),
+      resourceId: z.string().optional(),
+    })
+  ),
   createdAt: z.string(),
   expiresAt: z.string().optional(),
 });
@@ -288,10 +318,14 @@ export const IssueOutputSchema = z.object({
   body: z.string().optional(),
   state: z.enum(["open", "closed"]),
   labels: z.array(LabelOutputSchema).optional(),
-  assignees: z.array(z.object({
-    id: z.string(),
-    login: z.string(),
-  })).optional(),
+  assignees: z
+    .array(
+      z.object({
+        id: z.string(),
+        login: z.string(),
+      })
+    )
+    .optional(),
   milestone: MilestoneOutputSchema.optional(),
   createdAt: z.string(),
   updatedAt: z.string(),
@@ -326,10 +360,14 @@ export const DraftIssueOutputSchema = z.object({
   id: z.string(),
   title: z.string(),
   body: z.string().optional(),
-  assignees: z.array(z.object({
-    id: z.string(),
-    login: z.string(),
-  })).optional(),
+  assignees: z
+    .array(
+      z.object({
+        id: z.string(),
+        login: z.string(),
+      })
+    )
+    .optional(),
   createdAt: z.string(),
 });
 
@@ -417,15 +455,19 @@ export const AITriageOutputSchema = z.object({
 
 export const AIRoadmapOutputSchema = z.object({
   projectId: z.string(),
-  milestones: z.array(z.object({
-    title: z.string(),
-    description: z.string(),
-    dueDate: z.string().optional(),
-    issues: z.array(z.object({
+  milestones: z.array(
+    z.object({
       title: z.string(),
       description: z.string(),
-    })),
-  })),
+      dueDate: z.string().optional(),
+      issues: z.array(
+        z.object({
+          title: z.string(),
+          description: z.string(),
+        })
+      ),
+    })
+  ),
   created: z.boolean(),
 });
 
@@ -434,9 +476,11 @@ export const AIRoadmapOutputSchema = z.object({
 export const BulkOperationResultSchema = z.object({
   succeeded: z.number(),
   failed: z.number(),
-  results: z.array(z.object({
-    id: z.string(),
-    success: z.boolean(),
-    error: z.string().optional(),
-  })),
+  results: z.array(
+    z.object({
+      id: z.string(),
+      success: z.boolean(),
+      error: z.string().optional(),
+    })
+  ),
 });

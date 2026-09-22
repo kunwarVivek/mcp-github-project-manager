@@ -1,7 +1,7 @@
 import { z } from "zod";
-import type { TaskPriority, TaskComplexity, AITask, TaskDependency } from './ai-task-types';
-import { TaskPrioritySchema, TaskComplexitySchema } from './ai-task-types';
-import type { FeatureRequirement } from './prd-types';
+import type { TaskPriority, TaskComplexity, AITask, TaskDependency } from "./ai-task-types";
+import { TaskPrioritySchema, TaskComplexitySchema } from "./ai-task-types";
+import type { FeatureRequirement } from "./prd-types";
 
 // ============================================================================
 // Feature Addition and Lifecycle Types
@@ -22,7 +22,7 @@ export interface FeatureAdditionRequest {
   priority?: TaskPriority;
   estimatedComplexity?: TaskComplexity;
   createdAt: string;
-  status: 'pending' | 'approved' | 'rejected' | 'implemented';
+  status: "pending" | "approved" | "rejected" | "implemented";
 }
 
 /**
@@ -35,7 +35,7 @@ export interface FeatureExpansionResult {
   estimatedEffort: number;
   suggestedMilestone?: string;
   riskAssessment: {
-    level: 'low' | 'medium' | 'high';
+    level: "low" | "medium" | "high";
     factors: string[];
     mitigations: string[];
   };
@@ -46,7 +46,7 @@ export interface FeatureExpansionResult {
  */
 export interface TaskLifecycleState {
   taskId: string;
-  currentPhase: 'planning' | 'development' | 'testing' | 'review' | 'deployment' | 'completed';
+  currentPhase: "planning" | "development" | "testing" | "review" | "deployment" | "completed";
   phases: {
     planning: TaskPhaseInfo;
     development: TaskPhaseInfo;
@@ -63,12 +63,17 @@ export interface TaskLifecycleState {
 /**
  * Valid status values for a task phase
  */
-export type TaskPhaseStatus = 'not_started' | 'in_progress' | 'completed' | 'blocked';
+export type TaskPhaseStatus = "not_started" | "in_progress" | "completed" | "blocked";
 
 /**
  * All valid task phase status values
  */
-export const TASK_PHASE_STATUSES: readonly TaskPhaseStatus[] = ['not_started', 'in_progress', 'completed', 'blocked'] as const;
+export const TASK_PHASE_STATUSES: readonly TaskPhaseStatus[] = [
+  "not_started",
+  "in_progress",
+  "completed",
+  "blocked",
+] as const;
 
 /**
  * Type guard to check if a string is a valid TaskPhaseStatus
@@ -94,9 +99,9 @@ export interface TaskPhaseInfo {
  */
 export interface TaskBlocker {
   id: string;
-  type: 'dependency' | 'resource' | 'technical' | 'external';
+  type: "dependency" | "resource" | "technical" | "external";
   description: string;
-  severity: 'low' | 'medium' | 'high' | 'critical';
+  severity: "low" | "medium" | "high" | "critical";
   reportedAt: string;
   resolvedAt?: string;
   resolution?: string;
@@ -142,64 +147,66 @@ export const FeatureAdditionRequestSchema = z.object({
   priority: TaskPrioritySchema.optional(),
   estimatedComplexity: TaskComplexitySchema.optional(),
   createdAt: z.string(),
-  status: z.enum(['pending', 'approved', 'rejected', 'implemented'])
+  status: z.enum(["pending", "approved", "rejected", "implemented"]),
 });
 
 export const TaskLifecycleStateSchema = z.object({
   taskId: z.string(),
-  currentPhase: z.enum(['planning', 'development', 'testing', 'review', 'deployment', 'completed']),
+  currentPhase: z.enum(["planning", "development", "testing", "review", "deployment", "completed"]),
   phases: z.object({
     planning: z.object({
-      status: z.enum(['not_started', 'in_progress', 'completed', 'blocked']),
+      status: z.enum(["not_started", "in_progress", "completed", "blocked"]),
       startedAt: z.string().optional(),
       completedAt: z.string().optional(),
       assignee: z.string().optional(),
       notes: z.string().optional(),
-      artifacts: z.array(z.string()).optional()
+      artifacts: z.array(z.string()).optional(),
     }),
     development: z.object({
-      status: z.enum(['not_started', 'in_progress', 'completed', 'blocked']),
+      status: z.enum(["not_started", "in_progress", "completed", "blocked"]),
       startedAt: z.string().optional(),
       completedAt: z.string().optional(),
       assignee: z.string().optional(),
       notes: z.string().optional(),
-      artifacts: z.array(z.string()).optional()
+      artifacts: z.array(z.string()).optional(),
     }),
     testing: z.object({
-      status: z.enum(['not_started', 'in_progress', 'completed', 'blocked']),
+      status: z.enum(["not_started", "in_progress", "completed", "blocked"]),
       startedAt: z.string().optional(),
       completedAt: z.string().optional(),
       assignee: z.string().optional(),
       notes: z.string().optional(),
-      artifacts: z.array(z.string()).optional()
+      artifacts: z.array(z.string()).optional(),
     }),
     review: z.object({
-      status: z.enum(['not_started', 'in_progress', 'completed', 'blocked']),
+      status: z.enum(["not_started", "in_progress", "completed", "blocked"]),
       startedAt: z.string().optional(),
       completedAt: z.string().optional(),
       assignee: z.string().optional(),
       notes: z.string().optional(),
-      artifacts: z.array(z.string()).optional()
+      artifacts: z.array(z.string()).optional(),
     }),
     deployment: z.object({
-      status: z.enum(['not_started', 'in_progress', 'completed', 'blocked']),
+      status: z.enum(["not_started", "in_progress", "completed", "blocked"]),
       startedAt: z.string().optional(),
       completedAt: z.string().optional(),
       assignee: z.string().optional(),
       notes: z.string().optional(),
-      artifacts: z.array(z.string()).optional()
-    })
+      artifacts: z.array(z.string()).optional(),
+    }),
   }),
-  blockers: z.array(z.object({
-    id: z.string(),
-    type: z.enum(['dependency', 'resource', 'technical', 'external']),
-    description: z.string(),
-    severity: z.enum(['low', 'medium', 'high', 'critical']),
-    reportedAt: z.string(),
-    resolvedAt: z.string().optional(),
-    resolution: z.string().optional()
-  })),
+  blockers: z.array(
+    z.object({
+      id: z.string(),
+      type: z.enum(["dependency", "resource", "technical", "external"]),
+      description: z.string(),
+      severity: z.enum(["low", "medium", "high", "critical"]),
+      reportedAt: z.string(),
+      resolvedAt: z.string().optional(),
+      resolution: z.string().optional(),
+    })
+  ),
   progressPercentage: z.number().min(0).max(100),
   estimatedCompletion: z.string(),
-  actualCompletion: z.string().optional()
+  actualCompletion: z.string().optional(),
 });

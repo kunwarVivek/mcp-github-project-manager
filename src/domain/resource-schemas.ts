@@ -9,7 +9,7 @@ export const BaseResourceSchema = z.object({
   updatedAt: z.string().datetime().optional(),
   deletedAt: z.string().datetime().optional(),
   version: z.number().optional(),
-  status: z.nativeEnum(ResourceStatus).optional()
+  status: z.nativeEnum(ResourceStatus).optional(),
 });
 
 // Schema for Project resources
@@ -19,7 +19,7 @@ export const ProjectSchema = BaseResourceSchema.extend({
   description: z.string().optional(),
   repositoryUrl: z.string().url().optional(),
   owner: z.string().optional(),
-  settings: z.record(z.string(), z.any()).optional()
+  settings: z.record(z.string(), z.any()).optional(),
 });
 
 // Schema for Issue resources
@@ -32,7 +32,7 @@ export const IssueSchema = BaseResourceSchema.extend({
   labels: z.array(z.string()).optional(),
   status: z.string().optional(),
   milestoneId: z.string().optional(),
-  url: z.string().url().optional()
+  url: z.string().url().optional(),
 });
 
 // Schema for Milestone resources
@@ -45,7 +45,7 @@ export const MilestoneSchema = BaseResourceSchema.extend({
   dueDate: z.string().datetime().optional(),
   openIssues: z.number().optional(),
   closedIssues: z.number().optional(),
-  url: z.string().url().optional()
+  url: z.string().url().optional(),
 });
 
 // Schema for Sprint resources
@@ -56,7 +56,7 @@ export const SprintSchema = BaseResourceSchema.extend({
   startDate: z.string().datetime().optional(),
   endDate: z.string().datetime().optional(),
   status: z.string().optional(),
-  issues: z.array(z.string()).optional()
+  issues: z.array(z.string()).optional(),
 });
 
 // Schema for Relationship resources
@@ -66,40 +66,40 @@ export const RelationshipSchema = BaseResourceSchema.extend({
   sourceType: z.nativeEnum(ResourceType),
   targetId: z.string().uuid(),
   targetType: z.nativeEnum(ResourceType),
-  relationshipType: z.nativeEnum(RelationshipType)
+  relationshipType: z.nativeEnum(RelationshipType),
 });
 
 // GitHub Projects v2 Field Types (comprehensive)
 export enum GitHubFieldType {
-  TEXT = 'TEXT',
-  NUMBER = 'NUMBER',
-  DATE = 'DATE',
-  SINGLE_SELECT = 'SINGLE_SELECT',
-  ITERATION = 'ITERATION',
-  MILESTONE = 'MILESTONE',
-  PULL_REQUEST = 'PULL_REQUEST',
-  ASSIGNEES = 'ASSIGNEES',
-  LABELS = 'LABELS',
-  LINKED_PULL_REQUESTS = 'LINKED_PULL_REQUESTS',
-  REVIEWERS = 'REVIEWERS',
-  REPOSITORY = 'REPOSITORY',
-  TRACKED_BY = 'TRACKED_BY',
-  TRACKS = 'TRACKS'
+  TEXT = "TEXT",
+  NUMBER = "NUMBER",
+  DATE = "DATE",
+  SINGLE_SELECT = "SINGLE_SELECT",
+  ITERATION = "ITERATION",
+  MILESTONE = "MILESTONE",
+  PULL_REQUEST = "PULL_REQUEST",
+  ASSIGNEES = "ASSIGNEES",
+  LABELS = "LABELS",
+  LINKED_PULL_REQUESTS = "LINKED_PULL_REQUESTS",
+  REVIEWERS = "REVIEWERS",
+  REPOSITORY = "REPOSITORY",
+  TRACKED_BY = "TRACKED_BY",
+  TRACKS = "TRACKS",
 }
 
 // GitHub Pull Request States
 export enum GitHubPRState {
-  OPEN = 'open',
-  CLOSED = 'closed',
-  MERGED = 'merged',
-  DRAFT = 'draft'
+  OPEN = "open",
+  CLOSED = "closed",
+  MERGED = "merged",
+  DRAFT = "draft",
 }
 
 // GitHub Pull Request Review Decision
 export enum GitHubPRReviewDecision {
-  APPROVED = 'APPROVED',
-  CHANGES_REQUESTED = 'CHANGES_REQUESTED',
-  REVIEW_REQUIRED = 'REVIEW_REQUIRED'
+  APPROVED = "APPROVED",
+  CHANGES_REQUESTED = "CHANGES_REQUESTED",
+  REVIEW_REQUIRED = "REVIEW_REQUIRED",
 }
 
 // Complete Pull Request schema matching GitHub PR fields
@@ -123,7 +123,7 @@ export const PullRequestSchema = BaseResourceSchema.extend({
   additions: z.number().int().min(0).optional(),
   deletions: z.number().int().min(0).optional(),
   changedFiles: z.number().int().min(0).optional(),
-  repositoryId: z.string().uuid().optional()
+  repositoryId: z.string().uuid().optional(),
 });
 
 // Field Option schema for single-select fields
@@ -131,19 +131,23 @@ export const FieldOptionSchema = z.object({
   id: z.string(),
   name: z.string().min(1),
   color: z.string().optional(),
-  description: z.string().optional()
+  description: z.string().optional(),
 });
 
 // Iteration configuration schema
 export const IterationConfigSchema = z.object({
-  duration: z.number().int().positive().describe('Duration in days'),
-  startDay: z.number().int().min(0).max(6).describe('Day of week (0=Sunday)'),
-  iterations: z.array(z.object({
-    id: z.string(),
-    title: z.string(),
-    startDate: z.string().datetime(),
-    duration: z.number().int().positive()
-  })).optional()
+  duration: z.number().int().positive().describe("Duration in days"),
+  startDay: z.number().int().min(0).max(6).describe("Day of week (0=Sunday)"),
+  iterations: z
+    .array(
+      z.object({
+        id: z.string(),
+        title: z.string(),
+        startDate: z.string().datetime(),
+        duration: z.number().int().positive(),
+      })
+    )
+    .optional(),
 });
 
 // Field validation rules
@@ -153,8 +157,8 @@ export const FieldValidationSchema = z.object({
   maxValue: z.number().optional(),
   minLength: z.number().int().min(0).optional(),
   maxLength: z.number().int().min(0).optional(),
-  pattern: z.string().optional().describe('Regex pattern for validation'),
-  customValidation: z.string().optional().describe('Custom validation rules')
+  pattern: z.string().optional().describe("Regex pattern for validation"),
+  customValidation: z.string().optional().describe("Custom validation rules"),
 });
 
 // Complete Field schema matching GitHub Projects v2
@@ -162,14 +166,12 @@ export const FieldSchema = BaseResourceSchema.extend({
   type: z.literal(ResourceType.FIELD),
   name: z.string().min(1),
   fieldType: z.nativeEnum(GitHubFieldType),
-  dataType: z.enum(['string', 'number', 'date', 'boolean', 'array', 'object']).optional(),
-  projectId: z.string().uuid().describe('Project this field belongs to'),
+  dataType: z.enum(["string", "number", "date", "boolean", "array", "object"]).optional(),
+  projectId: z.string().uuid().describe("Project this field belongs to"),
 
   // Configuration for different field types
-  options: z.array(FieldOptionSchema).optional()
-    .describe('Options for SINGLE_SELECT fields'),
-  iterationConfig: IterationConfigSchema.optional()
-    .describe('Configuration for ITERATION fields'),
+  options: z.array(FieldOptionSchema).optional().describe("Options for SINGLE_SELECT fields"),
+  iterationConfig: IterationConfigSchema.optional().describe("Configuration for ITERATION fields"),
 
   // Field properties
   isRequired: z.boolean().default(false),
@@ -178,14 +180,12 @@ export const FieldSchema = BaseResourceSchema.extend({
   description: z.string().optional(),
 
   // Metadata
-  position: z.number().int().min(0).optional()
-    .describe('Display position in project'),
+  position: z.number().int().min(0).optional().describe("Display position in project"),
   isVisible: z.boolean().default(true),
   isArchived: z.boolean().default(false),
 
   // GitHub-specific
-  githubFieldId: z.string().optional()
-    .describe('GitHub Projects v2 field ID')
+  githubFieldId: z.string().optional().describe("GitHub Projects v2 field ID"),
 });
 
 // Map of all resource schemas indexed by resource type
@@ -196,7 +196,7 @@ export const resourceSchemas: Record<string, ResourceSchema> = {
   [ResourceType.SPRINT]: SprintSchema,
   [ResourceType.RELATIONSHIP]: RelationshipSchema,
   [ResourceType.PULL_REQUEST]: PullRequestSchema,
-  [ResourceType.FIELD]: FieldSchema
+  [ResourceType.FIELD]: FieldSchema,
 };
 
 // Type for the resource schema map

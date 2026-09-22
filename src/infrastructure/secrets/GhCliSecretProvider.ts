@@ -1,8 +1,8 @@
-import { execFileSync } from 'node:child_process';
-import type { SecretProvider } from './SecretProvider';
+import { execFileSync } from "node:child_process";
+import type { SecretProvider } from "./SecretProvider";
 
 /** Secrets this provider can supply. The `gh` CLI only vends a GitHub token. */
-const SUPPORTED_SECRETS = new Set(['GITHUB_TOKEN']);
+const SUPPORTED_SECRETS = new Set(["GITHUB_TOKEN"]);
 
 /** Hard cap on how long we will wait for the `gh` binary. */
 const GH_TIMEOUT_MS = 5_000;
@@ -42,10 +42,10 @@ export class GhCliSecretProvider implements SecretProvider {
 
 function readGhToken(): string | null {
   try {
-    const output = execFileSync('gh', ['auth', 'token'], {
-      encoding: 'utf8',
+    const output = execFileSync("gh", ["auth", "token"], {
+      encoding: "utf8",
       timeout: GH_TIMEOUT_MS,
-      stdio: ['ignore', 'pipe', 'ignore'],
+      stdio: ["ignore", "pipe", "ignore"],
     });
     const token = output.trim();
     return token.length > 0 ? token : null;

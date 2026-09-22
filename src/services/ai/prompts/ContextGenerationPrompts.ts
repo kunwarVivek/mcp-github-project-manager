@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import { z } from "zod";
 
 /**
  * AI Prompts for Task Context Generation
@@ -41,21 +41,25 @@ Focus on creating actionable business context that connects technical implementa
 Provide specific, actionable context that helps developers understand the business importance of their work.`,
 
   maxTokens: 1500,
-  temperature: 0.3
+  temperature: 0.3,
 };
 
 export const BusinessContextSchema = z.object({
-  businessObjective: z.string().describe('Primary business objective this task supports'),
-  userImpact: z.string().describe('Specific impact on end users'),
-  successMetrics: z.array(z.string()).describe('Measurable success indicators'),
-  businessValue: z.string().describe('Business value provided by this task'),
-  stakeholderImpact: z.array(z.object({
-    stakeholder: z.string(),
-    impact: z.string(),
-    importance: z.enum(['high', 'medium', 'low'])
-  })).describe('Impact on different stakeholders'),
-  riskMitigation: z.array(z.string()).describe('Business risks this task helps mitigate'),
-  priorityJustification: z.string().describe('Why this task has its assigned priority')
+  businessObjective: z.string().describe("Primary business objective this task supports"),
+  userImpact: z.string().describe("Specific impact on end users"),
+  successMetrics: z.array(z.string()).describe("Measurable success indicators"),
+  businessValue: z.string().describe("Business value provided by this task"),
+  stakeholderImpact: z
+    .array(
+      z.object({
+        stakeholder: z.string(),
+        impact: z.string(),
+        importance: z.enum(["high", "medium", "low"]),
+      })
+    )
+    .describe("Impact on different stakeholders"),
+  riskMitigation: z.array(z.string()).describe("Business risks this task helps mitigate"),
+  priorityJustification: z.string().describe("Why this task has its assigned priority"),
 });
 
 // ============================================================================
@@ -97,36 +101,52 @@ Focus on providing technical context that helps developers make informed impleme
 Provide specific technical guidance that helps developers understand implementation constraints and requirements.`,
 
   maxTokens: 1500,
-  temperature: 0.3
+  temperature: 0.3,
 };
 
 export const TechnicalContextSchema = z.object({
-  technicalConstraints: z.array(z.string()).describe('Technical limitations and requirements'),
-  architecturalDecisions: z.array(z.object({
-    decision: z.string(),
-    rationale: z.string(),
-    impact: z.string()
-  })).describe('Relevant architectural decisions'),
-  integrationPoints: z.array(z.object({
-    system: z.string(),
-    type: z.enum(['api', 'database', 'service', 'library', 'external']),
-    description: z.string(),
-    requirements: z.array(z.string())
-  })).describe('System integration requirements'),
-  dataRequirements: z.array(z.object({
-    type: z.enum(['model', 'schema', 'migration', 'query']),
-    name: z.string(),
-    description: z.string(),
-    requirements: z.array(z.string())
-  })).describe('Data-related requirements'),
-  performanceRequirements: z.array(z.string()).describe('Performance constraints and goals'),
-  securityRequirements: z.array(z.string()).describe('Security constraints and requirements'),
-  technologyStack: z.array(z.object({
-    category: z.enum(['framework', 'library', 'tool', 'service']),
-    name: z.string(),
-    purpose: z.string(),
-    required: z.boolean()
-  })).describe('Recommended technology stack')
+  technicalConstraints: z.array(z.string()).describe("Technical limitations and requirements"),
+  architecturalDecisions: z
+    .array(
+      z.object({
+        decision: z.string(),
+        rationale: z.string(),
+        impact: z.string(),
+      })
+    )
+    .describe("Relevant architectural decisions"),
+  integrationPoints: z
+    .array(
+      z.object({
+        system: z.string(),
+        type: z.enum(["api", "database", "service", "library", "external"]),
+        description: z.string(),
+        requirements: z.array(z.string()),
+      })
+    )
+    .describe("System integration requirements"),
+  dataRequirements: z
+    .array(
+      z.object({
+        type: z.enum(["model", "schema", "migration", "query"]),
+        name: z.string(),
+        description: z.string(),
+        requirements: z.array(z.string()),
+      })
+    )
+    .describe("Data-related requirements"),
+  performanceRequirements: z.array(z.string()).describe("Performance constraints and goals"),
+  securityRequirements: z.array(z.string()).describe("Security constraints and requirements"),
+  technologyStack: z
+    .array(
+      z.object({
+        category: z.enum(["framework", "library", "tool", "service"]),
+        name: z.string(),
+        purpose: z.string(),
+        required: z.boolean(),
+      })
+    )
+    .describe("Recommended technology stack"),
 });
 
 // ============================================================================
@@ -173,37 +193,51 @@ Focus on actionable guidance that helps developers implement tasks efficiently a
 Provide practical, actionable guidance that a developer can follow step-by-step.`,
 
   maxTokens: 2000,
-  temperature: 0.4
+  temperature: 0.4,
 };
 
 export const ImplementationGuidanceSchema = z.object({
-  recommendedApproach: z.string().describe('Overall implementation strategy'),
-  implementationSteps: z.array(z.object({
-    step: z.number(),
-    title: z.string(),
-    description: z.string(),
-    estimatedTime: z.string(),
-    dependencies: z.array(z.string())
-  })).describe('Step-by-step implementation guide'),
-  technicalConsiderations: z.array(z.string()).describe('Important technical points'),
-  bestPractices: z.array(z.object({
-    category: z.enum(['coding', 'architecture', 'security', 'performance', 'testing']),
-    practice: z.string(),
-    rationale: z.string()
-  })).describe('Recommended best practices'),
-  commonPitfalls: z.array(z.object({
-    pitfall: z.string(),
-    consequence: z.string(),
-    mitigation: z.string()
-  })).describe('Common mistakes and how to avoid them'),
-  testingStrategy: z.object({
-    approach: z.string(),
-    testTypes: z.array(z.string()),
-    coverage: z.string(),
-    tools: z.array(z.string())
-  }).describe('Testing approach and strategy'),
-  qualityAssurance: z.array(z.string()).describe('Quality checks and validations'),
-  performanceOptimization: z.array(z.string()).describe('Performance considerations')
+  recommendedApproach: z.string().describe("Overall implementation strategy"),
+  implementationSteps: z
+    .array(
+      z.object({
+        step: z.number(),
+        title: z.string(),
+        description: z.string(),
+        estimatedTime: z.string(),
+        dependencies: z.array(z.string()),
+      })
+    )
+    .describe("Step-by-step implementation guide"),
+  technicalConsiderations: z.array(z.string()).describe("Important technical points"),
+  bestPractices: z
+    .array(
+      z.object({
+        category: z.enum(["coding", "architecture", "security", "performance", "testing"]),
+        practice: z.string(),
+        rationale: z.string(),
+      })
+    )
+    .describe("Recommended best practices"),
+  commonPitfalls: z
+    .array(
+      z.object({
+        pitfall: z.string(),
+        consequence: z.string(),
+        mitigation: z.string(),
+      })
+    )
+    .describe("Common mistakes and how to avoid them"),
+  testingStrategy: z
+    .object({
+      approach: z.string(),
+      testTypes: z.array(z.string()),
+      coverage: z.string(),
+      tools: z.array(z.string()),
+    })
+    .describe("Testing approach and strategy"),
+  qualityAssurance: z.array(z.string()).describe("Quality checks and validations"),
+  performanceOptimization: z.array(z.string()).describe("Performance considerations"),
 });
 
 // ============================================================================
@@ -241,44 +275,64 @@ Focus on creating references that provide immediate value and reduce context-swi
 Ensure all references are directly relevant to the task and include clear explanations of why they matter.`,
 
   maxTokens: 1500,
-  temperature: 0.3
+  temperature: 0.3,
 };
 
 export const ContextualReferencesSchema = z.object({
-  prdSections: z.array(z.object({
-    section: z.string(),
-    content: z.string(),
-    relevance: z.string(),
-    importance: z.enum(['critical', 'high', 'medium', 'low'])
-  })).describe('Relevant PRD sections with context'),
-  relatedFeatures: z.array(z.object({
-    featureId: z.string(),
-    title: z.string(),
-    relationship: z.enum(['implements', 'extends', 'integrates_with', 'depends_on', 'enables']),
-    context: z.string()
-  })).describe('Related features and their relationships'),
-  technicalSpecs: z.array(z.object({
-    type: z.enum(['api_spec', 'data_model', 'architecture_doc', 'design_system', 'protocol']),
-    title: z.string(),
-    description: z.string(),
-    relevantSections: z.array(z.string()),
-    url: z.string().optional()
-  })).describe('Technical specification references'),
-  codeExamples: z.array(z.object({
-    title: z.string(),
-    description: z.string(),
-    language: z.string(),
-    snippet: z.string(),
-    explanation: z.string(),
-    source: z.string()
-  })).describe('Relevant code examples'),
-  externalReferences: z.array(z.object({
-    type: z.enum(['documentation', 'tutorial', 'best_practice', 'tool', 'library']),
-    title: z.string(),
-    description: z.string(),
-    url: z.string(),
-    relevance: z.string()
-  })).describe('External documentation and resources')
+  prdSections: z
+    .array(
+      z.object({
+        section: z.string(),
+        content: z.string(),
+        relevance: z.string(),
+        importance: z.enum(["critical", "high", "medium", "low"]),
+      })
+    )
+    .describe("Relevant PRD sections with context"),
+  relatedFeatures: z
+    .array(
+      z.object({
+        featureId: z.string(),
+        title: z.string(),
+        relationship: z.enum(["implements", "extends", "integrates_with", "depends_on", "enables"]),
+        context: z.string(),
+      })
+    )
+    .describe("Related features and their relationships"),
+  technicalSpecs: z
+    .array(
+      z.object({
+        type: z.enum(["api_spec", "data_model", "architecture_doc", "design_system", "protocol"]),
+        title: z.string(),
+        description: z.string(),
+        relevantSections: z.array(z.string()),
+        url: z.string().optional(),
+      })
+    )
+    .describe("Technical specification references"),
+  codeExamples: z
+    .array(
+      z.object({
+        title: z.string(),
+        description: z.string(),
+        language: z.string(),
+        snippet: z.string(),
+        explanation: z.string(),
+        source: z.string(),
+      })
+    )
+    .describe("Relevant code examples"),
+  externalReferences: z
+    .array(
+      z.object({
+        type: z.enum(["documentation", "tutorial", "best_practice", "tool", "library"]),
+        title: z.string(),
+        description: z.string(),
+        url: z.string(),
+        relevance: z.string(),
+      })
+    )
+    .describe("External documentation and resources"),
 });
 
 // ============================================================================
@@ -325,20 +379,38 @@ For each criterion, specify:
 - Acceptance threshold or success condition`,
 
   maxTokens: 1500,
-  temperature: 0.3
+  temperature: 0.3,
 };
 
 export const EnhancedAcceptanceCriteriaSchema = z.object({
-  criteria: z.array(z.object({
-    id: z.string(),
-    category: z.enum(['functional', 'technical', 'quality', 'integration', 'performance', 'security']),
-    description: z.string(),
-    verificationMethod: z.enum(['unit_test', 'integration_test', 'manual_test', 'code_review', 'demo', 'automated_test']),
-    verificationDetails: z.string(),
-    priority: z.enum(['must_have', 'should_have', 'nice_to_have']),
-    acceptanceThreshold: z.string(),
-    testingNotes: z.string().optional()
-  })).describe('Enhanced acceptance criteria with verification details')
+  criteria: z
+    .array(
+      z.object({
+        id: z.string(),
+        category: z.enum([
+          "functional",
+          "technical",
+          "quality",
+          "integration",
+          "performance",
+          "security",
+        ]),
+        description: z.string(),
+        verificationMethod: z.enum([
+          "unit_test",
+          "integration_test",
+          "manual_test",
+          "code_review",
+          "demo",
+          "automated_test",
+        ]),
+        verificationDetails: z.string(),
+        priority: z.enum(["must_have", "should_have", "nice_to_have"]),
+        acceptanceThreshold: z.string(),
+        testingNotes: z.string().optional(),
+      })
+    )
+    .describe("Enhanced acceptance criteria with verification details"),
 });
 
 // ============================================================================
@@ -351,36 +423,36 @@ export const CONTEXT_GENERATION_CONFIGS = {
     userPrompt: BUSINESS_CONTEXT_PROMPT.userPrompt,
     maxTokens: BUSINESS_CONTEXT_PROMPT.maxTokens,
     temperature: BUSINESS_CONTEXT_PROMPT.temperature,
-    schema: BusinessContextSchema
+    schema: BusinessContextSchema,
   },
   technicalContext: {
     systemPrompt: TECHNICAL_CONTEXT_PROMPT.systemPrompt,
     userPrompt: TECHNICAL_CONTEXT_PROMPT.userPrompt,
     maxTokens: TECHNICAL_CONTEXT_PROMPT.maxTokens,
     temperature: TECHNICAL_CONTEXT_PROMPT.temperature,
-    schema: TechnicalContextSchema
+    schema: TechnicalContextSchema,
   },
   implementationGuidance: {
     systemPrompt: IMPLEMENTATION_GUIDANCE_PROMPT.systemPrompt,
     userPrompt: IMPLEMENTATION_GUIDANCE_PROMPT.userPrompt,
     maxTokens: IMPLEMENTATION_GUIDANCE_PROMPT.maxTokens,
     temperature: IMPLEMENTATION_GUIDANCE_PROMPT.temperature,
-    schema: ImplementationGuidanceSchema
+    schema: ImplementationGuidanceSchema,
   },
   contextualReferences: {
     systemPrompt: CONTEXTUAL_REFERENCES_PROMPT.systemPrompt,
     userPrompt: CONTEXTUAL_REFERENCES_PROMPT.userPrompt,
     maxTokens: CONTEXTUAL_REFERENCES_PROMPT.maxTokens,
     temperature: CONTEXTUAL_REFERENCES_PROMPT.temperature,
-    schema: ContextualReferencesSchema
+    schema: ContextualReferencesSchema,
   },
   enhancedAcceptanceCriteria: {
     systemPrompt: ENHANCED_ACCEPTANCE_CRITERIA_PROMPT.systemPrompt,
     userPrompt: ENHANCED_ACCEPTANCE_CRITERIA_PROMPT.userPrompt,
     maxTokens: ENHANCED_ACCEPTANCE_CRITERIA_PROMPT.maxTokens,
     temperature: ENHANCED_ACCEPTANCE_CRITERIA_PROMPT.temperature,
-    schema: EnhancedAcceptanceCriteriaSchema
-  }
+    schema: EnhancedAcceptanceCriteriaSchema,
+  },
 };
 
 /**

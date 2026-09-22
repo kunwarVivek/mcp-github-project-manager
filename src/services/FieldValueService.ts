@@ -2,19 +2,25 @@ import type { GitHubRepositoryFactory } from "../infrastructure/github/GitHubRep
 import { ResourceNotFoundError } from "../domain/resource-types";
 import { ResourceType } from "../domain/resource-types";
 import { ValidationError } from "../domain/errors";
-import { safeCall } from './utils/safeCall';
+import { safeCall } from "./utils/safeCall";
 
 /** Strategy for building a field-type-specific mutation and variables. */
 interface FieldTypeStrategy {
   buildMutation(): string;
-  buildVariables(base: { projectId: string; itemId: string; fieldId: string }, rawValue: unknown): Record<string, unknown>;
+  buildVariables(
+    base: { projectId: string; itemId: string; fieldId: string },
+    rawValue: unknown
+  ): Record<string, unknown>;
 }
 
 const ITEM_FRAGMENT = `projectV2Item { id }`;
 
-function makeStrategy(dataType: string, options?: Array<{ id: string; name: string }>): FieldTypeStrategy {
+function makeStrategy(
+  dataType: string,
+  options?: Array<{ id: string; name: string }>
+): FieldTypeStrategy {
   switch (dataType) {
-    case 'TEXT':
+    case "TEXT":
       return {
         buildMutation: () =>
           `mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $value: String!) {
@@ -22,7 +28,7 @@ function makeStrategy(dataType: string, options?: Array<{ id: string; name: stri
           }`,
         buildVariables: (base, raw) => ({ ...base, value: String(raw) }),
       };
-    case 'NUMBER':
+    case "NUMBER":
       return {
         buildMutation: () =>
           `mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $value: Float!) {
@@ -30,7 +36,7 @@ function makeStrategy(dataType: string, options?: Array<{ id: string; name: stri
           }`,
         buildVariables: (base, raw) => ({ ...base, value: Number(raw) }),
       };
-    case 'DATE':
+    case "DATE":
       return {
         buildMutation: () =>
           `mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $value: Date!) {
@@ -38,7 +44,7 @@ function makeStrategy(dataType: string, options?: Array<{ id: string; name: stri
           }`,
         buildVariables: (base, raw) => ({ ...base, value: String(raw) }),
       };
-    case 'SINGLE_SELECT':
+    case "SINGLE_SELECT":
       return {
         buildMutation: () =>
           `mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $value: String!) {
@@ -47,13 +53,13 @@ function makeStrategy(dataType: string, options?: Array<{ id: string; name: stri
         buildVariables: (base, raw) => {
           let optionId = String(raw);
           if (options) {
-            const match = options.find(o => o.name === raw || o.id === raw);
+            const match = options.find((o) => o.name === raw || o.id === raw);
             if (match) optionId = match.id;
           }
           return { ...base, value: optionId };
         },
       };
-    case 'ITERATION':
+    case "ITERATION":
       return {
         buildMutation: () =>
           `mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $value: String!) {
@@ -123,7 +129,7 @@ export class FieldValueService {
 
       const fieldResponse = await this.factory.graphql<FieldQueryResponse>(fieldQuery, {
         projectId: data.projectId,
-        fieldId: data.fieldId
+        fieldId: data.fieldId,
       });
 
       if (!fieldResponse.node?.field) {
@@ -184,38 +190,42 @@ export class FieldValueService {
         };
       }
 
-      const response = await this.factory.graphql<FieldValueResponse>(query, { itemId: data.itemId });
+      const response = await this.factory.graphql<FieldValueResponse>(query, {
+        itemId: data.itemId,
+      });
 
       if (!response.node?.fieldValues?.nodes) {
         throw new ResourceNotFoundError(ResourceType.FIELD, data.itemId);
       }
 
-      const fieldValue = response.node.fieldValues.nodes.find(fv => fv.field?.id === data.fieldId);
+      const fieldValue = response.node.fieldValues.nodes.find(
+        (fv) => fv.field?.id === data.fieldId
+      );
       if (!fieldValue) {
-        return { fieldId: data.fieldId, fieldName: 'unknown', value: null, type: 'unknown' };
+        return { fieldId: data.fieldId, fieldName: "unknown", value: null, type: "unknown" };
       }
 
       let value: unknown = null;
-      let type = 'unknown';
+      let type = "unknown";
 
-      if ('text' in fieldValue && fieldValue.text !== undefined) {
+      if ("text" in fieldValue && fieldValue.text !== undefined) {
         value = fieldValue.text;
-        type = 'TEXT';
-      } else if ('number' in fieldValue && fieldValue.number !== undefined) {
+        type = "TEXT";
+      } else if ("number" in fieldValue && fieldValue.number !== undefined) {
         value = fieldValue.number;
-        type = 'NUMBER';
-      } else if ('date' in fieldValue && fieldValue.date !== undefined) {
+        type = "NUMBER";
+      } else if ("date" in fieldValue && fieldValue.date !== undefined) {
         value = fieldValue.date;
-        type = 'DATE';
-      } else if ('optionId' in fieldValue) {
+        type = "DATE";
+      } else if ("optionId" in fieldValue) {
         value = { optionId: fieldValue.optionId, name: fieldValue.name };
-        type = 'SINGLE_SELECT';
-      } else if ('iterationId' in fieldValue) {
+        type = "SINGLE_SELECT";
+      } else if ("iterationId" in fieldValue) {
         value = { iterationId: fieldValue.iterationId, title: fieldValue.title };
-        type = 'ITERATION';
+        type = "ITERATION";
       }
 
-      return { fieldId: data.fieldId, fieldName: fieldValue.field?.name || 'unknown', value, type };
+      return { fieldId: data.fieldId, fieldName: fieldValue.field?.name || "unknown", value, type };
     });
   }
 
@@ -236,7 +246,7 @@ export class FieldValueService {
       await this.factory.graphql(mutation, {
         projectId: data.projectId,
         itemId: data.itemId,
-        fieldId: data.fieldId
+        fieldId: data.fieldId,
       });
 
       return { success: true, message: `Field ${data.fieldId} cleared successfully` };

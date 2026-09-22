@@ -1,4 +1,4 @@
-import { createHash } from 'node:crypto';
+import { createHash } from "node:crypto";
 
 interface CachedResponse {
   response: unknown;
@@ -22,7 +22,10 @@ export class AIResponseCache {
 
   /** Generate a cache key from the request content. */
   private hashKey(content: string, model?: string): string {
-    return createHash('sha256').update(`${model ?? ''}:${content}`).digest('hex').substring(0, 16);
+    return createHash("sha256")
+      .update(`${model ?? ""}:${content}`)
+      .digest("hex")
+      .substring(0, 16);
   }
 
   /** Get cached response if available and not expired. */
@@ -49,8 +52,12 @@ export class AIResponseCache {
   }
 
   /** Clear all cached responses. */
-  clear(): void { this.cache.clear(); }
+  clear(): void {
+    this.cache.clear();
+  }
 
   /** Current cache size. */
-  get size(): number { return this.cache.size; }
+  get size(): number {
+    return this.cache.size;
+  }
 }

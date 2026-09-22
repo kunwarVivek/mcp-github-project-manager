@@ -1,9 +1,13 @@
-import { vi, beforeAll, afterAll, beforeEach, expect } from 'vitest';
+import { vi, beforeAll, afterAll, beforeEach, expect } from "vitest";
 import nock from "nock";
 
 // Check if we should run real E2E tests with actual APIs
-const isRealE2ETest = process.env.E2E_REAL_API === 'true';
-const hasGitHubCredentials = !!(process.env.GITHUB_TOKEN && process.env.GITHUB_OWNER && process.env.GITHUB_REPO);
+const isRealE2ETest = process.env.E2E_REAL_API === "true";
+const hasGitHubCredentials = !!(
+  process.env.GITHUB_TOKEN &&
+  process.env.GITHUB_OWNER &&
+  process.env.GITHUB_REPO
+);
 const hasAICredentials = !!(process.env.ANTHROPIC_API_KEY || process.env.OPENAI_API_KEY);
 
 beforeAll(() => {
@@ -13,10 +17,14 @@ beforeAll(() => {
   } else {
     // For real E2E tests, ensure we have credentials
     if (!hasGitHubCredentials) {
-      console.warn('⚠️  Real E2E tests require GITHUB_TOKEN, GITHUB_OWNER, and GITHUB_REPO environment variables');
+      console.warn(
+        "⚠️  Real E2E tests require GITHUB_TOKEN, GITHUB_OWNER, and GITHUB_REPO environment variables"
+      );
     }
     if (!hasAICredentials) {
-      console.warn('⚠️  AI tool tests require at least one AI API key (ANTHROPIC_API_KEY, OPENAI_API_KEY, etc.)');
+      console.warn(
+        "⚠️  AI tool tests require at least one AI API key (ANTHROPIC_API_KEY, OPENAI_API_KEY, etc.)"
+      );
     }
   }
 });
@@ -27,7 +35,6 @@ afterAll(() => {
     nock.enableNetConnect();
   }
 });
-
 
 /**
  * True when the currently-running file is an E2E suite.
@@ -81,7 +88,7 @@ afterEach(() => {
   if (!isRealE2ETest) {
     // Ensure all nock interceptors were used in mock tests
     if (!nock.isDone()) {
-      console.warn('⚠️  Not all nock interceptors were used:', nock.pendingMocks());
+      console.warn("⚠️  Not all nock interceptors were used:", nock.pendingMocks());
       nock.cleanAll(); // Clean up unused mocks
     }
   }
@@ -96,20 +103,20 @@ export const testConfig = {
   isRealE2ETest,
   hasGitHubCredentials,
   hasAICredentials,
-  skipIfNoCredentials: (testType: 'github' | 'ai' | 'both') => {
+  skipIfNoCredentials: (testType: "github" | "ai" | "both") => {
     if (!isRealE2ETest) return false; // Mock tests always run
 
     switch (testType) {
-      case 'github':
+      case "github":
         return !hasGitHubCredentials;
-      case 'ai':
+      case "ai":
         return !hasAICredentials;
-      case 'both':
+      case "both":
         return !hasGitHubCredentials || !hasAICredentials;
       default:
         return false;
     }
-  }
+  },
 };
 
 // Mock data for tests
@@ -174,8 +181,12 @@ export function mockGitHubAPI() {
       "access-control-allow-credentials": "true",
     })
     .intercept(/.*/, "OPTIONS")
-    .reply(200, {}, {
-      "access-control-allow-headers": "Authorization, Content-Type",
-      "access-control-allow-methods": "GET, POST, PATCH, PUT, DELETE",
-    });
+    .reply(
+      200,
+      {},
+      {
+        "access-control-allow-headers": "Authorization, Content-Type",
+        "access-control-allow-methods": "GET, POST, PATCH, PUT, DELETE",
+      }
+    );
 }

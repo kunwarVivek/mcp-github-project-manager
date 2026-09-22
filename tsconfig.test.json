@@ -3,9 +3,5 @@
   "compilerOptions": {
     "types": ["node", "vitest/globals"]
   },
-  "include": [
-    "src/**/*",
-    "tests/**/*",
-    "src/__tests__/**/*"
-  ]
+  "include": ["src/**/*", "tests/**/*", "src/__tests__/**/*"]
 }

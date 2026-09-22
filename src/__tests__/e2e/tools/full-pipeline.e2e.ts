@@ -25,15 +25,15 @@
  *   npm run test:pipeline
  */
 
-import { MCPToolTestUtils } from '../utils/MCPToolTestUtils';
+import { MCPToolTestUtils } from "../utils/MCPToolTestUtils";
 
 const hasRealCredentials = (): boolean => {
   const token = process.env.GITHUB_TOKEN;
   const owner = process.env.GITHUB_OWNER;
   const repo = process.env.GITHUB_REPO;
-  if (!token || token === 'test-token' || token === '') return false;
-  if (!owner || owner === 'test-owner') return false;
-  if (!repo || repo === 'test-repo') return false;
+  if (!token || token === "test-token" || token === "") return false;
+  if (!owner || owner === "test-owner") return false;
+  if (!repo || repo === "test-repo") return false;
   return true;
 };
 
@@ -46,33 +46,37 @@ const hasAICredentials = (): boolean => {
 };
 
 function data(response: any): any {
-  if (!response || typeof response !== 'object') return response;
+  if (!response || typeof response !== "object") return response;
   if (response.structuredContent) return response.structuredContent;
   if (Array.isArray(response.content) && response.content[0]?.text) {
-    try { return JSON.parse(response.content[0].text); } catch { return response.content[0].text; }
+    try {
+      return JSON.parse(response.content[0].text);
+    } catch {
+      return response.content[0].text;
+    }
   }
   return response;
 }
 
-describe('Full Pipeline E2E: Prompt → PRD → Tasks → Issues → Agent → PM', () => {
+describe("Full Pipeline E2E: Prompt → PRD → Tasks → Issues → Agent → PM", () => {
   let utils: MCPToolTestUtils | undefined;
   const runId = `${Date.now().toString(36).slice(-6)}`;
 
   // Pipeline state
-  let projectId = '';
-  let prdContent = '';
+  let projectId = "";
+  let prdContent = "";
   let tasks: any[] = [];
   let materializedIssues: any[] = [];
   let materializedResult: any = {};
-  let engineerAgentId = '';
-  let reviewerAgentId = '';
-  let pmAgentId = '';
+  let engineerAgentId = "";
+  let reviewerAgentId = "";
+  let pmAgentId = "";
   let assignedIssueNumber = 0;
   const agentIds: string[] = [];
 
   beforeAll(async () => {
     if (!hasRealCredentials() || !hasAICredentials()) {
-      console.log('Skipping Full Pipeline E2E — missing GitHub or AI credentials');
+      console.log("Skipping Full Pipeline E2E — missing GitHub or AI credentials");
       return;
     }
     utils = new MCPToolTestUtils();
@@ -83,7 +87,9 @@ describe('Full Pipeline E2E: Prompt → PRD → Tasks → Issues → Agent → P
     if (utils) {
       // Cleanup agents
       for (const id of agentIds) {
-        try { await utils.callTool('agent_manage', { action: 'deregister', agentId: id }); } catch {}
+        try {
+          await utils.callTool("agent_manage", { action: "deregister", agentId: id });
+        } catch {}
       }
       await utils.stopServer();
     }
@@ -93,43 +99,44 @@ describe('Full Pipeline E2E: Prompt → PRD → Tasks → Issues → Agent → P
   // Stage 1: Project Setup
   // ═══════════════════════════════════════════════════════════════════════════
 
-  it('Stage 1: Create project and setup agent fields', async () => {
+  it("Stage 1: Create project and setup agent fields", async () => {
     if (!utils) return;
 
-    const project = await utils.callTool('manage_project', {
-      action: 'create',
+    const project = await utils.callTool("manage_project", {
+      action: "create",
       title: `Pipeline E2E ${runId}`,
-      shortDescription: 'Full pipeline end-to-end test',
-      visibility: 'private',
+      shortDescription: "Full pipeline end-to-end test",
+      visibility: "private",
     });
     expect(project.id).toBeDefined();
     projectId = project.id;
 
     // Setup agent fields so checkout can find and claim issues
-    await utils.callTool('agent_manage', { action: 'setup_fields', projectId });
+    await utils.callTool("agent_manage", { action: "setup_fields", projectId });
   }, 30000);
 
   // ═══════════════════════════════════════════════════════════════════════════
   // Stage 2: AI — Generate PRD from project idea
   // ═══════════════════════════════════════════════════════════════════════════
 
-  it('Stage 2: Generate PRD from project idea (AI)', async () => {
+  it("Stage 2: Generate PRD from project idea (AI)", async () => {
     if (!utils || !projectId) return;
 
-    const result = await utils.callTool('ai_generate', {
-      action: 'generate_prd',
-      projectIdea: 'A simple command-line todo list application with file persistence',
+    const result = await utils.callTool("ai_generate", {
+      action: "generate_prd",
+      projectIdea: "A simple command-line todo list application with file persistence",
       projectName: `TodoCLI-${runId}`,
-      targetUsers: ['developers'],
-      timeline: '2 weeks',
-      complexity: 'low',
-      author: 'pipeline-e2e',
+      targetUsers: ["developers"],
+      timeline: "2 weeks",
+      complexity: "low",
+      author: "pipeline-e2e",
     });
 
     // PRD may come as string or object with content
-    prdContent = typeof result === 'string'
-      ? result
-      : (result?.content || result?.prd || JSON.stringify(result));
+    prdContent =
+      typeof result === "string"
+        ? result
+        : result?.content || result?.prd || JSON.stringify(result);
 
     expect(prdContent.length).toBeGreaterThan(100);
   }, 60000);
@@ -138,11 +145,11 @@ describe('Full Pipeline E2E: Prompt → PRD → Tasks → Issues → Agent → P
   // Stage 3: AI — Parse PRD into tasks
   // ═══════════════════════════════════════════════════════════════════════════
 
-  it('Stage 3: Parse PRD into tasks with dependencies (AI)', async () => {
+  it("Stage 3: Parse PRD into tasks with dependencies (AI)", async () => {
     if (!utils || !prdContent) return;
 
-    const result = await utils.callTool('ai_generate', {
-      action: 'parse_prd',
+    const result = await utils.callTool("ai_generate", {
+      action: "parse_prd",
       prdContent,
       maxTasks: 4,
       includeSubtasks: false,
@@ -163,11 +170,11 @@ describe('Full Pipeline E2E: Prompt → PRD → Tasks → Issues → Agent → P
   // Stage 4: Materialize tasks as GitHub issues
   // ═══════════════════════════════════════════════════════════════════════════
 
-  it('Stage 4: Materialize tasks → milestones, sprints, issues', async () => {
+  it("Stage 4: Materialize tasks → milestones, sprints, issues", async () => {
     if (!utils || !projectId || tasks.length === 0) return;
 
-    const result = await utils.callTool('ai_generate', {
-      action: 'materialize_tasks',
+    const result = await utils.callTool("ai_generate", {
+      action: "materialize_tasks",
       projectId,
       labelPrefix: `pipeline-${runId}`,
       prdContent,
@@ -193,37 +200,37 @@ describe('Full Pipeline E2E: Prompt → PRD → Tasks → Issues → Agent → P
   // Stage 5: Register all agents (engineer, reviewer, PM)
   // ═══════════════════════════════════════════════════════════════════════════
 
-  it('Stage 5: Register engineer, reviewer, and PM agents', async () => {
+  it("Stage 5: Register engineer, reviewer, and PM agents", async () => {
     if (!utils || materializedIssues.length === 0) return;
 
-    const engineer = await utils.callTool('agent_work', {
-      action: 'register',
+    const engineer = await utils.callTool("agent_work", {
+      action: "register",
       name: `engineer-${runId}`,
-      role: 'engineer',
-      runtime: 'claude-code',
-      capabilities: ['typescript', 'testing'],
+      role: "engineer",
+      runtime: "claude-code",
+      capabilities: ["typescript", "testing"],
     });
     expect(engineer.id).toBeDefined();
     engineerAgentId = engineer.id;
     agentIds.push(engineer.id);
 
-    const reviewer = await utils.callTool('agent_work', {
-      action: 'register',
+    const reviewer = await utils.callTool("agent_work", {
+      action: "register",
       name: `reviewer-${runId}`,
-      role: 'reviewer',
-      runtime: 'claude-code',
-      capabilities: ['code-review'],
+      role: "reviewer",
+      runtime: "claude-code",
+      capabilities: ["code-review"],
     });
     expect(reviewer.id).toBeDefined();
     reviewerAgentId = reviewer.id;
     agentIds.push(reviewer.id);
 
-    const pm = await utils.callTool('agent_work', {
-      action: 'register',
+    const pm = await utils.callTool("agent_work", {
+      action: "register",
       name: `pm-${runId}`,
-      role: 'pm',
-      runtime: 'claude-code',
-      capabilities: ['coordination', 'planning'],
+      role: "pm",
+      runtime: "claude-code",
+      capabilities: ["coordination", "planning"],
     });
     expect(pm.id).toBeDefined();
     pmAgentId = pm.id;
@@ -234,13 +241,13 @@ describe('Full Pipeline E2E: Prompt → PRD → Tasks → Issues → Agent → P
   // Stage 6: PM assigns a specific task to engineer (not self-service checkout)
   // ═══════════════════════════════════════════════════════════════════════════
 
-  it('Stage 6: PM assigns a specific task to engineer via assign_task', async () => {
+  it("Stage 6: PM assigns a specific task to engineer via assign_task", async () => {
     if (!utils || !engineerAgentId || !pmAgentId || materializedIssues.length === 0) return;
 
     assignedIssueNumber = materializedIssues[0].number;
 
-    const assignment = await utils.callTool('agent_manage', {
-      action: 'assign_task',
+    const assignment = await utils.callTool("agent_manage", {
+      action: "assign_task",
       agentId: engineerAgentId,
       projectId,
       issueNumber: assignedIssueNumber,
@@ -254,31 +261,31 @@ describe('Full Pipeline E2E: Prompt → PRD → Tasks → Issues → Agent → P
   // Stage 7: Engineer works — heartbeat + submit work product
   // ═══════════════════════════════════════════════════════════════════════════
 
-  it('Stage 7: Engineer heartbeats and submits work product', async () => {
+  it("Stage 7: Engineer heartbeats and submits work product", async () => {
     if (!utils || !engineerAgentId || !assignedIssueNumber) return;
 
     // Heartbeat
-    const heartbeat = await utils.callTool('agent_work', {
-      action: 'heartbeat',
+    const heartbeat = await utils.callTool("agent_work", {
+      action: "heartbeat",
       agentId: engineerAgentId,
-      status: 'working',
+      status: "working",
       progress: 80,
-      progressSummary: 'Implementation complete, writing tests',
+      progressSummary: "Implementation complete, writing tests",
     });
     expect(heartbeat.success).toBe(true);
 
     // Submit work product
-    const wp = await utils.callTool('agent_manage', {
-      action: 'submit_work_product',
+    const wp = await utils.callTool("agent_manage", {
+      action: "submit_work_product",
       agentId: engineerAgentId,
       taskId: String(assignedIssueNumber),
       issueNumber: assignedIssueNumber,
       branch: `eng-${runId}/task`,
-      filesChanged: ['src/todo.ts', 'src/todo.test.ts'],
+      filesChanged: ["src/todo.ts", "src/todo.test.ts"],
       testsPassed: 5,
       testsFailed: 0,
       testsTotal: 5,
-      summary: 'Implemented task with full test coverage',
+      summary: "Implemented task with full test coverage",
     });
     expect(wp.id).toBeDefined();
   }, 30000);
@@ -287,22 +294,22 @@ describe('Full Pipeline E2E: Prompt → PRD → Tasks → Issues → Agent → P
   // Stage 8: Submit for review and approve
   // ═══════════════════════════════════════════════════════════════════════════
 
-  it('Stage 8: Submit for review and reviewer approves', async () => {
+  it("Stage 8: Submit for review and reviewer approves", async () => {
     if (!utils || !engineerAgentId || !reviewerAgentId || !assignedIssueNumber) return;
 
-    const submitted = await utils.callTool('agent_work', {
-      action: 'submit_for_review',
+    const submitted = await utils.callTool("agent_work", {
+      action: "submit_for_review",
       agentId: engineerAgentId,
       taskId: String(assignedIssueNumber),
-      summary: 'Ready for review — all tests passing',
+      summary: "Ready for review — all tests passing",
     });
     expect(submitted.success).toBe(true);
 
-    const approved = await utils.callTool('agent_work', {
-      action: 'approve_task',
+    const approved = await utils.callTool("agent_work", {
+      action: "approve_task",
       reviewerId: reviewerAgentId,
       taskId: String(assignedIssueNumber),
-      summary: 'LGTM — clean implementation',
+      summary: "LGTM — clean implementation",
     });
     expect(approved.success).toBe(true);
   }, 30000);
@@ -311,11 +318,11 @@ describe('Full Pipeline E2E: Prompt → PRD → Tasks → Issues → Agent → P
   // Stage 9: PM verifies swarm status
   // ═══════════════════════════════════════════════════════════════════════════
 
-  it('Stage 9: PM checks swarm status after delivery', async () => {
+  it("Stage 9: PM checks swarm status after delivery", async () => {
     if (!utils || !pmAgentId) return;
 
-    const status = await utils.callTool('agent_manage', {
-      action: 'get_swarm_status',
+    const status = await utils.callTool("agent_manage", {
+      action: "get_swarm_status",
     });
 
     expect(status.totalAgents).toBeGreaterThanOrEqual(3);
@@ -331,7 +338,7 @@ describe('Full Pipeline E2E: Prompt → PRD → Tasks → Issues → Agent → P
   // Stage 10: Pipeline summary
   // ═══════════════════════════════════════════════════════════════════════════
 
-  it('Stage 10: Verify complete pipeline executed', async () => {
+  it("Stage 10: Verify complete pipeline executed", async () => {
     if (!utils) return;
 
     const summary = {

@@ -21,17 +21,17 @@
  * sprint.velocity; // completed issues per day
  * ```
  */
-import { ResourceStatus } from '../resource-types';
-import type { Sprint, CreateSprint, IssueId } from '../types';
+import { ResourceStatus } from "../resource-types";
+import type { Sprint, CreateSprint, IssueId } from "../types";
 
 /**
  * Sprint states
  */
 export enum SprintState {
-  PLANNING = 'planned',
-  ACTIVE = 'active',
-  COMPLETED = 'completed',
-  CANCELLED = 'cancelled',
+  PLANNING = "planned",
+  ACTIVE = "active",
+  COMPLETED = "completed",
+  CANCELLED = "cancelled",
 }
 
 /**
@@ -70,10 +70,7 @@ export class SprintEntity implements Sprint {
   // Internal config
   private readonly config: SprintEntityConfig;
 
-  private constructor(
-    data: Sprint,
-    config: SprintEntityConfig = DEFAULT_CONFIG
-  ) {
+  private constructor(data: Sprint, config: SprintEntityConfig = DEFAULT_CONFIG) {
     this.id = data.id;
     this.title = data.title;
     this.description = data.description;
@@ -214,8 +211,7 @@ export class SprintEntity implements Sprint {
    * Check if the sprint is active
    */
   get isActive(): boolean {
-    return this.status === ResourceStatus.ACTIVE ||
-           this.status === ResourceStatus.IN_PROGRESS;
+    return this.status === ResourceStatus.ACTIVE || this.status === ResourceStatus.IN_PROGRESS;
   }
 
   /**
@@ -243,8 +239,7 @@ export class SprintEntity implements Sprint {
    * Check if the sprint can accept more issues
    */
   get canAcceptIssues(): boolean {
-    return (this.isPlanning || this.isActive) &&
-           this.issueCount < (this.config.maxIssues ?? 50);
+    return (this.isPlanning || this.isActive) && this.issueCount < (this.config.maxIssues ?? 50);
   }
 
   /**
@@ -272,7 +267,7 @@ export class SprintEntity implements Sprint {
    */
   start(): void {
     if (!this.isPlanning) {
-      throw new Error('Can only start a sprint in planning state');
+      throw new Error("Can only start a sprint in planning state");
     }
 
     this.status = ResourceStatus.ACTIVE;
@@ -284,7 +279,7 @@ export class SprintEntity implements Sprint {
    */
   complete(): void {
     if (!this.isActive) {
-      throw new Error('Can only complete an active sprint');
+      throw new Error("Can only complete an active sprint");
     }
 
     this.status = ResourceStatus.COMPLETED;
@@ -296,7 +291,7 @@ export class SprintEntity implements Sprint {
    */
   cancel(): void {
     if (this.isCompleted) {
-      throw new Error('Cannot cancel a completed sprint');
+      throw new Error("Cannot cancel a completed sprint");
     }
 
     this.status = ResourceStatus.CLOSED; // Using CLOSED for cancelled

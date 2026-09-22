@@ -1,4 +1,3 @@
-
 import {
   ProtocolError,
   INTERNAL_ERROR,
@@ -20,7 +19,6 @@ const ErrorCode = {
   InvalidParams: INVALID_PARAMS,
   ParseError: PARSE_ERROR,
 } as const;
-
 
 describe("MCP Server E2E Tests", () => {
   let toolRegistry: any;
@@ -60,14 +58,14 @@ describe("MCP Server E2E Tests", () => {
       // Test error conversion
       const notFoundError = new Error("Resource not found");
       const mcpError = convertToMcpError(notFoundError);
-      
+
       expect(mcpError).toBeInstanceOf(McpError);
       expect(mcpError.code).toBe(ErrorCode.MethodNotFound);
-      
+
       // Test validation error conversion
       const validationError = new Error("Invalid input parameter");
       const mcpValidationError = convertToMcpError(validationError);
-      
+
       expect(mcpValidationError).toBeInstanceOf(McpError);
       expect(mcpValidationError.code).toBe(ErrorCode.InvalidParams);
     });
@@ -77,11 +75,11 @@ describe("MCP Server E2E Tests", () => {
       const rateLimitError = new Error("API rate limit exceeded");
       rateLimitError.name = "HttpError";
       (rateLimitError as any).status = 403;
-      
+
       try {
         // Convert the error
         const mcpError = convertToMcpError(rateLimitError);
-        
+
         // Verify conversion
         expect(mcpError).toBeInstanceOf(McpError);
         expect(mcpError.code).toBe(ErrorCode.ParseError);
@@ -97,12 +95,12 @@ describe("MCP Server E2E Tests", () => {
       const testResult = {
         id: "test-123",
         name: "Test Resource",
-        status: "active"
+        status: "active",
       };
-      
+
       // Format the result
       const formattedResult = formatSuccessResponse("test_operation", testResult);
-      
+
       // Verify formatting
       expect(formattedResult).toHaveProperty("data");
       expect(formattedResult).toHaveProperty("metadata");
@@ -112,10 +110,10 @@ describe("MCP Server E2E Tests", () => {
     it("should format error responses correctly", () => {
       // Create a test error
       const testError = new Error("Test error message");
-      
+
       // Format the error
       const formattedError = formatErrorResponse("test_operation", testError);
-      
+
       // Verify formatting
       expect(formattedError).toHaveProperty("error");
       expect(formattedError.error).toHaveProperty("message");
@@ -129,22 +127,25 @@ function convertToMcpError(error: Error): InstanceType<typeof McpError> {
   if (error instanceof McpError) {
     return error;
   }
-  
+
   // Rate limit error
   if (error.name === "HttpError" && (error as any).status === 403) {
     return new McpError(ErrorCode.ParseError, "GitHub API rate limit exceeded");
   }
-  
+
   // Not found error
   if (error.message.includes("not found")) {
     return new McpError(ErrorCode.MethodNotFound, error.message);
   }
-  
+
   // Validation error
-  if (error.message.toLowerCase().includes("invalid") || error.message.toLowerCase().includes("validation")) {
+  if (
+    error.message.toLowerCase().includes("invalid") ||
+    error.message.toLowerCase().includes("validation")
+  ) {
     return new McpError(ErrorCode.InvalidParams, error.message);
   }
-  
+
   // Default to internal error
   return new McpError(ErrorCode.InternalError, error.message);
 }
@@ -154,8 +155,8 @@ function formatSuccessResponse(operation: string, result: any) {
     data: result,
     metadata: {
       timestamp: new Date().toISOString(),
-      operation
-    }
+      operation,
+    },
   };
 }
 
@@ -164,7 +165,7 @@ function formatErrorResponse(operation: string, error: Error) {
     error: {
       message: error.message,
       code: (error as any).code || ErrorCode.InternalError,
-      operation
-    }
+      operation,
+    },
   };
 }

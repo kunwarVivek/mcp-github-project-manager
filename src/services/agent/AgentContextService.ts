@@ -1,8 +1,8 @@
-import type { GitHubRepositoryFactory } from '../../infrastructure/github/GitHubRepositoryFactory';
-import type { AgentTaskContext } from '../../domain/agent-orchestration-types';
-import { AIServiceFactory } from '../ai/AIServiceFactory';
-import { safeCall } from '../utils/safeCall';
-import { InputSanitizer } from '../utils/InputSanitizer';
+import type { GitHubRepositoryFactory } from "../../infrastructure/github/GitHubRepositoryFactory";
+import type { AgentTaskContext } from "../../domain/agent-orchestration-types";
+import { AIServiceFactory } from "../ai/AIServiceFactory";
+import { safeCall } from "../utils/safeCall";
+import { InputSanitizer } from "../utils/InputSanitizer";
 
 // ---------------------------------------------------------------------------
 // GraphQL response types (private to this module)
@@ -149,8 +149,8 @@ export class AgentContextService {
         throw new Error(`Issue #${issueNumber} not found`);
       }
 
-      const labels = issue.labels.nodes.map(l => l.name);
-      const assignees = issue.assignees.nodes.map(a => a.login);
+      const labels = issue.labels.nodes.map((l) => l.name);
+      const assignees = issue.assignees.nodes.map((a) => a.login);
 
       // Parallel fetches for related issues and coding standards
       const [relatedIssues, codingStandards] = await Promise.all([
@@ -159,27 +159,27 @@ export class AgentContextService {
       ]);
 
       // Build milestone context
-      let milestoneCtx: AgentTaskContext['milestone'] | undefined;
+      let milestoneCtx: AgentTaskContext["milestone"] | undefined;
       if (issue.milestone) {
         const closed = issue.milestone.closedIssues.totalCount;
         const open = issue.milestone.openIssues.totalCount;
         const total = closed + open;
         milestoneCtx = {
           title: issue.milestone.title,
-          description: issue.milestone.description ?? '',
+          description: issue.milestone.description ?? "",
           dueDate: issue.milestone.dueOn ?? undefined,
           progress: total > 0 ? Math.round((closed / total) * 100) : undefined,
         };
       }
 
       // Build parent context
-      let parentIssue: AgentTaskContext['parentIssue'] | undefined;
+      let parentIssue: AgentTaskContext["parentIssue"] | undefined;
       if (issue.parent) {
         parentIssue = {
           id: issue.parent.id,
           number: issue.parent.number,
           title: issue.parent.title,
-          body: issue.parent.body ?? '',
+          body: issue.parent.body ?? "",
         };
       }
 
@@ -188,7 +188,7 @@ export class AgentContextService {
           id: issue.id,
           number: issue.number,
           title: issue.title,
-          body: issue.body ?? '',
+          body: issue.body ?? "",
           labels,
           assignees,
           state: issue.state,
@@ -199,7 +199,7 @@ export class AgentContextService {
         relatedIssues,
         codingStandards: codingStandards ?? undefined,
         branchSuggestion: buildBranchName(issue.number, issue.title),
-        acceptanceCriteria: extractAcceptanceCriteria(issue.body ?? ''),
+        acceptanceCriteria: extractAcceptanceCriteria(issue.body ?? ""),
       };
 
       // AI augmentation (best-effort, graceful when unavailable)
@@ -222,37 +222,46 @@ export class AgentContextService {
    */
   private async generateAISuggestions(
     context: AgentTaskContext,
-    labels: string[],
-  ): Promise<AgentTaskContext['aiSuggestions']> {
+    labels: string[]
+  ): Promise<AgentTaskContext["aiSuggestions"]> {
     // Opt-out for latency/cost-sensitive deployments
-    if (process.env.AGENT_AI_CONTEXT === 'false') return undefined;
+    if (process.env.AGENT_AI_CONTEXT === "false") return undefined;
 
     try {
       const model = this.aiFactory.getBestAvailableModel();
       if (!model) return undefined;
 
-      const { generateObject } = await import('ai');
-      const { z } = await import('zod');
+      const { generateObject } = await import("ai");
+      const { z } = await import("zod");
 
       const schema = z.object({
-        acceptanceCriteria: z.array(z.string()).describe('Testable acceptance criteria for the task'),
-        complexityEstimate: z.number().int().min(1).max(13).describe('Story-point complexity estimate (1-13)'),
-        implementationGuidance: z.string().describe('Concise step-by-step implementation guidance'),
-        confidence: z.number().min(0).max(1).describe('Confidence in these suggestions (0-1)'),
+        acceptanceCriteria: z
+          .array(z.string())
+          .describe("Testable acceptance criteria for the task"),
+        complexityEstimate: z
+          .number()
+          .int()
+          .min(1)
+          .max(13)
+          .describe("Story-point complexity estimate (1-13)"),
+        implementationGuidance: z.string().describe("Concise step-by-step implementation guidance"),
+        confidence: z.number().min(0).max(1).describe("Confidence in these suggestions (0-1)"),
       });
 
       const { object } = await generateObject({
         model,
         schema,
-        system: 'You are an expert engineering advisor generating task context for an autonomous coding agent. ' +
-          'Produce concise, actionable acceptance criteria, a complexity estimate, and implementation guidance. ' +
-          'Do not invent repository facts; base everything on the provided task details.',
-        prompt: `Task title: ${InputSanitizer.sanitizeIssueContent(context.issue.title)}\n\n` +
-          `Task body:\n${InputSanitizer.sanitizeIssueContent((context.issue.body ?? '').slice(0, 4000))}\n\n` +
-          `Labels: ${labels.join(', ') || 'none'}\n` +
-          `Milestone: ${context.milestone?.title ?? 'none'} (due ${context.milestone?.dueDate ?? 'n/a'})\n` +
-          `Existing acceptance criteria:\n${context.acceptanceCriteria.join('\n') || 'none'}\n\n` +
-          `Repository coding standards:\n${InputSanitizer.sanitizeText((context.codingStandards ?? 'none').slice(0, 3000))}\n`,
+        system:
+          "You are an expert engineering advisor generating task context for an autonomous coding agent. " +
+          "Produce concise, actionable acceptance criteria, a complexity estimate, and implementation guidance. " +
+          "Do not invent repository facts; base everything on the provided task details.",
+        prompt:
+          `Task title: ${InputSanitizer.sanitizeIssueContent(context.issue.title)}\n\n` +
+          `Task body:\n${InputSanitizer.sanitizeIssueContent((context.issue.body ?? "").slice(0, 4000))}\n\n` +
+          `Labels: ${labels.join(", ") || "none"}\n` +
+          `Milestone: ${context.milestone?.title ?? "none"} (due ${context.milestone?.dueDate ?? "n/a"})\n` +
+          `Existing acceptance criteria:\n${context.acceptanceCriteria.join("\n") || "none"}\n\n` +
+          `Repository coding standards:\n${InputSanitizer.sanitizeText((context.codingStandards ?? "none").slice(0, 3000))}\n`,
         maxOutputTokens: 800,
       });
 
@@ -266,8 +275,8 @@ export class AgentContextService {
   private async fetchRelatedIssues(
     owner: string,
     repo: string,
-    issue: IssueNode,
-  ): Promise<AgentTaskContext['relatedIssues']> {
+    issue: IssueNode
+  ): Promise<AgentTaskContext["relatedIssues"]> {
     if (!issue.milestone) return [];
 
     try {
@@ -291,7 +300,8 @@ export class AgentContextService {
       `;
 
       const resp = await this.factory.graphql<MilestoneIssuesResponse>(query, {
-        owner, repo,
+        owner,
+        repo,
         milestoneTitle: issue.milestone.title,
       });
 
@@ -299,12 +309,12 @@ export class AgentContextService {
       if (!milestoneNode) return [];
 
       return milestoneNode.issues.nodes
-        .filter(i => i.number !== issue.number)
-        .map(i => ({
+        .filter((i) => i.number !== issue.number)
+        .map((i) => ({
           number: i.number,
           title: i.title,
           state: i.state,
-          labels: i.labels.nodes.map(l => l.name),
+          labels: i.labels.nodes.map((l) => l.name),
         }));
     } catch {
       // Non-fatal — return empty if milestone query fails
@@ -314,13 +324,14 @@ export class AgentContextService {
 
   /** Try to read CLAUDE.md and AGENTS.md from the repository root. */
   private async fetchCodingStandards(owner: string, repo: string): Promise<string | null> {
-    const files = ['CLAUDE.md', 'AGENTS.md'];
+    const files = ["CLAUDE.md", "AGENTS.md"];
     const parts: string[] = [];
 
     for (const file of files) {
       try {
         const resp = await this.factory.graphql<FileContentResponse>(FILE_CONTENT_QUERY, {
-          owner, repo,
+          owner,
+          repo,
           expression: `HEAD:${file}`,
         });
         if (resp.repository.object?.text) {
@@ -331,7 +342,7 @@ export class AgentContextService {
       }
     }
 
-    return parts.length > 0 ? parts.join('\n\n---\n\n') : null;
+    return parts.length > 0 ? parts.join("\n\n---\n\n") : null;
   }
 }
 
@@ -343,8 +354,8 @@ export class AgentContextService {
 function buildBranchName(issueNumber: number, title: string): string {
   const slug = title
     .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
     .slice(0, 50);
   return `agent/${issueNumber}-${slug}`;
 }
@@ -360,9 +371,9 @@ function extractAcceptanceCriteria(body: string): string[] {
     const afterHeading = body.slice(headingMatch.index + headingMatch[0].length);
     // Stop at the next heading or end of string
     const section = afterHeading.split(/^#{1,3}\s/m)[0] ?? afterHeading;
-    const lines = section.split('\n');
+    const lines = section.split("\n");
     for (const line of lines) {
-      const item = line.replace(/^[\s]*[-*]\s*(\[[ x]\]\s*)?/, '').trim();
+      const item = line.replace(/^[\s]*[-*]\s*(\[[ x]\]\s*)?/, "").trim();
       if (item.length > 0) {
         criteria.push(item);
       }

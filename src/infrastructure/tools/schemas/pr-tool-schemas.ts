@@ -64,11 +64,15 @@ export const createPullRequestReviewSchema = z.object({
   pullNumber: z.number().int().positive("Pull request number must be a positive integer"),
   body: z.string().optional(),
   event: z.enum(["APPROVE", "REQUEST_CHANGES", "COMMENT"]),
-  comments: z.array(z.object({
-    path: z.string(),
-    position: z.number().int().optional(),
-    body: z.string(),
-  })).optional(),
+  comments: z
+    .array(
+      z.object({
+        path: z.string(),
+        position: z.number().int().optional(),
+        body: z.string(),
+      })
+    )
+    .optional(),
 });
 
 export type CreatePullRequestReviewArgs = z.infer<typeof createPullRequestReviewSchema>;
@@ -77,7 +81,10 @@ export type CreatePullRequestReviewArgs = z.infer<typeof createPullRequestReview
 // Pull Request Tool Definitions
 // ============================================================================
 
-export const createPullRequestTool: ToolDefinition<CreatePullRequestArgs, z.infer<typeof PullRequestOutputSchema>> = {
+export const createPullRequestTool: ToolDefinition<
+  CreatePullRequestArgs,
+  z.infer<typeof PullRequestOutputSchema>
+> = {
   name: "create_pull_request",
   title: "Create Pull Request",
   description: "Create a new pull request in a GitHub repository",
@@ -92,13 +99,16 @@ export const createPullRequestTool: ToolDefinition<CreatePullRequestArgs, z.infe
         title: "Add user authentication",
         body: "Implements OAuth 2.0 authentication with Auth0",
         head: "feature/auth",
-        base: "main"
-      }
-    }
-  ]
+        base: "main",
+      },
+    },
+  ],
 };
 
-export const getPullRequestTool: ToolDefinition<GetPullRequestArgs, z.infer<typeof PullRequestOutputSchema>> = {
+export const getPullRequestTool: ToolDefinition<
+  GetPullRequestArgs,
+  z.infer<typeof PullRequestOutputSchema>
+> = {
   name: "get_pull_request",
   title: "Get Pull Request",
   description: "Get details of a specific pull request",
@@ -110,13 +120,16 @@ export const getPullRequestTool: ToolDefinition<GetPullRequestArgs, z.infer<type
       name: "Get PR details",
       description: "Retrieve information about PR #42",
       args: {
-        pullNumber: 42
-      }
-    }
-  ]
+        pullNumber: 42,
+      },
+    },
+  ],
 };
 
-export const listPullRequestsTool: ToolDefinition<ListPullRequestsArgs, z.infer<typeof PullRequestListOutputSchema>> = {
+export const listPullRequestsTool: ToolDefinition<
+  ListPullRequestsArgs,
+  z.infer<typeof PullRequestListOutputSchema>
+> = {
   name: "list_pull_requests",
   title: "List Pull Requests",
   description: "List pull requests in a GitHub repository",
@@ -128,13 +141,16 @@ export const listPullRequestsTool: ToolDefinition<ListPullRequestsArgs, z.infer<
       name: "List open PRs",
       description: "Get all open pull requests",
       args: {
-        state: "open"
-      }
-    }
-  ]
+        state: "open",
+      },
+    },
+  ],
 };
 
-export const updatePullRequestTool: ToolDefinition<UpdatePullRequestArgs, z.infer<typeof PullRequestOutputSchema>> = {
+export const updatePullRequestTool: ToolDefinition<
+  UpdatePullRequestArgs,
+  z.infer<typeof PullRequestOutputSchema>
+> = {
   name: "update_pull_request",
   title: "Update Pull Request",
   description: "Update a pull request's title, body, or state",
@@ -147,13 +163,16 @@ export const updatePullRequestTool: ToolDefinition<UpdatePullRequestArgs, z.infe
       description: "Update the title of a pull request",
       args: {
         pullNumber: 42,
-        title: "feat: Add OAuth 2.0 authentication"
-      }
-    }
-  ]
+        title: "feat: Add OAuth 2.0 authentication",
+      },
+    },
+  ],
 };
 
-export const mergePullRequestTool: ToolDefinition<MergePullRequestArgs, z.infer<typeof MergeResultOutputSchema>> = {
+export const mergePullRequestTool: ToolDefinition<
+  MergePullRequestArgs,
+  z.infer<typeof MergeResultOutputSchema>
+> = {
   name: "merge_pull_request",
   title: "Merge Pull Request",
   description: "Merge a pull request using merge, squash, or rebase",
@@ -167,13 +186,16 @@ export const mergePullRequestTool: ToolDefinition<MergePullRequestArgs, z.infer<
       args: {
         pullNumber: 42,
         mergeMethod: "squash",
-        commitTitle: "feat: Add authentication"
-      }
-    }
-  ]
+        commitTitle: "feat: Add authentication",
+      },
+    },
+  ],
 };
 
-export const listPullRequestReviewsTool: ToolDefinition<ListPullRequestReviewsArgs, z.infer<typeof PullRequestReviewListOutputSchema>> = {
+export const listPullRequestReviewsTool: ToolDefinition<
+  ListPullRequestReviewsArgs,
+  z.infer<typeof PullRequestReviewListOutputSchema>
+> = {
   name: "list_pull_request_reviews",
   title: "List Pull Request Reviews",
   description: "List all reviews on a pull request",
@@ -185,13 +207,16 @@ export const listPullRequestReviewsTool: ToolDefinition<ListPullRequestReviewsAr
       name: "Get PR reviews",
       description: "List all reviews for PR #42",
       args: {
-        pullNumber: 42
-      }
-    }
-  ]
+        pullNumber: 42,
+      },
+    },
+  ],
 };
 
-export const createPullRequestReviewTool: ToolDefinition<CreatePullRequestReviewArgs, z.infer<typeof PullRequestReviewOutputSchema>> = {
+export const createPullRequestReviewTool: ToolDefinition<
+  CreatePullRequestReviewArgs,
+  z.infer<typeof PullRequestReviewOutputSchema>
+> = {
   name: "create_pull_request_review",
   title: "Create Pull Request Review",
   description: "Create a review on a pull request (approve, request changes, or comment)",
@@ -205,8 +230,8 @@ export const createPullRequestReviewTool: ToolDefinition<CreatePullRequestReview
       args: {
         pullNumber: 42,
         event: "APPROVE",
-        body: "LGTM! Great work on the authentication implementation."
-      }
+        body: "LGTM! Great work on the authentication implementation.",
+      },
     },
     {
       name: "Request changes",
@@ -219,10 +244,10 @@ export const createPullRequestReviewTool: ToolDefinition<CreatePullRequestReview
           {
             path: "src/auth.ts",
             position: 15,
-            body: "Consider using bcrypt for password hashing"
-          }
-        ]
-      }
-    }
-  ]
+            body: "Consider using bcrypt for password hashing",
+          },
+        ],
+      },
+    },
+  ],
 };

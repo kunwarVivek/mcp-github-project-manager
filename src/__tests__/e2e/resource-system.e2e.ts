@@ -1,4 +1,4 @@
-import { vi } from 'vitest';
+import { vi } from "vitest";
 // Unmock ResourceCache for E2E tests
 vi.unmock("../../infrastructure/cache/ResourceCache");
 
@@ -26,13 +26,10 @@ describe("Resource System", () => {
       const projectData = {
         title: "Test Project",
         description: "Test Description",
-        status: ResourceStatus.ACTIVE
+        status: ResourceStatus.ACTIVE,
       };
 
-      const created = await manager.create<BaseProjectResource>(
-        ResourceType.PROJECT,
-        projectData
-      );
+      const created = await manager.create<BaseProjectResource>(ResourceType.PROJECT, projectData);
 
       expect(created.id).toBeDefined();
       expect(created.type).toBe(ResourceType.PROJECT);
@@ -45,15 +42,10 @@ describe("Resource System", () => {
       const projectData = {
         title: "Test Project",
         description: "Test Description",
-        status: ResourceStatus.ACTIVE
+        status: ResourceStatus.ACTIVE,
       };
 
-      const created = await manager.create<BaseProjectResource>(
-        ResourceType.PROJECT,
-        projectData
-      );
-
-
+      const created = await manager.create<BaseProjectResource>(ResourceType.PROJECT, projectData);
 
       const cached = await manager.get<BaseProjectResource>(ResourceType.PROJECT, created.id);
 
@@ -63,14 +55,11 @@ describe("Resource System", () => {
     });
 
     it("should update a resource with version check", async () => {
-      const project = await manager.create<BaseProjectResource>(
-        ResourceType.PROJECT,
-        {
-          title: "Original Title",
-          description: "Test Description",
-          status: ResourceStatus.ACTIVE
-        }
-      );
+      const project = await manager.create<BaseProjectResource>(ResourceType.PROJECT, {
+        title: "Original Title",
+        description: "Test Description",
+        status: ResourceStatus.ACTIVE,
+      });
 
       const updateData = {
         title: "Updated Title",
@@ -81,10 +70,10 @@ describe("Resource System", () => {
         project.id,
         updateData,
         {
-          updateOptions: { 
-            optimisticLock: true, 
-            expectedVersion: project.version 
-          }
+          updateOptions: {
+            optimisticLock: true,
+            expectedVersion: project.version,
+          },
         }
       );
 
@@ -93,14 +82,11 @@ describe("Resource System", () => {
     });
 
     it("should handle version conflicts", async () => {
-      const project = await manager.create<BaseProjectResource>(
-        ResourceType.PROJECT,
-        {
-          title: "Test Project",
-          description: "Test Description",
-          status: ResourceStatus.ACTIVE
-        }
-      );
+      const project = await manager.create<BaseProjectResource>(ResourceType.PROJECT, {
+        title: "Test Project",
+        description: "Test Description",
+        status: ResourceStatus.ACTIVE,
+      });
 
       await expect(
         manager.update<BaseProjectResource>(
@@ -110,8 +96,8 @@ describe("Resource System", () => {
           {
             updateOptions: {
               optimisticLock: true,
-              expectedVersion: (project.version || 0) + 1
-            }
+              expectedVersion: (project.version || 0) + 1,
+            },
           }
         )
       ).rejects.toThrow(ResourceVersionError);
@@ -120,33 +106,33 @@ describe("Resource System", () => {
 
   describe("Resource Status Management", () => {
     it("should archive and restore resources", async () => {
-      const project = await manager.create<BaseProjectResource>(
-        ResourceType.PROJECT,
-        {
-          title: "Test Project",
-          description: "Test Description",
-          status: ResourceStatus.ACTIVE
-        }
-      );
+      const project = await manager.create<BaseProjectResource>(ResourceType.PROJECT, {
+        title: "Test Project",
+        description: "Test Description",
+        status: ResourceStatus.ACTIVE,
+      });
 
       await manager.archive(ResourceType.PROJECT, project.id);
-      const archivedProject = await manager.get<BaseProjectResource>(ResourceType.PROJECT, project.id);
+      const archivedProject = await manager.get<BaseProjectResource>(
+        ResourceType.PROJECT,
+        project.id
+      );
       expect(archivedProject.status).toBe(ResourceStatus.ARCHIVED);
 
       await manager.restore(ResourceType.PROJECT, project.id);
-      const restoredProject = await manager.get<BaseProjectResource>(ResourceType.PROJECT, project.id);
+      const restoredProject = await manager.get<BaseProjectResource>(
+        ResourceType.PROJECT,
+        project.id
+      );
       expect(restoredProject.status).toBe(ResourceStatus.ACTIVE);
     });
 
     it("should soft delete resources", async () => {
-      const project = await manager.create<BaseProjectResource>(
-        ResourceType.PROJECT,
-        {
-          title: "Test Project",
-          description: "Test Description",
-          status: ResourceStatus.ACTIVE
-        }
-      );
+      const project = await manager.create<BaseProjectResource>(ResourceType.PROJECT, {
+        title: "Test Project",
+        description: "Test Description",
+        status: ResourceStatus.ACTIVE,
+      });
 
       await manager.delete(ResourceType.PROJECT, project.id);
       const deletedProject = await manager.get<BaseProjectResource>(
@@ -162,16 +148,13 @@ describe("Resource System", () => {
   describe("Resource Events", () => {
     it("should emit events for resource operations", async () => {
       const events: any[] = [];
-      manager.on('resource', (event: any) => events.push(event));
+      manager.on("resource", (event: any) => events.push(event));
 
-      const project = await manager.create<BaseProjectResource>(
-        ResourceType.PROJECT,
-        {
-          title: "Test Project",
-          description: "Test Description",
-          status: ResourceStatus.ACTIVE
-        }
-      );
+      const project = await manager.create<BaseProjectResource>(ResourceType.PROJECT, {
+        title: "Test Project",
+        description: "Test Description",
+        status: ResourceStatus.ACTIVE,
+      });
 
       expect(events).toHaveLength(1);
       expect(events[0].type).toBe(ResourceEventType.CREATED);

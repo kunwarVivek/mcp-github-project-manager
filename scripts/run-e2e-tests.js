@@ -7,24 +7,24 @@
  * with various options and configurations.
  */
 
-import { spawn } from 'node:child_process';
-import { existsSync } from 'node:fs';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { spawn } from "node:child_process";
+import { existsSync } from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // ANSI color codes for console output
 const colors = {
-  reset: '\x1b[0m',
-  bright: '\x1b[1m',
-  red: '\x1b[31m',
-  green: '\x1b[32m',
-  yellow: '\x1b[33m',
-  blue: '\x1b[34m',
-  magenta: '\x1b[35m',
-  cyan: '\x1b[36m'
+  reset: "\x1b[0m",
+  bright: "\x1b[1m",
+  red: "\x1b[31m",
+  green: "\x1b[32m",
+  yellow: "\x1b[33m",
+  blue: "\x1b[34m",
+  magenta: "\x1b[35m",
+  cyan: "\x1b[36m",
 };
 
 function colorize(text, color) {
@@ -32,95 +32,97 @@ function colorize(text, color) {
 }
 
 function printHeader() {
-  console.log(colorize('\n🧪 MCP Tools Comprehensive E2E Test Runner', 'cyan'));
-  console.log(colorize('=' .repeat(50), 'cyan'));
+  console.log(colorize("\n🧪 MCP Tools Comprehensive E2E Test Runner", "cyan"));
+  console.log(colorize("=".repeat(50), "cyan"));
 }
 
 function printUsage() {
-  console.log(colorize('\nUsage:', 'bright'));
-  console.log('  node scripts/run-e2e-tests.js [options]');
-  
-  console.log(colorize('\nOptions:', 'bright'));
-  console.log('  --help, -h              Show this help message');
-  console.log('  --real-api              Use real APIs instead of mocks');
-  console.log('  --github-only           Run only GitHub tool tests');
-  console.log('  --ai-only               Run only AI tool tests');
-  console.log('  --workflows-only        Run only workflow integration tests');
-  console.log('  --agent-only            Run only agent orchestration tool tests');
-  console.log('  --platform-only         Run only platform validation tests');
-  console.log('  --build                 Build the project before running tests');
-  console.log('  --verbose               Enable verbose output');
-  console.log('  --timeout <seconds>     Set test timeout (default: 60)');
-  
-  console.log(colorize('\nExamples:', 'bright'));
-  console.log('  node scripts/run-e2e-tests.js');
-  console.log('  node scripts/run-e2e-tests.js --real-api --github-only');
-  console.log('  node scripts/run-e2e-tests.js --build --verbose');
-  console.log('  node scripts/run-e2e-tests.js --ai-only --timeout 120');
+  console.log(colorize("\nUsage:", "bright"));
+  console.log("  node scripts/run-e2e-tests.js [options]");
+
+  console.log(colorize("\nOptions:", "bright"));
+  console.log("  --help, -h              Show this help message");
+  console.log("  --real-api              Use real APIs instead of mocks");
+  console.log("  --github-only           Run only GitHub tool tests");
+  console.log("  --ai-only               Run only AI tool tests");
+  console.log("  --workflows-only        Run only workflow integration tests");
+  console.log("  --agent-only            Run only agent orchestration tool tests");
+  console.log("  --platform-only         Run only platform validation tests");
+  console.log("  --build                 Build the project before running tests");
+  console.log("  --verbose               Enable verbose output");
+  console.log("  --timeout <seconds>     Set test timeout (default: 60)");
+
+  console.log(colorize("\nExamples:", "bright"));
+  console.log("  node scripts/run-e2e-tests.js");
+  console.log("  node scripts/run-e2e-tests.js --real-api --github-only");
+  console.log("  node scripts/run-e2e-tests.js --build --verbose");
+  console.log("  node scripts/run-e2e-tests.js --ai-only --timeout 120");
 }
 
 function checkEnvironment() {
-  console.log(colorize('\n🔍 Checking Environment...', 'yellow'));
-  
+  console.log(colorize("\n🔍 Checking Environment...", "yellow"));
+
   // Check if build exists
-  const buildPath = path.join(process.cwd(), 'build', 'index.js');
+  const buildPath = path.join(process.cwd(), "build", "index.js");
   if (!existsSync(buildPath)) {
-    console.log(colorize('⚠️  Build not found. Run with --build flag or run "npm run build" first.', 'yellow'));
+    console.log(
+      colorize('⚠️  Build not found. Run with --build flag or run "npm run build" first.', "yellow")
+    );
     return false;
   }
-  
+
   // Check environment variables
-  const requiredEnvVars = ['GITHUB_TOKEN', 'GITHUB_OWNER', 'GITHUB_REPO'];
-  const missingVars = requiredEnvVars.filter(varName => !process.env[varName]);
-  
+  const requiredEnvVars = ["GITHUB_TOKEN", "GITHUB_OWNER", "GITHUB_REPO"];
+  const missingVars = requiredEnvVars.filter((varName) => !process.env[varName]);
+
   if (missingVars.length > 0) {
-    console.log(colorize(`⚠️  Missing environment variables: ${missingVars.join(', ')}`, 'yellow'));
-    console.log(colorize('   Tests will run with mock values.', 'yellow'));
+    console.log(colorize(`⚠️  Missing environment variables: ${missingVars.join(", ")}`, "yellow"));
+    console.log(colorize("   Tests will run with mock values.", "yellow"));
   }
-  
+
   // Check AI API keys
-  const aiKeys = ['ANTHROPIC_API_KEY', 'OPENAI_API_KEY', 'GOOGLE_API_KEY', 'PERPLEXITY_API_KEY'];
-  const hasAIKey = aiKeys.some(key => process.env[key]);
-  
+  const aiKeys = ["ANTHROPIC_API_KEY", "OPENAI_API_KEY", "GOOGLE_API_KEY", "PERPLEXITY_API_KEY"];
+  const hasAIKey = aiKeys.some((key) => process.env[key]);
+
   if (!hasAIKey) {
-    console.log(colorize('⚠️  No AI API keys found. AI tests will use mock responses.', 'yellow'));
+    console.log(colorize("⚠️  No AI API keys found. AI tests will use mock responses.", "yellow"));
   }
-  
-  console.log(colorize('✅ Environment check complete.', 'green'));
+
+  console.log(colorize("✅ Environment check complete.", "green"));
   return true;
 }
 
 async function runCommand(command, args, options = {}) {
   return new Promise((resolve, reject) => {
-    console.log(colorize(`\n🚀 Running: ${command} ${args.join(' ')}`, 'blue'));
-    
+    console.log(colorize(`\n🚀 Running: ${command} ${args.join(" ")}`, "blue"));
+
     const child = spawn(command, args, {
-      stdio: 'inherit',
+      stdio: "inherit",
       shell: true,
-      ...options
+      ...options,
     });
-    
-    child.on('close', (code) => {
+
+    child.on("close", (code) => {
       if (code === 0) {
         resolve();
       } else {
         reject(new Error(`Command failed with exit code ${code}`));
       }
     });
-    
-    child.on('error', (error) => {
+
+    child.on("error", (error) => {
       reject(error);
     });
   });
 }
 
 async function buildProject() {
-  console.log(colorize('\n🔨 Building project...', 'yellow'));
+  console.log(colorize("\n🔨 Building project...", "yellow"));
   try {
-    await runCommand('npm', ['run', 'build']);
-    console.log(colorize('✅ Build completed successfully.', 'green'));
+    await runCommand("npm", ["run", "build"]);
+    console.log(colorize("✅ Build completed successfully.", "green"));
   } catch (error) {
-    console.error(colorize('❌ Build failed:', 'red'), error.message);
+    console.error(colorize("❌ Build failed:", "red"), error.message);
     process.exit(1);
   }
 }
@@ -137,149 +139,156 @@ function parseArgs() {
     platformOnly: false,
     build: false,
     verbose: false,
-    timeout: 60
+    timeout: 60,
   };
-  
+
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
-    
+
     switch (arg) {
-      case '--help':
-      case '-h':
+      case "--help":
+      case "-h":
         options.help = true;
         break;
-      case '--real-api':
+      case "--real-api":
         options.realApi = true;
         break;
-      case '--github-only':
+      case "--github-only":
         options.githubOnly = true;
         break;
-      case '--ai-only':
+      case "--ai-only":
         options.aiOnly = true;
         break;
-      case '--workflows-only':
+      case "--workflows-only":
         options.workflowsOnly = true;
         break;
-      case '--agent-only':
+      case "--agent-only":
         options.agentOnly = true;
         break;
-      case '--platform-only':
+      case "--platform-only":
         options.platformOnly = true;
         break;
-      case '--build':
+      case "--build":
         options.build = true;
         break;
-      case '--verbose':
+      case "--verbose":
         options.verbose = true;
         break;
-      case '--timeout':
+      case "--timeout":
         if (i + 1 < args.length) {
           options.timeout = parseInt(args[i + 1], 10);
           i++; // Skip next argument
         }
         break;
       default:
-        console.log(colorize(`⚠️  Unknown option: ${arg}`, 'yellow'));
+        console.log(colorize(`⚠️  Unknown option: ${arg}`, "yellow"));
     }
   }
-  
+
   return options;
 }
 
 function buildTestCommand(options) {
   // Use Vitest instead of Jest
-  const baseCommand = ['npx', 'vitest', 'run'];
+  const baseCommand = ["npx", "vitest", "run"];
   const args = [...baseCommand];
-  
+
   // Add test pattern based on options
   if (options.githubOnly) {
-    args.push('--testPathPattern=github-project-tools');
+    args.push("--testPathPattern=github-project-tools");
   } else if (options.aiOnly) {
-    args.push('--testPathPattern=ai-task-tools');
+    args.push("--testPathPattern=ai-task-tools");
   } else if (options.workflowsOnly) {
-    args.push('--testPathPattern=tool-integration-workflows');
+    args.push("--testPathPattern=tool-integration-workflows");
   } else if (options.agentOnly) {
-    args.push('--testPathPattern=agent-orchestration');
+    args.push("--testPathPattern=agent-orchestration");
   } else if (options.platformOnly) {
-    args.push('--testPathPattern=platform-validation');
+    args.push("--testPathPattern=platform-validation");
   }
-  
+
   // Add reporter based on verbose flag
   if (options.verbose) {
-    args.push('--reporter=verbose');
+    args.push("--reporter=verbose");
   }
-  
+
   // Set environment variables
   const env = { ...process.env };
-  
+
   if (options.realApi) {
-    env.E2E_REAL_API = 'true';
+    env.E2E_REAL_API = "true";
   }
-  
+
   if (options.timeout !== 60) {
     env.VITEST_TIMEOUT = (options.timeout * 1000).toString();
   }
-  
+
   return { command: args[0], args: args.slice(1), env };
 }
 
 async function runTests(options) {
   const { command, args, env } = buildTestCommand(options);
-  
-  console.log(colorize('\n📋 Test Configuration:', 'cyan'));
-  console.log(`  Mode: ${options.realApi ? 'Real API' : 'Mock API'}`);
-  console.log(`  Scope: ${options.githubOnly ? 'GitHub Tools' : options.aiOnly ? 'AI Tools' : options.workflowsOnly ? 'Workflows' : options.agentOnly ? 'Agent Orchestration Tools' : options.platformOnly ? 'Platform Validation' : 'All Tools'}`);
+
+  console.log(colorize("\n📋 Test Configuration:", "cyan"));
+  console.log(`  Mode: ${options.realApi ? "Real API" : "Mock API"}`);
+  console.log(
+    `  Scope: ${options.githubOnly ? "GitHub Tools" : options.aiOnly ? "AI Tools" : options.workflowsOnly ? "Workflows" : options.agentOnly ? "Agent Orchestration Tools" : options.platformOnly ? "Platform Validation" : "All Tools"}`
+  );
   console.log(`  Timeout: ${options.timeout} seconds`);
-  console.log(`  Verbose: ${options.verbose ? 'Yes' : 'No'}`);
-  
+  console.log(`  Verbose: ${options.verbose ? "Yes" : "No"}`);
+
   try {
     await runCommand(command, args, { env });
-    console.log(colorize('\n✅ All tests completed successfully!', 'green'));
+    console.log(colorize("\n✅ All tests completed successfully!", "green"));
   } catch (error) {
-    console.error(colorize('\n❌ Tests failed:', 'red'), error.message);
+    console.error(colorize("\n❌ Tests failed:", "red"), error.message);
     process.exit(1);
   }
 }
 
 async function main() {
   printHeader();
-  
+
   const options = parseArgs();
-  
+
   if (options.help) {
     printUsage();
     return;
   }
-  
+
   // Build project if requested
   if (options.build) {
     await buildProject();
   }
-  
+
   // Check environment
   if (!checkEnvironment()) {
-    console.log(colorize('\n⚠️  Environment issues detected. Continuing with available configuration...', 'yellow'));
+    console.log(
+      colorize(
+        "\n⚠️  Environment issues detected. Continuing with available configuration...",
+        "yellow"
+      )
+    );
   }
-  
+
   // Run tests
   await runTests(options);
 }
 
 // Handle uncaught errors
-process.on('uncaughtException', (error) => {
-  console.error(colorize('\n💥 Uncaught Exception:', 'red'), error);
+process.on("uncaughtException", (error) => {
+  console.error(colorize("\n💥 Uncaught Exception:", "red"), error);
   process.exit(1);
 });
 
-process.on('unhandledRejection', (reason, promise) => {
-  console.error(colorize('\n💥 Unhandled Rejection:', 'red'), reason);
+process.on("unhandledRejection", (reason, promise) => {
+  console.error(colorize("\n💥 Unhandled Rejection:", "red"), reason);
   process.exit(1);
 });
 
 // Run the script
 if (import.meta.url === `file://${process.argv[1]}`) {
   main().catch((error) => {
-    console.error(colorize('\n💥 Script failed:', 'red'), error);
+    console.error(colorize("\n💥 Script failed:", "red"), error);
     process.exit(1);
   });
 }

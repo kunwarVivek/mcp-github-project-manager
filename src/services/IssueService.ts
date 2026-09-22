@@ -1,8 +1,8 @@
 import type { GitHubRepositoryFactory } from "../infrastructure/github/GitHubRepositoryFactory";
 import type { GitHubIssueRepository } from "../infrastructure/github/repositories/GitHubIssueRepository";
 import type { Issue, CreateIssue } from "../domain/types";
-import { safeCall } from './utils/safeCall';
-import { parseResourceStatus, filterByStatus } from '../domain/utils/StatusParser';
+import { safeCall } from "./utils/safeCall";
+import { parseResourceStatus, filterByStatus } from "../domain/utils/StatusParser";
 
 /** A GitHub issue comment as returned by the REST API. */
 export interface IssueComment {
@@ -66,24 +66,26 @@ export class IssueService {
     });
   }
 
-  async listIssues(options: {
-    status?: string;
-    milestone?: string;
-    labels?: string[];
-    assignee?: string;
-    sort?: string;
-    direction?: string;
-    limit?: number;
-  } = {}): Promise<Issue[]> {
+  async listIssues(
+    options: {
+      status?: string;
+      milestone?: string;
+      labels?: string[];
+      assignee?: string;
+      sort?: string;
+      direction?: string;
+      limit?: number;
+    } = {}
+  ): Promise<Issue[]> {
     return safeCall(async () => {
       const {
-        status = 'open',
+        status = "open",
         milestone,
         labels = [],
         assignee,
-        sort = 'created',
-        direction = 'desc',
-        limit = 30
+        sort = "created",
+        direction = "desc",
+        limit = 30,
       } = options;
 
       let issues: Issue[];
@@ -93,33 +95,33 @@ export class IssueService {
         issues = await this.issueRepo.findAll();
       }
 
-      if (status !== 'all') {
-        issues = filterByStatus(issues, status, 'issue');
+      if (status !== "all") {
+        issues = filterByStatus(issues, status, "issue");
       }
 
       if (labels.length > 0) {
-        issues = issues.filter(issue => labels.every(label => issue.labels.includes(label)));
+        issues = issues.filter((issue) => labels.every((label) => issue.labels.includes(label)));
       }
 
       if (assignee) {
-        issues = issues.filter(issue => issue.assignees.includes(assignee));
+        issues = issues.filter((issue) => issue.assignees.includes(assignee));
       }
 
       issues.sort((a, b) => {
         let valueA: string | number | undefined;
         let valueB: string | number | undefined;
-        switch(sort) {
-          case 'updated':
+        switch (sort) {
+          case "updated":
             valueA = a.updatedAt;
             valueB = b.updatedAt;
             break;
-          case 'created':
+          case "created":
           default:
             valueA = a.createdAt;
             valueB = b.createdAt;
         }
         const comparison = valueA.localeCompare(valueB);
-        return direction === 'desc' ? -comparison : comparison;
+        return direction === "desc" ? -comparison : comparison;
       });
 
       // Return plain objects for MCP compatibility
@@ -151,7 +153,7 @@ export class IssueService {
       if (updates.title) data.title = updates.title;
       if (updates.description) data.description = updates.description;
       if (updates.status) {
-        data.status = parseResourceStatus(updates.status, 'issue');
+        data.status = parseResourceStatus(updates.status, "issue");
       }
       if (updates.assignees) data.assignees = updates.assignees;
       if (updates.labels) data.labels = updates.labels;
@@ -167,10 +169,7 @@ export class IssueService {
     });
   }
 
-  async createIssueComment(data: {
-    issueNumber: number;
-    body: string;
-  }): Promise<IssueComment> {
+  async createIssueComment(data: { issueNumber: number; body: string }): Promise<IssueComment> {
     return safeCall(async () => {
       const octokit = this.factory.getOctokit();
       const config = this.factory.getConfig();
@@ -179,23 +178,20 @@ export class IssueService {
         owner: config.owner,
         repo: config.repo,
         issue_number: data.issueNumber,
-        body: data.body
+        body: data.body,
       });
 
       return {
         id: response.data.id,
-        body: response.data.body || '',
-        user: response.data.user?.login || 'unknown',
+        body: response.data.body || "",
+        user: response.data.user?.login || "unknown",
         createdAt: response.data.created_at,
-        updatedAt: response.data.updated_at
+        updatedAt: response.data.updated_at,
       };
     });
   }
 
-  async updateIssueComment(data: {
-    commentId: number;
-    body: string;
-  }): Promise<IssueComment> {
+  async updateIssueComment(data: { commentId: number; body: string }): Promise<IssueComment> {
     return safeCall(async () => {
       const octokit = this.factory.getOctokit();
       const config = this.factory.getConfig();
@@ -204,20 +200,22 @@ export class IssueService {
         owner: config.owner,
         repo: config.repo,
         comment_id: data.commentId,
-        body: data.body
+        body: data.body,
       });
 
       return {
         id: response.data.id,
-        body: response.data.body || '',
-        user: response.data.user?.login || 'unknown',
+        body: response.data.body || "",
+        user: response.data.user?.login || "unknown",
         createdAt: response.data.created_at,
-        updatedAt: response.data.updated_at
+        updatedAt: response.data.updated_at,
       };
     });
   }
 
-  async deleteIssueComment(data: { commentId: number }): Promise<{ success: boolean; message: string }> {
+  async deleteIssueComment(data: {
+    commentId: number;
+  }): Promise<{ success: boolean; message: string }> {
     return safeCall(async () => {
       const octokit = this.factory.getOctokit();
       const config = this.factory.getConfig();
@@ -225,17 +223,14 @@ export class IssueService {
       await octokit.rest.issues.deleteComment({
         owner: config.owner,
         repo: config.repo,
-        comment_id: data.commentId
+        comment_id: data.commentId,
       });
 
       return { success: true, message: `Comment ${data.commentId} deleted successfully` };
     });
   }
 
-  async listIssueComments(data: {
-    issueNumber: number;
-    limit?: number;
-  }): Promise<IssueComment[]> {
+  async listIssueComments(data: { issueNumber: number; limit?: number }): Promise<IssueComment[]> {
     return safeCall(async () => {
       const octokit = this.factory.getOctokit();
       const config = this.factory.getConfig();
@@ -244,15 +239,15 @@ export class IssueService {
         owner: config.owner,
         repo: config.repo,
         issue_number: data.issueNumber,
-        per_page: data.limit || 30
+        per_page: data.limit || 30,
       });
 
-      return response.data.map(comment => ({
+      return response.data.map((comment) => ({
         id: comment.id,
-        body: comment.body || '',
-        user: comment.user?.login || 'unknown',
+        body: comment.body || "",
+        user: comment.user?.login || "unknown",
         createdAt: comment.created_at,
-        updatedAt: comment.updated_at
+        updatedAt: comment.updated_at,
       }));
     });
   }
@@ -294,9 +289,9 @@ export class IssueService {
         input: {
           projectId: data.projectId,
           title: data.title,
-          body: data.body || '',
-          assigneeIds: data.assigneeIds || []
-        }
+          body: data.body || "",
+          assigneeIds: data.assigneeIds || [],
+        },
       });
 
       const content = response.addProjectV2DraftIssue.projectV2Item.content;
@@ -340,7 +335,9 @@ export class IssueService {
     });
   }
 
-  async deleteDraftIssue(data: { draftIssueId: string }): Promise<{ success: boolean; message: string }> {
+  async deleteDraftIssue(data: {
+    draftIssueId: string;
+  }): Promise<{ success: boolean; message: string }> {
     return safeCall(async () => {
       const mutation = `
         mutation($input: DeleteProjectV2DraftIssueInput!) {

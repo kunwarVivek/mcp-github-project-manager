@@ -3,8 +3,8 @@ import type { GitHubRepositoryFactory } from "../infrastructure/github/GitHubRep
 import type { GitHubProjectRepository } from "../infrastructure/github/repositories/GitHubProjectRepository";
 import type { Project, CreateProject } from "../domain/types";
 import type { ResourceStatus } from "../domain/resource-types";
-import { safeCall } from './utils/safeCall';
-import { parseResourceStatus, filterByStatus } from '../domain/utils/StatusParser';
+import { safeCall } from "./utils/safeCall";
+import { parseResourceStatus, filterByStatus } from "../domain/utils/StatusParser";
 
 /**
  * Service for basic project CRUD operations.
@@ -35,14 +35,14 @@ export class ProjectStatusService {
   async createProject(data: {
     title: string;
     shortDescription?: string;
-    visibility?: 'private' | 'public';
+    visibility?: "private" | "public";
   }): Promise<Project> {
     return safeCall(async () => {
       const projectData: CreateProject = {
         title: data.title,
         shortDescription: data.shortDescription,
         owner: this.factory.getConfig().owner,
-        visibility: data.visibility || 'private',
+        visibility: data.visibility || "private",
       };
 
       const project = await this.projectRepo.create(projectData);
@@ -58,14 +58,14 @@ export class ProjectStatusService {
    * @param limit - Maximum number of projects to return
    * @returns Array of projects
    */
-  async listProjects(status: string = 'active', limit: number = 10): Promise<Project[]> {
+  async listProjects(status: string = "active", limit: number = 10): Promise<Project[]> {
     return safeCall(async () => {
       const projects = await this.projectRepo.findAll();
 
       // Filter by status if needed
       let filteredProjects = projects;
-      if (status !== 'all') {
-        filteredProjects = filterByStatus(projects, status, 'project');
+      if (status !== "all") {
+        filteredProjects = filterByStatus(projects, status, "project");
       }
 
       // Return plain objects for MCP compatibility
@@ -97,14 +97,14 @@ export class ProjectStatusService {
     projectId: string;
     title?: string;
     description?: string;
-    visibility?: 'private' | 'public';
-    status?: 'active' | 'closed';
+    visibility?: "private" | "public";
+    status?: "active" | "closed";
   }): Promise<Project> {
     return safeCall(async () => {
       // Convert the status string to ResourceStatus enum
       let resourceStatus: ResourceStatus | undefined;
       if (data.status) {
-        resourceStatus = parseResourceStatus(data.status, 'project');
+        resourceStatus = parseResourceStatus(data.status, "project");
       }
 
       // Map the data to the domain model
@@ -134,9 +134,7 @@ export class ProjectStatusService {
    * @param data - Project ID to delete
    * @returns Success result with message
    */
-  async deleteProject(data: {
-    projectId: string;
-  }): Promise<{ success: boolean; message: string }> {
+  async deleteProject(data: { projectId: string }): Promise<{ success: boolean; message: string }> {
     return safeCall(async () => {
       await this.projectRepo.delete(data.projectId);
       return {

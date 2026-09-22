@@ -136,13 +136,16 @@ export const createIssueTool: ToolDefinition<CreateIssueArgs, z.infer<typeof Iss
         priority: "high",
         type: "bug",
         assignees: ["developer1"],
-        labels: ["bug", "authentication"]
-      }
-    }
-  ]
+        labels: ["bug", "authentication"],
+      },
+    },
+  ],
 };
 
-export const listIssuesTool: ToolDefinition<ListIssuesArgs, z.infer<typeof IssueListOutputSchema>> = {
+export const listIssuesTool: ToolDefinition<
+  ListIssuesArgs,
+  z.infer<typeof IssueListOutputSchema>
+> = {
   name: "list_issues",
   title: "List Issues",
   description: "List GitHub issues",
@@ -158,10 +161,10 @@ export const listIssuesTool: ToolDefinition<ListIssuesArgs, z.infer<typeof Issue
         milestone: "1",
         sort: "updated",
         direction: "desc",
-        limit: 10
-      }
-    }
-  ]
+        limit: 10,
+      },
+    },
+  ],
 };
 
 export const getIssueTool: ToolDefinition<GetIssueArgs, z.infer<typeof IssueOutputSchema>> = {
@@ -176,10 +179,10 @@ export const getIssueTool: ToolDefinition<GetIssueArgs, z.infer<typeof IssueOutp
       name: "Get issue details",
       description: "Get detailed information about an issue",
       args: {
-        issueId: "42"
-      }
-    }
-  ]
+        issueId: "42",
+      },
+    },
+  ],
 };
 
 export const updateIssueTool: ToolDefinition<UpdateIssueArgs, z.infer<typeof IssueOutputSchema>> = {
@@ -196,17 +199,20 @@ export const updateIssueTool: ToolDefinition<UpdateIssueArgs, z.infer<typeof Iss
       args: {
         issueId: "42",
         status: "closed",
-        milestoneId: "3"
-      }
-    }
-  ]
+        milestoneId: "3",
+      },
+    },
+  ],
 };
 
 // ============================================================================
 // Issue Comment Tool Definitions
 // ============================================================================
 
-export const createIssueCommentTool: ToolDefinition<CreateIssueCommentArgs, z.infer<typeof IssueCommentOutputSchema>> = {
+export const createIssueCommentTool: ToolDefinition<
+  CreateIssueCommentArgs,
+  z.infer<typeof IssueCommentOutputSchema>
+> = {
   name: "create_issue_comment",
   title: "Create Issue Comment",
   description: "Add a comment to a GitHub issue",
@@ -219,13 +225,16 @@ export const createIssueCommentTool: ToolDefinition<CreateIssueCommentArgs, z.in
       description: "Post a comment to update the team on progress",
       args: {
         issueNumber: 42,
-        body: "Working on this issue now. Should have a PR ready by EOD."
-      }
-    }
-  ]
+        body: "Working on this issue now. Should have a PR ready by EOD.",
+      },
+    },
+  ],
 };
 
-export const updateIssueCommentTool: ToolDefinition<UpdateIssueCommentArgs, z.infer<typeof IssueCommentOutputSchema>> = {
+export const updateIssueCommentTool: ToolDefinition<
+  UpdateIssueCommentArgs,
+  z.infer<typeof IssueCommentOutputSchema>
+> = {
   name: "update_issue_comment",
   title: "Update Issue Comment",
   description: "Update an existing comment on a GitHub issue",
@@ -238,13 +247,16 @@ export const updateIssueCommentTool: ToolDefinition<UpdateIssueCommentArgs, z.in
       description: "Edit a previously posted comment to fix information",
       args: {
         commentId: 123456,
-        body: "Updated: PR is ready for review at #45"
-      }
-    }
-  ]
+        body: "Updated: PR is ready for review at #45",
+      },
+    },
+  ],
 };
 
-export const deleteIssueCommentTool: ToolDefinition<DeleteIssueCommentArgs, z.infer<typeof DeleteOutputSchema>> = {
+export const deleteIssueCommentTool: ToolDefinition<
+  DeleteIssueCommentArgs,
+  z.infer<typeof DeleteOutputSchema>
+> = {
   name: "delete_issue_comment",
   title: "Delete Issue Comment",
   description: "Delete a comment from a GitHub issue",
@@ -256,13 +268,16 @@ export const deleteIssueCommentTool: ToolDefinition<DeleteIssueCommentArgs, z.in
       name: "Remove outdated comment",
       description: "Delete a comment that is no longer relevant",
       args: {
-        commentId: 123456
-      }
-    }
-  ]
+        commentId: 123456,
+      },
+    },
+  ],
 };
 
-export const listIssueCommentsTool: ToolDefinition<ListIssueCommentsArgs, z.infer<typeof IssueCommentListOutputSchema>> = {
+export const listIssueCommentsTool: ToolDefinition<
+  ListIssueCommentsArgs,
+  z.infer<typeof IssueCommentListOutputSchema>
+> = {
   name: "list_issue_comments",
   title: "List Issue Comments",
   description: "List all comments on a GitHub issue",
@@ -274,28 +289,32 @@ export const listIssueCommentsTool: ToolDefinition<ListIssueCommentsArgs, z.infe
       name: "Get all comments",
       description: "Retrieve all comments for an issue",
       args: {
-        issueNumber: 42
-      }
+        issueNumber: 42,
+      },
     },
     {
       name: "Get recent comments",
       description: "Retrieve the 20 most recent comments",
       args: {
         issueNumber: 42,
-        perPage: 20
-      }
-    }
-  ]
+        perPage: 20,
+      },
+    },
+  ],
 };
 
 // ============================================================================
 // Draft Issue Tool Definitions
 // ============================================================================
 
-export const createDraftIssueTool: ToolDefinition<CreateDraftIssueArgs, z.infer<typeof DraftIssueOutputSchema>> = {
+export const createDraftIssueTool: ToolDefinition<
+  CreateDraftIssueArgs,
+  z.infer<typeof DraftIssueOutputSchema>
+> = {
   name: "create_draft_issue",
   title: "Create Draft Issue",
-  description: "Create a draft issue in a GitHub project. Draft issues are native to Projects v2 and don't require creating a repository issue first.",
+  description:
+    "Create a draft issue in a GitHub project. Draft issues are native to Projects v2 and don't require creating a repository issue first.",
   schema: createDraftIssueSchema as unknown as ToolSchema<CreateDraftIssueArgs>,
   outputSchema: DraftIssueOutputSchema,
   annotations: ANNOTATION_PATTERNS.create,
@@ -306,13 +325,16 @@ export const createDraftIssueTool: ToolDefinition<CreateDraftIssueArgs, z.infer<
       args: {
         projectId: "PVT_kwDOLhQ7gc4AOEbH",
         title: "Explore new authentication options",
-        body: "Research OAuth providers and compare features"
-      }
-    }
-  ]
+        body: "Research OAuth providers and compare features",
+      },
+    },
+  ],
 };
 
-export const updateDraftIssueTool: ToolDefinition<UpdateDraftIssueArgs, z.infer<typeof DraftIssueOutputSchema>> = {
+export const updateDraftIssueTool: ToolDefinition<
+  UpdateDraftIssueArgs,
+  z.infer<typeof DraftIssueOutputSchema>
+> = {
   name: "update_draft_issue",
   title: "Update Draft Issue",
   description: "Update an existing draft issue in a GitHub project",
@@ -326,13 +348,16 @@ export const updateDraftIssueTool: ToolDefinition<UpdateDraftIssueArgs, z.infer<
       args: {
         draftIssueId: "DI_kwDOLhQ7gc4AABB",
         title: "Implement OAuth 2.0 authentication",
-        body: "Use Auth0 as the provider. See research doc for details."
-      }
-    }
-  ]
+        body: "Use Auth0 as the provider. See research doc for details.",
+      },
+    },
+  ],
 };
 
-export const deleteDraftIssueTool: ToolDefinition<DeleteDraftIssueArgs, z.infer<typeof DeleteOutputSchema>> = {
+export const deleteDraftIssueTool: ToolDefinition<
+  DeleteDraftIssueArgs,
+  z.infer<typeof DeleteOutputSchema>
+> = {
   name: "delete_draft_issue",
   title: "Delete Draft Issue",
   description: "Delete a draft issue from a GitHub project",
@@ -344,8 +369,8 @@ export const deleteDraftIssueTool: ToolDefinition<DeleteDraftIssueArgs, z.infer<
       name: "Remove draft",
       description: "Delete a draft issue that's no longer needed",
       args: {
-        draftIssueId: "DI_kwDOLhQ7gc4AABB"
-      }
-    }
-  ]
+        draftIssueId: "DI_kwDOLhQ7gc4AABB",
+      },
+    },
+  ],
 };

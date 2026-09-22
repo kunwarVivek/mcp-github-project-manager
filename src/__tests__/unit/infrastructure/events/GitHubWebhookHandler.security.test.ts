@@ -1,6 +1,6 @@
-import { describe, expect, it } from 'vitest';
-import * as crypto from 'node:crypto';
-import { GitHubWebhookHandler } from '../../../../infrastructure/events/GitHubWebhookHandler';
+import { describe, expect, it } from "vitest";
+import * as crypto from "node:crypto";
+import { GitHubWebhookHandler } from "../../../../infrastructure/events/GitHubWebhookHandler";
 
 /**
  * Security regression tests for webhook signature validation.
@@ -10,52 +10,48 @@ import { GitHubWebhookHandler } from '../../../../infrastructure/events/GitHubWe
  * fail closed by default and only accept unsigned webhooks when the operator
  * explicitly opts in.
  */
-describe('GitHubWebhookHandler signature validation (security)', () => {
-  const payload = JSON.stringify({ action: 'opened', number: 1 });
+describe("GitHubWebhookHandler signature validation (security)", () => {
+  const payload = JSON.stringify({ action: "opened", number: 1 });
 
   const sign = (secret: string, body: string): string =>
-    `sha256=${crypto.createHmac('sha256', secret).update(body, 'utf8').digest('hex')}`;
+    `sha256=${crypto.createHmac("sha256", secret).update(body, "utf8").digest("hex")}`;
 
-  describe('no secret configured', () => {
-    it('fails closed: rejects when no secret and unsigned not allowed', async () => {
-      const handler = new GitHubWebhookHandler('', false);
-      await expect(handler.validateSignature(payload, 'sha256=anything')).resolves.toBe(false);
+  describe("no secret configured", () => {
+    it("fails closed: rejects when no secret and unsigned not allowed", async () => {
+      const handler = new GitHubWebhookHandler("", false);
+      await expect(handler.validateSignature(payload, "sha256=anything")).resolves.toBe(false);
     });
 
-    it('accepts unsigned only when explicitly opted in', async () => {
-      const handler = new GitHubWebhookHandler('', true);
-      await expect(handler.validateSignature(payload, '')).resolves.toBe(true);
+    it("accepts unsigned only when explicitly opted in", async () => {
+      const handler = new GitHubWebhookHandler("", true);
+      await expect(handler.validateSignature(payload, "")).resolves.toBe(true);
     });
   });
 
-  describe('secret configured', () => {
-    const secret = 'test-webhook-secret';
+  describe("secret configured", () => {
+    const secret = "test-webhook-secret";
 
-    it('accepts a correctly signed payload', async () => {
+    it("accepts a correctly signed payload", async () => {
       const handler = new GitHubWebhookHandler(secret, false);
-      await expect(
-        handler.validateSignature(payload, sign(secret, payload)),
-      ).resolves.toBe(true);
+      await expect(handler.validateSignature(payload, sign(secret, payload))).resolves.toBe(true);
     });
 
-    it('rejects a payload signed with the wrong secret', async () => {
+    it("rejects a payload signed with the wrong secret", async () => {
       const handler = new GitHubWebhookHandler(secret, false);
-      await expect(
-        handler.validateSignature(payload, sign('wrong-secret', payload)),
-      ).resolves.toBe(false);
+      await expect(handler.validateSignature(payload, sign("wrong-secret", payload))).resolves.toBe(
+        false
+      );
     });
 
-    it('rejects when signature is missing', async () => {
+    it("rejects when signature is missing", async () => {
       const handler = new GitHubWebhookHandler(secret, false);
-      await expect(handler.validateSignature(payload, '')).resolves.toBe(false);
+      await expect(handler.validateSignature(payload, "")).resolves.toBe(false);
     });
 
-    it('rejects a tampered payload', async () => {
+    it("rejects a tampered payload", async () => {
       const handler = new GitHubWebhookHandler(secret, false);
       const signature = sign(secret, payload);
-      await expect(
-        handler.validateSignature(`${payload}tampered`, signature),
-      ).resolves.toBe(false);
+      await expect(handler.validateSignature(`${payload}tampered`, signature)).resolves.toBe(false);
     });
   });
 });

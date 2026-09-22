@@ -5,13 +5,11 @@ import type { GitHubSprintRepository } from "../infrastructure/github/repositori
 import type { GitHubIssueRepository } from "../infrastructure/github/repositories/GitHubIssueRepository";
 import type { Sprint, CreateSprint, Issue } from "../domain/types";
 import { ResourceStatus, ResourceType } from "../domain/resource-types";
-import {
-  ResourceNotFoundError,
-} from "../domain/errors";
-import { safeCall } from './utils/safeCall';
-import { SprintEntity } from '../domain/entities/SprintEntity';
-import { parseResourceStatus } from '../domain/utils/StatusParser';
-import { SprintMetrics as SprintMetricsVO } from '../domain/value-objects/SprintMetrics';
+import { ResourceNotFoundError } from "../domain/errors";
+import { safeCall } from "./utils/safeCall";
+import { SprintEntity } from "../domain/entities/SprintEntity";
+import { parseResourceStatus } from "../domain/utils/StatusParser";
+import { SprintMetrics as SprintMetricsVO } from "../domain/value-objects/SprintMetrics";
 
 /**
  * Schema for validating sprint planning input
@@ -20,16 +18,16 @@ const PlanSprintSchema = z.object({
   sprint: z.object({
     title: z.string().min(1, "Sprint title is required"),
     description: z.string(),
-    startDate: z.string().refine(val => !isNaN(Date.parse(val)), {
-      message: "Start date must be a valid date string"
+    startDate: z.string().refine((val) => !isNaN(Date.parse(val)), {
+      message: "Start date must be a valid date string",
     }),
-    endDate: z.string().refine(val => !isNaN(Date.parse(val)), {
-      message: "End date must be a valid date string"
+    endDate: z.string().refine((val) => !isNaN(Date.parse(val)), {
+      message: "End date must be a valid date string",
     }),
     status: z.nativeEnum(ResourceStatus).optional(),
-    issues: z.array(z.string()).optional()
+    issues: z.array(z.string()).optional(),
   }),
-  issueIds: z.array(z.number())
+  issueIds: z.array(z.number()),
 });
 
 /**
@@ -88,21 +86,18 @@ export class SprintPlanningService {
    * @returns The created sprint
    * @throws ValidationError if input validation fails
    */
-  async planSprint(data: {
-    sprint: CreateSprint;
-    issueIds: number[];
-  }): Promise<Sprint> {
+  async planSprint(data: { sprint: CreateSprint; issueIds: number[] }): Promise<Sprint> {
     return safeCall(async () => {
       // Validate input with Zod schema
       const validatedData = PlanSprintSchema.parse(data);
 
-      const stringIssueIds = validatedData.issueIds.map(id => id.toString());
+      const stringIssueIds = validatedData.issueIds.map((id) => id.toString());
 
       // Create sprint with proper error handling
       const sprintData = await this.sprintRepo.create({
         ...validatedData.sprint,
         issues: stringIssueIds,
-        status: validatedData.sprint.status || ResourceStatus.PLANNED
+        status: validatedData.sprint.status || ResourceStatus.PLANNED,
       });
 
       // Create relationship between issues and sprint
@@ -145,14 +140,14 @@ export class SprintPlanningService {
     description?: string;
     startDate?: string;
     endDate?: string;
-    status?: 'planned' | 'active' | 'completed';
+    status?: "planned" | "active" | "completed";
     issues?: string[];
   }): Promise<Sprint> {
     return safeCall(async () => {
       // Convert status string to ResourceStatus enum if provided
       let resourceStatus: ResourceStatus | undefined;
       if (data.status) {
-        resourceStatus = parseResourceStatus(data.status, 'sprint');
+        resourceStatus = parseResourceStatus(data.status, "sprint");
       }
 
       // Map input data to domain model
@@ -162,11 +157,11 @@ export class SprintPlanningService {
         startDate: data.startDate,
         endDate: data.endDate,
         status: resourceStatus,
-        issues: data.issues
+        issues: data.issues,
       };
 
       // Clean up undefined values
-      Object.keys(sprintData).forEach(key => {
+      Object.keys(sprintData).forEach((key) => {
         if (sprintData[key as keyof Partial<Sprint>] === undefined) {
           delete sprintData[key as keyof Partial<Sprint>];
         }
@@ -204,7 +199,7 @@ export class SprintPlanningService {
       return {
         success: addedCount > 0,
         addedIssues: addedCount,
-        message: `Added ${addedCount} issue(s) to sprint ${data.sprintId}`
+        message: `Added ${addedCount} issue(s) to sprint ${data.sprintId}`,
       };
     });
   }
@@ -235,7 +230,7 @@ export class SprintPlanningService {
       return {
         success: removedCount > 0,
         removedIssues: removedCount,
-        message: `Removed ${removedCount} issue(s) from sprint ${data.sprintId}`
+        message: `Removed ${removedCount} issue(s) from sprint ${data.sprintId}`,
       };
     });
   }
@@ -260,14 +255,17 @@ export class SprintPlanningService {
       // Wrap in domain entity for business logic
       const sprint = SprintEntity.fromData(sprintData);
 
-      const issuePromises = sprint.issues.map((issueId: string) => this.issueRepo.findById(issueId));
+      const issuePromises = sprint.issues.map((issueId: string) =>
+        this.issueRepo.findById(issueId)
+      );
       const issuesResult = await Promise.all(issuePromises);
       const issues = issuesResult.filter((issue: Issue | null) => issue !== null) as Issue[];
 
       // Use entity business logic for metrics
       const totalIssues = issues.length;
       const completedIssues = issues.filter(
-        issue => issue.status === ResourceStatus.CLOSED || issue.status === ResourceStatus.COMPLETED
+        (issue) =>
+          issue.status === ResourceStatus.CLOSED || issue.status === ResourceStatus.COMPLETED
       ).length;
 
       // Create immutable value object
@@ -295,7 +293,7 @@ export class SprintPlanningService {
         status: metrics.status,
         issues: includeIssues ? issues : undefined,
         daysRemaining: metrics.daysRemaining,
-        isActive: metrics.isActive
+        isActive: metrics.isActive,
       };
     });
   }
@@ -325,7 +323,7 @@ export class SprintPlanningService {
         startDate: data.startDate,
         endDate: data.endDate,
         status: ResourceStatus.PLANNED,
-        issues: data.issueIds?.map(id => id.toString()) || [],
+        issues: data.issueIds?.map((id) => id.toString()) || [],
         projectId: data.projectId,
       };
 
@@ -340,13 +338,13 @@ export class SprintPlanningService {
    * @param status - Filter by status: 'planned', 'active', 'completed', or 'all'
    * @returns Array of sprints
    */
-  async listSprints(status: string = 'all'): Promise<Sprint[]> {
+  async listSprints(status: string = "all"): Promise<Sprint[]> {
     return safeCall(async () => {
       const sprints = await this.sprintRepo.findAll();
 
-      if (status !== 'all') {
-        const targetStatus = parseResourceStatus(status, 'sprint');
-        return sprints.filter(sprint => sprint.status === targetStatus);
+      if (status !== "all") {
+        const targetStatus = parseResourceStatus(status, "sprint");
+        return sprints.filter((sprint) => sprint.status === targetStatus);
       }
 
       // Return plain objects for MCP compatibility
@@ -377,7 +375,7 @@ export class SprintPlanningService {
         const issues = await this.sprintRepo.getIssues(currentSprintData.id);
         return {
           ...currentSprintData,
-          issueDetails: issues
+          issueDetails: issues,
         } as Sprint & { issueDetails?: Issue[] };
       }
 

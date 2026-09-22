@@ -1,24 +1,50 @@
-import { z } from 'zod';
+import { z } from "zod";
 
 // ============================================================================
 // Agent Registry Types
 // ============================================================================
 
 /** Agent role determines what types of tasks the agent can claim. */
-export type AgentRole = 'engineer' | 'reviewer' | 'pm' | 'designer' | 'qa' | 'devops' | 'general';
+export type AgentRole = "engineer" | "reviewer" | "pm" | "designer" | "qa" | "devops" | "general";
 
-export const AgentRoleSchema = z.enum(['engineer', 'reviewer', 'pm', 'designer', 'qa', 'devops', 'general']);
+export const AgentRoleSchema = z.enum([
+  "engineer",
+  "reviewer",
+  "pm",
+  "designer",
+  "qa",
+  "devops",
+  "general",
+]);
 
 /** Agent runtime — what system is driving this agent. */
-export type AgentRuntime = 'claude-code' | 'codex' | 'cursor' | 'cli' | 'http' | 'custom';
+export type AgentRuntime = "claude-code" | "codex" | "cursor" | "cli" | "http" | "custom";
 
-export const AgentRuntimeSchema = z.enum(['claude-code', 'codex', 'cursor', 'cli', 'http', 'custom']);
+export const AgentRuntimeSchema = z.enum([
+  "claude-code",
+  "codex",
+  "cursor",
+  "cli",
+  "http",
+  "custom",
+]);
 
 /** Current operational status of an agent. */
-export type AgentOperationalStatus = 'idle' | 'working' | 'blocked' | 'needs_review' | 'offline' | 'budget_exhausted';
+export type AgentOperationalStatus =
+  | "idle"
+  | "working"
+  | "blocked"
+  | "needs_review"
+  | "offline"
+  | "budget_exhausted";
 
 export const AgentOperationalStatusSchema = z.enum([
-  'idle', 'working', 'blocked', 'needs_review', 'offline', 'budget_exhausted',
+  "idle",
+  "working",
+  "blocked",
+  "needs_review",
+  "offline",
+  "budget_exhausted",
 ]);
 
 /** A registered agent. */
@@ -59,21 +85,36 @@ export const AgentSchema = z.object({
 // ============================================================================
 
 /** Status of a task in the agent orchestration workflow. */
-export type AgentTaskStatus = 'unclaimed' | 'in_progress' | 'review' | 'blocked' | 'completed';
+export type AgentTaskStatus = "unclaimed" | "in_progress" | "review" | "blocked" | "completed";
 
-export const AgentTaskStatusSchema = z.enum(['unclaimed', 'in_progress', 'review', 'blocked', 'completed']);
+export const AgentTaskStatusSchema = z.enum([
+  "unclaimed",
+  "in_progress",
+  "review",
+  "blocked",
+  "completed",
+]);
 
 /** Strategy for selecting which task to check out. */
-export type CheckoutStrategy = 'highest_priority' | 'oldest_first' | 'skills_match' | 'milestone_deadline' | 'ai';
+export type CheckoutStrategy =
+  | "highest_priority"
+  | "oldest_first"
+  | "skills_match"
+  | "milestone_deadline"
+  | "ai";
 
 export const CheckoutStrategySchema = z.enum([
-  'highest_priority', 'oldest_first', 'skills_match', 'milestone_deadline', 'ai',
+  "highest_priority",
+  "oldest_first",
+  "skills_match",
+  "milestone_deadline",
+  "ai",
 ]);
 
 /** Budget reset period. */
-export type BudgetResetPeriod = 'daily' | 'weekly' | 'monthly' | 'never';
+export type BudgetResetPeriod = "daily" | "weekly" | "monthly" | "never";
 
-export const BudgetResetPeriodSchema = z.enum(['daily', 'weekly', 'monthly', 'never']);
+export const BudgetResetPeriodSchema = z.enum(["daily", "weekly", "monthly", "never"]);
 
 /** Result of a task checkout operation. */
 export interface TaskCheckoutResult {
@@ -198,7 +239,7 @@ export interface AgentBudget {
   usedTokens: number;
   warningFraction: number;
   hardStop: boolean;
-  resetPeriod?: 'daily' | 'weekly' | 'monthly' | 'never';
+  resetPeriod?: "daily" | "weekly" | "monthly" | "never";
   lastResetAt?: string;
 }
 
@@ -209,7 +250,7 @@ export const AgentBudgetSchema = z.object({
   usedTokens: z.number().nonnegative(),
   warningFraction: z.number().min(0).max(1).default(0.8),
   hardStop: z.boolean().default(true),
-  resetPeriod: z.enum(['daily', 'weekly', 'monthly', 'never']).optional(),
+  resetPeriod: z.enum(["daily", "weekly", "monthly", "never"]).optional(),
   lastResetAt: z.string().optional(),
 });
 
@@ -312,35 +353,43 @@ export const AgentTaskContextSchema = z.object({
     state: z.string(),
     createdAt: z.string(),
   }),
-  parentIssue: z.object({
-    id: z.string(),
-    number: z.number(),
-    title: z.string(),
-    body: z.string(),
-  }).optional(),
-  milestone: z.object({
-    title: z.string(),
-    description: z.string(),
-    dueDate: z.string().optional(),
-    progress: z.number().optional(),
-  }).optional(),
-  relatedIssues: z.array(z.object({
-    number: z.number(),
-    title: z.string(),
-    state: z.string(),
-    labels: z.array(z.string()),
-  })),
+  parentIssue: z
+    .object({
+      id: z.string(),
+      number: z.number(),
+      title: z.string(),
+      body: z.string(),
+    })
+    .optional(),
+  milestone: z
+    .object({
+      title: z.string(),
+      description: z.string(),
+      dueDate: z.string().optional(),
+      progress: z.number().optional(),
+    })
+    .optional(),
+  relatedIssues: z.array(
+    z.object({
+      number: z.number(),
+      title: z.string(),
+      state: z.string(),
+      labels: z.array(z.string()),
+    })
+  ),
   projectGoals: z.string().optional(),
   codingStandards: z.string().optional(),
   branchSuggestion: z.string(),
   acceptanceCriteria: z.array(z.string()),
   estimatedComplexity: z.number().optional(),
-  aiSuggestions: z.object({
-    acceptanceCriteria: z.array(z.string()).optional(),
-    complexityEstimate: z.number().optional(),
-    implementationGuidance: z.string().optional(),
-    confidence: z.number().optional(),
-  }).optional(),
+  aiSuggestions: z
+    .object({
+      acceptanceCriteria: z.array(z.string()).optional(),
+      complexityEstimate: z.number().optional(),
+      implementationGuidance: z.string().optional(),
+      confidence: z.number().optional(),
+    })
+    .optional(),
 });
 
 // ============================================================================
@@ -390,29 +439,37 @@ export const AgentActivityEntrySchema = z.object({
     runtime: AgentRuntimeSchema,
     status: AgentOperationalStatusSchema,
   }),
-  currentTask: z.object({
-    issueId: z.string(),
-    issueNumber: z.number().optional(),
-    title: z.string(),
-    progress: z.number().optional(),
-    branch: z.string().optional(),
-    claimedAt: z.string(),
-  }).optional(),
+  currentTask: z
+    .object({
+      issueId: z.string(),
+      issueNumber: z.number().optional(),
+      title: z.string(),
+      progress: z.number().optional(),
+      branch: z.string().optional(),
+      claimedAt: z.string(),
+    })
+    .optional(),
   lastHeartbeat: z.string().optional(),
   heartbeatAge: z.string().optional(),
   isStale: z.boolean(),
-  budgetStatus: z.object({
-    usagePercent: z.number(),
-    isWarning: z.boolean(),
-    isExhausted: z.boolean(),
-  }).optional(),
+  budgetStatus: z
+    .object({
+      usagePercent: z.number(),
+      isWarning: z.boolean(),
+      isExhausted: z.boolean(),
+    })
+    .optional(),
   completedToday: z.number(),
-  heartbeatHistory: z.array(z.object({
-    timestamp: z.string(),
-    status: z.string(),
-    progress: z.number().optional(),
-    progressSummary: z.string().optional(),
-  })).optional(),
+  heartbeatHistory: z
+    .array(
+      z.object({
+        timestamp: z.string(),
+        status: z.string(),
+        progress: z.number().optional(),
+        progressSummary: z.string().optional(),
+      })
+    )
+    .optional(),
 });
 
 // ============================================================================
@@ -443,27 +500,27 @@ export const MAX_AGENT_HIERARCHY_DEPTH = 5;
 export const MAX_AGENT_CHILDREN = 20;
 
 /** Label used to identify the agent registry issue. */
-export const AGENT_REGISTRY_LABEL = 'agent-registry';
+export const AGENT_REGISTRY_LABEL = "agent-registry";
 
 /** Comment marker for structured work product data. */
-export const WORK_PRODUCT_MARKER = '<!-- agent-work-product:';
+export const WORK_PRODUCT_MARKER = "<!-- agent-work-product:";
 
 /** GitHub Project custom field names for agent orchestration. */
 export const AGENT_FIELDS = {
-  CLAIMED_BY: 'agent_claimed_by',
-  CLAIMED_AT: 'agent_claimed_at',
-  STATUS: 'agent_status',
-  WORK_BRANCH: 'agent_work_branch',
-  PR_NUMBER: 'agent_pr_number',
+  CLAIMED_BY: "agent_claimed_by",
+  CLAIMED_AT: "agent_claimed_at",
+  STATUS: "agent_status",
+  WORK_BRANCH: "agent_work_branch",
+  PR_NUMBER: "agent_pr_number",
 } as const;
 
 /** Valid values for the agent_status project field. */
 export const AGENT_STATUS_OPTIONS = [
-  { name: 'unclaimed', color: 'GRAY', description: 'Not assigned to any agent' },
-  { name: 'in_progress', color: 'YELLOW', description: 'Agent is actively working' },
-  { name: 'review', color: 'BLUE', description: 'Work submitted, awaiting review' },
-  { name: 'blocked', color: 'RED', description: 'Agent is blocked' },
-  { name: 'completed', color: 'GREEN', description: 'Work completed and verified' },
+  { name: "unclaimed", color: "GRAY", description: "Not assigned to any agent" },
+  { name: "in_progress", color: "YELLOW", description: "Agent is actively working" },
+  { name: "review", color: "BLUE", description: "Work submitted, awaiting review" },
+  { name: "blocked", color: "RED", description: "Agent is blocked" },
+  { name: "completed", color: "GREEN", description: "Work completed and verified" },
 ] as const;
 
 // ============================================================================

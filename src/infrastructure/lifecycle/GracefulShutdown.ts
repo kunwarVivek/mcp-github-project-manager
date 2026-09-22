@@ -18,10 +18,12 @@ export class GracefulShutdown {
   private readonly shutdownTimeoutMs: number;
   private readonly logger: ShutdownLogger;
 
-  constructor(options: {
-    shutdownTimeoutMs?: number;
-    logger?: ShutdownLogger;
-  } = {}) {
+  constructor(
+    options: {
+      shutdownTimeoutMs?: number;
+      logger?: ShutdownLogger;
+    } = {}
+  ) {
     this.shutdownTimeoutMs = options.shutdownTimeoutMs ?? 30_000;
     this.logger = options.logger ?? {
       info: console.error,
@@ -62,21 +64,19 @@ export class GracefulShutdown {
     this.isShuttingDown = true;
 
     this.logger.info(
-      `[Shutdown] Initiating graceful shutdown (${this.inFlightCount} in-flight requests)`,
+      `[Shutdown] Initiating graceful shutdown (${this.inFlightCount} in-flight requests)`
     );
 
     // Wait for in-flight requests to drain
     const deadline = Date.now() + this.shutdownTimeoutMs;
     while (this.inFlightCount > 0 && Date.now() < deadline) {
-      this.logger.info(
-        `[Shutdown] Waiting for ${this.inFlightCount} in-flight requests...`,
-      );
+      this.logger.info(`[Shutdown] Waiting for ${this.inFlightCount} in-flight requests...`);
       await new Promise<void>((resolve) => setTimeout(resolve, DRAIN_POLL_MS));
     }
 
     if (this.inFlightCount > 0) {
       this.logger.warn(
-        `[Shutdown] Force-closing ${this.inFlightCount} in-flight requests after timeout`,
+        `[Shutdown] Force-closing ${this.inFlightCount} in-flight requests after timeout`
       );
     }
 
@@ -86,7 +86,7 @@ export class GracefulShutdown {
         await cleanupFn();
       } catch (error) {
         this.logger.error(
-          `[Shutdown] Cleanup error: ${error instanceof Error ? error.message : String(error)}`,
+          `[Shutdown] Cleanup error: ${error instanceof Error ? error.message : String(error)}`
         );
       }
     }

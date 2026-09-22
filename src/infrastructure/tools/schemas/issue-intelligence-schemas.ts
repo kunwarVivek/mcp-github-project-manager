@@ -423,9 +423,7 @@ export const FindRelatedIssuesInputSchema = z.object({
   /** Optional issue labels for component grouping */
   issueLabels: z.array(z.string()).optional(),
   /** Repository issues to search for relationships */
-  repositoryIssues: z
-    .array(RepositoryIssueSchema)
-    .describe("Issues to search for relationships"),
+  repositoryIssues: z.array(RepositoryIssueSchema).describe("Issues to search for relationships"),
   /** Optional configuration for relationship types */
   config: RelatedIssueLinkingConfigSchema.optional(),
 });

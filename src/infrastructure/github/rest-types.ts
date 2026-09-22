@@ -1,4 +1,3 @@
-
 import type { components } from "@octokit/openapi-types";
 import { hasRestUserProperties } from "../../domain/type-guards";
 
@@ -209,7 +208,7 @@ export function mapOctokitResponseToRestIssue(response: OctokitIssue): RestIssue
     body: response.body ?? null,
     state: response.state === "closed" ? "closed" : "open",
     labels: Array.isArray(response.labels)
-      ? response.labels.map(label =>
+      ? response.labels.map((label) =>
           typeof label === "string"
             ? label
             : {
@@ -222,7 +221,7 @@ export function mapOctokitResponseToRestIssue(response: OctokitIssue): RestIssue
               }
         )
       : [],
-    assignees: (response.assignees || []).map(assignee => ({
+    assignees: (response.assignees || []).map((assignee) => ({
       login: assignee.login,
       id: toSafeRestId(assignee.id, "assignee.id") ?? 0,
       avatar_url: assignee.avatar_url,

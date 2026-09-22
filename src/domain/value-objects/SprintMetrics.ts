@@ -29,8 +29,8 @@
  * ```
  */
 
-import { ResourceStatus } from '../resource-types';
-import type { Issue } from '../types';
+import { ResourceStatus } from "../resource-types";
+import type { Issue } from "../types";
 
 /**
  * Configuration for creating SprintMetrics
@@ -117,13 +117,13 @@ export class SprintMetrics {
   static create(config: SprintMetricsConfig): SprintMetrics {
     // Validate inputs
     if (config.totalIssues < 0) {
-      throw new Error('totalIssues cannot be negative');
+      throw new Error("totalIssues cannot be negative");
     }
     if (config.completedIssues < 0) {
-      throw new Error('completedIssues cannot be negative');
+      throw new Error("completedIssues cannot be negative");
     }
     if (config.completedIssues > config.totalIssues) {
-      throw new Error('completedIssues cannot exceed totalIssues');
+      throw new Error("completedIssues cannot exceed totalIssues");
     }
 
     return new SprintMetrics(config);

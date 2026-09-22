@@ -66,26 +66,28 @@ export function formatEnrichmentPrompt(params: {
   repositoryLabels?: string[];
 }): string {
   const labelsList = params.repositoryLabels?.length
-    ? `\nAvailable repository labels: ${params.repositoryLabels.join(', ')}`
-    : '';
+    ? `\nAvailable repository labels: ${params.repositoryLabels.join(", ")}`
+    : "";
 
   const projectSection = params.projectContext
     ? `\nProject Context:\n${params.projectContext}`
-    : '';
+    : "";
 
   return `Analyze and enrich the following issue:
 
 Issue Title: ${params.issueTitle}
 
 Issue Description:
-${params.issueDescription || '(No description provided)'}
+${params.issueDescription || "(No description provided)"}
 ${projectSection}
 ${labelsList}
 
 Instructions:
-${params.preserveOriginal
-    ? '- The original description is substantial. Preserve it and add structured sections below it.'
-    : '- The original description is brief. Create a comprehensive rewrite integrating all available information.'}
+${
+  params.preserveOriginal
+    ? "- The original description is substantial. Preserve it and add structured sections below it."
+    : "- The original description is brief. Create a comprehensive rewrite integrating all available information."
+}
 - Generate structured sections: Problem, Solution, Context, Impact, Acceptance Criteria
 - Provide confidence scores (0-1) for each section
 - Suggest relevant labels from the available repository labels
@@ -147,25 +149,26 @@ export function formatLabelPrompt(params: {
   existingLabels: Array<{ name: string; description?: string; color?: string }>;
   issueHistory?: Array<{ labels: string[]; title: string }>;
 }): string {
-  const labelsSection = params.existingLabels.map(label =>
-    `- ${label.name}${label.description ? `: ${label.description}` : ''}`
-  ).join('\n');
+  const labelsSection = params.existingLabels
+    .map((label) => `- ${label.name}${label.description ? `: ${label.description}` : ""}`)
+    .join("\n");
 
   const historySection = params.issueHistory?.length
-    ? `\nIssue History (learn from past patterns):\n${params.issueHistory.slice(0, 10).map((issue, i) =>
-        `${i + 1}. "${issue.title}" -> [${issue.labels.join(', ')}]`
-      ).join('\n')}`
-    : '';
+    ? `\nIssue History (learn from past patterns):\n${params.issueHistory
+        .slice(0, 10)
+        .map((issue, i) => `${i + 1}. "${issue.title}" -> [${issue.labels.join(", ")}]`)
+        .join("\n")}`
+    : "";
 
   return `Suggest labels for the following issue:
 
 Issue Title: ${params.issueTitle}
 
 Issue Description:
-${params.issueDescription || '(No description provided)'}
+${params.issueDescription || "(No description provided)"}
 
 Available Repository Labels:
-${labelsSection || '(No labels defined)'}
+${labelsSection || "(No labels defined)"}
 ${historySection}
 
 Instructions:
@@ -236,12 +239,15 @@ export function formatDuplicatePrompt(params: {
 }): string {
   const sourceSection = `Source Issue:
 Title: ${params.sourceIssue.title}
-Description: ${params.sourceIssue.body || '(No description)'}${params.sourceIssue.labels?.length ? `\nLabels: ${params.sourceIssue.labels.join(', ')}` : ''}`;
+Description: ${params.sourceIssue.body || "(No description)"}${params.sourceIssue.labels?.length ? `\nLabels: ${params.sourceIssue.labels.join(", ")}` : ""}`;
 
-  const candidatesSection = params.candidateIssues.map((issue, i) =>
-    `${i + 1}. [#${issue.number}] ${issue.title}
-   Description: ${(issue.body || '').substring(0, 300)}${(issue.body || '').length > 300 ? '...' : ''}${issue.labels?.length ? `\n   Labels: ${issue.labels.join(', ')}` : ''}`
-  ).join('\n\n');
+  const candidatesSection = params.candidateIssues
+    .map(
+      (issue, i) =>
+        `${i + 1}. [#${issue.number}] ${issue.title}
+   Description: ${(issue.body || "").substring(0, 300)}${(issue.body || "").length > 300 ? "..." : ""}${issue.labels?.length ? `\n   Labels: ${issue.labels.join(", ")}` : ""}`
+    )
+    .join("\n\n");
 
   return `Analyze the following issue for potential duplicates:
 
@@ -317,24 +323,27 @@ export function formatRelatedIssuePrompt(params: {
     title: string;
     body: string;
     labels?: string[];
-    state: 'open' | 'closed';
+    state: "open" | "closed";
   }>;
   componentHints?: string[];
 }): string {
   const sourceSection = `Source Issue:
 ID: ${params.sourceIssue.id}
 Title: ${params.sourceIssue.title}
-Description: ${params.sourceIssue.body || '(No description)'}${params.sourceIssue.labels?.length ? `\nLabels: ${params.sourceIssue.labels.join(', ')}` : ''}`;
+Description: ${params.sourceIssue.body || "(No description)"}${params.sourceIssue.labels?.length ? `\nLabels: ${params.sourceIssue.labels.join(", ")}` : ""}`;
 
-  const candidatesSection = params.candidateIssues.map((issue, i) =>
-    `${i + 1}. [#${issue.number}] ${issue.title} (${issue.state})
+  const candidatesSection = params.candidateIssues
+    .map(
+      (issue, i) =>
+        `${i + 1}. [#${issue.number}] ${issue.title} (${issue.state})
    ID: ${issue.id}
-   Description: ${(issue.body || '').substring(0, 300)}${(issue.body || '').length > 300 ? '...' : ''}${issue.labels?.length ? `\n   Labels: ${issue.labels.join(', ')}` : ''}`
-  ).join('\n\n');
+   Description: ${(issue.body || "").substring(0, 300)}${(issue.body || "").length > 300 ? "..." : ""}${issue.labels?.length ? `\n   Labels: ${issue.labels.join(", ")}` : ""}`
+    )
+    .join("\n\n");
 
   const componentSection = params.componentHints?.length
-    ? `\nKnown Components:\n${params.componentHints.map(c => `- ${c}`).join('\n')}`
-    : '';
+    ? `\nKnown Components:\n${params.componentHints.map((c) => `- ${c}`).join("\n")}`
+    : "";
 
   return `Analyze the following issue for related issues:
 

@@ -112,7 +112,7 @@ export function formatRequirementsForPrompt(
 ): string {
   return requirements
     .map((req, i) => {
-      const id = req.id || `REQ-${String(i + 1).padStart(3, '0')}`;
+      const id = req.id || `REQ-${String(i + 1).padStart(3, "0")}`;
       const lines = [`${i + 1}. ${id}: ${req.title}`];
 
       if (req.description) {
@@ -128,9 +128,9 @@ export function formatRequirementsForPrompt(
         lines.push(`   Category: ${req.category}`);
       }
 
-      return lines.join('\n');
+      return lines.join("\n");
     })
-    .join('\n\n');
+    .join("\n\n");
 }
 
 /**
@@ -145,7 +145,7 @@ export function formatConstraintsForPrompt(constraints?: {
   velocity?: number;
   sprintDurationWeeks?: number;
 }): string {
-  if (!constraints) return '';
+  if (!constraints) return "";
 
   const parts: string[] = [];
 
@@ -162,7 +162,7 @@ export function formatConstraintsForPrompt(constraints?: {
     parts.push(`Sprint duration: ${constraints.sprintDurationWeeks} weeks`);
   }
 
-  return parts.length > 0 ? `\nCONSTRAINTS:\n${parts.join('\n')}` : '';
+  return parts.length > 0 ? `\nCONSTRAINTS:\n${parts.join("\n")}` : "";
 }
 
 /**
@@ -180,7 +180,7 @@ export function formatPhaseContextForPrompt(phase: {
   return `PHASE: ${phase.name}
 Description: ${phase.description}
 Objectives:
-${phase.objectives.map((obj, i) => `  ${i + 1}. ${obj}`).join('\n')}
+${phase.objectives.map((obj, i) => `  ${i + 1}. ${obj}`).join("\n")}
 Duration: ${phase.durationWeeks} weeks`;
 }
 
@@ -191,30 +191,30 @@ export const ROADMAP_PROMPT_CONFIGS = {
   parseRequirements: {
     systemPrompt: REQUIREMENTS_PARSING_PROMPT,
     maxTokens: 2000,
-    temperature: 0.3
+    temperature: 0.3,
   },
 
   generateStructure: {
     systemPrompt: ROADMAP_GENERATION_SYSTEM_PROMPT,
     maxTokens: 4000,
-    temperature: 0.5
+    temperature: 0.5,
   },
 
   sequencePhases: {
     systemPrompt: PHASE_SEQUENCING_PROMPT,
     maxTokens: 2500,
-    temperature: 0.4
+    temperature: 0.4,
   },
 
   estimateMilestones: {
     systemPrompt: MILESTONE_ESTIMATION_PROMPT,
     maxTokens: 2000,
-    temperature: 0.4
+    temperature: 0.4,
   },
 
   generateVisualization: {
     systemPrompt: VISUALIZATION_DATA_PROMPT,
     maxTokens: 1500,
-    temperature: 0.3
-  }
+    temperature: 0.3,
+  },
 };

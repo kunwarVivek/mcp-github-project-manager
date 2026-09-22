@@ -1,7 +1,7 @@
-import { z } from 'zod';
+import { z } from "zod";
 
 /** Validates a non-empty string (trims whitespace). */
-const nonEmptyString = z.string().min(1, 'must not be empty');
+const nonEmptyString = z.string().min(1, "must not be empty");
 
 /**
  * Parse a boolean-valued environment variable.
@@ -16,10 +16,10 @@ const booleanFlag = (defaultValue: boolean) =>
     .optional()
     .transform((value) => {
       if (value === undefined) return defaultValue;
-      if (typeof value === 'boolean') return value;
+      if (typeof value === "boolean") return value;
       const normalized = value.trim().toLowerCase();
-      if (normalized === '') return defaultValue;
-      return normalized === 'true' || normalized === '1';
+      if (normalized === "") return defaultValue;
+      return normalized === "true" || normalized === "1";
     });
 
 /** GitHub configuration — required for all operations. */
@@ -31,10 +31,10 @@ export const GitHubConfigSchema = z.object({
 
 /** AI provider keys — all optional; absence produces a warning, not a failure. */
 export const AIConfigSchema = z.object({
-  ANTHROPIC_API_KEY: z.string().default(''),
-  OPENAI_API_KEY: z.string().default(''),
-  GOOGLE_API_KEY: z.string().default(''),
-  PERPLEXITY_API_KEY: z.string().default(''),
+  ANTHROPIC_API_KEY: z.string().default(""),
+  OPENAI_API_KEY: z.string().default(""),
+  GOOGLE_API_KEY: z.string().default(""),
+  PERPLEXITY_API_KEY: z.string().default(""),
 });
 
 /** Sync/cache configuration. */
@@ -42,40 +42,40 @@ export const SyncConfigSchema = z.object({
   SYNC_ENABLED: booleanFlag(true),
   SYNC_TIMEOUT_MS: z.coerce.number().int().positive().default(30000),
   SYNC_INTERVAL_MS: z.coerce.number().int().nonnegative().default(0),
-  CACHE_DIRECTORY: z.string().default('.mcp-cache'),
+  CACHE_DIRECTORY: z.string().default(".mcp-cache"),
   MAX_CACHE_ENTRIES: z.coerce.number().int().positive().default(10000),
 });
 
 /** Webhook configuration. */
 export const WebhookConfigSchema = z.object({
-  WEBHOOK_SECRET: z.string().default(''),
+  WEBHOOK_SECRET: z.string().default(""),
   WEBHOOK_ALLOW_UNSIGNED: booleanFlag(false),
   WEBHOOK_PORT: z.coerce.number().int().min(1).max(65535).default(3001),
   WEBHOOK_TIMEOUT_MS: z.coerce.number().int().positive().default(5000),
-  WEBHOOK_ALLOWED_ORIGINS: z.string().default(''),
+  WEBHOOK_ALLOWED_ORIGINS: z.string().default(""),
   WEBHOOK_RATE_LIMIT: z.coerce.number().int().positive().default(100),
   WEBHOOK_RATE_WINDOW_MS: z.coerce.number().int().positive().default(60000),
 });
 
 /** AI model configuration. */
 export const AIModelConfigSchema = z.object({
-  AI_MAIN_MODEL: z.string().default(''),
-  AI_RESEARCH_MODEL: z.string().default(''),
-  AI_FALLBACK_MODEL: z.string().default(''),
-  AI_PRD_MODEL: z.string().default(''),
+  AI_MAIN_MODEL: z.string().default(""),
+  AI_RESEARCH_MODEL: z.string().default(""),
+  AI_FALLBACK_MODEL: z.string().default(""),
+  AI_PRD_MODEL: z.string().default(""),
   // Per-role provider overrides
-  AI_MAIN_PROVIDER: z.string().default(''),
-  AI_MAIN_API_KEY: z.string().default(''),
-  AI_MAIN_BASE_URL: z.string().default(''),
-  AI_RESEARCH_PROVIDER: z.string().default(''),
-  AI_RESEARCH_API_KEY: z.string().default(''),
-  AI_RESEARCH_BASE_URL: z.string().default(''),
-  AI_FALLBACK_PROVIDER: z.string().default(''),
-  AI_FALLBACK_API_KEY: z.string().default(''),
-  AI_FALLBACK_BASE_URL: z.string().default(''),
-  AI_PRD_PROVIDER: z.string().default(''),
-  AI_PRD_API_KEY: z.string().default(''),
-  AI_PRD_BASE_URL: z.string().default(''),
+  AI_MAIN_PROVIDER: z.string().default(""),
+  AI_MAIN_API_KEY: z.string().default(""),
+  AI_MAIN_BASE_URL: z.string().default(""),
+  AI_RESEARCH_PROVIDER: z.string().default(""),
+  AI_RESEARCH_API_KEY: z.string().default(""),
+  AI_RESEARCH_BASE_URL: z.string().default(""),
+  AI_FALLBACK_PROVIDER: z.string().default(""),
+  AI_FALLBACK_API_KEY: z.string().default(""),
+  AI_FALLBACK_BASE_URL: z.string().default(""),
+  AI_PRD_PROVIDER: z.string().default(""),
+  AI_PRD_API_KEY: z.string().default(""),
+  AI_PRD_BASE_URL: z.string().default(""),
 });
 
 /** Numeric bounds for AI task generation. */
@@ -110,10 +110,10 @@ export function validateConfig(env: Record<string, string | undefined>): ServerC
       GITHUB_REPO: env.GITHUB_REPO,
     },
     ai: {
-      ANTHROPIC_API_KEY: env.ANTHROPIC_API_KEY ?? '',
-      OPENAI_API_KEY: env.OPENAI_API_KEY ?? '',
-      GOOGLE_API_KEY: env.GOOGLE_API_KEY ?? '',
-      PERPLEXITY_API_KEY: env.PERPLEXITY_API_KEY ?? '',
+      ANTHROPIC_API_KEY: env.ANTHROPIC_API_KEY ?? "",
+      OPENAI_API_KEY: env.OPENAI_API_KEY ?? "",
+      GOOGLE_API_KEY: env.GOOGLE_API_KEY ?? "",
+      PERPLEXITY_API_KEY: env.PERPLEXITY_API_KEY ?? "",
     },
     sync: {
       SYNC_ENABLED: env.SYNC_ENABLED,
@@ -155,9 +155,7 @@ export function validateConfig(env: Record<string, string | undefined>): ServerC
   });
 
   if (!result.success) {
-    const issues = result.error.issues
-      .map(i => `  ${i.path.join('.')}: ${i.message}`)
-      .join('\n');
+    const issues = result.error.issues.map((i) => `  ${i.path.join(".")}: ${i.message}`).join("\n");
     throw new Error(`Configuration validation failed:\n${issues}`);
   }
 
@@ -170,11 +168,23 @@ export function validateConfig(env: Record<string, string | undefined>): ServerC
  */
 export function validateConfigWarnings(env: Record<string, string | undefined>): string[] {
   const warnings: string[] = [];
-  const globalKeys = [env.ANTHROPIC_API_KEY, env.OPENAI_API_KEY, env.GOOGLE_API_KEY, env.PERPLEXITY_API_KEY];
-  const perRoleKeys = [env.AI_MAIN_API_KEY, env.AI_RESEARCH_API_KEY, env.AI_FALLBACK_API_KEY, env.AI_PRD_API_KEY];
+  const globalKeys = [
+    env.ANTHROPIC_API_KEY,
+    env.OPENAI_API_KEY,
+    env.GOOGLE_API_KEY,
+    env.PERPLEXITY_API_KEY,
+  ];
+  const perRoleKeys = [
+    env.AI_MAIN_API_KEY,
+    env.AI_RESEARCH_API_KEY,
+    env.AI_FALLBACK_API_KEY,
+    env.AI_PRD_API_KEY,
+  ];
   const allKeys = [...globalKeys, ...perRoleKeys];
-  if (!allKeys.some(k => k && k.length > 0)) {
-    warnings.push('No AI provider API key configured — AI features will be unavailable. Set a global key (e.g. ANTHROPIC_API_KEY) or per-role keys (e.g. AI_MAIN_API_KEY).');
+  if (!allKeys.some((k) => k && k.length > 0)) {
+    warnings.push(
+      "No AI provider API key configured — AI features will be unavailable. Set a global key (e.g. ANTHROPIC_API_KEY) or per-role keys (e.g. AI_MAIN_API_KEY)."
+    );
   }
   return warnings;
 }

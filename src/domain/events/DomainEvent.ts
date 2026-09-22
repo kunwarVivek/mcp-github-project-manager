@@ -29,7 +29,7 @@
  * ```
  */
 
-import { ResourceType, type ResourceStatus } from '../resource-types';
+import { ResourceType, type ResourceStatus } from "../resource-types";
 
 /**
  * Base class for all domain events
@@ -70,7 +70,7 @@ export abstract class DomainEvent<T = unknown> {
    */
   public readonly data: T;
 
-  protected constructor(aggregateId: string, data: T, causedBy: string = 'system') {
+  protected constructor(aggregateId: string, data: T, causedBy: string = "system") {
     this.eventId = `evt-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     this.aggregateId = aggregateId;
     this.timestamp = new Date();
@@ -78,7 +78,7 @@ export abstract class DomainEvent<T = unknown> {
     this.data = data;
 
     // Freeze the data for immutability
-    if (data && typeof data === 'object') {
+    if (data && typeof data === "object") {
       Object.freeze(data);
     }
   }
@@ -133,10 +133,10 @@ export interface IssueCreatedEventData {
  * Event emitted when an issue is created
  */
 export class IssueCreatedEvent extends DomainEvent<IssueCreatedEventData> {
-  public readonly eventType = 'IssueCreated';
+  public readonly eventType = "IssueCreated";
   public readonly resourceType = ResourceType.ISSUE;
 
-  constructor(aggregateId: string, data: IssueCreatedEventData, causedBy: string = 'system') {
+  constructor(aggregateId: string, data: IssueCreatedEventData, causedBy: string = "system") {
     super(aggregateId, data, causedBy);
   }
 
@@ -158,7 +158,7 @@ export class IssueCreatedEvent extends DomainEvent<IssueCreatedEventData> {
         assignees: params.assignees ?? [],
         milestoneId: params.milestoneId,
       },
-      params.causedBy ?? 'system'
+      params.causedBy ?? "system"
     );
   }
 }
@@ -175,7 +175,7 @@ export interface IssueStatusChangedEventData {
  * Event emitted when an issue's status changes
  */
 export class IssueStatusChangedEvent extends DomainEvent<IssueStatusChangedEventData> {
-  public readonly eventType = 'IssueStatusChanged';
+  public readonly eventType = "IssueStatusChanged";
   public readonly resourceType = ResourceType.ISSUE;
 
   private constructor(aggregateId: string, data: IssueStatusChangedEventData, causedBy: string) {
@@ -194,7 +194,7 @@ export class IssueStatusChangedEvent extends DomainEvent<IssueStatusChangedEvent
         previousStatus: params.previousStatus,
         newStatus: params.newStatus,
       },
-      params.causedBy ?? 'system'
+      params.causedBy ?? "system"
     );
   }
 }
@@ -213,7 +213,7 @@ export interface IssueAssignedEventData {
  * Event emitted when issue assignment changes
  */
 export class IssueAssignedEvent extends DomainEvent<IssueAssignedEventData> {
-  public readonly eventType = 'IssueAssigned';
+  public readonly eventType = "IssueAssigned";
   public readonly resourceType = ResourceType.ISSUE;
 
   private constructor(aggregateId: string, data: IssueAssignedEventData, causedBy: string) {
@@ -226,8 +226,8 @@ export class IssueAssignedEvent extends DomainEvent<IssueAssignedEventData> {
     newAssignees: string[];
     causedBy?: string;
   }): IssueAssignedEvent {
-    const added = params.newAssignees.filter(a => !params.previousAssignees.includes(a));
-    const removed = params.previousAssignees.filter(a => !params.newAssignees.includes(a));
+    const added = params.newAssignees.filter((a) => !params.previousAssignees.includes(a));
+    const removed = params.previousAssignees.filter((a) => !params.newAssignees.includes(a));
 
     return new IssueAssignedEvent(
       params.issueId,
@@ -237,7 +237,7 @@ export class IssueAssignedEvent extends DomainEvent<IssueAssignedEventData> {
         addedAssignees: added,
         removedAssignees: removed,
       },
-      params.causedBy ?? 'system'
+      params.causedBy ?? "system"
     );
   }
 }
@@ -256,7 +256,7 @@ export interface IssueLabelChangedEventData {
  * Event emitted when issue labels change
  */
 export class IssueLabelChangedEvent extends DomainEvent<IssueLabelChangedEventData> {
-  public readonly eventType = 'IssueLabelChanged';
+  public readonly eventType = "IssueLabelChanged";
   public readonly resourceType = ResourceType.ISSUE;
 
   private constructor(aggregateId: string, data: IssueLabelChangedEventData, causedBy: string) {
@@ -269,8 +269,8 @@ export class IssueLabelChangedEvent extends DomainEvent<IssueLabelChangedEventDa
     newLabels: string[];
     causedBy?: string;
   }): IssueLabelChangedEvent {
-    const added = params.newLabels.filter(l => !params.previousLabels.includes(l));
-    const removed = params.previousLabels.filter(l => !params.newLabels.includes(l));
+    const added = params.newLabels.filter((l) => !params.previousLabels.includes(l));
+    const removed = params.previousLabels.filter((l) => !params.newLabels.includes(l));
 
     return new IssueLabelChangedEvent(
       params.issueId,
@@ -280,7 +280,7 @@ export class IssueLabelChangedEvent extends DomainEvent<IssueLabelChangedEventDa
         addedLabels: added,
         removedLabels: removed,
       },
-      params.causedBy ?? 'system'
+      params.causedBy ?? "system"
     );
   }
 }
@@ -303,10 +303,10 @@ export interface SprintCreatedEventData {
  * Event emitted when a sprint is created
  */
 export class SprintCreatedEvent extends DomainEvent<SprintCreatedEventData> {
-  public readonly eventType = 'SprintCreated';
+  public readonly eventType = "SprintCreated";
   public readonly resourceType = ResourceType.SPRINT;
 
-  constructor(aggregateId: string, data: SprintCreatedEventData, causedBy: string = 'system') {
+  constructor(aggregateId: string, data: SprintCreatedEventData, causedBy: string = "system") {
     super(aggregateId, data, causedBy);
   }
 
@@ -326,7 +326,7 @@ export class SprintCreatedEvent extends DomainEvent<SprintCreatedEventData> {
         endDate: params.endDate,
         issueIds: params.issueIds ?? [],
       },
-      params.causedBy ?? 'system'
+      params.causedBy ?? "system"
     );
   }
 }
@@ -343,7 +343,7 @@ export interface SprintStatusChangedEventData {
  * Event emitted when a sprint's status changes
  */
 export class SprintStatusChangedEvent extends DomainEvent<SprintStatusChangedEventData> {
-  public readonly eventType = 'SprintStatusChanged';
+  public readonly eventType = "SprintStatusChanged";
   public readonly resourceType = ResourceType.SPRINT;
 
   private constructor(aggregateId: string, data: SprintStatusChangedEventData, causedBy: string) {
@@ -362,7 +362,7 @@ export class SprintStatusChangedEvent extends DomainEvent<SprintStatusChangedEve
         previousStatus: params.previousStatus,
         newStatus: params.newStatus,
       },
-      params.causedBy ?? 'system'
+      params.causedBy ?? "system"
     );
   }
 }
@@ -379,7 +379,7 @@ export interface SprintIssuesChangedEventData {
  * Event emitted when sprint issues change
  */
 export class SprintIssuesChangedEvent extends DomainEvent<SprintIssuesChangedEventData> {
-  public readonly eventType = 'SprintIssuesChanged';
+  public readonly eventType = "SprintIssuesChanged";
   public readonly resourceType = ResourceType.SPRINT;
 
   private constructor(aggregateId: string, data: SprintIssuesChangedEventData, causedBy: string) {
@@ -398,7 +398,7 @@ export class SprintIssuesChangedEvent extends DomainEvent<SprintIssuesChangedEve
         addedIssueIds: params.addedIssueIds ?? [],
         removedIssueIds: params.removedIssueIds ?? [],
       },
-      params.causedBy ?? 'system'
+      params.causedBy ?? "system"
     );
   }
 }
@@ -420,7 +420,7 @@ export interface MilestoneCreatedEventData {
  * Event emitted when a milestone is created
  */
 export class MilestoneCreatedEvent extends DomainEvent<MilestoneCreatedEventData> {
-  public readonly eventType = 'MilestoneCreated';
+  public readonly eventType = "MilestoneCreated";
   public readonly resourceType = ResourceType.MILESTONE;
 
   private constructor(aggregateId: string, data: MilestoneCreatedEventData, causedBy: string) {
@@ -441,7 +441,7 @@ export class MilestoneCreatedEvent extends DomainEvent<MilestoneCreatedEventData
         description: params.description,
         dueDate: params.dueDate,
       },
-      params.causedBy ?? 'system'
+      params.causedBy ?? "system"
     );
   }
 }
@@ -458,10 +458,14 @@ export interface MilestoneStatusChangedEventData {
  * Event emitted when a milestone's status changes
  */
 export class MilestoneStatusChangedEvent extends DomainEvent<MilestoneStatusChangedEventData> {
-  public readonly eventType = 'MilestoneStatusChanged';
+  public readonly eventType = "MilestoneStatusChanged";
   public readonly resourceType = ResourceType.MILESTONE;
 
-  private constructor(aggregateId: string, data: MilestoneStatusChangedEventData, causedBy: string) {
+  private constructor(
+    aggregateId: string,
+    data: MilestoneStatusChangedEventData,
+    causedBy: string
+  ) {
     super(aggregateId, data, causedBy);
   }
 
@@ -477,7 +481,7 @@ export class MilestoneStatusChangedEvent extends DomainEvent<MilestoneStatusChan
         previousStatus: params.previousStatus,
         newStatus: params.newStatus,
       },
-      params.causedBy ?? 'system'
+      params.causedBy ?? "system"
     );
   }
 }
@@ -492,14 +496,14 @@ export class MilestoneStatusChangedEvent extends DomainEvent<MilestoneStatusChan
 export interface ProjectCreatedEventData {
   title: string;
   description?: string;
-  visibility: 'private' | 'public';
+  visibility: "private" | "public";
 }
 
 /**
  * Event emitted when a project is created
  */
 export class ProjectCreatedEvent extends DomainEvent<ProjectCreatedEventData> {
-  public readonly eventType = 'ProjectCreated';
+  public readonly eventType = "ProjectCreated";
   public readonly resourceType = ResourceType.PROJECT;
 
   private constructor(aggregateId: string, data: ProjectCreatedEventData, causedBy: string) {
@@ -510,7 +514,7 @@ export class ProjectCreatedEvent extends DomainEvent<ProjectCreatedEventData> {
     projectId: string;
     title: string;
     description?: string;
-    visibility?: 'private' | 'public';
+    visibility?: "private" | "public";
     causedBy?: string;
   }): ProjectCreatedEvent {
     return new ProjectCreatedEvent(
@@ -518,9 +522,9 @@ export class ProjectCreatedEvent extends DomainEvent<ProjectCreatedEventData> {
       {
         title: params.title,
         description: params.description,
-        visibility: params.visibility ?? 'private',
+        visibility: params.visibility ?? "private",
       },
-      params.causedBy ?? 'system'
+      params.causedBy ?? "system"
     );
   }
 }
@@ -537,7 +541,7 @@ export interface ProjectStatusChangedEventData {
  * Event emitted when a project's status changes
  */
 export class ProjectStatusChangedEvent extends DomainEvent<ProjectStatusChangedEventData> {
-  public readonly eventType = 'ProjectStatusChanged';
+  public readonly eventType = "ProjectStatusChanged";
   public readonly resourceType = ResourceType.PROJECT;
 
   private constructor(aggregateId: string, data: ProjectStatusChangedEventData, causedBy: string) {
@@ -556,7 +560,7 @@ export class ProjectStatusChangedEvent extends DomainEvent<ProjectStatusChangedE
         previousStatus: params.previousStatus,
         newStatus: params.newStatus,
       },
-      params.causedBy ?? 'system'
+      params.causedBy ?? "system"
     );
   }
 }

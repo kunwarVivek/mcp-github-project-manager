@@ -1,7 +1,11 @@
-import type { PRDDocument } from '../../domain/ai-types';
-import { ValidationRuleEngine, type ValidationResults, type ValidationRule } from './ValidationRuleEngine';
-import { COMPLETENESS_RULES } from './rules/CompletenessRules';
-import { CLARITY_RULES } from './rules/ClarityRules';
+import type { PRDDocument } from "../../domain/ai-types";
+import {
+  ValidationRuleEngine,
+  type ValidationResults,
+  type ValidationRule,
+} from "./ValidationRuleEngine";
+import { COMPLETENESS_RULES } from "./rules/CompletenessRules";
+import { CLARITY_RULES } from "./rules/ClarityRules";
 
 /**
  * PRD-specific validator with built-in rules
@@ -31,8 +35,8 @@ export class PRDValidator {
     const lines: string[] = [];
 
     lines.push(`PRD Validation Score: ${results.score}/100`);
-    lines.push(`Status: ${results.valid ? 'VALID' : 'INVALID'}`);
-    lines.push('');
+    lines.push(`Status: ${results.valid ? "VALID" : "INVALID"}`);
+    lines.push("");
     lines.push(`Rules: ${results.passedRules}/${results.totalRules} passed`);
 
     if (results.criticalIssues > 0) {
@@ -45,10 +49,10 @@ export class PRDValidator {
       lines.push(`Minor Issues: ${results.minorIssues}`);
     }
 
-    lines.push('');
-    lines.push('Issues:');
+    lines.push("");
+    lines.push("Issues:");
 
-    const failedResults = results.results.filter(r => !r.result.passed);
+    const failedResults = results.results.filter((r) => !r.result.passed);
     for (const { rule, result } of failedResults) {
       lines.push(`  [${rule.severity.toUpperCase()}] ${rule.name}`);
       lines.push(`    ${result.message}`);
@@ -57,7 +61,7 @@ export class PRDValidator {
       }
     }
 
-    return lines.join('\n');
+    return lines.join("\n");
   }
 
   /**
@@ -71,14 +75,14 @@ export class PRDValidator {
    * Enable standard rules (optional industry standards)
    */
   enableStandardRules(): void {
-    this.ruleEngine.enableLayer('standard');
+    this.ruleEngine.enableLayer("standard");
   }
 
   /**
    * Enable custom rules
    */
   enableCustomRules(): void {
-    this.ruleEngine.enableLayer('custom');
+    this.ruleEngine.enableLayer("custom");
   }
 
   /**

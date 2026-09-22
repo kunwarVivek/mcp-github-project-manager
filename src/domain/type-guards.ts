@@ -4,7 +4,7 @@
  * These guards provide type-safe access to external data (GitHub API responses,
  * cached resources, error objects) without using `as any` for property access.
  */
-import { z } from 'zod';
+import { z } from "zod";
 
 // =============================================================================
 // Project Item Type Guard
@@ -15,9 +15,11 @@ import { z } from 'zod';
  */
 const ProjectItemSchema = z.object({
   title: z.string().optional(),
-  content: z.object({
-    body: z.string().optional()
-  }).optional()
+  content: z
+    .object({
+      body: z.string().optional(),
+    })
+    .optional(),
 });
 
 export type ProjectItem = z.infer<typeof ProjectItemSchema>;
@@ -39,7 +41,7 @@ export function isProjectItem(data: unknown): data is ProjectItem {
  */
 const CacheableResourceSchema = z.object({
   updatedAt: z.string().optional(),
-  version: z.number().optional()
+  version: z.number().optional(),
 });
 
 export type CacheableResource = z.infer<typeof CacheableResourceSchema>;
@@ -49,7 +51,7 @@ export type CacheableResource = z.infer<typeof CacheableResourceSchema>;
  * Used when extracting metadata from cached values
  */
 export function isCacheableResource(data: unknown): data is CacheableResource {
-  return typeof data === 'object' && data !== null;
+  return typeof data === "object" && data !== null;
 }
 
 // =============================================================================
@@ -62,7 +64,7 @@ export function isCacheableResource(data: unknown): data is CacheableResource {
 const RestUserPropertiesSchema = z.object({
   avatar_url: z.string().optional(),
   gravatar_id: z.string().nullable().optional(),
-  url: z.string().optional()
+  url: z.string().optional(),
 });
 
 export type RestUserProperties = z.infer<typeof RestUserPropertiesSchema>;
@@ -72,7 +74,7 @@ export type RestUserProperties = z.infer<typeof RestUserPropertiesSchema>;
  * Used when mapping REST API responses to internal types
  */
 export function hasRestUserProperties(user: unknown): user is RestUserProperties {
-  return typeof user === 'object' && user !== null;
+  return typeof user === "object" && user !== null;
 }
 
 // =============================================================================
@@ -84,8 +86,10 @@ export function hasRestUserProperties(user: unknown): user is RestUserProperties
  * Used when checking retryable error codes
  */
 export function isGitHubErrorWithCode(error: unknown): error is { code: string } {
-  return typeof error === 'object' &&
-         error !== null &&
-         'code' in error &&
-         typeof (error as { code: unknown }).code === 'string';
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    typeof (error as { code: unknown }).code === "string"
+  );
 }

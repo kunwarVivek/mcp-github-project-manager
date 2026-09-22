@@ -1,7 +1,7 @@
-import * as crypto from 'node:crypto';
-import { ResourceType } from '../../domain/resource-types';
-import { type ILogger, Logger } from '../logger/index';
-import { WEBHOOK_SECRET, WEBHOOK_ALLOW_UNSIGNED } from '../../env';
+import * as crypto from "node:crypto";
+import { ResourceType } from "../../domain/resource-types";
+import { type ILogger, Logger } from "../logger/index";
+import { WEBHOOK_SECRET, WEBHOOK_ALLOW_UNSIGNED } from "../../env";
 
 export interface WebhookEvent {
   id: string;
@@ -14,12 +14,12 @@ export interface WebhookEvent {
 
 export interface ResourceEvent {
   id: string;
-  type: 'created' | 'updated' | 'deleted' | 'closed' | 'reopened';
+  type: "created" | "updated" | "deleted" | "closed" | "reopened";
   resourceType: ResourceType;
   resourceId: string;
   timestamp: string;
   data: any;
-  source: 'github' | 'api';
+  source: "github" | "api";
   metadata?: Record<string, any>;
 }
 
@@ -36,7 +36,11 @@ export class GitHubWebhookHandler {
   private readonly webhookSecret: string;
   private readonly allowUnsigned: boolean;
 
-  constructor(webhookSecret?: string, allowUnsigned: boolean = WEBHOOK_ALLOW_UNSIGNED, logger?: ILogger) {
+  constructor(
+    webhookSecret?: string,
+    allowUnsigned: boolean = WEBHOOK_ALLOW_UNSIGNED,
+    logger?: ILogger
+  ) {
     this.webhookSecret = webhookSecret || WEBHOOK_SECRET;
     this.allowUnsigned = allowUnsigned;
     this.logger = logger ?? Logger.getInstance();
@@ -55,13 +59,13 @@ export class GitHubWebhookHandler {
       if (this.allowUnsigned) {
         this.logger.warn(
           "WEBHOOK_ALLOW_UNSIGNED is enabled and no webhook secret is configured — " +
-          "accepting unsigned webhook. Do NOT use this in production."
+            "accepting unsigned webhook. Do NOT use this in production."
         );
         return true;
       }
       this.logger.error(
         "Rejecting webhook: no WEBHOOK_SECRET configured. Set WEBHOOK_SECRET to enable " +
-        "signature validation, or WEBHOOK_ALLOW_UNSIGNED=true for trusted local/dev use."
+          "signature validation, or WEBHOOK_ALLOW_UNSIGNED=true for trusted local/dev use."
       );
       return false; // Fail closed
     }
@@ -73,18 +77,16 @@ export class GitHubWebhookHandler {
 
     try {
       // GitHub sends signature as "sha256=<hash>"
-      const expectedSignature = signature.startsWith('sha256=')
-        ? signature
-        : `sha256=${signature}`;
+      const expectedSignature = signature.startsWith("sha256=") ? signature : `sha256=${signature}`;
 
       const computedSignature = `sha256=${crypto
-        .createHmac('sha256', this.webhookSecret)
-        .update(payload, 'utf8')
-        .digest('hex')}`;
+        .createHmac("sha256", this.webhookSecret)
+        .update(payload, "utf8")
+        .digest("hex")}`;
 
       // Use timingSafeEqual to prevent timing attacks
-      const expectedBuffer = Buffer.from(expectedSignature, 'utf8');
-      const computedBuffer = Buffer.from(computedSignature, 'utf8');
+      const expectedBuffer = Buffer.from(expectedSignature, "utf8");
+      const computedBuffer = Buffer.from(computedSignature, "utf8");
 
       if (expectedBuffer.length !== computedBuffer.length) {
         return false;
@@ -105,7 +107,7 @@ export class GitHubWebhookHandler {
       success: false,
       events: [],
       errors: [],
-      skipped: false
+      skipped: false,
     };
 
     try {
@@ -124,10 +126,12 @@ export class GitHubWebhookHandler {
       result.events = resourceEvents;
       result.success = true;
 
-      this.logger.info(`Successfully processed webhook ${event.id}: generated ${resourceEvents.length} resource events`);
-
+      this.logger.info(
+        `Successfully processed webhook ${event.id}: generated ${resourceEvents.length} resource events`
+      );
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : "Unknown error processing webhook";
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error processing webhook";
       result.errors.push(errorMessage);
       this.logger.error(`Failed to process webhook ${event.id}:`, error);
     }
@@ -143,25 +147,25 @@ export class GitHubWebhookHandler {
 
     try {
       switch (webhook.type) {
-        case 'projects_v2':
-          events.push(...await this.handleProjectsV2Event(webhook));
+        case "projects_v2":
+          events.push(...(await this.handleProjectsV2Event(webhook)));
           break;
-        case 'projects_v2_item':
-          events.push(...await this.handleProjectsV2ItemEvent(webhook));
+        case "projects_v2_item":
+          events.push(...(await this.handleProjectsV2ItemEvent(webhook)));
           break;
-        case 'milestone':
-          events.push(...await this.handleMilestoneEvent(webhook));
+        case "milestone":
+          events.push(...(await this.handleMilestoneEvent(webhook)));
           break;
-        case 'issues':
-          events.push(...await this.handleIssueEvent(webhook));
+        case "issues":
+          events.push(...(await this.handleIssueEvent(webhook)));
           break;
-        case 'pull_request':
-          events.push(...await this.handlePullRequestEvent(webhook));
+        case "pull_request":
+          events.push(...(await this.handlePullRequestEvent(webhook)));
           break;
-        case 'project_card':
-        case 'project_column':
-        case 'project':
-          events.push(...await this.handleLegacyProjectEvent(webhook));
+        case "project_card":
+        case "project_column":
+        case "project":
+          events.push(...(await this.handleLegacyProjectEvent(webhook)));
           break;
         default:
           this.logger.debug(`Unhandled webhook type: ${webhook.type}`);
@@ -189,20 +193,22 @@ export class GitHubWebhookHandler {
       return [];
     }
 
-    return [{
-      id: `${webhook.id}-project-${project.id}`,
-      type: eventType,
-      resourceType: ResourceType.PROJECT,
-      resourceId: project.id.toString(),
-      timestamp: webhook.timestamp,
-      data: project,
-      source: 'github',
-      metadata: {
-        action,
-        webhookId: webhook.id,
-        delivery: webhook.delivery
-      }
-    }];
+    return [
+      {
+        id: `${webhook.id}-project-${project.id}`,
+        type: eventType,
+        resourceType: ResourceType.PROJECT,
+        resourceId: project.id.toString(),
+        timestamp: webhook.timestamp,
+        data: project,
+        source: "github",
+        metadata: {
+          action,
+          webhookId: webhook.id,
+          delivery: webhook.delivery,
+        },
+      },
+    ];
   }
 
   /**
@@ -218,7 +224,7 @@ export class GitHubWebhookHandler {
     const events: ResourceEvent[] = [];
 
     // Handle the item itself (could be an issue or pull request)
-    if (item.content_type === 'Issue' && item.content_node_id) {
+    if (item.content_type === "Issue" && item.content_node_id) {
       const eventType = this.mapActionToEventType(action);
       if (eventType) {
         events.push({
@@ -228,13 +234,13 @@ export class GitHubWebhookHandler {
           resourceId: item.content_node_id,
           timestamp: webhook.timestamp,
           data: item,
-          source: 'github',
+          source: "github",
           metadata: {
             action,
             projectId: item.project_node_id,
             webhookId: webhook.id,
-            delivery: webhook.delivery
-          }
+            delivery: webhook.delivery,
+          },
         });
       }
     }
@@ -257,20 +263,22 @@ export class GitHubWebhookHandler {
       return [];
     }
 
-    return [{
-      id: `${webhook.id}-milestone-${milestone.id}`,
-      type: eventType,
-      resourceType: ResourceType.MILESTONE,
-      resourceId: milestone.id.toString(),
-      timestamp: webhook.timestamp,
-      data: milestone,
-      source: 'github',
-      metadata: {
-        action,
-        webhookId: webhook.id,
-        delivery: webhook.delivery
-      }
-    }];
+    return [
+      {
+        id: `${webhook.id}-milestone-${milestone.id}`,
+        type: eventType,
+        resourceType: ResourceType.MILESTONE,
+        resourceId: milestone.id.toString(),
+        timestamp: webhook.timestamp,
+        data: milestone,
+        source: "github",
+        metadata: {
+          action,
+          webhookId: webhook.id,
+          delivery: webhook.delivery,
+        },
+      },
+    ];
   }
 
   /**
@@ -288,20 +296,22 @@ export class GitHubWebhookHandler {
       return [];
     }
 
-    return [{
-      id: `${webhook.id}-issue-${issue.id}`,
-      type: eventType,
-      resourceType: ResourceType.ISSUE,
-      resourceId: issue.id.toString(),
-      timestamp: webhook.timestamp,
-      data: issue,
-      source: 'github',
-      metadata: {
-        action,
-        webhookId: webhook.id,
-        delivery: webhook.delivery
-      }
-    }];
+    return [
+      {
+        id: `${webhook.id}-issue-${issue.id}`,
+        type: eventType,
+        resourceType: ResourceType.ISSUE,
+        resourceId: issue.id.toString(),
+        timestamp: webhook.timestamp,
+        data: issue,
+        source: "github",
+        metadata: {
+          action,
+          webhookId: webhook.id,
+          delivery: webhook.delivery,
+        },
+      },
+    ];
   }
 
   /**
@@ -319,21 +329,23 @@ export class GitHubWebhookHandler {
       return [];
     }
 
-    return [{
-      id: `${webhook.id}-pr-${pull_request.id}`,
-      type: eventType,
-      resourceType: ResourceType.ISSUE, // PRs are treated as issues in project management
-      resourceId: pull_request.id.toString(),
-      timestamp: webhook.timestamp,
-      data: pull_request,
-      source: 'github',
-      metadata: {
-        action,
-        isPullRequest: true,
-        webhookId: webhook.id,
-        delivery: webhook.delivery
-      }
-    }];
+    return [
+      {
+        id: `${webhook.id}-pr-${pull_request.id}`,
+        type: eventType,
+        resourceType: ResourceType.ISSUE, // PRs are treated as issues in project management
+        resourceId: pull_request.id.toString(),
+        timestamp: webhook.timestamp,
+        data: pull_request,
+        source: "github",
+        metadata: {
+          action,
+          isPullRequest: true,
+          webhookId: webhook.id,
+          delivery: webhook.delivery,
+        },
+      },
+    ];
   }
 
   /**
@@ -348,20 +360,20 @@ export class GitHubWebhookHandler {
   /**
    * Map GitHub action to our event type
    */
-  private mapActionToEventType(action: string): ResourceEvent['type'] | null {
+  private mapActionToEventType(action: string): ResourceEvent["type"] | null {
     switch (action) {
-      case 'created':
-      case 'opened':
-        return 'created';
-      case 'edited':
-      case 'updated':
-        return 'updated';
-      case 'deleted':
-        return 'deleted';
-      case 'closed':
-        return 'closed';
-      case 'reopened':
-        return 'reopened';
+      case "created":
+      case "opened":
+        return "created";
+      case "edited":
+      case "updated":
+        return "updated";
+      case "deleted":
+        return "deleted";
+      case "closed":
+        return "closed";
+      case "reopened":
+        return "reopened";
       default:
         return null;
     }
@@ -382,7 +394,7 @@ export class GitHubWebhookHandler {
       timestamp: new Date().toISOString(),
       payload,
       signature,
-      delivery
+      delivery,
     };
   }
 
@@ -390,21 +402,21 @@ export class GitHubWebhookHandler {
    * Validate webhook payload structure
    */
   validateWebhookPayload(eventType: string, payload: any): boolean {
-    if (!payload || typeof payload !== 'object') {
+    if (!payload || typeof payload !== "object") {
       return false;
     }
 
     // Basic validation based on event type
     switch (eventType) {
-      case 'projects_v2':
+      case "projects_v2":
         return !!(payload.projects_v2 && payload.action);
-      case 'projects_v2_item':
+      case "projects_v2_item":
         return !!(payload.projects_v2_item && payload.action);
-      case 'milestone':
+      case "milestone":
         return !!(payload.milestone && payload.action);
-      case 'issues':
+      case "issues":
         return !!(payload.issue && payload.action);
-      case 'pull_request':
+      case "pull_request":
         return !!(payload.pull_request && payload.action);
       default:
         return true; // Allow unknown event types for future compatibility

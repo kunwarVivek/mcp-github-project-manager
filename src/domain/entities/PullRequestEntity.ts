@@ -25,29 +25,29 @@
  * Pull request state
  */
 export enum PullRequestState {
-  OPEN = 'open',
-  CLOSED = 'closed',
-  MERGED = 'merged',
+  OPEN = "open",
+  CLOSED = "closed",
+  MERGED = "merged",
 }
 
 /**
  * Review state
  */
 export enum ReviewState {
-  PENDING = 'pending',
-  APPROVED = 'approved',
-  CHANGES_REQUESTED = 'changes_requested',
-  COMMENTED = 'commented',
-  DISMISSED = 'dismissed',
+  PENDING = "pending",
+  APPROVED = "approved",
+  CHANGES_REQUESTED = "changes_requested",
+  COMMENTED = "commented",
+  DISMISSED = "dismissed",
 }
 
 /**
  * Merge method
  */
 export enum MergeMethod {
-  MERGE = 'merge',
-  SQUASH = 'squash',
-  REBASE = 'rebase',
+  MERGE = "merge",
+  SQUASH = "squash",
+  REBASE = "rebase",
 }
 
 /**
@@ -189,7 +189,7 @@ export class PullRequestEntity {
     let state: PullRequestState;
     if (data.merged) {
       state = PullRequestState.MERGED;
-    } else if (data.state === 'closed') {
+    } else if (data.state === "closed") {
       state = PullRequestState.CLOSED;
     } else {
       state = PullRequestState.OPEN;
@@ -202,11 +202,11 @@ export class PullRequestEntity {
         id: data.id,
         number: data.number,
         title: data.title,
-        description: data.body ?? data.description ?? '',
+        description: data.body ?? data.description ?? "",
         state,
-        author: data.user ?? data.author ?? 'unknown',
-        head: data.headRef ?? data.head ?? '',
-        base: data.baseRef ?? data.base ?? '',
+        author: data.user ?? data.author ?? "unknown",
+        head: data.headRef ?? data.head ?? "",
+        base: data.baseRef ?? data.base ?? "",
         url: data.url,
         createdAt: data.createdAt ?? now,
         updatedAt: data.updatedAt ?? now,
@@ -245,7 +245,7 @@ export class PullRequestEntity {
         id: options.id ?? 0,
         number: options.number ?? 0,
         title: data.title,
-        description: data.description ?? '',
+        description: data.description ?? "",
         state: PullRequestState.OPEN,
         author: data.author,
         head: data.head,
@@ -295,9 +295,7 @@ export class PullRequestEntity {
    * Check if the PR is approved
    */
   get isApproved(): boolean {
-    const approvals = this.reviews.filter(
-      r => r.state === ReviewState.APPROVED
-    ).length;
+    const approvals = this.reviews.filter((r) => r.state === ReviewState.APPROVED).length;
     return approvals >= (this.config.requiredApprovals ?? 1);
   }
 
@@ -305,21 +303,21 @@ export class PullRequestEntity {
    * Check if changes are requested
    */
   get hasChangesRequested(): boolean {
-    return this.reviews.some(r => r.state === ReviewState.CHANGES_REQUESTED);
+    return this.reviews.some((r) => r.state === ReviewState.CHANGES_REQUESTED);
   }
 
   /**
    * Get the number of approvals
    */
   get approvals(): number {
-    return this.reviews.filter(r => r.state === ReviewState.APPROVED).length;
+    return this.reviews.filter((r) => r.state === ReviewState.APPROVED).length;
   }
 
   /**
    * Get the number of change requests
    */
   get changeRequests(): number {
-    return this.reviews.filter(r => r.state === ReviewState.CHANGES_REQUESTED).length;
+    return this.reviews.filter((r) => r.state === ReviewState.CHANGES_REQUESTED).length;
   }
 
   /**
@@ -334,8 +332,8 @@ export class PullRequestEntity {
     return {
       approvals: this.approvals,
       changeRequests: this.changeRequests,
-      comments: this.reviews.filter(r => r.state === ReviewState.COMMENTED).length,
-      pending: this.reviews.filter(r => r.state === ReviewState.PENDING).length,
+      comments: this.reviews.filter((r) => r.state === ReviewState.COMMENTED).length,
+      pending: this.reviews.filter((r) => r.state === ReviewState.PENDING).length,
     };
   }
 
@@ -381,7 +379,7 @@ export class PullRequestEntity {
     const text = `${this.title} ${this.description}`;
     const matches = text.match(/#(\d+)/g);
     if (!matches) return [];
-    return [...new Set(matches.map(m => parseInt(m.slice(1), 10)))];
+    return [...new Set(matches.map((m) => parseInt(m.slice(1), 10)))];
   }
 
   // =========================================================================
@@ -407,7 +405,7 @@ export class PullRequestEntity {
       return; // Already draft
     }
     if (this.isMerged) {
-      throw new Error('Cannot convert merged PR to draft');
+      throw new Error("Cannot convert merged PR to draft");
     }
     this.isDraft = true;
     this.touch();
@@ -430,13 +428,13 @@ export class PullRequestEntity {
    */
   merge(mergeCommitSha: string): void {
     if (!this.canBeMerged) {
-      throw new Error('Cannot merge: PR is not open or is a draft');
+      throw new Error("Cannot merge: PR is not open or is a draft");
     }
     if (!this.isApproved && (this.config.requiredApprovals ?? 1) > 0) {
-      throw new Error('Cannot merge: PR is not approved');
+      throw new Error("Cannot merge: PR is not approved");
     }
     if (this.hasChangesRequested) {
-      throw new Error('Cannot merge: changes requested');
+      throw new Error("Cannot merge: changes requested");
     }
 
     this.state = PullRequestState.MERGED;
@@ -453,7 +451,7 @@ export class PullRequestEntity {
       return; // Already open
     }
     if (this.isMerged) {
-      throw new Error('Cannot reopen merged PR');
+      throw new Error("Cannot reopen merged PR");
     }
     this.state = PullRequestState.OPEN;
     this.closedAt = undefined;
@@ -465,7 +463,7 @@ export class PullRequestEntity {
    */
   addReview(review: PullRequestReview): void {
     // Remove existing review from same user
-    this.reviews = this.reviews.filter(r => r.user !== review.user);
+    this.reviews = this.reviews.filter((r) => r.user !== review.user);
     this.reviews.push(review);
     this.touch();
   }
@@ -478,7 +476,7 @@ export class PullRequestEntity {
       id: Date.now(),
       user,
       state: ReviewState.APPROVED,
-      body: body ?? '',
+      body: body ?? "",
       submittedAt: new Date().toISOString(),
     });
   }
@@ -488,7 +486,7 @@ export class PullRequestEntity {
    */
   requestChanges(user: string, body: string): void {
     if (!body) {
-      throw new Error('Change request must include a reason');
+      throw new Error("Change request must include a reason");
     }
     this.addReview({
       id: Date.now(),
@@ -606,8 +604,8 @@ export class PullRequestEntity {
   toBranchName(): string {
     return this.title
       .toLowerCase()
-      .replace(/[^a-z0-9\s-]/g, '')
-      .replace(/\s+/g, '-')
+      .replace(/[^a-z0-9\s-]/g, "")
+      .replace(/\s+/g, "-")
       .slice(0, 50);
   }
 

@@ -1,16 +1,16 @@
-import { AITaskProcessor } from './ai/AITaskProcessor';
-import type { AIServiceFactory } from './ai/AIServiceFactory';
-import { InputSanitizer } from './utils/InputSanitizer';
-import { safeCall } from './utils/safeCall';
+import { AITaskProcessor } from "./ai/AITaskProcessor";
+import type { AIServiceFactory } from "./ai/AIServiceFactory";
+import { InputSanitizer } from "./utils/InputSanitizer";
+import { safeCall } from "./utils/safeCall";
 import {
   type PRDDocument,
   type FeatureRequirement,
   PRDDocumentSchema,
   TaskPriority,
   type SectionConfidence,
-  type ConfidenceConfig
-} from '../domain/ai-types';
-import { v4 as uuidv4 } from 'uuid';
+  type ConfidenceConfig,
+} from "../domain/ai-types";
+import { v4 as uuidv4 } from "uuid";
 
 /**
  * Service for generating and managing Product Requirements Documents (PRDs)
@@ -30,7 +30,7 @@ export class PRDGenerationService {
     projectName: string;
     targetUsers?: string[];
     timeline?: string;
-    complexity?: 'low' | 'medium' | 'high';
+    complexity?: "low" | "medium" | "high";
     author: string;
     stakeholders?: string[];
   }): Promise<PRDDocument> {
@@ -40,19 +40,19 @@ export class PRDGenerationService {
       const projectName = InputSanitizer.sanitizeText(params.projectName);
 
       if (!projectIdea) {
-        throw new Error('Project idea is required');
+        throw new Error("Project idea is required");
       }
 
       if (!projectName) {
-        throw new Error('Project name is required');
+        throw new Error("Project name is required");
       }
 
       // Generate PRD using AI
       const generatedPRD = await this.aiProcessor.generatePRDFromIdea({
         projectIdea,
-        targetUsers: params.targetUsers?.join(', '),
+        targetUsers: params.targetUsers?.join(", "),
         timeline: params.timeline,
-        complexity: params.complexity
+        complexity: params.complexity,
       });
 
       // Enhance with provided metadata
@@ -61,7 +61,7 @@ export class PRDGenerationService {
         title: projectName,
         author: params.author,
         stakeholders: params.stakeholders || [],
-        version: '1.0.0'
+        version: "1.0.0",
       };
 
       // Validate the generated PRD
@@ -79,14 +79,14 @@ export class PRDGenerationService {
     projectName: string;
     targetUsers?: string[];
     timeline?: string;
-    complexity?: 'low' | 'medium' | 'high';
+    complexity?: "low" | "medium" | "high";
     author: string;
     stakeholders?: string[];
     confidenceConfig?: Partial<ConfidenceConfig>;
   }): Promise<{
     prd: PRDDocument;
     sectionConfidence: SectionConfidence[];
-    overallConfidence: { score: number; tier: 'high' | 'medium' | 'low' };
+    overallConfidence: { score: number; tier: "high" | "medium" | "low" };
     lowConfidenceSections: SectionConfidence[];
   }> {
     return safeCall(async () => {
@@ -95,19 +95,19 @@ export class PRDGenerationService {
       const projectName = InputSanitizer.sanitizeText(params.projectName);
 
       if (!projectIdea) {
-        throw new Error('Project idea is required');
+        throw new Error("Project idea is required");
       }
 
       if (!projectName) {
-        throw new Error('Project name is required');
+        throw new Error("Project name is required");
       }
 
       const result = await this.aiProcessor.generatePRDWithConfidence({
         projectIdea,
-        targetUsers: params.targetUsers?.join(', '),
+        targetUsers: params.targetUsers?.join(", "),
         timeline: params.timeline,
         complexity: params.complexity,
-        confidenceConfig: params.confidenceConfig
+        confidenceConfig: params.confidenceConfig,
       });
 
       // Enhance PRD with provided metadata
@@ -116,7 +116,7 @@ export class PRDGenerationService {
         title: projectName,
         author: params.author,
         stakeholders: params.stakeholders || [],
-        version: '1.0.0'
+        version: "1.0.0",
       };
 
       // Validate
@@ -126,7 +126,7 @@ export class PRDGenerationService {
         prd: validatedPRD,
         sectionConfidence: result.sectionConfidence,
         overallConfidence: result.overallConfidence,
-        lowConfidenceSections: result.lowConfidenceSections
+        lowConfidenceSections: result.lowConfidenceSections,
       };
     });
   }
@@ -136,23 +136,24 @@ export class PRDGenerationService {
    */
   async enhancePRD(params: {
     currentPRD: PRDDocument | string;
-    enhancementType: 'comprehensive' | 'technical' | 'user_focused' | 'business_focused';
+    enhancementType: "comprehensive" | "technical" | "user_focused" | "business_focused";
     focusAreas?: string[];
     includeResearch?: boolean;
   }): Promise<PRDDocument> {
     return safeCall(async () => {
-      const currentPRDContent = typeof params.currentPRD === 'string'
-        ? params.currentPRD
-        : JSON.stringify(params.currentPRD, null, 2);
+      const currentPRDContent =
+        typeof params.currentPRD === "string"
+          ? params.currentPRD
+          : JSON.stringify(params.currentPRD, null, 2);
 
       const enhancedPRD = await this.aiProcessor.enhancePRD({
         currentPRD: currentPRDContent,
         enhancementType: params.enhancementType,
-        focusAreas: params.focusAreas
+        focusAreas: params.focusAreas,
       });
 
       // If we started with a PRD object, preserve some original metadata
-      if (typeof params.currentPRD === 'object') {
+      if (typeof params.currentPRD === "object") {
         enhancedPRD.id = params.currentPRD.id;
         enhancedPRD.createdAt = params.currentPRD.createdAt;
         enhancedPRD.author = params.currentPRD.author;
@@ -168,16 +169,14 @@ export class PRDGenerationService {
    */
   async extractFeaturesFromPRD(prd: PRDDocument | string): Promise<FeatureRequirement[]> {
     return safeCall(async () => {
-      const prdContent = typeof prd === 'string'
-        ? prd
-        : JSON.stringify(prd, null, 2);
+      const prdContent = typeof prd === "string" ? prd : JSON.stringify(prd, null, 2);
 
       const features = await this.aiProcessor.extractFeaturesFromPRD(prdContent);
 
       // Validate and enhance features
-      return features.map(feature => ({
+      return features.map((feature) => ({
         ...feature,
-        id: feature.id || uuidv4()
+        id: feature.id || uuidv4(),
       }));
     });
   }
@@ -200,9 +199,9 @@ export class PRDGenerationService {
         return {
           isComplete: false,
           score: 0,
-          missingElements: validationResult.error.issues.map(e => e.message),
-          recommendations: ['Fix schema validation errors'],
-          qualityIssues: ['PRD does not match required structure']
+          missingElements: validationResult.error.issues.map((e) => e.message),
+          recommendations: ["Fix schema validation errors"],
+          qualityIssues: ["PRD does not match required structure"],
         };
       }
 
@@ -216,7 +215,7 @@ export class PRDGenerationService {
         score: contentScore,
         missingElements,
         recommendations,
-        qualityIssues: this.identifyQualityIssues(prd)
+        qualityIssues: this.identifyQualityIssues(prd),
       };
     });
   }
@@ -228,17 +227,19 @@ export class PRDGenerationService {
     [featureId: string]: {
       userStories: string[];
       acceptanceCriteria: string[];
-    }
+    };
   }> {
     return safeCall(async () => {
-      const userStoriesMap: { [featureId: string]: { userStories: string[]; acceptanceCriteria: string[] } } = {};
+      const userStoriesMap: {
+        [featureId: string]: { userStories: string[]; acceptanceCriteria: string[] };
+      } = {};
 
       for (const feature of features) {
         // For now, use the existing user stories and acceptance criteria
         // In a full implementation, you'd call AI to generate more comprehensive stories
         userStoriesMap[feature.id] = {
           userStories: feature.userStories,
-          acceptanceCriteria: feature.acceptanceCriteria
+          acceptanceCriteria: feature.acceptanceCriteria,
         };
       }
 
@@ -249,73 +250,75 @@ export class PRDGenerationService {
   /**
    * Create a PRD template for a specific industry or project type
    */
-  createPRDTemplate(type: 'web_app' | 'mobile_app' | 'api' | 'saas' | 'ecommerce'): Partial<PRDDocument> {
+  createPRDTemplate(
+    type: "web_app" | "mobile_app" | "api" | "saas" | "ecommerce"
+  ): Partial<PRDDocument> {
     const baseTemplate = {
       id: uuidv4(),
-      version: '1.0.0',
+      version: "1.0.0",
       aiGenerated: false,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       tags: [type],
       stakeholders: [],
       milestones: [],
-      successMetrics: []
+      successMetrics: [],
     };
 
     switch (type) {
-      case 'web_app':
+      case "web_app":
         return {
           ...baseTemplate,
-          title: 'Web Application PRD Template',
-          overview: 'Template for web application development projects',
+          title: "Web Application PRD Template",
+          overview: "Template for web application development projects",
           objectives: [
-            'Create responsive web application',
-            'Ensure cross-browser compatibility',
-            'Implement user authentication',
-            'Provide intuitive user experience'
+            "Create responsive web application",
+            "Ensure cross-browser compatibility",
+            "Implement user authentication",
+            "Provide intuitive user experience",
           ],
           technicalRequirements: [
             {
               id: uuidv4(),
-              category: 'performance',
-              requirement: 'Page load time under 3 seconds',
-              rationale: 'User experience and SEO requirements',
-              priority: TaskPriority.HIGH
+              category: "performance",
+              requirement: "Page load time under 3 seconds",
+              rationale: "User experience and SEO requirements",
+              priority: TaskPriority.HIGH,
             },
             {
               id: uuidv4(),
-              category: 'security',
-              requirement: 'HTTPS encryption for all communications',
-              rationale: 'Data security and privacy compliance',
-              priority: TaskPriority.CRITICAL
-            }
-          ]
+              category: "security",
+              requirement: "HTTPS encryption for all communications",
+              rationale: "Data security and privacy compliance",
+              priority: TaskPriority.CRITICAL,
+            },
+          ],
         };
 
-      case 'mobile_app':
+      case "mobile_app":
         return {
           ...baseTemplate,
-          title: 'Mobile Application PRD Template',
-          overview: 'Template for mobile application development projects',
+          title: "Mobile Application PRD Template",
+          overview: "Template for mobile application development projects",
           objectives: [
-            'Create native or cross-platform mobile app',
-            'Ensure optimal performance on mobile devices',
-            'Implement offline functionality',
-            'Provide seamless user experience'
-          ]
+            "Create native or cross-platform mobile app",
+            "Ensure optimal performance on mobile devices",
+            "Implement offline functionality",
+            "Provide seamless user experience",
+          ],
         };
 
-      case 'api':
+      case "api":
         return {
           ...baseTemplate,
-          title: 'API Development PRD Template',
-          overview: 'Template for API development projects',
+          title: "API Development PRD Template",
+          overview: "Template for API development projects",
           objectives: [
-            'Create RESTful API endpoints',
-            'Ensure proper authentication and authorization',
-            'Implement comprehensive error handling',
-            'Provide clear API documentation'
-          ]
+            "Create RESTful API endpoints",
+            "Ensure proper authentication and authorization",
+            "Implement comprehensive error handling",
+            "Provide clear API documentation",
+          ],
         };
 
       default:
@@ -340,7 +343,7 @@ export class PRDGenerationService {
 
     // Features (30 points)
     if (prd.features && prd.features.length > 0) score += 15;
-    if (prd.features?.some(f => f.userStories.length > 0)) score += 15;
+    if (prd.features?.some((f) => f.userStories.length > 0)) score += 15;
 
     // Technical requirements (15 points)
     if (prd.technicalRequirements && prd.technicalRequirements.length > 0) score += 15;
@@ -360,23 +363,23 @@ export class PRDGenerationService {
     const missing: string[] = [];
 
     if (!prd.overview || prd.overview.length < 50) {
-      missing.push('Detailed project overview');
+      missing.push("Detailed project overview");
     }
 
     if (!prd.targetUsers || prd.targetUsers.length === 0) {
-      missing.push('User personas');
+      missing.push("User personas");
     }
 
     if (!prd.features || prd.features.length === 0) {
-      missing.push('Feature requirements');
+      missing.push("Feature requirements");
     }
 
     if (!prd.technicalRequirements || prd.technicalRequirements.length === 0) {
-      missing.push('Technical requirements');
+      missing.push("Technical requirements");
     }
 
     if (!prd.successMetrics || prd.successMetrics.length === 0) {
-      missing.push('Success metrics and KPIs');
+      missing.push("Success metrics and KPIs");
     }
 
     return missing;
@@ -388,20 +391,22 @@ export class PRDGenerationService {
   private generateRecommendations(prd: PRDDocument, missingElements: string[]): string[] {
     const recommendations: string[] = [];
 
-    if (missingElements.includes('User personas')) {
-      recommendations.push('Add detailed user personas with goals, pain points, and technical levels');
+    if (missingElements.includes("User personas")) {
+      recommendations.push(
+        "Add detailed user personas with goals, pain points, and technical levels"
+      );
     }
 
-    if (missingElements.includes('Feature requirements')) {
-      recommendations.push('Define specific features with user stories and acceptance criteria');
+    if (missingElements.includes("Feature requirements")) {
+      recommendations.push("Define specific features with user stories and acceptance criteria");
     }
 
-    if (prd.features?.some(f => !f.userStories || f.userStories.length === 0)) {
-      recommendations.push('Add user stories for all features');
+    if (prd.features?.some((f) => !f.userStories || f.userStories.length === 0)) {
+      recommendations.push("Add user stories for all features");
     }
 
-    if (missingElements.includes('Success metrics and KPIs')) {
-      recommendations.push('Define measurable success criteria and key performance indicators');
+    if (missingElements.includes("Success metrics and KPIs")) {
+      recommendations.push("Define measurable success criteria and key performance indicators");
     }
 
     return recommendations;
@@ -415,17 +420,17 @@ export class PRDGenerationService {
 
     // Check for vague or unclear descriptions
     if (prd.overview && prd.overview.length < 100) {
-      issues.push('Project overview is too brief and may lack important details');
+      issues.push("Project overview is too brief and may lack important details");
     }
 
     // Check for missing priorities
-    if (prd.features?.some(f => !f.priority)) {
-      issues.push('Some features are missing priority levels');
+    if (prd.features?.some((f) => !f.priority)) {
+      issues.push("Some features are missing priority levels");
     }
 
     // Check for missing complexity estimates
-    if (prd.features?.some(f => !f.estimatedComplexity)) {
-      issues.push('Some features are missing complexity estimates');
+    if (prd.features?.some((f) => !f.estimatedComplexity)) {
+      issues.push("Some features are missing complexity estimates");
     }
 
     return issues;
@@ -435,7 +440,7 @@ export class PRDGenerationService {
    * Increment version number
    */
   private incrementVersion(currentVersion: string): string {
-    const parts = currentVersion.split('.');
+    const parts = currentVersion.split(".");
     if (parts.length === 3) {
       const patch = parseInt(parts[2], 10) + 1;
       return `${parts[0]}.${parts[1]}.${patch}`;

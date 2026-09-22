@@ -1,13 +1,16 @@
-import { z } from 'zod';
+import { z } from "zod";
 
 /**
  * Schema for AI self-assessment response embedded in generated content
  */
 export const AIConfidenceAssessmentSchema = z.object({
-  score: z.number().min(0).max(100).describe('Overall confidence score 0-100'),
-  reasoning: z.string().describe('Brief explanation of confidence level'),
-  uncertainAreas: z.array(z.string()).describe('Specific areas of uncertainty'),
-  clarifyingQuestions: z.array(z.string()).optional().describe('Questions that would increase confidence')
+  score: z.number().min(0).max(100).describe("Overall confidence score 0-100"),
+  reasoning: z.string().describe("Brief explanation of confidence level"),
+  uncertainAreas: z.array(z.string()).describe("Specific areas of uncertainty"),
+  clarifyingQuestions: z
+    .array(z.string())
+    .optional()
+    .describe("Questions that would increase confidence"),
 });
 
 export type AIConfidenceAssessment = z.infer<typeof AIConfidenceAssessmentSchema>;
@@ -25,10 +28,13 @@ export interface ConfidencePromptConfig {
 /**
  * Format confidence prompt with variables
  */
-export function formatConfidencePrompt(template: string, variables: Record<string, string>): string {
+export function formatConfidencePrompt(
+  template: string,
+  variables: Record<string, string>
+): string {
   let result = template;
   for (const [key, value] of Object.entries(variables)) {
-    result = result.replace(new RegExp(`\\{${key}\\}`, 'g'), value);
+    result = result.replace(new RegExp(`\\{${key}\\}`, "g"), value);
   }
   return result;
 }
@@ -87,7 +93,7 @@ Provide your assessment as JSON matching this schema:
 - uncertainAreas: List of unclear/incomplete areas
 - clarifyingQuestions: Questions to improve the section`,
     temperature: 0.3,
-    maxTokens: 500
+    maxTokens: 500,
   } as ConfidencePromptConfig,
 
   /**
@@ -122,7 +128,7 @@ Provide your assessment as JSON:
 - uncertainAreas: Areas needing clarification
 - clarifyingQuestions: Questions that would improve the task`,
     temperature: 0.3,
-    maxTokens: 500
+    maxTokens: 500,
   } as ConfidencePromptConfig,
 
   /**
@@ -153,7 +159,7 @@ Format as JSON array with:
 - confidence: 0-100
 - reasoning: Why this dependency exists`,
     temperature: 0.2,
-    maxTokens: 1000
+    maxTokens: 1000,
   } as ConfidencePromptConfig,
 
   /**
@@ -187,8 +193,8 @@ Provide:
 - range: {low: number, high: number} representing uncertainty
 - risks: Factors that could affect the estimate`,
     temperature: 0.3,
-    maxTokens: 400
-  } as ConfidencePromptConfig
+    maxTokens: 400,
+  } as ConfidencePromptConfig,
 };
 
 /**
@@ -198,6 +204,6 @@ export function withConfidenceAssessment<T extends z.ZodRawShape>(
   contentSchema: z.ZodObject<T>
 ): z.ZodObject<T & { confidenceAssessment: typeof AIConfidenceAssessmentSchema }> {
   return contentSchema.extend({
-    confidenceAssessment: AIConfidenceAssessmentSchema
+    confidenceAssessment: AIConfidenceAssessmentSchema,
   }) as z.ZodObject<T & { confidenceAssessment: typeof AIConfidenceAssessmentSchema }>;
 }

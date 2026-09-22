@@ -230,13 +230,13 @@ Return actionable recommendations with specific next steps and updated timelines
  */
 export function formatFeaturePrompt(template: string, variables: Record<string, any>): string {
   let formatted = template;
-  
+
   for (const [key, value] of Object.entries(variables)) {
     const placeholder = `{${key}}`;
-    const stringValue = typeof value === 'object' ? JSON.stringify(value, null, 2) : String(value);
-    formatted = formatted.replace(new RegExp(placeholder, 'g'), stringValue);
+    const stringValue = typeof value === "object" ? JSON.stringify(value, null, 2) : String(value);
+    formatted = formatted.replace(new RegExp(placeholder, "g"), stringValue);
   }
-  
+
   return formatted;
 }
 
@@ -248,34 +248,34 @@ export const FEATURE_PROMPT_CONFIGS = {
     systemPrompt: FEATURE_ADDITION_SYSTEM_PROMPT,
     userPrompt: ANALYZE_FEATURE_REQUEST_PROMPT,
     maxTokens: 3000,
-    temperature: 0.6
+    temperature: 0.6,
   },
-  
+
   expandToTasks: {
     systemPrompt: FEATURE_ADDITION_SYSTEM_PROMPT,
     userPrompt: EXPAND_FEATURE_TO_TASKS_PROMPT,
     maxTokens: 4000,
-    temperature: 0.5
+    temperature: 0.5,
   },
-  
+
   assessImpact: {
     systemPrompt: FEATURE_ADDITION_SYSTEM_PROMPT,
     userPrompt: ASSESS_FEATURE_IMPACT_PROMPT,
     maxTokens: 2500,
-    temperature: 0.6
+    temperature: 0.6,
   },
-  
+
   generateRoadmap: {
     systemPrompt: FEATURE_ADDITION_SYSTEM_PROMPT,
     userPrompt: GENERATE_FEATURE_ROADMAP_PROMPT,
     maxTokens: 3000,
-    temperature: 0.7
+    temperature: 0.7,
   },
-  
+
   trackLifecycle: {
     systemPrompt: FEATURE_ADDITION_SYSTEM_PROMPT,
     userPrompt: TRACK_TASK_LIFECYCLE_PROMPT,
     maxTokens: 2000,
-    temperature: 0.4
-  }
+    temperature: 0.4,
+  },
 };

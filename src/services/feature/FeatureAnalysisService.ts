@@ -1,18 +1,14 @@
-import { generateObject } from 'ai';
-import { z } from 'zod';
-import { AIServiceFactory } from '../ai/AIServiceFactory.js';
-import { type ILogger, Logger } from '../../infrastructure/logger';
-import {
-  TaskPriority,
-  type TaskComplexity,
-  type PRDDocument
-} from '../../domain/ai-types.js';
-import { InputSanitizer } from '../utils/InputSanitizer';
+import { generateObject } from "ai";
+import { z } from "zod";
+import { AIServiceFactory } from "../ai/AIServiceFactory.js";
+import { type ILogger, Logger } from "../../infrastructure/logger";
+import { TaskPriority, type TaskComplexity, type PRDDocument } from "../../domain/ai-types.js";
+import { InputSanitizer } from "../utils/InputSanitizer";
 import {
   FEATURE_PROMPT_CONFIGS,
-  formatFeaturePrompt
-} from '../ai/prompts/FeatureAdditionPrompts.js';
-import { safeCall } from '../utils/safeCall';
+  formatFeaturePrompt,
+} from "../ai/prompts/FeatureAdditionPrompts.js";
+import { safeCall } from "../utils/safeCall";
 
 /**
  * AI-powered analysis of feature requests.
@@ -49,7 +45,7 @@ export class FeatureAnalysisService {
     requestedBy: string;
   }): Promise<{
     analysis: string;
-    recommendation: 'approve' | 'reject' | 'modify';
+    recommendation: "approve" | "reject" | "modify";
     priority: TaskPriority;
     complexity: TaskComplexity;
     estimatedEffort: number;
@@ -57,11 +53,11 @@ export class FeatureAnalysisService {
     dependencies: string[];
   }> {
     const FeatureAnalysisSchema = z.object({
-      analysis: z.string().describe('Full analysis text'),
-      recommendation: z.enum(['approve', 'reject', 'modify']),
-      priority: z.enum(['critical', 'high', 'medium', 'low']),
+      analysis: z.string().describe("Full analysis text"),
+      recommendation: z.enum(["approve", "reject", "modify"]),
+      priority: z.enum(["critical", "high", "medium", "low"]),
       complexity: z.number().min(1).max(10),
-      estimatedEffort: z.number().positive().describe('Estimated effort in hours'),
+      estimatedEffort: z.number().positive().describe("Estimated effort in hours"),
       risks: z.array(z.string()),
       dependencies: z.array(z.string()),
     });
@@ -71,17 +67,25 @@ export class FeatureAnalysisService {
       const model = this.aiFactory.getMainModel() || this.aiFactory.getBestAvailableModel();
 
       if (!model) {
-        this.logger.error('Feature analysis failed: AI service is not available');
-        throw new Error('AI service is not available. Please configure at least one AI provider (ANTHROPIC_API_KEY, OPENAI_API_KEY, GOOGLE_API_KEY, or PERPLEXITY_API_KEY).');
+        this.logger.error("Feature analysis failed: AI service is not available");
+        throw new Error(
+          "AI service is not available. Please configure at least one AI provider (ANTHROPIC_API_KEY, OPENAI_API_KEY, GOOGLE_API_KEY, or PERPLEXITY_API_KEY)."
+        );
       }
 
       const prompt = formatFeaturePrompt(config.userPrompt, {
         featureIdea: InputSanitizer.sanitizeText(params.featureIdea),
         description: InputSanitizer.sanitizeIssueContent(params.description),
-        existingPRD: params.existingPRD ? JSON.stringify(params.existingPRD, null, 2) : 'No existing PRD provided',
-        projectState: params.projectState ? JSON.stringify(params.projectState) : 'No project state provided',
-        businessJustification: InputSanitizer.sanitizeText(params.businessJustification || 'No business justification provided'),
-        targetUsers: params.targetUsers?.join(', ') || 'General users'
+        existingPRD: params.existingPRD
+          ? JSON.stringify(params.existingPRD, null, 2)
+          : "No existing PRD provided",
+        projectState: params.projectState
+          ? JSON.stringify(params.projectState)
+          : "No project state provided",
+        businessJustification: InputSanitizer.sanitizeText(
+          params.businessJustification || "No business justification provided"
+        ),
+        targetUsers: params.targetUsers?.join(", ") || "General users",
       });
 
       const result = await generateObject({
@@ -90,7 +94,7 @@ export class FeatureAnalysisService {
         prompt,
         schema: FeatureAnalysisSchema,
         maxOutputTokens: config.maxTokens,
-        temperature: config.temperature
+        temperature: config.temperature,
       });
 
       return {
@@ -122,16 +126,16 @@ export class FeatureAnalysisService {
   // Extraction helpers
   // ---------------------------------------------------------------------------
 
-  extractRecommendation(analysis: string): 'approve' | 'reject' | 'modify' {
-    if (analysis.toLowerCase().includes('approve')) return 'approve';
-    if (analysis.toLowerCase().includes('reject')) return 'reject';
-    return 'modify';
+  extractRecommendation(analysis: string): "approve" | "reject" | "modify" {
+    if (analysis.toLowerCase().includes("approve")) return "approve";
+    if (analysis.toLowerCase().includes("reject")) return "reject";
+    return "modify";
   }
 
   extractPriority(analysis: string): TaskPriority {
-    if (analysis.toLowerCase().includes('critical')) return TaskPriority.CRITICAL;
-    if (analysis.toLowerCase().includes('high')) return TaskPriority.HIGH;
-    if (analysis.toLowerCase().includes('low')) return TaskPriority.LOW;
+    if (analysis.toLowerCase().includes("critical")) return TaskPriority.CRITICAL;
+    if (analysis.toLowerCase().includes("high")) return TaskPriority.HIGH;
+    if (analysis.toLowerCase().includes("low")) return TaskPriority.LOW;
     return TaskPriority.MEDIUM;
   }
 
@@ -145,7 +149,8 @@ export class FeatureAnalysisService {
   }
 
   extractRisks(analysis: string): string[] {
-    const riskPatterns = /(?:risk|concern|challenge|potential issue|caveat|danger|threat)s?[:\-]?\s*([^.\n]+)/gi;
+    const riskPatterns =
+      /(?:risk|concern|challenge|potential issue|caveat|danger|threat)s?[:\-]?\s*([^.\n]+)/gi;
     const risks: string[] = [];
     let match;
     while ((match = riskPatterns.exec(analysis)) !== null) {
@@ -156,15 +161,21 @@ export class FeatureAnalysisService {
     if (risks.length === 0) {
       const sectionMatch = analysis.match(/(?:risks?|risk factors?)[:\s]*\n([\s\S]*?)(?:\n\n|$)/i);
       if (sectionMatch) {
-        const lines = sectionMatch[1].split('\n').map(l => l.replace(/^[-*•\d.]+\s*/, '').trim()).filter(l => l.length > 5);
+        const lines = sectionMatch[1]
+          .split("\n")
+          .map((l) => l.replace(/^[-*•\d.]+\s*/, "").trim())
+          .filter((l) => l.length > 5);
         risks.push(...lines);
       }
     }
-    return risks.length > 0 ? risks : ['Technical complexity', 'Integration challenges', 'Resource constraints'];
+    return risks.length > 0
+      ? risks
+      : ["Technical complexity", "Integration challenges", "Resource constraints"];
   }
 
   extractDependencies(analysis: string): string[] {
-    const depPatterns = /(?:depend(?:s|ency|encies)|requires?|prerequisite|blocked by|needs)[:\-]?\s*([^.\n]+)/gi;
+    const depPatterns =
+      /(?:depend(?:s|ency|encies)|requires?|prerequisite|blocked by|needs)[:\-]?\s*([^.\n]+)/gi;
     const deps: string[] = [];
     let match;
     while ((match = depPatterns.exec(analysis)) !== null) {
@@ -172,9 +183,14 @@ export class FeatureAnalysisService {
       if (dep.length > 3 && dep.length < 200) deps.push(dep);
     }
     if (deps.length === 0) {
-      const sectionMatch = analysis.match(/(?:dependenc(?:y|ies)|prerequisites?)[:\s]*\n([\s\S]*?)(?:\n\n|$)/i);
+      const sectionMatch = analysis.match(
+        /(?:dependenc(?:y|ies)|prerequisites?)[:\s]*\n([\s\S]*?)(?:\n\n|$)/i
+      );
       if (sectionMatch) {
-        const lines = sectionMatch[1].split('\n').map(l => l.replace(/^[-*•\d.]+\s*/, '').trim()).filter(l => l.length > 3);
+        const lines = sectionMatch[1]
+          .split("\n")
+          .map((l) => l.replace(/^[-*•\d.]+\s*/, "").trim())
+          .filter((l) => l.length > 3);
         deps.push(...lines);
       }
     }

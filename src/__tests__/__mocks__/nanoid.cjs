@@ -9,11 +9,10 @@
  *
  * Mapped via jest.config.cjs moduleNameMapper for `nanoid` and `nanoid/non-secure`.
  */
-const urlAlphabet =
-  'useandom-26T198340PX75pxJACKVERYMINDBUSHWOLF_GQZbfghjklqvwyzrict';
+const urlAlphabet = "useandom-26T198340PX75pxJACKVERYMINDBUSHWOLF_GQZbfghjklqvwyzrict";
 
 function nanoid(size = 21) {
-  let id = '';
+  let id = "";
   for (let i = 0; i < size; i++) {
     id += urlAlphabet[Math.floor(Math.random() * urlAlphabet.length)];
   }
@@ -22,7 +21,7 @@ function nanoid(size = 21) {
 
 function customAlphabet(alphabet, defaultSize = 21) {
   return (size = defaultSize) => {
-    let id = '';
+    let id = "";
     for (let i = 0; i < size; i++) {
       id += alphabet[Math.floor(Math.random() * alphabet.length)];
     }
@@ -33,7 +32,7 @@ function customAlphabet(alphabet, defaultSize = 21) {
 function customRandom(alphabet, size, getRandom) {
   return () => {
     const bytes = getRandom(size);
-    let id = '';
+    let id = "";
     for (let i = 0; i < size; i++) {
       id += alphabet[bytes[i] % alphabet.length];
     }

@@ -1,29 +1,29 @@
-import type { ILogger } from '../logger/index.js';
-import { Logger } from '../logger/index.js';
+import type { ILogger } from "../logger/index.js";
+import { Logger } from "../logger/index.js";
 
 export type SecurityEventType =
-  | 'webhook_signature_invalid'
-  | 'webhook_signature_missing'
-  | 'cors_origin_rejected'
-  | 'rate_limit_exceeded'
-  | 'payload_too_large'
-  | 'content_type_invalid'
-  | 'unauthorized_access'
-  | 'input_sanitization_triggered';
+  | "webhook_signature_invalid"
+  | "webhook_signature_missing"
+  | "cors_origin_rejected"
+  | "rate_limit_exceeded"
+  | "payload_too_large"
+  | "content_type_invalid"
+  | "unauthorized_access"
+  | "input_sanitization_triggered";
 
 export interface SecurityEvent {
   timestamp: string;
   type: SecurityEventType;
   source: string;
   details: Record<string, unknown>;
-  severity: 'low' | 'medium' | 'high' | 'critical';
+  severity: "low" | "medium" | "high" | "critical";
 }
 
-const SEVERITY_LOG_LEVEL: Record<SecurityEvent['severity'], 'info' | 'warn' | 'error'> = {
-  low: 'info',
-  medium: 'warn',
-  high: 'error',
-  critical: 'error',
+const SEVERITY_LOG_LEVEL: Record<SecurityEvent["severity"], "info" | "warn" | "error"> = {
+  low: "info",
+  medium: "warn",
+  high: "error",
+  critical: "error",
 };
 
 export class SecurityAuditLog {
@@ -37,7 +37,7 @@ export class SecurityAuditLog {
     this.maxEvents = maxEvents;
   }
 
-  record(event: Omit<SecurityEvent, 'timestamp'>): void {
+  record(event: Omit<SecurityEvent, "timestamp">): void {
     const full: SecurityEvent = {
       ...event,
       timestamp: new Date().toISOString(),
@@ -53,10 +53,7 @@ export class SecurityAuditLog {
     this.counters.set(event.type, (this.counters.get(event.type) ?? 0) + 1);
 
     const level = SEVERITY_LOG_LEVEL[event.severity];
-    this.logger[level](
-      `[SECURITY] ${event.type} from ${event.source}`,
-      full.details,
-    );
+    this.logger[level](`[SECURITY] ${event.type} from ${event.source}`, full.details);
   }
 
   getCounters(): Record<SecurityEventType, number> {

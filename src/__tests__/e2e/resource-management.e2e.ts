@@ -4,14 +4,20 @@ import { ResourceStatus } from "../../domain/resource-types";
 import { TestFactory } from "../test-utils";
 import type { Issue, Milestone } from "../../domain/types";
 
-const hasGitHubCredentials = !!(process.env.GITHUB_TOKEN && process.env.GITHUB_OWNER && process.env.GITHUB_REPO);
+const hasGitHubCredentials = !!(
+  process.env.GITHUB_TOKEN &&
+  process.env.GITHUB_OWNER &&
+  process.env.GITHUB_REPO
+);
 
 describe.skip("Resource Management E2E Tests", () => {
   let service: ProjectManagementService;
 
   beforeAll(() => {
     if (!hasGitHubCredentials) {
-      console.log("Skipping Resource Management E2E tests - requires real GitHub API credentials (GITHUB_TOKEN, GITHUB_OWNER, GITHUB_REPO)");
+      console.log(
+        "Skipping Resource Management E2E tests - requires real GitHub API credentials (GITHUB_TOKEN, GITHUB_OWNER, GITHUB_REPO)"
+      );
       return;
     }
 
@@ -69,11 +75,11 @@ describe.skip("Resource Management E2E Tests", () => {
     it("should handle bulk status updates", async () => {
       // Update parent issue status
       await service.updateIssueStatus(parentIssue.id, ResourceStatus.CLOSED);
-      
+
       // Verify parent issue status
       const updatedParent = await service.getIssue(parentIssue.id);
       expect(updatedParent?.status).toBe(ResourceStatus.CLOSED);
-      
+
       // Verify impact on child issues (assuming your implementation has this relationship logic)
       // You might need to adapt this depending on how dependencies affect status in your system
       for (const childIssue of childIssues) {
@@ -128,14 +134,14 @@ describe.skip("Resource Management E2E Tests", () => {
     it("should update milestone progress when issues are completed", async () => {
       // Complete half of the issues
       const halfIndex = Math.floor(testIssues.length / 2);
-      
+
       for (let i = 0; i < halfIndex; i++) {
         await service.updateIssueStatus(testIssues[i].id, ResourceStatus.COMPLETED);
       }
 
       // Get milestone metrics
       const metrics = await service.getMilestoneMetrics(testMilestone.id, true);
-      
+
       // Verify milestone progress reflects the completed issues
       expect(metrics.totalIssues).toBe(testIssues.length);
       expect(metrics.closedIssues).toBe(halfIndex);
@@ -165,28 +171,28 @@ describe.skip("Resource Management E2E Tests", () => {
       await service.updateIssueStatus(testIssue.id, ResourceStatus.IN_PROGRESS);
       await service.updateIssueStatus(testIssue.id, ResourceStatus.COMPLETED);
       await service.updateIssueStatus(testIssue.id, ResourceStatus.CLOSED);
-      
+
       // Get issue history
       const history = await service.getIssueHistory(testIssue.id);
-      
+
       // Verify history is being tracked
       expect(history.length).toBeGreaterThan(0);
     });
 
     it("should track issue field updates in history", async () => {
       // Update issue fields
-      await service.updateIssue(testIssue.id, { 
+      await service.updateIssue(testIssue.id, {
         title: "Updated History Test Issue",
-        description: "Updated description for history tracking"
+        description: "Updated description for history tracking",
       });
-      
+
       // Get updated issue and history
       const updatedIssue = await service.getIssue(testIssue.id);
       const history = await service.getIssueHistory(testIssue.id);
-      
+
       // Verify issue was updated
       expect(updatedIssue?.title).toBe("Updated History Test Issue");
-      
+
       // Verify history is being tracked
       expect(history.length).toBeGreaterThan(0);
     });

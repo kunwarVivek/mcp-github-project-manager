@@ -15,17 +15,17 @@ import {
   type CustomField,
   createResource,
 } from "../domain/types";
-import { safeCall } from './utils/safeCall';
-import { type ILogger, Logger } from '../infrastructure/logger';
+import { safeCall } from "./utils/safeCall";
+import { type ILogger, Logger } from "../infrastructure/logger";
 
 const CreateRoadmapSchema = z.object({
   project: z.object({
     title: z.string().min(1, "Project title is required"),
     shortDescription: z.string().optional(),
     owner: z.string(),
-    visibility: z.enum(['private', 'public']).optional(),
+    visibility: z.enum(["private", "public"]).optional(),
     views: z.array(z.any()).optional(),
-    fields: z.array(z.any()).optional()
+    fields: z.array(z.any()).optional(),
   }),
   milestones: z.array(
     z.object({
@@ -40,11 +40,11 @@ const CreateRoadmapSchema = z.object({
           description: z.string(),
           assignees: z.array(z.string()).optional(),
           labels: z.array(z.string()).optional(),
-          milestoneId: z.string().optional()
+          milestoneId: z.string().optional(),
         })
-      )
+      ),
     })
-  )
+  ),
 });
 
 /**
@@ -76,7 +76,6 @@ export class RoadmapService {
     return this.factory.createIssueRepository();
   }
 
-
   async createRoadmap(data: {
     project: CreateProject;
     milestones: Array<{
@@ -94,7 +93,7 @@ export class RoadmapService {
         ...validatedData.project,
         type: ResourceType.PROJECT,
         status: ResourceStatus.ACTIVE,
-        visibility: validatedData.project.visibility || 'private',
+        visibility: validatedData.project.visibility || "private",
         views: [] as ProjectView[],
         fields: [] as CustomField[],
         shortDescription: validatedData.project.shortDescription,
@@ -109,7 +108,7 @@ export class RoadmapService {
       for (const { milestone, issues } of validatedData.milestones) {
         const milestoneWithRequiredFields = {
           ...milestone,
-          description: milestone.description || ''
+          description: milestone.description || "",
         };
 
         const createdMilestone = await this.milestoneRepo.create(milestoneWithRequiredFields);
@@ -123,7 +122,10 @@ export class RoadmapService {
             });
             createdIssues.push(created);
           } catch (issueError) {
-            this.logger.warn(`Failed to create issue "${issue.title}" for milestone "${milestone.title}"`, issueError);
+            this.logger.warn(
+              `Failed to create issue "${issue.title}" for milestone "${milestone.title}"`,
+              issueError
+            );
             // Continue with remaining issues — partial success is better than total failure
           }
         }

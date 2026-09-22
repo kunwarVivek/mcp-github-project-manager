@@ -1,19 +1,24 @@
-import type { PRDDocument } from '../../domain/ai-types';
+import type { PRDDocument } from "../../domain/ai-types";
 
 /**
  * Validation rule severity levels
  */
-export type ValidationSeverity = 'critical' | 'major' | 'minor';
+export type ValidationSeverity = "critical" | "major" | "minor";
 
 /**
  * Validation rule categories
  */
-export type ValidationCategory = 'completeness' | 'clarity' | 'feasibility' | 'testability' | 'consistency';
+export type ValidationCategory =
+  | "completeness"
+  | "clarity"
+  | "feasibility"
+  | "testability"
+  | "consistency";
 
 /**
  * Validation rule layers
  */
-export type ValidationLayer = 'builtin' | 'standard' | 'custom';
+export type ValidationLayer = "builtin" | "standard" | "custom";
 
 /**
  * Result of a single validation check
@@ -21,8 +26,8 @@ export type ValidationLayer = 'builtin' | 'standard' | 'custom';
 export interface ValidationCheckResult {
   passed: boolean;
   message: string;
-  location?: string;           // Where in the document the issue is
-  suggestedFix?: string;       // How to fix the issue
+  location?: string; // Where in the document the issue is
+  suggestedFix?: string; // How to fix the issue
   diff?: {
     before: string;
     after: string;
@@ -50,12 +55,12 @@ export interface ValidationRule {
  */
 export interface ValidationResults {
   valid: boolean;
-  score: number;               // 0-100 quality score
+  score: number; // 0-100 quality score
   totalRules: number;
   passedRules: number;
   failedRules: number;
   results: Array<{
-    rule: Pick<ValidationRule, 'id' | 'name' | 'severity' | 'category'>;
+    rule: Pick<ValidationRule, "id" | "name" | "severity" | "category">;
     result: ValidationCheckResult;
   }>;
   criticalIssues: number;
@@ -68,11 +73,11 @@ export interface ValidationResults {
  */
 export class ValidationRuleEngine {
   private rules: Map<string, ValidationRule> = new Map();
-  private enabledLayers: Set<ValidationLayer> = new Set(['builtin']);
+  private enabledLayers: Set<ValidationLayer> = new Set(["builtin"]);
 
   constructor() {
     // Built-in rules are always enabled by default
-    this.enabledLayers.add('builtin');
+    this.enabledLayers.add("builtin");
   }
 
   /**
@@ -103,7 +108,7 @@ export class ValidationRuleEngine {
    */
   disableLayer(layer: ValidationLayer): void {
     // Can't disable builtin
-    if (layer !== 'builtin') {
+    if (layer !== "builtin") {
       this.enabledLayers.delete(layer);
     }
   }
@@ -129,14 +134,14 @@ export class ValidationRuleEngine {
    * Get rules by category
    */
   getRulesByCategory(category: ValidationCategory): ValidationRule[] {
-    return this.getRules().filter(r => r.category === category);
+    return this.getRules().filter((r) => r.category === category);
   }
 
   /**
    * Run all enabled rules against a PRD
    */
   validate(prd: PRDDocument): ValidationResults {
-    const results: ValidationResults['results'] = [];
+    const results: ValidationResults["results"] = [];
     let passedRules = 0;
     let failedRules = 0;
     let criticalIssues = 0;
@@ -157,9 +162,9 @@ export class ValidationRuleEngine {
             id: rule.id,
             name: rule.name,
             severity: rule.severity,
-            category: rule.category
+            category: rule.category,
           },
-          result: checkResult
+          result: checkResult,
         });
 
         if (checkResult.passed) {
@@ -168,13 +173,13 @@ export class ValidationRuleEngine {
           failedRules++;
 
           switch (rule.severity) {
-            case 'critical':
+            case "critical":
               criticalIssues++;
               break;
-            case 'major':
+            case "major":
               majorIssues++;
               break;
-            case 'minor':
+            case "minor":
               minorIssues++;
               break;
           }
@@ -186,12 +191,12 @@ export class ValidationRuleEngine {
             id: rule.id,
             name: rule.name,
             severity: rule.severity,
-            category: rule.category
+            category: rule.category,
           },
           result: {
             passed: false,
-            message: `Rule execution error: ${error instanceof Error ? error.message : String(error)}`
-          }
+            message: `Rule execution error: ${error instanceof Error ? error.message : String(error)}`,
+          },
         });
         failedRules++;
         minorIssues++;
@@ -199,12 +204,13 @@ export class ValidationRuleEngine {
     }
 
     const totalRules = passedRules + failedRules;
-    const score = totalRules > 0
-      ? Math.round((passedRules / totalRules) * 100 - (criticalIssues * 10) - (majorIssues * 5))
-      : 100;
+    const score =
+      totalRules > 0
+        ? Math.round((passedRules / totalRules) * 100 - criticalIssues * 10 - majorIssues * 5)
+        : 100;
 
     return {
-      valid: criticalIssues === 0,  // Valid if no critical issues
+      valid: criticalIssues === 0, // Valid if no critical issues
       score: Math.max(0, Math.min(100, score)),
       totalRules,
       passedRules,
@@ -212,14 +218,17 @@ export class ValidationRuleEngine {
       results,
       criticalIssues,
       majorIssues,
-      minorIssues
+      minorIssues,
     };
   }
 
   /**
    * Auto-fix issues where possible
    */
-  autoFix(prd: PRDDocument, ruleIds?: string[]): {
+  autoFix(
+    prd: PRDDocument,
+    ruleIds?: string[]
+  ): {
     prd: PRDDocument;
     fixedIssues: string[];
     unfixableIssues: string[];
@@ -229,7 +238,7 @@ export class ValidationRuleEngine {
     const unfixableIssues: string[] = [];
 
     const rulesToCheck = ruleIds
-      ? ruleIds.map(id => this.rules.get(id)).filter((r): r is ValidationRule => r !== undefined)
+      ? ruleIds.map((id) => this.rules.get(id)).filter((r): r is ValidationRule => r !== undefined)
       : Array.from(this.rules.values());
 
     for (const rule of rulesToCheck) {

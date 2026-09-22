@@ -31,7 +31,7 @@
  * ```
  */
 
-import type { DomainEvent } from './DomainEvent';
+import type { DomainEvent } from "./DomainEvent";
 
 /**
  * Event handler function type
@@ -154,7 +154,7 @@ export class DomainEventBus {
       isAsync: false,
     };
 
-    return this.addSubscription('*', record);
+    return this.addSubscription("*", record);
   }
 
   /**
@@ -261,7 +261,7 @@ export class DomainEventBus {
    * Get history for a specific aggregate
    */
   getHistoryForAggregate(aggregateId: string, limit?: number): readonly DomainEvent[] {
-    const filtered = this.history.filter(e => e.aggregateId === aggregateId);
+    const filtered = this.history.filter((e) => e.aggregateId === aggregateId);
     if (limit) {
       return filtered.slice(-limit);
     }
@@ -346,7 +346,7 @@ export class DomainEventBus {
     }
 
     // Get handlers for wildcard subscription
-    const wildcardHandlers = this.subscriptions.get('*');
+    const wildcardHandlers = this.subscriptions.get("*");
     if (wildcardHandlers) {
       handlers.push(...wildcardHandlers);
     }

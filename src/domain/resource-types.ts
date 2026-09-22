@@ -20,7 +20,7 @@ export enum ResourceType {
   REQUIREMENT = "requirement",
   USE_CASE = "use_case",
   TRACEABILITY_MATRIX = "traceability_matrix",
-  TRACEABILITY_LINK = "traceability_link"
+  TRACEABILITY_LINK = "traceability_link",
 }
 
 export enum ResourceStatus {
@@ -30,7 +30,7 @@ export enum ResourceStatus {
   ARCHIVED = "archived",
   DELETED = "deleted",
   PLANNED = "planned",
-  COMPLETED = "completed"
+  COMPLETED = "completed",
 }
 
 export enum RelationshipType {
@@ -38,7 +38,7 @@ export enum RelationshipType {
   DEPENDENCY_OF = "dependency_of",
   BLOCKED_BY = "blocked_by",
   PARENT_CHILD = "parent_child",
-  DEPENDENCY = "dependency"
+  DEPENDENCY = "dependency",
 }
 
 export interface Resource {
@@ -67,7 +67,7 @@ export enum ResourceEventType {
   RESTORED = "restored",
   RELATIONSHIP_CREATED = "relationship_created",
   RELATIONSHIP_DELETED = "relationship_deleted",
-  RELATIONSHIP_REMOVED = "relationship_removed"
+  RELATIONSHIP_REMOVED = "relationship_removed",
 }
 
 export interface ResourceEvent {
@@ -87,8 +87,15 @@ export class ResourceNotFoundError extends Error {
 }
 
 export class ResourceVersionError extends Error {
-  constructor(resourceType: ResourceType, resourceId: string, currentVersion: number, expectedVersion: number) {
-    super(`Version mismatch for ${resourceType} with ID ${resourceId}: current=${currentVersion}, expected=${expectedVersion}`);
+  constructor(
+    resourceType: ResourceType,
+    resourceId: string,
+    currentVersion: number,
+    expectedVersion: number
+  ) {
+    super(
+      `Version mismatch for ${resourceType} with ID ${resourceId}: current=${currentVersion}, expected=${expectedVersion}`
+    );
     this.name = "ResourceVersionError";
   }
 }

@@ -1,8 +1,8 @@
-import * as fs from 'node:fs/promises';
-import * as path from 'node:path';
-import type { ResourceEvent } from './GitHubWebhookHandler';
-import { type ILogger, Logger } from '../logger/index';
-import { EVENT_RETENTION_DAYS, MAX_EVENTS_IN_MEMORY, CACHE_DIRECTORY } from '../../env';
+import * as fs from "node:fs/promises";
+import * as path from "node:path";
+import type { ResourceEvent } from "./GitHubWebhookHandler";
+import { type ILogger, Logger } from "../logger/index";
+import { EVENT_RETENTION_DAYS, MAX_EVENTS_IN_MEMORY, CACHE_DIRECTORY } from "../../env";
 
 export interface EventStoreOptions {
   retentionDays: number;
@@ -42,7 +42,7 @@ export class EventStore {
   private eventIndex = new Map<string, number>(); // eventId -> buffer index
 
   // File rotation tracking
-  private currentFileDate: string = '';
+  private currentFileDate: string = "";
   private currentFileEvents: number = 0;
   private readonly maxEventsPerFile = 10000;
 
@@ -51,8 +51,8 @@ export class EventStore {
     this.options = {
       retentionDays: options?.retentionDays || EVENT_RETENTION_DAYS,
       maxEventsInMemory: options?.maxEventsInMemory || MAX_EVENTS_IN_MEMORY,
-      storageDirectory: options?.storageDirectory || path.join(CACHE_DIRECTORY, 'events'),
-      enableCompression: options?.enableCompression ?? true
+      storageDirectory: options?.storageDirectory || path.join(CACHE_DIRECTORY, "events"),
+      enableCompression: options?.enableCompression ?? true,
     };
 
     this.eventsDirectory = this.options.storageDirectory;
@@ -135,7 +135,7 @@ export class EventStore {
   async getEventsFromTimestamp(timestamp: string, limit?: number): Promise<ResourceEvent[]> {
     return this.getEvents({
       fromTimestamp: timestamp,
-      limit: limit || 1000
+      limit: limit || 1000,
     });
   }
 
@@ -161,13 +161,15 @@ export class EventStore {
 
       // Clean memory buffer
       const initialMemorySize = this.memoryBuffer.length;
-      this.memoryBuffer = this.memoryBuffer.filter(event => event.timestamp >= cutoffTimestamp);
+      this.memoryBuffer = this.memoryBuffer.filter((event) => event.timestamp >= cutoffTimestamp);
       this.rebuildEventIndex();
 
       // Clean disk files
       const deletedFiles = await this.cleanupDiskFiles(cutoffDate);
 
-      this.logger.info(`Cleanup completed: removed ${initialMemorySize - this.memoryBuffer.length} events from memory, ${deletedFiles} files from disk`);
+      this.logger.info(
+        `Cleanup completed: removed ${initialMemorySize - this.memoryBuffer.length} events from memory, ${deletedFiles} files from disk`
+      );
     } catch (error) {
       this.logger.error("Failed to cleanup events:", error);
     }
@@ -184,11 +186,13 @@ export class EventStore {
         totalEvents: this.memoryBuffer.length + diskStats.eventCount,
         eventsInMemory: this.memoryBuffer.length,
         eventsOnDisk: diskStats.eventCount,
-        storageSize: diskStats.totalSize
+        storageSize: diskStats.totalSize,
       };
 
       if (this.memoryBuffer.length > 0) {
-        const sortedEvents = [...this.memoryBuffer].sort((a, b) => a.timestamp.localeCompare(b.timestamp));
+        const sortedEvents = [...this.memoryBuffer].sort((a, b) =>
+          a.timestamp.localeCompare(b.timestamp)
+        );
         stats.oldestEvent = sortedEvents[0].timestamp;
         stats.newestEvent = sortedEvents[sortedEvents.length - 1].timestamp;
       }
@@ -250,7 +254,7 @@ export class EventStore {
       return;
     }
 
-    const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+    const today = new Date().toISOString().split("T")[0]; // YYYY-MM-DD
 
     // Check if we need a new file
     if (this.currentFileDate !== today || this.currentFileEvents >= this.maxEventsPerFile) {
@@ -265,7 +269,7 @@ export class EventStore {
       // Read existing events if file exists
       let existingEvents: ResourceEvent[] = [];
       try {
-        const content = await fs.readFile(filepath, 'utf8');
+        const content = await fs.readFile(filepath, "utf8");
         existingEvents = JSON.parse(content);
       } catch {
         // File doesn't exist or is empty, start fresh
@@ -292,22 +296,22 @@ export class EventStore {
 
     // Apply filters
     if (query.resourceType) {
-      events = events.filter(e => e.resourceType === query.resourceType);
+      events = events.filter((e) => e.resourceType === query.resourceType);
     }
     if (query.resourceId) {
-      events = events.filter(e => e.resourceId === query.resourceId);
+      events = events.filter((e) => e.resourceId === query.resourceId);
     }
     if (query.eventType) {
-      events = events.filter(e => e.type === query.eventType);
+      events = events.filter((e) => e.type === query.eventType);
     }
     if (query.source) {
-      events = events.filter(e => e.source === query.source);
+      events = events.filter((e) => e.source === query.source);
     }
     if (query.fromTimestamp) {
-      events = events.filter(e => e.timestamp >= query.fromTimestamp!);
+      events = events.filter((e) => e.timestamp >= query.fromTimestamp!);
     }
     if (query.toTimestamp) {
-      events = events.filter(e => e.timestamp <= query.toTimestamp!);
+      events = events.filter((e) => e.timestamp <= query.toTimestamp!);
     }
 
     return events;
@@ -321,16 +325,16 @@ export class EventStore {
 
     try {
       const files = await fs.readdir(this.eventsDirectory);
-      const eventFiles = files.filter(f => f.startsWith('events-') && f.endsWith('.json'));
+      const eventFiles = files.filter((f) => f.startsWith("events-") && f.endsWith(".json"));
 
       for (const file of eventFiles) {
         try {
           const filepath = path.join(this.eventsDirectory, file);
-          const content = await fs.readFile(filepath, 'utf8');
+          const content = await fs.readFile(filepath, "utf8");
           const fileEvents: ResourceEvent[] = JSON.parse(content);
 
           // Apply basic filtering
-          const filteredEvents = fileEvents.filter(event => {
+          const filteredEvents = fileEvents.filter((event) => {
             if (query.resourceType && event.resourceType !== query.resourceType) return false;
             if (query.resourceId && event.resourceId !== query.resourceId) return false;
             if (query.eventType && event.type !== query.eventType) return false;
@@ -372,7 +376,10 @@ export class EventStore {
   /**
    * Merge and deduplicate events from memory and disk
    */
-  private mergeAndDeduplicateEvents(memoryEvents: ResourceEvent[], diskEvents: ResourceEvent[]): ResourceEvent[] {
+  private mergeAndDeduplicateEvents(
+    memoryEvents: ResourceEvent[],
+    diskEvents: ResourceEvent[]
+  ): ResourceEvent[] {
     const eventMap = new Map<string, ResourceEvent>();
 
     // Add memory events (they take precedence)
@@ -412,7 +419,7 @@ export class EventStore {
    * Get event file name
    */
   private getEventFileName(date: string, sequence: number): string {
-    const paddedSequence = sequence.toString().padStart(4, '0');
+    const paddedSequence = sequence.toString().padStart(4, "0");
     return `events-${date}-${paddedSequence}.json`;
   }
 
@@ -424,7 +431,7 @@ export class EventStore {
 
     try {
       const files = await fs.readdir(this.eventsDirectory);
-      const eventFiles = files.filter(f => f.startsWith('events-') && f.endsWith('.json'));
+      const eventFiles = files.filter((f) => f.startsWith("events-") && f.endsWith(".json"));
 
       for (const file of eventFiles) {
         // Extract date from filename
@@ -455,7 +462,7 @@ export class EventStore {
 
     try {
       const files = await fs.readdir(this.eventsDirectory);
-      const eventFiles = files.filter(f => f.startsWith('events-') && f.endsWith('.json'));
+      const eventFiles = files.filter((f) => f.startsWith("events-") && f.endsWith(".json"));
 
       for (const file of eventFiles) {
         try {
@@ -464,7 +471,7 @@ export class EventStore {
           totalSize += stats.size;
 
           // Count events in file
-          const content = await fs.readFile(filepath, 'utf8');
+          const content = await fs.readFile(filepath, "utf8");
           const events = JSON.parse(content);
           eventCount += events.length;
         } catch (error) {

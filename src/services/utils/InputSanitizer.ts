@@ -16,13 +16,16 @@ export class InputSanitizer {
   /**
    * Sanitize text input: trim, enforce length limit, strip control chars.
    */
-  static sanitizeText(input: string, maxLength: number = InputSanitizer.MAX_GENERIC_LENGTH): string {
-    if (!input || typeof input !== 'string') return '';
+  static sanitizeText(
+    input: string,
+    maxLength: number = InputSanitizer.MAX_GENERIC_LENGTH
+  ): string {
+    if (!input || typeof input !== "string") return "";
     // Strip null bytes and other control characters (keep newlines, tabs)
     // biome-ignore lint/suspicious/noControlCharactersInRegex: stripping control
     // characters is precisely this function's job — the rule's assumption that a
     // control char in a regex is accidental does not hold for a sanitizer.
-    let sanitized = input.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
+    let sanitized = input.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, "");
     // Trim whitespace
     sanitized = sanitized.trim();
     // Enforce length limit

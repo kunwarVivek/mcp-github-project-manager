@@ -11,7 +11,7 @@ export enum TaskPriority {
   CRITICAL = "critical",
   HIGH = "high",
   MEDIUM = "medium",
-  LOW = "low"
+  LOW = "low",
 }
 
 /**
@@ -22,7 +22,7 @@ export enum TaskStatus {
   IN_PROGRESS = "in_progress",
   BLOCKED = "blocked",
   DONE = "done",
-  CANCELLED = "cancelled"
+  CANCELLED = "cancelled",
 }
 
 /**
@@ -128,19 +128,19 @@ export const AIGenerationMetadataSchema = z.object({
   generatedAt: z.string(),
   prompt: z.string(),
   confidence: z.number().min(0).max(1),
-  version: z.string()
+  version: z.string(),
 });
 
 export const TaskDependencySchema = z.object({
   id: z.string(),
   type: z.enum(["blocks", "depends_on", "related_to"]),
-  description: z.string().optional()
+  description: z.string().optional(),
 });
 
 export const AcceptanceCriteriaSchema = z.object({
   id: z.string(),
   description: z.string(),
-  completed: z.boolean()
+  completed: z.boolean(),
 });
 
 export const AITaskSchema = z.object({
@@ -165,5 +165,5 @@ export const AITaskSchema = z.object({
   dueDate: z.string().optional(),
   tags: z.array(z.string()),
   assignee: z.string().optional(),
-  sourcePRD: z.string().optional()
+  sourcePRD: z.string().optional(),
 });

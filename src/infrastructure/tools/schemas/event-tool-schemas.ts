@@ -1,10 +1,7 @@
 import { z } from "zod";
 import type { ToolDefinition, ToolSchema } from "../ToolValidator";
 import { ANNOTATION_PATTERNS } from "../annotations/tool-annotations";
-import {
-  EventListOutputSchema,
-  SubscriptionOutputSchema,
-} from "./project-schemas";
+import { EventListOutputSchema, SubscriptionOutputSchema } from "./project-schemas";
 
 // ============================================================================
 // Event Management Schemas
@@ -12,15 +9,17 @@ import {
 
 export const subscribeToEventsSchema = z.object({
   clientId: z.string().min(1, "Client ID is required"),
-  filters: z.array(
-    z.object({
-      resourceType: z.enum(["PROJECT", "MILESTONE", "ISSUE", "SPRINT"]).optional(),
-      eventType: z.enum(["created", "updated", "deleted", "closed", "reopened"]).optional(),
-      resourceId: z.string().optional(),
-      source: z.enum(["github", "api"]).optional(),
-      tags: z.array(z.string()).optional(),
-    })
-  ).default([]),
+  filters: z
+    .array(
+      z.object({
+        resourceType: z.enum(["PROJECT", "MILESTONE", "ISSUE", "SPRINT"]).optional(),
+        eventType: z.enum(["created", "updated", "deleted", "closed", "reopened"]).optional(),
+        resourceId: z.string().optional(),
+        source: z.enum(["github", "api"]).optional(),
+        tags: z.array(z.string()).optional(),
+      })
+    )
+    .default([]),
   transport: z.enum(["sse", "webhook", "internal"]).default("sse"),
   endpoint: z.string().optional(),
   expiresAt: z.string().datetime().optional(),
@@ -51,7 +50,10 @@ export type ReplayEventsArgs = z.infer<typeof replayEventsSchema>;
 // Event Management Tool Definitions
 // ============================================================================
 
-export const subscribeToEventsTool: ToolDefinition<SubscribeToEventsArgs, z.infer<typeof SubscriptionOutputSchema>> = {
+export const subscribeToEventsTool: ToolDefinition<
+  SubscribeToEventsArgs,
+  z.infer<typeof SubscriptionOutputSchema>
+> = {
   name: "subscribe_to_events",
   title: "Subscribe to Events",
   description: "Subscribe to real-time events for GitHub resources",
@@ -65,8 +67,8 @@ export const subscribeToEventsTool: ToolDefinition<SubscribeToEventsArgs, z.infe
       args: {
         clientId: "my-client",
         filters: [{ resourceType: "PROJECT" }],
-        transport: "sse"
-      }
+        transport: "sse",
+      },
     },
     {
       name: "Subscribe to issue updates",
@@ -74,13 +76,16 @@ export const subscribeToEventsTool: ToolDefinition<SubscribeToEventsArgs, z.infe
       args: {
         clientId: "my-client",
         filters: [{ resourceType: "ISSUE", eventType: "updated", resourceId: "123" }],
-        transport: "sse"
-      }
-    }
-  ]
+        transport: "sse",
+      },
+    },
+  ],
 };
 
-export const getRecentEventsTool: ToolDefinition<GetRecentEventsArgs, z.infer<typeof EventListOutputSchema>> = {
+export const getRecentEventsTool: ToolDefinition<
+  GetRecentEventsArgs,
+  z.infer<typeof EventListOutputSchema>
+> = {
   name: "get_recent_events",
   title: "Get Recent Events",
   description: "Get recent events for GitHub resources",
@@ -93,8 +98,8 @@ export const getRecentEventsTool: ToolDefinition<GetRecentEventsArgs, z.infer<ty
       description: "Get the last 50 events for projects",
       args: {
         resourceType: "PROJECT",
-        limit: 50
-      }
+        limit: 50,
+      },
     },
     {
       name: "Get recent events for specific issue",
@@ -102,13 +107,16 @@ export const getRecentEventsTool: ToolDefinition<GetRecentEventsArgs, z.infer<ty
       args: {
         resourceType: "ISSUE",
         resourceId: "123",
-        limit: 20
-      }
-    }
-  ]
+        limit: 20,
+      },
+    },
+  ],
 };
 
-export const replayEventsTool: ToolDefinition<ReplayEventsArgs, z.infer<typeof EventListOutputSchema>> = {
+export const replayEventsTool: ToolDefinition<
+  ReplayEventsArgs,
+  z.infer<typeof EventListOutputSchema>
+> = {
   name: "replay_events",
   title: "Replay Events",
   description: "Replay events from a specific timestamp",
@@ -121,8 +129,8 @@ export const replayEventsTool: ToolDefinition<ReplayEventsArgs, z.infer<typeof E
       description: "Replay all events from yesterday",
       args: {
         fromTimestamp: "2025-01-01T00:00:00Z",
-        limit: 500
-      }
+        limit: 500,
+      },
     },
     {
       name: "Replay project events from specific time",
@@ -130,8 +138,8 @@ export const replayEventsTool: ToolDefinition<ReplayEventsArgs, z.infer<typeof E
       args: {
         fromTimestamp: "2025-01-01T12:00:00Z",
         resourceType: "PROJECT",
-        limit: 100
-      }
-    }
-  ]
+        limit: 100,
+      },
+    },
+  ],
 };

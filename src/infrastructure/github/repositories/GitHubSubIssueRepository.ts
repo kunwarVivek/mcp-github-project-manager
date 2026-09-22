@@ -20,7 +20,7 @@ interface AddSubIssueResponse {
       id: string;
       number: number;
       title: string;
-      state: 'OPEN' | 'CLOSED';
+      state: "OPEN" | "CLOSED";
       url: string;
     };
   };
@@ -47,7 +47,7 @@ interface ReprioritizeSubIssueResponse {
       id: string;
       number: number;
       title: string;
-      state: 'OPEN' | 'CLOSED';
+      state: "OPEN" | "CLOSED";
       url: string;
     };
   };
@@ -60,7 +60,7 @@ interface ListSubIssuesResponse {
         id: string;
         number: number;
         title: string;
-        state: 'OPEN' | 'CLOSED';
+        state: "OPEN" | "CLOSED";
         url: string;
       }>;
       pageInfo: {
@@ -83,7 +83,7 @@ interface GetParentIssueResponse {
       id: string;
       number: number;
       title: string;
-      state: 'OPEN' | 'CLOSED';
+      state: "OPEN" | "CLOSED";
       url: string;
     } | null;
   } | null;
@@ -199,7 +199,7 @@ const GET_PARENT_ISSUE_QUERY = `
  * Note: All operations require the 'sub_issues' GraphQL feature flag.
  */
 export class GitHubSubIssueRepository extends BaseGitHubRepository {
-  private static readonly SUB_ISSUES_FEATURE = ['sub_issues'];
+  private static readonly SUB_ISSUES_FEATURE = ["sub_issues"];
 
   /**
    * Add an existing issue as a sub-issue of a parent issue.
@@ -271,16 +271,14 @@ export class GitHubSubIssueRepository extends BaseGitHubRepository {
       throw new Error(`Issue with ID ${issueId} not found`);
     }
 
-    const subIssues: SubIssueListItem[] = response.node.subIssues.nodes.map(
-      (node, index) => ({
-        id: node.id,
-        number: node.number,
-        title: node.title,
-        state: node.state,
-        url: node.url,
-        position: index,
-      })
-    );
+    const subIssues: SubIssueListItem[] = response.node.subIssues.nodes.map((node, index) => ({
+      id: node.id,
+      number: node.number,
+      title: node.title,
+      state: node.state,
+      url: node.url,
+      position: index,
+    }));
 
     return {
       subIssues,
@@ -377,10 +375,7 @@ export class GitHubSubIssueRepository extends BaseGitHubRepository {
    * @param parentIssueId - Node ID of the parent issue
    * @param subIssueId - Node ID of the sub-issue to remove
    */
-  async removeSubIssue(
-    parentIssueId: string,
-    subIssueId: string
-  ): Promise<void> {
+  async removeSubIssue(parentIssueId: string, subIssueId: string): Promise<void> {
     await this.graphqlWithFeatures<RemoveSubIssueResponse>(
       REMOVE_SUB_ISSUE_MUTATION,
       {

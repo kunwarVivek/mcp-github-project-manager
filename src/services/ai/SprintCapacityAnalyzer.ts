@@ -7,20 +7,15 @@
  * Implements requirement AI-09: Sprint capacity planning with velocity.
  */
 
-import type {
-  EstimationCalibrator,
-} from '../../analysis/EstimationCalibrator';
-import {
-  calculateWeightedScore,
-  getConfidenceTier
-} from './ConfidenceScorer';
+import type { EstimationCalibrator } from "../../analysis/EstimationCalibrator";
+import { calculateWeightedScore, getConfidenceTier } from "./ConfidenceScorer";
 import type {
   SprintCapacity,
   TeamMember,
   SprintMetrics,
-  TeamAvailability
-} from '../../domain/sprint-planning-types';
-import type { SectionConfidence, ConfidenceFactors } from '../../domain/ai-types';
+  TeamAvailability,
+} from "../../domain/sprint-planning-types";
+import type { SectionConfidence, ConfidenceFactors } from "../../domain/ai-types";
 
 /**
  * Availability adjustment for capacity calculation.
@@ -38,7 +33,7 @@ interface AvailabilityAdjustment {
  */
 export interface CapacityParams {
   /** Velocity in points per sprint, or 'auto' to calculate from history */
-  velocity: number | 'auto';
+  velocity: number | "auto";
   /** Sprint duration in days */
   sprintDurationDays: number;
   /** Team members with their availability */
@@ -55,7 +50,7 @@ export interface CapacityParams {
 export class SprintCapacityAnalyzer {
   private estimationCalibrator?: EstimationCalibrator;
   private defaultVelocity = 20;
-  private defaultBuffer = 0.20; // 20%
+  private defaultBuffer = 0.2; // 20%
 
   constructor(estimationCalibrator?: EstimationCalibrator) {
     this.estimationCalibrator = estimationCalibrator;
@@ -69,9 +64,10 @@ export class SprintCapacityAnalyzer {
    */
   async calculateCapacity(params: CapacityParams): Promise<SprintCapacity> {
     // 1. Determine velocity
-    const velocity = params.velocity === 'auto'
-      ? this.calculateVelocityFromHistory(params.historicalSprints || [])
-      : params.velocity;
+    const velocity =
+      params.velocity === "auto"
+        ? this.calculateVelocityFromHistory(params.historicalSprints || [])
+        : params.velocity;
 
     // 2. Calculate team availability factor
     const availabilityResult = this.calculateTeamAvailability(params.teamMembers);
@@ -89,14 +85,11 @@ export class SprintCapacityAnalyzer {
     const confidence = this.calculateConfidence(
       hasHistoricalData,
       availabilityResult.factor,
-      params.velocity === 'auto'
+      params.velocity === "auto"
     );
 
     // 6. Build team availability details
-    const teamAvailability = this.buildTeamAvailability(
-      params.teamMembers,
-      availabilityResult
-    );
+    const teamAvailability = this.buildTeamAvailability(params.teamMembers, availabilityResult);
 
     return {
       totalPoints: calibratedVelocity,
@@ -104,9 +97,9 @@ export class SprintCapacityAnalyzer {
       teamAvailability,
       buffer: {
         percentage: bufferPercentage * 100,
-        reasoning: this.getBufferReasoning(bufferPercentage, hasHistoricalData)
+        reasoning: this.getBufferReasoning(bufferPercentage, hasHistoricalData),
       },
-      confidence
+      confidence,
     };
   }
 
@@ -120,17 +113,15 @@ export class SprintCapacityAnalyzer {
     }
 
     // Sort by date descending to get most recent first
-    const sorted = [...sprints].sort((a, b) =>
-      new Date(b.endDate).getTime() - new Date(a.endDate).getTime()
+    const sorted = [...sprints].sort(
+      (a, b) => new Date(b.endDate).getTime() - new Date(a.endDate).getTime()
     );
 
     // Use last 3-5 sprints
     const recentSprints = sorted.slice(0, Math.min(5, sorted.length));
 
     // Filter outliers (beyond 1.5 IQR)
-    const filteredVelocities = this.filterOutliers(
-      recentSprints.map(s => s.completedPoints)
-    );
+    const filteredVelocities = this.filterOutliers(recentSprints.map((s) => s.completedPoints));
 
     if (filteredVelocities.length === 0) {
       return this.defaultVelocity;
@@ -140,8 +131,9 @@ export class SprintCapacityAnalyzer {
     const weights = filteredVelocities.map((_, i) => 1 / (i + 1));
     const totalWeight = weights.reduce((a, b) => a + b, 0);
 
-    const weightedSum = filteredVelocities.reduce((sum, velocity, i) =>
-      sum + velocity * weights[i], 0
+    const weightedSum = filteredVelocities.reduce(
+      (sum, velocity, i) => sum + velocity * weights[i],
+      0
     );
 
     return Math.round(weightedSum / totalWeight);
@@ -166,7 +158,7 @@ export class SprintCapacityAnalyzer {
     const lowerBound = q1 - 1.5 * iqr;
     const upperBound = q3 + 1.5 * iqr;
 
-    return values.filter(v => v >= lowerBound && v <= upperBound);
+    return values.filter((v) => v >= lowerBound && v <= upperBound);
   }
 
   /**
@@ -193,7 +185,7 @@ export class SprintCapacityAnalyzer {
       if (originalAvailability < 0.25) {
         // Very low availability members contribute less predictably
         adjustedAvailability = originalAvailability * 0.8;
-        reason = 'Reduced predictability for low availability';
+        reason = "Reduced predictability for low availability";
       }
 
       adjustments.push({
@@ -201,7 +193,7 @@ export class SprintCapacityAnalyzer {
         memberName: member.name,
         originalAvailability,
         adjustedAvailability,
-        reason
+        reason,
       });
 
       totalAdjustedAvailability += adjustedAvailability;
@@ -222,7 +214,7 @@ export class SprintCapacityAnalyzer {
     }
 
     // Use medium complexity band as representative
-    const calibrationFactor = this.estimationCalibrator.getCalibrationFactor('medium');
+    const calibrationFactor = this.estimationCalibrator.getCalibrationFactor("medium");
     return calibrationFactor ?? 1.0;
   }
 
@@ -236,12 +228,12 @@ export class SprintCapacityAnalyzer {
     return {
       totalAvailability: availabilityResult.factor,
       memberCount: members.length,
-      members: members.map(m => ({
+      members: members.map((m) => ({
         id: m.id,
         name: m.name,
-        availability: m.availability
+        availability: m.availability,
       })),
-      confidence: members.length > 0 ? 0.8 : 0.5
+      confidence: members.length > 0 ? 0.8 : 0.5,
     };
   }
 
@@ -255,12 +247,11 @@ export class SprintCapacityAnalyzer {
   ): SectionConfidence {
     const factors: ConfidenceFactors = {
       // Input completeness based on historical data availability
-      inputCompleteness: hasHistoricalData ? 0.8 : (isAutoVelocity ? 0.4 : 0.6),
+      inputCompleteness: hasHistoricalData ? 0.8 : isAutoVelocity ? 0.4 : 0.6,
       // Self-assessment based on data quality
       aiSelfAssessment: hasHistoricalData ? 0.75 : 0.5,
       // Pattern match based on availability stability
-      patternMatch: availabilityFactor > 0.7 ? 0.8 :
-                    availabilityFactor > 0.5 ? 0.6 : 0.4
+      patternMatch: availabilityFactor > 0.7 ? 0.8 : availabilityFactor > 0.5 ? 0.6 : 0.4,
     };
 
     const score = calculateWeightedScore(factors);
@@ -268,13 +259,13 @@ export class SprintCapacityAnalyzer {
     const needsReview = score < 70; // Default warning threshold
 
     return {
-      sectionId: 'sprint-capacity',
-      sectionName: 'Sprint Capacity',
+      sectionId: "sprint-capacity",
+      sectionName: "Sprint Capacity",
       score,
       tier,
       factors,
       reasoning: this.getConfidenceReasoning(hasHistoricalData, availabilityFactor, isAutoVelocity),
-      needsReview
+      needsReview,
     };
   }
 
@@ -289,22 +280,22 @@ export class SprintCapacityAnalyzer {
     const reasons: string[] = [];
 
     if (hasHistoricalData) {
-      reasons.push('Based on historical velocity data from 3+ sprints');
+      reasons.push("Based on historical velocity data from 3+ sprints");
     } else if (isAutoVelocity) {
-      reasons.push('Limited historical data - using estimated velocity');
+      reasons.push("Limited historical data - using estimated velocity");
     } else {
-      reasons.push('Using provided velocity value');
+      reasons.push("Using provided velocity value");
     }
 
     if (availabilityFactor >= 0.8) {
-      reasons.push('High team availability');
+      reasons.push("High team availability");
     } else if (availabilityFactor >= 0.5) {
-      reasons.push('Moderate team availability');
+      reasons.push("Moderate team availability");
     } else {
-      reasons.push('Low team availability increases uncertainty');
+      reasons.push("Low team availability increases uncertainty");
     }
 
-    return reasons.join('. ');
+    return reasons.join(". ");
   }
 
   /**
@@ -331,23 +322,23 @@ export class SprintCapacityAnalyzer {
     }
 
     // Calculate variance in completion rates
-    const completionRates = historicalSprints.map(s =>
+    const completionRates = historicalSprints.map((s) =>
       s.plannedPoints > 0 ? s.completedPoints / s.plannedPoints : 1
     );
 
     const avgCompletion = completionRates.reduce((a, b) => a + b, 0) / completionRates.length;
-    const variance = completionRates.reduce((sum, rate) =>
-      sum + (rate - avgCompletion) ** 2, 0
-    ) / completionRates.length;
+    const variance =
+      completionRates.reduce((sum, rate) => sum + (rate - avgCompletion) ** 2, 0) /
+      completionRates.length;
     const stdDev = Math.sqrt(variance);
 
     // Higher variance = higher recommended buffer
     if (stdDev > 0.3) {
-      return 0.30; // 30% buffer for high variance
+      return 0.3; // 30% buffer for high variance
     } else if (stdDev > 0.15) {
       return 0.25; // 25% buffer for moderate variance
     } else {
-      return 0.20; // 20% buffer for stable teams
+      return 0.2; // 20% buffer for stable teams
     }
   }
 }

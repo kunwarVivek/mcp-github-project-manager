@@ -3,12 +3,10 @@ import type { GitHubIssueRepository } from "../infrastructure/github/repositorie
 import type { GitHubMilestoneRepository } from "../infrastructure/github/repositories/GitHubMilestoneRepository";
 import { ResourceStatus, ResourceType } from "../domain/resource-types";
 import type { Issue, Milestone, CreateMilestone } from "../domain/types";
-import {
-  ResourceNotFoundError,
-} from "../domain/errors";
-import { safeCall } from './utils/safeCall';
-import { parseResourceStatus, filterByStatus } from '../domain/utils/StatusParser';
-import { MilestoneMetrics as MilestoneMetricsVO } from '../domain/value-objects/MilestoneMetrics';
+import { ResourceNotFoundError } from "../domain/errors";
+import { safeCall } from "./utils/safeCall";
+import { parseResourceStatus, filterByStatus } from "../domain/utils/StatusParser";
+import { MilestoneMetrics as MilestoneMetricsVO } from "../domain/value-objects/MilestoneMetrics";
 
 /**
  * Metrics for a milestone including completion status and issue counts.
@@ -67,11 +65,12 @@ export class MilestoneService {
       }
 
       const allIssues = await this.issueRepo.findAll();
-      const issues = allIssues.filter(issue => issue.milestoneId === milestone.id);
+      const issues = allIssues.filter((issue) => issue.milestoneId === milestone.id);
 
       const totalIssues = issues.length;
       const closedIssues = issues.filter(
-        issue => issue.status === ResourceStatus.CLOSED || issue.status === ResourceStatus.COMPLETED
+        (issue) =>
+          issue.status === ResourceStatus.CLOSED || issue.status === ResourceStatus.COMPLETED
       ).length;
 
       // Create immutable value object
@@ -97,7 +96,8 @@ export class MilestoneService {
         status: metrics.status,
         issues: includeIssues ? issues : undefined,
         isOverdue: metrics.isOverdue,
-        daysRemaining: metrics.daysUntilDue && metrics.daysUntilDue > 0 ? metrics.daysUntilDue : undefined
+        daysRemaining:
+          metrics.daysUntilDue && metrics.daysUntilDue > 0 ? metrics.daysUntilDue : undefined,
       };
     });
   }
@@ -109,15 +109,22 @@ export class MilestoneService {
    * @param includeIssues - Whether to include the full issue list for each milestone
    * @returns Array of overdue milestone metrics, sorted by due date (oldest first)
    */
-  async getOverdueMilestones(limit: number = 10, includeIssues: boolean = false): Promise<MilestoneMetrics[]> {
+  async getOverdueMilestones(
+    limit: number = 10,
+    includeIssues: boolean = false
+  ): Promise<MilestoneMetrics[]> {
     return safeCall(async () => {
       const milestones = await this.milestoneRepo.findAll();
       const now = new Date();
 
-      const overdueMilestones = milestones.filter(milestone => {
+      const overdueMilestones = milestones.filter((milestone) => {
         if (!milestone.dueDate) return false;
         const dueDate = new Date(milestone.dueDate);
-        return now > dueDate && milestone.status !== ResourceStatus.COMPLETED && milestone.status !== ResourceStatus.CLOSED;
+        return (
+          now > dueDate &&
+          milestone.status !== ResourceStatus.COMPLETED &&
+          milestone.status !== ResourceStatus.CLOSED
+        );
       });
 
       overdueMilestones.sort((a, b) => {
@@ -128,9 +135,7 @@ export class MilestoneService {
       const limitedMilestones = overdueMilestones.slice(0, limit);
 
       const milestoneMetrics = await Promise.all(
-        limitedMilestones.map(milestone =>
-          this.getMilestoneMetrics(milestone.id, includeIssues)
-        )
+        limitedMilestones.map((milestone) => this.getMilestoneMetrics(milestone.id, includeIssues))
       );
 
       return milestoneMetrics;
@@ -145,19 +150,26 @@ export class MilestoneService {
    * @param includeIssues - Whether to include the full issue list for each milestone
    * @returns Array of upcoming milestone metrics, sorted by due date (soonest first)
    */
-  async getUpcomingMilestones(daysAhead: number = 30, limit: number = 10, includeIssues: boolean = false): Promise<MilestoneMetrics[]> {
+  async getUpcomingMilestones(
+    daysAhead: number = 30,
+    limit: number = 10,
+    includeIssues: boolean = false
+  ): Promise<MilestoneMetrics[]> {
     return safeCall(async () => {
       const milestones = await this.milestoneRepo.findAll();
       const now = new Date();
       const futureDate = new Date(now);
       futureDate.setDate(now.getDate() + daysAhead);
 
-      const upcomingMilestones = milestones.filter(milestone => {
+      const upcomingMilestones = milestones.filter((milestone) => {
         if (!milestone.dueDate) return false;
         const dueDate = new Date(milestone.dueDate);
-        return dueDate > now && dueDate <= futureDate &&
-               milestone.status !== ResourceStatus.COMPLETED &&
-               milestone.status !== ResourceStatus.CLOSED;
+        return (
+          dueDate > now &&
+          dueDate <= futureDate &&
+          milestone.status !== ResourceStatus.COMPLETED &&
+          milestone.status !== ResourceStatus.CLOSED
+        );
       });
 
       upcomingMilestones.sort((a, b) => {
@@ -168,9 +180,7 @@ export class MilestoneService {
       const limitedMilestones = upcomingMilestones.slice(0, limit);
 
       const milestoneMetrics = await Promise.all(
-        limitedMilestones.map(milestone =>
-          this.getMilestoneMetrics(milestone.id, includeIssues)
-        )
+        limitedMilestones.map((milestone) => this.getMilestoneMetrics(milestone.id, includeIssues))
       );
 
       return milestoneMetrics;
@@ -210,9 +220,9 @@ export class MilestoneService {
    * @returns Array of milestones matching the criteria
    */
   async listMilestones(
-    status: string = 'open',
-    sort: string = 'created_at',
-    direction: string = 'asc'
+    status: string = "open",
+    sort: string = "created_at",
+    direction: string = "asc"
   ): Promise<Milestone[]> {
     return safeCall(async () => {
       // Get all milestones
@@ -220,31 +230,31 @@ export class MilestoneService {
 
       // Filter by status if needed
       let filteredMilestones = milestones;
-      if (status !== 'all') {
-        filteredMilestones = filterByStatus(milestones, status, 'milestone');
+      if (status !== "all") {
+        filteredMilestones = filterByStatus(milestones, status, "milestone");
       }
 
       // Sort the milestones
       filteredMilestones.sort((a, b) => {
         let valueA: string, valueB: string;
 
-        switch(sort) {
-          case 'due_date':
-            valueA = a.dueDate || '';
-            valueB = b.dueDate || '';
+        switch (sort) {
+          case "due_date":
+            valueA = a.dueDate || "";
+            valueB = b.dueDate || "";
             break;
-          case 'title':
+          case "title":
             valueA = a.title;
             valueB = b.title;
             break;
-          case 'created_at':
+          case "created_at":
           default:
             valueA = a.createdAt;
             valueB = b.createdAt;
         }
 
         const comparison = valueA.localeCompare(valueB);
-        return direction === 'asc' ? comparison : -comparison;
+        return direction === "asc" ? comparison : -comparison;
       });
 
       // Return plain objects for MCP compatibility
@@ -264,13 +274,13 @@ export class MilestoneService {
     title?: string;
     description?: string;
     dueDate?: string | null;
-    state?: 'open' | 'closed';
+    state?: "open" | "closed";
   }): Promise<Milestone> {
     return safeCall(async () => {
       // Convert state to ResourceStatus if provided
       let status: ResourceStatus | undefined;
       if (data.state) {
-        status = parseResourceStatus(data.state, 'milestone');
+        status = parseResourceStatus(data.state, "milestone");
       }
 
       // Map input data to domain model
@@ -278,11 +288,11 @@ export class MilestoneService {
         title: data.title,
         description: data.description,
         dueDate: data.dueDate === null ? undefined : data.dueDate,
-        status
+        status,
       };
 
       // Clean up undefined values
-      Object.keys(milestoneData).forEach(key => {
+      Object.keys(milestoneData).forEach((key) => {
         if (milestoneData[key as keyof Partial<Milestone>] === undefined) {
           delete milestoneData[key as keyof Partial<Milestone>];
         }
@@ -309,7 +319,7 @@ export class MilestoneService {
 
       return {
         success: true,
-        message: `Milestone ${data.milestoneId} has been deleted`
+        message: `Milestone ${data.milestoneId} has been deleted`,
       };
     });
   }

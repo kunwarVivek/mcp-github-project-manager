@@ -1,6 +1,10 @@
 import { z } from "zod";
-import type { TaskPriority, TaskComplexity, AIGenerationMetadata } from './ai-task-types';
-import { TaskPrioritySchema, TaskComplexitySchema, AIGenerationMetadataSchema } from './ai-task-types';
+import type { TaskPriority, TaskComplexity, AIGenerationMetadata } from "./ai-task-types";
+import {
+  TaskPrioritySchema,
+  TaskComplexitySchema,
+  AIGenerationMetadataSchema,
+} from "./ai-task-types";
 
 // ============================================================================
 // PRD (Product Requirements Document) Types
@@ -128,7 +132,7 @@ export const UserPersonaSchema = z.object({
   description: z.string(),
   goals: z.array(z.string()),
   painPoints: z.array(z.string()),
-  technicalLevel: z.enum(["beginner", "intermediate", "advanced"])
+  technicalLevel: z.enum(["beginner", "intermediate", "advanced"]),
 });
 
 export const FeatureRequirementSchema = z.object({
@@ -139,7 +143,7 @@ export const FeatureRequirementSchema = z.object({
   userStories: z.array(z.string()),
   acceptanceCriteria: z.array(z.string()),
   estimatedComplexity: TaskComplexitySchema,
-  dependencies: z.array(z.string())
+  dependencies: z.array(z.string()),
 });
 
 export const PRDDocumentSchema = z.object({
@@ -152,23 +156,27 @@ export const PRDDocumentSchema = z.object({
     inScope: z.array(z.string()),
     outOfScope: z.array(z.string()),
     assumptions: z.array(z.string()),
-    constraints: z.array(z.string())
+    constraints: z.array(z.string()),
   }),
   targetUsers: z.array(UserPersonaSchema),
   userJourney: z.string(),
   features: z.array(FeatureRequirementSchema),
-  technicalRequirements: z.array(z.object({
-    id: z.string(),
-    category: z.enum(["performance", "security", "scalability", "integration", "infrastructure"]),
-    requirement: z.string(),
-    rationale: z.string(),
-    priority: TaskPrioritySchema
-  })),
-  marketResearch: z.object({
-    competitorAnalysis: z.array(z.string()),
-    marketSize: z.string(),
-    trends: z.array(z.string())
-  }).optional(),
+  technicalRequirements: z.array(
+    z.object({
+      id: z.string(),
+      category: z.enum(["performance", "security", "scalability", "integration", "infrastructure"]),
+      requirement: z.string(),
+      rationale: z.string(),
+      priority: TaskPrioritySchema,
+    })
+  ),
+  marketResearch: z
+    .object({
+      competitorAnalysis: z.array(z.string()),
+      marketSize: z.string(),
+      trends: z.array(z.string()),
+    })
+    .optional(),
   timeline: z.string(),
   milestones: z.array(z.string()),
   successMetrics: z.array(z.string()),
@@ -178,5 +186,5 @@ export const PRDDocumentSchema = z.object({
   updatedAt: z.string(),
   author: z.string(),
   stakeholders: z.array(z.string()),
-  tags: z.array(z.string())
+  tags: z.array(z.string()),
 });

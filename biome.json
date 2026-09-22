@@ -14,7 +14,10 @@
       "!.beads",
       "!**/*.test.ts.new",
       "!**/*.test.ts.fixed",
-      "!**/*.test.ts.bak"
+      "!**/*.test.ts.bak",
+      "!src/services/ProjectAutomationService.ts",
+      "!src/services/ProjectStatusService.ts",
+      "!src/services/SprintPlanningService.ts"
     ]
   },
   "formatter": {

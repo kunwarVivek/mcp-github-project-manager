@@ -1,4 +1,4 @@
-import { vi } from 'vitest';
+import { vi } from "vitest";
 /**
  * Unit tests for sub-issue MCP tools
  *
@@ -14,7 +14,7 @@ import {
   GetParentIssueInputSchema,
   ReprioritizeSubIssueInputSchema,
   RemoveSubIssueInputSchema,
-} from '../../../src/infrastructure/tools/schemas/sub-issue-schemas.js';
+} from "../../../src/infrastructure/tools/schemas/sub-issue-schemas.js";
 import {
   addSubIssueTool,
   listSubIssuesTool,
@@ -26,50 +26,52 @@ import {
   executeGetParentIssue,
   executeReprioritizeSubIssue,
   executeRemoveSubIssue,
-} from '../../../src/infrastructure/tools/sub-issue-tools.js';
-import { GitHubRepositoryFactory } from '../../../src/infrastructure/github/GitHubRepositoryFactory.js';
+} from "../../../src/infrastructure/tools/sub-issue-tools.js";
+import { GitHubRepositoryFactory } from "../../../src/infrastructure/github/GitHubRepositoryFactory.js";
 
 // Mock the repository factory
-vi.mock('../../../src/infrastructure/github/GitHubRepositoryFactory.js', () => {
+vi.mock("../../../src/infrastructure/github/GitHubRepositoryFactory.js", () => {
   return {
-    GitHubRepositoryFactory: vi.fn().mockImplementation(function () { return ({
-      createIssueRepository: vi.fn(),
-      createMilestoneRepository: vi.fn(),
-      createProjectRepository: vi.fn(),
-      createSprintRepository: vi.fn(),
-      createAutomationRuleRepository: vi.fn(),
-      createSubIssueRepository: vi.fn(),
-      createStatusUpdateRepository: vi.fn(),
-      getOctokit: vi.fn(),
-      getConfig: vi.fn(),
-      graphql: vi.fn(),
-    }); }),
+    GitHubRepositoryFactory: vi.fn().mockImplementation(function () {
+      return {
+        createIssueRepository: vi.fn(),
+        createMilestoneRepository: vi.fn(),
+        createProjectRepository: vi.fn(),
+        createSprintRepository: vi.fn(),
+        createAutomationRuleRepository: vi.fn(),
+        createSubIssueRepository: vi.fn(),
+        createStatusUpdateRepository: vi.fn(),
+        getOctokit: vi.fn(),
+        getConfig: vi.fn(),
+        graphql: vi.fn(),
+      };
+    }),
   };
 });
 
 const MockedFactory = GitHubRepositoryFactory as MockedClass<typeof GitHubRepositoryFactory>;
 
-describe('Sub-issue Tools', () => {
-  describe('Input Schemas', () => {
-    describe('AddSubIssueInputSchema', () => {
-      it('rejects missing required fields', () => {
+describe("Sub-issue Tools", () => {
+  describe("Input Schemas", () => {
+    describe("AddSubIssueInputSchema", () => {
+      it("rejects missing required fields", () => {
         const result = AddSubIssueInputSchema.safeParse({});
         expect(result.success).toBe(false);
       });
 
-      it('rejects missing owner', () => {
+      it("rejects missing owner", () => {
         const result = AddSubIssueInputSchema.safeParse({
-          repo: 'test-repo',
+          repo: "test-repo",
           parentIssueNumber: 1,
           subIssueNumber: 2,
         });
         expect(result.success).toBe(false);
       });
 
-      it('accepts valid input', () => {
+      it("accepts valid input", () => {
         const result = AddSubIssueInputSchema.safeParse({
-          owner: 'octocat',
-          repo: 'hello-world',
+          owner: "octocat",
+          repo: "hello-world",
           parentIssueNumber: 100,
           subIssueNumber: 123,
         });
@@ -79,10 +81,10 @@ describe('Sub-issue Tools', () => {
         }
       });
 
-      it('accepts replaceParent option', () => {
+      it("accepts replaceParent option", () => {
         const result = AddSubIssueInputSchema.safeParse({
-          owner: 'octocat',
-          repo: 'hello-world',
+          owner: "octocat",
+          repo: "hello-world",
           parentIssueNumber: 100,
           subIssueNumber: 123,
           replaceParent: true,
@@ -94,11 +96,11 @@ describe('Sub-issue Tools', () => {
       });
     });
 
-    describe('ListSubIssuesInputSchema', () => {
-      it('accepts valid input with defaults', () => {
+    describe("ListSubIssuesInputSchema", () => {
+      it("accepts valid input with defaults", () => {
         const result = ListSubIssuesInputSchema.safeParse({
-          owner: 'octocat',
-          repo: 'hello-world',
+          owner: "octocat",
+          repo: "hello-world",
           issueNumber: 100,
         });
         expect(result.success).toBe(true);
@@ -107,47 +109,47 @@ describe('Sub-issue Tools', () => {
         }
       });
 
-      it('accepts pagination parameters', () => {
+      it("accepts pagination parameters", () => {
         const result = ListSubIssuesInputSchema.safeParse({
-          owner: 'octocat',
-          repo: 'hello-world',
+          owner: "octocat",
+          repo: "hello-world",
           issueNumber: 100,
           first: 50,
-          after: 'cursor123',
+          after: "cursor123",
         });
         expect(result.success).toBe(true);
         if (result.success) {
           expect(result.data.first).toBe(50);
-          expect(result.data.after).toBe('cursor123');
+          expect(result.data.after).toBe("cursor123");
         }
       });
     });
 
-    describe('GetParentIssueInputSchema', () => {
-      it('accepts valid input', () => {
+    describe("GetParentIssueInputSchema", () => {
+      it("accepts valid input", () => {
         const result = GetParentIssueInputSchema.safeParse({
-          owner: 'octocat',
-          repo: 'hello-world',
+          owner: "octocat",
+          repo: "hello-world",
           issueNumber: 123,
         });
         expect(result.success).toBe(true);
       });
 
-      it('rejects invalid issue number', () => {
+      it("rejects invalid issue number", () => {
         const result = GetParentIssueInputSchema.safeParse({
-          owner: 'octocat',
-          repo: 'hello-world',
-          issueNumber: 'not-a-number',
+          owner: "octocat",
+          repo: "hello-world",
+          issueNumber: "not-a-number",
         });
         expect(result.success).toBe(false);
       });
     });
 
-    describe('ReprioritizeSubIssueInputSchema', () => {
-      it('accepts input without afterIssueNumber', () => {
+    describe("ReprioritizeSubIssueInputSchema", () => {
+      it("accepts input without afterIssueNumber", () => {
         const result = ReprioritizeSubIssueInputSchema.safeParse({
-          owner: 'octocat',
-          repo: 'hello-world',
+          owner: "octocat",
+          repo: "hello-world",
           parentIssueNumber: 100,
           subIssueNumber: 123,
         });
@@ -157,10 +159,10 @@ describe('Sub-issue Tools', () => {
         }
       });
 
-      it('accepts input with afterIssueNumber', () => {
+      it("accepts input with afterIssueNumber", () => {
         const result = ReprioritizeSubIssueInputSchema.safeParse({
-          owner: 'octocat',
-          repo: 'hello-world',
+          owner: "octocat",
+          repo: "hello-world",
           parentIssueNumber: 100,
           subIssueNumber: 123,
           afterIssueNumber: 122,
@@ -172,21 +174,21 @@ describe('Sub-issue Tools', () => {
       });
     });
 
-    describe('RemoveSubIssueInputSchema', () => {
-      it('accepts valid input', () => {
+    describe("RemoveSubIssueInputSchema", () => {
+      it("accepts valid input", () => {
         const result = RemoveSubIssueInputSchema.safeParse({
-          owner: 'octocat',
-          repo: 'hello-world',
+          owner: "octocat",
+          repo: "hello-world",
           parentIssueNumber: 100,
           subIssueNumber: 123,
         });
         expect(result.success).toBe(true);
       });
 
-      it('rejects missing subIssueNumber', () => {
+      it("rejects missing subIssueNumber", () => {
         const result = RemoveSubIssueInputSchema.safeParse({
-          owner: 'octocat',
-          repo: 'hello-world',
+          owner: "octocat",
+          repo: "hello-world",
           parentIssueNumber: 100,
         });
         expect(result.success).toBe(false);
@@ -194,13 +196,13 @@ describe('Sub-issue Tools', () => {
     });
   });
 
-  describe('Tool Definitions', () => {
-    it('addSubIssueTool has correct name and title', () => {
-      expect(addSubIssueTool.name).toBe('add_sub_issue');
-      expect(addSubIssueTool.title).toBe('Add Sub-Issue');
+  describe("Tool Definitions", () => {
+    it("addSubIssueTool has correct name and title", () => {
+      expect(addSubIssueTool.name).toBe("add_sub_issue");
+      expect(addSubIssueTool.title).toBe("Add Sub-Issue");
     });
 
-    it('addSubIssueTool has updateIdempotent annotation', () => {
+    it("addSubIssueTool has updateIdempotent annotation", () => {
       expect(addSubIssueTool.annotations).toEqual({
         readOnlyHint: false,
         destructiveHint: false,
@@ -209,8 +211,8 @@ describe('Sub-issue Tools', () => {
       });
     });
 
-    it('listSubIssuesTool has readOnly annotation', () => {
-      expect(listSubIssuesTool.name).toBe('list_sub_issues');
+    it("listSubIssuesTool has readOnly annotation", () => {
+      expect(listSubIssuesTool.name).toBe("list_sub_issues");
       expect(listSubIssuesTool.annotations).toEqual({
         readOnlyHint: true,
         destructiveHint: false,
@@ -219,8 +221,8 @@ describe('Sub-issue Tools', () => {
       });
     });
 
-    it('getParentIssueTool has readOnly annotation', () => {
-      expect(getParentIssueTool.name).toBe('get_parent_issue');
+    it("getParentIssueTool has readOnly annotation", () => {
+      expect(getParentIssueTool.name).toBe("get_parent_issue");
       expect(getParentIssueTool.annotations).toEqual({
         readOnlyHint: true,
         destructiveHint: false,
@@ -229,8 +231,8 @@ describe('Sub-issue Tools', () => {
       });
     });
 
-    it('reprioritizeSubIssueTool has updateIdempotent annotation', () => {
-      expect(reprioritizeSubIssueTool.name).toBe('reprioritize_sub_issue');
+    it("reprioritizeSubIssueTool has updateIdempotent annotation", () => {
+      expect(reprioritizeSubIssueTool.name).toBe("reprioritize_sub_issue");
       expect(reprioritizeSubIssueTool.annotations).toEqual({
         readOnlyHint: false,
         destructiveHint: false,
@@ -239,8 +241,8 @@ describe('Sub-issue Tools', () => {
       });
     });
 
-    it('removeSubIssueTool has delete annotation with destructiveHint', () => {
-      expect(removeSubIssueTool.name).toBe('remove_sub_issue');
+    it("removeSubIssueTool has delete annotation with destructiveHint", () => {
+      expect(removeSubIssueTool.name).toBe("remove_sub_issue");
       expect(removeSubIssueTool.annotations).toEqual({
         readOnlyHint: false,
         destructiveHint: true,
@@ -249,7 +251,7 @@ describe('Sub-issue Tools', () => {
       });
     });
 
-    it('all tools have output schemas defined', () => {
+    it("all tools have output schemas defined", () => {
       expect(addSubIssueTool.outputSchema).toBeDefined();
       expect(listSubIssuesTool.outputSchema).toBeDefined();
       expect(getParentIssueTool.outputSchema).toBeDefined();
@@ -257,7 +259,7 @@ describe('Sub-issue Tools', () => {
       expect(removeSubIssueTool.outputSchema).toBeDefined();
     });
 
-    it('all tools have examples', () => {
+    it("all tools have examples", () => {
       expect(addSubIssueTool.examples).toBeDefined();
       expect(addSubIssueTool.examples!.length).toBeGreaterThan(0);
       expect(listSubIssuesTool.examples).toBeDefined();
@@ -268,7 +270,7 @@ describe('Sub-issue Tools', () => {
     });
   });
 
-  describe('Executors', () => {
+  describe("Executors", () => {
     let mockSubIssueRepo: Mocked<{
       addSubIssue: Mock;
       listSubIssues: Mock;
@@ -280,7 +282,7 @@ describe('Sub-issue Tools', () => {
 
     beforeEach(() => {
       vi.resetAllMocks();
-      vi.stubEnv('GITHUB_TOKEN', 'test-token');
+      vi.stubEnv("GITHUB_TOKEN", "test-token");
 
       mockSubIssueRepo = {
         addSubIssue: vi.fn(),
@@ -292,74 +294,82 @@ describe('Sub-issue Tools', () => {
 
       mockGraphql = vi.fn();
 
-      MockedFactory.mockImplementation(function () { return ({
-        createSubIssueRepository: vi.fn().mockReturnValue(mockSubIssueRepo),
-        graphql: mockGraphql,
-        getConfig: vi.fn().mockReturnValue({ owner: 'octocat', repo: 'hello-world' }),
-      } as unknown as GitHubRepositoryFactory); });
+      MockedFactory.mockImplementation(function () {
+        return {
+          createSubIssueRepository: vi.fn().mockReturnValue(mockSubIssueRepo),
+          graphql: mockGraphql,
+          getConfig: vi.fn().mockReturnValue({ owner: "octocat", repo: "hello-world" }),
+        } as unknown as GitHubRepositoryFactory;
+      });
     });
 
     afterEach(() => {
       vi.unstubAllEnvs();
     });
 
-    describe('executeAddSubIssue', () => {
-      it('calls repository with correct params', async () => {
+    describe("executeAddSubIssue", () => {
+      it("calls repository with correct params", async () => {
         // Mock issue node ID resolution
         mockGraphql.mockResolvedValue({
-          repository: { issue: { id: 'I_parent123' } },
+          repository: { issue: { id: "I_parent123" } },
         });
 
         mockSubIssueRepo.addSubIssue.mockResolvedValue({
-          issue: { id: 'I_parent123', title: 'Parent Issue' },
+          issue: { id: "I_parent123", title: "Parent Issue" },
           subIssue: {
-            id: 'I_sub456',
+            id: "I_sub456",
             number: 456,
-            title: 'Sub Issue',
-            state: 'OPEN',
-            url: 'http://url',
+            title: "Sub Issue",
+            state: "OPEN",
+            url: "http://url",
           },
         });
 
         // Parse through schema to get defaults applied
         const input = AddSubIssueInputSchema.parse({
-          owner: 'octocat',
-          repo: 'hello-world',
+          owner: "octocat",
+          repo: "hello-world",
           parentIssueNumber: 100,
           subIssueNumber: 456,
         });
         const result = await executeAddSubIssue(input);
 
-        expect(result.parentIssue.id).toBe('I_parent123');
+        expect(result.parentIssue.id).toBe("I_parent123");
         expect(result.subIssue.number).toBe(456);
-        expect(result.subIssue.state).toBe('open'); // normalized
+        expect(result.subIssue.state).toBe("open"); // normalized
       });
 
-      it('returns error when token is missing', async () => {
-        vi.stubEnv('GITHUB_TOKEN', undefined as unknown as string);
+      it("returns error when token is missing", async () => {
+        vi.stubEnv("GITHUB_TOKEN", undefined as unknown as string);
 
         const input = AddSubIssueInputSchema.parse({
-          owner: 'octocat',
-          repo: 'hello-world',
+          owner: "octocat",
+          repo: "hello-world",
           parentIssueNumber: 100,
           subIssueNumber: 456,
         });
 
-        await expect(executeAddSubIssue(input))
-          .rejects.toThrow(/No GitHub token available/);
+        await expect(executeAddSubIssue(input)).rejects.toThrow(/No GitHub token available/);
       });
     });
 
-    describe('executeListSubIssues', () => {
-      it('returns structured result', async () => {
+    describe("executeListSubIssues", () => {
+      it("returns structured result", async () => {
         mockGraphql.mockResolvedValue({
-          repository: { issue: { id: 'I_parent' } },
+          repository: { issue: { id: "I_parent" } },
         });
 
         mockSubIssueRepo.listSubIssues.mockResolvedValue({
           subIssues: [
-            { id: 'I_1', number: 1, title: 'First', state: 'OPEN', url: 'http://1', position: 0 },
-            { id: 'I_2', number: 2, title: 'Second', state: 'CLOSED', url: 'http://2', position: 1 },
+            { id: "I_1", number: 1, title: "First", state: "OPEN", url: "http://1", position: 0 },
+            {
+              id: "I_2",
+              number: 2,
+              title: "Second",
+              state: "CLOSED",
+              url: "http://2",
+              position: 1,
+            },
           ],
           summary: { total: 2, completed: 1, percentCompleted: 50 },
           pageInfo: { hasNextPage: false, endCursor: undefined },
@@ -368,31 +378,31 @@ describe('Sub-issue Tools', () => {
 
         // Parse through schema to get defaults applied
         const input = ListSubIssuesInputSchema.parse({
-          owner: 'octocat',
-          repo: 'hello-world',
+          owner: "octocat",
+          repo: "hello-world",
           issueNumber: 100,
         });
         const result = await executeListSubIssues(input);
 
         expect(result.subIssues).toHaveLength(2);
-        expect(result.subIssues[0].state).toBe('open'); // normalized
-        expect(result.subIssues[1].state).toBe('closed'); // normalized
+        expect(result.subIssues[0].state).toBe("open"); // normalized
+        expect(result.subIssues[1].state).toBe("closed"); // normalized
         expect(result.summary.percentCompleted).toBe(50);
         expect(result.totalCount).toBe(2);
       });
     });
 
-    describe('executeGetParentIssue', () => {
-      it('returns null for issue without parent', async () => {
+    describe("executeGetParentIssue", () => {
+      it("returns null for issue without parent", async () => {
         mockGraphql.mockResolvedValue({
-          repository: { issue: { id: 'I_orphan' } },
+          repository: { issue: { id: "I_orphan" } },
         });
 
         mockSubIssueRepo.getParentIssue.mockResolvedValue(null);
 
         const input = GetParentIssueInputSchema.parse({
-          owner: 'octocat',
-          repo: 'hello-world',
+          owner: "octocat",
+          repo: "hello-world",
           issueNumber: 123,
         });
         const result = await executeGetParentIssue(input);
@@ -400,46 +410,46 @@ describe('Sub-issue Tools', () => {
         expect(result.parent).toBeNull();
       });
 
-      it('returns parent when exists', async () => {
+      it("returns parent when exists", async () => {
         mockGraphql.mockResolvedValue({
-          repository: { issue: { id: 'I_child' } },
+          repository: { issue: { id: "I_child" } },
         });
 
         mockSubIssueRepo.getParentIssue.mockResolvedValue({
-          id: 'I_parent',
+          id: "I_parent",
           number: 100,
-          title: 'Parent Issue',
-          state: 'OPEN',
-          url: 'http://parent',
+          title: "Parent Issue",
+          state: "OPEN",
+          url: "http://parent",
         });
 
         const input = GetParentIssueInputSchema.parse({
-          owner: 'octocat',
-          repo: 'hello-world',
+          owner: "octocat",
+          repo: "hello-world",
           issueNumber: 123,
         });
         const result = await executeGetParentIssue(input);
 
         expect(result.parent).not.toBeNull();
         expect(result.parent!.number).toBe(100);
-        expect(result.parent!.state).toBe('open'); // normalized
+        expect(result.parent!.state).toBe("open"); // normalized
       });
     });
 
-    describe('executeReprioritizeSubIssue', () => {
-      it('passes afterId correctly when moving to beginning', async () => {
+    describe("executeReprioritizeSubIssue", () => {
+      it("passes afterId correctly when moving to beginning", async () => {
         mockGraphql.mockResolvedValue({
-          repository: { issue: { id: 'I_node' } },
+          repository: { issue: { id: "I_node" } },
         });
 
         mockSubIssueRepo.reprioritizeSubIssue.mockResolvedValue({
-          issue: { id: 'I_parent', title: 'Parent' },
-          subIssue: { id: 'I_sub', number: 123, title: 'Sub', state: 'OPEN', url: 'http://u' },
+          issue: { id: "I_parent", title: "Parent" },
+          subIssue: { id: "I_sub", number: 123, title: "Sub", state: "OPEN", url: "http://u" },
         });
 
         const input = ReprioritizeSubIssueInputSchema.parse({
-          owner: 'octocat',
-          repo: 'hello-world',
+          owner: "octocat",
+          repo: "hello-world",
           parentIssueNumber: 100,
           subIssueNumber: 123,
           // No afterIssueNumber = move to beginning
@@ -448,25 +458,25 @@ describe('Sub-issue Tools', () => {
 
         expect(result.subIssue.number).toBe(123);
         expect(mockSubIssueRepo.reprioritizeSubIssue).toHaveBeenCalledWith(
-          'I_node', // parentNodeId
-          'I_node', // subIssueNodeId (same mock for all calls)
-          undefined  // afterNodeId
+          "I_node", // parentNodeId
+          "I_node", // subIssueNodeId (same mock for all calls)
+          undefined // afterNodeId
         );
       });
 
-      it('passes afterId correctly when moving after specific issue', async () => {
+      it("passes afterId correctly when moving after specific issue", async () => {
         mockGraphql.mockResolvedValue({
-          repository: { issue: { id: 'I_node' } },
+          repository: { issue: { id: "I_node" } },
         });
 
         mockSubIssueRepo.reprioritizeSubIssue.mockResolvedValue({
-          issue: { id: 'I_parent', title: 'Parent' },
-          subIssue: { id: 'I_sub', number: 123, title: 'Sub', state: 'CLOSED', url: 'http://u' },
+          issue: { id: "I_parent", title: "Parent" },
+          subIssue: { id: "I_sub", number: 123, title: "Sub", state: "CLOSED", url: "http://u" },
         });
 
         const input = ReprioritizeSubIssueInputSchema.parse({
-          owner: 'octocat',
-          repo: 'hello-world',
+          owner: "octocat",
+          repo: "hello-world",
           parentIssueNumber: 100,
           subIssueNumber: 123,
           afterIssueNumber: 122,
@@ -478,25 +488,25 @@ describe('Sub-issue Tools', () => {
       });
     });
 
-    describe('executeRemoveSubIssue', () => {
-      it('returns success message', async () => {
+    describe("executeRemoveSubIssue", () => {
+      it("returns success message", async () => {
         mockGraphql.mockResolvedValue({
-          repository: { issue: { id: 'I_node' } },
+          repository: { issue: { id: "I_node" } },
         });
 
         mockSubIssueRepo.removeSubIssue.mockResolvedValue(undefined);
 
         const input = RemoveSubIssueInputSchema.parse({
-          owner: 'octocat',
-          repo: 'hello-world',
+          owner: "octocat",
+          repo: "hello-world",
           parentIssueNumber: 100,
           subIssueNumber: 123,
         });
         const result = await executeRemoveSubIssue(input);
 
         expect(result.success).toBe(true);
-        expect(result.message).toContain('#123');
-        expect(result.message).toContain('#100');
+        expect(result.message).toContain("#123");
+        expect(result.message).toContain("#100");
       });
     });
   });

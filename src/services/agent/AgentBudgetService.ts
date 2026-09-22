@@ -1,10 +1,10 @@
-import type { AgentStore } from '../../infrastructure/agent/AgentStore';
-import type { Agent, BudgetStatus, AgentBudget } from '../../domain/agent-orchestration-types';
+import type { AgentStore } from "../../infrastructure/agent/AgentStore";
+import type { Agent, BudgetStatus, AgentBudget } from "../../domain/agent-orchestration-types";
 import {
   DEFAULT_AGENT_BUDGET_TOKENS,
   MAX_AGENT_HIERARCHY_DEPTH,
-} from '../../domain/agent-orchestration-types';
-import { safeCall } from '../utils/safeCall';
+} from "../../domain/agent-orchestration-types";
+import { safeCall } from "../utils/safeCall";
 
 /**
  * Per-agent token budget tracking and enforcement.
@@ -38,9 +38,8 @@ export class AgentBudgetService {
       const budget = normalizeBudget(freshOwner?.budget ?? budgetOwner.budget ?? defaultBudget());
 
       const remainingTokens = Math.max(0, budget.totalTokens - budget.usedTokens);
-      const usagePercent = budget.totalTokens > 0
-        ? (budget.usedTokens / budget.totalTokens) * 100
-        : 0;
+      const usagePercent =
+        budget.totalTokens > 0 ? (budget.usedTokens / budget.totalTokens) * 100 : 0;
 
       return {
         agentId: budgetOwner.id,
@@ -64,8 +63,8 @@ export class AgentBudgetService {
     agentId: string,
     totalTokens: number,
     warningFraction?: number,
-    resetPeriod?: 'daily' | 'weekly' | 'monthly' | 'never',
-    hardStop?: boolean,
+    resetPeriod?: "daily" | "weekly" | "monthly" | "never",
+    hardStop?: boolean
   ): Promise<BudgetStatus> {
     return safeCall(async () => {
       const agent = await this.agentStore.getAgent(agentId);
@@ -111,7 +110,7 @@ export class AgentBudgetService {
 
       // Flip status when budget is exhausted
       if (budget.hardStop && budget.usedTokens >= budget.totalTokens) {
-        budgetOwner.status = 'budget_exhausted';
+        budgetOwner.status = "budget_exhausted";
       }
 
       await this.agentStore.upsertAgent(budgetOwner);
@@ -140,7 +139,7 @@ export class AgentBudgetService {
 
       // Flip status when budget is exhausted
       if (budget.hardStop && budget.usedTokens >= budget.totalTokens) {
-        budgetOwner.status = 'budget_exhausted';
+        budgetOwner.status = "budget_exhausted";
       }
 
       await this.agentStore.upsertAgent(budgetOwner);
@@ -172,7 +171,7 @@ export class AgentBudgetService {
       }
 
       const budget = normalizeBudget(agent.budget ?? defaultBudget());
-      if (!budget.resetPeriod || budget.resetPeriod === 'never') {
+      if (!budget.resetPeriod || budget.resetPeriod === "never") {
         return false;
       }
 
@@ -192,8 +191,8 @@ export class AgentBudgetService {
       agent.budget = budget;
 
       // Restore agent status if it was budget-exhausted
-      if (agent.status === 'budget_exhausted') {
-        agent.status = 'idle';
+      if (agent.status === "budget_exhausted") {
+        agent.status = "idle";
       }
 
       await this.agentStore.upsertAgent(agent);
@@ -243,7 +242,7 @@ function defaultBudget(): AgentBudget {
     usedTokens: 0,
     warningFraction: 0.8,
     hardStop: true,
-    resetPeriod: 'never',
+    resetPeriod: "never",
   };
 }
 
@@ -258,18 +257,26 @@ function normalizeBudget(raw: AgentBudget): AgentBudget {
   raw.warningFraction ??= 0.8;
   // Legacy data has all spend in usedTokens with no metered/reported split.
   // Attribute existing spend to meteredTokens so the sum stays correct.
-  if (!hadSplitFields && raw.usedTokens > 0 && raw.meteredTokens === 0 && raw.reportedTokens === 0) {
+  if (
+    !hadSplitFields &&
+    raw.usedTokens > 0 &&
+    raw.meteredTokens === 0 &&
+    raw.reportedTokens === 0
+  ) {
     raw.meteredTokens = raw.usedTokens;
   }
   raw.usedTokens = raw.meteredTokens + raw.reportedTokens;
   return raw;
 }
 
-function resetPeriodToMs(period: 'daily' | 'weekly' | 'monthly'): number {
+function resetPeriodToMs(period: "daily" | "weekly" | "monthly"): number {
   const MS_PER_DAY = 86_400_000;
   switch (period) {
-    case 'daily':   return MS_PER_DAY;
-    case 'weekly':  return MS_PER_DAY * 7;
-    case 'monthly': return MS_PER_DAY * 30;
+    case "daily":
+      return MS_PER_DAY;
+    case "weekly":
+      return MS_PER_DAY * 7;
+    case "monthly":
+      return MS_PER_DAY * 30;
   }
 }

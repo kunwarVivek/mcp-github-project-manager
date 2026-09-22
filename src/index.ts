@@ -45,7 +45,7 @@ import {
   SSE_ENABLED,
   AGENT_RECLAIM_ENABLED,
   AGENT_RECLAIM_INTERVAL_MS,
-  AGENT_STALE_AFTER_MINUTES
+  AGENT_STALE_AFTER_MINUTES,
 } from "./env";
 import { ToolRegistry } from "./infrastructure/tools/ToolRegistry";
 import { ToolTelemetry } from "./infrastructure/tools/ToolTelemetry";
@@ -102,9 +102,7 @@ import {
 } from "./infrastructure/tools/sprint-ai-tools";
 
 // Phase 10 - Roadmap AI Tools
-import {
-  executeGenerateRoadmapVisualization,
-} from "./infrastructure/tools/roadmap-ai-tools";
+import { executeGenerateRoadmapVisualization } from "./infrastructure/tools/roadmap-ai-tools";
 
 // Phase 11 - Issue Intelligence Tools
 import {
@@ -162,7 +160,7 @@ import {
 } from "./infrastructure/tools/compound/compound-executors";
 
 import { ToolResultFormatter } from "./infrastructure/tools/ToolResultFormatter";
-import { MCPContentType, } from "./domain/mcp-types";
+import { MCPContentType } from "./domain/mcp-types";
 import { ResourceCache } from "./infrastructure/cache/ResourceCache";
 import { registerPrompts as registerPromptTemplates } from "./infrastructure/mcp/prompts";
 
@@ -258,7 +256,7 @@ class GitHubProjectManagerServer {
       cacheDirectory: CACHE_DIRECTORY,
       enableCompression: true,
       maxBackups: 5,
-      atomicWrites: true
+      atomicWrites: true,
     });
 
     // Initialize event system
@@ -266,7 +264,7 @@ class GitHubProjectManagerServer {
     this.subscriptionManager = new EventSubscriptionManager();
     this.eventStore = new EventStore({
       storageDirectory: `${CACHE_DIRECTORY}/events`,
-      enableCompression: true
+      enableCompression: true,
     });
 
     // Initialize all services via DI container
@@ -315,22 +313,26 @@ class GitHubProjectManagerServer {
       this.logger.info("🤖 AI Service Status Check");
 
       if (validation.hasAnyProvider) {
-        this.logger.info(`✅ AI Services Available: ${validation.available.join(', ')}`);
-        this.logger.info(`📊 Available Models: ${validation.availableModels.join(', ')}`);
+        this.logger.info(`✅ AI Services Available: ${validation.available.join(", ")}`);
+        this.logger.info(`📊 Available Models: ${validation.availableModels.join(", ")}`);
 
         if (validation.unavailableModels.length > 0) {
-          this.logger.warn(`⚠️  Unavailable Models: ${validation.unavailableModels.join(', ')}`);
+          this.logger.warn(`⚠️  Unavailable Models: ${validation.unavailableModels.join(", ")}`);
         }
 
         if (validation.missing.length > 0) {
-          this.logger.warn(`🔑 Missing API Keys: ${validation.missing.join(', ')}`);
+          this.logger.warn(`🔑 Missing API Keys: ${validation.missing.join(", ")}`);
         }
 
-        this.logger.info("🎯 AI-powered tools are ready: generate_prd, enhance_prd, parse_prd, add_feature, get_next_task, analyze_task_complexity, expand_task, create_traceability_matrix");
+        this.logger.info(
+          "🎯 AI-powered tools are ready: generate_prd, enhance_prd, parse_prd, add_feature, get_next_task, analyze_task_complexity, expand_task, create_traceability_matrix"
+        );
       } else {
         this.logger.warn("⚠️  No AI providers configured - AI features will be unavailable");
-        this.logger.warn(`🔑 Missing API Keys: ${validation.missing.join(', ')}`);
-        this.logger.info("💡 To enable AI features, set at least one of these environment variables:");
+        this.logger.warn(`🔑 Missing API Keys: ${validation.missing.join(", ")}`);
+        this.logger.info(
+          "💡 To enable AI features, set at least one of these environment variables:"
+        );
         this.logger.info("   - ANTHROPIC_API_KEY (recommended)");
         this.logger.info("   - OPENAI_API_KEY");
         this.logger.info("   - GOOGLE_API_KEY");
@@ -352,31 +354,35 @@ class GitHubProjectManagerServer {
       const toolCount = tools.length;
 
       // Count tools with various MCP compliance features
-      const toolsWithAnnotations = tools.filter(t => t.annotations !== undefined);
-      const toolsWithOutputSchema = tools.filter(t => t.outputSchema !== undefined);
-      const toolsWithTitle = tools.filter(t => t.title !== undefined);
+      const toolsWithAnnotations = tools.filter((t) => t.annotations !== undefined);
+      const toolsWithOutputSchema = tools.filter((t) => t.outputSchema !== undefined);
+      const toolsWithTitle = tools.filter((t) => t.title !== undefined);
 
       this.logger.info(`📦 Tool Registration Status: ${toolCount} tools registered`);
 
       // Annotation breakdown by behavior type
-      const readOnly = toolsWithAnnotations.filter(t => t.annotations?.readOnlyHint === true);
-      const destructive = toolsWithAnnotations.filter(t => t.annotations?.destructiveHint === true);
-      const idempotent = toolsWithAnnotations.filter(t => t.annotations?.idempotentHint === true);
+      const readOnly = toolsWithAnnotations.filter((t) => t.annotations?.readOnlyHint === true);
+      const destructive = toolsWithAnnotations.filter(
+        (t) => t.annotations?.destructiveHint === true
+      );
+      const idempotent = toolsWithAnnotations.filter((t) => t.annotations?.idempotentHint === true);
 
-      this.logger.info(`   Annotations: ${toolsWithAnnotations.length}/${toolCount} (readOnly: ${readOnly.length}, destructive: ${destructive.length}, idempotent: ${idempotent.length})`);
+      this.logger.info(
+        `   Annotations: ${toolsWithAnnotations.length}/${toolCount} (readOnly: ${readOnly.length}, destructive: ${destructive.length}, idempotent: ${idempotent.length})`
+      );
       this.logger.info(`   Output Schemas: ${toolsWithOutputSchema.length}/${toolCount}`);
       this.logger.info(`   Titles: ${toolsWithTitle.length}/${toolCount}`);
 
       // Warn if any tools are missing compliance features
       if (toolsWithAnnotations.length < toolCount) {
-        const missing = tools.filter(t => !t.annotations).map(t => t.name);
-        this.logger.warn(`⚠️  Tools missing annotations: ${missing.join(', ')}`);
+        const missing = tools.filter((t) => !t.annotations).map((t) => t.name);
+        this.logger.warn(`⚠️  Tools missing annotations: ${missing.join(", ")}`);
       }
 
       if (toolsWithOutputSchema.length < toolCount) {
-        const missing = tools.filter(t => !t.outputSchema).map(t => t.name);
+        const missing = tools.filter((t) => !t.outputSchema).map((t) => t.name);
         if (missing.length <= 5) {
-          this.logger.debug(`Tools without outputSchema: ${missing.join(', ')}`);
+          this.logger.debug(`Tools without outputSchema: ${missing.join(", ")}`);
         }
       }
     } catch (error) {
@@ -396,65 +402,65 @@ class GitHubProjectManagerServer {
 
     // ── Pattern A: PMS facade (pass-through — args forwarded as-is) ──
     const passthroughTools: Array<[string, string]> = [
-      ['create_roadmap', 'createRoadmap'],
-      ['plan_sprint', 'planSprint'],
-      ['create_project', 'createProject'],
-      ['update_project', 'updateProject'],
-      ['delete_project', 'deleteProject'],
-      ['get_project_readme', 'getProjectReadme'],
-      ['update_project_readme', 'updateProjectReadme'],
-      ['list_project_fields', 'listProjectFields'],
-      ['update_project_field', 'updateProjectField'],
-      ['create_milestone', 'createMilestone'],
-      ['update_milestone', 'updateMilestone'],
-      ['delete_milestone', 'deleteMilestone'],
-      ['create_issue', 'createIssue'],
-      ['list_issues', 'listIssues'],
-      ['create_issue_comment', 'createIssueComment'],
-      ['update_issue_comment', 'updateIssueComment'],
-      ['delete_issue_comment', 'deleteIssueComment'],
-      ['list_issue_comments', 'listIssueComments'],
-      ['create_draft_issue', 'createDraftIssue'],
-      ['update_draft_issue', 'updateDraftIssue'],
-      ['delete_draft_issue', 'deleteDraftIssue'],
-      ['create_pull_request', 'createPullRequest'],
-      ['get_pull_request', 'getPullRequest'],
-      ['list_pull_requests', 'listPullRequests'],
-      ['update_pull_request', 'updatePullRequest'],
-      ['merge_pull_request', 'mergePullRequest'],
-      ['list_pull_request_reviews', 'listPullRequestReviews'],
-      ['create_pull_request_review', 'createPullRequestReview'],
-      ['create_sprint', 'createSprint'],
-      ['update_sprint', 'updateSprint'],
-      ['add_issues_to_sprint', 'addIssuesToSprint'],
-      ['remove_issues_from_sprint', 'removeIssuesFromSprint'],
-      ['create_label', 'createLabel'],
-      ['list_labels', 'listLabels'],
-      ['create_project_view', 'createProjectView'],
-      ['list_project_views', 'listProjectViews'],
-      ['update_project_view', 'updateProjectView'],
-      ['delete_project_view', 'deleteProjectView'],
-      ['add_project_item', 'addProjectItem'],
-      ['remove_project_item', 'removeProjectItem'],
-      ['list_project_items', 'listProjectItems'],
-      ['archive_project_item', 'archiveProjectItem'],
-      ['unarchive_project_item', 'unarchiveProjectItem'],
-      ['set_field_value', 'setFieldValue'],
-      ['get_field_value', 'getFieldValue'],
-      ['clear_field_value', 'clearFieldValue'],
-      ['create_automation_rule', 'createAutomationRule'],
-      ['update_automation_rule', 'updateAutomationRule'],
-      ['delete_automation_rule', 'deleteAutomationRule'],
-      ['get_automation_rule', 'getAutomationRule'],
-      ['list_automation_rules', 'listAutomationRules'],
-      ['enable_automation_rule', 'enableAutomationRule'],
-      ['disable_automation_rule', 'disableAutomationRule'],
-      ['get_iteration_configuration', 'getIterationConfiguration'],
-      ['get_current_iteration', 'getCurrentIteration'],
-      ['get_iteration_items', 'getIterationItems'],
-      ['get_iteration_by_date', 'getIterationByDate'],
-      ['assign_items_to_iteration', 'assignItemsToIteration'],
-      ['create_project_field', 'createProjectField'],
+      ["create_roadmap", "createRoadmap"],
+      ["plan_sprint", "planSprint"],
+      ["create_project", "createProject"],
+      ["update_project", "updateProject"],
+      ["delete_project", "deleteProject"],
+      ["get_project_readme", "getProjectReadme"],
+      ["update_project_readme", "updateProjectReadme"],
+      ["list_project_fields", "listProjectFields"],
+      ["update_project_field", "updateProjectField"],
+      ["create_milestone", "createMilestone"],
+      ["update_milestone", "updateMilestone"],
+      ["delete_milestone", "deleteMilestone"],
+      ["create_issue", "createIssue"],
+      ["list_issues", "listIssues"],
+      ["create_issue_comment", "createIssueComment"],
+      ["update_issue_comment", "updateIssueComment"],
+      ["delete_issue_comment", "deleteIssueComment"],
+      ["list_issue_comments", "listIssueComments"],
+      ["create_draft_issue", "createDraftIssue"],
+      ["update_draft_issue", "updateDraftIssue"],
+      ["delete_draft_issue", "deleteDraftIssue"],
+      ["create_pull_request", "createPullRequest"],
+      ["get_pull_request", "getPullRequest"],
+      ["list_pull_requests", "listPullRequests"],
+      ["update_pull_request", "updatePullRequest"],
+      ["merge_pull_request", "mergePullRequest"],
+      ["list_pull_request_reviews", "listPullRequestReviews"],
+      ["create_pull_request_review", "createPullRequestReview"],
+      ["create_sprint", "createSprint"],
+      ["update_sprint", "updateSprint"],
+      ["add_issues_to_sprint", "addIssuesToSprint"],
+      ["remove_issues_from_sprint", "removeIssuesFromSprint"],
+      ["create_label", "createLabel"],
+      ["list_labels", "listLabels"],
+      ["create_project_view", "createProjectView"],
+      ["list_project_views", "listProjectViews"],
+      ["update_project_view", "updateProjectView"],
+      ["delete_project_view", "deleteProjectView"],
+      ["add_project_item", "addProjectItem"],
+      ["remove_project_item", "removeProjectItem"],
+      ["list_project_items", "listProjectItems"],
+      ["archive_project_item", "archiveProjectItem"],
+      ["unarchive_project_item", "unarchiveProjectItem"],
+      ["set_field_value", "setFieldValue"],
+      ["get_field_value", "getFieldValue"],
+      ["clear_field_value", "clearFieldValue"],
+      ["create_automation_rule", "createAutomationRule"],
+      ["update_automation_rule", "updateAutomationRule"],
+      ["delete_automation_rule", "deleteAutomationRule"],
+      ["get_automation_rule", "getAutomationRule"],
+      ["list_automation_rules", "listAutomationRules"],
+      ["enable_automation_rule", "enableAutomationRule"],
+      ["disable_automation_rule", "disableAutomationRule"],
+      ["get_iteration_configuration", "getIterationConfiguration"],
+      ["get_current_iteration", "getCurrentIteration"],
+      ["get_iteration_items", "getIterationItems"],
+      ["get_iteration_by_date", "getIterationByDate"],
+      ["assign_items_to_iteration", "assignItemsToIteration"],
+      ["create_project_field", "createProjectField"],
     ];
     for (const [tool, method] of passthroughTools) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -462,115 +468,129 @@ class GitHubProjectManagerServer {
     }
 
     // Pattern A: PMS facade (arg destructuring required)
-    r.registerExecutor('get_milestone_metrics', (a) => svc.getMilestoneMetrics(a.milestoneId, a.includeIssues));
-    r.registerExecutor('get_sprint_metrics', (a) => svc.getSprintMetrics(a.sprintId, a.includeIssues));
-    r.registerExecutor('get_overdue_milestones', (a) => svc.getOverdueMilestones(a.limit, a.includeIssues));
-    r.registerExecutor('get_upcoming_milestones', (a) => svc.getUpcomingMilestones(a.daysAhead, a.limit, a.includeIssues));
-    r.registerExecutor('list_projects', (a) => svc.listProjects(a.status, a.limit));
-    r.registerExecutor('get_project', (a) => svc.getProject(a.projectId));
-    r.registerExecutor('list_milestones', (a) => svc.listMilestones(a.status, a.sort, a.direction));
-    r.registerExecutor('get_issue', (a) => svc.getIssue(a.issueId));
-    r.registerExecutor('update_issue', (a) => svc.updateIssue(a.issueId, {
-      title: a.title, description: a.description, status: a.status,
-      milestoneId: a.milestoneId, assignees: a.assignees, labels: a.labels,
-    }));
-    r.registerExecutor('list_sprints', (a) => svc.listSprints(a.status));
-    r.registerExecutor('get_current_sprint', (a) => svc.getCurrentSprint(a.includeIssues));
+    r.registerExecutor("get_milestone_metrics", (a) =>
+      svc.getMilestoneMetrics(a.milestoneId, a.includeIssues)
+    );
+    r.registerExecutor("get_sprint_metrics", (a) =>
+      svc.getSprintMetrics(a.sprintId, a.includeIssues)
+    );
+    r.registerExecutor("get_overdue_milestones", (a) =>
+      svc.getOverdueMilestones(a.limit, a.includeIssues)
+    );
+    r.registerExecutor("get_upcoming_milestones", (a) =>
+      svc.getUpcomingMilestones(a.daysAhead, a.limit, a.includeIssues)
+    );
+    r.registerExecutor("list_projects", (a) => svc.listProjects(a.status, a.limit));
+    r.registerExecutor("get_project", (a) => svc.getProject(a.projectId));
+    r.registerExecutor("list_milestones", (a) => svc.listMilestones(a.status, a.sort, a.direction));
+    r.registerExecutor("get_issue", (a) => svc.getIssue(a.issueId));
+    r.registerExecutor("update_issue", (a) =>
+      svc.updateIssue(a.issueId, {
+        title: a.title,
+        description: a.description,
+        status: a.status,
+        milestoneId: a.milestoneId,
+        assignees: a.assignees,
+        labels: a.labels,
+      })
+    );
+    r.registerExecutor("list_sprints", (a) => svc.listSprints(a.status));
+    r.registerExecutor("get_current_sprint", (a) => svc.getCurrentSprint(a.includeIssues));
 
     // ── Pattern B: standalone execute functions ──────────────────────
-    r.registerExecutor('add_feature', executeAddFeature);
-    r.registerExecutor('generate_prd', executeGeneratePRD);
-    r.registerExecutor('parse_prd', executeParsePRD);
-    r.registerExecutor('get_next_task', executeGetNextTask);
-    r.registerExecutor('analyze_task_complexity', executeAnalyzeTaskComplexity);
-    r.registerExecutor('expand_task', executeExpandTask);
-    r.registerExecutor('enhance_prd', executeEnhancePRD);
-    r.registerExecutor('create_traceability_matrix', executeCreateTraceabilityMatrix);
-    r.registerExecutor('add_sub_issue', executeAddSubIssue);
-    r.registerExecutor('list_sub_issues', executeListSubIssues);
-    r.registerExecutor('get_parent_issue', executeGetParentIssue);
-    r.registerExecutor('reprioritize_sub_issue', executeReprioritizeSubIssue);
-    r.registerExecutor('remove_sub_issue', executeRemoveSubIssue);
-    r.registerExecutor('create_status_update', executeCreateStatusUpdate);
-    r.registerExecutor('list_status_updates', executeListStatusUpdates);
-    r.registerExecutor('get_status_update', executeGetStatusUpdate);
-    r.registerExecutor('mark_project_as_template', executeMarkProjectAsTemplate);
-    r.registerExecutor('unmark_project_as_template', executeUnmarkProjectAsTemplate);
-    r.registerExecutor('copy_project_from_template', executeCopyProjectFromTemplate);
-    r.registerExecutor('list_organization_templates', executeListOrganizationTemplates);
-    r.registerExecutor('link_project_to_repository', executeLinkProjectToRepository);
-    r.registerExecutor('unlink_project_from_repository', executeUnlinkProjectFromRepository);
-    r.registerExecutor('link_project_to_team', executeLinkProjectToTeam);
-    r.registerExecutor('unlink_project_from_team', executeUnlinkProjectFromTeam);
-    r.registerExecutor('list_linked_repositories', executeListLinkedRepositories);
-    r.registerExecutor('list_linked_teams', executeListLinkedTeams);
-    r.registerExecutor('close_project', executeCloseProject);
-    r.registerExecutor('reopen_project', executeReopenProject);
-    r.registerExecutor('convert_draft_issue', executeConvertDraftIssue);
-    r.registerExecutor('update_item_position', executeUpdateItemPosition);
-    r.registerExecutor('search_issues_advanced', executeSearchIssuesAdvanced);
-    r.registerExecutor('filter_project_items', executeFilterProjectItems);
-    r.registerExecutor('calculate_sprint_capacity', executeCalculateSprintCapacity);
-    r.registerExecutor('prioritize_backlog', executePrioritizeBacklog);
-    r.registerExecutor('assess_sprint_risk', executeAssessSprintRisk);
-    r.registerExecutor('suggest_sprint_composition', executeSuggestSprintComposition);
-    r.registerExecutor('generate_roadmap_visualization', executeGenerateRoadmapVisualization);
-    r.registerExecutor('suggest_labels', executeSuggestLabels);
-    r.registerExecutor('detect_duplicates', executeDetectDuplicates);
-    r.registerExecutor('find_related_issues', executeFindRelatedIssues);
-    r.registerExecutor('health_check', () => executeHealthCheck());
+    r.registerExecutor("add_feature", executeAddFeature);
+    r.registerExecutor("generate_prd", executeGeneratePRD);
+    r.registerExecutor("parse_prd", executeParsePRD);
+    r.registerExecutor("get_next_task", executeGetNextTask);
+    r.registerExecutor("analyze_task_complexity", executeAnalyzeTaskComplexity);
+    r.registerExecutor("expand_task", executeExpandTask);
+    r.registerExecutor("enhance_prd", executeEnhancePRD);
+    r.registerExecutor("create_traceability_matrix", executeCreateTraceabilityMatrix);
+    r.registerExecutor("add_sub_issue", executeAddSubIssue);
+    r.registerExecutor("list_sub_issues", executeListSubIssues);
+    r.registerExecutor("get_parent_issue", executeGetParentIssue);
+    r.registerExecutor("reprioritize_sub_issue", executeReprioritizeSubIssue);
+    r.registerExecutor("remove_sub_issue", executeRemoveSubIssue);
+    r.registerExecutor("create_status_update", executeCreateStatusUpdate);
+    r.registerExecutor("list_status_updates", executeListStatusUpdates);
+    r.registerExecutor("get_status_update", executeGetStatusUpdate);
+    r.registerExecutor("mark_project_as_template", executeMarkProjectAsTemplate);
+    r.registerExecutor("unmark_project_as_template", executeUnmarkProjectAsTemplate);
+    r.registerExecutor("copy_project_from_template", executeCopyProjectFromTemplate);
+    r.registerExecutor("list_organization_templates", executeListOrganizationTemplates);
+    r.registerExecutor("link_project_to_repository", executeLinkProjectToRepository);
+    r.registerExecutor("unlink_project_from_repository", executeUnlinkProjectFromRepository);
+    r.registerExecutor("link_project_to_team", executeLinkProjectToTeam);
+    r.registerExecutor("unlink_project_from_team", executeUnlinkProjectFromTeam);
+    r.registerExecutor("list_linked_repositories", executeListLinkedRepositories);
+    r.registerExecutor("list_linked_teams", executeListLinkedTeams);
+    r.registerExecutor("close_project", executeCloseProject);
+    r.registerExecutor("reopen_project", executeReopenProject);
+    r.registerExecutor("convert_draft_issue", executeConvertDraftIssue);
+    r.registerExecutor("update_item_position", executeUpdateItemPosition);
+    r.registerExecutor("search_issues_advanced", executeSearchIssuesAdvanced);
+    r.registerExecutor("filter_project_items", executeFilterProjectItems);
+    r.registerExecutor("calculate_sprint_capacity", executeCalculateSprintCapacity);
+    r.registerExecutor("prioritize_backlog", executePrioritizeBacklog);
+    r.registerExecutor("assess_sprint_risk", executeAssessSprintRisk);
+    r.registerExecutor("suggest_sprint_composition", executeSuggestSprintComposition);
+    r.registerExecutor("generate_roadmap_visualization", executeGenerateRoadmapVisualization);
+    r.registerExecutor("suggest_labels", executeSuggestLabels);
+    r.registerExecutor("detect_duplicates", executeDetectDuplicates);
+    r.registerExecutor("find_related_issues", executeFindRelatedIssues);
+    r.registerExecutor("health_check", () => executeHealthCheck());
 
     // ── Agent orchestration tools ──────────────────────────────────
-    r.registerExecutor('register_agent', executeRegisterAgent);
-    r.registerExecutor('list_agents', executeListAgents);
-    r.registerExecutor('deregister_agent', executeDeregisterAgent);
-    r.registerExecutor('checkout_task', executeCheckoutTask);
-    r.registerExecutor('release_task', executeReleaseTask);
-    r.registerExecutor('complete_task', executeCompleteTask);
-    r.registerExecutor('get_task_context', executeGetTaskContext);
-    r.registerExecutor('agent_heartbeat', executeAgentHeartbeat);
-    r.registerExecutor('submit_work_product', executeSubmitWorkProduct);
-    r.registerExecutor('get_agent_activity', executeGetAgentActivity);
-    r.registerExecutor('get_budget_status', executeGetBudgetStatus);
-    r.registerExecutor('set_agent_budget', executeSetAgentBudget);
-    r.registerExecutor('check_work_status', (args) => executeCheckWorkStatus(args));
-    r.registerExecutor('reclaim_stale_tasks', executeReclaimStaleTasks);
-    r.registerExecutor('record_usage', executeRecordUsage);
-    r.registerExecutor('submit_for_review', executeSubmitForReview);
-    r.registerExecutor('approve_task', executeApproveTask);
-    r.registerExecutor('reject_task', executeRejectTask);
-    r.registerExecutor('get_agent_metrics', executeGetAgentMetrics);
-    r.registerExecutor('setup_agent_fields', executeSetupAgentFields);
+    r.registerExecutor("register_agent", executeRegisterAgent);
+    r.registerExecutor("list_agents", executeListAgents);
+    r.registerExecutor("deregister_agent", executeDeregisterAgent);
+    r.registerExecutor("checkout_task", executeCheckoutTask);
+    r.registerExecutor("release_task", executeReleaseTask);
+    r.registerExecutor("complete_task", executeCompleteTask);
+    r.registerExecutor("get_task_context", executeGetTaskContext);
+    r.registerExecutor("agent_heartbeat", executeAgentHeartbeat);
+    r.registerExecutor("submit_work_product", executeSubmitWorkProduct);
+    r.registerExecutor("get_agent_activity", executeGetAgentActivity);
+    r.registerExecutor("get_budget_status", executeGetBudgetStatus);
+    r.registerExecutor("set_agent_budget", executeSetAgentBudget);
+    r.registerExecutor("check_work_status", (args) => executeCheckWorkStatus(args));
+    r.registerExecutor("reclaim_stale_tasks", executeReclaimStaleTasks);
+    r.registerExecutor("record_usage", executeRecordUsage);
+    r.registerExecutor("submit_for_review", executeSubmitForReview);
+    r.registerExecutor("approve_task", executeApproveTask);
+    r.registerExecutor("reject_task", executeRejectTask);
+    r.registerExecutor("get_agent_metrics", executeGetAgentMetrics);
+    r.registerExecutor("setup_agent_fields", executeSetupAgentFields);
 
     // ── Pattern C: server-bound handlers (use this.xxxService) ───────
-    r.registerExecutor('subscribe_to_events', (a) => this.handleSubscribeToEvents(a));
-    r.registerExecutor('get_recent_events', (a) => this.handleGetRecentEvents(a));
-    r.registerExecutor('replay_events', (a) => this.handleReplayEvents(a));
-    r.registerExecutor('generate_roadmap', (a) => this.handleGenerateRoadmap(a));
-    r.registerExecutor('enrich_issue', (a) => this.handleEnrichIssue(a));
-    r.registerExecutor('enrich_issues_bulk', (a) => this.handleEnrichIssuesBulk(a));
-    r.registerExecutor('triage_issue', (a) => this.handleTriageIssue(a));
-    r.registerExecutor('triage_all_issues', (a) => this.handleTriageAllIssues(a));
-    r.registerExecutor('schedule_triaging', (a) => this.handleScheduleTriaging(a));
+    r.registerExecutor("subscribe_to_events", (a) => this.handleSubscribeToEvents(a));
+    r.registerExecutor("get_recent_events", (a) => this.handleGetRecentEvents(a));
+    r.registerExecutor("replay_events", (a) => this.handleReplayEvents(a));
+    r.registerExecutor("generate_roadmap", (a) => this.handleGenerateRoadmap(a));
+    r.registerExecutor("enrich_issue", (a) => this.handleEnrichIssue(a));
+    r.registerExecutor("enrich_issues_bulk", (a) => this.handleEnrichIssuesBulk(a));
+    r.registerExecutor("triage_issue", (a) => this.handleTriageIssue(a));
+    r.registerExecutor("triage_all_issues", (a) => this.handleTriageAllIssues(a));
+    r.registerExecutor("schedule_triaging", (a) => this.handleScheduleTriaging(a));
 
     // ── Compound tools (aggregated MCP-facing tools) ────────────────
-    r.registerExecutor('manage_project', executeManageProject);
-    r.registerExecutor('manage_issues', executeManageIssues);
-    r.registerExecutor('manage_prs', executeManagePrs);
-    r.registerExecutor('manage_milestones', executeManageMilestones);
-    r.registerExecutor('manage_sprints', executeManageSprints);
-    r.registerExecutor('manage_labels', executeManageLabels);
-    r.registerExecutor('manage_automation', executeManageAutomation);
-    r.registerExecutor('manage_iterations', executeManageIterations);
-    r.registerExecutor('manage_events', executeManageEvents);
-    r.registerExecutor('manage_status_updates', executeManageStatusUpdates);
-    r.registerExecutor('ai_generate', executeAiGenerate);
-    r.registerExecutor('ai_analyze', executeAiAnalyze);
-    r.registerExecutor('ai_plan', executeAiPlan);
-    r.registerExecutor('agent_work', executeAgentWork);
-    r.registerExecutor('agent_manage', executeAgentManage);
-    r.registerExecutor('system', executeSystem);
-    r.registerExecutor('discover_tools', executeDiscoverTools);
+    r.registerExecutor("manage_project", executeManageProject);
+    r.registerExecutor("manage_issues", executeManageIssues);
+    r.registerExecutor("manage_prs", executeManagePrs);
+    r.registerExecutor("manage_milestones", executeManageMilestones);
+    r.registerExecutor("manage_sprints", executeManageSprints);
+    r.registerExecutor("manage_labels", executeManageLabels);
+    r.registerExecutor("manage_automation", executeManageAutomation);
+    r.registerExecutor("manage_iterations", executeManageIterations);
+    r.registerExecutor("manage_events", executeManageEvents);
+    r.registerExecutor("manage_status_updates", executeManageStatusUpdates);
+    r.registerExecutor("ai_generate", executeAiGenerate);
+    r.registerExecutor("ai_analyze", executeAiAnalyze);
+    r.registerExecutor("ai_plan", executeAiPlan);
+    r.registerExecutor("agent_work", executeAgentWork);
+    r.registerExecutor("agent_manage", executeAgentManage);
+    r.registerExecutor("system", executeSystem);
+    r.registerExecutor("discover_tools", executeDiscoverTools);
   }
 
   private setupToolHandlers() {
@@ -596,7 +616,7 @@ class GitHubProjectManagerServer {
           ...(tool.annotations ? { annotations: tool.annotations } : {}),
         },
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (async (args: unknown) => this.dispatchTool(tool.name, args)) as any,
+        (async (args: unknown) => this.dispatchTool(tool.name, args)) as any
       );
     }
   }
@@ -626,8 +646,7 @@ class GitHubProjectManagerServer {
       "github://config",
       {
         title: "Server Configuration",
-        description:
-          "Target repository, GitHub token status, and AI provider availability.",
+        description: "Target repository, GitHub token status, and AI provider availability.",
         mimeType: "application/json",
       },
       async (uri) => {
@@ -650,10 +669,10 @@ class GitHubProjectManagerServer {
           this.logger.error("Failed to read github://config resource", error);
           throw new McpError(
             ErrorCode.InternalError,
-            `Failed to read server configuration: ${error instanceof Error ? error.message : String(error)}`,
+            `Failed to read server configuration: ${error instanceof Error ? error.message : String(error)}`
           );
         }
-      },
+      }
     );
 
     this.server.registerResource(
@@ -673,10 +692,10 @@ class GitHubProjectManagerServer {
           this.logger.error("Failed to read github://projects resource", error);
           throw new McpError(
             ErrorCode.InternalError,
-            `Failed to list projects: ${error instanceof Error ? error.message : String(error)}`,
+            `Failed to list projects: ${error instanceof Error ? error.message : String(error)}`
           );
         }
-      },
+      }
     );
 
     this.server.registerResource(
@@ -696,10 +715,10 @@ class GitHubProjectManagerServer {
           this.logger.error("Failed to read github://sprints/current resource", error);
           throw new McpError(
             ErrorCode.InternalError,
-            `Failed to read current sprint: ${error instanceof Error ? error.message : String(error)}`,
+            `Failed to read current sprint: ${error instanceof Error ? error.message : String(error)}`
           );
         }
-      },
+      }
     );
 
     this.server.registerResource(
@@ -719,10 +738,10 @@ class GitHubProjectManagerServer {
           this.logger.error("Failed to read github://milestones resource", error);
           throw new McpError(
             ErrorCode.InternalError,
-            `Failed to list milestones: ${error instanceof Error ? error.message : String(error)}`,
+            `Failed to list milestones: ${error instanceof Error ? error.message : String(error)}`
           );
         }
-      },
+      }
     );
 
     this.server.registerResource(
@@ -742,10 +761,10 @@ class GitHubProjectManagerServer {
           this.logger.error("Failed to read github://agents resource", error);
           throw new McpError(
             ErrorCode.InternalError,
-            `Failed to list agents: ${error instanceof Error ? error.message : String(error)}`,
+            `Failed to list agents: ${error instanceof Error ? error.message : String(error)}`
           );
         }
-      },
+      }
     );
 
     this.server.registerResource(
@@ -770,10 +789,10 @@ class GitHubProjectManagerServer {
           this.logger.error("Failed to read github://tools resource", error);
           throw new McpError(
             ErrorCode.InternalError,
-            `Failed to read tool catalog: ${error instanceof Error ? error.message : String(error)}`,
+            `Failed to read tool catalog: ${error instanceof Error ? error.message : String(error)}`
           );
         }
-      },
+      }
     );
   }
 
@@ -798,9 +817,7 @@ class GitHubProjectManagerServer {
    * result, and only that form is visible to the model so it can recover.
    */
   private get agentBudgetService(): AgentBudgetService {
-    this._agentBudgetService ??= new AgentBudgetService(
-      new AgentStore(createGitHubFactory()),
-    );
+    this._agentBudgetService ??= new AgentBudgetService(new AgentStore(createGitHubFactory()));
     return this._agentBudgetService;
   }
 
@@ -813,7 +830,7 @@ class GitHubProjectManagerServer {
     if (this.gracefulShutdown.shuttingDown) {
       throw new McpError(
         ErrorCode.InternalError,
-        "Server is shutting down — no new requests accepted",
+        "Server is shutting down — no new requests accepted"
       );
     }
 
@@ -833,7 +850,7 @@ class GitHubProjectManagerServer {
       // on tools that declare one; otherwise there is simply nothing to debit.
       const agentId =
         typeof (validatedArgs as { agentId?: unknown })?.agentId === "string"
-          ? ((validatedArgs as { agentId: string }).agentId)
+          ? (validatedArgs as { agentId: string }).agentId
           : undefined;
       const usage = { tokens: 0 };
       let budgetWarningLine: string | undefined;
@@ -846,7 +863,7 @@ class GitHubProjectManagerServer {
           agentId,
           usage,
         },
-        () => this.toolRegistry.execute(toolName, validatedArgs),
+        () => this.toolRegistry.execute(toolName, validatedArgs)
       );
       const telemetryLatency = Date.now() - telemetryStart;
       ToolTelemetry.getInstance().recordCall(toolName, telemetryLatency, false);
@@ -859,10 +876,7 @@ class GitHubProjectManagerServer {
         const budgetStatus = await this.agentBudgetService
           .recordMeteredUsage(agentId, usage.tokens)
           .catch((error) => {
-            this.logger.warn(
-              `Failed to debit ${usage.tokens} tokens to agent ${agentId}`,
-              error,
-            );
+            this.logger.warn(`Failed to debit ${usage.tokens} tokens to agent ${agentId}`, error);
             return undefined;
           });
 
@@ -878,21 +892,18 @@ class GitHubProjectManagerServer {
       if (mcpResponse.status !== "success") {
         throw new McpError(
           ErrorCode.InternalError,
-          "Unexpected response format from tool execution",
+          "Unexpected response format from tool execution"
         );
       }
 
       // structuredContent is only meaningful against a declared outputSchema —
       // emitting it without one gives clients data they cannot validate.
       const structuredContent =
-        tool.outputSchema &&
-        result !== null &&
-        typeof result === "object" &&
-        !Array.isArray(result)
+        tool.outputSchema && result !== null && typeof result === "object" && !Array.isArray(result)
           ? (JSON.parse(JSON.stringify(result)) as Record<string, unknown>)
           : undefined;
 
-      const content: Array<{ type: 'text'; text: string }> = [
+      const content: Array<{ type: "text"; text: string }> = [
         {
           type: "text" as const,
           text: mcpResponse.output.content ?? JSON.stringify(result),
@@ -931,21 +942,21 @@ class GitHubProjectManagerServer {
       const subscriptionId = this.subscriptionManager.subscribe({
         clientId: args.clientId,
         filters: args.filters || [],
-        transport: args.transport || 'internal',
+        transport: args.transport || "internal",
         endpoint: args.endpoint,
-        expiresAt: args.expiresAt
+        expiresAt: args.expiresAt,
       });
 
       return {
         success: true,
         subscriptionId,
-        message: `Subscription created successfully for client ${args.clientId}`
+        message: `Subscription created successfully for client ${args.clientId}`,
       };
     } catch (error) {
       this.logger.error("Failed to create event subscription:", error);
       throw new McpError(
         ErrorCode.InternalError,
-        `Failed to create subscription: ${error instanceof Error ? error.message : 'Unknown error'}`
+        `Failed to create subscription: ${error instanceof Error ? error.message : "Unknown error"}`
       );
     }
   }
@@ -967,13 +978,13 @@ class GitHubProjectManagerServer {
       return {
         success: true,
         events,
-        count: events.length
+        count: events.length,
       };
     } catch (error) {
       this.logger.error("Failed to get recent events:", error);
       throw new McpError(
         ErrorCode.InternalError,
-        `Failed to get recent events: ${error instanceof Error ? error.message : 'Unknown error'}`
+        `Failed to get recent events: ${error instanceof Error ? error.message : "Unknown error"}`
       );
     }
   }
@@ -985,7 +996,7 @@ class GitHubProjectManagerServer {
     try {
       const query: any = {
         fromTimestamp: args.fromTimestamp,
-        limit: args.limit || 1000
+        limit: args.limit || 1000,
       };
 
       if (args.toTimestamp) query.toTimestamp = args.toTimestamp;
@@ -999,13 +1010,13 @@ class GitHubProjectManagerServer {
         events,
         count: events.length,
         fromTimestamp: args.fromTimestamp,
-        toTimestamp: args.toTimestamp
+        toTimestamp: args.toTimestamp,
       };
     } catch (error) {
       this.logger.error("Failed to replay events:", error);
       throw new McpError(
         ErrorCode.InternalError,
-        `Failed to replay events: ${error instanceof Error ? error.message : 'Unknown error'}`
+        `Failed to replay events: ${error instanceof Error ? error.message : "Unknown error"}`
       );
     }
   }
@@ -1020,31 +1031,31 @@ class GitHubProjectManagerServer {
         projectTitle: args.projectTitle,
         projectDescription: args.projectDescription,
         sprintDurationWeeks: args.sprintDurationWeeks,
-        targetMilestones: args.targetMilestones
+        targetMilestones: args.targetMilestones,
       });
 
       if (args.autoCreate) {
         const result = await this.roadmapService.createRoadmapInGitHub({
           projectId: args.projectId,
-          roadmap
+          roadmap,
         });
 
         return {
           success: true,
           roadmap,
-          created: result
+          created: result,
         };
       }
 
       return {
         success: true,
-        roadmap
+        roadmap,
       };
     } catch (error) {
       this.logger.error("Failed to generate roadmap:", error);
       throw new McpError(
         ErrorCode.InternalError,
-        `Failed to generate roadmap: ${error instanceof Error ? error.message : 'Unknown error'}`
+        `Failed to generate roadmap: ${error instanceof Error ? error.message : "Unknown error"}`
       );
     }
   }
@@ -1059,7 +1070,7 @@ class GitHubProjectManagerServer {
         issueId: args.issueId,
         issueTitle: args.issueTitle,
         issueDescription: args.issueDescription,
-        projectContext: args.projectContext
+        projectContext: args.projectContext,
       });
 
       if (args.autoApply) {
@@ -1067,19 +1078,19 @@ class GitHubProjectManagerServer {
           projectId: args.projectId,
           issueNumber: args.issueNumber,
           enrichment,
-          applyLabels: true
+          applyLabels: true,
         });
       }
 
       return {
         success: true,
-        enrichment
+        enrichment,
       };
     } catch (error) {
       this.logger.error("Failed to enrich issue:", error);
       throw new McpError(
         ErrorCode.InternalError,
-        `Failed to enrich issue: ${error instanceof Error ? error.message : 'Unknown error'}`
+        `Failed to enrich issue: ${error instanceof Error ? error.message : "Unknown error"}`
       );
     }
   }
@@ -1091,7 +1102,7 @@ class GitHubProjectManagerServer {
     try {
       const items = await this.service.listProjectItems({
         projectId: args.projectId,
-        limit: 200
+        limit: 200,
       });
 
       const issueIds = args.issueIds || items.map((item: any) => item.id);
@@ -1099,19 +1110,19 @@ class GitHubProjectManagerServer {
       const enrichments = await this.enrichmentService.enrichIssues({
         projectId: args.projectId,
         issueIds,
-        projectContext: args.projectContext
+        projectContext: args.projectContext,
       });
 
       return {
         success: true,
         enriched: enrichments.length,
-        enrichments
+        enrichments,
       };
     } catch (error) {
       this.logger.error("Failed to bulk enrich issues:", error);
       throw new McpError(
         ErrorCode.InternalError,
-        `Failed to bulk enrich issues: ${error instanceof Error ? error.message : 'Unknown error'}`
+        `Failed to bulk enrich issues: ${error instanceof Error ? error.message : "Unknown error"}`
       );
     }
   }
@@ -1128,18 +1139,18 @@ class GitHubProjectManagerServer {
         issueTitle: args.issueTitle,
         issueDescription: args.issueDescription,
         projectContext: args.projectContext,
-        autoApply: args.autoApply
+        autoApply: args.autoApply,
       });
 
       return {
         success: true,
-        triage
+        triage,
       };
     } catch (error) {
       this.logger.error("Failed to triage issue:", error);
       throw new McpError(
         ErrorCode.InternalError,
-        `Failed to triage issue: ${error instanceof Error ? error.message : 'Unknown error'}`
+        `Failed to triage issue: ${error instanceof Error ? error.message : "Unknown error"}`
       );
     }
   }
@@ -1153,19 +1164,19 @@ class GitHubProjectManagerServer {
         projectId: args.projectId,
         onlyUntriaged: args.onlyUntriaged,
         autoApply: args.autoApply,
-        projectContext: args.projectContext
+        projectContext: args.projectContext,
       });
 
       return {
         success: true,
         triaged: result.triaged,
-        results: result.results
+        results: result.results,
       };
     } catch (error) {
       this.logger.error("Failed to triage all issues:", error);
       throw new McpError(
         ErrorCode.InternalError,
-        `Failed to triage all issues: ${error instanceof Error ? error.message : 'Unknown error'}`
+        `Failed to triage all issues: ${error instanceof Error ? error.message : "Unknown error"}`
       );
     }
   }
@@ -1178,19 +1189,19 @@ class GitHubProjectManagerServer {
       const result = await this.triagingService.scheduleTriaging({
         projectId: args.projectId,
         schedule: args.schedule,
-        autoApply: args.autoApply
+        autoApply: args.autoApply,
       });
 
       return {
         success: true,
         ruleId: result.ruleId,
-        schedule: args.schedule
+        schedule: args.schedule,
       };
     } catch (error) {
       this.logger.error("Failed to schedule triaging:", error);
       throw new McpError(
         ErrorCode.InternalError,
-        `Failed to schedule triaging: ${error instanceof Error ? error.message : 'Unknown error'}`
+        `Failed to schedule triaging: ${error instanceof Error ? error.message : "Unknown error"}`
       );
     }
   }
@@ -1200,14 +1211,16 @@ class GitHubProjectManagerServer {
    */
   private setupEventHandlers(): void {
     // Handle events from subscription manager
-    this.subscriptionManager.on('internalEvent', ({ event }) => {
-      this.logger.debug(`Internal event notification: ${event.type} ${event.resourceType} ${event.resourceId}`);
+    this.subscriptionManager.on("internalEvent", ({ event }) => {
+      this.logger.debug(
+        `Internal event notification: ${event.type} ${event.resourceType} ${event.resourceId}`
+      );
       // Handle internal events (e.g., cache invalidation)
       this.handleInternalEvent(event);
     });
 
     // Store events when they're processed
-    this.subscriptionManager.on('sseEvent', async ({ event }) => {
+    this.subscriptionManager.on("sseEvent", async ({ event }) => {
       try {
         await this.eventStore.storeEvent(event);
       } catch (error) {
@@ -1246,9 +1259,11 @@ class GitHubProjectManagerServer {
       const syncResult = await this.syncService.performInitialSync(SYNC_TIMEOUT_MS);
 
       if (syncResult.success) {
-        this.logger.info(`Initial sync completed successfully: ${syncResult.syncedResources} resources synced, ${syncResult.skippedResources} skipped in ${syncResult.duration}ms`);
+        this.logger.info(
+          `Initial sync completed successfully: ${syncResult.syncedResources} resources synced, ${syncResult.skippedResources} skipped in ${syncResult.duration}ms`
+        );
       } else {
-        this.logger.warn(`Initial sync completed with errors: ${syncResult.errors.join(', ')}`);
+        this.logger.warn(`Initial sync completed with errors: ${syncResult.errors.join(", ")}`);
       }
     } catch (error) {
       this.logger.error("Failed to initialize sync service:", error);
@@ -1261,7 +1276,9 @@ class GitHubProjectManagerServer {
    */
   private async initializeWebhookServer(): Promise<void> {
     if (!SSE_ENABLED && !WEBHOOK_SECRET) {
-      this.logger.info("Event system disabled (no SSE and no webhook secret), skipping webhook server");
+      this.logger.info(
+        "Event system disabled (no SSE and no webhook secret), skipping webhook server"
+      );
       return;
     }
 
@@ -1272,7 +1289,7 @@ class GitHubProjectManagerServer {
         this.eventStore,
         {
           port: WEBHOOK_PORT,
-          enableSSE: SSE_ENABLED
+          enableSSE: SSE_ENABLED,
         }
       );
 
@@ -1280,7 +1297,9 @@ class GitHubProjectManagerServer {
       this.logger.info(`Webhook server started on port ${WEBHOOK_PORT}`);
     } catch (error) {
       this.logger.error("Failed to start webhook server:", error);
-      this.logger.warn("Continuing without webhook server - real-time events will not be available");
+      this.logger.warn(
+        "Continuing without webhook server - real-time events will not be available"
+      );
     }
   }
 
@@ -1317,7 +1336,6 @@ class GitHubProjectManagerServer {
       // Close MCP server
       await this.server.close();
       this.logger.info("MCP server closed");
-
     } catch (error) {
       this.logger.error("Error during shutdown:", error);
     }
@@ -1350,16 +1368,16 @@ class GitHubProjectManagerServer {
           const clientCaps = server.getClientCapabilities();
           if (!clientCaps?.sampling) {
             throw new Error(
-              'MCP client does not support sampling. ' +
-              'Configure AI_MAIN_MODEL + provider key, or use ' +
-              'AI_MAIN_PROVIDER=openai-compatible with a base URL. ' +
-              'See docs/CONFIGURATION.md for examples.',
+              "MCP client does not support sampling. " +
+                "Configure AI_MAIN_MODEL + provider key, or use " +
+                "AI_MAIN_PROVIDER=openai-compatible with a base URL. " +
+                "See docs/CONFIGURATION.md for examples."
             );
           }
 
           const result = await server.createMessage({
             messages: params.messages.map((m) => ({
-              role: m.role as 'user' | 'assistant',
+              role: m.role as "user" | "assistant",
               content: m.content,
             })),
             systemPrompt: params.systemPrompt,
@@ -1369,9 +1387,16 @@ class GitHubProjectManagerServer {
 
           return {
             role: result.role,
-            content: typeof result.content === 'string'
-              ? result.content
-              : { type: 'text', text: 'text' in result.content ? String(result.content.text) : String(result.content) },
+            content:
+              typeof result.content === "string"
+                ? result.content
+                : {
+                    type: "text",
+                    text:
+                      "text" in result.content
+                        ? String(result.content.text)
+                        : String(result.content),
+                  },
             model: result.model,
           };
         });
@@ -1383,13 +1408,17 @@ class GitHubProjectManagerServer {
         process.stderr.write("GitHub Project Manager MCP server configuration:\n");
         process.stderr.write(`- Owner: ${GITHUB_OWNER}\n`);
         process.stderr.write(`- Repository: ${GITHUB_REPO}\n`);
-        process.stderr.write(`- Token: ${GITHUB_TOKEN.substring(0, 4)}...${GITHUB_TOKEN.substring(GITHUB_TOKEN.length - 4)}\n`);
-        process.stderr.write(`- Environment file: ${CLI_OPTIONS.envFile || '.env (default)'}\n`);
+        process.stderr.write(
+          `- Token: ${GITHUB_TOKEN.substring(0, 4)}...${GITHUB_TOKEN.substring(GITHUB_TOKEN.length - 4)}\n`
+        );
+        process.stderr.write(`- Environment file: ${CLI_OPTIONS.envFile || ".env (default)"}\n`);
         process.stderr.write(`- Sync enabled: ${SYNC_ENABLED}\n`);
         process.stderr.write(`- Cache directory: ${CACHE_DIRECTORY}\n`);
         process.stderr.write(`- Webhook port: ${WEBHOOK_PORT}\n`);
         process.stderr.write(`- SSE enabled: ${SSE_ENABLED}\n`);
-        process.stderr.write(`- Agent auto-reclaim: ${AGENT_RECLAIM_ENABLED ? `enabled (every ${AGENT_RECLAIM_INTERVAL_MS}ms, stale after ${AGENT_STALE_AFTER_MINUTES}min)` : 'disabled'}\n`);
+        process.stderr.write(
+          `- Agent auto-reclaim: ${AGENT_RECLAIM_ENABLED ? `enabled (every ${AGENT_RECLAIM_INTERVAL_MS}ms, stale after ${AGENT_STALE_AFTER_MINUTES}min)` : "disabled"}\n`
+        );
       }
 
       process.stderr.write("GitHub Project Manager MCP server running on stdio\n");
@@ -1423,7 +1452,9 @@ try {
       process.stderr.write("\nPlease provide the required GitHub repository information:\n");
       process.stderr.write("  - Set the GITHUB_OWNER and GITHUB_REPO environment variables\n");
       process.stderr.write("  - Use the --owner and --repo command line arguments\n");
-      process.stderr.write("\nExample: mcp-github-project-manager --owner=your_username --repo=your_repo\n");
+      process.stderr.write(
+        "\nExample: mcp-github-project-manager --owner=your_username --repo=your_repo\n"
+      );
     }
 
     process.stderr.write("\nFor more information, run: mcp-github-project-manager --help\n");

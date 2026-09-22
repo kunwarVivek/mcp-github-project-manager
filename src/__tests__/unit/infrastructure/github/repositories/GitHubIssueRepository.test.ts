@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi, type Mocked, type MockedClass, } from 'vitest';
+import { beforeEach, describe, expect, it, vi, type Mocked, type MockedClass } from "vitest";
 import { Octokit } from "@octokit/rest";
 import { GitHubConfig } from "../../../../../infrastructure/github/GitHubConfig";
 import { GitHubIssueRepository } from "../../../../../infrastructure/github/repositories/GitHubIssueRepository";
@@ -24,14 +24,12 @@ describe("GitHubIssueRepository", () => {
           update: vi.fn(),
           get: vi.fn(),
           list: vi.fn(),
-          listForRepo: vi.fn()
-        }
-      }
+          listForRepo: vi.fn(),
+        },
+      },
     } as any;
 
-    (Octokit as MockedClass<typeof Octokit>).mockImplementation(
-      () => mockOctokit
-    );
+    (Octokit as MockedClass<typeof Octokit>).mockImplementation(() => mockOctokit);
 
     // Create configuration
     config = new GitHubConfig("test-owner", "test-repo", "test-token");

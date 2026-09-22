@@ -23,8 +23,8 @@
  * ```
  */
 
-import { ResourceType, } from '../resource-types';
-import { DomainEvent } from './DomainEvent';
+import { ResourceType } from "../resource-types";
+import { DomainEvent } from "./DomainEvent";
 
 // =============================================================================
 // Agent Registration Events
@@ -45,10 +45,10 @@ export interface AgentRegisteredEventData {
  * Event emitted when an agent is registered
  */
 export class AgentRegisteredEvent extends DomainEvent<AgentRegisteredEventData> {
-  public readonly eventType = 'AgentRegistered';
+  public readonly eventType = "AgentRegistered";
   public readonly resourceType = ResourceType.ISSUE; // Agents are tracked via issues
 
-  constructor(aggregateId: string, data: AgentRegisteredEventData, causedBy: string = 'system') {
+  constructor(aggregateId: string, data: AgentRegisteredEventData, causedBy: string = "system") {
     super(aggregateId, data, causedBy);
   }
 
@@ -70,7 +70,7 @@ export class AgentRegisteredEvent extends DomainEvent<AgentRegisteredEventData> 
         capabilities: params.capabilities ?? [],
         parentAgentId: params.parentAgentId,
       },
-      params.causedBy ?? 'system'
+      params.causedBy ?? "system"
     );
   }
 }
@@ -87,10 +87,10 @@ export interface AgentDeregisteredEventData {
  * Event emitted when an agent is deregistered
  */
 export class AgentDeregisteredEvent extends DomainEvent<AgentDeregisteredEventData> {
-  public readonly eventType = 'AgentDeregistered';
+  public readonly eventType = "AgentDeregistered";
   public readonly resourceType = ResourceType.ISSUE;
 
-  constructor(aggregateId: string, data: AgentDeregisteredEventData, causedBy: string = 'system') {
+  constructor(aggregateId: string, data: AgentDeregisteredEventData, causedBy: string = "system") {
     super(aggregateId, data, causedBy);
   }
 
@@ -106,7 +106,7 @@ export class AgentDeregisteredEvent extends DomainEvent<AgentDeregisteredEventDa
         agentName: params.agentName,
         reason: params.reason,
       },
-      params.causedBy ?? 'system'
+      params.causedBy ?? "system"
     );
   }
 }
@@ -132,10 +132,10 @@ export interface TaskCheckedOutEventData {
  * Event emitted when an agent checks out a task
  */
 export class TaskCheckedOutEvent extends DomainEvent<TaskCheckedOutEventData> {
-  public readonly eventType = 'TaskCheckedOut';
+  public readonly eventType = "TaskCheckedOut";
   public readonly resourceType = ResourceType.ISSUE;
 
-  constructor(aggregateId: string, data: TaskCheckedOutEventData, causedBy: string = 'system') {
+  constructor(aggregateId: string, data: TaskCheckedOutEventData, causedBy: string = "system") {
     super(aggregateId, data, causedBy);
   }
 
@@ -155,13 +155,13 @@ export class TaskCheckedOutEvent extends DomainEvent<TaskCheckedOutEventData> {
       {
         issueNumber: params.issueNumber,
         issueTitle: params.issueTitle,
-        strategy: params.strategy ?? 'highest_priority',
+        strategy: params.strategy ?? "highest_priority",
         selectionRationale: params.selectionRationale,
         milestone: params.milestone,
         labels: params.labels ?? [],
         branchSuggestion: params.branchSuggestion,
       },
-      params.causedBy ?? 'system'
+      params.causedBy ?? "system"
     );
   }
 }
@@ -178,10 +178,10 @@ export interface TaskReleasedEventData {
  * Event emitted when an agent releases a task
  */
 export class TaskReleasedEvent extends DomainEvent<TaskReleasedEventData> {
-  public readonly eventType = 'TaskReleased';
+  public readonly eventType = "TaskReleased";
   public readonly resourceType = ResourceType.ISSUE;
 
-  constructor(aggregateId: string, data: TaskReleasedEventData, causedBy: string = 'system') {
+  constructor(aggregateId: string, data: TaskReleasedEventData, causedBy: string = "system") {
     super(aggregateId, data, causedBy);
   }
 
@@ -197,7 +197,7 @@ export class TaskReleasedEvent extends DomainEvent<TaskReleasedEventData> {
         issueNumber: params.issueNumber,
         reason: params.reason,
       },
-      params.causedBy ?? 'system'
+      params.causedBy ?? "system"
     );
   }
 }
@@ -216,10 +216,10 @@ export interface TaskCompletedEventData {
  * Event emitted when an agent completes a task
  */
 export class TaskCompletedEvent extends DomainEvent<TaskCompletedEventData> {
-  public readonly eventType = 'TaskCompleted';
+  public readonly eventType = "TaskCompleted";
   public readonly resourceType = ResourceType.ISSUE;
 
-  constructor(aggregateId: string, data: TaskCompletedEventData, causedBy: string = 'system') {
+  constructor(aggregateId: string, data: TaskCompletedEventData, causedBy: string = "system") {
     super(aggregateId, data, causedBy);
   }
 
@@ -239,7 +239,7 @@ export class TaskCompletedEvent extends DomainEvent<TaskCompletedEventData> {
         prNumber: params.prNumber,
         closeIssue: params.closeIssue ?? true,
       },
-      params.causedBy ?? 'system'
+      params.causedBy ?? "system"
     );
   }
 }
@@ -260,10 +260,14 @@ export interface TaskSubmittedForReviewEventData {
  * Event emitted when a task is submitted for review
  */
 export class TaskSubmittedForReviewEvent extends DomainEvent<TaskSubmittedForReviewEventData> {
-  public readonly eventType = 'TaskSubmittedForReview';
+  public readonly eventType = "TaskSubmittedForReview";
   public readonly resourceType = ResourceType.ISSUE;
 
-  constructor(aggregateId: string, data: TaskSubmittedForReviewEventData, causedBy: string = 'system') {
+  constructor(
+    aggregateId: string,
+    data: TaskSubmittedForReviewEventData,
+    causedBy: string = "system"
+  ) {
     super(aggregateId, data, causedBy);
   }
 
@@ -279,7 +283,7 @@ export class TaskSubmittedForReviewEvent extends DomainEvent<TaskSubmittedForRev
         issueNumber: params.issueNumber,
         summary: params.summary,
       },
-      params.causedBy ?? 'system'
+      params.causedBy ?? "system"
     );
   }
 }
@@ -297,10 +301,10 @@ export interface TaskApprovedEventData {
  * Event emitted when a task is approved
  */
 export class TaskApprovedEvent extends DomainEvent<TaskApprovedEventData> {
-  public readonly eventType = 'TaskApproved';
+  public readonly eventType = "TaskApproved";
   public readonly resourceType = ResourceType.ISSUE;
 
-  constructor(aggregateId: string, data: TaskApprovedEventData, causedBy: string = 'system') {
+  constructor(aggregateId: string, data: TaskApprovedEventData, causedBy: string = "system") {
     super(aggregateId, data, causedBy);
   }
 
@@ -317,7 +321,7 @@ export class TaskApprovedEvent extends DomainEvent<TaskApprovedEventData> {
         reviewerId: params.reviewerId,
         summary: params.summary,
       },
-      params.causedBy ?? 'system'
+      params.causedBy ?? "system"
     );
   }
 }
@@ -335,10 +339,10 @@ export interface TaskRejectedEventData {
  * Event emitted when a task is rejected
  */
 export class TaskRejectedEvent extends DomainEvent<TaskRejectedEventData> {
-  public readonly eventType = 'TaskRejected';
+  public readonly eventType = "TaskRejected";
   public readonly resourceType = ResourceType.ISSUE;
 
-  constructor(aggregateId: string, data: TaskRejectedEventData, causedBy: string = 'system') {
+  constructor(aggregateId: string, data: TaskRejectedEventData, causedBy: string = "system") {
     super(aggregateId, data, causedBy);
   }
 
@@ -355,7 +359,7 @@ export class TaskRejectedEvent extends DomainEvent<TaskRejectedEventData> {
         reviewerId: params.reviewerId,
         feedback: params.feedback,
       },
-      params.causedBy ?? 'system'
+      params.causedBy ?? "system"
     );
   }
 }
@@ -380,10 +384,10 @@ export interface AgentHeartbeatEventData {
  * Event emitted when an agent sends a heartbeat
  */
 export class AgentHeartbeatEvent extends DomainEvent<AgentHeartbeatEventData> {
-  public readonly eventType = 'AgentHeartbeat';
+  public readonly eventType = "AgentHeartbeat";
   public readonly resourceType = ResourceType.ISSUE;
 
-  constructor(aggregateId: string, data: AgentHeartbeatEventData, causedBy: string = 'system') {
+  constructor(aggregateId: string, data: AgentHeartbeatEventData, causedBy: string = "system") {
     super(aggregateId, data, causedBy);
   }
 
@@ -407,7 +411,7 @@ export class AgentHeartbeatEvent extends DomainEvent<AgentHeartbeatEventData> {
         estimatedCompletionMinutes: params.estimatedCompletionMinutes,
         blockerDescription: params.blockerDescription,
       },
-      params.causedBy ?? 'system'
+      params.causedBy ?? "system"
     );
   }
 }
@@ -429,10 +433,10 @@ export interface TaskReclaimedEventData {
  * Event emitted when a task is reclaimed from a stale agent
  */
 export class TaskReclaimedEvent extends DomainEvent<TaskReclaimedEventData> {
-  public readonly eventType = 'TaskReclaimed';
+  public readonly eventType = "TaskReclaimed";
   public readonly resourceType = ResourceType.ISSUE;
 
-  constructor(aggregateId: string, data: TaskReclaimedEventData, causedBy: string = 'system') {
+  constructor(aggregateId: string, data: TaskReclaimedEventData, causedBy: string = "system") {
     super(aggregateId, data, causedBy);
   }
 
@@ -447,9 +451,9 @@ export class TaskReclaimedEvent extends DomainEvent<TaskReclaimedEventData> {
       {
         issueNumber: params.issueNumber,
         previousAgentId: params.previousAgentId,
-        reason: params.reason ?? 'Heartbeat timeout',
+        reason: params.reason ?? "Heartbeat timeout",
       },
-      params.causedBy ?? 'system'
+      params.causedBy ?? "system"
     );
   }
 }

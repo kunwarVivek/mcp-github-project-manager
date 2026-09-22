@@ -51,7 +51,7 @@ describe.skip("Metrics and Reporting E2E Tests", () => {
         milestoneId: milestone.id,
       })
     );
-    
+
     // Mark one issue as completed
     await service.updateIssueStatus(completedIssue.id, ResourceStatus.COMPLETED);
 
@@ -107,7 +107,7 @@ describe.skip("Metrics and Reporting E2E Tests", () => {
   describe("Milestone Metrics", () => {
     it("should retrieve accurate milestone metrics", async () => {
       const metrics = await service.getMilestoneMetrics(String(testMilestoneId), true);
-      
+
       expect(metrics.id).toBe(testMilestoneId.toString());
       expect(metrics.title).toBe("Metrics Test Milestone");
       expect(metrics.totalIssues).toBe(2);
@@ -120,8 +120,11 @@ describe.skip("Metrics and Reporting E2E Tests", () => {
     });
 
     it("should include only requested data in milestone metrics", async () => {
-      const metricsWithoutIssues = await service.getMilestoneMetrics(String(testMilestoneId), false);
-      
+      const metricsWithoutIssues = await service.getMilestoneMetrics(
+        String(testMilestoneId),
+        false
+      );
+
       expect(metricsWithoutIssues.id).toBe(testMilestoneId.toString());
       expect(metricsWithoutIssues.issues).toBeUndefined();
     });
@@ -130,7 +133,7 @@ describe.skip("Metrics and Reporting E2E Tests", () => {
   describe("Sprint Metrics", () => {
     it("should retrieve accurate sprint metrics", async () => {
       const metrics = await service.getSprintMetrics(testSprintId, true);
-      
+
       expect(metrics.id).toBe(testSprintId);
       expect(metrics.title).toBe("Metrics Test Sprint");
       expect(metrics.totalIssues).toBe(2);
@@ -144,7 +147,7 @@ describe.skip("Metrics and Reporting E2E Tests", () => {
 
     it("should include only requested data in sprint metrics", async () => {
       const metricsWithoutIssues = await service.getSprintMetrics(testSprintId, false);
-      
+
       expect(metricsWithoutIssues.id).toBe(testSprintId);
       expect(metricsWithoutIssues.issues).toBeUndefined();
     });
@@ -155,7 +158,7 @@ describe.skip("Metrics and Reporting E2E Tests", () => {
       // Create an overdue milestone
       const pastDate = new Date();
       pastDate.setDate(pastDate.getDate() - 7);
-      
+
       await service.createMilestone(
         TestFactory.createMilestone({
           title: "Overdue Milestone",
@@ -166,7 +169,7 @@ describe.skip("Metrics and Reporting E2E Tests", () => {
       );
 
       const overdueMilestones = await service.getOverdueMilestones(5, false);
-      
+
       expect(overdueMilestones.length).toBeGreaterThan(0);
       expect(overdueMilestones[0].isOverdue).toBe(true);
       expect(overdueMilestones[0].title).toContain("Overdue");
@@ -174,7 +177,7 @@ describe.skip("Metrics and Reporting E2E Tests", () => {
 
     it("should limit the number of returned overdue milestones", async () => {
       const limitedOverdueMilestones = await service.getOverdueMilestones(1, false);
-      
+
       expect(limitedOverdueMilestones.length).toBeLessThanOrEqual(1);
     });
   });
@@ -182,7 +185,7 @@ describe.skip("Metrics and Reporting E2E Tests", () => {
   describe("Upcoming Milestones", () => {
     it("should find upcoming milestones within a time range", async () => {
       const upcomingMilestones = await service.getUpcomingMilestones(10, 5, false);
-      
+
       expect(upcomingMilestones.length).toBeGreaterThan(0);
       expect(upcomingMilestones[0].isOverdue).toBe(false);
       expect(upcomingMilestones[0].daysRemaining).toBeLessThanOrEqual(10);
@@ -190,7 +193,7 @@ describe.skip("Metrics and Reporting E2E Tests", () => {
 
     it("should respect the limit parameter for upcoming milestones", async () => {
       const limitedUpcomingMilestones = await service.getUpcomingMilestones(30, 1, false);
-      
+
       expect(limitedUpcomingMilestones.length).toBeLessThanOrEqual(1);
     });
   });

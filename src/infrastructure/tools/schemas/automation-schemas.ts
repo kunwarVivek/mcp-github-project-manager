@@ -7,11 +7,15 @@ import { z } from "zod";
 export const AutomationTriggerSchema = z.object({
   type: z.string(),
   resourceType: z.string().optional(),
-  conditions: z.array(z.object({
-    field: z.string(),
-    operator: z.string(),
-    value: z.unknown(),
-  })).optional(),
+  conditions: z
+    .array(
+      z.object({
+        field: z.string(),
+        operator: z.string(),
+        value: z.unknown(),
+      })
+    )
+    .optional(),
 });
 
 export const AutomationActionSchema = z.object({

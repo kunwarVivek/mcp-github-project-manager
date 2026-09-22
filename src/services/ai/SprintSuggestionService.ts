@@ -7,19 +7,16 @@
  * Implements requirement AI-12: Sprint scope recommendations.
  */
 
-import { generateObject } from 'ai';
-import { z } from 'zod';
-import { AIServiceFactory } from './AIServiceFactory';
-import { InputSanitizer } from '../utils/InputSanitizer';
-import { type ILogger, Logger } from '../../infrastructure/logger';
-import { SprintCapacityAnalyzer, } from './SprintCapacityAnalyzer';
-import { BacklogPrioritizer } from './BacklogPrioritizer';
-import { SprintRiskAssessor } from './SprintRiskAssessor';
-import { DependencyGraph, type GraphAnalysisResult } from '../../analysis/DependencyGraph';
-import {
-  calculateWeightedScore,
-  getConfidenceTier
-} from './ConfidenceScorer';
+import { generateObject } from "ai";
+import { z } from "zod";
+import { AIServiceFactory } from "./AIServiceFactory";
+import { InputSanitizer } from "../utils/InputSanitizer";
+import { type ILogger, Logger } from "../../infrastructure/logger";
+import { SprintCapacityAnalyzer } from "./SprintCapacityAnalyzer";
+import { BacklogPrioritizer } from "./BacklogPrioritizer";
+import { SprintRiskAssessor } from "./SprintRiskAssessor";
+import { DependencyGraph, type GraphAnalysisResult } from "../../analysis/DependencyGraph";
+import { calculateWeightedScore, getConfidenceTier } from "./ConfidenceScorer";
 import {
   type SprintSuggestion,
   type SuggestedItem,
@@ -30,14 +27,20 @@ import {
   type PriorityTier,
   type SprintMetrics,
   SPRINT_RISK_CATEGORIES,
-  RISK_PROBABILITIES
-} from '../../domain/sprint-planning-types';
-import { type SectionConfidence, type ConfidenceFactors, type AITask, TaskStatus, TaskPriority } from '../../domain/ai-types';
+  RISK_PROBABILITIES,
+} from "../../domain/sprint-planning-types";
+import {
+  type SectionConfidence,
+  type ConfidenceFactors,
+  type AITask,
+  TaskStatus,
+  TaskPriority,
+} from "../../domain/ai-types";
 import {
   SPRINT_SUGGESTION_SYSTEM_PROMPT,
-  formatSprintSuggestionPrompt
-} from './prompts/SprintPlanningPrompts';
-import type { EstimationCalibrator } from '../../analysis/EstimationCalibrator';
+  formatSprintSuggestionPrompt,
+} from "./prompts/SprintPlanningPrompts";
+import type { EstimationCalibrator } from "../../analysis/EstimationCalibrator";
 
 // ============================================================================
 // Zod Schemas for AI Response Validation
@@ -47,23 +50,27 @@ import type { EstimationCalibrator } from '../../analysis/EstimationCalibrator';
  * Schema for AI sprint suggestion response.
  */
 const SprintSuggestionSchema = z.object({
-  suggestedItems: z.array(z.object({
-    itemId: z.string(),
-    title: z.string(),
-    points: z.number(),
-    priority: z.enum(['critical', 'high', 'medium', 'low']),
-    includeReason: z.string(),
-    dependencies: z.array(z.string())
-  })),
+  suggestedItems: z.array(
+    z.object({
+      itemId: z.string(),
+      title: z.string(),
+      points: z.number(),
+      priority: z.enum(["critical", "high", "medium", "low"]),
+      includeReason: z.string(),
+      dependencies: z.array(z.string()),
+    })
+  ),
   totalPoints: z.number(),
   capacityUtilization: z.number().min(0).max(1),
   reasoning: z.string(),
-  risks: z.array(z.object({
-    category: z.enum(SPRINT_RISK_CATEGORIES),
-    description: z.string(),
-    probability: z.enum(RISK_PROBABILITIES),
-    mitigation: z.string()
-  }))
+  risks: z.array(
+    z.object({
+      category: z.enum(SPRINT_RISK_CATEGORIES),
+      description: z.string(),
+      probability: z.enum(RISK_PROBABILITIES),
+      mitigation: z.string(),
+    })
+  ),
 });
 
 // ============================================================================
@@ -85,7 +92,7 @@ export interface SprintSuggestionParams {
   /** Optional business goals to optimize for */
   businessGoals?: string[];
   /** Risk tolerance level */
-  riskTolerance?: 'low' | 'medium' | 'high';
+  riskTolerance?: "low" | "medium" | "high";
   /** Optional historical sprint data */
   historicalSprints?: SprintMetrics[];
   /** Optional estimation calibrator for better estimates */
@@ -129,7 +136,7 @@ export class SprintSuggestionService {
       velocity: params.velocity,
       sprintDurationDays: params.sprintDurationDays,
       teamMembers: params.teamMembers || [],
-      historicalSprints: params.historicalSprints
+      historicalSprints: params.historicalSprints,
     });
 
     // 2. Get prioritization
@@ -137,7 +144,7 @@ export class SprintSuggestionService {
       backlogItems: params.backlogItems,
       sprintCapacity: capacity.recommendedLoad,
       businessGoals: params.businessGoals,
-      riskTolerance: params.riskTolerance
+      riskTolerance: params.riskTolerance,
     });
 
     // 3. Build dependency graph for selection
@@ -156,13 +163,13 @@ export class SprintSuggestionService {
     const utilization = totalPoints / capacity.recommendedLoad;
 
     // 6. Assess risks for selected items
-    const selectedBacklogItems = selectedItems.map(si =>
-      params.backlogItems.find(bi => bi.id === si.itemId)!
-    ).filter(Boolean);
+    const selectedBacklogItems = selectedItems
+      .map((si) => params.backlogItems.find((bi) => bi.id === si.itemId)!)
+      .filter(Boolean);
 
     const riskAssessment = await this.riskAssessor.assessRisks({
       sprintItems: selectedBacklogItems,
-      sprintCapacity: capacity
+      sprintCapacity: capacity,
     });
 
     // 7. Calculate confidence
@@ -187,7 +194,7 @@ export class SprintSuggestionService {
       capacityUtilization: utilization,
       reasoning,
       risks: riskAssessment.risks,
-      confidence
+      confidence,
     };
   }
 
@@ -201,24 +208,24 @@ export class SprintSuggestionService {
     const dependencyGraph = new DependencyGraph();
 
     // Convert BacklogItems to AITasks for DependencyGraph
-    const aiTasks: AITask[] = items.map(item => ({
+    const aiTasks: AITask[] = items.map((item) => ({
       id: item.id,
       title: item.title,
-      description: item.description || '',
+      description: item.description || "",
       status: TaskStatus.PENDING,
       priority: this.mapPriorityToEnum(item.priority),
       complexity: this.estimateComplexity(item.points),
       estimatedHours: (item.points || 3) * 4,
       aiGenerated: false,
       subtasks: [],
-      dependencies: (item.dependencies || []).map(d => ({
+      dependencies: (item.dependencies || []).map((d) => ({
         id: d,
-        type: 'depends_on' as const
+        type: "depends_on" as const,
       })),
       acceptanceCriteria: [],
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
-      tags: item.labels || []
+      tags: item.labels || [],
     }));
 
     dependencyGraph.addTasks(aiTasks);
@@ -241,7 +248,7 @@ export class SprintSuggestionService {
     const selected: SuggestedItem[] = [];
     let remainingCapacity = capacity;
     const includedIds = new Set<string>();
-    const backlogMap = new Map(backlogItems.map(bi => [bi.id, bi]));
+    const backlogMap = new Map(backlogItems.map((bi) => [bi.id, bi]));
 
     // Sort by priority score descending
     const sorted = [...prioritized].sort((a, b) => b.score - a.score);
@@ -255,7 +262,7 @@ export class SprintSuggestionService {
 
       // Check if all dependencies are included
       const deps = backlogItem.dependencies || [];
-      const depsIncluded = deps.every(d => {
+      const depsIncluded = deps.every((d) => {
         // Dependency is satisfied if:
         // 1. Already included in selection
         // 2. Not in the current backlog (external dependency)
@@ -269,7 +276,7 @@ export class SprintSuggestionService {
           points,
           priority: item.priority,
           includeReason: this.formatIncludeReason(item, graphAnalysis),
-          dependencies: deps
+          dependencies: deps,
         });
         remainingCapacity -= points;
         includedIds.add(item.itemId);
@@ -282,43 +289,40 @@ export class SprintSuggestionService {
   /**
    * Format inclusion reason for a selected item.
    */
-  private formatIncludeReason(
-    item: PrioritizedItem,
-    graphAnalysis: GraphAnalysisResult
-  ): string {
+  private formatIncludeReason(item: PrioritizedItem, graphAnalysis: GraphAnalysisResult): string {
     const reasons: string[] = [];
 
     // Priority-based reason
-    if (item.priority === 'critical') {
-      reasons.push('Critical priority');
-    } else if (item.priority === 'high') {
-      reasons.push('High business value');
+    if (item.priority === "critical") {
+      reasons.push("Critical priority");
+    } else if (item.priority === "high") {
+      reasons.push("High business value");
     }
 
     // Score-based reason
     if (item.score >= 80) {
-      reasons.push('top-scored item');
+      reasons.push("top-scored item");
     } else if (item.score >= 60) {
-      reasons.push('high-scoring item');
+      reasons.push("high-scoring item");
     }
 
     // Graph-based reasons
     if (graphAnalysis.orphanTasks.includes(item.itemId)) {
-      reasons.push('can start immediately (no blockers)');
+      reasons.push("can start immediately (no blockers)");
     } else if (graphAnalysis.criticalPath.includes(item.itemId)) {
-      reasons.push('on critical path');
+      reasons.push("on critical path");
     }
 
     // Factor-based reasons
     if (item.factors.dependencyScore >= 0.8) {
-      reasons.push('enables other work');
+      reasons.push("enables other work");
     }
     if (item.factors.effortFit >= 0.8) {
-      reasons.push('good capacity fit');
+      reasons.push("good capacity fit");
     }
 
     return reasons.length > 0
-      ? reasons.join('; ')
+      ? reasons.join("; ")
       : `Score ${item.score} (balanced across factors)`;
   }
 
@@ -336,35 +340,33 @@ export class SprintSuggestionService {
     // Capacity context
     parts.push(
       `Selected ${selectedItems.length} items (${selectedItems.reduce((s, i) => s + i.points, 0)} pts) ` +
-      `for capacity of ${capacity.recommendedLoad} pts (${Math.round(capacity.buffer.percentage)}% buffer applied).`
+        `for capacity of ${capacity.recommendedLoad} pts (${Math.round(capacity.buffer.percentage)}% buffer applied).`
     );
 
     // Priority distribution
-    const criticalCount = selectedItems.filter(i => i.priority === 'critical').length;
-    const highCount = selectedItems.filter(i => i.priority === 'high').length;
+    const criticalCount = selectedItems.filter((i) => i.priority === "critical").length;
+    const highCount = selectedItems.filter((i) => i.priority === "high").length;
     if (criticalCount > 0 || highCount > 0) {
-      parts.push(
-        `Includes ${criticalCount} critical and ${highCount} high-priority items.`
-      );
+      parts.push(`Includes ${criticalCount} critical and ${highCount} high-priority items.`);
     }
 
     // Business goals
     if (businessGoals && businessGoals.length > 0) {
-      parts.push(`Optimized for goals: ${businessGoals.slice(0, 2).join(', ')}.`);
+      parts.push(`Optimized for goals: ${businessGoals.slice(0, 2).join(", ")}.`);
     }
 
     // Excluded high-value items
     const notSelected = prioritization.prioritizedItems.filter(
-      p => !selectedItems.find(s => s.itemId === p.itemId)
+      (p) => !selectedItems.find((s) => s.itemId === p.itemId)
     );
-    const highValueExcluded = notSelected.filter(p => p.score >= 60);
+    const highValueExcluded = notSelected.filter((p) => p.score >= 60);
     if (highValueExcluded.length > 0) {
       parts.push(
         `${highValueExcluded.length} high-value item(s) deferred due to capacity or dependency constraints.`
       );
     }
 
-    return parts.join(' ');
+    return parts.join(" ");
   }
 
   /**
@@ -379,19 +381,19 @@ export class SprintSuggestionService {
     // Input completeness from capacity and prioritization
     const inputCompleteness =
       (capacity.confidence.factors.inputCompleteness +
-       prioritizationConfidence.factors.inputCompleteness) / 2;
+        prioritizationConfidence.factors.inputCompleteness) /
+      2;
 
     // AI self-assessment from prioritization
     const aiSelfAssessment = prioritizationConfidence.factors.aiSelfAssessment;
 
     // Pattern match based on utilization
-    const patternMatch = utilization <= 0.85 ? 0.8 :
-                         utilization <= 1.0 ? 0.6 : 0.4;
+    const patternMatch = utilization <= 0.85 ? 0.8 : utilization <= 1.0 ? 0.6 : 0.4;
 
     const factors: ConfidenceFactors = {
       inputCompleteness,
       aiSelfAssessment,
-      patternMatch
+      patternMatch,
     };
 
     const score = calculateWeightedScore(factors);
@@ -399,13 +401,13 @@ export class SprintSuggestionService {
     const needsReview = score < 70;
 
     return {
-      sectionId: 'sprint-suggestion',
-      sectionName: 'Sprint Suggestion',
+      sectionId: "sprint-suggestion",
+      sectionName: "Sprint Suggestion",
       score,
       tier,
       factors,
       reasoning: this.getConfidenceReasoning(utilization, capacity, prioritizationConfidence),
-      needsReview
+      needsReview,
     };
   }
 
@@ -420,27 +422,27 @@ export class SprintSuggestionService {
     const reasons: string[] = [];
 
     // Capacity confidence
-    if (capacity.confidence.tier === 'high') {
-      reasons.push('High confidence in capacity calculation');
-    } else if (capacity.confidence.tier === 'low') {
-      reasons.push('Capacity calculation has uncertainty');
+    if (capacity.confidence.tier === "high") {
+      reasons.push("High confidence in capacity calculation");
+    } else if (capacity.confidence.tier === "low") {
+      reasons.push("Capacity calculation has uncertainty");
     }
 
     // Prioritization confidence
-    if (prioritizationConfidence.tier === 'high') {
-      reasons.push('strong prioritization data');
-    } else if (prioritizationConfidence.tier === 'low') {
-      reasons.push('limited prioritization data');
+    if (prioritizationConfidence.tier === "high") {
+      reasons.push("strong prioritization data");
+    } else if (prioritizationConfidence.tier === "low") {
+      reasons.push("limited prioritization data");
     }
 
     // Utilization health
     if (utilization <= 0.8) {
-      reasons.push('healthy capacity buffer');
+      reasons.push("healthy capacity buffer");
     } else if (utilization > 0.95) {
-      reasons.push('tight capacity - consider risk');
+      reasons.push("tight capacity - consider risk");
     }
 
-    return reasons.join('; ');
+    return reasons.join("; ");
   }
 
   /**
@@ -451,17 +453,17 @@ export class SprintSuggestionService {
       suggestedItems: [],
       totalPoints: 0,
       capacityUtilization: 0,
-      reasoning: 'No backlog items available for sprint planning',
+      reasoning: "No backlog items available for sprint planning",
       risks: [],
       confidence: {
-        sectionId: 'sprint-suggestion',
-        sectionName: 'Sprint Suggestion',
+        sectionId: "sprint-suggestion",
+        sectionName: "Sprint Suggestion",
         score: 100,
-        tier: 'high',
+        tier: "high",
         factors: { inputCompleteness: 1, aiSelfAssessment: 1, patternMatch: 1 },
-        reasoning: 'Empty backlog - no suggestions needed',
-        needsReview: false
-      }
+        reasoning: "Empty backlog - no suggestions needed",
+        needsReview: false,
+      },
     };
   }
 
@@ -470,11 +472,16 @@ export class SprintSuggestionService {
    */
   private mapPriorityToEnum(priority?: string): TaskPriority {
     switch (priority) {
-      case 'critical': return TaskPriority.CRITICAL;
-      case 'high': return TaskPriority.HIGH;
-      case 'medium': return TaskPriority.MEDIUM;
-      case 'low': return TaskPriority.LOW;
-      default: return TaskPriority.MEDIUM;
+      case "critical":
+        return TaskPriority.CRITICAL;
+      case "high":
+        return TaskPriority.HIGH;
+      case "medium":
+        return TaskPriority.MEDIUM;
+      case "low":
+        return TaskPriority.LOW;
+      default:
+        return TaskPriority.MEDIUM;
     }
   }
 
@@ -497,7 +504,7 @@ export class SprintSuggestionService {
    * Uses AI directly for composition instead of combining services.
    */
   async getAISuggestion(params: SprintSuggestionParams): Promise<SprintSuggestion | null> {
-    const model = this.aiFactory.getModel('main') || this.aiFactory.getBestAvailableModel();
+    const model = this.aiFactory.getModel("main") || this.aiFactory.getBestAvailableModel();
 
     if (!model) {
       return null;
@@ -508,61 +515,61 @@ export class SprintSuggestionService {
       const capacity = await this.capacityAnalyzer.calculateCapacity({
         velocity: params.velocity,
         sprintDurationDays: params.sprintDurationDays,
-        teamMembers: params.teamMembers || []
+        teamMembers: params.teamMembers || [],
       });
 
       const result = await generateObject({
         model,
         system: SPRINT_SUGGESTION_SYSTEM_PROMPT,
         prompt: formatSprintSuggestionPrompt({
-          availableItems: params.backlogItems.map(item => ({
+          availableItems: params.backlogItems.map((item) => ({
             id: item.id,
             title: InputSanitizer.sanitizeText(item.title),
             points: item.points,
-            priority: item.priority
+            priority: item.priority,
           })),
           capacity: capacity.recommendedLoad,
-          businessGoals: params.businessGoals?.map(g => InputSanitizer.sanitizeText(g)),
-          riskTolerance: params.riskTolerance || 'medium'
+          businessGoals: params.businessGoals?.map((g) => InputSanitizer.sanitizeText(g)),
+          riskTolerance: params.riskTolerance || "medium",
         }),
         schema: SprintSuggestionSchema,
-        temperature: 0.4
+        temperature: 0.4,
       });
 
       // Map AI response to SprintSuggestion
       return {
-        suggestedItems: result.object.suggestedItems.map(item => ({
+        suggestedItems: result.object.suggestedItems.map((item) => ({
           itemId: item.itemId,
           title: item.title,
           points: item.points,
           priority: item.priority as PriorityTier,
           includeReason: item.includeReason,
-          dependencies: item.dependencies
+          dependencies: item.dependencies,
         })),
         totalPoints: result.object.totalPoints,
         capacityUtilization: result.object.capacityUtilization,
         reasoning: result.object.reasoning,
-        risks: result.object.risks.map(r => ({
+        risks: result.object.risks.map((r) => ({
           id: `ai-risk-${Math.random().toString(36).substr(2, 9)}`,
           category: r.category,
           title: r.description.substring(0, 50),
           description: r.description,
           probability: r.probability,
-          impact: 'medium' as const,
-          relatedItems: []
+          impact: "medium" as const,
+          relatedItems: [],
         })),
         confidence: {
-          sectionId: 'ai-sprint-suggestion',
-          sectionName: 'AI Sprint Suggestion',
+          sectionId: "ai-sprint-suggestion",
+          sectionName: "AI Sprint Suggestion",
           score: 70,
-          tier: 'medium',
+          tier: "medium",
           factors: { inputCompleteness: 0.7, aiSelfAssessment: 0.7, patternMatch: 0.7 },
-          reasoning: 'AI-generated sprint composition',
-          needsReview: false
-        }
+          reasoning: "AI-generated sprint composition",
+          needsReview: false,
+        },
       };
     } catch (error) {
-      this.logger.warn('AI sprint suggestion failed', { error });
+      this.logger.warn("AI sprint suggestion failed", { error });
       return null;
     }
   }

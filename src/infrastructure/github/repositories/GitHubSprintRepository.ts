@@ -1,7 +1,7 @@
 import { BaseGitHubRepository } from "./BaseRepository";
 import { logger } from "../../logger";
 import type { IssueId, Sprint, SprintId, SprintRepository, Issue } from "../../../domain/types";
-import { ResourceStatus, } from "../../../domain/resource-types";
+import { ResourceStatus } from "../../../domain/resource-types";
 import { GitHubIssueRepository } from "./GitHubIssueRepository";
 import type { GitHubConfig } from "../GitHubConfig"; // Import the class, not the interface
 
@@ -41,32 +41,39 @@ export class GitHubSprintRepository extends BaseGitHubRepository implements Spri
     this.factory = {
       createIssueRepository: () => {
         return new GitHubIssueRepository(octokit, config);
-      }
+      },
     };
   }
 
-  async create(data: Omit<Sprint, "id" | "createdAt" | "updatedAt" | "type"> & { projectId?: string }): Promise<Sprint> {
+  async create(
+    data: Omit<Sprint, "id" | "createdAt" | "updatedAt" | "type"> & { projectId?: string }
+  ): Promise<Sprint> {
     // Find the target project's iteration field, creating one if needed
-    const { fieldId, projectId, existingIterations } = await this.ensureIterationField(data.projectId);
+    const { fieldId, projectId, existingIterations } = await this.ensureIterationField(
+      data.projectId
+    );
 
     // Calculate duration in days (GitHub stores as weeks but the input is days)
     const startDate = new Date(data.startDate);
     const endDate = new Date(data.endDate);
-    const durationDays = Math.max(7, Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)));
+    const durationDays = Math.max(
+      7,
+      Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24))
+    );
     // GitHub iteration duration is in DAYS (despite what docs sometimes suggest)
     const durationValue = durationDays;
 
     // Append new iteration to existing ones via updateProjectV2Field
     // The API replaces all iterations, so we must include existing ones
     const allIterations = [
-      ...existingIterations.map(iter => ({
+      ...existingIterations.map((iter) => ({
         title: iter.title,
         startDate: iter.startDate,
         duration: iter.duration,
       })),
       {
         title: data.title,
-        startDate: startDate.toISOString().split('T')[0],
+        startDate: startDate.toISOString().split("T")[0],
         duration: durationValue,
       },
     ];
@@ -92,7 +99,9 @@ export class GitHubSprintRepository extends BaseGitHubRepository implements Spri
       updateProjectV2Field: {
         projectV2Field: {
           id: string;
-          configuration: { iterations: Array<{ id: string; title: string; startDate: string; duration: number }> };
+          configuration: {
+            iterations: Array<{ id: string; title: string; startDate: string; duration: number }>;
+          };
         };
       };
     }>(mutation, {
@@ -107,8 +116,9 @@ export class GitHubSprintRepository extends BaseGitHubRepository implements Spri
     });
 
     // Find the newly created iteration by title match
-    const created = response.updateProjectV2Field.projectV2Field.configuration.iterations
-      .find(i => i.title === data.title);
+    const created = response.updateProjectV2Field.projectV2Field.configuration.iterations.find(
+      (i) => i.title === data.title
+    );
 
     if (!created) {
       throw new Error(`Iteration "${data.title}" was not found after creation`);
@@ -121,7 +131,7 @@ export class GitHubSprintRepository extends BaseGitHubRepository implements Spri
     return {
       id: created.id,
       title: created.title,
-      description: data.description || '',
+      description: data.description || "",
       startDate: createdStart.toISOString(),
       endDate: createdEnd.toISOString(),
       status: this.determineSprintStatus(createdStart, createdEnd),
@@ -167,7 +177,10 @@ export class GitHubSprintRepository extends BaseGitHubRepository implements Spri
           }
         }
       `;
-      const result = await this.graphql<{ node: { id: string; fields: { nodes: any[] } } | null }>(query, { id: targetProjectId });
+      const result = await this.graphql<{ node: { id: string; fields: { nodes: any[] } } | null }>(
+        query,
+        { id: targetProjectId }
+      );
       projectNode = result.node || undefined;
     } else {
       // Fallback: most recent project
@@ -195,12 +208,15 @@ export class GitHubSprintRepository extends BaseGitHubRepository implements Spri
           }
         }
       `;
-      const result = await this.graphql<ListIterationFieldsResponse>(query, { owner: this.owner, repo: this.repo });
+      const result = await this.graphql<ListIterationFieldsResponse>(query, {
+        owner: this.owner,
+        repo: this.repo,
+      });
       projectNode = result.repository?.projectsV2?.nodes?.[0];
     }
 
     if (!projectNode) {
-      throw new Error('No GitHub Project V2 found. Create a project first.');
+      throw new Error("No GitHub Project V2 found. Create a project first.");
     }
 
     // Look for an existing iteration field
@@ -238,16 +254,18 @@ export class GitHubSprintRepository extends BaseGitHubRepository implements Spri
       createProjectV2Field: {
         projectV2Field: {
           id: string;
-          configuration: { iterations: Array<{ id: string; title: string; startDate: string; duration: number }> };
+          configuration: {
+            iterations: Array<{ id: string; title: string; startDate: string; duration: number }>;
+          };
         };
       };
     }>(createMutation, {
       input: {
         projectId: projectNode.id,
-        dataType: 'ITERATION',
-        name: 'Sprint',
+        dataType: "ITERATION",
+        name: "Sprint",
         iterationConfiguration: {
-          startDate: new Date().toISOString().split('T')[0],
+          startDate: new Date().toISOString().split("T")[0],
           duration: 14,
           iterations: [],
         },
@@ -257,7 +275,8 @@ export class GitHubSprintRepository extends BaseGitHubRepository implements Spri
     return {
       fieldId: createResult.createProjectV2Field.projectV2Field.id,
       projectId: projectNode.id,
-      existingIterations: createResult.createProjectV2Field.projectV2Field.configuration?.iterations || [],
+      existingIterations:
+        createResult.createProjectV2Field.projectV2Field.configuration?.iterations || [],
     };
   }
 
@@ -301,7 +320,7 @@ export class GitHubSprintRepository extends BaseGitHubRepository implements Spri
     // GitHub Projects V2 doesn't support querying individual iterations by ID
     // For now, we'll search through all sprints to find the matching one
     const allSprints = await this.findAll();
-    return allSprints.find(sprint => sprint.id === id) || null;
+    return allSprints.find((sprint) => sprint.id === id) || null;
   }
 
   async findAll(options?: { status?: ResourceStatus }): Promise<Sprint[]> {
@@ -369,7 +388,7 @@ export class GitHubSprintRepository extends BaseGitHubRepository implements Spri
     }
 
     if (options?.status) {
-      return sprints.filter(sprint => sprint.status === options.status);
+      return sprints.filter((sprint) => sprint.status === options.status);
     }
 
     return sprints;
@@ -378,13 +397,15 @@ export class GitHubSprintRepository extends BaseGitHubRepository implements Spri
   async findCurrent(): Promise<Sprint | null> {
     const now = new Date();
     const sprints = await this.findAll();
-    
+
     // Find a sprint that contains the current date
-    return sprints.find(sprint => {
-      const startDate = new Date(sprint.startDate);
-      const endDate = new Date(sprint.endDate);
-      return startDate <= now && now <= endDate;
-    }) || null;
+    return (
+      sprints.find((sprint) => {
+        const startDate = new Date(sprint.startDate);
+        const endDate = new Date(sprint.endDate);
+        return startDate <= now && now <= endDate;
+      }) || null
+    );
   }
 
   async addIssue(sprintId: SprintId, issueId: IssueId): Promise<Sprint> {
@@ -400,12 +421,12 @@ export class GitHubSprintRepository extends BaseGitHubRepository implements Spri
 
     // Add the issue to the sprint
     await this.addIssuesToSprint(sprintId, [issueId]);
-    
+
     // Return the updated sprint
     return {
       ...sprint,
       issues: [...sprint.issues, issueId],
-      updatedAt: new Date().toISOString()
+      updatedAt: new Date().toISOString(),
     };
   }
 
@@ -439,12 +460,12 @@ export class GitHubSprintRepository extends BaseGitHubRepository implements Spri
         value: null,
       },
     });
-    
+
     // Return the updated sprint
     return {
       ...sprint,
-      issues: sprint.issues.filter(id => id !== issueId),
-      updatedAt: new Date().toISOString()
+      issues: sprint.issues.filter((id) => id !== issueId),
+      updatedAt: new Date().toISOString(),
     };
   }
 
@@ -461,9 +482,7 @@ export class GitHubSprintRepository extends BaseGitHubRepository implements Spri
     // Use factory to create an issue repository
     const issueRepo = this.factory.createIssueRepository();
 
-    const issues = await Promise.all(
-      sprint.issues.map(issueId => issueRepo.findById(issueId))
-    );
+    const issues = await Promise.all(sprint.issues.map((issueId) => issueRepo.findById(issueId)));
 
     // Filter out any null results
     return issues.filter((issue): issue is Issue => issue !== null);
@@ -492,7 +511,7 @@ export class GitHubSprintRepository extends BaseGitHubRepository implements Spri
     sprintId: string,
     issueIds: IssueId[],
     iterationFieldId?: string,
-    projectId?: string,
+    projectId?: string
   ): Promise<void> {
     // Resolve the iteration field ID and project ID if not provided
     if (!iterationFieldId || !projectId) {
@@ -516,8 +535,8 @@ export class GitHubSprintRepository extends BaseGitHubRepository implements Spri
       await this.graphql(mutation, {
         input: {
           projectId,
-          itemId,                          // PVTI_... (project item, not issue)
-          fieldId: iterationFieldId,       // PVTIF_... (iteration field, not instance)
+          itemId, // PVTI_... (project item, not issue)
+          fieldId: iterationFieldId, // PVTIF_... (iteration field, not instance)
           value: { iterationId: sprintId }, // iteration instance ID
         },
       });
@@ -530,7 +549,7 @@ export class GitHubSprintRepository extends BaseGitHubRepository implements Spri
    */
   private async resolveProjectItemIds(
     projectId: string,
-    issueIds: string[],
+    issueIds: string[]
   ): Promise<Array<{ issueId: string; itemId: string }>> {
     const query = `
       query($projectId: ID!) {

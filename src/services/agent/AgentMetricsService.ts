@@ -1,13 +1,16 @@
-import type { AgentStore } from '../../infrastructure/agent/AgentStore';
-import type { WorkProductStore } from '../../infrastructure/agent/WorkProductStore';
-import type { GitHubRepositoryFactory } from '../../infrastructure/github/GitHubRepositoryFactory';
+import type { AgentStore } from "../../infrastructure/agent/AgentStore";
+import type { WorkProductStore } from "../../infrastructure/agent/WorkProductStore";
+import type { GitHubRepositoryFactory } from "../../infrastructure/github/GitHubRepositoryFactory";
 import type {
   AgentMetrics,
   AgentMetricEntry,
   WorkProduct,
-} from '../../domain/agent-orchestration-types';
-import { DEFAULT_HEARTBEAT_TIMEOUT_MINUTES, WORK_PRODUCT_MARKER } from '../../domain/agent-orchestration-types';
-import { safeCall } from '../utils/safeCall';
+} from "../../domain/agent-orchestration-types";
+import {
+  DEFAULT_HEARTBEAT_TIMEOUT_MINUTES,
+  WORK_PRODUCT_MARKER,
+} from "../../domain/agent-orchestration-types";
+import { safeCall } from "../utils/safeCall";
 
 /**
  * Computes agent orchestration metrics: throughput, cycle time, budget burn,
@@ -34,7 +37,7 @@ export class AgentMetricsService {
   constructor(
     factory: GitHubRepositoryFactory,
     agentStore: AgentStore,
-    workProductStore: WorkProductStore,
+    workProductStore: WorkProductStore
   ) {
     this.factory = factory;
     this.agentStore = agentStore;
@@ -43,7 +46,7 @@ export class AgentMetricsService {
 
   /** Compute aggregate + per-agent metrics. */
   async getMetrics(
-    staleAfterMinutes: number = DEFAULT_HEARTBEAT_TIMEOUT_MINUTES,
+    staleAfterMinutes: number = DEFAULT_HEARTBEAT_TIMEOUT_MINUTES
   ): Promise<AgentMetrics> {
     return safeCall(async () => {
       const agents = await this.agentStore.listAgents();
@@ -66,25 +69,27 @@ export class AgentMetricsService {
       let budgetExhaustedAgents = 0;
       let activeAgents = 0;
 
-      const entries: AgentMetricEntry[] = agents.map(agent => {
+      const entries: AgentMetricEntry[] = agents.map((agent) => {
         const lastHb = agent.lastHeartbeat ? new Date(agent.lastHeartbeat).getTime() : undefined;
         const isStale = lastHb != null && now - lastHb > staleMs;
         const budget = agent.budget;
         const isExhausted =
-          agent.status === 'budget_exhausted' ||
+          agent.status === "budget_exhausted" ||
           (budget?.hardStop === true && budget.usedTokens >= budget.totalTokens);
 
         const completed = completedByAgent.get(agent.id) ?? 0;
         const durations = cycleTimesByAgent.get(agent.id) ?? [];
         // Approximate: average minutes since last submission(s).
         // Not a true claim→completion cycle time (that data is not persisted).
-        const avgCycle = durations.length > 0
-          ? Math.round(durations.reduce((s, d) => s + d, 0) / durations.length / 60_000)
-          : undefined;
+        const avgCycle =
+          durations.length > 0
+            ? Math.round(durations.reduce((s, d) => s + d, 0) / durations.length / 60_000)
+            : undefined;
 
-        const budgetUsagePercent = budget && budget.totalTokens > 0
-          ? Math.round((budget.usedTokens / budget.totalTokens) * 1000) / 10
-          : 0;
+        const budgetUsagePercent =
+          budget && budget.totalTokens > 0
+            ? Math.round((budget.usedTokens / budget.totalTokens) * 1000) / 10
+            : 0;
 
         if (agent.currentTaskId) totalTasksInProgress++;
         totalTasksCompleted += completed;
@@ -94,7 +99,7 @@ export class AgentMetricsService {
         }
         if (isStale) staleAgents++;
         if (isExhausted) budgetExhaustedAgents++;
-        if (agent.status !== 'offline' && agent.status !== 'budget_exhausted') activeAgents++;
+        if (agent.status !== "offline" && agent.status !== "budget_exhausted") activeAgents++;
 
         return {
           agentId: agent.id,
@@ -121,9 +126,8 @@ export class AgentMetricsService {
         totalTasksCompleted,
         totalTokensBudget,
         totalTokensUsed,
-        overallBudgetUsagePercent: totalTokensBudget > 0
-          ? Math.round((totalTokensUsed / totalTokensBudget) * 1000) / 10
-          : 0,
+        overallBudgetUsagePercent:
+          totalTokensBudget > 0 ? Math.round((totalTokensUsed / totalTokensBudget) * 1000) / 10 : 0,
         agents: entries,
         isTruncated,
       };
@@ -147,7 +151,10 @@ export class AgentMetricsService {
     isTruncated: boolean;
   }> {
     const now = Date.now();
-    if (this.workProductCache.data && now - this.workProductCache.fetchedAt < AgentMetricsService.CACHE_TTL_MS) {
+    if (
+      this.workProductCache.data &&
+      now - this.workProductCache.fetchedAt < AgentMetricsService.CACHE_TTL_MS
+    ) {
       return this.workProductCache.data;
     }
 
@@ -163,8 +170,8 @@ export class AgentMetricsService {
         owner: config.owner,
         repo: config.repo,
         per_page: 100,
-        sort: 'created',
-        direction: 'desc',
+        sort: "created",
+        direction: "desc",
       });
 
       // A full page means older work-product comments may exist beyond
@@ -175,7 +182,7 @@ export class AgentMetricsService {
         const body = comment.body;
         if (!body || !body.includes(WORK_PRODUCT_MARKER)) continue;
         // Work products are submitted on task issues, not PR conversations.
-        if (comment.html_url?.includes('/pull/')) continue;
+        if (comment.html_url?.includes("/pull/")) continue;
 
         const product = this.parseWorkProductComment(body);
         if (!product?.agentId) continue;
@@ -193,7 +200,7 @@ export class AgentMetricsService {
     for (const [agentId, products] of productsByAgent) {
       completedByAgent.set(agentId, products.length);
       const durations = products
-        .map(p => p.submittedAt ? now - new Date(p.submittedAt).getTime() : null)
+        .map((p) => (p.submittedAt ? now - new Date(p.submittedAt).getTime() : null))
         .filter((d): d is number => d != null && d >= 0)
         .slice(0, 50);
       if (durations.length > 0) {
@@ -215,7 +222,7 @@ export class AgentMetricsService {
     if (markerIdx < 0) return null;
 
     const jsonStart = markerIdx + WORK_PRODUCT_MARKER.length;
-    const endIdx = body.indexOf('-->', jsonStart);
+    const endIdx = body.indexOf("-->", jsonStart);
     if (endIdx < 0) return null;
 
     const jsonStr = body.substring(jsonStart, endIdx).trim();

@@ -3,12 +3,12 @@ import {
   MCPErrorSchema,
   MCPErrorCode,
   type MCPSuccessResponse,
-  type MCPErrorResponse
+  type MCPErrorResponse,
 } from "../../domain/mcp-types";
 import { z } from "zod";
 
 export interface RichContent {
-  type: 'text' | 'json' | 'markdown' | 'html';
+  type: "text" | "json" | "markdown" | "html";
   data: unknown;
   metadata?: Record<string, unknown>;
 }
@@ -17,7 +17,7 @@ export interface ProgressUpdate {
   completed: number;
   total: number;
   message?: string;
-  status: 'in-progress' | 'completed' | 'failed';
+  status: "in-progress" | "completed" | "failed";
 }
 
 export class MCPResponseFormatter {
@@ -35,15 +35,15 @@ export class MCPResponseFormatter {
     // Create a success response that matches the MCPSuccessResponse type
     return {
       version: "1.0",
-      requestId: metadata?.requestId as string || `req-${Date.now()}`,
+      requestId: (metadata?.requestId as string) || `req-${Date.now()}`,
       status: "success",
       output: {
         content: formattedContent,
         format: {
-          type: MCPResponseFormatter.getTypeFromContentType(contentType)
+          type: MCPResponseFormatter.getTypeFromContentType(contentType),
         },
-        context: metadata
-      }
+        context: metadata,
+      },
     };
   }
 
@@ -51,7 +51,11 @@ export class MCPResponseFormatter {
    * Format multiple content pieces into a single MCP response
    */
   static formatMultiple(
-    contents: Array<{ data: unknown; contentType: MCPContentType; metadata?: Record<string, unknown> }>
+    contents: Array<{
+      data: unknown;
+      contentType: MCPContentType;
+      metadata?: Record<string, unknown>;
+    }>
   ): MCPSuccessResponse {
     // Combine all content into a single string with formatting
     let combinedContent = "";
@@ -67,9 +71,9 @@ export class MCPResponseFormatter {
       output: {
         content: combinedContent.trim(),
         format: {
-          type: "text"
-        }
-      }
+          type: "text",
+        },
+      },
     };
   }
 
@@ -91,15 +95,15 @@ export class MCPResponseFormatter {
     // Create a success response with the combined content
     return {
       version: "1.0",
-      requestId: metadata?.requestId as string || `req-${Date.now()}`,
+      requestId: (metadata?.requestId as string) || `req-${Date.now()}`,
       status: "success",
       output: {
         content: combinedContent.trim(),
         format: {
-          type: "text"
+          type: "text",
         },
-        context: metadata
-      }
+        context: metadata,
+      },
     };
   }
 
@@ -110,28 +114,29 @@ export class MCPResponseFormatter {
     data: T[],
     options?: {
       title?: string;
-      columns?: Array<{key: keyof T; header: string}>;
+      columns?: Array<{ key: keyof T; header: string }>;
     }
   ): string {
-    if (data.length === 0) return 'No data available';
+    if (data.length === 0) return "No data available";
 
     // Determine columns
-    const columns = options?.columns ||
-      Object.keys(data[0]).map(key => ({
+    const columns =
+      options?.columns ||
+      Object.keys(data[0]).map((key) => ({
         key: key as keyof T,
         header: String(key),
       }));
 
     // Build header
-    let markdown = options?.title ? `# ${options.title}\n\n` : '';
+    let markdown = options?.title ? `# ${options.title}\n\n` : "";
 
     // Build table header
-    markdown += `| ${columns.map(col => col.header).join(' | ')} |\n`;
-    markdown += `| ${columns.map(() => '---').join(' | ')} |\n`;
+    markdown += `| ${columns.map((col) => col.header).join(" | ")} |\n`;
+    markdown += `| ${columns.map(() => "---").join(" | ")} |\n`;
 
     // Build table rows
     for (const row of data) {
-      markdown += `| ${columns.map(col => String(row[col.key] ?? '')).join(' | ')} |\n`;
+      markdown += `| ${columns.map((col) => String(row[col.key] ?? "")).join(" | ")} |\n`;
     }
 
     return markdown;
@@ -140,10 +145,7 @@ export class MCPResponseFormatter {
   /**
    * Format as rich HTML (with classes for styling)
    */
-  static formatAsRichHtml<T>(
-    data: T,
-    template: (data: T) => string
-  ): string {
+  static formatAsRichHtml<T>(data: T, template: (data: T) => string): string {
     return template(data);
   }
 
@@ -173,18 +175,15 @@ export class MCPResponseFormatter {
       error: {
         code: code,
         message: message,
-        details: details ? [{ code: "details", message: JSON.stringify(details) }] : undefined
-      }
+        details: details ? [{ code: "details", message: JSON.stringify(details) }] : undefined,
+      },
     };
   }
 
   /**
    * Create a progressive response for long-running operations
    */
-  static progress(
-    update: ProgressUpdate,
-    requestId: string
-  ): MCPSuccessResponse {
+  static progress(update: ProgressUpdate, requestId: string): MCPSuccessResponse {
     return {
       version: "1.0",
       requestId: requestId,
@@ -192,13 +191,13 @@ export class MCPResponseFormatter {
       output: {
         content: JSON.stringify(update),
         format: {
-          type: "json"
+          type: "json",
         },
         context: {
           status: "in-progress",
-          progress: update
-        }
-      }
+          progress: update,
+        },
+      },
     };
   }
 
@@ -211,7 +210,10 @@ export class MCPResponseFormatter {
     requestId?: string,
     metadata?: Record<string, unknown>
   ): MCPSuccessResponse {
-    const formattedContent = MCPResponseFormatter.formatContent(data, contentType || MCPContentType.JSON);
+    const formattedContent = MCPResponseFormatter.formatContent(
+      data,
+      contentType || MCPContentType.JSON
+    );
 
     return {
       version: "1.0",
@@ -220,10 +222,10 @@ export class MCPResponseFormatter {
       output: {
         content: formattedContent,
         format: {
-          type: MCPResponseFormatter.getTypeFromContentType(contentType || MCPContentType.JSON)
+          type: MCPResponseFormatter.getTypeFromContentType(contentType || MCPContentType.JSON),
         },
-        context: metadata
-      }
+        context: metadata,
+      },
     };
   }
 
@@ -240,7 +242,10 @@ export class MCPResponseFormatter {
       totalItems?: number;
     }
   ): MCPSuccessResponse {
-    const formattedContent = MCPResponseFormatter.formatContent(data, options?.contentType || MCPContentType.JSON);
+    const formattedContent = MCPResponseFormatter.formatContent(
+      data,
+      options?.contentType || MCPContentType.JSON
+    );
 
     return {
       version: "1.0",
@@ -249,16 +254,18 @@ export class MCPResponseFormatter {
       output: {
         content: formattedContent,
         format: {
-          type: MCPResponseFormatter.getTypeFromContentType(options?.contentType || MCPContentType.JSON)
+          type: MCPResponseFormatter.getTypeFromContentType(
+            options?.contentType || MCPContentType.JSON
+          ),
         },
         context: {
           pagination: {
             page,
             totalPages,
-            totalItems: options?.totalItems
-          }
-        }
-      }
+            totalItems: options?.totalItems,
+          },
+        },
+      },
     };
   }
 
@@ -266,17 +273,23 @@ export class MCPResponseFormatter {
    * Validate the structure of an MCP response
    */
   static validateResponse(response: unknown): boolean {
-    const result = z.object({
-      content: z.array(z.object({
-        type: z.enum(['text', 'json', 'markdown', 'html']),
-        text: z.string(),
-        contentType: z.nativeEnum(MCPContentType),
-      })).nonempty(),
-      metadata: z.object({
-        timestamp: z.string(),
-        status: z.number(),
-      }),
-    }).safeParse(response);
+    const result = z
+      .object({
+        content: z
+          .array(
+            z.object({
+              type: z.enum(["text", "json", "markdown", "html"]),
+              text: z.string(),
+              contentType: z.nativeEnum(MCPContentType),
+            })
+          )
+          .nonempty(),
+        metadata: z.object({
+          timestamp: z.string(),
+          status: z.number(),
+        }),
+      })
+      .safeParse(response);
 
     return result.success;
   }
@@ -296,11 +309,11 @@ export class MCPResponseFormatter {
         // Create a simple markdown representation for objects
         if (data && typeof data === "object") {
           if (Array.isArray(data)) {
-            return data.map(item => `- ${JSON.stringify(item)}`).join('\n');
+            return data.map((item) => `- ${JSON.stringify(item)}`).join("\n");
           } else {
             return Object.entries(data)
               .map(([key, value]) => `### ${key}\n${JSON.stringify(value, null, 2)}`)
-              .join('\n\n');
+              .join("\n\n");
           }
         }
 
@@ -309,7 +322,7 @@ export class MCPResponseFormatter {
       case MCPContentType.HTML:
         if (typeof data === "string") {
           // Check if it's already HTML
-          if (data.trim().startsWith('<') && data.trim().endsWith('>')) {
+          if (data.trim().startsWith("<") && data.trim().endsWith(">")) {
             return data;
           }
           return `<pre>${data}</pre>`;
@@ -318,17 +331,19 @@ export class MCPResponseFormatter {
         // Create a simple HTML representation for objects
         if (data && typeof data === "object") {
           if (Array.isArray(data)) {
-            return `<ul>${data.map(item => `<li>${JSON.stringify(item)}</li>`).join('')}</ul>`;
+            return `<ul>${data.map((item) => `<li>${JSON.stringify(item)}</li>`).join("")}</ul>`;
           } else {
             return `<div class="mcp-object">
               ${Object.entries(data)
-                .map(([key, value]) => `
+                .map(
+                  ([key, value]) => `
                   <div class="mcp-property">
                     <div class="mcp-key">${key}</div>
                     <div class="mcp-value"><pre>${JSON.stringify(value, null, 2)}</pre></div>
                   </div>
-                `)
-                .join('')}
+                `
+                )
+                .join("")}
             </div>`;
           }
         }
@@ -340,7 +355,9 @@ export class MCPResponseFormatter {
     }
   }
 
-  private static getTypeFromContentType(contentType: MCPContentType): "text" | "json" | "markdown" | "html" {
+  private static getTypeFromContentType(
+    contentType: MCPContentType
+  ): "text" | "json" | "markdown" | "html" {
     switch (contentType) {
       case MCPContentType.JSON:
         return "json";
@@ -353,7 +370,9 @@ export class MCPResponseFormatter {
     }
   }
 
-  private static getContentTypeFromType(type: "text" | "json" | "markdown" | "html"): MCPContentType {
+  private static getContentTypeFromType(
+    type: "text" | "json" | "markdown" | "html"
+  ): MCPContentType {
     switch (type) {
       case "json":
         return MCPContentType.JSON;

@@ -23,18 +23,13 @@ export class OptimisticLockManager {
    * Verify version match and acquire lock for a resource update
    */
   async verifyAndLock(
-    resourceId: string, 
-    type: ResourceType, 
-    currentVersion: number, 
+    resourceId: string,
+    type: ResourceType,
+    currentVersion: number,
     expectedVersion?: number
   ): Promise<void> {
     if (expectedVersion !== undefined && expectedVersion !== currentVersion) {
-      throw new ResourceVersionError(
-        type,
-        resourceId,
-        expectedVersion,
-        currentVersion
-      );
+      throw new ResourceVersionError(type, resourceId, expectedVersion, currentVersion);
     }
 
     const now = Date.now();

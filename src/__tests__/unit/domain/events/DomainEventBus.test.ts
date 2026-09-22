@@ -1,10 +1,8 @@
-import { vi } from 'vitest';
-import { DomainEventBus } from '../../../../domain/events/DomainEventBus';
-import {
-  IssueCreatedEvent,
-} from '../../../../domain/events/DomainEvent';
+import { vi } from "vitest";
+import { DomainEventBus } from "../../../../domain/events/DomainEventBus";
+import { IssueCreatedEvent } from "../../../../domain/events/DomainEvent";
 
-describe('DomainEventBus', () => {
+describe("DomainEventBus", () => {
   let eventBus: DomainEventBus;
 
   beforeEach(() => {
@@ -18,54 +16,54 @@ describe('DomainEventBus', () => {
     eventBus.unsubscribeAll();
   });
 
-  describe('singleton', () => {
-    it('should return the same instance', () => {
+  describe("singleton", () => {
+    it("should return the same instance", () => {
       const instance1 = DomainEventBus.getInstance();
       const instance2 = DomainEventBus.getInstance();
       expect(instance1).toBe(instance2);
     });
   });
 
-  describe('subscriptions', () => {
-    it('should subscribe to events by name', () => {
+  describe("subscriptions", () => {
+    it("should subscribe to events by name", () => {
       const handler = vi.fn();
-      eventBus.subscribeByName('IssueCreated', handler);
+      eventBus.subscribeByName("IssueCreated", handler);
 
-      expect(eventBus.getSubscriptionCount('IssueCreated')).toBe(1);
+      expect(eventBus.getSubscriptionCount("IssueCreated")).toBe(1);
     });
 
-    it('should return unsubscribe function', () => {
+    it("should return unsubscribe function", () => {
       const handler = vi.fn();
-      const unsubscribe = eventBus.subscribeByName('IssueCreated', handler);
+      const unsubscribe = eventBus.subscribeByName("IssueCreated", handler);
 
-      expect(eventBus.getSubscriptionCount('IssueCreated')).toBe(1);
+      expect(eventBus.getSubscriptionCount("IssueCreated")).toBe(1);
 
       unsubscribe();
 
-      expect(eventBus.getSubscriptionCount('IssueCreated')).toBe(0);
+      expect(eventBus.getSubscriptionCount("IssueCreated")).toBe(0);
     });
 
-    it('should subscribe to all events', () => {
+    it("should subscribe to all events", () => {
       const handler = vi.fn();
       eventBus.subscribeToAll(handler);
 
-      expect(eventBus.getSubscriptionCount('*')).toBe(1);
+      expect(eventBus.getSubscriptionCount("*")).toBe(1);
     });
 
-    it('should unsubscribe all from a specific type', () => {
-      eventBus.subscribeByName('IssueCreated', vi.fn());
-      eventBus.subscribeByName('IssueCreated', vi.fn());
+    it("should unsubscribe all from a specific type", () => {
+      eventBus.subscribeByName("IssueCreated", vi.fn());
+      eventBus.subscribeByName("IssueCreated", vi.fn());
 
-      expect(eventBus.getSubscriptionCount('IssueCreated')).toBe(2);
+      expect(eventBus.getSubscriptionCount("IssueCreated")).toBe(2);
 
-      eventBus.unsubscribeAll('IssueCreated');
+      eventBus.unsubscribeAll("IssueCreated");
 
-      expect(eventBus.getSubscriptionCount('IssueCreated')).toBe(0);
+      expect(eventBus.getSubscriptionCount("IssueCreated")).toBe(0);
     });
 
-    it('should unsubscribe all from all types', () => {
-      eventBus.subscribeByName('IssueCreated', vi.fn());
-      eventBus.subscribeByName('SprintCreated', vi.fn());
+    it("should unsubscribe all from all types", () => {
+      eventBus.subscribeByName("IssueCreated", vi.fn());
+      eventBus.subscribeByName("SprintCreated", vi.fn());
 
       expect(eventBus.hasSubscriptions()).toBe(true);
 
@@ -75,15 +73,15 @@ describe('DomainEventBus', () => {
     });
   });
 
-  describe('publishing', () => {
-    it('should publish events to subscribers', () => {
+  describe("publishing", () => {
+    it("should publish events to subscribers", () => {
       const handler = vi.fn();
-      eventBus.subscribeByName('IssueCreated', handler);
+      eventBus.subscribeByName("IssueCreated", handler);
 
       const event = IssueCreatedEvent.create({
-        issueId: 'issue-1',
-        title: 'Test Issue',
-        description: 'Description',
+        issueId: "issue-1",
+        title: "Test Issue",
+        description: "Description",
       });
 
       eventBus.publish(event);
@@ -92,14 +90,14 @@ describe('DomainEventBus', () => {
       expect(handler).toHaveBeenCalledWith(event);
     });
 
-    it('should publish to wildcard subscribers', () => {
+    it("should publish to wildcard subscribers", () => {
       const handler = vi.fn();
       eventBus.subscribeToAll(handler);
 
       const event = IssueCreatedEvent.create({
-        issueId: 'issue-1',
-        title: 'Test Issue',
-        description: 'Description',
+        issueId: "issue-1",
+        title: "Test Issue",
+        description: "Description",
       });
 
       eventBus.publish(event);
@@ -107,14 +105,14 @@ describe('DomainEventBus', () => {
       expect(handler).toHaveBeenCalledTimes(1);
     });
 
-    it('should not publish to other event types', () => {
+    it("should not publish to other event types", () => {
       const handler = vi.fn();
-      eventBus.subscribeByName('SprintCreated', handler);
+      eventBus.subscribeByName("SprintCreated", handler);
 
       const event = IssueCreatedEvent.create({
-        issueId: 'issue-1',
-        title: 'Test Issue',
-        description: 'Description',
+        issueId: "issue-1",
+        title: "Test Issue",
+        description: "Description",
       });
 
       eventBus.publish(event);
@@ -122,17 +120,17 @@ describe('DomainEventBus', () => {
       expect(handler).not.toHaveBeenCalled();
     });
 
-    it('should execute handlers in priority order', () => {
+    it("should execute handlers in priority order", () => {
       const callOrder: number[] = [];
 
-      eventBus.subscribeByName('IssueCreated', () => callOrder.push(2), { priority: 2 });
-      eventBus.subscribeByName('IssueCreated', () => callOrder.push(1), { priority: 1 });
-      eventBus.subscribeByName('IssueCreated', () => callOrder.push(3), { priority: 3 });
+      eventBus.subscribeByName("IssueCreated", () => callOrder.push(2), { priority: 2 });
+      eventBus.subscribeByName("IssueCreated", () => callOrder.push(1), { priority: 1 });
+      eventBus.subscribeByName("IssueCreated", () => callOrder.push(3), { priority: 3 });
 
       const event = IssueCreatedEvent.create({
-        issueId: 'issue-1',
-        title: 'Test',
-        description: 'Test',
+        issueId: "issue-1",
+        title: "Test",
+        description: "Test",
       });
 
       eventBus.publish(event);
@@ -140,21 +138,21 @@ describe('DomainEventBus', () => {
       expect(callOrder).toEqual([1, 2, 3]);
     });
 
-    it('should catch errors when catchErrors is true', () => {
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation();
+    it("should catch errors when catchErrors is true", () => {
+      const consoleSpy = vi.spyOn(console, "error").mockImplementation();
 
       eventBus.subscribeByName(
-        'IssueCreated',
+        "IssueCreated",
         () => {
-          throw new Error('Handler error');
+          throw new Error("Handler error");
         },
         { catchErrors: true }
       );
 
       const event = IssueCreatedEvent.create({
-        issueId: 'issue-1',
-        title: 'Test',
-        description: 'Test',
+        issueId: "issue-1",
+        title: "Test",
+        description: "Test",
       });
 
       // Should not throw
@@ -164,15 +162,15 @@ describe('DomainEventBus', () => {
     });
   });
 
-  describe('async publishing', () => {
-    it('should await async handlers', async () => {
+  describe("async publishing", () => {
+    it("should await async handlers", async () => {
       const handler = vi.fn().mockResolvedValue(undefined);
-      eventBus.subscribeByNameAsync('IssueCreated', handler);
+      eventBus.subscribeByNameAsync("IssueCreated", handler);
 
       const event = IssueCreatedEvent.create({
-        issueId: 'issue-1',
-        title: 'Test',
-        description: 'Test',
+        issueId: "issue-1",
+        title: "Test",
+        description: "Test",
       });
 
       await eventBus.publishAsync(event);
@@ -180,21 +178,21 @@ describe('DomainEventBus', () => {
       expect(handler).toHaveBeenCalledTimes(1);
     });
 
-    it('should catch errors in async handlers when catchErrors is true', async () => {
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation();
+    it("should catch errors in async handlers when catchErrors is true", async () => {
+      const consoleSpy = vi.spyOn(console, "error").mockImplementation();
 
       eventBus.subscribeByNameAsync(
-        'IssueCreated',
+        "IssueCreated",
         async () => {
-          throw new Error('Async error');
+          throw new Error("Async error");
         },
         { catchErrors: true }
       );
 
       const event = IssueCreatedEvent.create({
-        issueId: 'issue-1',
-        title: 'Test',
-        description: 'Test',
+        issueId: "issue-1",
+        title: "Test",
+        description: "Test",
       });
 
       // Should not throw when catchErrors is true
@@ -204,12 +202,12 @@ describe('DomainEventBus', () => {
     });
   });
 
-  describe('history', () => {
-    it('should record events in history', () => {
+  describe("history", () => {
+    it("should record events in history", () => {
       const event = IssueCreatedEvent.create({
-        issueId: 'issue-1',
-        title: 'Test',
-        description: 'Test',
+        issueId: "issue-1",
+        title: "Test",
+        description: "Test",
       });
 
       eventBus.publish(event);
@@ -219,14 +217,14 @@ describe('DomainEventBus', () => {
       expect(history[0]).toBe(event);
     });
 
-    it('should limit history', () => {
+    it("should limit history", () => {
       // Publish 5 events
       for (let i = 0; i < 5; i++) {
         eventBus.publish(
           IssueCreatedEvent.create({
             issueId: `issue-${i}`,
             title: `Test ${i}`,
-            description: 'Test',
+            description: "Test",
           })
         );
       }
@@ -235,39 +233,39 @@ describe('DomainEventBus', () => {
       expect(history).toHaveLength(3);
     });
 
-    it('should filter history by aggregate ID', () => {
+    it("should filter history by aggregate ID", () => {
       eventBus.publish(
         IssueCreatedEvent.create({
-          issueId: 'issue-1',
-          title: 'Test 1',
-          description: 'Test',
+          issueId: "issue-1",
+          title: "Test 1",
+          description: "Test",
         })
       );
       eventBus.publish(
         IssueCreatedEvent.create({
-          issueId: 'issue-2',
-          title: 'Test 2',
-          description: 'Test',
+          issueId: "issue-2",
+          title: "Test 2",
+          description: "Test",
         })
       );
       eventBus.publish(
         IssueCreatedEvent.create({
-          issueId: 'issue-1',
-          title: 'Test 3',
-          description: 'Test',
+          issueId: "issue-1",
+          title: "Test 3",
+          description: "Test",
         })
       );
 
-      const history = eventBus.getHistoryForAggregate('issue-1');
+      const history = eventBus.getHistoryForAggregate("issue-1");
       expect(history).toHaveLength(2);
     });
 
-    it('should clear history', () => {
+    it("should clear history", () => {
       eventBus.publish(
         IssueCreatedEvent.create({
-          issueId: 'issue-1',
-          title: 'Test',
-          description: 'Test',
+          issueId: "issue-1",
+          title: "Test",
+          description: "Test",
         })
       );
 
@@ -278,14 +276,14 @@ describe('DomainEventBus', () => {
       expect(eventBus.getHistory()).toHaveLength(0);
     });
 
-    it('should allow disabling history', () => {
+    it("should allow disabling history", () => {
       eventBus.setHistoryEnabled(false);
 
       eventBus.publish(
         IssueCreatedEvent.create({
-          issueId: 'issue-1',
-          title: 'Test',
-          description: 'Test',
+          issueId: "issue-1",
+          title: "Test",
+          description: "Test",
         })
       );
 

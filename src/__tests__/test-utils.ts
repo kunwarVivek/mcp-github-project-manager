@@ -1,11 +1,8 @@
-import { 
-  ResourceStatus, 
-  ResourceType 
-} from "../domain/resource-types";
-import type { 
-  Issue, 
-  Milestone, 
-  Project, 
+import { ResourceStatus, ResourceType } from "../domain/resource-types";
+import type {
+  Issue,
+  Milestone,
+  Project,
   Sprint,
   CreateIssue,
   CreateProject,
@@ -24,7 +21,7 @@ export class TestFactory {
       visibility: "private",
       views: [],
       fields: [],
-      ...overrides
+      ...overrides,
     };
   }
 
@@ -33,7 +30,7 @@ export class TestFactory {
       title: "Test Milestone",
       description: "A test milestone",
       dueDate: TestFactory.futureDate(30),
-      ...overrides
+      ...overrides,
     };
   }
 
@@ -43,7 +40,7 @@ export class TestFactory {
       description: "A test issue",
       assignees: [],
       labels: [],
-      ...overrides
+      ...overrides,
     };
   }
 
@@ -59,7 +56,7 @@ export class TestFactory {
       endDate: endDate.toISOString(),
       status: ResourceStatus.PLANNED,
       issues: [],
-      ...overrides
+      ...overrides,
     };
   }
 
@@ -70,9 +67,9 @@ export class TestFactory {
       layout: "board",
       settings: {
         groupBy: "status",
-        sortBy: [{ field: "priority", direction: "desc" }]
+        sortBy: [{ field: "priority", direction: "desc" }],
       },
-      ...overrides
+      ...overrides,
     };
   }
 
@@ -82,7 +79,7 @@ export class TestFactory {
       name: "Test Field",
       type: "text",
       options: [],
-      ...overrides
+      ...overrides,
     };
   }
 
@@ -102,7 +99,7 @@ export class TestFactory {
       updatedAt: new Date().toISOString(),
       status: ResourceStatus.ACTIVE,
       visibility: data.visibility || "private",
-      version: 1
+      version: 1,
     };
   }
 
@@ -120,8 +117,8 @@ export class TestFactory {
       progress: {
         percent: 0,
         complete: 0,
-        total: 0
-      }
+        total: 0,
+      },
     };
   }
 
@@ -137,7 +134,7 @@ export class TestFactory {
       milestoneId: data.milestoneId,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
-      url: `https://github.com/test-owner/test-repo/issues/1`
+      url: `https://github.com/test-owner/test-repo/issues/1`,
     };
   }
 
@@ -151,7 +148,7 @@ export class TestFactory {
       status: data.status || ResourceStatus.ACTIVE,
       issues: data.issues || [],
       createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
+      updatedAt: new Date().toISOString(),
     };
   }
 
@@ -191,13 +188,13 @@ export class TestFactory {
       ITERATION: "PVTI_kwDOLhQ7gc4AOEbHzM4AOAIter1",
       MILESTONE: "MI_kwDOLhQ7gc4AOEbHzM4AOAMile1",
       ASSIGNEES: ["MDQ6VXNlcjEyMzQ1Njc4", "MDQ6VXNlcjg3NjU0MzIx"],
-      LABELS: ["LA_kwDOLhQ7gc4AOEbHzM4AOAL1", "LA_kwDOLhQ7gc4AOEbHzM4AOAL2"]
+      LABELS: ["LA_kwDOLhQ7gc4AOEbHzM4AOAL1", "LA_kwDOLhQ7gc4AOEbHzM4AOAL2"],
     };
 
     return {
       ...baseData,
       value: fieldTypeValues[fieldType as keyof typeof fieldTypeValues],
-      ...overrides
+      ...overrides,
     };
   }
 
@@ -205,18 +202,18 @@ export class TestFactory {
     const baseField = {
       id: "PVTF_lADOLhQ7gc4AOEbHzM4AOAI1",
       name: `Test ${fieldType} Field`,
-      dataType: fieldType
+      dataType: fieldType,
     };
 
-    if (fieldType === 'SINGLE_SELECT') {
+    if (fieldType === "SINGLE_SELECT") {
       return {
         ...baseField,
         options: [
-          { id: 'OPTION_1', name: 'To Do' },
-          { id: 'OPTION_2', name: 'In Progress' },
-          { id: 'OPTION_3', name: 'Done' }
+          { id: "OPTION_1", name: "To Do" },
+          { id: "OPTION_2", name: "In Progress" },
+          { id: "OPTION_3", name: "Done" },
         ],
-        ...overrides
+        ...overrides,
       };
     }
 
@@ -226,41 +223,41 @@ export class TestFactory {
   static createMockFieldValueResponse(fieldType: string, value: any) {
     const baseField = {
       name: `Test ${fieldType} Field`,
-      dataType: fieldType
+      dataType: fieldType,
     };
 
     // Create the field value object based on type
     const fieldValue: any = { field: baseField };
 
     switch (fieldType) {
-      case 'TEXT':
+      case "TEXT":
         fieldValue.text = value;
         break;
-      case 'NUMBER':
+      case "NUMBER":
         fieldValue.number = value;
         break;
-      case 'DATE':
+      case "DATE":
         fieldValue.date = value;
         break;
-      case 'SINGLE_SELECT':
+      case "SINGLE_SELECT":
         fieldValue.name = value;
         break;
-      case 'ITERATION':
-        fieldValue.iterationId = typeof value === 'object' ? value.iterationId : value;
-        fieldValue.title = typeof value === 'object' ? value.title : 'Sprint 1';
+      case "ITERATION":
+        fieldValue.iterationId = typeof value === "object" ? value.iterationId : value;
+        fieldValue.title = typeof value === "object" ? value.title : "Sprint 1";
         break;
-      case 'MILESTONE':
-        fieldValue.milestoneId = typeof value === 'object' ? value.milestoneId : value;
-        fieldValue.title = typeof value === 'object' ? value.title : 'v1.0 Release';
+      case "MILESTONE":
+        fieldValue.milestoneId = typeof value === "object" ? value.milestoneId : value;
+        fieldValue.title = typeof value === "object" ? value.title : "v1.0 Release";
         break;
-      case 'ASSIGNEES':
+      case "ASSIGNEES":
         fieldValue.users = {
-          nodes: Array.isArray(value) ? value : [value]
+          nodes: Array.isArray(value) ? value : [value],
         };
         break;
-      case 'LABELS':
+      case "LABELS":
         fieldValue.labels = {
-          nodes: Array.isArray(value) ? value : [value]
+          nodes: Array.isArray(value) ? value : [value],
         };
         break;
     }
@@ -268,9 +265,9 @@ export class TestFactory {
     return {
       node: {
         item: {
-          fieldValueByName: fieldValue
-        }
-      }
+          fieldValueByName: fieldValue,
+        },
+      },
     };
   }
 
@@ -278,9 +275,9 @@ export class TestFactory {
     return {
       updateProjectV2ItemFieldValue: {
         projectV2Item: {
-          id: "PVTI_lADOLhQ7gc4AOEbHzM4AOAJ7"
-        }
-      }
+          id: "PVTI_lADOLhQ7gc4AOEbHzM4AOAJ7",
+        },
+      },
     };
   }
 }

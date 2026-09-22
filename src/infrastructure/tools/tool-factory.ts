@@ -28,7 +28,7 @@ export function requireToken(): string {
   if (!token) {
     throw new Error(
       "No GitHub token available. Provide one via --token, GITHUB_TOKEN, " +
-        "a SECRETS_DIR-mounted file, or an authenticated `gh` CLI.",
+        "a SECRETS_DIR-mounted file, or an authenticated `gh` CLI."
     );
   }
   return token;
@@ -63,6 +63,6 @@ export function createGitHubFactory(owner?: string, repo?: string): GitHubReposi
     app ? "" : requireToken(),
     owner || resolveOwner() || UNUSED_REPO_CONTEXT,
     repo || resolveRepo() || UNUSED_REPO_CONTEXT,
-    app ? { app } : {},
+    app ? { app } : {}
   );
 }

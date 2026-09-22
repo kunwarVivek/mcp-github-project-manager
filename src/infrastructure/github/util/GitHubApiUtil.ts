@@ -1,4 +1,3 @@
-
 import type { OctokitInstance } from "../types";
 
 export interface RateLimitInfo {
@@ -39,32 +38,34 @@ export class GitHubApiUtil {
       if (octokit.rest?.rateLimit) {
         const response = await octokit.rest.rateLimit.get();
         const { limit, remaining, reset, used } = response.data.rate;
-        
+
         return {
           limit,
-          remaining, 
+          remaining,
           reset,
           used,
-          resetDate: new Date(reset * 1000)
+          resetDate: new Date(reset * 1000),
         };
       } else {
         // For tests or other environments where rateLimit might not be available
         return this.getDefaultRateLimitInfo();
       }
     } catch (error) {
-      process.stderr.write(`Failed to get rate limit info: ${error instanceof Error ? error.message : String(error)}\n`);
+      process.stderr.write(
+        `Failed to get rate limit info: ${error instanceof Error ? error.message : String(error)}\n`
+      );
       // Return default values if we can't get rate limit info
       return this.getDefaultRateLimitInfo();
     }
   }
-  
+
   private getDefaultRateLimitInfo(): RateLimitInfo {
     return {
       limit: 5000,
       remaining: 5000,
       reset: Math.floor(Date.now() / 1000) + 3600,
       used: 0,
-      resetDate: new Date(Date.now() + 3600000)
+      resetDate: new Date(Date.now() + 3600000),
     };
   }
 
@@ -81,12 +82,12 @@ export class GitHubApiUtil {
    */
   public async calculateRequestDelay(octokit: OctokitInstance): Promise<number> {
     const rateLimitInfo = await this.getRateLimit(octokit);
-    
+
     // If we're approaching the limit, calculate time to wait
     if (rateLimitInfo.remaining < this.rateLimitWarningThreshold) {
       const resetTime = rateLimitInfo.resetDate.getTime();
       const now = Date.now();
-      
+
       if (resetTime > now) {
         const timeToReset = resetTime - now;
         const requestsLeft = Math.max(1, rateLimitInfo.remaining);
@@ -94,7 +95,7 @@ export class GitHubApiUtil {
         return Math.max(this.minRequestDelay, timeToReset / requestsLeft);
       }
     }
-    
+
     return this.minRequestDelay;
   }
 
@@ -105,12 +106,7 @@ export class GitHubApiUtil {
     requestFn: (options: { page: number; per_page: number }) => Promise<{ data: T[] }>,
     options: PaginationOptions = {}
   ): Promise<T[]> {
-    const {
-      perPage = 100,
-      page = 1,
-      maxItems = 1000,
-      maxPages = 10
-    } = options;
+    const { perPage = 100, page = 1, maxItems = 1000, maxPages = 10 } = options;
 
     let currentPage = page;
     let allResults: T[] = [];
@@ -119,12 +115,12 @@ export class GitHubApiUtil {
     while (hasMorePages && currentPage <= maxPages && allResults.length < maxItems) {
       // Add a small delay between requests
       if (currentPage > page) {
-        await new Promise(resolve => setTimeout(resolve, this.minRequestDelay));
+        await new Promise((resolve) => setTimeout(resolve, this.minRequestDelay));
       }
 
       const response = await requestFn({
         page: currentPage,
-        per_page: perPage
+        per_page: perPage,
       });
 
       const results = response.data;
@@ -133,7 +129,7 @@ export class GitHubApiUtil {
       // Check if we have more pages
       hasMorePages = results.length === perPage;
       currentPage++;
-      
+
       // Check if we've reached the max items
       if (allResults.length >= maxItems) {
         allResults = allResults.slice(0, maxItems);
@@ -152,17 +148,13 @@ export class GitHubApiUtil {
       pageInfo: { hasNextPage: boolean; endCursor?: string };
       nodes: T[];
     }>,
-    options: { 
-      pageSize?: number; 
-      maxItems?: number; 
-      initialCursor?: string 
+    options: {
+      pageSize?: number;
+      maxItems?: number;
+      initialCursor?: string;
     } = {}
   ): Promise<T[]> {
-    const {
-      pageSize = 100,
-      maxItems = 1000,
-      initialCursor = undefined
-    } = options;
+    const { pageSize = 100, maxItems = 1000, initialCursor = undefined } = options;
 
     let cursor = initialCursor;
     let allResults: T[] = [];
@@ -171,19 +163,19 @@ export class GitHubApiUtil {
     while (hasNextPage && allResults.length < maxItems) {
       // Add a small delay between requests
       if (allResults.length > 0) {
-        await new Promise(resolve => setTimeout(resolve, this.minRequestDelay));
+        await new Promise((resolve) => setTimeout(resolve, this.minRequestDelay));
       }
 
       const response = await queryFn({
         cursor,
-        pageSize: Math.min(pageSize, maxItems - allResults.length)
+        pageSize: Math.min(pageSize, maxItems - allResults.length),
       });
 
       allResults = [...allResults, ...response.nodes];
-      
+
       hasNextPage = response.pageInfo.hasNextPage && response.nodes.length > 0;
       cursor = response.pageInfo.endCursor;
-      
+
       // Check if we've reached the max items
       if (allResults.length >= maxItems) {
         allResults = allResults.slice(0, maxItems);

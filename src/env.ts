@@ -1,18 +1,19 @@
-import { join, resolve } from 'node:path';
-import { parseCommandLineArgs } from './cli';
-import * as dotenv from 'dotenv';
-import { createDefaultSecretResolver } from './infrastructure/secrets/SecretProvider';
-import { validateConfig, validateConfigWarnings } from './domain/config-schema';
+import { join, resolve } from "node:path";
+import { parseCommandLineArgs } from "./cli";
+import * as dotenv from "dotenv";
+import { createDefaultSecretResolver } from "./infrastructure/secrets/SecretProvider";
+import { validateConfig, validateConfigWarnings } from "./domain/config-schema";
 
 // Parse command line arguments only if not in test environment
-const cliOptions = process.env.NODE_ENV === 'test'
-  ? { verbose: false, envFile: undefined, token: undefined, owner: undefined, repo: undefined }
-  : parseCommandLineArgs();
+const cliOptions =
+  process.env.NODE_ENV === "test"
+    ? { verbose: false, envFile: undefined, token: undefined, owner: undefined, repo: undefined }
+    : parseCommandLineArgs();
 
 // Load environment variables from .env file
 const envPath = cliOptions.envFile
   ? resolve(process.cwd(), cliOptions.envFile)
-  : join(process.cwd(), '.env');
+  : join(process.cwd(), ".env");
 
 // `quiet` is mandatory, not cosmetic: dotenv v17 prints an "injected env"
 // banner to STDOUT, which corrupts the JSON-RPC stream this server speaks over
@@ -33,11 +34,21 @@ const secretResolver = createDefaultSecretResolver();
  * SECRETS_DIR file → environment variable).
  */
 const RESOLVED_CONFIG_KEYS = [
-  'GITHUB_TOKEN', 'GITHUB_OWNER', 'GITHUB_REPO',
-  'GITHUB_APP_ID', 'GITHUB_APP_PRIVATE_KEY', 'GITHUB_APP_INSTALLATION_ID',
-  'ANTHROPIC_API_KEY', 'OPENAI_API_KEY', 'GOOGLE_API_KEY', 'PERPLEXITY_API_KEY',
-  'AI_MAIN_API_KEY', 'AI_RESEARCH_API_KEY', 'AI_FALLBACK_API_KEY', 'AI_PRD_API_KEY',
-  'WEBHOOK_SECRET',
+  "GITHUB_TOKEN",
+  "GITHUB_OWNER",
+  "GITHUB_REPO",
+  "GITHUB_APP_ID",
+  "GITHUB_APP_PRIVATE_KEY",
+  "GITHUB_APP_INSTALLATION_ID",
+  "ANTHROPIC_API_KEY",
+  "OPENAI_API_KEY",
+  "GOOGLE_API_KEY",
+  "PERPLEXITY_API_KEY",
+  "AI_MAIN_API_KEY",
+  "AI_RESEARCH_API_KEY",
+  "AI_FALLBACK_API_KEY",
+  "AI_PRD_API_KEY",
+  "WEBHOOK_SECRET",
 ] as const;
 
 /**
@@ -64,7 +75,7 @@ function buildResolvedEnv(): Record<string, string | undefined> {
 }
 
 // Validate configuration at startup (skip in test environment)
-if (process.env.NODE_ENV !== 'test') {
+if (process.env.NODE_ENV !== "test") {
   const resolvedEnv = buildResolvedEnv();
   try {
     validateConfig(resolvedEnv);
@@ -102,7 +113,9 @@ export function getConfigValue(name: string, cliValue?: string): string {
   // Then check the secret chain (file-mounted secrets, then environment vars)
   const value = secretResolver.resolve(name);
   if (!value) {
-    throw new Error(`${name} is required. Provide it via command line argument (--${name.toLowerCase()}), environment variable, or a mounted secret (SECRETS_DIR).`);
+    throw new Error(
+      `${name} is required. Provide it via command line argument (--${name.toLowerCase()}), environment variable, or a mounted secret (SECRETS_DIR).`
+    );
   }
   return value;
 }
@@ -114,7 +127,11 @@ export function getConfigValue(name: string, cliValue?: string): string {
  * @param cliValue Optional CLI argument value
  * @returns The configuration value or default
  */
-export function getOptionalConfigValue(name: string, defaultValue: string, cliValue?: string): string {
+export function getOptionalConfigValue(
+  name: string,
+  defaultValue: string,
+  cliValue?: string
+): string {
   // First check CLI arguments
   if (cliValue) {
     return cliValue;
@@ -138,7 +155,7 @@ export function getBooleanConfigValue(name: string, defaultValue: boolean): bool
     return defaultValue;
   }
   const normalized = value.trim().toLowerCase();
-  return normalized === 'true' || normalized === '1';
+  return normalized === "true" || normalized === "1";
 }
 
 /**
@@ -162,16 +179,22 @@ export function getNumericConfigValue(name: string, defaultValue: number): numbe
 // values are hardcoded to safe test defaults — preserving hermetic unit-test isolation.
 // The ONE exception: when E2E_REAL_API=true is set explicitly, real env vars are honored
 // so live E2E suites that spawn the server as a subprocess can pass real credentials.
-const isTestEnv = process.env.NODE_ENV === 'test';
-const isRealE2E = process.env.E2E_REAL_API === 'true';
+const isTestEnv = process.env.NODE_ENV === "test";
+const isRealE2E = process.env.E2E_REAL_API === "true";
 export const GITHUB_TOKEN = isTestEnv
-  ? (isRealE2E ? (process.env.GITHUB_TOKEN || 'test-token') : 'test-token')
+  ? isRealE2E
+    ? process.env.GITHUB_TOKEN || "test-token"
+    : "test-token"
   : getConfigValue("GITHUB_TOKEN", cliOptions.token);
 export const GITHUB_OWNER = isTestEnv
-  ? (isRealE2E ? (process.env.GITHUB_OWNER || 'test-owner') : 'test-owner')
+  ? isRealE2E
+    ? process.env.GITHUB_OWNER || "test-owner"
+    : "test-owner"
   : getConfigValue("GITHUB_OWNER", cliOptions.owner);
 export const GITHUB_REPO = isTestEnv
-  ? (isRealE2E ? (process.env.GITHUB_REPO || 'test-repo') : 'test-repo')
+  ? isRealE2E
+    ? process.env.GITHUB_REPO || "test-repo"
+    : "test-repo"
   : getConfigValue("GITHUB_REPO", cliOptions.repo);
 
 // GitHub App installation auth (optional). When all three are present the
@@ -204,7 +227,10 @@ export const SYNC_ENABLED = getBooleanConfigValue("SYNC_ENABLED", true);
 export const SYNC_TIMEOUT_MS = getNumericConfigValue("SYNC_TIMEOUT_MS", 30000);
 export const SYNC_INTERVAL_MS = getNumericConfigValue("SYNC_INTERVAL_MS", 0); // 0 = disabled
 export const CACHE_DIRECTORY = getOptionalConfigValue("CACHE_DIRECTORY", ".mcp-cache");
-export const SYNC_RESOURCES = getOptionalConfigValue("SYNC_RESOURCES", "PROJECT,MILESTONE,ISSUE,SPRINT").split(',');
+export const SYNC_RESOURCES = getOptionalConfigValue(
+  "SYNC_RESOURCES",
+  "PROJECT,MILESTONE,ISSUE,SPRINT"
+).split(",");
 
 // Agent orchestration — auto-reclaim scheduler
 // The scheduler is a server-side background sweep that detects agents whose
@@ -252,22 +278,25 @@ export const AI_PRD_MODEL = getOptionalConfigValue("AI_PRD_MODEL", "");
 // Provider types: anthropic, openai, google, perplexity, openai-compatible
 // "openai-compatible" works with any OpenAI-protocol endpoint:
 // OpenRouter, Together, Groq, Ollama, LM Studio, Azure OpenAI, etc.
-export const AI_MAIN_PROVIDER = getOptionalConfigValue('AI_MAIN_PROVIDER', '');
-export const AI_MAIN_API_KEY = getOptionalConfigValue('AI_MAIN_API_KEY', '');
-export const AI_MAIN_BASE_URL = getOptionalConfigValue('AI_MAIN_BASE_URL', '');
-export const AI_RESEARCH_PROVIDER = getOptionalConfigValue('AI_RESEARCH_PROVIDER', '');
-export const AI_RESEARCH_API_KEY = getOptionalConfigValue('AI_RESEARCH_API_KEY', '');
-export const AI_RESEARCH_BASE_URL = getOptionalConfigValue('AI_RESEARCH_BASE_URL', '');
-export const AI_FALLBACK_PROVIDER = getOptionalConfigValue('AI_FALLBACK_PROVIDER', '');
-export const AI_FALLBACK_API_KEY = getOptionalConfigValue('AI_FALLBACK_API_KEY', '');
-export const AI_FALLBACK_BASE_URL = getOptionalConfigValue('AI_FALLBACK_BASE_URL', '');
-export const AI_PRD_PROVIDER = getOptionalConfigValue('AI_PRD_PROVIDER', '');
-export const AI_PRD_API_KEY = getOptionalConfigValue('AI_PRD_API_KEY', '');
-export const AI_PRD_BASE_URL = getOptionalConfigValue('AI_PRD_BASE_URL', '');
+export const AI_MAIN_PROVIDER = getOptionalConfigValue("AI_MAIN_PROVIDER", "");
+export const AI_MAIN_API_KEY = getOptionalConfigValue("AI_MAIN_API_KEY", "");
+export const AI_MAIN_BASE_URL = getOptionalConfigValue("AI_MAIN_BASE_URL", "");
+export const AI_RESEARCH_PROVIDER = getOptionalConfigValue("AI_RESEARCH_PROVIDER", "");
+export const AI_RESEARCH_API_KEY = getOptionalConfigValue("AI_RESEARCH_API_KEY", "");
+export const AI_RESEARCH_BASE_URL = getOptionalConfigValue("AI_RESEARCH_BASE_URL", "");
+export const AI_FALLBACK_PROVIDER = getOptionalConfigValue("AI_FALLBACK_PROVIDER", "");
+export const AI_FALLBACK_API_KEY = getOptionalConfigValue("AI_FALLBACK_API_KEY", "");
+export const AI_FALLBACK_BASE_URL = getOptionalConfigValue("AI_FALLBACK_BASE_URL", "");
+export const AI_PRD_PROVIDER = getOptionalConfigValue("AI_PRD_PROVIDER", "");
+export const AI_PRD_API_KEY = getOptionalConfigValue("AI_PRD_API_KEY", "");
+export const AI_PRD_BASE_URL = getOptionalConfigValue("AI_PRD_BASE_URL", "");
 
 // AI Task Generation configuration
 export const MAX_TASKS_PER_PRD = getNumericConfigValue("MAX_TASKS_PER_PRD", 50);
-export const DEFAULT_COMPLEXITY_THRESHOLD = getNumericConfigValue("DEFAULT_COMPLEXITY_THRESHOLD", 7);
+export const DEFAULT_COMPLEXITY_THRESHOLD = getNumericConfigValue(
+  "DEFAULT_COMPLEXITY_THRESHOLD",
+  7
+);
 export const MAX_SUBTASK_DEPTH = getNumericConfigValue("MAX_SUBTASK_DEPTH", 3);
 export const AUTO_DEPENDENCY_DETECTION = getBooleanConfigValue("AUTO_DEPENDENCY_DETECTION", true);
 export const AUTO_EFFORT_ESTIMATION = getBooleanConfigValue("AUTO_EFFORT_ESTIMATION", true);
@@ -280,7 +309,10 @@ export const AUTO_CREATE_LIFECYCLE = getBooleanConfigValue("AUTO_CREATE_LIFECYCL
 export const ENHANCED_CONTEXT_LEVEL = getOptionalConfigValue("ENHANCED_CONTEXT_LEVEL", "standard"); // minimal, standard, full
 export const INCLUDE_BUSINESS_CONTEXT = getBooleanConfigValue("INCLUDE_BUSINESS_CONTEXT", false); // Default: traceability only
 export const INCLUDE_TECHNICAL_CONTEXT = getBooleanConfigValue("INCLUDE_TECHNICAL_CONTEXT", false); // Default: traceability only
-export const INCLUDE_IMPLEMENTATION_GUIDANCE = getBooleanConfigValue("INCLUDE_IMPLEMENTATION_GUIDANCE", false); // Default: traceability only
+export const INCLUDE_IMPLEMENTATION_GUIDANCE = getBooleanConfigValue(
+  "INCLUDE_IMPLEMENTATION_GUIDANCE",
+  false
+); // Default: traceability only
 
 // GitHub AI Integration
 export const AUTO_CREATE_PROJECT_FIELDS = getBooleanConfigValue("AUTO_CREATE_PROJECT_FIELDS", true);
@@ -289,11 +321,11 @@ export const AI_BATCH_SIZE = getNumericConfigValue("AI_BATCH_SIZE", 10);
 // Export CLI options for use in other modules
 
 // Logging configuration
-export const LOG_FORMAT = getOptionalConfigValue('LOG_FORMAT', 'text'); // 'text' | 'json'
-export const LOG_LEVEL = getOptionalConfigValue('LOG_LEVEL', 'info'); // debug, info, warn, error
+export const LOG_FORMAT = getOptionalConfigValue("LOG_FORMAT", "text"); // 'text' | 'json'
+export const LOG_LEVEL = getOptionalConfigValue("LOG_LEVEL", "info"); // debug, info, warn, error
 export const CLI_OPTIONS = cliOptions;
 
 // MCP tool exposure configuration
 // Controls which compound tool groups are exposed to MCP clients.
 // Values: 'all' (default) or comma-separated list of: core, ai, agents, events, system
-export const MCP_TOOL_GROUPS = getOptionalConfigValue('MCP_TOOL_GROUPS', 'all');
+export const MCP_TOOL_GROUPS = getOptionalConfigValue("MCP_TOOL_GROUPS", "all");

@@ -11,9 +11,9 @@
  * - Atomic write pattern for data safety
  */
 
-import * as fs from 'node:fs/promises';
-import * as path from 'node:path';
-import { existsSync } from 'node:fs';
+import * as fs from "node:fs/promises";
+import * as path from "node:path";
+import { existsSync } from "node:fs";
 
 /**
  * A single cache entry for persistence
@@ -51,9 +51,9 @@ export class CachePersistence {
    *
    * @param cacheDirectory - Directory to store the cache snapshot (default: '.cache')
    */
-  constructor(cacheDirectory: string = '.cache') {
+  constructor(cacheDirectory: string = ".cache") {
     this.cacheDirectory = cacheDirectory;
-    this.filePath = path.join(cacheDirectory, 'cache-snapshot.json');
+    this.filePath = path.join(cacheDirectory, "cache-snapshot.json");
   }
 
   /**
@@ -83,7 +83,7 @@ export class CachePersistence {
 
       // Atomic write: write to temp file, then rename
       const tempPath = `${this.filePath}.tmp`;
-      await fs.writeFile(tempPath, JSON.stringify(snapshot, null, 2), 'utf-8');
+      await fs.writeFile(tempPath, JSON.stringify(snapshot, null, 2), "utf-8");
       await fs.rename(tempPath, this.filePath);
 
       this.lastPersistTime = snapshot.timestamp;
@@ -93,9 +93,7 @@ export class CachePersistence {
       );
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      process.stderr.write(
-        `[CachePersistence] Failed to save cache: ${message}\n`
-      );
+      process.stderr.write(`[CachePersistence] Failed to save cache: ${message}\n`);
       throw error;
     }
   }
@@ -113,20 +111,16 @@ export class CachePersistence {
 
     try {
       if (!existsSync(this.filePath)) {
-        process.stderr.write(
-          `[CachePersistence] No snapshot file found at ${this.filePath}\n`
-        );
+        process.stderr.write(`[CachePersistence] No snapshot file found at ${this.filePath}\n`);
         return result;
       }
 
-      const data = await fs.readFile(this.filePath, 'utf-8');
+      const data = await fs.readFile(this.filePath, "utf-8");
       const snapshot = JSON.parse(data) as CacheSnapshot;
 
       // Validate snapshot version
       if (snapshot.version !== 1) {
-        process.stderr.write(
-          `[CachePersistence] Unknown snapshot version: ${snapshot.version}\n`
-        );
+        process.stderr.write(`[CachePersistence] Unknown snapshot version: ${snapshot.version}\n`);
         return result;
       }
 
@@ -155,11 +149,9 @@ export class CachePersistence {
         `[CachePersistence] Restored ${restored} entries (${expired} expired) from ${this.filePath}\n`
       );
     } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
         const message = error instanceof Error ? error.message : String(error);
-        process.stderr.write(
-          `[CachePersistence] Failed to restore cache: ${message}\n`
-        );
+        process.stderr.write(`[CachePersistence] Failed to restore cache: ${message}\n`);
       }
     }
 

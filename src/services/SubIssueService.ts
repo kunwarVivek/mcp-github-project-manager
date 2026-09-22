@@ -3,10 +3,8 @@ import type { GitHubIssueRepository } from "../infrastructure/github/repositorie
 import type { GitHubMilestoneRepository } from "../infrastructure/github/repositories/GitHubMilestoneRepository";
 import { ResourceStatus, ResourceType } from "../domain/resource-types";
 import type { Issue } from "../domain/types";
-import {
-  ResourceNotFoundError,
-} from "../domain/errors";
-import { safeCall } from './utils/safeCall';
+import { ResourceNotFoundError } from "../domain/errors";
+import { safeCall } from "./utils/safeCall";
 
 /**
  * Represents a dependency relationship between issues.
@@ -122,9 +120,9 @@ export class SubIssueService {
 
       // Extract dependency IDs from labels
       const dependencies: string[] = [];
-      issue.labels.forEach(label => {
-        if (label.startsWith('depends-on:')) {
-          dependencies.push(label.replace('depends-on:', ''));
+      issue.labels.forEach((label) => {
+        if (label.startsWith("depends-on:")) {
+          dependencies.push(label.replace("depends-on:", ""));
         }
       });
 
@@ -180,23 +178,23 @@ export class SubIssueService {
       return [
         {
           id: `history-${issueId}-${Date.now()}`,
-          action: 'created',
+          action: "created",
           timestamp: issue.createdAt,
-          actor: 'system',
+          actor: "system",
           changes: {
             status: { from: null, to: issue.status },
-            title: issue.title
-          }
+            title: issue.title,
+          },
         },
         {
           id: `history-${issueId}-${Date.now() + 1}`,
-          action: 'updated',
+          action: "updated",
           timestamp: issue.updatedAt,
-          actor: 'system',
+          actor: "system",
           changes: {
-            status: { from: ResourceStatus.ACTIVE, to: issue.status }
-          }
-        }
+            status: { from: ResourceStatus.ACTIVE, to: issue.status },
+          },
+        },
       ];
     });
   }

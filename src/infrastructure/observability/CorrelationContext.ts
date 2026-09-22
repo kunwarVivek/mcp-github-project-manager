@@ -15,8 +15,8 @@
  * ```
  */
 
-import { AsyncLocalStorage } from 'node:async_hooks';
-import { v4 as uuidv4 } from 'uuid';
+import { AsyncLocalStorage } from "node:async_hooks";
+import { v4 as uuidv4 } from "uuid";
 
 /**
  * Context stored for each trace
@@ -72,10 +72,7 @@ export const traceContext = new AsyncLocalStorage<TraceContext>();
  * @returns The result of the operation
  * @throws Re-throws any error from the operation after logging
  */
-export async function startTrace<T>(
-  operation: string,
-  fn: () => Promise<T>
-): Promise<T> {
+export async function startTrace<T>(operation: string, fn: () => Promise<T>): Promise<T> {
   const context: TraceContext = {
     correlationId: uuidv4(),
     startTime: Date.now(),
@@ -83,15 +80,15 @@ export async function startTrace<T>(
   };
 
   // Log trace start
-  logTraceEvent('start', context);
+  logTraceEvent("start", context);
 
   return traceContext.run(context, async () => {
     try {
       const result = await fn();
-      logTraceEvent('success', context);
+      logTraceEvent("success", context);
       return result;
     } catch (error) {
-      logTraceEvent('error', context, error);
+      logTraceEvent("error", context, error);
       throw error;
     }
   });
@@ -119,16 +116,16 @@ export function getTraceContext(): TraceContext | undefined {
  * Log a trace event to stderr in JSON format.
  */
 function logTraceEvent(
-  status: 'start' | 'success' | 'error',
+  status: "start" | "success" | "error",
   context: TraceContext,
   error?: unknown
 ): void {
-  const duration = status === 'start' ? undefined : Date.now() - context.startTime;
+  const duration = status === "start" ? undefined : Date.now() - context.startTime;
 
   const logEntry: Record<string, unknown> = {
     timestamp: new Date().toISOString(),
-    level: status === 'error' ? 'error' : 'info',
-    type: 'trace',
+    level: status === "error" ? "error" : "info",
+    type: "trace",
     correlationId: context.correlationId,
     operation: context.operation,
     status,

@@ -173,39 +173,36 @@ export interface GitHubMilestone {
 
 // Type Guards
 function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null;
+  return typeof value === "object" && value !== null;
 }
 
 function hasErrorsArray(obj: unknown): obj is { errors: unknown[] } {
-  return isRecord(obj) &&
-    'errors' in obj &&
-    Array.isArray(obj.errors);
+  return isRecord(obj) && "errors" in obj && Array.isArray(obj.errors);
 }
 
 function isErrorWithMessage(e: unknown): e is { message: string } {
-  return isRecord(e) && 'message' in e && typeof e.message === 'string';
+  return isRecord(e) && "message" in e && typeof e.message === "string";
 }
 
 export function isGitHubError(error: unknown): error is GitHubError {
-  return error instanceof Error &&
-    ('status' in error || 'response' in error);
+  return error instanceof Error && ("status" in error || "response" in error);
 }
 
 export function isRequestError(error: unknown): error is RequestError {
-  return isGitHubError(error) &&
-    'status' in error &&
-    'headers' in error &&
-    error.name === 'HttpError';
+  return (
+    isGitHubError(error) && "status" in error && "headers" in error && error.name === "HttpError"
+  );
 }
 
 export function isRateLimitError(error: unknown): error is RateLimitError {
-  return isGitHubError(error) &&
+  return (
+    isGitHubError(error) &&
     error.status === 403 &&
-    'headers' in error &&
-    'x-ratelimit-remaining' in (error.headers || {});
+    "headers" in error &&
+    "x-ratelimit-remaining" in (error.headers || {})
+  );
 }
 
 export function isGraphQLErrorResponse(error: unknown): error is GraphQLErrorResponse {
-  return hasErrorsArray(error) &&
-    error.errors.every(isErrorWithMessage);
+  return hasErrorsArray(error) && error.errors.every(isErrorWithMessage);
 }

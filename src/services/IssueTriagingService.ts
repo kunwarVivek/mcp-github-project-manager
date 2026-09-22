@@ -1,6 +1,6 @@
-import { generateObject } from 'ai';
-import { z } from 'zod';
-import { InputSanitizer } from './utils/InputSanitizer';
+import { generateObject } from "ai";
+import { z } from "zod";
+import { InputSanitizer } from "./utils/InputSanitizer";
 import type { AIServiceFactory } from "./ai/AIServiceFactory";
 import type { ProjectManagementService } from "./ProjectManagementService";
 import type { IssueEnrichmentService } from "./IssueEnrichmentService";
@@ -52,9 +52,9 @@ export class IssueTriagingService {
         ? InputSanitizer.sanitizeIssueContent(params.issueDescription)
         : undefined;
 
-      const model = this.aiFactory.getModel('main') || this.aiFactory.getBestAvailableModel();
+      const model = this.aiFactory.getModel("main") || this.aiFactory.getBestAvailableModel();
       if (!model) {
-        throw new Error('AI service is not available');
+        throw new Error("AI service is not available");
       }
 
       const TriageSchema = z.object({
@@ -64,20 +64,22 @@ export class IssueTriagingService {
           severity: z.string().optional(),
           actionable: z.boolean(),
         }),
-        actions: z.array(z.object({
-          type: z.string(),
-          description: z.string(),
-          value: z.string(),
-        })),
+        actions: z.array(
+          z.object({
+            type: z.string(),
+            description: z.string(),
+            value: z.string(),
+          })
+        ),
         reasoning: z.string(),
       });
 
       const result = await generateObject({
         model,
-        prompt: `Triage this issue.\n\nIssue Title: ${issueTitle}${issueDescription ? `\nDescription: ${issueDescription}` : ''}${params.issueLabels?.length ? `\nExisting Labels: ${params.issueLabels.join(', ')}` : ''}${params.projectContext ? `\nProject Context: ${params.projectContext}` : ''}`,
+        prompt: `Triage this issue.\n\nIssue Title: ${issueTitle}${issueDescription ? `\nDescription: ${issueDescription}` : ""}${params.issueLabels?.length ? `\nExisting Labels: ${params.issueLabels.join(", ")}` : ""}${params.projectContext ? `\nProject Context: ${params.projectContext}` : ""}`,
         schema: TriageSchema,
         temperature: 0.5,
-        maxOutputTokens: 1000
+        maxOutputTokens: 1000,
       });
 
       const triage = result.object;
@@ -87,7 +89,7 @@ export class IssueTriagingService {
         issueTitle,
         classification: triage.classification,
         actions: triage.actions.map((a) => ({ ...a, applied: false })),
-        reasoning: triage.reasoning
+        reasoning: triage.reasoning,
       };
     } catch (error) {
       this.logger.error(`Failed to triage issue`, error);
@@ -103,12 +105,12 @@ export class IssueTriagingService {
   }): Promise<{ triaged: number; results: TriageResult[] }> {
     const results: TriageResult[] = [];
     const issues = await this.projectService.listIssues({
-      status: 'open',
+      status: "open",
       limit: params.onlyUntriaged ? 100 : 50,
     });
 
     const candidates = params.onlyUntriaged
-      ? issues.filter((issue) => !issue.labels.includes('triaged'))
+      ? issues.filter((issue) => !issue.labels.includes("triaged"))
       : issues;
 
     for (const issue of candidates) {
@@ -127,42 +129,50 @@ export class IssueTriagingService {
         if (params.autoApply && triageResult.actions.length > 0) {
           for (const action of triageResult.actions) {
             try {
-              if (action.type === 'label') {
+              if (action.type === "label") {
                 const updatedLabels = [...new Set([...issue.labels, action.value])];
                 await this.projectService.updateIssue(issue.id, { labels: updatedLabels });
                 action.applied = true;
-              } else if (action.type === 'assignee') {
+              } else if (action.type === "assignee") {
                 const updatedAssignees = [...new Set([...issue.assignees, action.value])];
                 await this.projectService.updateIssue(issue.id, { assignees: updatedAssignees });
                 action.applied = true;
-              } else if (action.type === 'status') {
+              } else if (action.type === "status") {
                 await this.projectService.updateIssue(issue.id, { status: action.value });
                 action.applied = true;
               }
             } catch (applyError) {
-              this.logger.error(`Failed to apply action '${action.type}' for issue ${issue.id}`, applyError);
+              this.logger.error(
+                `Failed to apply action '${action.type}' for issue ${issue.id}`,
+                applyError
+              );
             }
           }
         }
 
         // Mark as triaged so re-runs skip this issue
-        const labelsWithTriaged = [...new Set([...issue.labels, 'triaged'])];
-        await this.projectService.updateIssue(issue.id, { labels: labelsWithTriaged }).catch((err) => {
-          this.logger.warn(`Could not add 'triaged' label to issue #${issue.number}`, err);
-        });
+        const labelsWithTriaged = [...new Set([...issue.labels, "triaged"])];
+        await this.projectService
+          .updateIssue(issue.id, { labels: labelsWithTriaged })
+          .catch((err) => {
+            this.logger.warn(`Could not add 'triaged' label to issue #${issue.number}`, err);
+          });
 
         // Post audit comment only when actions were applied
         if (params.autoApply) {
-          const appliedActions = triageResult.actions.filter(a => a.applied);
-          const actionSummary = appliedActions.length > 0
-            ? `\n\n**Actions applied:**\n${appliedActions.map(a => `- ${a.type}: ${a.value}`).join('\n')}`
-            : '';
-          await this.projectService.createIssueComment({
-            issueNumber: issue.number,
-            body: `<!-- auto-triage -->\n## Auto-Triage Result\n\n**Classification:** ${triageResult.classification.category} (${triageResult.classification.priority})\n**Reasoning:** ${triageResult.reasoning}${actionSummary}`,
-          }).catch((err) => {
-            this.logger.warn(`Could not post triage comment on issue #${issue.number}`, err);
-          });
+          const appliedActions = triageResult.actions.filter((a) => a.applied);
+          const actionSummary =
+            appliedActions.length > 0
+              ? `\n\n**Actions applied:**\n${appliedActions.map((a) => `- ${a.type}: ${a.value}`).join("\n")}`
+              : "";
+          await this.projectService
+            .createIssueComment({
+              issueNumber: issue.number,
+              body: `<!-- auto-triage -->\n## Auto-Triage Result\n\n**Classification:** ${triageResult.classification.category} (${triageResult.classification.priority})\n**Reasoning:** ${triageResult.reasoning}${actionSummary}`,
+            })
+            .catch((err) => {
+              this.logger.warn(`Could not post triage comment on issue #${issue.number}`, err);
+            });
         }
 
         results.push(triageResult);
@@ -176,7 +186,7 @@ export class IssueTriagingService {
 
   async scheduleTriaging(params: {
     projectId: string;
-    schedule: 'hourly' | 'daily' | 'weekly';
+    schedule: "hourly" | "daily" | "weekly";
     autoApply: boolean;
   }): Promise<{ ruleId: string }> {
     const rule = await this.projectService.createAutomationRule({
@@ -184,11 +194,15 @@ export class IssueTriagingService {
       description: `Auto-triage issues ${params.schedule}`,
       projectId: params.projectId,
       enabled: true,
-      triggers: [{ type: 'schedule' }],
-      actions: [{ type: 'custom_script', parameters: { script: 'triage' } }]
+      triggers: [{ type: "schedule" }],
+      actions: [{ type: "custom_script", parameters: { script: "triage" } }],
     });
 
-    this.logger.info(`Scheduled ${params.schedule} triage for project ${params.projectId}`, { ruleId: rule.id, schedule: params.schedule, autoApply: params.autoApply });
+    this.logger.info(`Scheduled ${params.schedule} triage for project ${params.projectId}`, {
+      ruleId: rule.id,
+      schedule: params.schedule,
+      autoApply: params.autoApply,
+    });
 
     return { ruleId: rule.id };
   }

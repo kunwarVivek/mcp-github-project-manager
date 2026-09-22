@@ -7,14 +7,11 @@
  * Implements requirement AI-11: Sprint risk assessment.
  */
 
-import { generateObject } from 'ai';
-import { z } from 'zod';
-import { AIServiceFactory } from './AIServiceFactory';
-import { InputSanitizer } from '../utils/InputSanitizer';
-import {
-  calculateWeightedScore,
-  getConfidenceTier
-} from './ConfidenceScorer';
+import { generateObject } from "ai";
+import { z } from "zod";
+import { AIServiceFactory } from "./AIServiceFactory";
+import { InputSanitizer } from "../utils/InputSanitizer";
+import { calculateWeightedScore, getConfidenceTier } from "./ConfidenceScorer";
 import {
   type SprintRiskAssessment,
   type SprintRisk,
@@ -26,14 +23,11 @@ import {
   type MitigationStrategy,
   type MitigationEffort,
   SPRINT_RISK_CATEGORIES,
-  RISK_PROBABILITIES
-} from '../../domain/sprint-planning-types';
-import type { DetectedDependency } from '../../analysis/DependencyGraph';
-import type { SectionConfidence, ConfidenceFactors } from '../../domain/ai-types';
-import {
-  SPRINT_RISK_SYSTEM_PROMPT,
-  formatRiskPrompt
-} from './prompts/SprintPlanningPrompts';
+  RISK_PROBABILITIES,
+} from "../../domain/sprint-planning-types";
+import type { DetectedDependency } from "../../analysis/DependencyGraph";
+import type { SectionConfidence, ConfidenceFactors } from "../../domain/ai-types";
+import { SPRINT_RISK_SYSTEM_PROMPT, formatRiskPrompt } from "./prompts/SprintPlanningPrompts";
 
 // ============================================================================
 // Zod Schemas for AI Response Validation
@@ -45,23 +39,27 @@ import {
 const SprintRiskAssessmentSchema = z.object({
   overallRisk: z.enum(RISK_PROBABILITIES),
   riskScore: z.number().min(0).max(100),
-  risks: z.array(z.object({
-    id: z.string(),
-    category: z.enum(SPRINT_RISK_CATEGORIES),
-    title: z.string(),
-    description: z.string(),
-    probability: z.enum(RISK_PROBABILITIES),
-    impact: z.enum(RISK_PROBABILITIES),
-    relatedItems: z.array(z.string())
-  })),
-  mitigations: z.array(z.object({
-    riskId: z.string(),
-    strategy: z.enum(['avoid', 'mitigate', 'transfer', 'accept']),
-    action: z.string(),
-    effort: z.enum(['low', 'medium', 'high']),
-    effectiveness: z.number().min(0).max(1)
-  })),
-  reasoning: z.string()
+  risks: z.array(
+    z.object({
+      id: z.string(),
+      category: z.enum(SPRINT_RISK_CATEGORIES),
+      title: z.string(),
+      description: z.string(),
+      probability: z.enum(RISK_PROBABILITIES),
+      impact: z.enum(RISK_PROBABILITIES),
+      relatedItems: z.array(z.string()),
+    })
+  ),
+  mitigations: z.array(
+    z.object({
+      riskId: z.string(),
+      strategy: z.enum(["avoid", "mitigate", "transfer", "accept"]),
+      action: z.string(),
+      effort: z.enum(["low", "medium", "high"]),
+      effectiveness: z.number().min(0).max(1),
+    })
+  ),
+  reasoning: z.string(),
 });
 
 // ============================================================================
@@ -103,7 +101,7 @@ export class SprintRiskAssessor {
    * @returns Risk assessment with mitigations
    */
   async assessRisks(params: RiskAssessmentParams): Promise<SprintRiskAssessment> {
-    const model = this.aiFactory.getModel('main') || this.aiFactory.getBestAvailableModel();
+    const model = this.aiFactory.getModel("main") || this.aiFactory.getBestAvailableModel();
 
     if (!model) {
       return this.getFallbackAssessment(params);
@@ -115,7 +113,7 @@ export class SprintRiskAssessor {
         system: SPRINT_RISK_SYSTEM_PROMPT,
         prompt: this.formatRiskPromptFromParams(params),
         schema: SprintRiskAssessmentSchema,
-        temperature: 0.3
+        temperature: 0.3,
       });
 
       // Add confidence scoring
@@ -124,26 +122,26 @@ export class SprintRiskAssessor {
       return {
         overallRisk: result.object.overallRisk,
         riskScore: result.object.riskScore,
-        risks: result.object.risks.map(r => ({
+        risks: result.object.risks.map((r) => ({
           id: r.id,
           category: r.category,
           title: r.title,
           description: r.description,
           probability: r.probability,
           impact: r.impact,
-          relatedItems: r.relatedItems
+          relatedItems: r.relatedItems,
         })),
-        mitigations: result.object.mitigations.map(m => ({
+        mitigations: result.object.mitigations.map((m) => ({
           riskId: m.riskId,
           strategy: m.strategy as MitigationStrategy,
           action: m.action,
           effort: m.effort as MitigationEffort,
-          effectiveness: m.effectiveness
+          effectiveness: m.effectiveness,
         })),
-        confidence
+        confidence,
       };
     } catch (error) {
-      console.error('AI risk assessment failed:', error);
+      console.error("AI risk assessment failed:", error);
       return this.getFallbackAssessment(params);
     }
   }
@@ -152,25 +150,22 @@ export class SprintRiskAssessor {
    * Format risk prompt from assessment parameters.
    */
   private formatRiskPromptFromParams(params: RiskAssessmentParams): string {
-    const totalPoints = params.sprintItems.reduce(
-      (sum, item) => sum + (item.points || 3),
-      0
-    );
+    const totalPoints = params.sprintItems.reduce((sum, item) => sum + (item.points || 3), 0);
 
     const itemsWithDeps = params.sprintItems.filter(
-      i => i.dependencies && i.dependencies.length > 0
+      (i) => i.dependencies && i.dependencies.length > 0
     ).length;
 
     return formatRiskPrompt({
-      sprintItems: params.sprintItems.map(item => ({
+      sprintItems: params.sprintItems.map((item) => ({
         id: item.id,
         title: InputSanitizer.sanitizeText(item.title),
         points: item.points,
-        dependencies: item.dependencies
+        dependencies: item.dependencies,
       })),
       totalPoints,
       recommendedCapacity: params.sprintCapacity.recommendedLoad,
-      dependencyCount: itemsWithDeps
+      dependencyCount: itemsWithDeps,
     });
   }
 
@@ -182,10 +177,7 @@ export class SprintRiskAssessor {
     const mitigations: MitigationSuggestion[] = [];
     let riskIdCounter = 1;
 
-    const totalPoints = params.sprintItems.reduce(
-      (sum, item) => sum + (item.points || 3),
-      0
-    );
+    const totalPoints = params.sprintItems.reduce((sum, item) => sum + (item.points || 3), 0);
     const utilizationRatio = totalPoints / params.sprintCapacity.recommendedLoad;
 
     // 1. Check for capacity overcommitment
@@ -193,21 +185,22 @@ export class SprintRiskAssessor {
       const riskId = `risk-${riskIdCounter++}`;
       risks.push({
         id: riskId,
-        category: 'capacity',
-        title: 'Sprint overcommitment',
-        description: `Sprint scope (${totalPoints} points) exceeds recommended capacity ` +
-                    `(${params.sprintCapacity.recommendedLoad} points) by ` +
-                    `${Math.round((utilizationRatio - 1) * 100)}%`,
-        probability: utilizationRatio > 1.3 ? 'high' : 'medium',
-        impact: 'high',
-        relatedItems: params.sprintItems.map(i => i.id)
+        category: "capacity",
+        title: "Sprint overcommitment",
+        description:
+          `Sprint scope (${totalPoints} points) exceeds recommended capacity ` +
+          `(${params.sprintCapacity.recommendedLoad} points) by ` +
+          `${Math.round((utilizationRatio - 1) * 100)}%`,
+        probability: utilizationRatio > 1.3 ? "high" : "medium",
+        impact: "high",
+        relatedItems: params.sprintItems.map((i) => i.id),
       });
       mitigations.push({
         riskId,
-        strategy: 'mitigate',
-        action: 'Reduce sprint scope or defer lower-priority items',
-        effort: 'low',
-        effectiveness: 0.8
+        strategy: "mitigate",
+        action: "Reduce sprint scope or defer lower-priority items",
+        effort: "low",
+        effectiveness: 0.8,
       });
     }
 
@@ -216,93 +209,100 @@ export class SprintRiskAssessor {
       const riskId = `risk-${riskIdCounter++}`;
       risks.push({
         id: riskId,
-        category: 'capacity',
-        title: 'Minimal capacity buffer',
-        description: `Sprint is at ${Math.round(utilizationRatio * 100)}% capacity, ` +
-                    `leaving little room for unexpected work`,
-        probability: 'medium',
-        impact: 'medium',
-        relatedItems: []
+        category: "capacity",
+        title: "Minimal capacity buffer",
+        description:
+          `Sprint is at ${Math.round(utilizationRatio * 100)}% capacity, ` +
+          `leaving little room for unexpected work`,
+        probability: "medium",
+        impact: "medium",
+        relatedItems: [],
       });
       mitigations.push({
         riskId,
-        strategy: 'accept',
-        action: 'Monitor sprint progress closely and be prepared to descope',
-        effort: 'low',
-        effectiveness: 0.5
+        strategy: "accept",
+        action: "Monitor sprint progress closely and be prepared to descope",
+        effort: "low",
+        effectiveness: 0.5,
       });
     }
 
     // 3. Check for complex items (high point items)
-    const complexItems = params.sprintItems.filter(i => (i.points || 3) >= 8);
+    const complexItems = params.sprintItems.filter((i) => (i.points || 3) >= 8);
     if (complexItems.length > 0) {
       const riskId = `risk-${riskIdCounter++}`;
       risks.push({
         id: riskId,
-        category: 'technical',
-        title: 'High-complexity items present',
-        description: `Sprint includes ${complexItems.length} high-complexity item(s) ` +
-                    `(8+ points) which may have estimation uncertainty`,
-        probability: 'medium',
-        impact: 'medium',
-        relatedItems: complexItems.map(i => i.id)
+        category: "technical",
+        title: "High-complexity items present",
+        description:
+          `Sprint includes ${complexItems.length} high-complexity item(s) ` +
+          `(8+ points) which may have estimation uncertainty`,
+        probability: "medium",
+        impact: "medium",
+        relatedItems: complexItems.map((i) => i.id),
       });
       mitigations.push({
         riskId,
-        strategy: 'mitigate',
-        action: 'Consider breaking down complex items or timeboxing investigation',
-        effort: 'medium',
-        effectiveness: 0.7
+        strategy: "mitigate",
+        action: "Consider breaking down complex items or timeboxing investigation",
+        effort: "medium",
+        effectiveness: 0.7,
       });
     }
 
     // 4. Check for dependency risks
     const itemsWithDeps = params.sprintItems.filter(
-      i => i.dependencies && i.dependencies.length > 0
+      (i) => i.dependencies && i.dependencies.length > 0
     );
     if (itemsWithDeps.length >= params.sprintItems.length * 0.5 && params.sprintItems.length > 2) {
       const riskId = `risk-${riskIdCounter++}`;
       risks.push({
         id: riskId,
-        category: 'dependency',
-        title: 'High dependency concentration',
-        description: `${itemsWithDeps.length} of ${params.sprintItems.length} items have ` +
-                    `dependencies, creating potential blocking chains`,
-        probability: 'medium',
-        impact: 'medium',
-        relatedItems: itemsWithDeps.map(i => i.id)
+        category: "dependency",
+        title: "High dependency concentration",
+        description:
+          `${itemsWithDeps.length} of ${params.sprintItems.length} items have ` +
+          `dependencies, creating potential blocking chains`,
+        probability: "medium",
+        impact: "medium",
+        relatedItems: itemsWithDeps.map((i) => i.id),
       });
       mitigations.push({
         riskId,
-        strategy: 'mitigate',
-        action: 'Prioritize dependency-free items early in sprint and monitor blockers',
-        effort: 'low',
-        effectiveness: 0.6
+        strategy: "mitigate",
+        action: "Prioritize dependency-free items early in sprint and monitor blockers",
+        effort: "low",
+        effectiveness: 0.6,
       });
     }
 
     // 5. Check for missing descriptions (unclear scope)
     const itemsWithoutDesc = params.sprintItems.filter(
-      i => !i.description || i.description.length < 20
+      (i) => !i.description || i.description.length < 20
     );
-    if (itemsWithoutDesc.length >= params.sprintItems.length * 0.3 && params.sprintItems.length > 2) {
+    if (
+      itemsWithoutDesc.length >= params.sprintItems.length * 0.3 &&
+      params.sprintItems.length > 2
+    ) {
       const riskId = `risk-${riskIdCounter++}`;
       risks.push({
         id: riskId,
-        category: 'scope',
-        title: 'Unclear item definitions',
-        description: `${itemsWithoutDesc.length} items lack detailed descriptions, ` +
-                    `increasing scope uncertainty`,
-        probability: 'medium',
-        impact: 'medium',
-        relatedItems: itemsWithoutDesc.map(i => i.id)
+        category: "scope",
+        title: "Unclear item definitions",
+        description:
+          `${itemsWithoutDesc.length} items lack detailed descriptions, ` +
+          `increasing scope uncertainty`,
+        probability: "medium",
+        impact: "medium",
+        relatedItems: itemsWithoutDesc.map((i) => i.id),
       });
       mitigations.push({
         riskId,
-        strategy: 'mitigate',
-        action: 'Refine item descriptions and acceptance criteria before sprint start',
-        effort: 'medium',
-        effectiveness: 0.7
+        strategy: "mitigate",
+        action: "Refine item descriptions and acceptance criteria before sprint start",
+        effort: "medium",
+        effectiveness: 0.7,
       });
     }
 
@@ -318,7 +318,7 @@ export class SprintRiskAssessor {
       riskScore,
       risks,
       mitigations,
-      confidence
+      confidence,
     };
   }
 
@@ -344,9 +344,9 @@ export class SprintRiskAssessor {
    * Determine overall risk level from score.
    */
   private getOverallRiskLevel(score: number): RiskProbability {
-    if (score >= 60) return 'high';
-    if (score >= 30) return 'medium';
-    return 'low';
+    if (score >= 60) return "high";
+    if (score >= 30) return "medium";
+    return "low";
   }
 
   /**
@@ -359,7 +359,7 @@ export class SprintRiskAssessor {
   ): SectionConfidence {
     // Input completeness based on item details
     const hasDescriptions = params.sprintItems.filter(
-      i => i.description && i.description.length > 50
+      (i) => i.description && i.description.length > 50
     ).length;
     const descriptionRatio = hasDescriptions / Math.max(1, params.sprintItems.length);
     const inputCompleteness = descriptionRatio * 0.7 + 0.3;
@@ -368,15 +368,15 @@ export class SprintRiskAssessor {
     const aiSelfAssessment = usedAI ? 0.75 : 0.5;
 
     // Pattern match based on capacity utilization clarity
-    const utilizationRatio = params.sprintItems.reduce(
-      (sum, i) => sum + (i.points || 3), 0
-    ) / params.sprintCapacity.recommendedLoad;
+    const utilizationRatio =
+      params.sprintItems.reduce((sum, i) => sum + (i.points || 3), 0) /
+      params.sprintCapacity.recommendedLoad;
     const patternMatch = utilizationRatio <= 1.0 ? 0.7 : 0.5;
 
     const factors: ConfidenceFactors = {
       inputCompleteness,
       aiSelfAssessment,
-      patternMatch
+      patternMatch,
     };
 
     const score = calculateWeightedScore(factors);
@@ -384,15 +384,15 @@ export class SprintRiskAssessor {
     const needsReview = score < 70;
 
     return {
-      sectionId: 'sprint-risk-assessment',
-      sectionName: 'Sprint Risk Assessment',
+      sectionId: "sprint-risk-assessment",
+      sectionName: "Sprint Risk Assessment",
       score,
       tier,
       factors,
       reasoning: usedAI
-        ? 'AI-powered risk assessment with mitigation suggestions'
-        : 'Algorithmic risk detection (AI unavailable)',
-      needsReview
+        ? "AI-powered risk assessment with mitigation suggestions"
+        : "Algorithmic risk detection (AI unavailable)",
+      needsReview,
     };
   }
 }

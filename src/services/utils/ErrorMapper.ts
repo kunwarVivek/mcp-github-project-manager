@@ -1,5 +1,12 @@
-import { DomainError, ResourceNotFoundError, ValidationError, RateLimitError, UnauthorizedError, GitHubAPIError } from '../../domain/errors';
-import { MCPErrorCode } from '../../domain/mcp-types';
+import {
+  DomainError,
+  ResourceNotFoundError,
+  ValidationError,
+  RateLimitError,
+  UnauthorizedError,
+  GitHubAPIError,
+} from "../../domain/errors";
+import { MCPErrorCode } from "../../domain/mcp-types";
 
 export function mapErrorToMCPError(error: unknown): Error {
   if (error instanceof ValidationError) {
@@ -17,5 +24,7 @@ export function mapErrorToMCPError(error: unknown): Error {
   if (error instanceof GitHubAPIError) {
     return new DomainError(`${MCPErrorCode.INTERNAL_ERROR}: GitHub API Error - ${error.message}`);
   }
-  return new DomainError(`${MCPErrorCode.INTERNAL_ERROR}: ${error instanceof Error ? error.message : String(error)}`);
+  return new DomainError(
+    `${MCPErrorCode.INTERNAL_ERROR}: ${error instanceof Error ? error.message : String(error)}`
+  );
 }

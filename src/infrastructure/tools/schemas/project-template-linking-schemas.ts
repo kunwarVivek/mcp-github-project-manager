@@ -56,13 +56,20 @@ export type UnmarkProjectAsTemplateInput = z.infer<typeof UnmarkProjectAsTemplat
  */
 export const CopyProjectFromTemplateInputSchema = z.object({
   /** Source template project node ID (e.g., 'PVT_kwDO...') */
-  projectId: z.string().min(1, "Project ID is required").describe("Source template project node ID"),
+  projectId: z
+    .string()
+    .min(1, "Project ID is required")
+    .describe("Source template project node ID"),
   /** Organization login to create the new project under */
   targetOwner: z.string().min(1, "Target owner is required").describe("Organization login"),
   /** Title for the new project */
   title: z.string().min(1, "Title is required").describe("New project title"),
   /** Whether to include draft issues from the template */
-  includeDraftIssues: z.boolean().optional().default(false).describe("Include draft issues from template"),
+  includeDraftIssues: z
+    .boolean()
+    .optional()
+    .default(false)
+    .describe("Include draft issues from template"),
 });
 
 export type CopyProjectFromTemplateInput = z.infer<typeof CopyProjectFromTemplateInputSchema>;
@@ -76,7 +83,14 @@ export const ListOrganizationTemplatesInputSchema = z.object({
   /** Organization login */
   org: z.string().min(1, "Organization is required").describe("Organization login"),
   /** Number of templates to return (default: 20, max: 100) */
-  first: z.number().int().positive().max(100).optional().default(20).describe("Number of templates to return"),
+  first: z
+    .number()
+    .int()
+    .positive()
+    .max(100)
+    .optional()
+    .default(20)
+    .describe("Number of templates to return"),
   /** Cursor for pagination */
   after: z.string().optional().describe("Pagination cursor"),
 });
@@ -118,7 +132,9 @@ export const UnlinkProjectFromRepositoryInputSchema = z.object({
   repo: z.string().min(1, "Repository name is required").describe("Repository name"),
 });
 
-export type UnlinkProjectFromRepositoryInput = z.infer<typeof UnlinkProjectFromRepositoryInputSchema>;
+export type UnlinkProjectFromRepositoryInput = z.infer<
+  typeof UnlinkProjectFromRepositoryInputSchema
+>;
 
 /**
  * Input schema for link_project_to_team tool (GHAPI-15).
@@ -161,7 +177,14 @@ export const ListLinkedRepositoriesInputSchema = z.object({
   /** Project node ID (e.g., 'PVT_kwDO...') */
   projectId: z.string().min(1, "Project ID is required").describe("Project node ID"),
   /** Number of repositories to return (default: 20, max: 100) */
-  first: z.number().int().positive().max(100).optional().default(20).describe("Number of repositories to return"),
+  first: z
+    .number()
+    .int()
+    .positive()
+    .max(100)
+    .optional()
+    .default(20)
+    .describe("Number of repositories to return"),
   /** Cursor for pagination */
   after: z.string().optional().describe("Pagination cursor"),
 });
@@ -177,7 +200,14 @@ export const ListLinkedTeamsInputSchema = z.object({
   /** Project node ID (e.g., 'PVT_kwDO...') */
   projectId: z.string().min(1, "Project ID is required").describe("Project node ID"),
   /** Number of teams to return (default: 20, max: 100) */
-  first: z.number().int().positive().max(100).optional().default(20).describe("Number of teams to return"),
+  first: z
+    .number()
+    .int()
+    .positive()
+    .max(100)
+    .optional()
+    .default(20)
+    .describe("Number of teams to return"),
   /** Cursor for pagination */
   after: z.string().optional().describe("Pagination cursor"),
 });

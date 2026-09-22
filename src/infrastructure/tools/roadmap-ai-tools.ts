@@ -53,7 +53,10 @@ export const generateRoadmapTool: ToolDefinition<RoadmapGenerationInput, Roadmap
  * Generates Gantt-ready visualization data from a roadmap. Returns
  * simplified data structures optimized for chart rendering.
  */
-export const generateRoadmapVisualizationTool: ToolDefinition<RoadmapOutput, RoadmapVisualizationOutput> = {
+export const generateRoadmapVisualizationTool: ToolDefinition<
+  RoadmapOutput,
+  RoadmapVisualizationOutput
+> = {
   name: "generate_roadmap_visualization",
   title: "Generate Roadmap Visualization",
   description:
@@ -75,9 +78,7 @@ export const generateRoadmapVisualizationTool: ToolDefinition<RoadmapOutput, Roa
  * @param args - Roadmap generation input parameters
  * @returns Generated roadmap with phases and milestones
  */
-export async function executeGenerateRoadmap(
-  args: RoadmapGenerationInput
-): Promise<RoadmapOutput> {
+export async function executeGenerateRoadmap(args: RoadmapGenerationInput): Promise<RoadmapOutput> {
   const service = new RoadmapAIService();
 
   const result = await service.generateRoadmap({
@@ -122,5 +123,7 @@ export const roadmapAITools: ToolDefinition<unknown>[] = [
  */
 export const roadmapAIExecutors: Record<string, (args: unknown) => Promise<unknown>> = {
   generate_roadmap: executeGenerateRoadmap as (args: unknown) => Promise<unknown>,
-  generate_roadmap_visualization: executeGenerateRoadmapVisualization as (args: unknown) => Promise<unknown>,
+  generate_roadmap_visualization: executeGenerateRoadmapVisualization as (
+    args: unknown
+  ) => Promise<unknown>,
 };

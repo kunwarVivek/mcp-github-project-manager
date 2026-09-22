@@ -1,9 +1,9 @@
-import { generateObject } from 'ai';
-import { z } from 'zod';
+import { generateObject } from "ai";
+import { z } from "zod";
 import type { AIServiceFactory } from "./ai/AIServiceFactory";
 import type { ProjectManagementService } from "./ProjectManagementService";
 import { type ILogger, Logger } from "../infrastructure/logger";
-import { InputSanitizer } from './utils/InputSanitizer';
+import { InputSanitizer } from "./utils/InputSanitizer";
 
 /**
  * AI-powered roadmap planning service
@@ -63,33 +63,33 @@ export class RoadmapPlanningService {
       // Fetch all issues for the project
       const items = await this.projectService.listProjectItems({
         projectId: params.projectId,
-        limit: 200
+        limit: 200,
       });
 
       // Extract issue information
       const issues = items.map((item: any) => ({
         id: item.id,
-        title: item.title || 'Untitled',
+        title: item.title || "Untitled",
         type: item.type,
-        content: item.content
+        content: item.content,
       }));
 
       if (issues.length === 0) {
-        throw new Error('No issues found in project. Cannot generate roadmap.');
+        throw new Error("No issues found in project. Cannot generate roadmap.");
       }
 
       // Generate roadmap using AI
       const roadmapAnalysis = await this.analyzeIssuesForRoadmap({
         projectTitle: params.projectTitle,
-        projectDescription: params.projectDescription || '',
+        projectDescription: params.projectDescription || "",
         issues,
         sprintDurationWeeks: params.sprintDurationWeeks || 2,
-        targetMilestones: params.targetMilestones || 4
+        targetMilestones: params.targetMilestones || 4,
       });
 
       return roadmapAnalysis;
     } catch (error) {
-      this.logger.error('Failed to generate roadmap', error);
+      this.logger.error("Failed to generate roadmap", error);
       throw error;
     }
   }
@@ -104,9 +104,9 @@ export class RoadmapPlanningService {
     sprintDurationWeeks: number;
     targetMilestones: number;
   }): Promise<any> {
-    const model = this.aiFactory.getModel('main') || this.aiFactory.getBestAvailableModel();
+    const model = this.aiFactory.getModel("main") || this.aiFactory.getBestAvailableModel();
     if (!model) {
-      throw new Error('AI service is not available');
+      throw new Error("AI service is not available");
     }
 
     const prompt = `You are a product roadmap planning expert. Analyze the following project and its issues to create a comprehensive roadmap.
@@ -116,7 +116,7 @@ Title: ${InputSanitizer.sanitizeText(params.projectTitle)}
 Description: ${InputSanitizer.sanitizeIssueContent(params.projectDescription)}
 
 EXISTING ISSUES (${params.issues.length} total):
-${params.issues.map((issue, idx) => `${idx + 1}. [${issue.type}] ${InputSanitizer.sanitizeText(issue.title)} (ID: ${issue.id})`).join('\n')}
+${params.issues.map((issue, idx) => `${idx + 1}. [${issue.type}] ${InputSanitizer.sanitizeText(issue.title)} (ID: ${issue.id})`).join("\n")}
 
 YOUR TASK:
 Create a comprehensive project roadmap with the following structure:
@@ -131,30 +131,36 @@ REQUIREMENTS:
 - Prioritize based on dependencies and logical order
 - Create meaningful milestone descriptions
 - Suggest realistic timelines
-- Start sprints from today's date (${new Date().toISOString().split('T')[0]}).`;
+- Start sprints from today's date (${new Date().toISOString().split("T")[0]}).`;
 
     const RoadmapAnalysisSchema = z.object({
       roadmap: z.object({
-        phases: z.array(z.object({
-          name: z.string(),
-          description: z.string(),
-          duration: z.string(),
-          milestones: z.array(z.string()),
-        }))
+        phases: z.array(
+          z.object({
+            name: z.string(),
+            description: z.string(),
+            duration: z.string(),
+            milestones: z.array(z.string()),
+          })
+        ),
       }),
-      milestones: z.array(z.object({
-        title: z.string(),
-        description: z.string(),
-        dueDate: z.string(),
-        issueIds: z.array(z.string()),
-      })),
-      sprints: z.array(z.object({
-        title: z.string(),
-        description: z.string(),
-        startDate: z.string(),
-        endDate: z.string(),
-        issueIds: z.array(z.string()),
-      })),
+      milestones: z.array(
+        z.object({
+          title: z.string(),
+          description: z.string(),
+          dueDate: z.string(),
+          issueIds: z.array(z.string()),
+        })
+      ),
+      sprints: z.array(
+        z.object({
+          title: z.string(),
+          description: z.string(),
+          startDate: z.string(),
+          endDate: z.string(),
+          issueIds: z.array(z.string()),
+        })
+      ),
     });
 
     const result = await generateObject({
@@ -162,7 +168,7 @@ REQUIREMENTS:
       prompt,
       schema: RoadmapAnalysisSchema,
       temperature: 0.7,
-      maxOutputTokens: 4000
+      maxOutputTokens: 4000,
     });
 
     return result.object;
@@ -171,10 +177,7 @@ REQUIREMENTS:
   /**
    * Auto-create roadmap in GitHub (creates actual milestones and updates project)
    */
-  async createRoadmapInGitHub(params: {
-    projectId: string;
-    roadmap: any;
-  }): Promise<{
+  async createRoadmapInGitHub(params: { projectId: string; roadmap: any }): Promise<{
     createdMilestones: number;
     updatedIssues: number;
   }> {
@@ -188,7 +191,7 @@ REQUIREMENTS:
           await this.projectService.createMilestone({
             title: milestone.title,
             description: milestone.description,
-            dueDate: milestone.dueDate
+            dueDate: milestone.dueDate,
           });
           createdMilestones++;
           this.logger.info(`Created milestone: ${milestone.title}`);
@@ -201,10 +204,10 @@ REQUIREMENTS:
 
       return {
         createdMilestones,
-        updatedIssues
+        updatedIssues,
       };
     } catch (error) {
-      this.logger.error('Failed to create roadmap in GitHub', error);
+      this.logger.error("Failed to create roadmap in GitHub", error);
       throw error;
     }
   }

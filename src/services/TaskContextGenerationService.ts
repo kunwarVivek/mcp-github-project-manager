@@ -1,38 +1,38 @@
-import { generateObject } from 'ai';
-import { AIServiceFactory } from './ai/AIServiceFactory';
-import { type ILogger, Logger } from '../infrastructure/logger';
-import { InputSanitizer } from './utils/InputSanitizer';
+import { generateObject } from "ai";
+import { AIServiceFactory } from "./ai/AIServiceFactory";
+import { type ILogger, Logger } from "../infrastructure/logger";
+import { InputSanitizer } from "./utils/InputSanitizer";
 import {
   CONTEXT_GENERATION_CONFIGS,
   formatContextPrompt,
   BusinessContextSchema,
-  TechnicalContextSchema
-} from './ai/prompts/ContextGenerationPrompts';
+  TechnicalContextSchema,
+} from "./ai/prompts/ContextGenerationPrompts";
 import type {
   AITask,
   PRDDocument,
   EnhancedTaskGenerationConfig,
-  FeatureRequirement
-} from '../domain/ai-types';
+  FeatureRequirement,
+} from "../domain/ai-types";
 import {
   type TaskExecutionContext,
   type ContextQualityMetrics,
-  calculateCompletenessScore
-} from '../domain/task-context-schemas';
+  calculateCompletenessScore,
+} from "../domain/task-context-schemas";
 import {
   ENHANCED_TASK_GENERATION,
   INCLUDE_BUSINESS_CONTEXT,
   INCLUDE_TECHNICAL_CONTEXT,
   INCLUDE_IMPLEMENTATION_GUIDANCE,
-  ENHANCED_CONTEXT_LEVEL
-} from '../env';
+  ENHANCED_CONTEXT_LEVEL,
+} from "../env";
 
 // Import new context generation services
-import { ContextualReferenceGenerator } from './context/ContextualReferenceGenerator';
-import { DependencyContextGenerator } from './context/DependencyContextGenerator';
-import { CodeExampleGenerator } from './context/CodeExampleGenerator';
-import { ContextQualityValidator } from './validation/ContextQualityValidator';
-import { TokenCounter } from './ai/TokenCounter';
+import { ContextualReferenceGenerator } from "./context/ContextualReferenceGenerator";
+import { DependencyContextGenerator } from "./context/DependencyContextGenerator";
+import { CodeExampleGenerator } from "./context/CodeExampleGenerator";
+import { ContextQualityValidator } from "./validation/ContextQualityValidator";
+import { TokenCounter } from "./ai/TokenCounter";
 
 /**
  * Service for generating comprehensive task context using AI and traceability
@@ -81,7 +81,7 @@ export class TaskContextGenerationService {
     const warnings: string[] = [];
 
     try {
-      const prdContent = typeof prd === 'string' ? prd : JSON.stringify(prd, null, 2);
+      const prdContent = typeof prd === "string" ? prd : JSON.stringify(prd, null, 2);
 
       // Start with traceability-based context (always available)
       const traceabilityContext = await this.generateTraceabilityContext(task, prd);
@@ -103,8 +103,10 @@ export class TaskContextGenerationService {
           estimatedTokens = aiResult.estimatedTokens;
           aiEnhanced = true;
         } catch (error) {
-          errors.push(`AI enhancement failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
-          warnings.push('Falling back to traceability-based context only');
+          errors.push(
+            `AI enhancement failed: ${error instanceof Error ? error.message : "Unknown error"}`
+          );
+          warnings.push("Falling back to traceability-based context only");
         }
       }
 
@@ -122,13 +124,14 @@ export class TaskContextGenerationService {
         cacheHit: false, // TODO: Implement caching
         aiEnhanced,
         errors,
-        warnings
+        warnings,
       };
 
       return { context, metrics };
-
     } catch (error) {
-      errors.push(`Context generation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      errors.push(
+        `Context generation failed: ${error instanceof Error ? error.message : "Unknown error"}`
+      );
 
       // Fallback to minimal context
       const fallbackContext = await this.generateTraceabilityContext(task, prd);
@@ -141,7 +144,7 @@ export class TaskContextGenerationService {
         cacheHit: false,
         aiEnhanced: false,
         errors,
-        warnings: ['Using fallback context due to errors']
+        warnings: ["Using fallback context due to errors"],
       };
 
       return { context: fallbackContext, metrics };
@@ -157,37 +160,51 @@ export class TaskContextGenerationService {
   ): Promise<TaskExecutionContext> {
     try {
       // Create basic context from traceability information
-      const prdObj = typeof prd === 'object' ? prd : {
-        objectives: ['Deliver high-quality software solution'],
-        title: 'Project Requirements'
-      };
+      const prdObj =
+        typeof prd === "object"
+          ? prd
+          : {
+              objectives: ["Deliver high-quality software solution"],
+              title: "Project Requirements",
+            };
 
       return {
-        businessObjective: `Supports project objective: ${prdObj.objectives?.[0] || 'Deliver software solution'}`,
+        businessObjective: `Supports project objective: ${prdObj.objectives?.[0] || "Deliver software solution"}`,
         userImpact: `Contributes to overall user experience and system functionality`,
-        successMetrics: ['Task completed according to acceptance criteria', 'Code review approved', 'Tests passing'],
+        successMetrics: [
+          "Task completed according to acceptance criteria",
+          "Code review approved",
+          "Tests passing",
+        ],
 
         parentFeature: {
-          id: task.sourcePRD || 'unknown',
-          title: 'Related Feature',
-          description: 'Feature containing this task',
-          userStories: ['As a user, I want this functionality to work correctly'],
-          businessValue: 'Provides essential system functionality'
+          id: task.sourcePRD || "unknown",
+          title: "Related Feature",
+          description: "Feature containing this task",
+          userStories: ["As a user, I want this functionality to work correctly"],
+          businessValue: "Provides essential system functionality",
         },
 
-        technicalConstraints: ['Follow existing code patterns', 'Maintain system performance', 'Ensure security standards'],
-        architecturalDecisions: ['Use established architecture patterns', 'Follow team coding standards'],
-        integrationPoints: ['Integrate with existing system components'],
-        dataRequirements: ['Use existing data models where applicable'],
+        technicalConstraints: [
+          "Follow existing code patterns",
+          "Maintain system performance",
+          "Ensure security standards",
+        ],
+        architecturalDecisions: [
+          "Use established architecture patterns",
+          "Follow team coding standards",
+        ],
+        integrationPoints: ["Integrate with existing system components"],
+        dataRequirements: ["Use existing data models where applicable"],
 
         prdContextSummary: {
-          relevantObjectives: prdObj.objectives || ['Deliver software solution'],
-          relevantRequirements: ['Implement according to specifications'],
-          scopeConstraints: ['Stay within defined project scope']
-        }
+          relevantObjectives: prdObj.objectives || ["Deliver software solution"],
+          relevantRequirements: ["Implement according to specifications"],
+          scopeConstraints: ["Stay within defined project scope"],
+        },
       };
     } catch (error) {
-      this.logger.error('Error generating traceability context', error);
+      this.logger.error("Error generating traceability context", error);
       return this.getMinimalContext(task);
     }
   }
@@ -227,14 +244,14 @@ export class TaskContextGenerationService {
           // "Cannot read properties of undefined (reading 'map')" and took down
           // the whole context generation for a merely incomplete answer.
           enhancedContext.technicalConstraints = technicalContext.technicalConstraints ?? [];
-          enhancedContext.architecturalDecisions = (technicalContext.architecturalDecisions ?? []).map(
-            (ad: any) => ad?.decision,
-          );
+          enhancedContext.architecturalDecisions = (
+            technicalContext.architecturalDecisions ?? []
+          ).map((ad: any) => ad?.decision);
           enhancedContext.integrationPoints = (technicalContext.integrationPoints ?? []).map(
-            (ip: any) => ip?.description,
+            (ip: any) => ip?.description
           );
           enhancedContext.dataRequirements = (technicalContext.dataRequirements ?? []).map(
-            (dr: any) => dr?.description,
+            (dr: any) => dr?.description
           );
           totalTokens += TokenCounter.estimateFromObject(technicalContext);
         }
@@ -242,7 +259,11 @@ export class TaskContextGenerationService {
 
       // FR-3: Generate implementation guidance if enabled
       if (config.includeImplementationGuidance) {
-        const guidance = await this.generateImplementationGuidance(task, enhancedContext, technicalContext);
+        const guidance = await this.generateImplementationGuidance(
+          task,
+          enhancedContext,
+          technicalContext
+        );
         if (guidance) {
           enhancedContext.implementationGuidance = guidance;
           totalTokens += TokenCounter.estimateFromObject(guidance);
@@ -278,11 +299,10 @@ export class TaskContextGenerationService {
 
       return {
         context: enhancedContext,
-        estimatedTokens: totalTokens
+        estimatedTokens: totalTokens,
       };
-
     } catch (error) {
-      this.logger.error('Error generating AI-enhanced context', error);
+      this.logger.error("Error generating AI-enhanced context", error);
       return { context: {}, estimatedTokens: totalTokens };
     }
   }
@@ -300,7 +320,7 @@ export class TaskContextGenerationService {
         prdContent: InputSanitizer.sanitizePRDContent(prdContent),
         taskTitle: InputSanitizer.sanitizeTaskContent(task.title),
         taskDescription: InputSanitizer.sanitizeTaskContent(task.description),
-        taskPriority: task.priority
+        taskPriority: task.priority,
       });
 
       const result = await generateObject({
@@ -309,12 +329,12 @@ export class TaskContextGenerationService {
         prompt,
         schema: BusinessContextSchema,
         maxOutputTokens: config.maxTokens,
-        temperature: config.temperature
+        temperature: config.temperature,
       });
 
       return result.object;
     } catch (error) {
-      this.logger.error('Error generating business context', error);
+      this.logger.error("Error generating business context", error);
       return null;
     }
   }
@@ -332,7 +352,7 @@ export class TaskContextGenerationService {
         prdContent: InputSanitizer.sanitizePRDContent(prdContent),
         taskTitle: InputSanitizer.sanitizeTaskContent(task.title),
         taskDescription: InputSanitizer.sanitizeTaskContent(task.description),
-        taskComplexity: task.complexity
+        taskComplexity: task.complexity,
       });
 
       const result = await generateObject({
@@ -341,12 +361,12 @@ export class TaskContextGenerationService {
         prompt,
         schema: TechnicalContextSchema,
         maxOutputTokens: config.maxTokens,
-        temperature: config.temperature
+        temperature: config.temperature,
       });
 
       return result.object;
     } catch (error) {
-      this.logger.error('Error generating technical context', error);
+      this.logger.error("Error generating technical context", error);
       return null;
     }
   }
@@ -373,20 +393,20 @@ export class TaskContextGenerationService {
         return {
           recommendedApproach: `Implement ${task.title} following best practices`,
           implementationSteps: [
-            'Review requirements and acceptance criteria',
-            'Design the solution architecture',
-            'Implement core functionality',
-            'Write comprehensive tests',
-            'Review and refactor code',
-            'Document the implementation'
+            "Review requirements and acceptance criteria",
+            "Design the solution architecture",
+            "Implement core functionality",
+            "Write comprehensive tests",
+            "Review and refactor code",
+            "Document the implementation",
           ],
-          technicalConsiderations: ['Follow coding standards', 'Ensure proper error handling'],
-          commonPitfalls: ['Not handling edge cases', 'Insufficient testing'],
-          testingStrategy: 'Write unit tests for all functionality',
+          technicalConsiderations: ["Follow coding standards", "Ensure proper error handling"],
+          commonPitfalls: ["Not handling edge cases", "Insufficient testing"],
+          testingStrategy: "Write unit tests for all functionality",
           recommendedTools: [],
-          codeQualityStandards: ['Follow linting rules', 'Maintain test coverage'],
-          performanceConsiderations: ['Optimize for performance'],
-          securityConsiderations: ['Follow security best practices']
+          codeQualityStandards: ["Follow linting rules", "Maintain test coverage"],
+          performanceConsiderations: ["Optimize for performance"],
+          securityConsiderations: ["Follow security best practices"],
         };
       }
 
@@ -396,8 +416,12 @@ export class TaskContextGenerationService {
         taskDescription: InputSanitizer.sanitizeTaskContent(task.description),
         taskComplexity: task.complexity,
         taskPriority: task.priority,
-        businessContext: businessContext ? JSON.stringify(businessContext, null, 2) : 'Not available',
-        technicalContext: technicalContext ? JSON.stringify(technicalContext, null, 2) : 'Not available'
+        businessContext: businessContext
+          ? JSON.stringify(businessContext, null, 2)
+          : "Not available",
+        technicalContext: technicalContext
+          ? JSON.stringify(technicalContext, null, 2)
+          : "Not available",
       });
 
       const result = await generateObject({
@@ -406,7 +430,7 @@ export class TaskContextGenerationService {
         prompt,
         schema: config.schema,
         maxOutputTokens: config.maxTokens,
-        temperature: config.temperature
+        temperature: config.temperature,
       });
 
       // Merge with code examples
@@ -414,13 +438,13 @@ export class TaskContextGenerationService {
       if (codeExamples.length > 0 && guidance.contextualReferences) {
         guidance.contextualReferences = {
           ...guidance.contextualReferences,
-          codeExamples
+          codeExamples,
         };
       }
 
       return guidance;
     } catch (error) {
-      this.logger.error('Error generating implementation guidance', error);
+      this.logger.error("Error generating implementation guidance", error);
       return null;
     }
   }
@@ -431,14 +455,16 @@ export class TaskContextGenerationService {
   private transformImplementationGuidance(aiGuidance: any): any {
     return {
       recommendedApproach: aiGuidance.recommendedApproach,
-      implementationSteps: aiGuidance.implementationSteps.map((step: any) => step.description || step),
+      implementationSteps: aiGuidance.implementationSteps.map(
+        (step: any) => step.description || step
+      ),
       technicalConsiderations: aiGuidance.technicalConsiderations,
       commonPitfalls: aiGuidance.commonPitfalls.map((pitfall: any) => pitfall.pitfall || pitfall),
-      testingStrategy: aiGuidance.testingStrategy?.approach || 'Standard testing approach',
+      testingStrategy: aiGuidance.testingStrategy?.approach || "Standard testing approach",
       recommendedTools: aiGuidance.bestPractices?.map((bp: any) => bp.practice) || [],
       codeQualityStandards: aiGuidance.qualityAssurance || [],
       performanceConsiderations: aiGuidance.performanceOptimization || [],
-      securityConsiderations: []
+      securityConsiderations: [],
     };
   }
 
@@ -455,13 +481,13 @@ export class TaskContextGenerationService {
       // Merge arrays intelligently
       successMetrics: [
         ...(aiContext.successMetrics || []),
-        ...traceabilityContext.successMetrics
+        ...traceabilityContext.successMetrics,
       ].filter((metric, index, arr) => arr.indexOf(metric) === index),
 
       technicalConstraints: [
         ...(aiContext.technicalConstraints || []),
-        ...traceabilityContext.technicalConstraints
-      ].filter((constraint, index, arr) => arr.indexOf(constraint) === index)
+        ...traceabilityContext.technicalConstraints,
+      ].filter((constraint, index, arr) => arr.indexOf(constraint) === index),
     };
   }
 
@@ -477,28 +503,28 @@ export class TaskContextGenerationService {
    */
   private getMinimalContext(task: AITask): TaskExecutionContext {
     return {
-      businessObjective: 'Complete assigned development task',
-      userImpact: 'Contributes to overall system functionality',
-      successMetrics: ['Task completed', 'Tests passing', 'Code reviewed'],
+      businessObjective: "Complete assigned development task",
+      userImpact: "Contributes to overall system functionality",
+      successMetrics: ["Task completed", "Tests passing", "Code reviewed"],
 
       parentFeature: {
-        id: 'unknown',
-        title: 'Development Task',
+        id: "unknown",
+        title: "Development Task",
         description: task.description,
-        userStories: ['As a developer, I need to complete this task'],
-        businessValue: 'Maintains system functionality'
+        userStories: ["As a developer, I need to complete this task"],
+        businessValue: "Maintains system functionality",
       },
 
-      technicalConstraints: ['Follow coding standards'],
-      architecturalDecisions: ['Use existing patterns'],
-      integrationPoints: ['Standard system integration'],
-      dataRequirements: ['Use appropriate data structures'],
+      technicalConstraints: ["Follow coding standards"],
+      architecturalDecisions: ["Use existing patterns"],
+      integrationPoints: ["Standard system integration"],
+      dataRequirements: ["Use appropriate data structures"],
 
       prdContextSummary: {
-        relevantObjectives: ['Complete development work'],
-        relevantRequirements: ['Implement as specified'],
-        scopeConstraints: ['Stay within task scope']
-      }
+        relevantObjectives: ["Complete development work"],
+        relevantRequirements: ["Implement as specified"],
+        scopeConstraints: ["Stay within task scope"],
+      },
     };
   }
 
@@ -529,13 +555,13 @@ export class TaskContextGenerationService {
       createTraceabilityMatrix: true,
       generateUseCases: true,
       createLifecycleTracking: true,
-      contextLevel: ENHANCED_CONTEXT_LEVEL as 'minimal' | 'standard' | 'full',
+      contextLevel: ENHANCED_CONTEXT_LEVEL as "minimal" | "standard" | "full",
       includeBusinessContext: INCLUDE_BUSINESS_CONTEXT,
       includeTechnicalContext: INCLUDE_TECHNICAL_CONTEXT,
       includeImplementationGuidance: INCLUDE_IMPLEMENTATION_GUIDANCE,
       enforceTraceability: true,
       requireBusinessJustification: INCLUDE_BUSINESS_CONTEXT,
-      trackRequirementCoverage: true
+      trackRequirementCoverage: true,
     };
   }
 }

@@ -1,17 +1,17 @@
-import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
-import { EventEmitter } from 'node:events';
-import { WebhookServer } from '../../../../infrastructure/http/WebhookServer';
-import type { GitHubWebhookHandler } from '../../../../infrastructure/events/GitHubWebhookHandler';
-import type { EventSubscriptionManager } from '../../../../infrastructure/events/EventSubscriptionManager';
-import type { EventStore } from '../../../../infrastructure/events/EventStore';
-import type { ILogger } from '../../../../infrastructure/logger/index';
-import type { SecurityAuditLog } from '../../../../infrastructure/observability/SecurityAuditLog';
+import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
+import { EventEmitter } from "node:events";
+import { WebhookServer } from "../../../../infrastructure/http/WebhookServer";
+import type { GitHubWebhookHandler } from "../../../../infrastructure/events/GitHubWebhookHandler";
+import type { EventSubscriptionManager } from "../../../../infrastructure/events/EventSubscriptionManager";
+import type { EventStore } from "../../../../infrastructure/events/EventStore";
+import type { ILogger } from "../../../../infrastructure/logger/index";
+import type { SecurityAuditLog } from "../../../../infrastructure/observability/SecurityAuditLog";
 
 // The rate limiter and window are read from env at call time; pinning them to
 // small values keeps the isRateLimited tests fast and exact regardless of
 // what happens to be configured in the ambient environment.
-vi.mock('../../../../env', async () => {
-  const actual = await vi.importActual<Record<string, unknown>>('../../../../env');
+vi.mock("../../../../env", async () => {
+  const actual = await vi.importActual<Record<string, unknown>>("../../../../env");
   return {
     ...actual,
     WEBHOOK_RATE_LIMIT: 5,
@@ -40,15 +40,18 @@ interface MockResponse {
   write: (chunk: string) => void;
 }
 
-function createMockReq(headers: Record<string, string> = {}, remoteAddress = '127.0.0.1'): MockRequest {
+function createMockReq(
+  headers: Record<string, string> = {},
+  remoteAddress = "127.0.0.1"
+): MockRequest {
   // EventEmitter is a genuine supertype of MockRequest, so this narrowing cast
   // is valid without an `unknown` indirection (same as `as HTMLInputElement`).
   const req = new EventEmitter() as MockRequest;
   req.headers = headers;
   req.socket = { remoteAddress };
   req.destroy = vi.fn();
-  req.url = '/webhooks/github';
-  req.method = 'POST';
+  req.url = "/webhooks/github";
+  req.method = "POST";
   return req;
 }
 
@@ -76,7 +79,12 @@ function createMockRes(): MockResponse {
 interface WebhookHandlerMock {
   validateSignature: (payload: string, signature: string) => Promise<boolean>;
   validateWebhookPayload: (eventType: string, payload: unknown) => boolean;
-  createWebhookEvent: (eventType: string, payload: unknown, signature: string, delivery?: string) => unknown;
+  createWebhookEvent: (
+    eventType: string,
+    payload: unknown,
+    signature: string,
+    delivery?: string
+  ) => unknown;
   processWebhookEvent: (event: unknown) => Promise<{ success: boolean; events: unknown[] }>;
 }
 
@@ -126,7 +134,7 @@ function internals(server: WebhookServer): WebhookServerInternals {
   return server as unknown as WebhookServerInternals;
 }
 
-describe('WebhookServer', () => {
+describe("WebhookServer", () => {
   let webhookHandler: WebhookHandlerMock;
   let subscriptionManager: SubscriptionManagerMock;
   let eventStore: EventStoreMock;
@@ -143,7 +151,7 @@ describe('WebhookServer', () => {
     };
     subscriptionManager = {
       on: vi.fn(),
-      subscribe: vi.fn(() => 'sub-id'),
+      subscribe: vi.fn(() => "sub-id"),
       unsubscribe: vi.fn(() => true),
       notifySubscribers: vi.fn(async () => {}),
       getStats: vi.fn(() => ({})),
@@ -172,53 +180,53 @@ describe('WebhookServer', () => {
       eventStore as unknown as EventStore,
       undefined,
       logger,
-      securityLog as unknown as SecurityAuditLog,
+      securityLog as unknown as SecurityAuditLog
     );
   });
 
-  describe('setCORSHeaders', () => {
-    it('reflects an allowed origin and sets the CORS header set', () => {
-      vi.spyOn(internals(server), 'resolveAllowedOrigin').mockReturnValue('https://allowed.com');
-      const req = createMockReq({ origin: 'https://allowed.com' });
+  describe("setCORSHeaders", () => {
+    it("reflects an allowed origin and sets the CORS header set", () => {
+      vi.spyOn(internals(server), "resolveAllowedOrigin").mockReturnValue("https://allowed.com");
+      const req = createMockReq({ origin: "https://allowed.com" });
       const res = createMockRes();
 
       internals(server).setCORSHeaders(req, res);
 
-      expect(res.headers['Access-Control-Allow-Origin']).toBe('https://allowed.com');
-      expect(res.headers['Access-Control-Allow-Methods']).toBe('GET, POST, DELETE, OPTIONS');
-      expect(res.headers['Vary']).toBe('Origin');
+      expect(res.headers["Access-Control-Allow-Origin"]).toBe("https://allowed.com");
+      expect(res.headers["Access-Control-Allow-Methods"]).toBe("GET, POST, DELETE, OPTIONS");
+      expect(res.headers["Vary"]).toBe("Origin");
       expect(securityLog.record).not.toHaveBeenCalled();
     });
 
-    it('omits CORS headers and logs a security event for a disallowed origin', () => {
-      vi.spyOn(internals(server), 'resolveAllowedOrigin').mockReturnValue(undefined);
-      const req = createMockReq({ origin: 'https://evil.com' });
+    it("omits CORS headers and logs a security event for a disallowed origin", () => {
+      vi.spyOn(internals(server), "resolveAllowedOrigin").mockReturnValue(undefined);
+      const req = createMockReq({ origin: "https://evil.com" });
       const res = createMockRes();
 
       internals(server).setCORSHeaders(req, res);
 
-      expect(res.headers['Access-Control-Allow-Origin']).toBeUndefined();
+      expect(res.headers["Access-Control-Allow-Origin"]).toBeUndefined();
       expect(securityLog.record).toHaveBeenCalledWith({
-        type: 'cors_origin_rejected',
-        source: '127.0.0.1',
-        details: { origin: 'https://evil.com' },
-        severity: 'medium',
+        type: "cors_origin_rejected",
+        source: "127.0.0.1",
+        details: { origin: "https://evil.com" },
+        severity: "medium",
       });
     });
 
-    it('reflects a wildcard origin when configured', () => {
-      vi.spyOn(internals(server), 'resolveAllowedOrigin').mockReturnValue('*');
-      const req = createMockReq({ origin: 'https://anything.example' });
+    it("reflects a wildcard origin when configured", () => {
+      vi.spyOn(internals(server), "resolveAllowedOrigin").mockReturnValue("*");
+      const req = createMockReq({ origin: "https://anything.example" });
       const res = createMockRes();
 
       internals(server).setCORSHeaders(req, res);
 
-      expect(res.headers['Access-Control-Allow-Origin']).toBe('*');
+      expect(res.headers["Access-Control-Allow-Origin"]).toBe("*");
       expect(securityLog.record).not.toHaveBeenCalled();
     });
   });
 
-  describe('isRateLimited', () => {
+  describe("isRateLimited", () => {
     beforeEach(() => {
       vi.useFakeTimers();
     });
@@ -227,22 +235,22 @@ describe('WebhookServer', () => {
       vi.useRealTimers();
     });
 
-    it('returns false while under the configured limit', () => {
-      const ip = '10.0.0.1';
+    it("returns false while under the configured limit", () => {
+      const ip = "10.0.0.1";
       // WEBHOOK_RATE_LIMIT is mocked to 5; the limiter only trips once count
       // exceeds the limit, so the first 5 calls in a window must all pass.
       const results = Array.from({ length: 5 }, () => internals(server).isRateLimited(ip));
       expect(results).toEqual([false, false, false, false, false]);
     });
 
-    it('returns true once the limit is exceeded', () => {
-      const ip = '10.0.0.2';
+    it("returns true once the limit is exceeded", () => {
+      const ip = "10.0.0.2";
       const results = Array.from({ length: 6 }, () => internals(server).isRateLimited(ip));
       expect(results).toEqual([false, false, false, false, false, true]);
     });
 
-    it('resets the window after WEBHOOK_RATE_WINDOW_MS elapses', () => {
-      const ip = '10.0.0.3';
+    it("resets the window after WEBHOOK_RATE_WINDOW_MS elapses", () => {
+      const ip = "10.0.0.3";
       for (let i = 0; i < 6; i++) {
         internals(server).isRateLimited(ip);
       }
@@ -254,97 +262,102 @@ describe('WebhookServer', () => {
     });
   });
 
-  describe('readRequestBody', () => {
-    it('resolves the concatenated body when under the size limit', async () => {
+  describe("readRequestBody", () => {
+    it("resolves the concatenated body when under the size limit", async () => {
       const req = createMockReq();
       const promise = internals(server).readRequestBody(req);
 
-      req.emit('data', Buffer.from('{"hello":'));
-      req.emit('data', Buffer.from('"world"}'));
-      req.emit('end');
+      req.emit("data", Buffer.from('{"hello":'));
+      req.emit("data", Buffer.from('"world"}'));
+      req.emit("end");
 
       await expect(promise).resolves.toBe('{"hello":"world"}');
     });
 
-    it('rejects with a 413 and destroys the request when the body exceeds 1MB', async () => {
+    it("rejects with a 413 and destroys the request when the body exceeds 1MB", async () => {
       const req = createMockReq();
       const promise = internals(server).readRequestBody(req);
 
       const oversized = Buffer.alloc(1_048_577);
-      req.emit('data', oversized);
+      req.emit("data", oversized);
 
-      await expect(promise).rejects.toMatchObject({ statusCode: 413, message: 'Payload Too Large' });
+      await expect(promise).rejects.toMatchObject({
+        statusCode: 413,
+        message: "Payload Too Large",
+      });
       expect(req.destroy).toHaveBeenCalledTimes(1);
     });
   });
 
-  describe('setSecurityHeaders', () => {
-    it('sets nosniff, deny-framing, and disabled XSS-auditor headers', () => {
+  describe("setSecurityHeaders", () => {
+    it("sets nosniff, deny-framing, and disabled XSS-auditor headers", () => {
       const res = createMockRes();
 
       internals(server).setSecurityHeaders(res);
 
-      expect(res.headers['X-Content-Type-Options']).toBe('nosniff');
-      expect(res.headers['X-Frame-Options']).toBe('DENY');
-      expect(res.headers['X-XSS-Protection']).toBe('0');
+      expect(res.headers["X-Content-Type-Options"]).toBe("nosniff");
+      expect(res.headers["X-Frame-Options"]).toBe("DENY");
+      expect(res.headers["X-XSS-Protection"]).toBe("0");
     });
   });
 
-  describe('handleGitHubWebhook - content-type validation', () => {
-    it('rejects a non-JSON content type with 415 and logs the security event', async () => {
-      const req = createMockReq({ 'content-type': 'text/plain' });
+  describe("handleGitHubWebhook - content-type validation", () => {
+    it("rejects a non-JSON content type with 415 and logs the security event", async () => {
+      const req = createMockReq({ "content-type": "text/plain" });
       const res = createMockRes();
 
       await internals(server).handleGitHubWebhook(req, res);
 
       expect(res.statusCode).toBe(415);
-      expect(JSON.parse(res.body ?? '')).toEqual({ error: 'Unsupported Media Type: expected application/json' });
+      expect(JSON.parse(res.body ?? "")).toEqual({
+        error: "Unsupported Media Type: expected application/json",
+      });
       expect(securityLog.record).toHaveBeenCalledWith({
-        type: 'content_type_invalid',
-        source: '127.0.0.1',
-        details: { contentType: 'text/plain' },
-        severity: 'low',
+        type: "content_type_invalid",
+        source: "127.0.0.1",
+        details: { contentType: "text/plain" },
+        severity: "low",
       });
       expect(webhookHandler.validateSignature).not.toHaveBeenCalled();
     });
   });
 
-  describe('handleGitHubWebhook - idempotency', () => {
-    it('short-circuits a duplicate delivery ID as deduplicated, without validating the signature', async () => {
-      internals(server).trackDelivery('delivery-abc');
+  describe("handleGitHubWebhook - idempotency", () => {
+    it("short-circuits a duplicate delivery ID as deduplicated, without validating the signature", async () => {
+      internals(server).trackDelivery("delivery-abc");
 
       const req = createMockReq({
-        'content-type': 'application/json',
-        'x-github-event': 'push',
-        'x-github-delivery': 'delivery-abc',
+        "content-type": "application/json",
+        "x-github-event": "push",
+        "x-github-delivery": "delivery-abc",
       });
       const res = createMockRes();
 
       const promise = internals(server).handleGitHubWebhook(req, res);
-      req.emit('end');
+      req.emit("end");
       await promise;
 
       expect(res.statusCode).toBe(200);
-      expect(JSON.parse(res.body ?? '')).toEqual({ success: true, deduplicated: true });
+      expect(JSON.parse(res.body ?? "")).toEqual({ success: true, deduplicated: true });
       expect(webhookHandler.validateSignature).not.toHaveBeenCalled();
     });
 
-    it('processes a fresh delivery ID normally (not deduplicated)', async () => {
+    it("processes a fresh delivery ID normally (not deduplicated)", async () => {
       const req = createMockReq({
-        'content-type': 'application/json',
-        'x-github-event': 'push',
-        'x-github-delivery': 'delivery-new',
+        "content-type": "application/json",
+        "x-github-event": "push",
+        "x-github-delivery": "delivery-new",
       });
       const res = createMockRes();
 
       const promise = internals(server).handleGitHubWebhook(req, res);
-      req.emit('data', Buffer.from('{}'));
-      req.emit('end');
+      req.emit("data", Buffer.from("{}"));
+      req.emit("end");
       await promise;
 
       expect(webhookHandler.validateSignature).toHaveBeenCalledTimes(1);
       expect(res.statusCode).toBe(200);
-      expect(JSON.parse(res.body ?? '')).toMatchObject({ success: true });
+      expect(JSON.parse(res.body ?? "")).toMatchObject({ success: true });
     });
   });
 });

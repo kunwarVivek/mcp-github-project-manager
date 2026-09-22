@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import { z } from "zod";
 
 // ============================================================================
 // Template Types for PRD and Task Generation
@@ -7,7 +7,7 @@ import { z } from 'zod';
 /**
  * Template format detection
  */
-export type TemplateFormat = 'markdown' | 'json-schema' | 'example-based';
+export type TemplateFormat = "markdown" | "json-schema" | "example-based";
 
 /**
  * Template section definition
@@ -50,10 +50,10 @@ export interface TemplateValidationResult {
  * Template source location
  */
 export type TemplateSource =
-  | { type: 'project'; path: string }
-  | { type: 'org'; repo: string; path: string }
-  | { type: 'url'; url: string }
-  | { type: 'inline'; content: string };
+  | { type: "project"; path: string }
+  | { type: "org"; repo: string; path: string }
+  | { type: "url"; url: string }
+  | { type: "inline"; content: string };
 
 /**
  * Template storage configuration
@@ -62,14 +62,14 @@ export interface TemplateConfig {
   source: TemplateSource;
   name: string;
   version?: string;
-  inheritsFrom?: string;  // Template ID to inherit from
+  inheritsFrom?: string; // Template ID to inherit from
 }
 
 // ============================================================================
 // Zod Schemas
 // ============================================================================
 
-export const TemplateFormatSchema = z.enum(['markdown', 'json-schema', 'example-based']);
+export const TemplateFormatSchema = z.enum(["markdown", "json-schema", "example-based"]);
 
 export const TemplateSectionSchema = z.object({
   id: z.string(),
@@ -79,7 +79,7 @@ export const TemplateSectionSchema = z.object({
   minLength: z.number().optional(),
   maxLength: z.number().optional(),
   placeholder: z.string().optional(),
-  defaultValue: z.string().optional()
+  defaultValue: z.string().optional(),
 });
 
 export const ParsedTemplateSchema = z.object({
@@ -88,7 +88,7 @@ export const ParsedTemplateSchema = z.object({
   description: z.string().optional(),
   sections: z.array(TemplateSectionSchema),
   placeholders: z.array(z.string()),
-  rawContent: z.string()
+  rawContent: z.string(),
 });
 
 export const TemplateValidationResultSchema = z.object({
@@ -96,19 +96,19 @@ export const TemplateValidationResultSchema = z.object({
   errors: z.array(z.string()),
   warnings: z.array(z.string()),
   placeholders: z.array(z.string()),
-  missingSections: z.array(z.string())
+  missingSections: z.array(z.string()),
 });
 
-export const TemplateSourceSchema = z.discriminatedUnion('type', [
-  z.object({ type: z.literal('project'), path: z.string() }),
-  z.object({ type: z.literal('org'), repo: z.string(), path: z.string() }),
-  z.object({ type: z.literal('url'), url: z.string() }),
-  z.object({ type: z.literal('inline'), content: z.string() })
+export const TemplateSourceSchema = z.discriminatedUnion("type", [
+  z.object({ type: z.literal("project"), path: z.string() }),
+  z.object({ type: z.literal("org"), repo: z.string(), path: z.string() }),
+  z.object({ type: z.literal("url"), url: z.string() }),
+  z.object({ type: z.literal("inline"), content: z.string() }),
 ]);
 
 export const TemplateConfigSchema = z.object({
   source: TemplateSourceSchema,
   name: z.string(),
   version: z.string().optional(),
-  inheritsFrom: z.string().optional()
+  inheritsFrom: z.string().optional(),
 });

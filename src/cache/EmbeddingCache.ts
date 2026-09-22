@@ -6,7 +6,7 @@
  * Supports optional file persistence.
  */
 
-import * as crypto from 'node:crypto';
+import * as crypto from "node:crypto";
 
 /**
  * Cached embedding entry with metadata.
@@ -109,7 +109,7 @@ export class EmbeddingCache {
       issueId,
       contentHash,
       embedding,
-      cachedAt: Date.now()
+      cachedAt: Date.now(),
     };
 
     this.cache.set(issueId, entry);
@@ -127,8 +127,8 @@ export class EmbeddingCache {
    */
   static computeContentHash(title: string, body: string): string {
     // Normalize: trim whitespace, lowercase for consistency
-    const normalizedContent = `${(title || '').trim().toLowerCase()}\n${(body || '').trim().toLowerCase()}`;
-    return crypto.createHash('sha256').update(normalizedContent).digest('hex');
+    const normalizedContent = `${(title || "").trim().toLowerCase()}\n${(body || "").trim().toLowerCase()}`;
+    return crypto.createHash("sha256").update(normalizedContent).digest("hex");
   }
 
   /**
@@ -178,8 +178,7 @@ export class EmbeddingCache {
     const evictCount = Math.max(1, Math.floor(this.maxSize * 0.1));
 
     // Get all entries sorted by cachedAt (oldest first)
-    const entries = Array.from(this.cache.entries())
-      .sort((a, b) => a[1].cachedAt - b[1].cachedAt);
+    const entries = Array.from(this.cache.entries()).sort((a, b) => a[1].cachedAt - b[1].cachedAt);
 
     // Remove the oldest entries
     for (let i = 0; i < evictCount && i < entries.length; i++) {
@@ -239,7 +238,7 @@ export class EmbeddingCache {
       maxSize: this.maxSize,
       ttlMs: this.ttlMs,
       oldestEntryAge: oldestAge,
-      newestEntryAge: newestAge
+      newestEntryAge: newestAge,
     };
   }
 }

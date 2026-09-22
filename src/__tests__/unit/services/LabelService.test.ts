@@ -1,11 +1,11 @@
-import { type Mocked, type MockedFunction, beforeEach, describe, expect, it, vi } from 'vitest';
-import { LabelService } from '../../../services/LabelService';
-import type { GitHubRepositoryFactory } from '../../../infrastructure/github/GitHubRepositoryFactory';
-import { DomainError } from '../../../domain/errors';
+import { type Mocked, type MockedFunction, beforeEach, describe, expect, it, vi } from "vitest";
+import { LabelService } from "../../../services/LabelService";
+import type { GitHubRepositoryFactory } from "../../../infrastructure/github/GitHubRepositoryFactory";
+import { DomainError } from "../../../domain/errors";
 
-vi.mock('../../../infrastructure/github/GitHubRepositoryFactory');
+vi.mock("../../../infrastructure/github/GitHubRepositoryFactory");
 
-describe('LabelService', () => {
+describe("LabelService", () => {
   let service: LabelService;
   let mockFactory: Mocked<GitHubRepositoryFactory>;
   let mockOctokit: {
@@ -17,7 +17,7 @@ describe('LabelService', () => {
     };
   };
 
-  const config = { owner: 'testOwner', repo: 'testRepo' };
+  const config = { owner: "testOwner", repo: "testRepo" };
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -39,88 +39,96 @@ describe('LabelService', () => {
     service = new LabelService(mockFactory);
   });
 
-  describe('createLabel', () => {
-    it('should create a label with all fields', async () => {
+  describe("createLabel", () => {
+    it("should create a label with all fields", async () => {
       mockOctokit.rest.issues.createLabel.mockResolvedValueOnce({
-        data: { id: 1, name: 'bug', color: 'ff0000', description: 'Bug reports' },
+        data: { id: 1, name: "bug", color: "ff0000", description: "Bug reports" },
       });
 
       const result = await service.createLabel({
-        name: 'bug', color: '#ff0000', description: 'Bug reports',
+        name: "bug",
+        color: "#ff0000",
+        description: "Bug reports",
       });
 
-      expect(result).toEqual({ id: 1, name: 'bug', color: 'ff0000', description: 'Bug reports' });
+      expect(result).toEqual({ id: 1, name: "bug", color: "ff0000", description: "Bug reports" });
       expect(mockOctokit.rest.issues.createLabel).toHaveBeenCalledWith({
-        owner: 'testOwner', repo: 'testRepo',
-        name: 'bug', color: 'ff0000', description: 'Bug reports',
+        owner: "testOwner",
+        repo: "testRepo",
+        name: "bug",
+        color: "ff0000",
+        description: "Bug reports",
       });
     });
 
-    it('should strip hash from color', async () => {
+    it("should strip hash from color", async () => {
       mockOctokit.rest.issues.createLabel.mockResolvedValueOnce({
-        data: { id: 2, name: 'feat', color: '00ff00', description: '' },
+        data: { id: 2, name: "feat", color: "00ff00", description: "" },
       });
 
-      await service.createLabel({ name: 'feat', color: '#00ff00' });
+      await service.createLabel({ name: "feat", color: "#00ff00" });
 
       expect(mockOctokit.rest.issues.createLabel).toHaveBeenCalledWith(
-        expect.objectContaining({ color: '00ff00' })
+        expect.objectContaining({ color: "00ff00" })
       );
     });
 
-    it('should use default color when none provided', async () => {
+    it("should use default color when none provided", async () => {
       mockOctokit.rest.issues.createLabel.mockResolvedValueOnce({
-        data: { id: 3, name: 'chore', color: 'ededed', description: '' },
+        data: { id: 3, name: "chore", color: "ededed", description: "" },
       });
 
-      await service.createLabel({ name: 'chore' });
+      await service.createLabel({ name: "chore" });
 
       expect(mockOctokit.rest.issues.createLabel).toHaveBeenCalledWith(
-        expect.objectContaining({ color: 'ededed', description: '' })
+        expect.objectContaining({ color: "ededed", description: "" })
       );
     });
 
-    it('should handle null description in response', async () => {
+    it("should handle null description in response", async () => {
       mockOctokit.rest.issues.createLabel.mockResolvedValueOnce({
-        data: { id: 4, name: 'docs', color: '0000ff', description: null },
+        data: { id: 4, name: "docs", color: "0000ff", description: null },
       });
 
-      const result = await service.createLabel({ name: 'docs' });
+      const result = await service.createLabel({ name: "docs" });
 
-      expect(result.description).toBe('');
+      expect(result.description).toBe("");
     });
 
-    it('should throw mapped error on API failure', async () => {
-      mockOctokit.rest.issues.createLabel.mockRejectedValueOnce(
-        new Error('Label already exists')
-      );
+    it("should throw mapped error on API failure", async () => {
+      mockOctokit.rest.issues.createLabel.mockRejectedValueOnce(new Error("Label already exists"));
 
-      await expect(
-        service.createLabel({ name: 'duplicate' })
-      ).rejects.toThrow(DomainError);
+      await expect(service.createLabel({ name: "duplicate" })).rejects.toThrow(DomainError);
     });
   });
 
-  describe('listLabels', () => {
-    it('should list labels with default limit', async () => {
+  describe("listLabels", () => {
+    it("should list labels with default limit", async () => {
       mockOctokit.rest.issues.listLabelsForRepo.mockResolvedValueOnce({
         data: [
-          { id: 1, name: 'bug', color: 'ff0000', description: 'Bug reports' },
-          { id: 2, name: 'feature', color: '00ff00', description: null },
+          { id: 1, name: "bug", color: "ff0000", description: "Bug reports" },
+          { id: 2, name: "feature", color: "00ff00", description: null },
         ],
       });
 
       const result = await service.listLabels();
 
       expect(result).toHaveLength(2);
-      expect(result[0]).toEqual({ id: 1, name: 'bug', color: 'ff0000', description: 'Bug reports' });
-      expect(result[1].description).toBe('');
+      expect(result[0]).toEqual({
+        id: 1,
+        name: "bug",
+        color: "ff0000",
+        description: "Bug reports",
+      });
+      expect(result[1].description).toBe("");
       expect(mockOctokit.rest.issues.listLabelsForRepo).toHaveBeenCalledWith({
-        owner: 'testOwner', repo: 'testRepo', per_page: 100,
+        owner: "testOwner",
+        repo: "testRepo",
+        per_page: 100,
       });
     });
 
-    it('should use custom limit', async () => {
+    it("should use custom limit", async () => {
       mockOctokit.rest.issues.listLabelsForRepo.mockResolvedValueOnce({ data: [] });
 
       const result = await service.listLabels({ limit: 10 });
@@ -131,10 +139,8 @@ describe('LabelService', () => {
       );
     });
 
-    it('should throw mapped error on API failure', async () => {
-      mockOctokit.rest.issues.listLabelsForRepo.mockRejectedValueOnce(
-        new Error('Not Found')
-      );
+    it("should throw mapped error on API failure", async () => {
+      mockOctokit.rest.issues.listLabelsForRepo.mockRejectedValueOnce(new Error("Not Found"));
 
       await expect(service.listLabels()).rejects.toThrow(DomainError);
     });

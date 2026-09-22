@@ -1,8 +1,8 @@
-import type { GitHubError } from './types';
-import { ResourceNotFoundError } from '../../domain/errors';
-import { MCPErrorCode } from '../../domain/mcp-types';
-import { ResourceType } from '../../domain/resource-types';
-import { isGitHubErrorWithCode } from '../../domain/type-guards';
+import type { GitHubError } from "./types";
+import { ResourceNotFoundError } from "../../domain/errors";
+import { MCPErrorCode } from "../../domain/mcp-types";
+import { ResourceType } from "../../domain/resource-types";
+import { isGitHubErrorWithCode } from "../../domain/type-guards";
 
 export class GitHubApiError extends Error {
   constructor(
@@ -10,10 +10,10 @@ export class GitHubApiError extends Error {
     public readonly status?: number,
     public readonly code?: string,
     public readonly mcpErrorCode: MCPErrorCode = MCPErrorCode.INTERNAL_ERROR,
-    public readonly details?: Record<string, any>,
+    public readonly details?: Record<string, any>
   ) {
     super(message);
-    this.name = 'GitHubApiError';
+    this.name = "GitHubApiError";
   }
 }
 
@@ -23,18 +23,12 @@ export class GitHubRateLimitError extends GitHubApiError {
     public readonly resetDate: Date,
     details?: Record<string, any>
   ) {
-    super(
-      message,
-      429,
-      'RATE_LIMIT_EXCEEDED',
-      MCPErrorCode.RATE_LIMITED,
-      {
-        resetAt: resetDate.toISOString(),
-        resetAtFormatted: resetDate.toLocaleString(),
-        ...details
-      }
-    );
-    this.name = 'GitHubRateLimitError';
+    super(message, 429, "RATE_LIMIT_EXCEEDED", MCPErrorCode.RATE_LIMITED, {
+      resetAt: resetDate.toISOString(),
+      resetAtFormatted: resetDate.toLocaleString(),
+      ...details,
+    });
+    this.name = "GitHubRateLimitError";
   }
 }
 
@@ -54,11 +48,11 @@ export class GitHubErrorHandler {
   ]);
 
   private retryableErrorCodes = new Set([
-    'ETIMEDOUT',
-    'ECONNRESET',
-    'ECONNREFUSED',
-    'SOCKET_TIMEOUT',
-    'EAI_AGAIN',
+    "ETIMEDOUT",
+    "ECONNRESET",
+    "ECONNREFUSED",
+    "SOCKET_TIMEOUT",
+    "EAI_AGAIN",
   ]);
 
   private defaultRetryDelay = 1000; // 1 second
@@ -90,12 +84,12 @@ export class GitHubErrorHandler {
   handleError(error: unknown, context?: string): Error {
     if (this.isGitHubError(error)) {
       const status = error.status || error.response?.status;
-      const message = error.message || error.response?.data?.message || 'Unknown GitHub error';
-      const contextMessage = context ? ` while ${context}` : '';
+      const message = error.message || error.response?.data?.message || "Unknown GitHub error";
+      const contextMessage = context ? ` while ${context}` : "";
 
       // Handle rate limit errors
       if (status === 429 || this.isRateLimitError(error)) {
-        const resetTimestamp = error.response?.headers?.['x-ratelimit-reset'];
+        const resetTimestamp = error.response?.headers?.["x-ratelimit-reset"];
         const resetDate = resetTimestamp
           ? new Date(parseInt(resetTimestamp, 10) * 1000)
           : new Date(Date.now() + 60000); // Default to 1 minute from now
@@ -118,7 +112,7 @@ export class GitHubErrorHandler {
         return new GitHubApiError(
           `Resource not found${contextMessage}: ${message}`,
           status,
-          'NOT_FOUND',
+          "NOT_FOUND",
           MCPErrorCode.RESOURCE_NOT_FOUND
         );
       }
@@ -128,7 +122,7 @@ export class GitHubErrorHandler {
         return new GitHubApiError(
           `Authentication failed${contextMessage}: ${message}`,
           status,
-          'UNAUTHORIZED',
+          "UNAUTHORIZED",
           MCPErrorCode.UNAUTHORIZED
         );
       }
@@ -138,7 +132,7 @@ export class GitHubErrorHandler {
         return new GitHubApiError(
           `Permission denied${contextMessage}: ${message}`,
           status,
-          'FORBIDDEN',
+          "FORBIDDEN",
           MCPErrorCode.UNAUTHORIZED
         );
       }
@@ -151,7 +145,7 @@ export class GitHubErrorHandler {
         return new GitHubApiError(
           `Validation error${contextMessage}: ${message}`,
           status,
-          'VALIDATION_FAILED',
+          "VALIDATION_FAILED",
           MCPErrorCode.VALIDATION_ERROR,
           details
         );
@@ -161,7 +155,7 @@ export class GitHubErrorHandler {
       return new GitHubApiError(
         `GitHub API error (${status})${contextMessage}: ${message}`,
         status,
-        error.response?.data?.error || 'API_ERROR',
+        error.response?.data?.error || "API_ERROR",
         this.mapStatusToMCPErrorCode(status)
       );
     }
@@ -170,7 +164,7 @@ export class GitHubErrorHandler {
       return error;
     }
 
-    return new Error(`Unknown error occurred${context ? ` while ${context}` : ''}`);
+    return new Error(`Unknown error occurred${context ? ` while ${context}` : ""}`);
   }
 
   /**
@@ -186,7 +180,7 @@ export class GitHubErrorHandler {
    */
   private getRetryDelayParams(headers: Record<string, string>): RetryDelay {
     // Use GitHub's rate limit reset if available
-    const resetTimestamp = headers['x-ratelimit-reset'];
+    const resetTimestamp = headers["x-ratelimit-reset"];
     if (resetTimestamp) {
       const resetTime = parseInt(resetTimestamp, 10) * 1000;
       const now = Date.now();
@@ -199,7 +193,7 @@ export class GitHubErrorHandler {
     }
 
     // Use exponential backoff with jitter
-    const retryAfter = headers['retry-after'];
+    const retryAfter = headers["retry-after"];
     const baseDelay = retryAfter ? parseInt(retryAfter, 10) * 1000 : this.defaultRetryDelay;
 
     return {
@@ -213,7 +207,7 @@ export class GitHubErrorHandler {
    */
   private isGitHubError(error: unknown): error is GitHubError {
     if (!(error instanceof Error)) return false;
-    return 'status' in error || 'response' in error;
+    return "status" in error || "response" in error;
   }
 
   /**
@@ -221,9 +215,9 @@ export class GitHubErrorHandler {
    */
   private isRateLimitError(error: GitHubError): boolean {
     return (
-      error.response?.headers?.['x-ratelimit-remaining'] === '0' ||
-      error.response?.data?.message?.includes('rate limit') ||
-      error.message?.includes('rate limit')
+      error.response?.headers?.["x-ratelimit-remaining"] === "0" ||
+      error.response?.data?.message?.includes("rate limit") ||
+      error.message?.includes("rate limit")
     );
   }
 
@@ -232,14 +226,14 @@ export class GitHubErrorHandler {
    */
   private extractResourceType(error: GitHubError): ResourceType | null {
     // Try to determine the resource type from the URL
-    const url = error.response?.url || '';
+    const url = error.response?.url || "";
 
-    if (url.includes('/issues/')) return ResourceType.ISSUE;
-    if (url.includes('/milestones/')) return ResourceType.MILESTONE;
-    if (url.includes('/projects/')) return ResourceType.PROJECT;
-    if (url.includes('/pulls/')) return ResourceType.PULL_REQUEST;
-    if (url.includes('/comments/')) return ResourceType.COMMENT;
-    if (url.includes('/labels/')) return ResourceType.LABEL;
+    if (url.includes("/issues/")) return ResourceType.ISSUE;
+    if (url.includes("/milestones/")) return ResourceType.MILESTONE;
+    if (url.includes("/projects/")) return ResourceType.PROJECT;
+    if (url.includes("/pulls/")) return ResourceType.PULL_REQUEST;
+    if (url.includes("/comments/")) return ResourceType.COMMENT;
+    if (url.includes("/labels/")) return ResourceType.LABEL;
 
     // Use NotFoundError for unrecognized resource types
     return null;
@@ -250,8 +244,8 @@ export class GitHubErrorHandler {
    */
   private extractResourceId(error: GitHubError): string | null {
     // Try to determine the resource ID from the URL
-    const url = error.response?.url || '';
-    const urlParts = url.split('/');
+    const url = error.response?.url || "";
+    const urlParts = url.split("/");
 
     // The ID is usually the last part of the URL
     if (urlParts.length > 0) {

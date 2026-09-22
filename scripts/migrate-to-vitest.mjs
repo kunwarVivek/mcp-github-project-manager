@@ -3,8 +3,8 @@
 // Migration script: Jest → Vitest
 // Replaces @jest/globals imports with vitest, jest.fn → vi.fn, jest.mock → vi.mock
 
-import { readFileSync, writeFileSync, readdirSync, statSync } from 'node:fs';
-import { join } from 'node:path';
+import { readFileSync, writeFileSync, readdirSync, statSync } from "node:fs";
+import { join } from "node:path";
 
 function findTestFiles(dir) {
   const results = [];
@@ -12,9 +12,18 @@ function findTestFiles(dir) {
     for (const entry of readdirSync(dir)) {
       const full = join(dir, entry);
       const stat = statSync(full);
-      if (stat.isDirectory() && !entry.startsWith('.') && entry !== 'node_modules' && entry !== 'build') {
+      if (
+        stat.isDirectory() &&
+        !entry.startsWith(".") &&
+        entry !== "node_modules" &&
+        entry !== "build"
+      ) {
         results.push(...findTestFiles(full));
-      } else if (entry.endsWith('.test.ts') || entry.endsWith('.spec.ts') || entry.endsWith('.e2e.ts')) {
+      } else if (
+        entry.endsWith(".test.ts") ||
+        entry.endsWith(".spec.ts") ||
+        entry.endsWith(".e2e.ts")
+      ) {
         results.push(full);
       }
     }
@@ -22,12 +31,12 @@ function findTestFiles(dir) {
   return results;
 }
 
-const files = [...findTestFiles('src/__tests__'), ...findTestFiles('tests')];
+const files = [...findTestFiles("src/__tests__"), ...findTestFiles("tests")];
 let totalFiles = 0;
 let totalChanges = 0;
 
 for (const file of files) {
-  let content = readFileSync(file, 'utf8');
+  let content = readFileSync(file, "utf8");
   const original = content;
   let changes = 0;
 
@@ -38,49 +47,53 @@ for (const file of files) {
     (match, imports) => {
       // Replace 'jest' with 'vi' in the import list
       const newImports = imports
-        .split(',')
-        .map(i => i.trim())
-        .map(i => i === 'jest' ? 'vi' : i)
-        .filter(i => i.length > 0);
+        .split(",")
+        .map((i) => i.trim())
+        .map((i) => (i === "jest" ? "vi" : i))
+        .filter((i) => i.length > 0);
       changes++;
-      return `import { ${newImports.join(', ')} } from 'vitest';`;
+      return `import { ${newImports.join(", ")} } from 'vitest';`;
     }
   );
 
   // 2. Replace jest.fn() with vi.fn()
   const jestFnBefore = (content.match(/jest\.fn\(/g) || []).length;
-  content = content.replace(/\bjest\.fn\(/g, 'vi.fn(');
+  content = content.replace(/\bjest\.fn\(/g, "vi.fn(");
   changes += jestFnBefore;
 
   // 3. Replace jest.mock() with vi.mock()
   const jestMockBefore = (content.match(/jest\.mock\(/g) || []).length;
-  content = content.replace(/\bjest\.mock\(/g, 'vi.mock(');
+  content = content.replace(/\bjest\.mock\(/g, "vi.mock(");
   changes += jestMockBefore;
 
   // 4. Replace jest.spyOn() with vi.spyOn()
   const jestSpyBefore = (content.match(/jest\.spyOn\(/g) || []).length;
-  content = content.replace(/\bjest\.spyOn\(/g, 'vi.spyOn(');
+  content = content.replace(/\bjest\.spyOn\(/g, "vi.spyOn(");
   changes += jestSpyBefore;
 
   // 5. Replace jest.clearAllMocks() with vi.clearAllMocks()
-  content = content.replace(/\bjest\.clearAllMocks\(\)/g, 'vi.clearAllMocks()');
-  content = content.replace(/\bjest\.resetAllMocks\(\)/g, 'vi.resetAllMocks()');
-  content = content.replace(/\bjest\.restoreAllMocks\(\)/g, 'vi.restoreAllMocks()');
+  content = content.replace(/\bjest\.clearAllMocks\(\)/g, "vi.clearAllMocks()");
+  content = content.replace(/\bjest\.resetAllMocks\(\)/g, "vi.resetAllMocks()");
+  content = content.replace(/\bjest\.restoreAllMocks\(\)/g, "vi.restoreAllMocks()");
 
   // 6. Replace jest.Mocked<T> with Mocked<T> from vitest
-  content = content.replace(/\bjest\.Mocked</g, 'Mocked<');
-  content = content.replace(/\bjest\.MockedClass</g, 'MockedClass<');
-  content = content.replace(/\bjest\.MockedFunction</g, 'MockedFunction<');
+  content = content.replace(/\bjest\.Mocked</g, "Mocked<");
+  content = content.replace(/\bjest\.MockedClass</g, "MockedClass<");
+  content = content.replace(/\bjest\.MockedFunction</g, "MockedFunction<");
 
   // 7. Add Mocked import if needed
-  if (content.includes('Mocked<') || content.includes('MockedClass<') || content.includes('MockedFunction<')) {
+  if (
+    content.includes("Mocked<") ||
+    content.includes("MockedClass<") ||
+    content.includes("MockedFunction<")
+  ) {
     // Check if Mocked is already imported from vitest
     if (!content.includes("Mocked") || !content.match(/import.*Mocked.*from\s*['"]vitest['"]/)) {
       // Add Mocked to the vitest import
       content = content.replace(
         /import\s*\{([^}]*)\}\s*from\s*['"]vitest['"]\s*;/g,
         (match, imports) => {
-          if (!imports.includes('Mocked')) {
+          if (!imports.includes("Mocked")) {
             return `import { ${imports.trim()}, Mocked, MockedClass, MockedFunction } from 'vitest';`;
           }
           return match;

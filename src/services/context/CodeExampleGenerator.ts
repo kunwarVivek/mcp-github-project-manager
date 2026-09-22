@@ -1,23 +1,28 @@
-import { generateObject } from 'ai';
-import { AIServiceFactory } from '../ai/AIServiceFactory';
-import type { CodeExample } from '../../domain/task-context-schemas';
-import type { AITask } from '../../domain/ai-types';
-import { type ILogger, Logger } from '../../infrastructure/logger';
-import { InputSanitizer } from '../utils/InputSanitizer';
-import { z } from 'zod';
+import { generateObject } from "ai";
+import { AIServiceFactory } from "../ai/AIServiceFactory";
+import type { CodeExample } from "../../domain/task-context-schemas";
+import type { AITask } from "../../domain/ai-types";
+import { type ILogger, Logger } from "../../infrastructure/logger";
+import { InputSanitizer } from "../utils/InputSanitizer";
+import { z } from "zod";
 
 /**
  * Schema for AI-generated code examples
  */
 const CodeExamplesSchema = z.object({
-  examples: z.array(z.object({
-    title: z.string().min(3),
-    description: z.string().min(10),
-    language: z.string(),
-    snippet: z.string().min(20),
-    explanation: z.string().min(20),
-    source: z.string()
-  })).min(1).max(5)
+  examples: z
+    .array(
+      z.object({
+        title: z.string().min(3),
+        description: z.string().min(10),
+        language: z.string(),
+        snippet: z.string().min(20),
+        explanation: z.string().min(20),
+        source: z.string(),
+      })
+    )
+    .min(1)
+    .max(5),
 });
 
 /**
@@ -63,13 +68,12 @@ export class CodeExampleGenerator {
         prompt,
         schema: CodeExamplesSchema,
         maxOutputTokens: 2000,
-        temperature: 0.4
+        temperature: 0.4,
       });
 
       return result.object.examples.slice(0, maxExamples) as CodeExample[];
-
     } catch (error) {
-      this.logger.error('Error generating code examples', error);
+      this.logger.error("Error generating code examples", error);
       // Fallback to templates
       return this.generateTemplateExamples(task, maxExamples);
     }
@@ -104,11 +108,11 @@ export class CodeExampleGenerator {
     const templates = new Map<string, CodeExample[]>();
 
     // API/Endpoint templates
-    templates.set('api', [
+    templates.set("api", [
       {
-        title: 'RESTful API Endpoint with Validation',
-        description: 'Complete API endpoint with request validation and error handling',
-        language: 'typescript',
+        title: "RESTful API Endpoint with Validation",
+        description: "Complete API endpoint with request validation and error handling",
+        language: "typescript",
         snippet: `import { Router, Request, Response } from 'express';
 import { z } from 'zod';
 
@@ -152,17 +156,18 @@ router.post('/api/resources', async (req: Request, res: Response) => {
 });
 
 export default router;`,
-        explanation: 'Complete API endpoint pattern with Zod validation, proper error handling, and TypeScript types',
-        source: 'Express.js + Zod Best Practices'
-      }
+        explanation:
+          "Complete API endpoint pattern with Zod validation, proper error handling, and TypeScript types",
+        source: "Express.js + Zod Best Practices",
+      },
     ]);
 
     // React Component templates
-    templates.set('component', [
+    templates.set("component", [
       {
-        title: 'React Functional Component with Hooks',
-        description: 'Modern React component using hooks for state and effects',
-        language: 'typescript',
+        title: "React Functional Component with Hooks",
+        description: "Modern React component using hooks for state and effects",
+        language: "typescript",
         snippet: `import React, { useState, useEffect } from 'react';
 
 interface TaskItemProps {
@@ -243,17 +248,18 @@ export const TaskItem: React.FC<TaskItemProps> = ({
     </div>
   );
 };`,
-        explanation: 'React component with state management, async operations, error handling, and user interaction',
-        source: 'React Hooks Best Practices'
-      }
+        explanation:
+          "React component with state management, async operations, error handling, and user interaction",
+        source: "React Hooks Best Practices",
+      },
     ]);
 
     // Service Layer templates
-    templates.set('service', [
+    templates.set("service", [
       {
-        title: 'Service Class with Dependency Injection',
-        description: 'Clean service layer with DI and proper error handling',
-        language: 'typescript',
+        title: "Service Class with Dependency Injection",
+        description: "Clean service layer with DI and proper error handling",
+        language: "typescript",
         snippet: `import { injectable, inject } from 'tsyringe';
 import { ResourceRepository } from './repositories/ResourceRepository';
 import { EventEmitter } from './events/EventEmitter';
@@ -356,17 +362,18 @@ class ResourceNotFoundError extends Error {
     this.name = 'ResourceNotFoundError';
   }
 }`,
-        explanation: 'Service class with dependency injection, validation, event emission, and logging',
-        source: 'Clean Architecture + tsyringe'
-      }
+        explanation:
+          "Service class with dependency injection, validation, event emission, and logging",
+        source: "Clean Architecture + tsyringe",
+      },
     ]);
 
     // Database/Model templates
-    templates.set('database', [
+    templates.set("database", [
       {
-        title: 'TypeORM Entity with Relations',
-        description: 'Database entity with relationships and validation',
-        language: 'typescript',
+        title: "TypeORM Entity with Relations",
+        description: "Database entity with relationships and validation",
+        language: "typescript",
         snippet: `import {
   Entity,
   Column,
@@ -417,17 +424,17 @@ export class Resource {
   @Column({ name: 'deleted_at', nullable: true })
   deletedAt?: Date;
 }`,
-        explanation: 'Complete TypeORM entity with validation, relationships, and indexes',
-        source: 'TypeORM + class-validator'
-      }
+        explanation: "Complete TypeORM entity with validation, relationships, and indexes",
+        source: "TypeORM + class-validator",
+      },
     ]);
 
     // Testing templates
-    templates.set('test', [
+    templates.set("test", [
       {
-        title: 'Unit Test with Jest',
-        description: 'Complete unit test suite with mocks and assertions',
-        language: 'typescript',
+        title: "Unit Test with Jest",
+        description: "Complete unit test suite with mocks and assertions",
+        language: "typescript",
         snippet: `import { describe, it, expect, beforeEach, jest } from '@jest/globals';
 import { ResourceService } from './ResourceService';
 import { ResourceRepository } from './repositories/ResourceRepository';
@@ -535,9 +542,9 @@ describe('ResourceService', () => {
     });
   });
 });`,
-        explanation: 'Comprehensive unit tests with mocks, setup, and multiple test cases',
-        source: 'Jest Testing Best Practices'
-      }
+        explanation: "Comprehensive unit tests with mocks, setup, and multiple test cases",
+        source: "Jest Testing Best Practices",
+      },
     ]);
 
     return templates;
@@ -549,9 +556,9 @@ describe('ResourceService', () => {
   private getGenericExamples(_task: AITask): CodeExample[] {
     return [
       {
-        title: 'Error Handling Pattern',
-        description: 'Robust error handling with custom error types',
-        language: 'typescript',
+        title: "Error Handling Pattern",
+        description: "Robust error handling with custom error types",
+        language: "typescript",
         snippet: `class AppError extends Error {
   constructor(
     public message: string,
@@ -580,13 +587,13 @@ try {
   logger.error('Unexpected error:', error);
   throw error;
 }`,
-        explanation: 'Custom error classes with proper error handling patterns',
-        source: 'Node.js Error Handling Best Practices'
+        explanation: "Custom error classes with proper error handling patterns",
+        source: "Node.js Error Handling Best Practices",
       },
       {
-        title: 'Async/Await with Retry Logic',
-        description: 'Retry mechanism for failed operations',
-        language: 'typescript',
+        title: "Async/Await with Retry Logic",
+        description: "Retry mechanism for failed operations",
+        language: "typescript",
         snippet: `async function withRetry<T>(
   operation: () => Promise<T>,
   maxRetries: number = 3,
@@ -614,9 +621,9 @@ try {
 
 // Usage
 const data = await withRetry(() => fetchDataFromAPI(), 3, 1000);`,
-        explanation: 'Retry logic with exponential backoff for resilient operations',
-        source: 'Resilience Patterns'
-      }
+        explanation: "Retry logic with exponential backoff for resilient operations",
+        source: "Resilience Patterns",
+      },
     ];
   }
 
@@ -633,9 +640,9 @@ const data = await withRetry(() => fetchDataFromAPI(), 3, 1000);`,
 - Description: ${InputSanitizer.sanitizeTaskContent(task.description)}
 - Complexity: ${task.complexity}/10
 
-**Technology Stack:** ${techStack.join(', ')}
+**Technology Stack:** ${techStack.join(", ")}
 
-${technicalContext ? `**Technical Context:**\n${JSON.stringify(technicalContext, null, 2)}` : ''}
+${technicalContext ? `**Technical Context:**\n${JSON.stringify(technicalContext, null, 2)}` : ""}
 
 Generate 2-3 code examples that:
 1. Are directly relevant to implementing this task
@@ -655,26 +662,26 @@ Focus on practical examples that developers can reference during implementation.
     const taskText = `${task.title} ${task.description}`.toLowerCase();
 
     // Programming languages
-    if (taskText.includes('typescript') || taskText.includes('.ts')) stack.push('TypeScript');
-    if (taskText.includes('javascript') || taskText.includes('.js')) stack.push('JavaScript');
-    if (taskText.includes('python')) stack.push('Python');
-    if (taskText.includes('java') && !taskText.includes('javascript')) stack.push('Java');
+    if (taskText.includes("typescript") || taskText.includes(".ts")) stack.push("TypeScript");
+    if (taskText.includes("javascript") || taskText.includes(".js")) stack.push("JavaScript");
+    if (taskText.includes("python")) stack.push("Python");
+    if (taskText.includes("java") && !taskText.includes("javascript")) stack.push("Java");
 
     // Frameworks
-    if (taskText.includes('react')) stack.push('React');
-    if (taskText.includes('vue')) stack.push('Vue.js');
-    if (taskText.includes('angular')) stack.push('Angular');
-    if (taskText.includes('express')) stack.push('Express.js');
-    if (taskText.includes('fastapi')) stack.push('FastAPI');
+    if (taskText.includes("react")) stack.push("React");
+    if (taskText.includes("vue")) stack.push("Vue.js");
+    if (taskText.includes("angular")) stack.push("Angular");
+    if (taskText.includes("express")) stack.push("Express.js");
+    if (taskText.includes("fastapi")) stack.push("FastAPI");
 
     // Databases
-    if (taskText.includes('postgres') || taskText.includes('postgresql')) stack.push('PostgreSQL');
-    if (taskText.includes('mongodb') || taskText.includes('mongo')) stack.push('MongoDB');
-    if (taskText.includes('redis')) stack.push('Redis');
+    if (taskText.includes("postgres") || taskText.includes("postgresql")) stack.push("PostgreSQL");
+    if (taskText.includes("mongodb") || taskText.includes("mongo")) stack.push("MongoDB");
+    if (taskText.includes("redis")) stack.push("Redis");
 
     // Default to common stack if nothing detected
     if (stack.length === 0) {
-      stack.push('TypeScript', 'Node.js');
+      stack.push("TypeScript", "Node.js");
     }
 
     return stack;

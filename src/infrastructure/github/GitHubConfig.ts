@@ -40,7 +40,7 @@ export class GitHubConfig {
       },
     });
   }
-  
+
   static create(owner: string, repo: string, token: string, projectId?: string): GitHubConfig {
     return new GitHubConfig(owner, repo, token, projectId);
   }

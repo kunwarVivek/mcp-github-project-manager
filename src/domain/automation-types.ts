@@ -15,7 +15,7 @@ export enum AutomationTriggerType {
   SPRINT_STARTED = "sprint_started",
   SPRINT_ENDED = "sprint_ended",
   MILESTONE_REACHED = "milestone_reached",
-  SCHEDULE = "schedule"
+  SCHEDULE = "schedule",
 }
 
 export enum AutomationActionType {
@@ -30,7 +30,7 @@ export enum AutomationActionType {
   DELETE_RELATIONSHIP = "delete_relationship",
   NOTIFY = "notify",
   WEBHOOK = "webhook",
-  CUSTOM_SCRIPT = "custom_script"
+  CUSTOM_SCRIPT = "custom_script",
 }
 
 export interface AutomationCondition {

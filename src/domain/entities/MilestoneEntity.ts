@@ -21,8 +21,8 @@
  * milestone.canClose(); // checks if all issues are resolved
  * ```
  */
-import { ResourceStatus } from '../resource-types';
-import type { Milestone, CreateMilestone } from '../types';
+import { ResourceStatus } from "../resource-types";
+import type { Milestone, CreateMilestone } from "../types";
 
 /**
  * Milestone state transitions
@@ -75,10 +75,7 @@ export class MilestoneEntity implements Milestone {
   // Internal config
   private readonly config: MilestoneEntityConfig;
 
-  private constructor(
-    data: Milestone,
-    config: MilestoneEntityConfig = DEFAULT_CONFIG
-  ) {
+  private constructor(data: Milestone, config: MilestoneEntityConfig = DEFAULT_CONFIG) {
     this.id = data.id;
     this.number = data.number;
     this.title = data.title;
@@ -233,10 +230,10 @@ export class MilestoneEntity implements Milestone {
    */
   updateProgress(complete: number, total: number): void {
     if (complete < 0 || total < 0) {
-      throw new Error('Progress values cannot be negative');
+      throw new Error("Progress values cannot be negative");
     }
     if (complete > total) {
-      throw new Error('Completed count cannot exceed total');
+      throw new Error("Completed count cannot exceed total");
     }
 
     this.progress = {
@@ -259,7 +256,7 @@ export class MilestoneEntity implements Milestone {
     if (!force && this.hasIssues && !this.allIssuesComplete) {
       throw new Error(
         `Cannot close milestone: ${this.completedCount}/${this.totalCount} issues complete. ` +
-        `Use force=true to close anyway.`
+          `Use force=true to close anyway.`
       );
     }
 
@@ -283,16 +280,14 @@ export class MilestoneEntity implements Milestone {
    * Check if the milestone can be closed
    */
   canClose(): boolean {
-    return !this.isComplete && 
-           (this.allIssuesComplete || !this.hasIssues);
+    return !this.isComplete && (this.allIssuesComplete || !this.hasIssues);
   }
 
   /**
    * Check if the milestone can accept new issues
    */
   canAcceptIssues(): boolean {
-    return this.status === ResourceStatus.ACTIVE ||
-           this.status === ResourceStatus.PLANNED;
+    return this.status === ResourceStatus.ACTIVE || this.status === ResourceStatus.PLANNED;
   }
 
   /**
@@ -300,7 +295,7 @@ export class MilestoneEntity implements Milestone {
    */
   addIssue(): void {
     if (!this.canAcceptIssues()) {
-      throw new Error('Milestone cannot accept issues in current state');
+      throw new Error("Milestone cannot accept issues in current state");
     }
 
     if (!this.progress) {
@@ -321,7 +316,7 @@ export class MilestoneEntity implements Milestone {
     }
 
     if (this.completedCount >= this.totalCount) {
-      throw new Error('No incomplete issues remaining');
+      throw new Error("No incomplete issues remaining");
     }
 
     this.progress.complete += 1;
@@ -409,9 +404,10 @@ export class MilestoneEntity implements Milestone {
    */
   private updateProgressPercent(): void {
     if (this.progress) {
-      this.progress.percent = this.progress.total > 0
-        ? Math.round((this.progress.complete / this.progress.total) * 100)
-        : 0;
+      this.progress.percent =
+        this.progress.total > 0
+          ? Math.round((this.progress.complete / this.progress.total) * 100)
+          : 0;
     }
   }
 

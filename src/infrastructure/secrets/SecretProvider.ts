@@ -1,6 +1,6 @@
-import { existsSync, readFileSync } from 'node:fs';
-import { GhCliSecretProvider } from './GhCliSecretProvider';
-import { join } from 'node:path';
+import { existsSync, readFileSync } from "node:fs";
+import { GhCliSecretProvider } from "./GhCliSecretProvider";
+import { join } from "node:path";
 
 /**
  * A source of secret/config values. Implementations must be synchronous so the
@@ -17,7 +17,7 @@ export interface SecretProvider {
  * joined, so a caller can never read outside the mounted directory.
  */
 function isSafeSecretName(name: string): boolean {
-  if (name.length === 0 || name === '.' || name === '..') return false;
+  if (name.length === 0 || name === "." || name === "..") return false;
   return !/[/\\\0]/.test(name);
 }
 
@@ -62,7 +62,7 @@ export class FileSecretProvider implements SecretProvider {
     }
     try {
       // Trim trailing newline that secret managers commonly append.
-      return readFileSync(path, 'utf8').replace(/\r?\n$/, '');
+      return readFileSync(path, "utf8").replace(/\r?\n$/, "");
     } catch {
       return undefined;
     }
@@ -92,7 +92,7 @@ export class SecretResolver {
   resolve(name: string): string | undefined {
     for (const provider of this.providers) {
       const value = provider.get(name);
-      if (value !== undefined && value !== '') {
+      if (value !== undefined && value !== "") {
         return value;
       }
     }
@@ -108,9 +108,7 @@ export class SecretResolver {
  * - `gh auth token` is consulted last (GITHUB_TOKEN only), unless
  *   GH_CLI_TOKEN_FALLBACK=false.
  */
-export function createDefaultSecretResolver(
-  env?: NodeJS.ProcessEnv,
-): SecretResolver {
+export function createDefaultSecretResolver(env?: NodeJS.ProcessEnv): SecretResolver {
   // Read config off the live env when no explicit one is supplied, for the same
   // reason EnvSecretProvider does (see its constructor docs).
   const config = env ?? process.env;
@@ -119,14 +117,14 @@ export function createDefaultSecretResolver(
   if (secretsDir) {
     providers.push(new FileSecretProvider(secretsDir));
   }
-  providers.push(new EnvSecretProvider(env));  // undefined -> live process.env
+  providers.push(new EnvSecretProvider(env)); // undefined -> live process.env
 
   // Last resort: borrow the token from an authenticated `gh` CLI so local
   // development needs no explicit configuration. Everything above wins over it.
   // Opt out with GH_CLI_TOKEN_FALLBACK=false where shelling out is unwanted.
   const ghFallbackAllowed =
-    config.NODE_ENV !== 'test' &&
-    (config.GH_CLI_TOKEN_FALLBACK ?? 'true').toLowerCase() !== 'false';
+    config.NODE_ENV !== "test" &&
+    (config.GH_CLI_TOKEN_FALLBACK ?? "true").toLowerCase() !== "false";
   if (ghFallbackAllowed) {
     providers.push(new GhCliSecretProvider());
   }

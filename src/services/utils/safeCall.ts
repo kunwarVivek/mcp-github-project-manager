@@ -1,4 +1,4 @@
-import { mapErrorToMCPError } from './ErrorMapper';
+import { mapErrorToMCPError } from "./ErrorMapper";
 
 /**
  * Wraps an async function with standard MCP error mapping.

@@ -9,26 +9,24 @@
  * Falls back to keyword/label matching when AI unavailable.
  */
 
-import { embed, embedMany, cosineSimilarity } from 'ai';
-import { generateObject } from 'ai';
-import { z } from 'zod';
-import { openai } from '@ai-sdk/openai';
-import { AIServiceFactory } from './AIServiceFactory.js';
-import { calculateWeightedScore, getConfidenceTier } from './ConfidenceScorer.js';
-import { EmbeddingCache } from '../../cache/EmbeddingCache.js';
-import { InputSanitizer } from '../utils/InputSanitizer';
-import { type ILogger, Logger } from '../../infrastructure/logger';
-import {
-  RELATED_ISSUE_SYSTEM_PROMPT,
-} from './prompts/IssueIntelligencePrompts.js';
+import { embed, embedMany, cosineSimilarity } from "ai";
+import { generateObject } from "ai";
+import { z } from "zod";
+import { openai } from "@ai-sdk/openai";
+import { AIServiceFactory } from "./AIServiceFactory.js";
+import { calculateWeightedScore, getConfidenceTier } from "./ConfidenceScorer.js";
+import { EmbeddingCache } from "../../cache/EmbeddingCache.js";
+import { InputSanitizer } from "../utils/InputSanitizer";
+import { type ILogger, Logger } from "../../infrastructure/logger";
+import { RELATED_ISSUE_SYSTEM_PROMPT } from "./prompts/IssueIntelligencePrompts.js";
 import type {
   IssueRelationship,
   RelatedIssueResult,
   RelatedIssueLinkingConfig,
   DependencySubType,
-  IssueInput
-} from '../../domain/issue-intelligence-types.js';
-import type { SectionConfidence, ConfidenceFactors } from '../../domain/ai-types.js';
+  IssueInput,
+} from "../../domain/issue-intelligence-types.js";
+import type { SectionConfidence, ConfidenceFactors } from "../../domain/ai-types.js";
 
 // ============================================================================
 // Constants
@@ -37,26 +35,44 @@ import type { SectionConfidence, ConfidenceFactors } from '../../domain/ai-types
 /**
  * Default configuration for related issue linking.
  */
-const DEFAULT_CONFIG: Required<Pick<RelatedIssueLinkingConfig, 'includeSemanticSimilarity' | 'includeDependencies' | 'includeComponentGrouping'>> = {
+const DEFAULT_CONFIG: Required<
+  Pick<
+    RelatedIssueLinkingConfig,
+    "includeSemanticSimilarity" | "includeDependencies" | "includeComponentGrouping"
+  >
+> = {
   includeSemanticSimilarity: true,
   includeDependencies: true,
-  includeComponentGrouping: true
+  includeComponentGrouping: true,
 };
 
 /**
  * Keywords indicating the issue blocks something else.
  */
 const BLOCKS_KEYWORDS = [
-  'enables', 'unblocks', 'required for', 'blocks', 'prerequisite for',
-  'must be done before', 'needed for', 'enables work on'
+  "enables",
+  "unblocks",
+  "required for",
+  "blocks",
+  "prerequisite for",
+  "must be done before",
+  "needed for",
+  "enables work on",
 ];
 
 /**
  * Keywords indicating the issue is blocked by something.
  */
 const BLOCKING_KEYWORDS = [
-  'prerequisite', 'requires', 'depends on', 'needs', 'blocked by',
-  'waiting for', 'depends upon', 'cannot start until', 'after #'
+  "prerequisite",
+  "requires",
+  "depends on",
+  "needs",
+  "blocked by",
+  "waiting for",
+  "depends upon",
+  "cannot start until",
+  "after #",
 ];
 
 /**
@@ -73,12 +89,14 @@ const COMPONENT_LABEL_THRESHOLD = 0.3;
  * Zod schema for AI dependency analysis response.
  */
 const AIDependencySchema = z.object({
-  relationships: z.array(z.object({
-    targetIssueId: z.string(),
-    subType: z.enum(['blocks', 'blocked_by', 'related_to']),
-    confidence: z.number().min(0).max(1),
-    reasoning: z.string()
-  }))
+  relationships: z.array(
+    z.object({
+      targetIssueId: z.string(),
+      subType: z.enum(["blocks", "blocked_by", "related_to"]),
+      confidence: z.number().min(0).max(1),
+      reasoning: z.string(),
+    })
+  ),
 });
 
 // ============================================================================
@@ -97,7 +115,12 @@ const AIDependencySchema = z.object({
 export class RelatedIssueLinkingService {
   private aiFactory: AIServiceFactory;
   private embeddingCache: EmbeddingCache;
-  private config: Required<Pick<RelatedIssueLinkingConfig, 'includeSemanticSimilarity' | 'includeDependencies' | 'includeComponentGrouping'>>;
+  private config: Required<
+    Pick<
+      RelatedIssueLinkingConfig,
+      "includeSemanticSimilarity" | "includeDependencies" | "includeComponentGrouping"
+    >
+  >;
   private readonly logger: ILogger;
 
   /**
@@ -105,7 +128,11 @@ export class RelatedIssueLinkingService {
    *
    * @param config - Optional configuration overrides
    */
-  constructor(aiFactory?: AIServiceFactory, config?: Partial<RelatedIssueLinkingConfig>, logger?: ILogger) {
+  constructor(
+    aiFactory?: AIServiceFactory,
+    config?: Partial<RelatedIssueLinkingConfig>,
+    logger?: ILogger
+  ) {
     this.aiFactory = aiFactory ?? AIServiceFactory.getInstance();
     this.embeddingCache = new EmbeddingCache();
     this.config = { ...DEFAULT_CONFIG, ...config };
@@ -128,7 +155,7 @@ export class RelatedIssueLinkingService {
     const { issueId, issueTitle, issueDescription, issueLabels = [], repositoryIssues } = params;
 
     // Filter out the source issue
-    const candidateIssues = repositoryIssues.filter(i => i.id !== issueId);
+    const candidateIssues = repositoryIssues.filter((i) => i.id !== issueId);
 
     if (candidateIssues.length === 0) {
       return this.getEmptyResult();
@@ -144,11 +171,11 @@ export class RelatedIssueLinkingService {
           sourceId: issueId,
           sourceTitle: issueTitle,
           sourceDescription: issueDescription,
-          candidateIssues
+          candidateIssues,
         });
         allRelationships.push(...semanticRelations);
       } catch (error) {
-        this.logger.error('[RelatedIssueLinking] Semantic analysis failed', error);
+        this.logger.error("[RelatedIssueLinking] Semantic analysis failed", error);
         // Continue with other strategies
       }
     }
@@ -159,7 +186,7 @@ export class RelatedIssueLinkingService {
         sourceId: issueId,
         sourceTitle: issueTitle,
         sourceDescription: issueDescription,
-        candidateIssues
+        candidateIssues,
       });
       allRelationships.push(...dependencyRelations);
     }
@@ -169,7 +196,7 @@ export class RelatedIssueLinkingService {
       const componentRelations = this.detectComponentGrouping({
         sourceId: issueId,
         sourceLabels: issueLabels,
-        candidateIssues
+        candidateIssues,
       });
       allRelationships.push(...componentRelations);
     }
@@ -187,13 +214,13 @@ export class RelatedIssueLinkingService {
       strategiesUsed: [
         this.config.includeSemanticSimilarity,
         this.config.includeDependencies,
-        this.config.includeComponentGrouping
-      ].filter(Boolean).length
+        this.config.includeComponentGrouping,
+      ].filter(Boolean).length,
     });
 
     return {
       relationships: mergedRelationships,
-      confidence
+      confidence,
     };
   }
 
@@ -209,10 +236,10 @@ export class RelatedIssueLinkingService {
     const { sourceId, sourceTitle, sourceDescription, candidateIssues } = params;
 
     // Get embedding for source issue
-    const sourceText = `${InputSanitizer.sanitizeIssueContent(sourceTitle)}\n\n${InputSanitizer.sanitizeIssueContent(sourceDescription || '')}`;
+    const sourceText = `${InputSanitizer.sanitizeIssueContent(sourceTitle)}\n\n${InputSanitizer.sanitizeIssueContent(sourceDescription || "")}`;
     const { embedding: sourceEmbedding } = await embed({
-      model: openai.embedding('text-embedding-3-small'),
-      value: sourceText
+      model: openai.embedding("text-embedding-3-small"),
+      value: sourceText,
     });
 
     // Get embeddings for candidates
@@ -232,9 +259,9 @@ export class RelatedIssueLinkingService {
           targetIssueId: candidate.id,
           targetIssueNumber: candidate.number,
           targetIssueTitle: candidate.title,
-          relationshipType: 'semantic',
+          relationshipType: "semantic",
           confidence: similarity,
-          reasoning: `${(similarity * 100).toFixed(0)}% semantic similarity - similar topic or feature area`
+          reasoning: `${(similarity * 100).toFixed(0)}% semantic similarity - similar topic or feature area`,
         });
       }
     }
@@ -259,15 +286,17 @@ export class RelatedIssueLinkingService {
         result.set(issue.id, cached);
       } else {
         uncachedIssues.push(issue);
-        uncachedTexts.push(`${InputSanitizer.sanitizeIssueContent(issue.title)}\n\n${InputSanitizer.sanitizeIssueContent(issue.body || '')}`);
+        uncachedTexts.push(
+          `${InputSanitizer.sanitizeIssueContent(issue.title)}\n\n${InputSanitizer.sanitizeIssueContent(issue.body || "")}`
+        );
       }
     }
 
     // Batch compute uncached
     if (uncachedTexts.length > 0) {
       const { embeddings } = await embedMany({
-        model: openai.embedding('text-embedding-3-small'),
-        values: uncachedTexts
+        model: openai.embedding("text-embedding-3-small"),
+        values: uncachedTexts,
       });
 
       for (let i = 0; i < uncachedIssues.length; i++) {
@@ -295,29 +324,34 @@ export class RelatedIssueLinkingService {
     const { sourceId, sourceTitle, sourceDescription, candidateIssues } = params;
     const relationships: IssueRelationship[] = [];
 
-    const sourceText = `${sourceTitle}\n${sourceDescription || ''}`.toLowerCase();
+    const sourceText = `${sourceTitle}\n${sourceDescription || ""}`.toLowerCase();
 
     // First pass: keyword-based detection
     for (const candidate of candidateIssues) {
-      const candidateText = `${candidate.title}\n${candidate.body || ''}`.toLowerCase();
+      const candidateText = `${candidate.title}\n${candidate.body || ""}`.toLowerCase();
 
       // Check if source references candidate (blocks or blocked_by)
-      const issuePattern = new RegExp(`#${candidate.number}\\b|issue\\s*${candidate.number}\\b`, 'i');
+      const issuePattern = new RegExp(
+        `#${candidate.number}\\b|issue\\s*${candidate.number}\\b`,
+        "i"
+      );
 
       if (issuePattern.test(sourceText)) {
         // Source mentions candidate - determine direction
-        const blocksMatch = BLOCKS_KEYWORDS.some(kw =>
-          sourceText.includes(kw) && sourceText.indexOf(kw) < sourceText.search(issuePattern)
+        const blocksMatch = BLOCKS_KEYWORDS.some(
+          (kw) =>
+            sourceText.includes(kw) && sourceText.indexOf(kw) < sourceText.search(issuePattern)
         );
-        const blockedByMatch = BLOCKING_KEYWORDS.some(kw =>
-          sourceText.includes(kw) && sourceText.indexOf(kw) < sourceText.search(issuePattern)
+        const blockedByMatch = BLOCKING_KEYWORDS.some(
+          (kw) =>
+            sourceText.includes(kw) && sourceText.indexOf(kw) < sourceText.search(issuePattern)
         );
 
-        let subType: DependencySubType = 'related_to';
+        let subType: DependencySubType = "related_to";
         if (blocksMatch && !blockedByMatch) {
-          subType = 'blocks';
+          subType = "blocks";
         } else if (blockedByMatch && !blocksMatch) {
-          subType = 'blocked_by';
+          subType = "blocked_by";
         }
 
         relationships.push({
@@ -325,18 +359,21 @@ export class RelatedIssueLinkingService {
           targetIssueId: candidate.id,
           targetIssueNumber: candidate.number,
           targetIssueTitle: candidate.title,
-          relationshipType: 'dependency',
+          relationshipType: "dependency",
           subType,
           confidence: 0.9, // High confidence for explicit references
-          reasoning: `Source issue explicitly references #${candidate.number}`
+          reasoning: `Source issue explicitly references #${candidate.number}`,
         });
       }
 
       // Check for keyword overlap suggesting implicit dependency
-      const hasBlocksKeyword = BLOCKS_KEYWORDS.some(kw => sourceText.includes(kw));
-      const hasBlockedByKeyword = BLOCKING_KEYWORDS.some(kw => sourceText.includes(kw));
+      const hasBlocksKeyword = BLOCKS_KEYWORDS.some((kw) => sourceText.includes(kw));
+      const hasBlockedByKeyword = BLOCKING_KEYWORDS.some((kw) => sourceText.includes(kw));
 
-      if ((hasBlocksKeyword || hasBlockedByKeyword) && !relationships.find(r => r.targetIssueId === candidate.id)) {
+      if (
+        (hasBlocksKeyword || hasBlockedByKeyword) &&
+        !relationships.find((r) => r.targetIssueId === candidate.id)
+      ) {
         // Check for strong thematic overlap that might indicate dependency
         const overlapScore = this.calculateKeywordOverlap(sourceText, candidateText);
         if (overlapScore > 0.4) {
@@ -346,10 +383,10 @@ export class RelatedIssueLinkingService {
             targetIssueId: candidate.id,
             targetIssueNumber: candidate.number,
             targetIssueTitle: candidate.title,
-            relationshipType: 'dependency',
-            subType: 'related_to',
-            confidence: 0.5 + (overlapScore * 0.2),
-            reasoning: `Potential dependency based on keyword overlap (${(overlapScore * 100).toFixed(0)}% overlap)`
+            relationshipType: "dependency",
+            subType: "related_to",
+            confidence: 0.5 + overlapScore * 0.2,
+            reasoning: `Potential dependency based on keyword overlap (${(overlapScore * 100).toFixed(0)}% overlap)`,
           });
         }
       }
@@ -357,13 +394,13 @@ export class RelatedIssueLinkingService {
 
     // Second pass: AI analysis for implicit dependencies
     const aiRelationships = await this.aiDependencyAnalysis(
-      { id: sourceId, title: sourceTitle, body: sourceDescription || '' },
-      candidateIssues.filter(c => !relationships.find(r => r.targetIssueId === c.id))
+      { id: sourceId, title: sourceTitle, body: sourceDescription || "" },
+      candidateIssues.filter((c) => !relationships.find((r) => r.targetIssueId === c.id))
     );
 
     // Merge AI results (don't duplicate)
     for (const aiRel of aiRelationships) {
-      if (!relationships.find(r => r.targetIssueId === aiRel.targetIssueId)) {
+      if (!relationships.find((r) => r.targetIssueId === aiRel.targetIssueId)) {
         relationships.push(aiRel);
       }
     }
@@ -382,7 +419,7 @@ export class RelatedIssueLinkingService {
       return [];
     }
 
-    const model = this.aiFactory.getModel('main') || this.aiFactory.getBestAvailableModel();
+    const model = this.aiFactory.getModel("main") || this.aiFactory.getBestAvailableModel();
     if (!model) {
       // AI unavailable
       return [];
@@ -397,7 +434,7 @@ export class RelatedIssueLinkingService {
         system: RELATED_ISSUE_SYSTEM_PROMPT,
         prompt: this.formatDependencyAnalysisPrompt(sourceIssue, limitedCandidates),
         schema: AIDependencySchema,
-        temperature: 0.3
+        temperature: 0.3,
       });
 
       // Convert AI result to IssueRelationship[]
@@ -406,7 +443,7 @@ export class RelatedIssueLinkingService {
       for (const rel of result.object.relationships) {
         if (rel.confidence < 0.5) continue;
 
-        const candidate = candidateIssues.find(c => c.id === rel.targetIssueId);
+        const candidate = candidateIssues.find((c) => c.id === rel.targetIssueId);
         if (!candidate) continue;
 
         relationships.push({
@@ -414,16 +451,16 @@ export class RelatedIssueLinkingService {
           targetIssueId: rel.targetIssueId,
           targetIssueNumber: candidate.number,
           targetIssueTitle: candidate.title,
-          relationshipType: 'dependency',
+          relationshipType: "dependency",
           subType: rel.subType as DependencySubType,
           confidence: rel.confidence,
-          reasoning: rel.reasoning
+          reasoning: rel.reasoning,
         });
       }
 
       return relationships;
     } catch (error) {
-      this.logger.error('[RelatedIssueLinking] AI dependency analysis failed', error);
+      this.logger.error("[RelatedIssueLinking] AI dependency analysis failed", error);
       return [];
     }
   }
@@ -435,9 +472,12 @@ export class RelatedIssueLinkingService {
     sourceIssue: { id: string; title: string; body: string },
     candidateIssues: IssueInput[]
   ): string {
-    const candidatesText = candidateIssues.map((issue, i) =>
-      `${i + 1}. ID: ${issue.id}, #${issue.number}: ${issue.title}\n   ${(issue.body || '').substring(0, 200)}${(issue.body || '').length > 200 ? '...' : ''}`
-    ).join('\n\n');
+    const candidatesText = candidateIssues
+      .map(
+        (issue, i) =>
+          `${i + 1}. ID: ${issue.id}, #${issue.number}: ${issue.title}\n   ${(issue.body || "").substring(0, 200)}${(issue.body || "").length > 200 ? "..." : ""}`
+      )
+      .join("\n\n");
 
     return `Analyze the following source issue and identify any dependency relationships with the candidate issues.
 
@@ -473,12 +513,20 @@ Return an empty array if no relationships are detected.`;
     }
 
     // Component-related label prefixes to prioritize
-    const componentPrefixes = ['component:', 'area:', 'module:', 'package:', 'scope:'];
+    const componentPrefixes = ["component:", "area:", "module:", "package:", "scope:"];
 
     // Extract component labels from source
-    const sourceComponentLabels = sourceLabels.filter(label =>
-      componentPrefixes.some(prefix => label.toLowerCase().startsWith(prefix)) ||
-      !['bug', 'feature', 'enhancement', 'documentation', 'help wanted', 'good first issue'].includes(label.toLowerCase())
+    const sourceComponentLabels = sourceLabels.filter(
+      (label) =>
+        componentPrefixes.some((prefix) => label.toLowerCase().startsWith(prefix)) ||
+        ![
+          "bug",
+          "feature",
+          "enhancement",
+          "documentation",
+          "help wanted",
+          "good first issue",
+        ].includes(label.toLowerCase())
     );
 
     for (const candidate of candidateIssues) {
@@ -486,26 +534,39 @@ Return an empty array if no relationships are detected.`;
       if (candidateLabels.length === 0) continue;
 
       // Filter candidate labels through the same component prefix filter
-      const candidateComponentLabels = candidateLabels.filter(label =>
-        componentPrefixes.some(prefix => label.toLowerCase().startsWith(prefix)) ||
-        !['bug', 'feature', 'enhancement', 'documentation', 'help wanted', 'good first issue'].includes(label.toLowerCase())
+      const candidateComponentLabels = candidateLabels.filter(
+        (label) =>
+          componentPrefixes.some((prefix) => label.toLowerCase().startsWith(prefix)) ||
+          ![
+            "bug",
+            "feature",
+            "enhancement",
+            "documentation",
+            "help wanted",
+            "good first issue",
+          ].includes(label.toLowerCase())
       );
       if (candidateComponentLabels.length === 0) continue;
 
-      const overlapScore = this.calculateLabelOverlap(sourceComponentLabels, candidateComponentLabels);
+      const overlapScore = this.calculateLabelOverlap(
+        sourceComponentLabels,
+        candidateComponentLabels
+      );
 
       if (overlapScore >= COMPONENT_LABEL_THRESHOLD) {
         // Find the common component labels for reasoning
-        const commonLabels = sourceComponentLabels.filter(l => candidateComponentLabels.includes(l));
+        const commonLabels = sourceComponentLabels.filter((l) =>
+          candidateComponentLabels.includes(l)
+        );
 
         relationships.push({
           sourceIssueId: sourceId,
           targetIssueId: candidate.id,
           targetIssueNumber: candidate.number,
           targetIssueTitle: candidate.title,
-          relationshipType: 'component',
+          relationshipType: "component",
           confidence: Math.min(1, overlapScore + 0.1), // Slight boost since we matched
-          reasoning: `Shared labels: ${commonLabels.join(', ')}`
+          reasoning: `Shared labels: ${commonLabels.join(", ")}`,
         });
       }
     }
@@ -521,10 +582,10 @@ Return an empty array if no relationships are detected.`;
       return 0;
     }
 
-    const set1 = new Set(labels1.map(l => l.toLowerCase()));
-    const set2 = new Set(labels2.map(l => l.toLowerCase()));
+    const set1 = new Set(labels1.map((l) => l.toLowerCase()));
+    const set2 = new Set(labels2.map((l) => l.toLowerCase()));
 
-    const intersection = [...set1].filter(l => set2.has(l)).length;
+    const intersection = [...set1].filter((l) => set2.has(l)).length;
     const union = new Set([...set1, ...set2]).size;
 
     return intersection / union;
@@ -541,7 +602,7 @@ Return an empty array if no relationships are detected.`;
       return 0;
     }
 
-    const intersection = [...keywords1].filter(k => keywords2.has(k)).length;
+    const intersection = [...keywords1].filter((k) => keywords2.has(k)).length;
     const union = new Set([...keywords1, ...keywords2]).size;
 
     return intersection / union;
@@ -552,14 +613,48 @@ Return an empty array if no relationships are detected.`;
    */
   private extractKeywords(text: string): Set<string> {
     const stopwords = new Set([
-      'a', 'an', 'and', 'are', 'as', 'at', 'be', 'by', 'for', 'from',
-      'has', 'he', 'in', 'is', 'it', 'its', 'of', 'on', 'or', 'that',
-      'the', 'to', 'was', 'were', 'will', 'with', 'this', 'but', 'they',
-      'have', 'had', 'what', 'when', 'where', 'who', 'which', 'why', 'how'
+      "a",
+      "an",
+      "and",
+      "are",
+      "as",
+      "at",
+      "be",
+      "by",
+      "for",
+      "from",
+      "has",
+      "he",
+      "in",
+      "is",
+      "it",
+      "its",
+      "of",
+      "on",
+      "or",
+      "that",
+      "the",
+      "to",
+      "was",
+      "were",
+      "will",
+      "with",
+      "this",
+      "but",
+      "they",
+      "have",
+      "had",
+      "what",
+      "when",
+      "where",
+      "who",
+      "which",
+      "why",
+      "how",
     ]);
 
     const words = text.toLowerCase().split(/[^a-z0-9]+/);
-    return new Set(words.filter(w => w.length >= 3 && !stopwords.has(w)));
+    return new Set(words.filter((w) => w.length >= 3 && !stopwords.has(w)));
   }
 
   /**
@@ -585,9 +680,9 @@ Return an empty array if no relationships are detected.`;
 
       // If there are multiple relationship types, combine reasoning
       if (rels.length > 1) {
-        const types = [...new Set(rels.map(r => r.relationshipType))];
+        const types = [...new Set(rels.map((r) => r.relationshipType))];
         if (types.length > 1) {
-          best.reasoning = `Multiple relationships detected: ${types.join(', ')}. ${best.reasoning}`;
+          best.reasoning = `Multiple relationships detected: ${types.join(", ")}. ${best.reasoning}`;
         }
       }
 
@@ -620,7 +715,7 @@ Return an empty array if no relationships are detected.`;
     const factors: ConfidenceFactors = {
       inputCompleteness,
       aiSelfAssessment,
-      patternMatch
+      patternMatch,
     };
 
     const score = calculateWeightedScore(factors);
@@ -628,13 +723,13 @@ Return an empty array if no relationships are detected.`;
     const needsReview = score < 70;
 
     return {
-      sectionId: 'related-issue-linking',
-      sectionName: 'Related Issue Linking',
+      sectionId: "related-issue-linking",
+      sectionName: "Related Issue Linking",
       score,
       tier,
       factors,
       reasoning: `Analyzed ${totalCandidates} candidates using ${strategiesUsed} detection strategies. Found ${relationshipsFound} relationships.`,
-      needsReview
+      needsReview,
     };
   }
 
@@ -645,18 +740,18 @@ Return an empty array if no relationships are detected.`;
     return {
       relationships: [],
       confidence: {
-        sectionId: 'related-issue-linking',
-        sectionName: 'Related Issue Linking',
+        sectionId: "related-issue-linking",
+        sectionName: "Related Issue Linking",
         score: 100,
-        tier: 'high',
+        tier: "high",
         factors: {
           inputCompleteness: 1,
           aiSelfAssessment: 1,
-          patternMatch: 1
+          patternMatch: 1,
         },
-        reasoning: 'No candidate issues to analyze.',
-        needsReview: false
-      }
+        reasoning: "No candidate issues to analyze.",
+        needsReview: false,
+      },
     };
   }
 

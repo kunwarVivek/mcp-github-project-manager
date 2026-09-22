@@ -1,14 +1,13 @@
-
-import { v4 as uuidv4 } from 'uuid';
-import { type ILogger, Logger } from '../../infrastructure/logger';
+import { v4 as uuidv4 } from "uuid";
+import { type ILogger, Logger } from "../../infrastructure/logger";
 
 import type {
   FeatureAdditionRequest,
   FeatureRequirement,
   PRDDocument,
-} from '../../domain/ai-types.js';
-import { safeCall } from '../utils/safeCall';
-import { FeatureAnalysisService } from './FeatureAnalysisService.js';
+} from "../../domain/ai-types.js";
+import { safeCall } from "../utils/safeCall";
+import { FeatureAnalysisService } from "./FeatureAnalysisService.js";
 
 /**
  * Manages adding features to PRD documents.
@@ -53,10 +52,10 @@ export class FeaturePRDService {
         existingPRD: params.targetPRD,
         businessJustification: params.featureRequest.businessJustification,
         targetUsers: params.featureRequest.targetUsers,
-        requestedBy: params.featureRequest.requestedBy
+        requestedBy: params.featureRequest.requestedBy,
       });
 
-      if (!params.autoApprove && analysis.recommendation !== 'approve') {
+      if (!params.autoApprove && analysis.recommendation !== "approve") {
         this.logger.error(`Feature request not approved: ${analysis.recommendation}`);
         throw new Error(`Feature request not approved: ${analysis.analysis}`);
       }
@@ -68,15 +67,15 @@ export class FeaturePRDService {
         description: params.featureRequest.description,
         priority: analysis.priority,
         userStories: [
-          `As a user, I want ${params.featureRequest.featureIdea.toLowerCase()} so that I can achieve my goals more effectively`
+          `As a user, I want ${params.featureRequest.featureIdea.toLowerCase()} so that I can achieve my goals more effectively`,
         ],
         acceptanceCriteria: [
-          'Feature is implemented according to specifications',
-          'Feature integrates seamlessly with existing functionality',
-          'Feature passes all quality gates'
+          "Feature is implemented according to specifications",
+          "Feature integrates seamlessly with existing functionality",
+          "Feature passes all quality gates",
         ],
         estimatedComplexity: analysis.complexity,
-        dependencies: analysis.dependencies
+        dependencies: analysis.dependencies,
       };
 
       // Merge into PRD
@@ -84,13 +83,13 @@ export class FeaturePRDService {
         ...params.targetPRD,
         features: [...params.targetPRD.features, newFeature],
         updatedAt: new Date().toISOString(),
-        version: this.incrementVersion(params.targetPRD.version)
+        version: this.incrementVersion(params.targetPRD.version),
       };
 
       const impactAssessment = this.assessFeatureImpact({
         newFeature,
         existingFeatures: params.targetPRD.features,
-        systemContext: params.targetPRD.technicalRequirements
+        systemContext: params.targetPRD.technicalRequirements,
       });
 
       return { updatedPRD, newFeature, impactAssessment };
@@ -102,7 +101,7 @@ export class FeaturePRDService {
   // ---------------------------------------------------------------------------
 
   incrementVersion(version: string): string {
-    const parts = version.split('.');
+    const parts = version.split(".");
     if (parts.length === 3) {
       const minor = parseInt(parts[1], 10) + 1;
       return `${parts[0]}.${minor}.0`;

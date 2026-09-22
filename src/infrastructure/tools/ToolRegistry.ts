@@ -4,9 +4,7 @@ import { ProtocolError, INTERNAL_ERROR, METHOD_NOT_FOUND } from "@modelcontextpr
 /** v2 compatibility aliases (McpError -> ProtocolError, ErrorCode enum -> constants). */
 const McpError = ProtocolError;
 const ErrorCode = { InternalError: INTERNAL_ERROR, MethodNotFound: METHOD_NOT_FOUND } as const;
-import type {
-  ZodTypeAny,
-} from "zod";
+import type { ZodTypeAny } from "zod";
 import type { ToolDefinition, ToolAnnotations } from "./ToolValidator";
 import {
   // Original tools
@@ -25,18 +23,15 @@ import {
   listIssuesTool,
   getIssueTool,
   updateIssueTool,
-
   // Issue comment tools
   createIssueCommentTool,
   updateIssueCommentTool,
   deleteIssueCommentTool,
   listIssueCommentsTool,
-
   // Draft issue tools
   createDraftIssueTool,
   updateDraftIssueTool,
   deleteDraftIssueTool,
-
   // Pull Request tools
   createPullRequestTool,
   getPullRequestTool,
@@ -45,13 +40,11 @@ import {
   mergePullRequestTool,
   listPullRequestReviewsTool,
   createPullRequestReviewTool,
-
   createSprintTool,
   listSprintsTool,
   getCurrentSprintTool,
   createProjectFieldTool,
   createProjectViewTool,
-
   // New project tools
   updateProjectTool,
   deleteProjectTool,
@@ -59,37 +52,30 @@ import {
   updateProjectReadmeTool,
   listProjectFieldsTool,
   updateProjectFieldTool,
-
   // Project item tools
   addProjectItemTool,
   removeProjectItemTool,
   listProjectItemsTool,
   archiveProjectItemTool,
   unarchiveProjectItemTool,
-
   // Field values tools
   setFieldValueTool,
   getFieldValueTool,
   clearFieldValueTool,
-
   // View tools
   listProjectViewsTool,
   updateProjectViewTool,
   deleteProjectViewTool,
-
   // Milestone tools
   updateMilestoneTool,
   deleteMilestoneTool,
-
   // Sprint tools
   updateSprintTool,
   addIssuesToSprintTool,
   removeIssuesFromSprintTool,
-
   // Label tools
   createLabelTool,
   listLabelsTool,
-
   // AI task management tools
   addFeatureTool,
   generatePRDTool,
@@ -99,7 +85,6 @@ import {
   expandTaskTool,
   enhancePRDTool,
   createTraceabilityMatrixTool,
-
   // Automation service tools
   createAutomationRuleTool,
   updateAutomationRuleTool,
@@ -108,14 +93,12 @@ import {
   listAutomationRulesTool,
   enableAutomationRuleTool,
   disableAutomationRuleTool,
-
   // Iteration management tools
   getIterationConfigurationTool,
   getCurrentIterationTool,
   getIterationItemsTool,
   getIterationByDateTool,
   assignItemsToIterationTool,
-
   // AI-powered automation tools
   generateRoadmapTool,
   enrichIssueTool,
@@ -123,26 +106,22 @@ import {
   triageIssueTool,
   triageAllIssuesTool,
   scheduleTriagingTool,
-
   // Status update tools
   createStatusUpdateTool,
   listStatusUpdatesTool,
   getStatusUpdateTool,
-
   // Sub-issue management tools
   addSubIssueTool,
   listSubIssuesTool,
   getParentIssueTool,
   reprioritizeSubIssueTool,
   removeSubIssueTool,
-
   // Project template tools
   markProjectAsTemplateTool,
   unmarkProjectAsTemplateTool,
   copyProjectFromTemplateTool,
   listOrganizationTemplatesTool,
 } from "./ToolSchemas";
-
 
 // Health check tool
 import { healthCheckTool } from "./health-tools";
@@ -263,12 +242,13 @@ const toJsonSchema = (schema: ZodTypeAny): Record<string, unknown> =>
  * Capability groups for compound tools.
  * Control which groups are exposed via MCP_TOOL_GROUPS env var.
  */
-export type CompoundToolGroup = 'core' | 'ai' | 'agents' | 'events' | 'system';
+export type CompoundToolGroup = "core" | "ai" | "agents" | "events" | "system";
 
 /**
  * Compound tool definition — extends ToolDefinition with a capability group tag.
  */
-export interface CompoundToolDef<TInput = unknown, TOutput = unknown> extends ToolDefinition<TInput, TOutput> {
+export interface CompoundToolDef<TInput = unknown, TOutput = unknown>
+  extends ToolDefinition<TInput, TOutput> {
   group: CompoundToolGroup;
 }
 
@@ -298,10 +278,11 @@ export class ToolRegistry {
     this._executors = new Map();
 
     // Parse MCP_TOOL_GROUPS env var (default: expose all groups)
-    const groups = process.env.MCP_TOOL_GROUPS || 'all';
-    this._enabledGroups = groups === 'all'
-      ? new Set<string>(['core', 'ai', 'agents', 'events', 'system'])
-      : new Set(groups.split(',').map(g => g.trim()));
+    const groups = process.env.MCP_TOOL_GROUPS || "all";
+    this._enabledGroups =
+      groups === "all"
+        ? new Set<string>(["core", "ai", "agents", "events", "system"])
+        : new Set(groups.split(",").map((g) => g.trim()));
 
     this.registerBuiltInTools();
     this.registerCompoundTools();
@@ -332,7 +313,9 @@ export class ToolRegistry {
    */
   public registerCompoundTool(tool: CompoundToolDef): void {
     if (this._publicTools.has(tool.name)) {
-      process.stderr.write(`Compound tool '${tool.name}' is already registered and will be overwritten.\n`);
+      process.stderr.write(
+        `Compound tool '${tool.name}' is already registered and will be overwritten.\n`
+      );
     }
     this._publicTools.set(tool.name, tool);
   }
@@ -361,17 +344,16 @@ export class ToolRegistry {
     if (tool?.execute) {
       return tool.execute(args);
     }
-    throw new McpError(
-      ErrorCode.MethodNotFound,
-      `Tool handler not implemented: ${toolName}`,
-    );
+    throw new McpError(ErrorCode.MethodNotFound, `Tool handler not implemented: ${toolName}`);
   }
 
   /**
    * Get a tool by name (searches internal first, then public/compound)
    */
   public getTool<T>(name: string): ToolDefinition<T> | undefined {
-    return (this._internalTools.get(name) ?? this._publicTools.get(name)) as ToolDefinition<T> | undefined;
+    return (this._internalTools.get(name) ?? this._publicTools.get(name)) as
+      | ToolDefinition<T>
+      | undefined;
   }
 
   /**
@@ -396,11 +378,11 @@ export class ToolRegistry {
   }> {
     const tools: CompoundToolDef[] = [];
     for (const tool of this._publicTools.values()) {
-      if (tool.name === 'discover_tools' || this._enabledGroups.has(tool.group)) {
+      if (tool.name === "discover_tools" || this._enabledGroups.has(tool.group)) {
         tools.push(tool);
       }
     }
-    return tools.map(tool => ({
+    return tools.map((tool) => ({
       name: tool.name,
       title: tool.title,
       description: tool.description,
@@ -620,140 +602,242 @@ export class ToolRegistry {
   private registerCompoundTools(): void {
     const compoundTools: CompoundToolDef[] = [
       {
-        name: 'manage_project',
-        title: 'Manage Projects',
-        description: 'Manage GitHub Projects (v2): create, list, get, update, delete projects; manage readme, fields, views, items; handle templates and link to repos/teams. Use the `action` field to select the operation.',
+        name: "manage_project",
+        title: "Manage Projects",
+        description:
+          "Manage GitHub Projects (v2): create, list, get, update, delete projects; manage readme, fields, views, items; handle templates and link to repos/teams. Use the `action` field to select the operation.",
         schema: manageProjectSchema,
-        annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
-        group: 'core',
+        annotations: {
+          readOnlyHint: false,
+          destructiveHint: true,
+          idempotentHint: false,
+          openWorldHint: true,
+        },
+        group: "core",
       },
       {
-        name: 'manage_issues',
-        title: 'Manage Issues',
-        description: 'Manage GitHub Issues: create, list, get, update issues; manage comments and drafts; search with advanced filters; manage sub-issues. Use the `action` field to select the operation.',
+        name: "manage_issues",
+        title: "Manage Issues",
+        description:
+          "Manage GitHub Issues: create, list, get, update issues; manage comments and drafts; search with advanced filters; manage sub-issues. Use the `action` field to select the operation.",
         schema: manageIssuesSchema,
-        annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
-        group: 'core',
+        annotations: {
+          readOnlyHint: false,
+          destructiveHint: true,
+          idempotentHint: false,
+          openWorldHint: true,
+        },
+        group: "core",
       },
       {
-        name: 'manage_prs',
-        title: 'Manage Pull Requests',
-        description: 'Manage Pull Requests: create, get, list, update, merge PRs; list and create reviews. Use the `action` field to select the operation.',
+        name: "manage_prs",
+        title: "Manage Pull Requests",
+        description:
+          "Manage Pull Requests: create, get, list, update, merge PRs; list and create reviews. Use the `action` field to select the operation.",
         schema: managePrsSchema,
-        annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
-        group: 'core',
+        annotations: {
+          readOnlyHint: false,
+          destructiveHint: false,
+          idempotentHint: false,
+          openWorldHint: true,
+        },
+        group: "core",
       },
       {
-        name: 'manage_milestones',
-        title: 'Manage Milestones',
-        description: 'Manage Milestones: create, list, update, delete milestones; get metrics; find overdue and upcoming milestones. Use the `action` field to select the operation.',
+        name: "manage_milestones",
+        title: "Manage Milestones",
+        description:
+          "Manage Milestones: create, list, update, delete milestones; get metrics; find overdue and upcoming milestones. Use the `action` field to select the operation.",
         schema: manageMilestonesSchema,
-        annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
-        group: 'core',
+        annotations: {
+          readOnlyHint: false,
+          destructiveHint: true,
+          idempotentHint: false,
+          openWorldHint: true,
+        },
+        group: "core",
       },
       {
-        name: 'manage_sprints',
-        title: 'Manage Sprints',
-        description: 'Manage Sprints: create, list, update sprints; get current sprint; add/remove issues; get metrics and plan. Use the `action` field to select the operation.',
+        name: "manage_sprints",
+        title: "Manage Sprints",
+        description:
+          "Manage Sprints: create, list, update sprints; get current sprint; add/remove issues; get metrics and plan. Use the `action` field to select the operation.",
         schema: manageSprintsSchema,
-        annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
-        group: 'core',
+        annotations: {
+          readOnlyHint: false,
+          destructiveHint: false,
+          idempotentHint: false,
+          openWorldHint: true,
+        },
+        group: "core",
       },
       {
-        name: 'manage_labels',
-        title: 'Manage Labels',
-        description: 'Manage repository Labels: create and list labels. Use the `action` field to select the operation.',
+        name: "manage_labels",
+        title: "Manage Labels",
+        description:
+          "Manage repository Labels: create and list labels. Use the `action` field to select the operation.",
         schema: manageLabelsSchema,
-        annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
-        group: 'core',
+        annotations: {
+          readOnlyHint: false,
+          destructiveHint: false,
+          idempotentHint: false,
+          openWorldHint: true,
+        },
+        group: "core",
       },
       {
-        name: 'manage_automation',
-        title: 'Manage Automation',
-        description: 'Manage Automation Rules: create, update, delete, get, list rules; enable and disable rules. Use the `action` field to select the operation.',
+        name: "manage_automation",
+        title: "Manage Automation",
+        description:
+          "Manage Automation Rules: create, update, delete, get, list rules; enable and disable rules. Use the `action` field to select the operation.",
         schema: manageAutomationSchema,
-        annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
-        group: 'core',
+        annotations: {
+          readOnlyHint: false,
+          destructiveHint: true,
+          idempotentHint: false,
+          openWorldHint: true,
+        },
+        group: "core",
       },
       {
-        name: 'manage_iterations',
-        title: 'Manage Iterations',
-        description: 'Manage Project Iterations: get configuration, current iteration, items; find by date; assign items. Use the `action` field to select the operation.',
+        name: "manage_iterations",
+        title: "Manage Iterations",
+        description:
+          "Manage Project Iterations: get configuration, current iteration, items; find by date; assign items. Use the `action` field to select the operation.",
         schema: manageIterationsSchema,
-        annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
-        group: 'core',
+        annotations: {
+          readOnlyHint: false,
+          destructiveHint: false,
+          idempotentHint: false,
+          openWorldHint: true,
+        },
+        group: "core",
       },
       {
-        name: 'manage_events',
-        title: 'Manage Events',
-        description: 'Manage Events: subscribe to project events, get recent events, replay events. Use the `action` field to select the operation.',
+        name: "manage_events",
+        title: "Manage Events",
+        description:
+          "Manage Events: subscribe to project events, get recent events, replay events. Use the `action` field to select the operation.",
         schema: manageEventsSchema,
-        annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
-        group: 'events',
+        annotations: {
+          readOnlyHint: false,
+          destructiveHint: false,
+          idempotentHint: false,
+          openWorldHint: true,
+        },
+        group: "events",
       },
       {
-        name: 'manage_status_updates',
-        title: 'Manage Status Updates',
-        description: 'Manage project Status Updates: create, list, and get status updates. Use the `action` field to select the operation.',
+        name: "manage_status_updates",
+        title: "Manage Status Updates",
+        description:
+          "Manage project Status Updates: create, list, and get status updates. Use the `action` field to select the operation.",
         schema: manageStatusUpdatesSchema,
-        annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
-        group: 'core',
+        annotations: {
+          readOnlyHint: false,
+          destructiveHint: false,
+          idempotentHint: false,
+          openWorldHint: true,
+        },
+        group: "core",
       },
       {
-        name: 'ai_generate',
-        title: 'AI Generation',
-        description: 'AI-powered generation: generate/enhance/parse PRDs, add features, get next tasks, analyze complexity, expand tasks, create traceability matrices. Use the `action` field to select the operation.',
+        name: "ai_generate",
+        title: "AI Generation",
+        description:
+          "AI-powered generation: generate/enhance/parse PRDs, add features, get next tasks, analyze complexity, expand tasks, create traceability matrices. Use the `action` field to select the operation.",
         schema: aiGenerateSchema,
-        annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
-        group: 'ai',
+        annotations: {
+          readOnlyHint: false,
+          destructiveHint: false,
+          idempotentHint: false,
+          openWorldHint: true,
+        },
+        group: "ai",
       },
       {
-        name: 'ai_analyze',
-        title: 'AI Analysis',
-        description: 'AI-powered analysis: enrich issues (single/bulk), triage issues, schedule triaging, suggest labels, detect duplicates, find related issues. Use the `action` field to select the operation.',
+        name: "ai_analyze",
+        title: "AI Analysis",
+        description:
+          "AI-powered analysis: enrich issues (single/bulk), triage issues, schedule triaging, suggest labels, detect duplicates, find related issues. Use the `action` field to select the operation.",
         schema: aiAnalyzeSchema,
-        annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
-        group: 'ai',
+        annotations: {
+          readOnlyHint: false,
+          destructiveHint: false,
+          idempotentHint: false,
+          openWorldHint: true,
+        },
+        group: "ai",
       },
       {
-        name: 'ai_plan',
-        title: 'AI Planning',
-        description: 'AI-powered planning: calculate capacity, prioritize backlog, assess risk, suggest sprint composition, generate roadmaps and visualizations. Use the `action` field to select the operation.',
+        name: "ai_plan",
+        title: "AI Planning",
+        description:
+          "AI-powered planning: calculate capacity, prioritize backlog, assess risk, suggest sprint composition, generate roadmaps and visualizations. Use the `action` field to select the operation.",
         schema: aiPlanSchema,
-        annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
-        group: 'ai',
+        annotations: {
+          readOnlyHint: false,
+          destructiveHint: false,
+          idempotentHint: false,
+          openWorldHint: true,
+        },
+        group: "ai",
       },
       {
-        name: 'agent_work',
-        title: 'Agent Work',
-        description: 'Agent work operations: register agents, checkout/release/complete tasks, send heartbeats, check work status, get task context. Use the `action` field to select the operation.',
+        name: "agent_work",
+        title: "Agent Work",
+        description:
+          "Agent work operations: register agents, checkout/release/complete tasks, send heartbeats, check work status, get task context. Use the `action` field to select the operation.",
         schema: agentWorkSchema,
-        annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
-        group: 'agents',
+        annotations: {
+          readOnlyHint: false,
+          destructiveHint: false,
+          idempotentHint: false,
+          openWorldHint: true,
+        },
+        group: "agents",
       },
       {
-        name: 'agent_manage',
-        title: 'Agent Management',
-        description: 'Agent management: list/deregister agents, get activity, submit work products, get/set budgets. Use the `action` field to select the operation.',
+        name: "agent_manage",
+        title: "Agent Management",
+        description:
+          "Agent management: list/deregister agents, get activity, submit work products, get/set budgets. Use the `action` field to select the operation.",
         schema: agentManageSchema,
-        annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
-        group: 'agents',
+        annotations: {
+          readOnlyHint: false,
+          destructiveHint: true,
+          idempotentHint: false,
+          openWorldHint: true,
+        },
+        group: "agents",
       },
       {
-        name: 'system',
-        title: 'System',
-        description: 'System operations: health check and project field setup. Use the `action` field to select the operation.',
+        name: "system",
+        title: "System",
+        description:
+          "System operations: health check and project field setup. Use the `action` field to select the operation.",
         schema: systemSchema,
-        annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
-        group: 'system',
+        annotations: {
+          readOnlyHint: false,
+          destructiveHint: false,
+          idempotentHint: true,
+          openWorldHint: true,
+        },
+        group: "system",
       },
       {
-        name: 'discover_tools',
-        title: 'Discover Tools',
-        description: 'Discover available compound tools, their actions, and parameters. Always available regardless of group filter.',
+        name: "discover_tools",
+        title: "Discover Tools",
+        description:
+          "Discover available compound tools, their actions, and parameters. Always available regardless of group filter.",
         schema: discoverToolsSchema,
-        annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
-        group: 'system',
+        annotations: {
+          readOnlyHint: true,
+          destructiveHint: false,
+          idempotentHint: true,
+          openWorldHint: false,
+        },
+        group: "system",
       },
     ];
 
@@ -761,5 +845,4 @@ export class ToolRegistry {
       this.registerCompoundTool(tool);
     }
   }
-
 }

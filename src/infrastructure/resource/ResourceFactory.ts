@@ -60,10 +60,7 @@ export class ResourceFactory {
     resourceData: Partial<T>
   ): Promise<T> {
     // Create the resource first
-    const resource = await this.resourceManager.create<T>(
-      resourceType,
-      resourceData
-    );
+    const resource = await this.resourceManager.create<T>(resourceType, resourceData);
 
     // Create a parent-child relationship if parent ID is provided
     if (parentId && parentType) {
@@ -100,13 +97,10 @@ export class ResourceFactory {
   /**
    * Delete a resource and all its relationships
    */
-  public async deleteResourceWithRelationships(
-    type: ResourceType,
-    id: string
-  ): Promise<void> {
+  public async deleteResourceWithRelationships(type: ResourceType, id: string): Promise<void> {
     // Delete all relationships first
     await this.relationshipManager.deleteAllRelationships(id);
-    
+
     // Then delete the resource
     await this.resourceManager.delete(type, id);
   }
@@ -120,15 +114,15 @@ export class ResourceFactory {
     childType?: ResourceType
   ): Promise<{ resource: T; children: C[] }> {
     const resource = await this.resourceManager.get<T>(type, id);
-    
+
     // Get children with optional type filtering
     const children = await this.relationshipManager.getChildResources<C>(id);
-    
+
     // Filter by child type if specified
-    const filteredChildren = childType 
-      ? children.filter(child => child.type === childType)
+    const filteredChildren = childType
+      ? children.filter((child) => child.type === childType)
       : children;
-    
+
     return {
       resource,
       children: filteredChildren,
@@ -139,14 +133,14 @@ export class ResourceFactory {
    * Get a resource with its parent
    */
   public async getResourceWithParent<T extends Resource, P extends Resource>(
-    type: ResourceType, 
+    type: ResourceType,
     id: string
   ): Promise<{ resource: T; parent: P | null }> {
     const resource = await this.resourceManager.get<T>(type, id);
-    
+
     // Get parents (should be at most one)
     const parents = await this.relationshipManager.getParentResources<P>(id);
-    
+
     return {
       resource,
       parent: parents.length > 0 ? parents[0] : null,

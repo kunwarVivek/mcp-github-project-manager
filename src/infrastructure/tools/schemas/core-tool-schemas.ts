@@ -90,15 +90,17 @@ export const createProjectFieldSchema = z.object({
     "iteration",
     "milestone",
     "assignees",
-    "labels"
+    "labels",
   ]),
-  options: z.array(
-    z.object({
-      name: z.string().min(1),
-      description: z.string().optional(),
-      color: z.string().optional(),
-    })
-  ).optional(),
+  options: z
+    .array(
+      z.object({
+        name: z.string().min(1),
+        description: z.string().optional(),
+        color: z.string().optional(),
+      })
+    )
+    .optional(),
   description: z.string().optional(),
   required: z.boolean().optional(),
 });
@@ -116,14 +118,16 @@ export const updateProjectFieldSchema = z.object({
   fieldId: z.string().min(1, "Field ID is required"),
   name: z.string().optional(),
   description: z.string().optional(),
-  options: z.array(
-    z.object({
-      id: z.string().optional(),
-      name: z.string().min(1),
-      description: z.string().optional(),
-      color: z.string().optional(),
-    })
-  ).optional(),
+  options: z
+    .array(
+      z.object({
+        id: z.string().optional(),
+        name: z.string().min(1),
+        description: z.string().optional(),
+        color: z.string().optional(),
+      })
+    )
+    .optional(),
   required: z.boolean().optional(),
 });
 
@@ -236,7 +240,10 @@ export type ClearFieldValueArgs = z.infer<typeof clearFieldValueSchema>;
 // Project CRUD Tool Definitions
 // ============================================================================
 
-export const createProjectTool: ToolDefinition<CreateProjectArgs, z.infer<typeof ProjectOutputSchema>> = {
+export const createProjectTool: ToolDefinition<
+  CreateProjectArgs,
+  z.infer<typeof ProjectOutputSchema>
+> = {
   name: "create_project",
   title: "Create Project",
   description: "Create a new GitHub project",
@@ -251,13 +258,16 @@ export const createProjectTool: ToolDefinition<CreateProjectArgs, z.infer<typeof
         title: "Backend API Development",
         shortDescription: "Project for tracking backend API development tasks",
         owner: "example-owner",
-        visibility: "private"
-      }
-    }
-  ]
+        visibility: "private",
+      },
+    },
+  ],
 };
 
-export const listProjectsTool: ToolDefinition<ListProjectsArgs, z.infer<typeof ProjectListOutputSchema>> = {
+export const listProjectsTool: ToolDefinition<
+  ListProjectsArgs,
+  z.infer<typeof ProjectListOutputSchema>
+> = {
   name: "list_projects",
   title: "List Projects",
   description: "List GitHub projects",
@@ -270,10 +280,10 @@ export const listProjectsTool: ToolDefinition<ListProjectsArgs, z.infer<typeof P
       description: "List all active GitHub projects",
       args: {
         status: "active",
-        limit: 5
-      }
-    }
-  ]
+        limit: 5,
+      },
+    },
+  ],
 };
 
 export const getProjectTool: ToolDefinition<GetProjectArgs, z.infer<typeof ProjectOutputSchema>> = {
@@ -288,13 +298,16 @@ export const getProjectTool: ToolDefinition<GetProjectArgs, z.infer<typeof Proje
       name: "Get project details",
       description: "Get details for a specific project",
       args: {
-        projectId: "PVT_kwDOLhQ7gc4AOEbH"
-      }
-    }
-  ]
+        projectId: "PVT_kwDOLhQ7gc4AOEbH",
+      },
+    },
+  ],
 };
 
-export const updateProjectTool: ToolDefinition<UpdateProjectArgs, z.infer<typeof ProjectOutputSchema>> = {
+export const updateProjectTool: ToolDefinition<
+  UpdateProjectArgs,
+  z.infer<typeof ProjectOutputSchema>
+> = {
   name: "update_project",
   title: "Update Project",
   description: "Update an existing GitHub project",
@@ -308,21 +321,24 @@ export const updateProjectTool: ToolDefinition<UpdateProjectArgs, z.infer<typeof
       args: {
         projectId: "PVT_kwDOLhQ7gc4AOEbH",
         title: "Updated API Development",
-        visibility: "public"
-      }
+        visibility: "public",
+      },
     },
     {
       name: "Close a project",
       description: "Mark a project as closed",
       args: {
         projectId: "PVT_kwDOLhQ7gc4AOEbH",
-        status: "closed"
-      }
-    }
-  ]
+        status: "closed",
+      },
+    },
+  ],
 };
 
-export const deleteProjectTool: ToolDefinition<DeleteProjectArgs, z.infer<typeof DeleteOutputSchema>> = {
+export const deleteProjectTool: ToolDefinition<
+  DeleteProjectArgs,
+  z.infer<typeof DeleteOutputSchema>
+> = {
   name: "delete_project",
   title: "Delete Project",
   description: "Delete a GitHub project",
@@ -334,17 +350,20 @@ export const deleteProjectTool: ToolDefinition<DeleteProjectArgs, z.infer<typeof
       name: "Delete project",
       description: "Delete a GitHub project by ID",
       args: {
-        projectId: "PVT_kwDOLhQ7gc4AOEbH"
-      }
-    }
-  ]
+        projectId: "PVT_kwDOLhQ7gc4AOEbH",
+      },
+    },
+  ],
 };
 
 // ============================================================================
 // README Tool Definitions
 // ============================================================================
 
-export const getProjectReadmeTool: ToolDefinition<GetProjectReadmeArgs, z.infer<typeof ProjectReadmeOutputSchema>> = {
+export const getProjectReadmeTool: ToolDefinition<
+  GetProjectReadmeArgs,
+  z.infer<typeof ProjectReadmeOutputSchema>
+> = {
   name: "get_project_readme",
   title: "Get Project README",
   description: "Get the README content of a GitHub project",
@@ -356,13 +375,16 @@ export const getProjectReadmeTool: ToolDefinition<GetProjectReadmeArgs, z.infer<
       name: "Get project README",
       description: "Retrieve the README for a project",
       args: {
-        projectId: "PVT_kwDOLhQ7gc4AOEbH"
-      }
-    }
-  ]
+        projectId: "PVT_kwDOLhQ7gc4AOEbH",
+      },
+    },
+  ],
 };
 
-export const updateProjectReadmeTool: ToolDefinition<UpdateProjectReadmeArgs, z.infer<typeof ProjectReadmeOutputSchema>> = {
+export const updateProjectReadmeTool: ToolDefinition<
+  UpdateProjectReadmeArgs,
+  z.infer<typeof ProjectReadmeOutputSchema>
+> = {
   name: "update_project_readme",
   title: "Update Project README",
   description: "Update the README content of a GitHub project",
@@ -375,17 +397,20 @@ export const updateProjectReadmeTool: ToolDefinition<UpdateProjectReadmeArgs, z.
       description: "Update the project README with documentation",
       args: {
         projectId: "PVT_kwDOLhQ7gc4AOEbH",
-        readme: "# Project Overview\n\nThis project tracks our development roadmap..."
-      }
-    }
-  ]
+        readme: "# Project Overview\n\nThis project tracks our development roadmap...",
+      },
+    },
+  ],
 };
 
 // ============================================================================
 // Project Field Tool Definitions
 // ============================================================================
 
-export const createProjectFieldTool: ToolDefinition<CreateProjectFieldArgs, z.infer<typeof ProjectFieldOutputSchema>> = {
+export const createProjectFieldTool: ToolDefinition<
+  CreateProjectFieldArgs,
+  z.infer<typeof ProjectFieldOutputSchema>
+> = {
   name: "create_project_field",
   title: "Create Project Field",
   description: "Create a custom field for a GitHub project",
@@ -403,16 +428,19 @@ export const createProjectFieldTool: ToolDefinition<CreateProjectFieldArgs, z.in
         options: [
           { name: "To Do", color: "red" },
           { name: "In Progress", color: "yellow" },
-          { name: "Done", color: "green" }
+          { name: "Done", color: "green" },
         ],
         description: "Current status of the task",
-        required: true
-      }
-    }
-  ]
+        required: true,
+      },
+    },
+  ],
 };
 
-export const listProjectFieldsTool: ToolDefinition<ListProjectFieldsArgs, z.infer<typeof ProjectFieldListOutputSchema>> = {
+export const listProjectFieldsTool: ToolDefinition<
+  ListProjectFieldsArgs,
+  z.infer<typeof ProjectFieldListOutputSchema>
+> = {
   name: "list_project_fields",
   title: "List Project Fields",
   description: "List all fields in a GitHub project",
@@ -424,13 +452,16 @@ export const listProjectFieldsTool: ToolDefinition<ListProjectFieldsArgs, z.infe
       name: "List project fields",
       description: "Get all fields for a specific project",
       args: {
-        projectId: "PVT_kwDOLhQ7gc4AOEbH"
-      }
-    }
-  ]
+        projectId: "PVT_kwDOLhQ7gc4AOEbH",
+      },
+    },
+  ],
 };
 
-export const updateProjectFieldTool: ToolDefinition<UpdateProjectFieldArgs, z.infer<typeof ProjectFieldOutputSchema>> = {
+export const updateProjectFieldTool: ToolDefinition<
+  UpdateProjectFieldArgs,
+  z.infer<typeof ProjectFieldOutputSchema>
+> = {
   name: "update_project_field",
   title: "Update Project Field",
   description: "Update a custom field in a GitHub project",
@@ -449,18 +480,21 @@ export const updateProjectFieldTool: ToolDefinition<UpdateProjectFieldArgs, z.in
           { name: "Not Started", color: "red" },
           { name: "In Progress", color: "yellow" },
           { name: "Review", color: "blue" },
-          { name: "Complete", color: "green" }
-        ]
-      }
-    }
-  ]
+          { name: "Complete", color: "green" },
+        ],
+      },
+    },
+  ],
 };
 
 // ============================================================================
 // Project View Tool Definitions
 // ============================================================================
 
-export const createProjectViewTool: ToolDefinition<CreateProjectViewArgs, z.infer<typeof ProjectViewOutputSchema>> = {
+export const createProjectViewTool: ToolDefinition<
+  CreateProjectViewArgs,
+  z.infer<typeof ProjectViewOutputSchema>
+> = {
   name: "create_project_view",
   title: "Create Project View",
   description: "Create a new view for a GitHub project",
@@ -474,13 +508,16 @@ export const createProjectViewTool: ToolDefinition<CreateProjectViewArgs, z.infe
       args: {
         projectId: "PVT_kwDOLhQ7gc4AOEbH",
         name: "Development Board",
-        layout: "board"
-      }
-    }
-  ]
+        layout: "board",
+      },
+    },
+  ],
 };
 
-export const listProjectViewsTool: ToolDefinition<ListProjectViewsArgs, z.infer<typeof ProjectViewListOutputSchema>> = {
+export const listProjectViewsTool: ToolDefinition<
+  ListProjectViewsArgs,
+  z.infer<typeof ProjectViewListOutputSchema>
+> = {
   name: "list_project_views",
   title: "List Project Views",
   description: "List all views in a GitHub project",
@@ -492,13 +529,16 @@ export const listProjectViewsTool: ToolDefinition<ListProjectViewsArgs, z.infer<
       name: "List project views",
       description: "Get all views for a specific project",
       args: {
-        projectId: "PVT_kwDOLhQ7gc4AOEbH"
-      }
-    }
-  ]
+        projectId: "PVT_kwDOLhQ7gc4AOEbH",
+      },
+    },
+  ],
 };
 
-export const updateProjectViewTool: ToolDefinition<UpdateProjectViewArgs, z.infer<typeof ProjectViewOutputSchema>> = {
+export const updateProjectViewTool: ToolDefinition<
+  UpdateProjectViewArgs,
+  z.infer<typeof ProjectViewOutputSchema>
+> = {
   name: "update_project_view",
   title: "Update Project View",
   description: "Update a view in a GitHub project",
@@ -513,13 +553,16 @@ export const updateProjectViewTool: ToolDefinition<UpdateProjectViewArgs, z.infe
         projectId: "PVT_kwDOLhQ7gc4AOEbH",
         viewId: "PVV_lADOLhQ7gc4AOEbHzM4AOAL9",
         name: "Development Timeline",
-        layout: "timeline"
-      }
-    }
-  ]
+        layout: "timeline",
+      },
+    },
+  ],
 };
 
-export const deleteProjectViewTool: ToolDefinition<DeleteProjectViewArgs, z.infer<typeof DeleteOutputSchema>> = {
+export const deleteProjectViewTool: ToolDefinition<
+  DeleteProjectViewArgs,
+  z.infer<typeof DeleteOutputSchema>
+> = {
   name: "delete_project_view",
   title: "Delete Project View",
   description: "Delete a view from a GitHub project",
@@ -532,17 +575,20 @@ export const deleteProjectViewTool: ToolDefinition<DeleteProjectViewArgs, z.infe
       description: "Delete a specific view from a project",
       args: {
         projectId: "PVT_kwDOLhQ7gc4AOEbH",
-        viewId: "PVV_lADOLhQ7gc4AOEbHzM4AOAL9"
-      }
-    }
-  ]
+        viewId: "PVV_lADOLhQ7gc4AOEbHzM4AOAL9",
+      },
+    },
+  ],
 };
 
 // ============================================================================
 // Project Item Tool Definitions
 // ============================================================================
 
-export const addProjectItemTool: ToolDefinition<AddProjectItemArgs, z.infer<typeof ProjectItemAddOutputSchema>> = {
+export const addProjectItemTool: ToolDefinition<
+  AddProjectItemArgs,
+  z.infer<typeof ProjectItemAddOutputSchema>
+> = {
   name: "add_project_item",
   title: "Add Project Item",
   description: "Add an item to a GitHub project",
@@ -556,13 +602,16 @@ export const addProjectItemTool: ToolDefinition<AddProjectItemArgs, z.infer<type
       args: {
         projectId: "PVT_kwDOLhQ7gc4AOEbH",
         contentId: "I_kwDOJrIzLs5eGXAT",
-        contentType: "issue"
-      }
-    }
-  ]
+        contentType: "issue",
+      },
+    },
+  ],
 };
 
-export const removeProjectItemTool: ToolDefinition<RemoveProjectItemArgs, z.infer<typeof DeleteOutputSchema>> = {
+export const removeProjectItemTool: ToolDefinition<
+  RemoveProjectItemArgs,
+  z.infer<typeof DeleteOutputSchema>
+> = {
   name: "remove_project_item",
   title: "Remove Project Item",
   description: "Remove an item from a GitHub project",
@@ -575,13 +624,16 @@ export const removeProjectItemTool: ToolDefinition<RemoveProjectItemArgs, z.infe
       description: "Remove an item from a project",
       args: {
         projectId: "PVT_kwDOLhQ7gc4AOEbH",
-        itemId: "PVTI_lADOLhQ7gc4AOEbHzM4AOAJ7"
-      }
-    }
-  ]
+        itemId: "PVTI_lADOLhQ7gc4AOEbHzM4AOAJ7",
+      },
+    },
+  ],
 };
 
-export const listProjectItemsTool: ToolDefinition<ListProjectItemsArgs, z.infer<typeof ProjectItemListOutputSchema>> = {
+export const listProjectItemsTool: ToolDefinition<
+  ListProjectItemsArgs,
+  z.infer<typeof ProjectItemListOutputSchema>
+> = {
   name: "list_project_items",
   title: "List Project Items",
   description: "List all items in a GitHub project",
@@ -594,16 +646,20 @@ export const listProjectItemsTool: ToolDefinition<ListProjectItemsArgs, z.infer<
       description: "Get all items in a project with limit",
       args: {
         projectId: "PVT_kwDOLhQ7gc4AOEbH",
-        limit: 20
-      }
-    }
-  ]
+        limit: 20,
+      },
+    },
+  ],
 };
 
-export const archiveProjectItemTool: ToolDefinition<ArchiveProjectItemArgs, z.infer<typeof SuccessOutputSchema>> = {
+export const archiveProjectItemTool: ToolDefinition<
+  ArchiveProjectItemArgs,
+  z.infer<typeof SuccessOutputSchema>
+> = {
   name: "archive_project_item",
   title: "Archive Project Item",
-  description: "Archive an item in a GitHub project. Archived items are hidden from views but not deleted.",
+  description:
+    "Archive an item in a GitHub project. Archived items are hidden from views but not deleted.",
   schema: archiveProjectItemSchema as unknown as ToolSchema<ArchiveProjectItemArgs>,
   outputSchema: SuccessOutputSchema,
   annotations: ANNOTATION_PATTERNS.updateIdempotent,
@@ -613,13 +669,16 @@ export const archiveProjectItemTool: ToolDefinition<ArchiveProjectItemArgs, z.in
       description: "Archive a project item that is complete",
       args: {
         projectId: "PVT_kwDOLhQ7gc4AOEbH",
-        itemId: "PVTI_lADOLhQ7gc4AOEbHzM4AOAJ7"
-      }
-    }
-  ]
+        itemId: "PVTI_lADOLhQ7gc4AOEbHzM4AOAJ7",
+      },
+    },
+  ],
 };
 
-export const unarchiveProjectItemTool: ToolDefinition<UnarchiveProjectItemArgs, z.infer<typeof SuccessOutputSchema>> = {
+export const unarchiveProjectItemTool: ToolDefinition<
+  UnarchiveProjectItemArgs,
+  z.infer<typeof SuccessOutputSchema>
+> = {
   name: "unarchive_project_item",
   title: "Unarchive Project Item",
   description: "Unarchive an item in a GitHub project. Brings back a previously archived item.",
@@ -632,20 +691,24 @@ export const unarchiveProjectItemTool: ToolDefinition<UnarchiveProjectItemArgs, 
       description: "Restore an archived project item",
       args: {
         projectId: "PVT_kwDOLhQ7gc4AOEbH",
-        itemId: "PVTI_lADOLhQ7gc4AOEbHzM4AOAJ7"
-      }
-    }
-  ]
+        itemId: "PVTI_lADOLhQ7gc4AOEbHzM4AOAJ7",
+      },
+    },
+  ],
 };
 
 // ============================================================================
 // Field Value Tool Definitions
 // ============================================================================
 
-export const setFieldValueTool: ToolDefinition<SetFieldValueArgs, z.infer<typeof FieldValueOutputSchema>> = {
+export const setFieldValueTool: ToolDefinition<
+  SetFieldValueArgs,
+  z.infer<typeof FieldValueOutputSchema>
+> = {
   name: "set_field_value",
   title: "Set Field Value",
-  description: "Set a field value for a GitHub project item. Supports all field types: TEXT, NUMBER, DATE, SINGLE_SELECT, ITERATION, MILESTONE, ASSIGNEES, LABELS",
+  description:
+    "Set a field value for a GitHub project item. Supports all field types: TEXT, NUMBER, DATE, SINGLE_SELECT, ITERATION, MILESTONE, ASSIGNEES, LABELS",
   schema: setFieldValueSchema as unknown as ToolSchema<SetFieldValueArgs>,
   outputSchema: FieldValueOutputSchema,
   annotations: ANNOTATION_PATTERNS.updateIdempotent,
@@ -657,8 +720,8 @@ export const setFieldValueTool: ToolDefinition<SetFieldValueArgs, z.infer<typeof
         projectId: "PVT_kwDOLhQ7gc4AOEbH",
         itemId: "PVTI_lADOLhQ7gc4AOEbHzM4AOAJ7",
         fieldId: "PVTF_lADOLhQ7gc4AOEbHzM4AOAI1",
-        value: "Updated task description"
-      }
+        value: "Updated task description",
+      },
     },
     {
       name: "Set number field value",
@@ -667,8 +730,8 @@ export const setFieldValueTool: ToolDefinition<SetFieldValueArgs, z.infer<typeof
         projectId: "PVT_kwDOLhQ7gc4AOEbH",
         itemId: "PVTI_lADOLhQ7gc4AOEbHzM4AOAJ7",
         fieldId: "PVTF_lADOLhQ7gc4AOEbHzM4AOAI2",
-        value: 8
-      }
+        value: 8,
+      },
     },
     {
       name: "Set date field value",
@@ -677,8 +740,8 @@ export const setFieldValueTool: ToolDefinition<SetFieldValueArgs, z.infer<typeof
         projectId: "PVT_kwDOLhQ7gc4AOEbH",
         itemId: "PVTI_lADOLhQ7gc4AOEbHzM4AOAJ7",
         fieldId: "PVTF_lADOLhQ7gc4AOEbHzM4AOAI3",
-        value: "2025-06-15"
-      }
+        value: "2025-06-15",
+      },
     },
     {
       name: "Set single select field value",
@@ -687,8 +750,8 @@ export const setFieldValueTool: ToolDefinition<SetFieldValueArgs, z.infer<typeof
         projectId: "PVT_kwDOLhQ7gc4AOEbH",
         itemId: "PVTI_lADOLhQ7gc4AOEbHzM4AOAJ7",
         fieldId: "PVTF_lADOLhQ7gc4AOEbHzM4AOAI4",
-        value: "In Progress"
-      }
+        value: "In Progress",
+      },
     },
     {
       name: "Set iteration field value",
@@ -697,8 +760,8 @@ export const setFieldValueTool: ToolDefinition<SetFieldValueArgs, z.infer<typeof
         projectId: "PVT_kwDOLhQ7gc4AOEbH",
         itemId: "PVTI_lADOLhQ7gc4AOEbHzM4AOAJ7",
         fieldId: "PVTF_lADOLhQ7gc4AOEbHzM4AOAI5",
-        value: "PVTI_kwDOLhQ7gc4AOEbHzM4AOAIter1"
-      }
+        value: "PVTI_kwDOLhQ7gc4AOEbHzM4AOAIter1",
+      },
     },
     {
       name: "Set milestone field value",
@@ -707,8 +770,8 @@ export const setFieldValueTool: ToolDefinition<SetFieldValueArgs, z.infer<typeof
         projectId: "PVT_kwDOLhQ7gc4AOEbH",
         itemId: "PVTI_lADOLhQ7gc4AOEbHzM4AOAJ7",
         fieldId: "PVTF_lADOLhQ7gc4AOEbHzM4AOAI6",
-        value: "MI_kwDOLhQ7gc4AOEbHzM4AOAMile1"
-      }
+        value: "MI_kwDOLhQ7gc4AOEbHzM4AOAMile1",
+      },
     },
     {
       name: "Set assignees field value",
@@ -717,8 +780,8 @@ export const setFieldValueTool: ToolDefinition<SetFieldValueArgs, z.infer<typeof
         projectId: "PVT_kwDOLhQ7gc4AOEbH",
         itemId: "PVTI_lADOLhQ7gc4AOEbHzM4AOAJ7",
         fieldId: "PVTF_lADOLhQ7gc4AOEbHzM4AOAI7",
-        value: ["MDQ6VXNlcjEyMzQ1Njc4", "MDQ6VXNlcjg3NjU0MzIx"]
-      }
+        value: ["MDQ6VXNlcjEyMzQ1Njc4", "MDQ6VXNlcjg3NjU0MzIx"],
+      },
     },
     {
       name: "Set single assignee field value",
@@ -727,8 +790,8 @@ export const setFieldValueTool: ToolDefinition<SetFieldValueArgs, z.infer<typeof
         projectId: "PVT_kwDOLhQ7gc4AOEbH",
         itemId: "PVTI_lADOLhQ7gc4AOEbHzM4AOAJ7",
         fieldId: "PVTF_lADOLhQ7gc4AOEbHzM4AOAI7",
-        value: "MDQ6VXNlcjEyMzQ1Njc4"
-      }
+        value: "MDQ6VXNlcjEyMzQ1Njc4",
+      },
     },
     {
       name: "Set labels field value",
@@ -737,8 +800,8 @@ export const setFieldValueTool: ToolDefinition<SetFieldValueArgs, z.infer<typeof
         projectId: "PVT_kwDOLhQ7gc4AOEbH",
         itemId: "PVTI_lADOLhQ7gc4AOEbHzM4AOAJ7",
         fieldId: "PVTF_lADOLhQ7gc4AOEbHzM4AOAI8",
-        value: ["LA_kwDOLhQ7gc4AOEbHzM4AOAL1", "LA_kwDOLhQ7gc4AOEbHzM4AOAL2"]
-      }
+        value: ["LA_kwDOLhQ7gc4AOEbHzM4AOAL1", "LA_kwDOLhQ7gc4AOEbHzM4AOAL2"],
+      },
     },
     {
       name: "Set single label field value",
@@ -747,16 +810,20 @@ export const setFieldValueTool: ToolDefinition<SetFieldValueArgs, z.infer<typeof
         projectId: "PVT_kwDOLhQ7gc4AOEbH",
         itemId: "PVTI_lADOLhQ7gc4AOEbHzM4AOAJ7",
         fieldId: "PVTF_lADOLhQ7gc4AOEbHzM4AOAI8",
-        value: "LA_kwDOLhQ7gc4AOEbHzM4AOAL1"
-      }
-    }
-  ]
+        value: "LA_kwDOLhQ7gc4AOEbHzM4AOAL1",
+      },
+    },
+  ],
 };
 
-export const getFieldValueTool: ToolDefinition<GetFieldValueArgs, z.infer<typeof FieldValueOutputSchema>> = {
+export const getFieldValueTool: ToolDefinition<
+  GetFieldValueArgs,
+  z.infer<typeof FieldValueOutputSchema>
+> = {
   name: "get_field_value",
   title: "Get Field Value",
-  description: "Get a field value for a GitHub project item. Supports reading all field types: TEXT, NUMBER, DATE, SINGLE_SELECT, ITERATION, MILESTONE, ASSIGNEES, LABELS",
+  description:
+    "Get a field value for a GitHub project item. Supports reading all field types: TEXT, NUMBER, DATE, SINGLE_SELECT, ITERATION, MILESTONE, ASSIGNEES, LABELS",
   schema: getFieldValueSchema as unknown as ToolSchema<GetFieldValueArgs>,
   outputSchema: FieldValueOutputSchema,
   annotations: ANNOTATION_PATTERNS.readOnly,
@@ -767,8 +834,8 @@ export const getFieldValueTool: ToolDefinition<GetFieldValueArgs, z.infer<typeof
       args: {
         projectId: "PVT_kwDOLhQ7gc4AOEbH",
         itemId: "PVTI_lADOLhQ7gc4AOEbHzM4AOAJ7",
-        fieldId: "PVTF_lADOLhQ7gc4AOEbHzM4AOAI1"
-      }
+        fieldId: "PVTF_lADOLhQ7gc4AOEbHzM4AOAI1",
+      },
     },
     {
       name: "Get status field value",
@@ -776,8 +843,8 @@ export const getFieldValueTool: ToolDefinition<GetFieldValueArgs, z.infer<typeof
       args: {
         projectId: "PVT_kwDOLhQ7gc4AOEbH",
         itemId: "PVTI_lADOLhQ7gc4AOEbHzM4AOAJ7",
-        fieldId: "PVTF_lADOLhQ7gc4AOEbHzM4AOAI2"
-      }
+        fieldId: "PVTF_lADOLhQ7gc4AOEbHzM4AOAI2",
+      },
     },
     {
       name: "Get iteration field value",
@@ -785,8 +852,8 @@ export const getFieldValueTool: ToolDefinition<GetFieldValueArgs, z.infer<typeof
       args: {
         projectId: "PVT_kwDOLhQ7gc4AOEbH",
         itemId: "PVTI_lADOLhQ7gc4AOEbHzM4AOAJ7",
-        fieldId: "PVTF_lADOLhQ7gc4AOEbHzM4AOAI3"
-      }
+        fieldId: "PVTF_lADOLhQ7gc4AOEbHzM4AOAI3",
+      },
     },
     {
       name: "Get milestone field value",
@@ -794,8 +861,8 @@ export const getFieldValueTool: ToolDefinition<GetFieldValueArgs, z.infer<typeof
       args: {
         projectId: "PVT_kwDOLhQ7gc4AOEbH",
         itemId: "PVTI_lADOLhQ7gc4AOEbHzM4AOAJ7",
-        fieldId: "PVTF_lADOLhQ7gc4AOEbHzM4AOAI4"
-      }
+        fieldId: "PVTF_lADOLhQ7gc4AOEbHzM4AOAI4",
+      },
     },
     {
       name: "Get assignees field value",
@@ -803,8 +870,8 @@ export const getFieldValueTool: ToolDefinition<GetFieldValueArgs, z.infer<typeof
       args: {
         projectId: "PVT_kwDOLhQ7gc4AOEbH",
         itemId: "PVTI_lADOLhQ7gc4AOEbHzM4AOAJ7",
-        fieldId: "PVTF_lADOLhQ7gc4AOEbHzM4AOAI5"
-      }
+        fieldId: "PVTF_lADOLhQ7gc4AOEbHzM4AOAI5",
+      },
     },
     {
       name: "Get labels field value",
@@ -812,16 +879,20 @@ export const getFieldValueTool: ToolDefinition<GetFieldValueArgs, z.infer<typeof
       args: {
         projectId: "PVT_kwDOLhQ7gc4AOEbH",
         itemId: "PVTI_lADOLhQ7gc4AOEbHzM4AOAJ7",
-        fieldId: "PVTF_lADOLhQ7gc4AOEbHzM4AOAI6"
-      }
-    }
-  ]
+        fieldId: "PVTF_lADOLhQ7gc4AOEbHzM4AOAI6",
+      },
+    },
+  ],
 };
 
-export const clearFieldValueTool: ToolDefinition<ClearFieldValueArgs, z.infer<typeof SuccessOutputSchema>> = {
+export const clearFieldValueTool: ToolDefinition<
+  ClearFieldValueArgs,
+  z.infer<typeof SuccessOutputSchema>
+> = {
   name: "clear_field_value",
   title: "Clear Field Value",
-  description: "Clear a field value for a GitHub project item. This removes/clears the value for any field type.",
+  description:
+    "Clear a field value for a GitHub project item. This removes/clears the value for any field type.",
   schema: clearFieldValueSchema as unknown as ToolSchema<ClearFieldValueArgs>,
   outputSchema: SuccessOutputSchema,
   annotations: ANNOTATION_PATTERNS.updateIdempotent,
@@ -832,8 +903,8 @@ export const clearFieldValueTool: ToolDefinition<ClearFieldValueArgs, z.infer<ty
       args: {
         projectId: "PVT_kwDOLhQ7gc4AOEbH",
         itemId: "PVTI_lADOLhQ7gc4AOEbHzM4AOAJ7",
-        fieldId: "PVTF_lADOLhQ7gc4AOEbHzM4AOAI1"
-      }
+        fieldId: "PVTF_lADOLhQ7gc4AOEbHzM4AOAI1",
+      },
     },
     {
       name: "Clear iteration assignment",
@@ -841,8 +912,8 @@ export const clearFieldValueTool: ToolDefinition<ClearFieldValueArgs, z.infer<ty
       args: {
         projectId: "PVT_kwDOLhQ7gc4AOEbH",
         itemId: "PVTI_lADOLhQ7gc4AOEbHzM4AOAJ7",
-        fieldId: "PVTF_lADOLhQ7gc4AOEbHzM4AOAI2"
-      }
-    }
-  ]
+        fieldId: "PVTF_lADOLhQ7gc4AOEbHzM4AOAI2",
+      },
+    },
+  ],
 };

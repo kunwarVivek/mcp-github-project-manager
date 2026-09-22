@@ -173,10 +173,9 @@ export class GitHubStatusUpdateRepository extends BaseGitHubRepository {
       input.targetDate = options.targetDate;
     }
 
-    const response = await this.graphql<CreateStatusUpdateResponse>(
-      CREATE_STATUS_UPDATE_MUTATION,
-      { input }
-    );
+    const response = await this.graphql<CreateStatusUpdateResponse>(CREATE_STATUS_UPDATE_MUTATION, {
+      input,
+    });
 
     return this.mapStatusUpdateNode(response.createProjectV2StatusUpdate.statusUpdate);
   }
@@ -196,21 +195,18 @@ export class GitHubStatusUpdateRepository extends BaseGitHubRepository {
     first: number = 20,
     after?: string
   ): Promise<StatusUpdateListResult> {
-    const response = await this.graphql<ListStatusUpdatesResponse>(
-      LIST_STATUS_UPDATES_QUERY,
-      {
-        projectId,
-        first: Math.min(first, 100),
-        after: after || null,
-      }
-    );
+    const response = await this.graphql<ListStatusUpdatesResponse>(LIST_STATUS_UPDATES_QUERY, {
+      projectId,
+      first: Math.min(first, 100),
+      after: after || null,
+    });
 
     if (!response.node) {
       throw new Error(`Project with ID ${projectId} not found`);
     }
 
-    const statusUpdates: StatusUpdate[] = response.node.statusUpdates.nodes.map(
-      (node) => this.mapStatusUpdateNode(node)
+    const statusUpdates: StatusUpdate[] = response.node.statusUpdates.nodes.map((node) =>
+      this.mapStatusUpdateNode(node)
     );
 
     return {
@@ -230,12 +226,9 @@ export class GitHubStatusUpdateRepository extends BaseGitHubRepository {
    * @returns The status update if found, null otherwise
    */
   async getStatusUpdate(statusUpdateId: string): Promise<StatusUpdate | null> {
-    const response = await this.graphql<GetStatusUpdateResponse>(
-      GET_STATUS_UPDATE_QUERY,
-      {
-        statusUpdateId,
-      }
-    );
+    const response = await this.graphql<GetStatusUpdateResponse>(GET_STATUS_UPDATE_QUERY, {
+      statusUpdateId,
+    });
 
     if (!response.node) {
       return null;

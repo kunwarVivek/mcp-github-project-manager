@@ -1,20 +1,20 @@
-import { generateObject } from 'ai';
-import { z } from 'zod';
-import { AIServiceFactory } from '../ai/AIServiceFactory.js';
-import { type ILogger, Logger } from '../../infrastructure/logger';
-import { InputSanitizer } from '../utils/InputSanitizer';
+import { generateObject } from "ai";
+import { z } from "zod";
+import { AIServiceFactory } from "../ai/AIServiceFactory.js";
+import { type ILogger, Logger } from "../../infrastructure/logger";
+import { InputSanitizer } from "../utils/InputSanitizer";
 import {
   type TaskLifecycleState,
   type TaskPhaseInfo,
   type TaskBlocker,
-  isTaskPhaseStatus
-} from '../../domain/feature-lifecycle-types.js';
-import type { AITask, } from '../../domain/ai-types.js';
+  isTaskPhaseStatus,
+} from "../../domain/feature-lifecycle-types.js";
+import type { AITask } from "../../domain/ai-types.js";
 import {
   FEATURE_PROMPT_CONFIGS,
-  formatFeaturePrompt
-} from '../ai/prompts/FeatureAdditionPrompts.js';
-import { safeCall } from '../utils/safeCall';
+  formatFeaturePrompt,
+} from "../ai/prompts/FeatureAdditionPrompts.js";
+import { safeCall } from "../utils/safeCall";
 
 /**
  * Manages the lifecycle of individual tasks through planning → development
@@ -49,29 +49,29 @@ export class TaskLifecycleService {
    */
   createInitialTaskLifecycleState(task: AITask): TaskLifecycleState {
     const basePhase: TaskPhaseInfo = {
-      status: 'not_started',
+      status: "not_started",
       startedAt: undefined,
       completedAt: undefined,
       assignee: undefined,
       notes: undefined,
-      artifacts: []
+      artifacts: [],
     };
 
     return {
       taskId: task.id,
-      currentPhase: 'planning',
+      currentPhase: "planning",
       phases: {
         planning: { ...basePhase },
         development: { ...basePhase },
         testing: { ...basePhase },
         review: { ...basePhase },
-        deployment: { ...basePhase }
+        deployment: { ...basePhase },
       },
       blockers: [],
       progressPercentage: 0,
       estimatedCompletion: new Date(
         Date.now() + task.estimatedHours * 60 * 60 * 1000
-      ).toISOString()
+      ).toISOString(),
     };
   }
 
@@ -108,14 +108,13 @@ export class TaskLifecycleService {
             status: validStatus,
             assignee: params.updateData.assignee,
             notes: params.updateData.notes,
-            artifacts:
-              params.updateData.artifacts || updatedState.phases[phase].artifacts
+            artifacts: params.updateData.artifacts || updatedState.phases[phase].artifacts,
           };
 
-          if (validStatus === 'in_progress' && !updatedState.phases[phase].startedAt) {
+          if (validStatus === "in_progress" && !updatedState.phases[phase].startedAt) {
             updatedState.phases[phase].startedAt = new Date().toISOString();
           }
-          if (validStatus === 'completed') {
+          if (validStatus === "completed") {
             updatedState.phases[phase].completedAt = new Date().toISOString();
           }
         }
@@ -146,9 +145,9 @@ export class TaskLifecycleService {
       const model = this.aiFactory.getMainModel() || this.aiFactory.getBestAvailableModel();
 
       if (!model) {
-        this.logger.error('Task lifecycle recommendations failed: AI service is not available');
+        this.logger.error("Task lifecycle recommendations failed: AI service is not available");
         throw new Error(
-          'AI service is not available. Please configure at least one AI provider (ANTHROPIC_API_KEY, OPENAI_API_KEY, GOOGLE_API_KEY, or PERPLEXITY_API_KEY).'
+          "AI service is not available. Please configure at least one AI provider (ANTHROPIC_API_KEY, OPENAI_API_KEY, GOOGLE_API_KEY, or PERPLEXITY_API_KEY)."
         );
       }
 
@@ -157,12 +156,12 @@ export class TaskLifecycleService {
         currentPhase: taskLifecycle.currentPhase,
         progressData: JSON.stringify(taskLifecycle.phases),
         blockers: JSON.stringify(taskLifecycle.blockers),
-        teamContext: 'Standard development team'
+        teamContext: "Standard development team",
       });
 
       const LifecycleAnalysisSchema = z.object({
-        nextActions: z.array(z.string()).describe('Ordered list of next actions to take'),
-        recommendations: z.array(z.string()).describe('Strategic recommendations'),
+        nextActions: z.array(z.string()).describe("Ordered list of next actions to take"),
+        recommendations: z.array(z.string()).describe("Strategic recommendations"),
       });
 
       const result = await generateObject({
@@ -171,14 +170,14 @@ export class TaskLifecycleService {
         prompt,
         schema: LifecycleAnalysisSchema,
         maxOutputTokens: config.maxTokens,
-        temperature: config.temperature
+        temperature: config.temperature,
       });
 
       return {
         nextActions: result.object.nextActions,
-        blockers: taskLifecycle.blockers.map(b => b.description),
+        blockers: taskLifecycle.blockers.map((b) => b.description),
         recommendations: result.object.recommendations,
-        estimatedCompletion: this.calculateEstimatedCompletion(taskLifecycle)
+        estimatedCompletion: this.calculateEstimatedCompletion(taskLifecycle),
       };
     });
   }
@@ -189,27 +188,25 @@ export class TaskLifecycleService {
 
   calculateTaskProgress(state: TaskLifecycleState): number {
     const phases = Object.values(state.phases);
-    const completedPhases = phases.filter(p => p.status === 'completed').length;
+    const completedPhases = phases.filter((p) => p.status === "completed").length;
     return Math.round((completedPhases / phases.length) * 100);
   }
 
-  determineCurrentPhase(
-    state: TaskLifecycleState
-  ): TaskLifecycleState['currentPhase'] {
-    const phaseOrder: (keyof TaskLifecycleState['phases'])[] = [
-      'planning',
-      'development',
-      'testing',
-      'review',
-      'deployment'
+  determineCurrentPhase(state: TaskLifecycleState): TaskLifecycleState["currentPhase"] {
+    const phaseOrder: (keyof TaskLifecycleState["phases"])[] = [
+      "planning",
+      "development",
+      "testing",
+      "review",
+      "deployment",
     ];
 
     for (const phase of phaseOrder) {
-      if (state.phases[phase].status !== 'completed') {
+      if (state.phases[phase].status !== "completed") {
         return phase;
       }
     }
-    return 'completed';
+    return "completed";
   }
 
   calculateEstimatedCompletion(state: TaskLifecycleState): string {
@@ -220,35 +217,55 @@ export class TaskLifecycleService {
 
   extractNextActions(analysis: string): string[] {
     // Look for numbered/bulleted action items or "next steps" section
-    const sectionMatch = analysis.match(/(?:next (?:steps|actions)|action items?|to.?do|immediate actions?)[:\s]*\n([\s\S]*?)(?:\n\n|$)/i);
+    const sectionMatch = analysis.match(
+      /(?:next (?:steps|actions)|action items?|to.?do|immediate actions?)[:\s]*\n([\s\S]*?)(?:\n\n|$)/i
+    );
     if (sectionMatch) {
-      const lines = sectionMatch[1].split('\n').map(l => l.replace(/^[-*•\d.]+\s*/, '').trim()).filter(l => l.length > 5);
+      const lines = sectionMatch[1]
+        .split("\n")
+        .map((l) => l.replace(/^[-*•\d.]+\s*/, "").trim())
+        .filter((l) => l.length > 5);
       if (lines.length > 0) return lines.slice(0, 5);
     }
     // Fallback: look for imperative sentences
-    const imperativePattern = /(?:^|\n)\s*[-*•\d.]+\s*((?:Review|Implement|Create|Set up|Configure|Test|Deploy|Document|Fix|Update|Add|Remove|Refactor)\s[^.\n]+)/gi;
+    const imperativePattern =
+      /(?:^|\n)\s*[-*•\d.]+\s*((?:Review|Implement|Create|Set up|Configure|Test|Deploy|Document|Fix|Update|Add|Remove|Refactor)\s[^.\n]+)/gi;
     const actions: string[] = [];
     let match;
     while ((match = imperativePattern.exec(analysis)) !== null) {
       actions.push(match[1].trim());
     }
-    return actions.length > 0 ? actions.slice(0, 5) : ['Review requirements', 'Start implementation', 'Set up testing environment'];
+    return actions.length > 0
+      ? actions.slice(0, 5)
+      : ["Review requirements", "Start implementation", "Set up testing environment"];
   }
 
   extractRecommendations(analysis: string): string[] {
-    const sectionMatch = analysis.match(/(?:recommend(?:ation)?s?|suggest(?:ion)?s?|best practices?|advice)[:\s]*\n([\s\S]*?)(?:\n\n|$)/i);
+    const sectionMatch = analysis.match(
+      /(?:recommend(?:ation)?s?|suggest(?:ion)?s?|best practices?|advice)[:\s]*\n([\s\S]*?)(?:\n\n|$)/i
+    );
     if (sectionMatch) {
-      const lines = sectionMatch[1].split('\n').map(l => l.replace(/^[-*•\d.]+\s*/, '').trim()).filter(l => l.length > 5);
+      const lines = sectionMatch[1]
+        .split("\n")
+        .map((l) => l.replace(/^[-*•\d.]+\s*/, "").trim())
+        .filter((l) => l.length > 5);
       if (lines.length > 0) return lines.slice(0, 5);
     }
     // Fallback: look for sentences with recommendation language
-    const recPattern = /(?:recommend|suggest|advise|consider|should|best practice)s?[:\-]?\s*([^.\n]+[.]?)/gi;
+    const recPattern =
+      /(?:recommend|suggest|advise|consider|should|best practice)s?[:\-]?\s*([^.\n]+[.]?)/gi;
     const recs: string[] = [];
     let match;
     while ((match = recPattern.exec(analysis)) !== null) {
       const rec = match[1].trim();
       if (rec.length > 10) recs.push(rec);
     }
-    return recs.length > 0 ? recs.slice(0, 5) : ['Focus on core functionality first', 'Implement comprehensive testing', 'Plan for gradual rollout'];
+    return recs.length > 0
+      ? recs.slice(0, 5)
+      : [
+          "Focus on core functionality first",
+          "Implement comprehensive testing",
+          "Plan for gradual rollout",
+        ];
   }
 }

@@ -1,9 +1,9 @@
-import * as fs from 'node:fs/promises';
-import * as path from 'node:path';
-import * as zlib from 'node:zlib';
-import { promisify } from 'node:util';
-import type { SyncMetadata } from '../../domain/resource-types';
-import { type ILogger, Logger } from '../logger/index';
+import * as fs from "node:fs/promises";
+import * as path from "node:path";
+import * as zlib from "node:zlib";
+import { promisify } from "node:util";
+import type { SyncMetadata } from "../../domain/resource-types";
+import { type ILogger, Logger } from "../logger/index";
 
 const gzip = promisify(zlib.gzip);
 const gunzip = promisify(zlib.gunzip);
@@ -33,15 +33,15 @@ export class FilePersistenceAdapter {
   constructor(options: Partial<PersistenceOptions> = {}, logger?: ILogger) {
     this.logger = logger ?? Logger.getInstance();
     this.options = {
-      cacheDirectory: options.cacheDirectory || '.mcp-cache',
+      cacheDirectory: options.cacheDirectory || ".mcp-cache",
       enableCompression: options.enableCompression ?? true,
       maxBackups: options.maxBackups || 5,
-      atomicWrites: options.atomicWrites ?? true
+      atomicWrites: options.atomicWrites ?? true,
     };
 
-    this.metadataFile = path.join(this.options.cacheDirectory, 'metadata.json');
-    this.lockFile = path.join(this.options.cacheDirectory, 'metadata.lock');
-    this.tempDir = path.join(this.options.cacheDirectory, 'temp');
+    this.metadataFile = path.join(this.options.cacheDirectory, "metadata.json");
+    this.lockFile = path.join(this.options.cacheDirectory, "metadata.lock");
+    this.tempDir = path.join(this.options.cacheDirectory, "temp");
   }
 
   /**
@@ -52,7 +52,7 @@ export class FilePersistenceAdapter {
       await this.ensureDirectoryExists();
       await this.acquireLock();
 
-      if (!await this.fileExists(this.metadataFile)) {
+      if (!(await this.fileExists(this.metadataFile))) {
         this.logger.info("No existing metadata file found, starting fresh");
         return [];
       }
@@ -69,7 +69,6 @@ export class FilePersistenceAdapter {
 
       this.logger.info(`Loaded ${metadata.length} metadata entries from persistence`);
       return metadata;
-
     } catch (error) {
       this.logger.error("Failed to load metadata:", error);
 
@@ -100,7 +99,7 @@ export class FilePersistenceAdapter {
 
       // Update or add the metadata entry
       const existingIndex = existingMetadata.findIndex(
-        m => m.resourceId === metadata.resourceId && m.resourceType === metadata.resourceType
+        (m) => m.resourceId === metadata.resourceId && m.resourceType === metadata.resourceType
       );
 
       if (existingIndex >= 0) {
@@ -111,7 +110,6 @@ export class FilePersistenceAdapter {
 
       // Save updated metadata
       await this.saveAllMetadata(existingMetadata);
-
     } catch (error) {
       this.logger.error("Failed to save metadata:", error);
       throw error;
@@ -140,7 +138,6 @@ export class FilePersistenceAdapter {
       }
 
       this.logger.debug(`Saved ${metadata.length} metadata entries to persistence`);
-
     } catch (error) {
       this.logger.error("Failed to save all metadata:", error);
       throw error;
@@ -160,7 +157,7 @@ export class FilePersistenceAdapter {
       const result: PersistenceStats = {
         totalMetadataEntries: metadata.length,
         fileSize: stats.size,
-        lastModified: new Date(stats.mtime)
+        lastModified: new Date(stats.mtime),
       };
 
       // Calculate compression ratio if compression is enabled
@@ -218,7 +215,7 @@ export class FilePersistenceAdapter {
    */
   private async acquireLock(timeout = 5000): Promise<void> {
     // Skip locking in test environment
-    if (process.env.NODE_ENV === 'test') {
+    if (process.env.NODE_ENV === "test") {
       return;
     }
 
@@ -226,11 +223,11 @@ export class FilePersistenceAdapter {
 
     while (Date.now() - startTime < timeout) {
       try {
-        await fs.writeFile(this.lockFile, process.pid.toString(), { flag: 'wx' });
+        await fs.writeFile(this.lockFile, process.pid.toString(), { flag: "wx" });
         return;
       } catch {
         // Lock file exists, wait and retry
-        await new Promise(resolve => setTimeout(resolve, 100));
+        await new Promise((resolve) => setTimeout(resolve, 100));
       }
     }
 
@@ -242,7 +239,7 @@ export class FilePersistenceAdapter {
    */
   private async releaseLock(): Promise<void> {
     // Skip locking in test environment
-    if (process.env.NODE_ENV === 'test') {
+    if (process.env.NODE_ENV === "test") {
       return;
     }
 
@@ -275,14 +272,14 @@ export class FilePersistenceAdapter {
     if (this.options.enableCompression) {
       try {
         const decompressed = await gunzip(buffer);
-        return decompressed.toString('utf8');
+        return decompressed.toString("utf8");
       } catch {
         // File might not be compressed, try reading as plain text
-        return buffer.toString('utf8');
+        return buffer.toString("utf8");
       }
     }
 
-    return buffer.toString('utf8');
+    return buffer.toString("utf8");
   }
 
   /**
@@ -292,9 +289,9 @@ export class FilePersistenceAdapter {
     let buffer: Buffer;
 
     if (this.options.enableCompression) {
-      buffer = await gzip(Buffer.from(data, 'utf8'));
+      buffer = await gzip(Buffer.from(data, "utf8"));
     } else {
-      buffer = Buffer.from(data, 'utf8');
+      buffer = Buffer.from(data, "utf8");
     }
 
     await fs.writeFile(filePath, buffer);
@@ -304,7 +301,10 @@ export class FilePersistenceAdapter {
    * Write file atomically using temporary file
    */
   private async writeFileAtomic(filePath: string, data: string): Promise<void> {
-    const tempFile = path.join(this.tempDir, `metadata-${Date.now()}-${Math.random().toString(36).substr(2, 9)}.tmp`);
+    const tempFile = path.join(
+      this.tempDir,
+      `metadata-${Date.now()}-${Math.random().toString(36).substr(2, 9)}.tmp`
+    );
 
     try {
       await this.writeFile(tempFile, data);
@@ -324,7 +324,7 @@ export class FilePersistenceAdapter {
    * Load metadata without locking (internal use)
    */
   private async loadMetadataInternal(): Promise<SyncMetadata[]> {
-    if (!await this.fileExists(this.metadataFile)) {
+    if (!(await this.fileExists(this.metadataFile))) {
       return [];
     }
 
@@ -341,11 +341,11 @@ export class FilePersistenceAdapter {
    * Create backup of current metadata file
    */
   private async createBackup(): Promise<void> {
-    if (!await this.fileExists(this.metadataFile)) {
+    if (!(await this.fileExists(this.metadataFile))) {
       return;
     }
 
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
     const backupFile = path.join(this.options.cacheDirectory, `metadata-backup-${timestamp}.json`);
 
     try {
@@ -363,7 +363,7 @@ export class FilePersistenceAdapter {
     try {
       const files = await fs.readdir(this.options.cacheDirectory);
       const backupFiles = files
-        .filter(f => f.startsWith('metadata-backup-') && f.endsWith('.json'))
+        .filter((f) => f.startsWith("metadata-backup-") && f.endsWith(".json"))
         .sort()
         .reverse(); // Most recent first
 
@@ -380,7 +380,9 @@ export class FilePersistenceAdapter {
             continue; // Try next backup
           }
 
-          this.logger.info(`Recovered ${metadata.length} metadata entries from backup: ${backupFile}`);
+          this.logger.info(
+            `Recovered ${metadata.length} metadata entries from backup: ${backupFile}`
+          );
           return metadata;
         } catch (error) {
           this.logger.warn(`Failed to recover from backup ${backupFile}:`, error);
@@ -400,7 +402,7 @@ export class FilePersistenceAdapter {
     try {
       const files = await fs.readdir(this.options.cacheDirectory);
       const backupFiles = files
-        .filter(f => f.startsWith('metadata-backup-') && f.endsWith('.json'))
+        .filter((f) => f.startsWith("metadata-backup-") && f.endsWith(".json"))
         .sort();
 
       if (backupFiles.length > this.options.maxBackups) {

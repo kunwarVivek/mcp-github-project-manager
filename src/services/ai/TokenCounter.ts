@@ -4,12 +4,11 @@
  * More accurate than hardcoded constants, no external dependency needed.
  */
 export class TokenCounter {
-
   /** Estimate token count from text. */
   static estimate(text: string): number {
     if (!text) return 0;
     // Split on whitespace and punctuation for better accuracy
-    const words = text.split(/\s+/).filter(w => w.length > 0);
+    const words = text.split(/\s+/).filter((w) => w.length > 0);
     // Each word averages ~1.3 tokens, plus overhead for punctuation
     return Math.ceil(words.length * 1.3);
   }
@@ -33,4 +32,3 @@ export class TokenCounter {
     return `${text.substring(0, targetChars)}\n[...truncated to fit token limit]`;
   }
 }
-

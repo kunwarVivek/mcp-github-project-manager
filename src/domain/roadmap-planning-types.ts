@@ -283,7 +283,12 @@ export interface RoadmapRecalculationResult {
   /** Changes made during recalculation */
   changes: Array<{
     /** Type of change */
-    type: "milestone_moved" | "phase_extended" | "phase_shortened" | "milestone_added" | "milestone_removed";
+    type:
+      | "milestone_moved"
+      | "phase_extended"
+      | "phase_shortened"
+      | "milestone_added"
+      | "milestone_removed";
     /** ID of the affected element */
     elementId: string;
     /** Description of the change */

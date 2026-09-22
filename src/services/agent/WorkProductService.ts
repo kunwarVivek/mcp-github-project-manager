@@ -1,8 +1,8 @@
-import type { GitHubRepositoryFactory } from '../../infrastructure/github/GitHubRepositoryFactory';
-import type { WorkProductStore } from '../../infrastructure/agent/WorkProductStore';
-import type { WorkProduct } from '../../domain/agent-orchestration-types';
-import { AGENT_FIELDS } from '../../domain/agent-orchestration-types';
-import { safeCall } from '../utils/safeCall';
+import type { GitHubRepositoryFactory } from "../../infrastructure/github/GitHubRepositoryFactory";
+import type { WorkProductStore } from "../../infrastructure/agent/WorkProductStore";
+import type { WorkProduct } from "../../domain/agent-orchestration-types";
+import { AGENT_FIELDS } from "../../domain/agent-orchestration-types";
+import { safeCall } from "../utils/safeCall";
 
 // ---------------------------------------------------------------------------
 // GraphQL helpers
@@ -172,7 +172,7 @@ export class WorkProductService {
       const { data: issues } = await octokit.rest.issues.listForRepo({
         owner: config.owner,
         repo: config.repo,
-        state: 'all',
+        state: "all",
         per_page: 100,
       });
 
@@ -219,14 +219,17 @@ export class WorkProductService {
     });
 
     const fields = fieldsResp.node.fields.nodes;
-    const fieldMap = new Map(fields.map(f => [f.name, f]));
+    const fieldMap = new Map(fields.map((f) => [f.name, f]));
 
     // Update branch
     if (product.branch) {
       const branchField = fieldMap.get(AGENT_FIELDS.WORK_BRANCH);
       if (branchField) {
         await this.factory.graphql(UPDATE_TEXT_FIELD, {
-          projectId, itemId, fieldId: branchField.id, value: product.branch,
+          projectId,
+          itemId,
+          fieldId: branchField.id,
+          value: product.branch,
         });
       }
     }
@@ -236,7 +239,10 @@ export class WorkProductService {
       const prField = fieldMap.get(AGENT_FIELDS.PR_NUMBER);
       if (prField) {
         await this.factory.graphql(UPDATE_NUMBER_FIELD, {
-          projectId, itemId, fieldId: prField.id, value: product.prNumber,
+          projectId,
+          itemId,
+          fieldId: prField.id,
+          value: product.prNumber,
         });
       }
     }
@@ -244,10 +250,13 @@ export class WorkProductService {
     // Update status to 'review'
     const statusField = fieldMap.get(AGENT_FIELDS.STATUS);
     if (statusField?.options) {
-      const reviewOption = statusField.options.find(o => o.name === 'review');
+      const reviewOption = statusField.options.find((o) => o.name === "review");
       if (reviewOption) {
         await this.factory.graphql(UPDATE_SELECT_FIELD, {
-          projectId, itemId, fieldId: statusField.id, value: reviewOption.id,
+          projectId,
+          itemId,
+          fieldId: statusField.id,
+          value: reviewOption.id,
         });
       }
     }

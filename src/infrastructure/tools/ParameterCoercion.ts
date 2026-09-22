@@ -9,23 +9,23 @@ export class ParameterCoercion {
    * Coerce MCP parameters to appropriate types based on Zod schema
    */
   static coerceParameters(args: Record<string, any>, schema: z.ZodType): Record<string, any> {
-    if (!args || typeof args !== 'object') {
+    if (!args || typeof args !== "object") {
       return args;
     }
 
     const coerced = { ...args };
-    
+
     // Get the shape of the schema if it's an object schema
     if (schema instanceof z.ZodObject) {
       const shape = schema.shape;
-      
+
       for (const [key, value] of Object.entries(coerced)) {
         if (shape[key]) {
           coerced[key] = ParameterCoercion.coerceValue(value, shape[key]);
         }
       }
     }
-    
+
     return coerced;
   }
 
@@ -54,16 +54,16 @@ export class ParameterCoercion {
 
     // Handle ZodBoolean - convert string "true"/"false" to boolean
     if (zodType instanceof z.ZodBoolean) {
-      if (typeof value === 'string') {
-        if (value.toLowerCase() === 'true') return true;
-        if (value.toLowerCase() === 'false') return false;
+      if (typeof value === "string") {
+        if (value.toLowerCase() === "true") return true;
+        if (value.toLowerCase() === "false") return false;
       }
       return value;
     }
 
     // Handle ZodNumber - convert string numbers to numbers
     if (zodType instanceof z.ZodNumber) {
-      if (typeof value === 'string' && !isNaN(Number(value))) {
+      if (typeof value === "string" && !isNaN(Number(value))) {
         return Number(value);
       }
       return value;
@@ -71,18 +71,18 @@ export class ParameterCoercion {
 
     // Handle ZodArray - parse JSON arrays from strings
     if (zodType instanceof z.ZodArray) {
-      if (typeof value === 'string') {
+      if (typeof value === "string") {
         try {
           // Try to parse as JSON array
-          if (value.startsWith('[') && value.endsWith(']')) {
+          if (value.startsWith("[") && value.endsWith("]")) {
             const parsed = JSON.parse(value);
             if (Array.isArray(parsed)) {
               return parsed;
             }
           }
           // Handle comma-separated values
-          if (value.includes(',')) {
-            return value.split(',').map(v => v.trim());
+          if (value.includes(",")) {
+            return value.split(",").map((v) => v.trim());
           }
         } catch {
           // If parsing fails, return original value for Zod to handle
@@ -92,7 +92,7 @@ export class ParameterCoercion {
     }
 
     // Handle ZodObject - recursively coerce nested objects
-    if (zodType instanceof z.ZodObject && typeof value === 'object') {
+    if (zodType instanceof z.ZodObject && typeof value === "object") {
       return ParameterCoercion.coerceParameters(value, zodType);
     }
 
@@ -103,7 +103,7 @@ export class ParameterCoercion {
 
     // Handle ZodString - ensure string type
     if (zodType instanceof z.ZodString) {
-      if (typeof value !== 'string') {
+      if (typeof value !== "string") {
         return String(value);
       }
       return value;
@@ -131,13 +131,13 @@ export class ParameterCoercion {
    * Coerce common boolean parameter patterns
    */
   static coerceBoolean(value: any): boolean | any {
-    if (typeof value === 'boolean') return value;
-    if (typeof value === 'string') {
+    if (typeof value === "boolean") return value;
+    if (typeof value === "string") {
       const lower = value.toLowerCase();
-      if (lower === 'true' || lower === '1' || lower === 'yes') return true;
-      if (lower === 'false' || lower === '0' || lower === 'no') return false;
+      if (lower === "true" || lower === "1" || lower === "yes") return true;
+      if (lower === "false" || lower === "0" || lower === "no") return false;
     }
-    if (typeof value === 'number') {
+    if (typeof value === "number") {
       return value !== 0;
     }
     return value; // Let Zod handle invalid values
@@ -148,16 +148,19 @@ export class ParameterCoercion {
    */
   static coerceArray(value: any): any[] | any {
     if (Array.isArray(value)) return value;
-    if (typeof value === 'string') {
+    if (typeof value === "string") {
       try {
         // JSON array
-        if (value.startsWith('[') && value.endsWith(']')) {
+        if (value.startsWith("[") && value.endsWith("]")) {
           const parsed = JSON.parse(value);
           if (Array.isArray(parsed)) return parsed;
         }
         // Comma-separated
-        if (value.includes(',')) {
-          return value.split(',').map(v => v.trim()).filter(v => v.length > 0);
+        if (value.includes(",")) {
+          return value
+            .split(",")
+            .map((v) => v.trim())
+            .filter((v) => v.length > 0);
         }
         // Single item
         if (value.trim().length > 0) {

@@ -11,25 +11,22 @@
  * - Falls back to basic structure when AI unavailable
  */
 
-import { generateObject } from 'ai';
-import { z } from 'zod';
-import { AIServiceFactory } from './AIServiceFactory';
-import {
-  calculateWeightedScore,
-  getConfidenceTier
-} from './ConfidenceScorer';
-import { InputSanitizer } from '../utils/InputSanitizer';
+import { generateObject } from "ai";
+import { z } from "zod";
+import { AIServiceFactory } from "./AIServiceFactory";
+import { calculateWeightedScore, getConfidenceTier } from "./ConfidenceScorer";
+import { InputSanitizer } from "../utils/InputSanitizer";
 import type {
   EnrichedIssue,
   EnrichedIssueSections,
   EnrichedSection,
-  IssueEnrichmentConfig
-} from '../../domain/issue-intelligence-types';
-import type { SectionConfidence, ConfidenceFactors, ConfidenceTier } from '../../domain/ai-types';
+  IssueEnrichmentConfig,
+} from "../../domain/issue-intelligence-types";
+import type { SectionConfidence, ConfidenceFactors, ConfidenceTier } from "../../domain/ai-types";
 import {
   ENRICHMENT_SYSTEM_PROMPT,
-  formatEnrichmentPrompt
-} from './prompts/IssueIntelligencePrompts';
+  formatEnrichmentPrompt,
+} from "./prompts/IssueIntelligencePrompts";
 
 // ============================================================================
 // Zod Schemas for AI Response Validation
@@ -40,7 +37,7 @@ import {
  */
 const AIEnrichedSectionSchema = z.object({
   content: z.string(),
-  confidence: z.number().min(0).max(1)
+  confidence: z.number().min(0).max(1),
 });
 
 /**
@@ -53,12 +50,12 @@ const AIEnrichmentResponseSchema = z.object({
     solution: AIEnrichedSectionSchema.optional(),
     context: AIEnrichedSectionSchema.optional(),
     impact: AIEnrichedSectionSchema.optional(),
-    acceptanceCriteria: AIEnrichedSectionSchema.optional()
+    acceptanceCriteria: AIEnrichedSectionSchema.optional(),
   }),
   suggestedLabels: z.array(z.string()),
   suggestedAssignees: z.array(z.string()).optional(),
   overallConfidence: z.number().min(0).max(1),
-  reasoning: z.string().optional()
+  reasoning: z.string().optional(),
 });
 
 /**
@@ -75,9 +72,9 @@ type AIEnrichmentResponse = z.infer<typeof AIEnrichmentResponseSchema>;
  */
 const DEFAULT_ENRICHMENT_CONFIG: IssueEnrichmentConfig = {
   preserveOriginal: true,
-  includeSections: ['problem', 'solution', 'context', 'impact', 'acceptanceCriteria'],
+  includeSections: ["problem", "solution", "context", "impact", "acceptanceCriteria"],
   suggestLabels: true,
-  suggestAssignees: false
+  suggestAssignees: false,
 };
 
 /**
@@ -114,17 +111,18 @@ export class IssueEnrichmentAIService {
     repositoryLabels?: string[];
   }): Promise<EnrichedIssue> {
     // Only preserve original when config allows AND description is substantial
-    const preserveOriginal = this.config.preserveOriginal
-      && (params.issueDescription?.length || 0) > SUBSTANTIAL_DESCRIPTION_LENGTH;
+    const preserveOriginal =
+      this.config.preserveOriginal &&
+      (params.issueDescription?.length || 0) > SUBSTANTIAL_DESCRIPTION_LENGTH;
 
     // Get AI model
-    const model = this.aiFactory.getModel('main') || this.aiFactory.getBestAvailableModel();
+    const model = this.aiFactory.getModel("main") || this.aiFactory.getBestAvailableModel();
 
     if (!model) {
       // Fallback when AI unavailable
       return this.getFallbackEnrichment({
         ...params,
-        preserveOriginal
+        preserveOriginal,
       });
     }
 
@@ -135,21 +133,23 @@ export class IssueEnrichmentAIService {
         prompt: formatEnrichmentPrompt({
           issueTitle: InputSanitizer.sanitizeIssueContent(params.issueTitle),
           issueDescription: InputSanitizer.sanitizeIssueContent(params.issueDescription),
-          projectContext: params.projectContext ? InputSanitizer.sanitizeText(params.projectContext) : undefined,
+          projectContext: params.projectContext
+            ? InputSanitizer.sanitizeText(params.projectContext)
+            : undefined,
           preserveOriginal,
-          repositoryLabels: params.repositoryLabels
+          repositoryLabels: params.repositoryLabels,
         }),
         schema: AIEnrichmentResponseSchema,
-        temperature: 0.4 // Balanced for consistent enrichment with some creativity
+        temperature: 0.4, // Balanced for consistent enrichment with some creativity
       });
 
       return this.formatEnrichmentResult(result.object, params, preserveOriginal, this.config);
     } catch (error) {
       // Fallback on AI error
-      console.error('Issue enrichment AI call failed:', error);
+      console.error("Issue enrichment AI call failed:", error);
       return this.getFallbackEnrichment({
         ...params,
-        preserveOriginal
+        preserveOriginal,
       });
     }
   }
@@ -168,20 +168,30 @@ export class IssueEnrichmentAIService {
 
     const aiSections = aiResult.sections;
     const included = config.includeSections;
-    if (included.includes('problem') && aiSections.problem?.content) {
-      sections.problem = this.convertSection(aiSections.problem as { content: string; confidence: number });
+    if (included.includes("problem") && aiSections.problem?.content) {
+      sections.problem = this.convertSection(
+        aiSections.problem as { content: string; confidence: number }
+      );
     }
-    if (included.includes('solution') && aiSections.solution?.content) {
-      sections.solution = this.convertSection(aiSections.solution as { content: string; confidence: number });
+    if (included.includes("solution") && aiSections.solution?.content) {
+      sections.solution = this.convertSection(
+        aiSections.solution as { content: string; confidence: number }
+      );
     }
-    if (included.includes('context') && aiSections.context?.content) {
-      sections.context = this.convertSection(aiSections.context as { content: string; confidence: number });
+    if (included.includes("context") && aiSections.context?.content) {
+      sections.context = this.convertSection(
+        aiSections.context as { content: string; confidence: number }
+      );
     }
-    if (included.includes('impact') && aiSections.impact?.content) {
-      sections.impact = this.convertSection(aiSections.impact as { content: string; confidence: number });
+    if (included.includes("impact") && aiSections.impact?.content) {
+      sections.impact = this.convertSection(
+        aiSections.impact as { content: string; confidence: number }
+      );
     }
-    if (included.includes('acceptanceCriteria') && aiSections.acceptanceCriteria?.content) {
-      sections.acceptanceCriteria = this.convertSection(aiSections.acceptanceCriteria as { content: string; confidence: number });
+    if (included.includes("acceptanceCriteria") && aiSections.acceptanceCriteria?.content) {
+      sections.acceptanceCriteria = this.convertSection(
+        aiSections.acceptanceCriteria as { content: string; confidence: number }
+      );
     }
 
     // Calculate overall confidence
@@ -194,14 +204,14 @@ export class IssueEnrichmentAIService {
     return {
       original: {
         title: params.issueTitle,
-        body: params.issueDescription
+        body: params.issueDescription,
       },
       preserveOriginal,
       enrichedBody: aiResult.enrichedBody,
       sections,
       suggestedLabels: config.suggestLabels ? aiResult.suggestedLabels : [],
       suggestedAssignees: config.suggestAssignees ? aiResult.suggestedAssignees : undefined,
-      overallConfidence
+      overallConfidence,
     };
   }
 
@@ -211,7 +221,7 @@ export class IssueEnrichmentAIService {
   private convertSection(aiSection: { content: string; confidence: number }): EnrichedSection {
     return {
       content: aiSection.content,
-      confidence: Math.round(aiSection.confidence * 100)
+      confidence: Math.round(aiSection.confidence * 100),
     };
   }
 
@@ -231,30 +241,31 @@ export class IssueEnrichmentAIService {
     const sectionCoverage = sectionKeys.length / 5; // 5 possible sections
 
     // Average section confidence
-    const sectionConfidences = sectionKeys.map(key =>
-      (sections[key as keyof EnrichedIssueSections]?.confidence || 0) / 100
+    const sectionConfidences = sectionKeys.map(
+      (key) => (sections[key as keyof EnrichedIssueSections]?.confidence || 0) / 100
     );
-    const avgSectionConfidence = sectionConfidences.length > 0
-      ? sectionConfidences.reduce((a, b) => a + b, 0) / sectionConfidences.length
-      : 0.5;
+    const avgSectionConfidence =
+      sectionConfidences.length > 0
+        ? sectionConfidences.reduce((a, b) => a + b, 0) / sectionConfidences.length
+        : 0.5;
 
     const factors: ConfidenceFactors = {
       inputCompleteness,
       aiSelfAssessment: aiConfidence,
-      patternMatch: (sectionCoverage + avgSectionConfidence) / 2
+      patternMatch: (sectionCoverage + avgSectionConfidence) / 2,
     };
 
     const score = calculateWeightedScore(factors);
     const tier = getConfidenceTier(score);
 
     return {
-      sectionId: 'enrichment',
-      sectionName: 'Issue Enrichment',
+      sectionId: "enrichment",
+      sectionName: "Issue Enrichment",
       score,
       tier,
       factors,
       reasoning: `Enrichment based on ${originalDescription.length} char description, generated ${sectionKeys.length}/5 sections`,
-      needsReview: score < 70
+      needsReview: score < 70,
     };
   }
 
@@ -281,25 +292,25 @@ export class IssueEnrichmentAIService {
     projectContext?: string;
     preserveOriginal: boolean;
   }): EnrichedIssue {
-    const description = params.issueDescription || '';
+    const description = params.issueDescription || "";
 
     // Create basic structure with original content
     const enrichedBody = params.preserveOriginal
-      ? `${description}\n\n---\n\n**[Auto-structured - AI unavailable]**\n\n**Problem:** ${params.issueTitle}\n\n**Description:** ${description.substring(0, 500)}${description.length > 500 ? '...' : ''}`
+      ? `${description}\n\n---\n\n**[Auto-structured - AI unavailable]**\n\n**Problem:** ${params.issueTitle}\n\n**Description:** ${description.substring(0, 500)}${description.length > 500 ? "..." : ""}`
       : `**Problem:** ${params.issueTitle}\n\n**Description:** ${description}`;
 
     // Basic section generation
     const sections: EnrichedIssueSections = {
       problem: {
         content: params.issueTitle,
-        confidence: 40 // Low confidence for fallback
-      }
+        confidence: 40, // Low confidence for fallback
+      },
     };
 
     if (description) {
       sections.context = {
         content: description.substring(0, 300),
-        confidence: 40
+        confidence: 40,
       };
     }
 
@@ -307,30 +318,30 @@ export class IssueEnrichmentAIService {
     const factors: ConfidenceFactors = {
       inputCompleteness: this.calculateInputCompleteness(description),
       aiSelfAssessment: 0.4, // AI unavailable, low self-assessment
-      patternMatch: 0.3 // Basic pattern matching only
+      patternMatch: 0.3, // Basic pattern matching only
     };
 
     const score = 40; // Fixed low score for fallback
-    const tier: ConfidenceTier = 'low';
+    const tier: ConfidenceTier = "low";
 
     return {
       original: {
         title: params.issueTitle,
-        body: description
+        body: description,
       },
       preserveOriginal: params.preserveOriginal,
       enrichedBody,
       sections,
       suggestedLabels: [], // No label suggestions in fallback
       overallConfidence: {
-        sectionId: 'enrichment-fallback',
-        sectionName: 'Issue Enrichment (Fallback)',
+        sectionId: "enrichment-fallback",
+        sectionName: "Issue Enrichment (Fallback)",
         score,
         tier,
         factors,
-        reasoning: 'AI unavailable, using basic structure',
-        needsReview: true
-      }
+        reasoning: "AI unavailable, using basic structure",
+        needsReview: true,
+      },
     };
   }
 }

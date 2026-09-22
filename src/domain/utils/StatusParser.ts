@@ -1,8 +1,8 @@
-import { ResourceStatus } from '../resource-types';
+import { ResourceStatus } from "../resource-types";
 
 /**
  * Status mapping configuration for different resource types.
- * 
+ *
  * Each resource type can have different string representations for the same
  * logical state (e.g., 'open' vs 'active' for active state).
  */
@@ -25,54 +25,54 @@ interface StatusMapping {
 const STATUS_MAPPINGS: Record<string, StatusMapping> = {
   /** Issues use 'open' for active */
   issue: {
-    active: 'open',
-    closed: 'closed',
+    active: "open",
+    closed: "closed",
   },
   /** Projects use 'active' for active */
   project: {
-    active: 'active',
-    closed: 'closed',
+    active: "active",
+    closed: "closed",
   },
   /** Milestones use 'open' for active */
   milestone: {
-    active: 'open',
-    closed: 'closed',
+    active: "open",
+    closed: "closed",
   },
   /** Sprints have more status options */
   sprint: {
-    active: 'active',
-    closed: 'closed',
-    planned: 'planned',
-    completed: 'completed',
+    active: "active",
+    closed: "closed",
+    planned: "planned",
+    completed: "completed",
   },
   /** GitHub API uses uppercase for issues */
   githubIssue: {
-    active: 'OPEN',
-    closed: 'CLOSED',
+    active: "OPEN",
+    closed: "CLOSED",
   },
   /** GitHub API uses lowercase for milestones */
   githubMilestone: {
-    active: 'open',
-    closed: 'closed',
+    active: "open",
+    closed: "closed",
   },
 };
 
 /**
  * Parse a status string to ResourceStatus enum.
- * 
+ *
  * @param status - The status string to parse
  * @param resourceType - The resource type context for parsing (default: 'issue')
  * @returns The corresponding ResourceStatus enum value
- * 
+ *
  * @example
  * ```typescript
  * // Parse issue status
  * parseResourceStatus('open'); // ResourceStatus.ACTIVE
  * parseResourceStatus('closed'); // ResourceStatus.CLOSED
- * 
+ *
  * // Parse project status
  * parseResourceStatus('active', 'project'); // ResourceStatus.ACTIVE
- * 
+ *
  * // Parse sprint status
  * parseResourceStatus('planned', 'sprint'); // ResourceStatus.PLANNED
  * parseResourceStatus('completed', 'sprint'); // ResourceStatus.COMPLETED
@@ -80,7 +80,7 @@ const STATUS_MAPPINGS: Record<string, StatusMapping> = {
  */
 export function parseResourceStatus(
   status: string,
-  resourceType: string = 'issue'
+  resourceType: string = "issue"
 ): ResourceStatus {
   const mapping = STATUS_MAPPINGS[resourceType] || STATUS_MAPPINGS.issue;
   const normalizedStatus = status.toLowerCase();
@@ -112,10 +112,8 @@ export function parseResourceStatus(
 
   // Default fallback: try to match any ResourceStatus value
   const allStatuses = Object.values(ResourceStatus);
-  const matched = allStatuses.find(
-    s => s.toLowerCase() === normalizedStatus
-  );
-  
+  const matched = allStatuses.find((s) => s.toLowerCase() === normalizedStatus);
+
   if (matched) {
     return matched;
   }
@@ -126,27 +124,27 @@ export function parseResourceStatus(
 
 /**
  * Convert ResourceStatus to a status string for the given resource type.
- * 
+ *
  * @param resourceStatus - The ResourceStatus enum value
  * @param resourceType - The resource type context for conversion (default: 'issue')
  * @returns The corresponding status string
- * 
+ *
  * @example
  * ```typescript
  * // Convert to issue status string
  * toStatusString(ResourceStatus.ACTIVE); // 'open'
  * toStatusString(ResourceStatus.CLOSED); // 'closed'
- * 
+ *
  * // Convert to project status string
  * toStatusString(ResourceStatus.ACTIVE, 'project'); // 'active'
- * 
+ *
  * // Convert to GitHub issue state
  * toStatusString(ResourceStatus.ACTIVE, 'githubIssue'); // 'OPEN'
  * ```
  */
 export function toStatusString(
   resourceStatus: ResourceStatus,
-  resourceType: string = 'issue'
+  resourceType: string = "issue"
 ): string {
   const mapping = STATUS_MAPPINGS[resourceType] || STATUS_MAPPINGS.issue;
 
@@ -170,11 +168,11 @@ export function toStatusString(
 
 /**
  * Check if a status string represents an open/active state.
- * 
+ *
  * @param status - The status string to check
  * @param resourceType - The resource type context (default: 'issue')
  * @returns True if the status represents an active/open state
- * 
+ *
  * @example
  * ```typescript
  * isActiveStatus('open'); // true
@@ -182,37 +180,31 @@ export function toStatusString(
  * isActiveStatus('active', 'project'); // true
  * ```
  */
-export function isActiveStatus(
-  status: string,
-  resourceType: string = 'issue'
-): boolean {
+export function isActiveStatus(status: string, resourceType: string = "issue"): boolean {
   const mapping = STATUS_MAPPINGS[resourceType] || STATUS_MAPPINGS.issue;
   return status.toLowerCase() === mapping.active.toLowerCase();
 }
 
 /**
  * Check if a status string represents a closed/completed state.
- * 
+ *
  * @param status - The status string to check
  * @param resourceType - The resource type context (default: 'issue')
  * @returns True if the status represents a closed/completed state
  */
-export function isClosedStatus(
-  status: string,
-  resourceType: string = 'issue'
-): boolean {
+export function isClosedStatus(status: string, resourceType: string = "issue"): boolean {
   const parsed = parseResourceStatus(status, resourceType);
   return parsed === ResourceStatus.CLOSED || parsed === ResourceStatus.COMPLETED;
 }
 
 /**
  * Filter resources by status string.
- * 
+ *
  * @param resources - Array of resources with a status field
  * @param statusFilter - The status string to filter by ('all' returns all)
  * @param resourceType - The resource type context (default: 'issue')
  * @returns Filtered array of resources
- * 
+ *
  * @example
  * ```typescript
  * const openIssues = filterByStatus(issues, 'open');
@@ -222,27 +214,24 @@ export function isClosedStatus(
 export function filterByStatus<T extends { status?: ResourceStatus }>(
   resources: T[],
   statusFilter: string,
-  resourceType: string = 'issue'
+  resourceType: string = "issue"
 ): T[] {
-  if (statusFilter === 'all') {
+  if (statusFilter === "all") {
     return resources;
   }
 
   const targetStatus = parseResourceStatus(statusFilter, resourceType);
-  return resources.filter(r => r.status === targetStatus);
+  return resources.filter((r) => r.status === targetStatus);
 }
 
 /**
  * Register a custom status mapping for a new resource type.
  * This allows extending the parser for domain-specific resources.
- * 
+ *
  * @param resourceType - The resource type identifier
  * @param mapping - The status mapping configuration
  */
-export function registerStatusMapping(
-  resourceType: string,
-  mapping: StatusMapping
-): void {
+export function registerStatusMapping(resourceType: string, mapping: StatusMapping): void {
   STATUS_MAPPINGS[resourceType] = mapping;
 }
 

@@ -1,7 +1,7 @@
 import type { GitHubRepositoryFactory } from "../infrastructure/github/GitHubRepositoryFactory";
 import type { ProjectItem } from "../domain/types";
 import { ResourceType } from "../domain/resource-types";
-import { safeCall } from './utils/safeCall';
+import { safeCall } from "./utils/safeCall";
 
 /**
  * ProjectLinkingService handles project item operations:
@@ -31,12 +31,11 @@ export class ProjectLinkingService {
     this.factory = factory;
   }
 
-
   // Project Item Operations
   async addProjectItem(data: {
     projectId: string;
     contentId: string;
-    contentType: 'issue' | 'pull_request';
+    contentType: "issue" | "pull_request";
   }): Promise<ProjectItem> {
     return safeCall(async () => {
       // GraphQL mutation to add an item to a project
@@ -69,7 +68,8 @@ export class ProjectLinkingService {
       const itemId = response.addProjectV2ItemById.item.id;
       const contentId = response.addProjectV2ItemById.item.content.id;
 
-      const resourceType = data.contentType === 'issue' ? ResourceType.ISSUE : ResourceType.PULL_REQUEST;
+      const resourceType =
+        data.contentType === "issue" ? ResourceType.ISSUE : ResourceType.PULL_REQUEST;
 
       return {
         id: itemId,
@@ -78,7 +78,7 @@ export class ProjectLinkingService {
         projectId: data.projectId,
         fieldValues: {},
         createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
+        updatedAt: new Date().toISOString(),
       };
     });
   }
@@ -89,7 +89,7 @@ export class ProjectLinkingService {
    */
   private async addProjectItemWithRetry(
     mutation: string,
-    data: { projectId: string; contentId: string },
+    data: { projectId: string; contentId: string }
   ): Promise<AddProjectItemResponse> {
     let lastError: unknown;
     for (let attempt = 0; attempt < 3; attempt++) {
@@ -106,7 +106,7 @@ export class ProjectLinkingService {
         if (!/temporary conflict/i.test(message) && !/try again/i.test(message)) {
           throw error;
         }
-        await new Promise(resolve => setTimeout(resolve, 250 * (attempt + 1)));
+        await new Promise((resolve) => setTimeout(resolve, 250 * (attempt + 1)));
       }
     }
     throw lastError;
@@ -134,13 +134,13 @@ export class ProjectLinkingService {
       await this.factory.graphql<DeleteProjectItemResponse>(mutation, {
         input: {
           projectId: data.projectId,
-          itemId: data.itemId
-        }
+          itemId: data.itemId,
+        },
       });
 
       return {
         success: true,
-        message: `Item ${data.itemId} has been removed from project ${data.projectId}`
+        message: `Item ${data.itemId} has been removed from project ${data.projectId}`,
       };
     });
   }
@@ -173,13 +173,13 @@ export class ProjectLinkingService {
       await this.factory.graphql<ArchiveProjectItemResponse>(mutation, {
         input: {
           projectId: data.projectId,
-          itemId: data.itemId
-        }
+          itemId: data.itemId,
+        },
       });
 
       return {
         success: true,
-        message: `Item ${data.itemId} has been archived in project ${data.projectId}`
+        message: `Item ${data.itemId} has been archived in project ${data.projectId}`,
       };
     });
   }
@@ -212,21 +212,18 @@ export class ProjectLinkingService {
       await this.factory.graphql<UnarchiveProjectItemResponse>(mutation, {
         input: {
           projectId: data.projectId,
-          itemId: data.itemId
-        }
+          itemId: data.itemId,
+        },
       });
 
       return {
         success: true,
-        message: `Item ${data.itemId} has been unarchived in project ${data.projectId}`
+        message: `Item ${data.itemId} has been unarchived in project ${data.projectId}`,
       };
     });
   }
 
-  async listProjectItems(data: {
-    projectId: string;
-    limit?: number;
-  }): Promise<ProjectItem[]> {
+  async listProjectItems(data: { projectId: string; limit?: number }): Promise<ProjectItem[]> {
     return safeCall(async () => {
       const limit = data.limit || 50;
       const query = `
@@ -304,17 +301,17 @@ export class ProjectLinkingService {
                   field: {
                     id: string;
                     name: string;
-                  }
-                }>
-              }
-            }>
-          }
-        }
+                  };
+                }>;
+              };
+            }>;
+          };
+        };
       }
 
       const response = await this.factory.graphql<ListProjectItemsResponse>(query, {
         projectId: data.projectId,
-        limit
+        limit,
       });
 
       // If project doesn't exist or has no items
@@ -331,11 +328,11 @@ export class ProjectLinkingService {
 
             const fieldId = fieldValue.field.id;
 
-            if ('text' in fieldValue) {
+            if ("text" in fieldValue) {
               fieldValues[fieldId] = fieldValue.text;
-            } else if ('date' in fieldValue) {
+            } else if ("date" in fieldValue) {
               fieldValues[fieldId] = fieldValue.date;
-            } else if ('name' in fieldValue) {
+            } else if ("name" in fieldValue) {
               fieldValues[fieldId] = fieldValue.name;
             }
           });
@@ -344,19 +341,18 @@ export class ProjectLinkingService {
         // Determine content type
         let contentType = ResourceType.ISSUE; // Default
         if (item.content?.__typename) {
-          contentType = item.content.__typename === 'Issue'
-            ? ResourceType.ISSUE
-            : ResourceType.PULL_REQUEST;
+          contentType =
+            item.content.__typename === "Issue" ? ResourceType.ISSUE : ResourceType.PULL_REQUEST;
         }
 
         return {
           id: item.id,
-          contentId: item.content?.id || '',
+          contentId: item.content?.id || "",
           contentType,
           projectId: data.projectId,
           fieldValues,
           createdAt: new Date().toISOString(), // GitHub API doesn't provide creation date for items
-          updatedAt: new Date().toISOString()
+          updatedAt: new Date().toISOString(),
         };
       });
     });

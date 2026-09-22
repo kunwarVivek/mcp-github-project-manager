@@ -20,11 +20,11 @@
  * ```
  */
 
-import type { AIServiceFactory } from '../../services/ai/AIServiceFactory.js';
-import type { ResourceCache, CacheStats } from '../cache/ResourceCache.js';
-import type { AIResiliencePolicy } from '../resilience/AIResiliencePolicy.js';
-import type { CircuitBreakerState } from '../resilience/CircuitBreakerService.js';
-import type { GitHubRepositoryFactory } from '../github/GitHubRepositoryFactory.js';
+import type { AIServiceFactory } from "../../services/ai/AIServiceFactory.js";
+import type { ResourceCache, CacheStats } from "../cache/ResourceCache.js";
+import type { AIResiliencePolicy } from "../resilience/AIResiliencePolicy.js";
+import type { CircuitBreakerState } from "../resilience/CircuitBreakerService.js";
+import type { GitHubRepositoryFactory } from "../github/GitHubRepositoryFactory.js";
 
 /**
  * Health status for individual services
@@ -39,7 +39,7 @@ export interface ServiceHealthStatus {
   };
   ai: {
     available: boolean;
-    circuitState: CircuitBreakerState | 'disabled';
+    circuitState: CircuitBreakerState | "disabled";
     models: {
       available: string[];
       unavailable: string[];
@@ -62,7 +62,7 @@ export interface HealthStatus {
    * - 'degraded': Some services unavailable but system functional
    * - 'unhealthy': Critical services down
    */
-  status: 'healthy' | 'degraded' | 'unhealthy';
+  status: "healthy" | "degraded" | "unhealthy";
 
   /**
    * ISO timestamp of the health check
@@ -136,15 +136,15 @@ export class HealthService {
     ]);
 
     // Compute overall status
-    let status: HealthStatus['status'] = 'healthy';
+    let status: HealthStatus["status"] = "healthy";
 
     // GitHub down = unhealthy (core functionality)
     if (!github.connected) {
-      status = 'unhealthy';
+      status = "unhealthy";
     }
     // AI unavailable or circuit open = degraded
-    else if (!ai.available || ai.circuitState === 'open') {
-      status = 'degraded';
+    else if (!ai.available || ai.circuitState === "open") {
+      status = "degraded";
     }
 
     return {
@@ -170,7 +170,7 @@ export class HealthService {
    *
    * @returns GitHub health status
    */
-  private async checkGitHub(): Promise<ServiceHealthStatus['github']> {
+  private async checkGitHub(): Promise<ServiceHealthStatus["github"]> {
     if (!this.githubFactory) {
       return { connected: false };
     }
@@ -195,14 +195,14 @@ export class HealthService {
    *
    * @returns AI health status
    */
-  private async checkAI(): Promise<ServiceHealthStatus['ai']> {
+  private async checkAI(): Promise<ServiceHealthStatus["ai"]> {
     if (!this.aiFactory) {
       return {
         available: false,
-        circuitState: 'disabled',
+        circuitState: "disabled",
         models: {
           available: [],
-          unavailable: ['main', 'research', 'fallback', 'prd'],
+          unavailable: ["main", "research", "fallback", "prd"],
         },
       };
     }
@@ -211,7 +211,7 @@ export class HealthService {
     const config = this.aiFactory.validateConfiguration();
 
     // Get circuit state from resilience policy if available
-    let circuitState: CircuitBreakerState | 'disabled' = 'disabled';
+    let circuitState: CircuitBreakerState | "disabled" = "disabled";
     if (this.aiResilience) {
       circuitState = this.aiResilience.getCircuitState();
     }
@@ -231,7 +231,7 @@ export class HealthService {
    *
    * @returns Cache health status
    */
-  private async checkCache(): Promise<ServiceHealthStatus['cache']> {
+  private async checkCache(): Promise<ServiceHealthStatus["cache"]> {
     if (!this.cache) {
       return {
         entries: 0,

@@ -110,7 +110,14 @@ export const SearchIssuesAdvancedInputSchema = z.object({
   /** GitHub search query with AND/OR support */
   query: z.string().min(1, "Query is required").describe("GitHub search query with AND/OR support"),
   /** Number of results to return (default: 20, max: 100) */
-  first: z.number().int().positive().max(100).optional().default(20).describe("Number of results to return"),
+  first: z
+    .number()
+    .int()
+    .positive()
+    .max(100)
+    .optional()
+    .default(20)
+    .describe("Number of results to return"),
   /** Cursor for pagination */
   after: z.string().optional().describe("Pagination cursor"),
 });
@@ -153,7 +160,14 @@ export const FilterProjectItemsInputSchema = z.object({
   /** Filter criteria (all conditions combined with AND) */
   filter: ProjectItemFilterSchema.describe("Filter criteria"),
   /** Number of items to return (default: 50, max: 100) */
-  first: z.number().int().positive().max(100).optional().default(50).describe("Number of items to return"),
+  first: z
+    .number()
+    .int()
+    .positive()
+    .max(100)
+    .optional()
+    .default(50)
+    .describe("Number of items to return"),
   /** Cursor for pagination */
   after: z.string().optional().describe("Pagination cursor"),
 });

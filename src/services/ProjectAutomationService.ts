@@ -1,11 +1,11 @@
 import { injectable, inject } from "tsyringe";
-import type { 
-  AutomationRule, 
+import type {
+  AutomationRule,
   AutomationTrigger,
   AutomationAction,
   AutomationTriggerType,
   AutomationActionType,
-  CreateAutomationRule
+  CreateAutomationRule,
 } from "../domain/automation-types";
 
 /** Tool-shaped input for creating an automation rule (string-typed enums). */
@@ -14,7 +14,11 @@ export interface CreateAutomationRuleInput {
   description?: string;
   projectId: string;
   enabled?: boolean;
-  triggers: Array<{ type: string; resourceType?: string; conditions?: Array<{ field: string; operator: string; value: unknown }> }>;
+  triggers: Array<{
+    type: string;
+    resourceType?: string;
+    conditions?: Array<{ field: string; operator: string; value: unknown }>;
+  }>;
   actions: Array<{ type: string; parameters: Record<string, unknown> }>;
 }
 
@@ -24,7 +28,11 @@ export interface UpdateAutomationRuleInput {
   name?: string;
   description?: string;
   enabled?: boolean;
-  triggers?: Array<{ type: string; resourceType?: string; conditions?: Array<{ field: string; operator: string; value: unknown }> }>;
+  triggers?: Array<{
+    type: string;
+    resourceType?: string;
+    conditions?: Array<{ field: string; operator: string; value: unknown }>;
+  }>;
   actions?: Array<{ type: string; parameters: Record<string, unknown> }>;
 }
 
@@ -50,38 +58,64 @@ export interface AutomationRuleSummary {
 }
 
 function ruleToDTO(rule: AutomationRule): AutomationRuleDTO {
-  return { id: rule.id, name: rule.name, description: rule.description, projectId: rule.projectId, enabled: rule.enabled, triggers: rule.triggers, actions: rule.actions };
+  return {
+    id: rule.id,
+    name: rule.name,
+    description: rule.description,
+    projectId: rule.projectId,
+    enabled: rule.enabled,
+    triggers: rule.triggers,
+    actions: rule.actions,
+  };
 }
 
-function mapTriggersForCreate(triggers: CreateAutomationRuleInput['triggers']): Omit<AutomationTrigger, 'id'>[] {
-  return triggers.map(t => ({
+function mapTriggersForCreate(
+  triggers: CreateAutomationRuleInput["triggers"]
+): Omit<AutomationTrigger, "id">[] {
+  return triggers.map((t) => ({
     type: t.type as AutomationTriggerType,
     resourceType: t.resourceType as ResourceType | undefined,
-    conditions: t.conditions?.map(c => ({ id: '', field: c.field, operator: c.operator, value: c.value }))
+    conditions: t.conditions?.map((c) => ({
+      id: "",
+      field: c.field,
+      operator: c.operator,
+      value: c.value,
+    })),
   }));
 }
 
-function mapTriggersForUpdate(triggers?: UpdateAutomationRuleInput['triggers']): AutomationTrigger[] | undefined {
-  return triggers?.map(t => ({
-    id: '',
+function mapTriggersForUpdate(
+  triggers?: UpdateAutomationRuleInput["triggers"]
+): AutomationTrigger[] | undefined {
+  return triggers?.map((t) => ({
+    id: "",
     type: t.type as AutomationTriggerType,
     resourceType: t.resourceType as ResourceType | undefined,
-    conditions: t.conditions?.map(c => ({ id: '', field: c.field, operator: c.operator, value: c.value }))
+    conditions: t.conditions?.map((c) => ({
+      id: "",
+      field: c.field,
+      operator: c.operator,
+      value: c.value,
+    })),
   }));
 }
 
-function mapActions(actions: Array<{ type: string; parameters: Record<string, unknown> }>): Omit<AutomationAction, 'id'>[] {
-  return actions.map(a => ({ type: a.type as AutomationActionType, parameters: a.parameters }));
+function mapActions(
+  actions: Array<{ type: string; parameters: Record<string, unknown> }>
+): Omit<AutomationAction, "id">[] {
+  return actions.map((a) => ({ type: a.type as AutomationActionType, parameters: a.parameters }));
 }
 
-function mapActionsForUpdate(actions?: Array<{ type: string; parameters: Record<string, unknown> }>): AutomationAction[] | undefined {
-  return actions?.map(a => ({ id: '', type: a.type as AutomationActionType, parameters: a.parameters }));
+function mapActionsForUpdate(
+  actions?: Array<{ type: string; parameters: Record<string, unknown> }>
+): AutomationAction[] | undefined {
+  return actions?.map((a) => ({
+    id: "",
+    type: a.type as AutomationActionType,
+    parameters: a.parameters,
+  }));
 }
-import type { 
-  CustomField, 
-  FieldId, 
-  ProjectId, 
-} from "../domain/types";
+import type { CustomField, FieldId, ProjectId } from "../domain/types";
 // Decorated constructor params: `emitDecoratorMetadata` references these types
 // at runtime, so `isolatedModules` requires an explicit type-only import.
 import type { AutomationRuleRepository } from "../domain/automation-types";
@@ -89,7 +123,7 @@ import type { ProjectRepository } from "../domain/types";
 import { ResourceNotFoundError } from "../domain/errors";
 import type { ILogger } from "../infrastructure/logger";
 import { ResourceType } from "../domain/resource-types";
-import { safeCall } from './utils/safeCall';
+import { safeCall } from "./utils/safeCall";
 
 /**
  * Service for managing project automation rules.
@@ -227,7 +261,11 @@ export class ProjectAutomationService {
   /**
    * Updates a custom field
    */
-  async updateField(projectId: ProjectId, fieldId: FieldId, data: Partial<CustomField>): Promise<CustomField> {
+  async updateField(
+    projectId: ProjectId,
+    fieldId: FieldId,
+    data: Partial<CustomField>
+  ): Promise<CustomField> {
     return safeCall(async () => {
       // Verify project exists
       const project = await this.projectRepo.findById(projectId);
@@ -279,7 +317,7 @@ export class ProjectAutomationService {
       projectId: data.projectId,
       enabled: data.enabled !== false,
       triggers: mapTriggersForCreate(data.triggers),
-      actions: mapActions(data.actions)
+      actions: mapActions(data.actions),
     } as CreateAutomationRule);
     return ruleToDTO(rule);
   }
@@ -290,7 +328,7 @@ export class ProjectAutomationService {
       description: data.description,
       enabled: data.enabled,
       triggers: mapTriggersForUpdate(data.triggers),
-      actions: mapActionsForUpdate(data.actions)
+      actions: mapActionsForUpdate(data.actions),
     });
     return ruleToDTO(updated);
   }
@@ -301,13 +339,13 @@ export class ProjectAutomationService {
 
   async listRuleSummaries(projectId: string): Promise<AutomationRuleSummary[]> {
     const rules = await this.getRulesByProject(projectId);
-    return rules.map(rule => ({
+    return rules.map((rule) => ({
       id: rule.id,
       name: rule.name,
       description: rule.description,
       enabled: rule.enabled,
       triggersCount: rule.triggers.length,
-      actionsCount: rule.actions.length
+      actionsCount: rule.actions.length,
     }));
   }
 }

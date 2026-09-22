@@ -1,5 +1,10 @@
 import { type MCPError, MCPErrorCode, type MCPErrorResponse } from "../../domain/mcp-types";
-import { ValidationError, ResourceNotFoundError, UnauthorizedError, RateLimitError } from "../../domain/errors";
+import {
+  ValidationError,
+  ResourceNotFoundError,
+  UnauthorizedError,
+  RateLimitError,
+} from "../../domain/errors";
 
 export class MCPErrorHandler {
   /**
@@ -7,7 +12,7 @@ export class MCPErrorHandler {
    */
   static handle(error: unknown, requestId?: string): MCPErrorResponse {
     const mcpError = MCPErrorHandler.createMCPError(error);
-    
+
     // Create proper MCPErrorResponse object
     return {
       version: "1.0",
@@ -16,11 +21,15 @@ export class MCPErrorHandler {
       error: {
         code: mcpError.code,
         message: mcpError.message,
-        details: mcpError.details ? [{ 
-          code: "details", 
-          message: JSON.stringify(mcpError.details) 
-        }] : undefined
-      }
+        details: mcpError.details
+          ? [
+              {
+                code: "details",
+                message: JSON.stringify(mcpError.details),
+              },
+            ]
+          : undefined,
+      },
     };
   }
 

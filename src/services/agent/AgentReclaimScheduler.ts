@@ -1,5 +1,5 @@
-import type { TaskCheckoutService } from './TaskCheckoutService';
-import { type ILogger, Logger } from '../../infrastructure/logger';
+import type { TaskCheckoutService } from "./TaskCheckoutService";
+import { type ILogger, Logger } from "../../infrastructure/logger";
 
 /**
  * Configuration for the auto-reclaim scheduler.
@@ -64,7 +64,8 @@ export class AgentReclaimScheduler {
     if (!this.config.enabled || this.config.intervalMs <= 0) {
       if (this.config.enabled) {
         this.logger.info(
-          `[AgentReclaim] scheduler disabled (interval ${this.config.intervalMs}ms)`);
+          `[AgentReclaim] scheduler disabled (interval ${this.config.intervalMs}ms)`
+        );
       }
       return;
     }
@@ -75,13 +76,13 @@ export class AgentReclaimScheduler {
     }, this.config.intervalMs);
 
     // unref so the timer never keeps a stdio MCP process alive by itself.
-    if (typeof (this.timer as NodeJS.Timeout & { unref?: () => void }).unref === 'function') {
+    if (typeof (this.timer as NodeJS.Timeout & { unref?: () => void }).unref === "function") {
       (this.timer as NodeJS.Timeout & { unref: () => void }).unref();
     }
 
     this.logger.info(
       `[AgentReclaim] scheduler started — sweep every ${this.config.intervalMs}ms, ` +
-      `reclaim agents idle/stale after ${this.config.staleAfterMinutes}min`,
+        `reclaim agents idle/stale after ${this.config.staleAfterMinutes}min`
     );
   }
 
@@ -90,7 +91,7 @@ export class AgentReclaimScheduler {
     if (this.timer) {
       clearInterval(this.timer);
       this.timer = null;
-      this.logger.info('[AgentReclaim] scheduler stopped');
+      this.logger.info("[AgentReclaim] scheduler stopped");
     }
   }
 
@@ -118,9 +119,9 @@ export class AgentReclaimScheduler {
           (_, reject) => {
             timeout = setTimeout(
               () => reject(new Error(`sweep timed out after ${timeoutMs}ms`)),
-              timeoutMs,
+              timeoutMs
             );
-          },
+          }
         ),
       ]).finally(() => {
         if (timeout) clearTimeout(timeout);
@@ -128,13 +129,13 @@ export class AgentReclaimScheduler {
       if (result.reclaimed > 0) {
         this.logger.info(
           `[AgentReclaim] reclaimed ${result.reclaimed} stale task(s)`,
-          result.details,
+          result.details
         );
       }
       return { reclaimed: result.reclaimed };
     } catch (error) {
       // Never crash the server — log and let the next interval retry.
-      this.logger.warn('[AgentReclaim] sweep failed (will retry next interval)', error);
+      this.logger.warn("[AgentReclaim] sweep failed (will retry next interval)", error);
       return { reclaimed: 0 };
     } finally {
       this.sweeping = false;

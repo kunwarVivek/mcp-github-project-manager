@@ -12,25 +12,22 @@
  * - Supports new label proposals when existing labels don't fit
  */
 
-import { generateObject } from 'ai';
-import { z } from 'zod';
-import { AIServiceFactory } from './AIServiceFactory';
-import { InputSanitizer } from '../utils/InputSanitizer';
-import {
-  calculateWeightedScore,
-  getConfidenceTier
-} from './ConfidenceScorer';
+import { generateObject } from "ai";
+import { z } from "zod";
+import { AIServiceFactory } from "./AIServiceFactory";
+import { InputSanitizer } from "../utils/InputSanitizer";
+import { calculateWeightedScore, getConfidenceTier } from "./ConfidenceScorer";
 import type {
   LabelSuggestion,
   LabelSuggestionResult,
   LabelSuggestionConfig,
   NewLabelProposal,
-} from '../../domain/issue-intelligence-types';
-import type { SectionConfidence, ConfidenceFactors, ConfidenceTier } from '../../domain/ai-types';
+} from "../../domain/issue-intelligence-types";
+import type { SectionConfidence, ConfidenceFactors, ConfidenceTier } from "../../domain/ai-types";
 import {
   LABEL_SUGGESTION_SYSTEM_PROMPT,
-  formatLabelPrompt
-} from './prompts/IssueIntelligencePrompts';
+  formatLabelPrompt,
+} from "./prompts/IssueIntelligencePrompts";
 
 // ============================================================================
 // Zod Schemas for AI Response Validation
@@ -44,7 +41,7 @@ const AILabelSuggestionSchema = z.object({
   isExisting: z.boolean(),
   confidence: z.number().min(0).max(1),
   rationale: z.string(),
-  matchedPatterns: z.array(z.string())
+  matchedPatterns: z.array(z.string()),
 });
 
 /**
@@ -54,7 +51,7 @@ const AINewLabelProposalSchema = z.object({
   name: z.string(),
   description: z.string(),
   color: z.string(),
-  rationale: z.string()
+  rationale: z.string(),
 });
 
 /**
@@ -64,7 +61,7 @@ const AILabelResponseSchema = z.object({
   suggestions: z.array(AILabelSuggestionSchema),
   newLabelProposals: z.array(AINewLabelProposalSchema).optional(),
   overallConfidence: z.number().min(0).max(1),
-  reasoning: z.string().optional()
+  reasoning: z.string().optional(),
 });
 
 /**
@@ -85,8 +82,8 @@ const DEFAULT_CONFIG: LabelSuggestionConfig = {
   includeNewProposals: true,
   confidenceThresholds: {
     high: 0.8,
-    medium: 0.5
-  }
+    medium: 0.5,
+  },
 };
 
 // ============================================================================
@@ -107,8 +104,8 @@ export class LabelSuggestionService {
       ...config,
       confidenceThresholds: {
         ...DEFAULT_CONFIG.confidenceThresholds,
-        ...config?.confidenceThresholds
-      }
+        ...config?.confidenceThresholds,
+      },
     };
   }
 
@@ -125,7 +122,7 @@ export class LabelSuggestionService {
     issueHistory?: Array<{ labels: string[]; title: string }>;
   }): Promise<LabelSuggestionResult> {
     // Get AI model
-    const model = this.aiFactory.getModel('main') || this.aiFactory.getBestAvailableModel();
+    const model = this.aiFactory.getModel("main") || this.aiFactory.getBestAvailableModel();
 
     if (!model) {
       // Fallback when AI unavailable
@@ -140,16 +137,16 @@ export class LabelSuggestionService {
           issueTitle: InputSanitizer.sanitizeIssueContent(params.issueTitle),
           issueDescription: InputSanitizer.sanitizeIssueContent(params.issueDescription),
           existingLabels: params.existingLabels,
-          issueHistory: params.issueHistory
+          issueHistory: params.issueHistory,
         }),
         schema: AILabelResponseSchema,
-        temperature: 0.3 // Low temperature for consistent labeling
+        temperature: 0.3, // Low temperature for consistent labeling
       });
 
       return this.formatLabelResult(result.object, params);
     } catch (error) {
       // Fallback on AI error
-      console.error('Label suggestion AI call failed:', error);
+      console.error("Label suggestion AI call failed:", error);
       return this.getFallbackSuggestions(params);
     }
   }
@@ -159,7 +156,11 @@ export class LabelSuggestionService {
    */
   private formatLabelResult(
     aiResult: AILabelResponse,
-    params: { issueTitle: string; issueDescription: string; existingLabels: Array<{ name: string }> }
+    params: {
+      issueTitle: string;
+      issueDescription: string;
+      existingLabels: Array<{ name: string }>;
+    }
   ): LabelSuggestionResult {
     const { high, medium } = this.config.confidenceThresholds;
 
@@ -174,7 +175,7 @@ export class LabelSuggestionService {
         isExisting: suggestion.isExisting,
         confidence: suggestion.confidence,
         rationale: suggestion.rationale,
-        matchedPatterns: suggestion.matchedPatterns
+        matchedPatterns: suggestion.matchedPatterns,
       };
 
       if (suggestion.confidence >= high) {
@@ -221,7 +222,7 @@ export class LabelSuggestionService {
       medium: limitedMedium,
       low: limitedLow,
       newLabelProposals,
-      confidence
+      confidence,
     };
   }
 
@@ -231,34 +232,39 @@ export class LabelSuggestionService {
   private calculateOverallConfidence(
     aiConfidence: number,
     suggestions: LabelSuggestion[],
-    params: { issueTitle: string; issueDescription: string; existingLabels: Array<{ name: string }> }
+    params: {
+      issueTitle: string;
+      issueDescription: string;
+      existingLabels: Array<{ name: string }>;
+    }
   ): SectionConfidence {
     // Calculate input completeness
-    const descriptionLength = (params.issueDescription || '').length;
+    const descriptionLength = (params.issueDescription || "").length;
     const inputCompleteness = Math.min(1, descriptionLength / 300);
 
     // Calculate pattern match score based on suggestion quality
-    const avgSuggestionConfidence = suggestions.length > 0
-      ? suggestions.reduce((sum, s) => sum + s.confidence, 0) / suggestions.length
-      : 0.5;
+    const avgSuggestionConfidence =
+      suggestions.length > 0
+        ? suggestions.reduce((sum, s) => sum + s.confidence, 0) / suggestions.length
+        : 0.5;
 
     const factors: ConfidenceFactors = {
       inputCompleteness,
       aiSelfAssessment: aiConfidence,
-      patternMatch: avgSuggestionConfidence
+      patternMatch: avgSuggestionConfidence,
     };
 
     const score = calculateWeightedScore(factors);
     const tier = getConfidenceTier(score);
 
     return {
-      sectionId: 'label-suggestion',
-      sectionName: 'Label Suggestions',
+      sectionId: "label-suggestion",
+      sectionName: "Label Suggestions",
       score,
       tier,
       factors,
       reasoning: `Generated ${suggestions.length} label suggestions from ${params.existingLabels.length} available labels`,
-      needsReview: score < 70
+      needsReview: score < 70,
     };
   }
 
@@ -275,19 +281,19 @@ export class LabelSuggestionService {
 
     // Sort into tiers (all will likely be low/medium for fallback)
     const { high, medium } = this.config.confidenceThresholds;
-    const highTier = suggestions.filter(s => s.confidence >= high);
-    const mediumTier = suggestions.filter(s => s.confidence >= medium && s.confidence < high);
-    const lowTier = suggestions.filter(s => s.confidence < medium);
+    const highTier = suggestions.filter((s) => s.confidence >= high);
+    const mediumTier = suggestions.filter((s) => s.confidence >= medium && s.confidence < high);
+    const lowTier = suggestions.filter((s) => s.confidence < medium);
 
     // Low confidence factors for fallback
     const factors: ConfidenceFactors = {
       inputCompleteness: Math.min(1, (params.issueDescription?.length || 0) / 300),
       aiSelfAssessment: 0.4, // AI unavailable
-      patternMatch: 0.3 // Basic keyword matching
+      patternMatch: 0.3, // Basic keyword matching
     };
 
     const score = 40; // Fixed low score for fallback
-    const tier: ConfidenceTier = 'low';
+    const tier: ConfidenceTier = "low";
 
     return {
       high: highTier,
@@ -295,14 +301,14 @@ export class LabelSuggestionService {
       low: lowTier,
       // No new label proposals in fallback mode
       confidence: {
-        sectionId: 'label-suggestion-fallback',
-        sectionName: 'Label Suggestions (Fallback)',
+        sectionId: "label-suggestion-fallback",
+        sectionName: "Label Suggestions (Fallback)",
         score,
         tier,
         factors,
-        reasoning: 'AI unavailable, using keyword matching',
-        needsReview: true
-      }
+        reasoning: "AI unavailable, using keyword matching",
+        needsReview: true,
+      },
     };
   }
 
@@ -324,12 +330,12 @@ export class LabelSuggestionService {
     const suggestions: LabelSuggestion[] = [];
 
     // Extract keywords from issue content
-    const issueText = `${params.issueTitle} ${params.issueDescription || ''}`.toLowerCase();
+    const issueText = `${params.issueTitle} ${params.issueDescription || ""}`.toLowerCase();
     const issueWords = this.extractKeywords(issueText);
 
     for (const label of params.existingLabels) {
       // Extract keywords from label name and description
-      const labelText = `${label.name} ${label.description || ''}`.toLowerCase();
+      const labelText = `${label.name} ${label.description || ""}`.toLowerCase();
       const labelWords = this.extractKeywords(labelText);
 
       // Calculate overlap score
@@ -344,17 +350,18 @@ export class LabelSuggestionService {
       }
 
       // Calculate confidence based on match ratio
-      const confidence = labelWords.size > 0
-        ? Math.min(0.8, matchCount / labelWords.size) // Cap at 0.8 for keyword matching
-        : 0;
+      const confidence =
+        labelWords.size > 0
+          ? Math.min(0.8, matchCount / labelWords.size) // Cap at 0.8 for keyword matching
+          : 0;
 
       if (confidence >= minScore && matchedPatterns.length > 0) {
         suggestions.push({
           label: label.name,
           isExisting: true,
           confidence,
-          rationale: `Keyword match: ${matchedPatterns.slice(0, 3).join(', ')}`,
-          matchedPatterns
+          rationale: `Keyword match: ${matchedPatterns.slice(0, 3).join(", ")}`,
+          matchedPatterns,
         });
       }
     }
@@ -369,24 +376,104 @@ export class LabelSuggestionService {
   private extractKeywords(text: string): Set<string> {
     // Common stop words to filter out
     const stopWords = new Set([
-      'a', 'an', 'the', 'is', 'are', 'was', 'were', 'be', 'been', 'being',
-      'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could',
-      'should', 'may', 'might', 'must', 'shall', 'can', 'need', 'dare',
-      'to', 'of', 'in', 'for', 'on', 'with', 'at', 'by', 'from', 'as',
-      'into', 'through', 'during', 'before', 'after', 'above', 'below',
-      'between', 'under', 'again', 'further', 'then', 'once', 'here',
-      'there', 'when', 'where', 'why', 'how', 'all', 'each', 'few',
-      'more', 'most', 'other', 'some', 'such', 'no', 'nor', 'not',
-      'only', 'own', 'same', 'so', 'than', 'too', 'very', 'just',
-      'and', 'but', 'if', 'or', 'because', 'until', 'while', 'this',
-      'that', 'these', 'those', 'it', 'its', 'we', 'you', 'they'
+      "a",
+      "an",
+      "the",
+      "is",
+      "are",
+      "was",
+      "were",
+      "be",
+      "been",
+      "being",
+      "have",
+      "has",
+      "had",
+      "do",
+      "does",
+      "did",
+      "will",
+      "would",
+      "could",
+      "should",
+      "may",
+      "might",
+      "must",
+      "shall",
+      "can",
+      "need",
+      "dare",
+      "to",
+      "of",
+      "in",
+      "for",
+      "on",
+      "with",
+      "at",
+      "by",
+      "from",
+      "as",
+      "into",
+      "through",
+      "during",
+      "before",
+      "after",
+      "above",
+      "below",
+      "between",
+      "under",
+      "again",
+      "further",
+      "then",
+      "once",
+      "here",
+      "there",
+      "when",
+      "where",
+      "why",
+      "how",
+      "all",
+      "each",
+      "few",
+      "more",
+      "most",
+      "other",
+      "some",
+      "such",
+      "no",
+      "nor",
+      "not",
+      "only",
+      "own",
+      "same",
+      "so",
+      "than",
+      "too",
+      "very",
+      "just",
+      "and",
+      "but",
+      "if",
+      "or",
+      "because",
+      "until",
+      "while",
+      "this",
+      "that",
+      "these",
+      "those",
+      "it",
+      "its",
+      "we",
+      "you",
+      "they",
     ]);
 
     // Extract words, filter stop words, and require minimum length
     const words = text
-      .replace(/[^a-z0-9-]/g, ' ')
+      .replace(/[^a-z0-9-]/g, " ")
       .split(/\s+/)
-      .filter(word => word.length >= 3 && !stopWords.has(word));
+      .filter((word) => word.length >= 3 && !stopWords.has(word));
 
     return new Set(words);
   }

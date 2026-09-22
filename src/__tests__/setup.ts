@@ -1,4 +1,4 @@
-import { vi } from 'vitest';
+import { vi } from "vitest";
 import { ResourceType, ResourceStatus } from "../domain/resource-types";
 import type { Project, Milestone, Issue } from "../domain/types";
 
@@ -41,7 +41,7 @@ export const mockMilestone: Milestone = {
   progress: {
     percent: 0,
     complete: 0,
-    total: 5
+    total: 5,
   },
   url: "https://github.com/test-owner/test-repo/milestones/1",
   createdAt: new Date().toISOString(),
@@ -98,7 +98,7 @@ export const mockData = {
   project: mockProject,
   milestone: mockMilestone,
   issue: mockIssue,
-  responses: mockGitHubResponses
+  responses: mockGitHubResponses,
 };
 
 // Mock Factory Functions
@@ -114,21 +114,23 @@ vi.mock("../infrastructure/cache/ResourceCache", () => ({
 }));
 
 vi.mock("@octokit/rest", () => ({
-  Octokit: vi.fn().mockImplementation(function () { return ({
-    graphql: vi.fn(),
-    rest: {
-      issues: {
-        create: vi.fn(),
-        update: vi.fn(),
-        get: vi.fn(),
-        list: vi.fn(),
+  Octokit: vi.fn().mockImplementation(function () {
+    return {
+      graphql: vi.fn(),
+      rest: {
+        issues: {
+          create: vi.fn(),
+          update: vi.fn(),
+          get: vi.fn(),
+          list: vi.fn(),
+        },
+        projects: {
+          create: vi.fn(),
+          update: vi.fn(),
+          get: vi.fn(),
+          list: vi.fn(),
+        },
       },
-      projects: {
-        create: vi.fn(),
-        update: vi.fn(),
-        get: vi.fn(),
-        list: vi.fn(),
-      },
-    },
-  }); }),
+    };
+  }),
 }));

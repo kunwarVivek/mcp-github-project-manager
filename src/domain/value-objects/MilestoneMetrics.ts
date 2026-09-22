@@ -28,8 +28,8 @@
  * ```
  */
 
-import { ResourceStatus } from '../resource-types';
-import type { Issue } from '../types';
+import { ResourceStatus } from "../resource-types";
+import type { Issue } from "../types";
 
 /**
  * Configuration for creating MilestoneMetrics
@@ -109,13 +109,13 @@ export class MilestoneMetrics {
   static create(config: MilestoneMetricsConfig): MilestoneMetrics {
     // Validate inputs
     if (config.totalIssues < 0) {
-      throw new Error('totalIssues cannot be negative');
+      throw new Error("totalIssues cannot be negative");
     }
     if (config.closedIssues < 0) {
-      throw new Error('closedIssues cannot be negative');
+      throw new Error("closedIssues cannot be negative");
     }
     if (config.closedIssues > config.totalIssues) {
-      throw new Error('closedIssues cannot exceed totalIssues');
+      throw new Error("closedIssues cannot exceed totalIssues");
     }
 
     return new MilestoneMetrics(config);

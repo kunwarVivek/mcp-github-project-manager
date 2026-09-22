@@ -1,30 +1,32 @@
 import { BaseGitHubRepository } from "./BaseRepository";
-import { 
-  type AutomationAction, 
-  type AutomationCondition, 
-  type AutomationRule, 
-  type AutomationRuleRepository, 
+import {
+  type AutomationAction,
+  type AutomationCondition,
+  type AutomationRule,
+  type AutomationRuleRepository,
   type AutomationTrigger,
   type CreateAutomationRule,
   AutomationTriggerType,
-  AutomationActionType
+  AutomationActionType,
 } from "../../../domain/automation-types";
-import { 
-  type CreateProjectRuleResponse, 
-  type DeleteProjectRuleResponse, 
-  type GetProjectRuleResponse, 
-  type GitHubProjectRuleNode, 
-  type ListProjectRulesResponse, 
-  type UpdateProjectRuleResponse, 
-  mapFromGitHubActionType, 
-  mapFromGitHubTriggerType, 
-  mapToGitHubActionType, 
-  mapToGitHubTriggerType 
+import {
+  type CreateProjectRuleResponse,
+  type DeleteProjectRuleResponse,
+  type GetProjectRuleResponse,
+  type GitHubProjectRuleNode,
+  type ListProjectRulesResponse,
+  type UpdateProjectRuleResponse,
+  mapFromGitHubActionType,
+  mapFromGitHubTriggerType,
+  mapToGitHubActionType,
+  mapToGitHubTriggerType,
 } from "../automation-types";
 import type { ProjectId } from "../../../domain/types";
 
-export class GitHubAutomationRuleRepository extends BaseGitHubRepository implements AutomationRuleRepository {
-  
+export class GitHubAutomationRuleRepository
+  extends BaseGitHubRepository
+  implements AutomationRuleRepository
+{
   async create(data: CreateAutomationRule): Promise<AutomationRule> {
     const mutation = `
       mutation($input: CreateProjectV2RuleInput!) {
@@ -61,7 +63,10 @@ export class GitHubAutomationRuleRepository extends BaseGitHubRepository impleme
     try {
       const variables = this.prepareCreateRuleVariables(data);
       const response = await this.graphql<CreateProjectRuleResponse>(mutation, variables);
-      return this.mapGitHubRuleToAutomationRule(response.createProjectV2Rule.projectRule, data.projectId);
+      return this.mapGitHubRuleToAutomationRule(
+        response.createProjectV2Rule.projectRule,
+        data.projectId
+      );
     } catch (error) {
       this.logger.error(`Failed to create automation rule for project ${data.projectId}`, error);
       throw this.handleGraphQLError(error);
@@ -107,12 +112,12 @@ export class GitHubAutomationRuleRepository extends BaseGitHubRepository impleme
           ruleId: id,
           name: data.name,
           isActive: data.enabled,
-        }
+        },
       };
 
       const response = await this.graphql<UpdateProjectRuleResponse>(mutation, variables);
       return this.mapGitHubRuleToAutomationRule(
-        response.updateProjectV2Rule.projectRule, 
+        response.updateProjectV2Rule.projectRule,
         data.projectId || ""
       );
     } catch (error) {
@@ -135,8 +140,8 @@ export class GitHubAutomationRuleRepository extends BaseGitHubRepository impleme
     try {
       await this.graphql<DeleteProjectRuleResponse>(mutation, {
         input: {
-          ruleId: id
-        }
+          ruleId: id,
+        },
       });
     } catch (error) {
       this.logger.error(`Failed to delete automation rule ${id}`, error);
@@ -231,7 +236,7 @@ export class GitHubAutomationRuleRepository extends BaseGitHubRepository impleme
       const response = await this.graphql<ListProjectRulesResponse>(query, { projectId });
       if (!response.node?.projectRules?.nodes) return [];
 
-      return response.node.projectRules.nodes.map(rule => 
+      return response.node.projectRules.nodes.map((rule) =>
         this.mapGitHubRuleToAutomationRule(rule, projectId)
       );
     } catch (error) {
@@ -284,23 +289,23 @@ export class GitHubAutomationRuleRepository extends BaseGitHubRepository impleme
       input: {
         projectId: data.projectId,
         name: data.name,
-        isActive: data.enabled === undefined ? true : data.enabled
-      }
+        isActive: data.enabled === undefined ? true : data.enabled,
+      },
     };
 
     // Map trigger - use the first trigger from the triggers array
     if (data.triggers && data.triggers.length > 0) {
       const trigger = data.triggers[0]; // GitHub API allows one trigger per rule
       variables.input.triggerType = mapToGitHubTriggerType(trigger.type);
-      
+
       // Map conditions
       if (trigger.conditions && trigger.conditions.length > 0) {
         const condition = trigger.conditions[0]; // GitHub only supports one condition per rule
-        
+
         if (trigger.type === AutomationTriggerType.RESOURCE_UPDATED && condition.field) {
           variables.input.whenFieldId = condition.field;
-          
-          if (condition.operator === 'equals' && condition.value) {
+
+          if (condition.operator === "equals" && condition.value) {
             variables.input.whenFieldValueEquals = String(condition.value);
           }
         }
@@ -311,17 +316,21 @@ export class GitHubAutomationRuleRepository extends BaseGitHubRepository impleme
     if (data.actions && data.actions.length > 0) {
       const action = data.actions[0]; // GitHub API expects actions to be passed one at a time
       variables.input.actionType = mapToGitHubActionType(action.type);
-      
+
       // Get action parameters
       const params = action.parameters || {};
-      
+
       if (action.type === AutomationActionType.UPDATE_RESOURCE) {
         variables.input.fieldId = params.fieldId;
         variables.input.value = String(params.value);
       } else if (action.type === AutomationActionType.CUSTOM_SCRIPT) {
         variables.input.sourceFieldId = params.sourceFieldId;
         variables.input.targetFieldId = params.targetFieldId;
-      } else if ((action.type === AutomationActionType.ADD_LABEL || action.type === AutomationActionType.REMOVE_LABEL) && params.labelName) {
+      } else if (
+        (action.type === AutomationActionType.ADD_LABEL ||
+          action.type === AutomationActionType.REMOVE_LABEL) &&
+        params.labelName
+      ) {
         variables.input.labelName = params.labelName;
       } else if (params.milestoneId) {
         // Handle milestone separately from the type check to avoid type errors
@@ -332,23 +341,29 @@ export class GitHubAutomationRuleRepository extends BaseGitHubRepository impleme
     return variables;
   }
 
-  private mapGitHubRuleToAutomationRule(rule: GitHubProjectRuleNode, projectId: string): AutomationRule {
+  private mapGitHubRuleToAutomationRule(
+    rule: GitHubProjectRuleNode,
+    projectId: string
+  ): AutomationRule {
     // Map trigger and conditions
     const trigger: AutomationTrigger = {
       id: `trigger_${Date.now()}`, // Generate a unique ID
       type: mapFromGitHubTriggerType(rule.ruleTrigger.type),
-      conditions: [] // Initialize with empty array to avoid undefined conditions
+      conditions: [], // Initialize with empty array to avoid undefined conditions
     };
 
     // Add condition if available
-    if (rule.ruleTrigger.whenFieldId || rule.ruleTrigger.whenFieldValueEquals || 
-        rule.ruleTrigger.whenStateEquals || rule.ruleTrigger.whenStateWas) {
-      
+    if (
+      rule.ruleTrigger.whenFieldId ||
+      rule.ruleTrigger.whenFieldValueEquals ||
+      rule.ruleTrigger.whenStateEquals ||
+      rule.ruleTrigger.whenStateWas
+    ) {
       const condition: AutomationCondition = {
         id: `condition_${Date.now()}`, // Generate a unique ID
-        field: rule.ruleTrigger.whenFieldId || '',
-        operator: 'equals', // Default operator
-        value: rule.ruleTrigger.whenFieldValueEquals || rule.ruleTrigger.whenStateEquals || null
+        field: rule.ruleTrigger.whenFieldId || "",
+        operator: "equals", // Default operator
+        value: rule.ruleTrigger.whenFieldValueEquals || rule.ruleTrigger.whenStateEquals || null,
       };
 
       // Safe to push now that we know conditions is an array
@@ -358,12 +373,12 @@ export class GitHubAutomationRuleRepository extends BaseGitHubRepository impleme
     }
 
     // Map actions
-    const actions: AutomationAction[] = rule.ruleActions.map(action => {
+    const actions: AutomationAction[] = rule.ruleActions.map((action) => {
       // Create a base action with required properties
       const domainAction: AutomationAction = {
         id: `action_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`, // Generate a unique ID
         type: mapFromGitHubActionType(action.type),
-        parameters: {} // Initialize empty parameters object
+        parameters: {}, // Initialize empty parameters object
       };
 
       // Add parameters based on available properties
@@ -386,7 +401,7 @@ export class GitHubAutomationRuleRepository extends BaseGitHubRepository impleme
       createdAt: new Date(rule.createdAt), // Convert string to Date
       updatedAt: rule.updatedAt ? new Date(rule.updatedAt) : undefined, // Convert string to Date
       triggers: [trigger], // Use the triggers array instead of a single trigger
-      actions
+      actions,
     };
   }
 }

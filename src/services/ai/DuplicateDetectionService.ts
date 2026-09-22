@@ -10,19 +10,19 @@
  * Falls back to keyword-based detection when embedding API unavailable.
  */
 
-import { embed, embedMany, cosineSimilarity } from 'ai';
-import { openai } from '@ai-sdk/openai';
-import { calculateWeightedScore, getConfidenceTier } from './ConfidenceScorer.js';
-import { InputSanitizer } from '../utils/InputSanitizer';
-import { EmbeddingCache } from '../../cache/EmbeddingCache.js';
-import { type ILogger, Logger } from '../../infrastructure/logger';
+import { embed, embedMany, cosineSimilarity } from "ai";
+import { openai } from "@ai-sdk/openai";
+import { calculateWeightedScore, getConfidenceTier } from "./ConfidenceScorer.js";
+import { InputSanitizer } from "../utils/InputSanitizer";
+import { EmbeddingCache } from "../../cache/EmbeddingCache.js";
+import { type ILogger, Logger } from "../../infrastructure/logger";
 import type {
   DuplicateCandidate,
   DuplicateDetectionResult,
   DuplicateDetectionThresholds,
-  IssueInput
-} from '../../domain/issue-intelligence-types.js';
-import type { SectionConfidence, ConfidenceFactors } from '../../domain/ai-types.js';
+  IssueInput,
+} from "../../domain/issue-intelligence-types.js";
+import type { SectionConfidence, ConfidenceFactors } from "../../domain/ai-types.js";
 
 // ============================================================================
 // Constants
@@ -33,7 +33,7 @@ import type { SectionConfidence, ConfidenceFactors } from '../../domain/ai-types
  */
 const DEFAULT_THRESHOLDS: DuplicateDetectionThresholds = {
   high: 0.92,
-  medium: 0.75
+  medium: 0.75,
 };
 
 /**
@@ -42,20 +42,80 @@ const DEFAULT_THRESHOLDS: DuplicateDetectionThresholds = {
  */
 const FALLBACK_THRESHOLDS: DuplicateDetectionThresholds = {
   high: 0.8,
-  medium: 0.6
+  medium: 0.6,
 };
 
 /**
  * Common English stopwords to filter out during keyword extraction.
  */
 const STOPWORDS = new Set([
-  'a', 'an', 'and', 'are', 'as', 'at', 'be', 'by', 'for', 'from',
-  'has', 'he', 'in', 'is', 'it', 'its', 'of', 'on', 'or', 'that',
-  'the', 'to', 'was', 'were', 'will', 'with', 'this', 'but', 'they',
-  'have', 'had', 'what', 'when', 'where', 'who', 'which', 'why', 'how',
-  'all', 'each', 'every', 'both', 'few', 'more', 'most', 'other', 'some',
-  'such', 'no', 'nor', 'not', 'only', 'own', 'same', 'so', 'than', 'too',
-  'very', 'can', 'just', 'should', 'now', 'i', 'we', 'you', 'your', 'my'
+  "a",
+  "an",
+  "and",
+  "are",
+  "as",
+  "at",
+  "be",
+  "by",
+  "for",
+  "from",
+  "has",
+  "he",
+  "in",
+  "is",
+  "it",
+  "its",
+  "of",
+  "on",
+  "or",
+  "that",
+  "the",
+  "to",
+  "was",
+  "were",
+  "will",
+  "with",
+  "this",
+  "but",
+  "they",
+  "have",
+  "had",
+  "what",
+  "when",
+  "where",
+  "who",
+  "which",
+  "why",
+  "how",
+  "all",
+  "each",
+  "every",
+  "both",
+  "few",
+  "more",
+  "most",
+  "other",
+  "some",
+  "such",
+  "no",
+  "nor",
+  "not",
+  "only",
+  "own",
+  "same",
+  "so",
+  "than",
+  "too",
+  "very",
+  "can",
+  "just",
+  "should",
+  "now",
+  "i",
+  "we",
+  "you",
+  "your",
+  "my",
 ]);
 
 /**
@@ -103,7 +163,12 @@ export class DuplicateDetectionService {
     existingIssues: IssueInput[];
     maxResults?: number;
   }): Promise<DuplicateDetectionResult> {
-    const { issueTitle, issueDescription, existingIssues, maxResults = DEFAULT_MAX_RESULTS } = params;
+    const {
+      issueTitle,
+      issueDescription,
+      existingIssues,
+      maxResults = DEFAULT_MAX_RESULTS,
+    } = params;
 
     // Handle empty existing issues
     if (existingIssues.length === 0) {
@@ -111,7 +176,7 @@ export class DuplicateDetectionService {
     }
 
     // Prepare the new issue text
-    const newIssueText = `${InputSanitizer.sanitizeIssueContent(issueTitle)}\n\n${InputSanitizer.sanitizeIssueContent(issueDescription || '')}`;
+    const newIssueText = `${InputSanitizer.sanitizeIssueContent(issueTitle)}\n\n${InputSanitizer.sanitizeIssueContent(issueDescription || "")}`;
 
     try {
       // Try embedding-based detection
@@ -120,15 +185,15 @@ export class DuplicateDetectionService {
         issueTitle,
         issueDescription,
         existingIssues,
-        maxResults
+        maxResults,
       });
     } catch (error) {
       // Fallback to keyword-based detection
-      this.logger.error('[DuplicateDetection] Embedding failed, using keyword fallback', error);
+      this.logger.error("[DuplicateDetection] Embedding failed, using keyword fallback", error);
       return this.getFallbackDetection({
         newIssueText,
         existingIssues,
-        maxResults
+        maxResults,
       });
     }
   }
@@ -167,7 +232,7 @@ export class DuplicateDetectionService {
           issueNumber: issue.number,
           title: issue.title,
           similarity,
-          reasoning: this.generateReasoning(similarity, issue, issueTitle)
+          reasoning: this.generateReasoning(similarity, issue, issueTitle),
         });
       }
     }
@@ -182,13 +247,13 @@ export class DuplicateDetectionService {
     const confidence = this.calculateConfidence({
       totalIssuesScanned: existingIssues.length,
       candidatesFound: candidates.length,
-      aiAvailable: true
+      aiAvailable: true,
     });
 
     return {
       ...tiered,
       newEmbedding: newIssueEmbedding,
-      confidence
+      confidence,
     };
   }
 
@@ -197,8 +262,8 @@ export class DuplicateDetectionService {
    */
   private async getEmbedding(text: string): Promise<number[]> {
     const { embedding } = await embed({
-      model: openai.embedding('text-embedding-3-small'),
-      value: text
+      model: openai.embedding("text-embedding-3-small"),
+      value: text,
     });
     return embedding;
   }
@@ -225,15 +290,15 @@ export class DuplicateDetectionService {
         result.set(issue.id, cached);
       } else {
         uncachedIssues.push(issue);
-        uncachedTexts.push(`${issue.title}\n\n${issue.body || ''}`);
+        uncachedTexts.push(`${issue.title}\n\n${issue.body || ""}`);
       }
     }
 
     // Batch compute embeddings for uncached issues
     if (uncachedTexts.length > 0) {
       const { embeddings } = await embedMany({
-        model: openai.embedding('text-embedding-3-small'),
-        values: uncachedTexts
+        model: openai.embedding("text-embedding-3-small"),
+        values: uncachedTexts,
       });
 
       // Store in cache and result map
@@ -263,7 +328,7 @@ export class DuplicateDetectionService {
     const candidates: DuplicateCandidate[] = [];
 
     for (const issue of existingIssues) {
-      const issueText = `${issue.title}\n\n${issue.body || ''}`;
+      const issueText = `${issue.title}\n\n${issue.body || ""}`;
       const similarity = this.keywordOverlapScore(newIssueText, issueText);
 
       // Use fallback thresholds (lower)
@@ -273,7 +338,7 @@ export class DuplicateDetectionService {
           issueNumber: issue.number,
           title: issue.title,
           similarity,
-          reasoning: `Keyword-based similarity: ${(similarity * 100).toFixed(0)}% overlap in terms`
+          reasoning: `Keyword-based similarity: ${(similarity * 100).toFixed(0)}% overlap in terms`,
         });
       }
     }
@@ -288,12 +353,12 @@ export class DuplicateDetectionService {
     const confidence = this.calculateConfidence({
       totalIssuesScanned: existingIssues.length,
       candidatesFound: candidates.length,
-      aiAvailable: false
+      aiAvailable: false,
     });
 
     return {
       ...tiered,
-      confidence
+      confidence,
     };
   }
 
@@ -313,7 +378,7 @@ export class DuplicateDetectionService {
     }
 
     // Calculate Jaccard similarity
-    const intersection = new Set([...keywords1].filter(k => keywords2.has(k)));
+    const intersection = new Set([...keywords1].filter((k) => keywords2.has(k)));
     const union = new Set([...keywords1, ...keywords2]);
 
     return intersection.size / union.size;
@@ -327,10 +392,8 @@ export class DuplicateDetectionService {
     const words = text.toLowerCase().split(/[^a-z0-9]+/);
 
     // Filter stopwords, short words, and numbers
-    const keywords = words.filter(word =>
-      word.length >= 3 &&
-      !STOPWORDS.has(word) &&
-      !/^\d+$/.test(word)
+    const keywords = words.filter(
+      (word) => word.length >= 3 && !STOPWORDS.has(word) && !/^\d+$/.test(word)
     );
 
     return new Set(keywords);
@@ -343,7 +406,7 @@ export class DuplicateDetectionService {
     candidates: DuplicateCandidate[],
     maxResults: number,
     thresholds: DuplicateDetectionThresholds = this.thresholds
-  ): Omit<DuplicateDetectionResult, 'confidence' | 'newEmbedding'> {
+  ): Omit<DuplicateDetectionResult, "confidence" | "newEmbedding"> {
     const highConfidence: DuplicateCandidate[] = [];
     const mediumConfidence: DuplicateCandidate[] = [];
     const lowConfidence: DuplicateCandidate[] = [];
@@ -370,11 +433,7 @@ export class DuplicateDetectionService {
   /**
    * Generate reasoning for a duplicate candidate.
    */
-  private generateReasoning(
-    similarity: number,
-    _candidate: IssueInput,
-    _newTitle: string
-  ): string {
+  private generateReasoning(similarity: number, _candidate: IssueInput, _newTitle: string): string {
     const percent = (similarity * 100).toFixed(0);
 
     if (similarity >= this.thresholds.high) {
@@ -403,14 +462,13 @@ export class DuplicateDetectionService {
     const aiSelfAssessment = aiAvailable ? 0.85 : 0.4;
 
     // Pattern match: based on finding reasonable number of candidates
-    const patternMatch = candidatesFound > 0 && candidatesFound < totalIssuesScanned * 0.5
-      ? 0.8
-      : 0.5;
+    const patternMatch =
+      candidatesFound > 0 && candidatesFound < totalIssuesScanned * 0.5 ? 0.8 : 0.5;
 
     const factors: ConfidenceFactors = {
       inputCompleteness,
       aiSelfAssessment,
-      patternMatch
+      patternMatch,
     };
 
     const score = calculateWeightedScore(factors);
@@ -422,13 +480,13 @@ export class DuplicateDetectionService {
       : `Keyword-based fallback detection (embeddings unavailable). Scanned ${totalIssuesScanned} issues.`;
 
     return {
-      sectionId: 'duplicate-detection',
-      sectionName: 'Duplicate Detection',
+      sectionId: "duplicate-detection",
+      sectionName: "Duplicate Detection",
       score,
       tier,
       factors,
       reasoning,
-      needsReview
+      needsReview,
     };
   }
 
@@ -441,18 +499,18 @@ export class DuplicateDetectionService {
       mediumConfidence: [],
       lowConfidence: [],
       confidence: {
-        sectionId: 'duplicate-detection',
-        sectionName: 'Duplicate Detection',
+        sectionId: "duplicate-detection",
+        sectionName: "Duplicate Detection",
         score: 100,
-        tier: 'high',
+        tier: "high",
         factors: {
           inputCompleteness: 1,
           aiSelfAssessment: 1,
-          patternMatch: 1
+          patternMatch: 1,
         },
-        reasoning: 'No existing issues to compare against.',
-        needsReview: false
-      }
+        reasoning: "No existing issues to compare against.",
+        needsReview: false,
+      },
     };
   }
 

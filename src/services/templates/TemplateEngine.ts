@@ -1,6 +1,6 @@
-import Handlebars from 'handlebars';
-import type { ParsedTemplate, } from '../../domain/template-types';
-import { TemplateParser } from './TemplateParser';
+import Handlebars from "handlebars";
+import type { ParsedTemplate } from "../../domain/template-types";
+import { TemplateParser } from "./TemplateParser";
 
 /**
  * Handlebars-based template engine for PRD and task templates
@@ -20,54 +20,62 @@ export class TemplateEngine {
    */
   private registerHelpers(): void {
     // Safe iteration helper
-    Handlebars.registerHelper('each_safe', function(
-      this: unknown,
-      context: unknown[],
-      options: Handlebars.HelperOptions
-    ) {
-      if (!context || !Array.isArray(context)) {
-        return '';
+    Handlebars.registerHelper(
+      "each_safe",
+      function (this: unknown, context: unknown[], options: Handlebars.HelperOptions) {
+        if (!context || !Array.isArray(context)) {
+          return "";
+        }
+        return context
+          .map((item, index) => {
+            const itemObj = typeof item === "object" && item !== null ? item : { value: item };
+            return options.fn({
+              ...(itemObj as Record<string, unknown>),
+              "@index": index,
+              "@first": index === 0,
+              "@last": index === context.length - 1,
+            });
+          })
+          .join("");
       }
-      return context.map((item, index) => {
-        const itemObj = typeof item === 'object' && item !== null ? item : { value: item };
-        return options.fn({ ...(itemObj as Record<string, unknown>), '@index': index, '@first': index === 0, '@last': index === context.length - 1 });
-      }).join('');
-    });
+    );
 
     // Conditional with default
-    Handlebars.registerHelper('default', (value: unknown, defaultValue: unknown) => value !== undefined && value !== null && value !== '' ? value : defaultValue);
+    Handlebars.registerHelper("default", (value: unknown, defaultValue: unknown) =>
+      value !== undefined && value !== null && value !== "" ? value : defaultValue
+    );
 
     // Format as list
-    Handlebars.registerHelper('list', (items: string[]) => {
-      if (!items || !Array.isArray(items)) return '';
-      return items.map(item => `- ${item}`).join('\n');
+    Handlebars.registerHelper("list", (items: string[]) => {
+      if (!items || !Array.isArray(items)) return "";
+      return items.map((item) => `- ${item}`).join("\n");
     });
 
     // Format as numbered list
-    Handlebars.registerHelper('numbered_list', (items: string[]) => {
-      if (!items || !Array.isArray(items)) return '';
-      return items.map((item, i) => `${i + 1}. ${item}`).join('\n');
+    Handlebars.registerHelper("numbered_list", (items: string[]) => {
+      if (!items || !Array.isArray(items)) return "";
+      return items.map((item, i) => `${i + 1}. ${item}`).join("\n");
     });
 
     // Join array with separator
-    Handlebars.registerHelper('join', (items: string[], separator: string) => {
-      if (!items || !Array.isArray(items)) return '';
-      return items.join(typeof separator === 'string' ? separator : ', ');
+    Handlebars.registerHelper("join", (items: string[], separator: string) => {
+      if (!items || !Array.isArray(items)) return "";
+      return items.join(typeof separator === "string" ? separator : ", ");
     });
 
     // Conditional section - only render if value exists and is non-empty
-    Handlebars.registerHelper('section_if', function(
-      this: unknown,
-      condition: unknown,
-      options: Handlebars.HelperOptions
-    ) {
-      const isEmpty = condition === undefined ||
-        condition === null ||
-        condition === '' ||
-        (Array.isArray(condition) && condition.length === 0);
+    Handlebars.registerHelper(
+      "section_if",
+      function (this: unknown, condition: unknown, options: Handlebars.HelperOptions) {
+        const isEmpty =
+          condition === undefined ||
+          condition === null ||
+          condition === "" ||
+          (Array.isArray(condition) && condition.length === 0);
 
-      return isEmpty ? '' : options.fn(this);
-    });
+        return isEmpty ? "" : options.fn(this);
+      }
+    );
   }
 
   /**
@@ -81,7 +89,7 @@ export class TemplateEngine {
    * Compile template for repeated use
    */
   compile(template: string | ParsedTemplate): HandlebarsTemplateDelegate<unknown> {
-    const content = typeof template === 'string' ? template : template.rawContent;
+    const content = typeof template === "string" ? template : template.rawContent;
     const cacheKey = content.substring(0, 200);
 
     if (this.compiledCache.has(cacheKey)) {
@@ -93,7 +101,9 @@ export class TemplateEngine {
       this.compiledCache.set(cacheKey, compiled);
       return compiled;
     } catch (error) {
-      throw new Error(`Template compilation failed: ${error instanceof Error ? error.message : String(error)}`);
+      throw new Error(
+        `Template compilation failed: ${error instanceof Error ? error.message : String(error)}`
+      );
     }
   }
 
@@ -105,7 +115,9 @@ export class TemplateEngine {
     try {
       return compiled(data);
     } catch (error) {
-      throw new Error(`Template rendering failed: ${error instanceof Error ? error.message : String(error)}`);
+      throw new Error(
+        `Template rendering failed: ${error instanceof Error ? error.message : String(error)}`
+      );
     }
   }
 
@@ -130,12 +142,12 @@ export class TemplateEngine {
 
     // Check for empty placeholders
     if (/\{\{\s*\}\}/.test(template)) {
-      errors.push('Empty placeholder found: {{}}');
+      errors.push("Empty placeholder found: {{}}");
     }
 
     return {
       valid: errors.length === 0,
-      errors
+      errors,
     };
   }
 
@@ -143,16 +155,14 @@ export class TemplateEngine {
    * Get required placeholders that have no default value
    */
   getRequiredPlaceholders(template: ParsedTemplate): string[] {
-    return template.sections
-      .filter(s => s.required && !s.defaultValue)
-      .map(s => s.id);
+    return template.sections.filter((s) => s.required && !s.defaultValue).map((s) => s.id);
   }
 
   /**
    * Create a preview with sample data
    */
   preview(template: string | ParsedTemplate, partialData?: Record<string, unknown>): string {
-    const parsed = typeof template === 'string' ? this.parse(template) : template;
+    const parsed = typeof template === "string" ? this.parse(template) : template;
 
     // Generate sample data for missing placeholders
     const sampleData: Record<string, unknown> = { ...partialData };

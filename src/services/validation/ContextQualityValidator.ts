@@ -2,20 +2,20 @@ import {
   type TaskExecutionContext,
   type ContextQualityMetrics,
   calculateCompletenessScore,
-  getMissingFields
-} from '../../domain/task-context-schemas';
-import type { AITask } from '../../domain/ai-types';
+  getMissingFields,
+} from "../../domain/task-context-schemas";
+import type { AITask } from "../../domain/ai-types";
 
 /**
  * Quality thresholds from PRD requirements
  */
 export const QUALITY_THRESHOLDS = {
   COMPLETENESS_TARGET: 95, // PRD requirement: 95% of required context fields populated
-  ACCURACY_TARGET: 90,     // PRD requirement: 90% accuracy validated
-  RELEVANCE_TARGET: 85,    // PRD requirement: 85% rated as "highly relevant"
+  ACCURACY_TARGET: 90, // PRD requirement: 90% accuracy validated
+  RELEVANCE_TARGET: 85, // PRD requirement: 85% rated as "highly relevant"
   GENERATION_TIME_MAX: 30, // PRD requirement: < 30 seconds per task
-  TOKEN_USAGE_MAX: 2000,   // PRD requirement: < 2000 estimated tokens per task
-  ERROR_RATE_MAX: 5        // PRD requirement: < 5% error rate
+  TOKEN_USAGE_MAX: 2000, // PRD requirement: < 2000 estimated tokens per task
+  ERROR_RATE_MAX: 5, // PRD requirement: < 5% error rate
 };
 
 /**
@@ -76,40 +76,40 @@ export class ContextQualityValidator {
 
     // Check required fields
     if (missingFields.length > 0) {
-      issues.push(`Missing required fields: ${missingFields.join(', ')}`);
-      suggestions.push(`Populate missing fields: ${missingFields.join(', ')}`);
+      issues.push(`Missing required fields: ${missingFields.join(", ")}`);
+      suggestions.push(`Populate missing fields: ${missingFields.join(", ")}`);
     }
 
     // Check field quality
     if (context.businessObjective && context.businessObjective.length < 20) {
-      warnings.push('Business objective is too short (minimum 20 characters recommended)');
-      suggestions.push('Expand business objective with more detail about WHY this task matters');
+      warnings.push("Business objective is too short (minimum 20 characters recommended)");
+      suggestions.push("Expand business objective with more detail about WHY this task matters");
     }
 
     if (context.userImpact && context.userImpact.length < 20) {
-      warnings.push('User impact is too short (minimum 20 characters recommended)');
-      suggestions.push('Provide specific details about HOW this affects end users');
+      warnings.push("User impact is too short (minimum 20 characters recommended)");
+      suggestions.push("Provide specific details about HOW this affects end users");
     }
 
     if (context.successMetrics && context.successMetrics.length === 0) {
-      issues.push('No success metrics defined');
-      suggestions.push('Add at least one measurable success metric');
+      issues.push("No success metrics defined");
+      suggestions.push("Add at least one measurable success metric");
     }
 
     // Check optional but valuable fields
     if (!context.implementationGuidance) {
-      warnings.push('No implementation guidance provided');
-      suggestions.push('Add implementation guidance for better developer experience');
+      warnings.push("No implementation guidance provided");
+      suggestions.push("Add implementation guidance for better developer experience");
     }
 
     if (!context.contextualReferences) {
-      warnings.push('No contextual references provided');
-      suggestions.push('Add PRD references and code examples');
+      warnings.push("No contextual references provided");
+      suggestions.push("Add PRD references and code examples");
     }
 
     if (!context.enhancedAcceptanceCriteria) {
-      warnings.push('No enhanced acceptance criteria provided');
-      suggestions.push('Add detailed acceptance criteria with verification methods');
+      warnings.push("No enhanced acceptance criteria provided");
+      suggestions.push("Add detailed acceptance criteria with verification methods");
     }
 
     return {
@@ -117,17 +117,14 @@ export class ContextQualityValidator {
       score,
       issues,
       warnings,
-      suggestions
+      suggestions,
     };
   }
 
   /**
    * Validate context accuracy
    */
-  validateAccuracy(
-    context: TaskExecutionContext,
-    task: AITask
-  ): ValidationResult {
+  validateAccuracy(context: TaskExecutionContext, task: AITask): ValidationResult {
     const issues: string[] = [];
     const warnings: string[] = [];
     const suggestions: string[] = [];
@@ -145,15 +142,15 @@ export class ContextQualityValidator {
       );
 
       if (!hasTaskKeywords) {
-        warnings.push('Business objective may not align with task title/description');
+        warnings.push("Business objective may not align with task title/description");
         score -= 10;
-        suggestions.push('Ensure business objective relates to the specific task');
+        suggestions.push("Ensure business objective relates to the specific task");
       }
     }
 
     // Check if technical constraints are realistic
     if (context.technicalConstraints.length === 0) {
-      warnings.push('No technical constraints identified - may be incomplete');
+      warnings.push("No technical constraints identified - may be incomplete");
       score -= 5;
     }
 
@@ -163,25 +160,25 @@ export class ContextQualityValidator {
       const complexity = task.complexity;
 
       if (complexity >= 7 && guidanceSteps < 3) {
-        warnings.push('High complexity task has minimal implementation guidance');
+        warnings.push("High complexity task has minimal implementation guidance");
         score -= 10;
-        suggestions.push('Add more detailed implementation steps for complex tasks');
+        suggestions.push("Add more detailed implementation steps for complex tasks");
       }
 
       if (complexity <= 3 && guidanceSteps > 5) {
-        warnings.push('Low complexity task has excessive implementation steps');
+        warnings.push("Low complexity task has excessive implementation steps");
         score -= 5;
       }
     }
 
     // Check for placeholder or generic content
     const genericPhrases = [
-      'to be determined',
-      'tbd',
-      'placeholder',
-      'todo',
-      'not specified',
-      'unknown'
+      "to be determined",
+      "tbd",
+      "placeholder",
+      "todo",
+      "not specified",
+      "unknown",
     ];
 
     const allText = JSON.stringify(context).toLowerCase();
@@ -200,25 +197,20 @@ export class ContextQualityValidator {
       score,
       issues,
       warnings,
-      suggestions
+      suggestions,
     };
   }
 
   /**
    * Validate context relevance to task
    */
-  validateRelevance(
-    context: TaskExecutionContext,
-    task: AITask
-  ): ValidationResult {
+  validateRelevance(context: TaskExecutionContext, task: AITask): ValidationResult {
     const issues: string[] = [];
     const warnings: string[] = [];
     const suggestions: string[] = [];
     let score = 100;
 
-    const taskKeywords = this.extractKeywords(
-      `${task.title} ${task.description}`.toLowerCase()
-    );
+    const taskKeywords = this.extractKeywords(`${task.title} ${task.description}`.toLowerCase());
 
     // Check business context relevance
     if (context.businessObjective) {
@@ -226,9 +218,9 @@ export class ContextQualityValidator {
       const overlap = this.calculateKeywordOverlap(taskKeywords, objectiveKeywords);
 
       if (overlap < 0.2) {
-        warnings.push('Business objective has low relevance to task (low keyword overlap)');
+        warnings.push("Business objective has low relevance to task (low keyword overlap)");
         score -= 15;
-        suggestions.push('Ensure business objective directly relates to the task');
+        suggestions.push("Ensure business objective directly relates to the task");
       }
     }
 
@@ -236,15 +228,17 @@ export class ContextQualityValidator {
     const techContextText = [
       ...context.technicalConstraints,
       ...context.architecturalDecisions,
-      ...context.integrationPoints
-    ].join(' ').toLowerCase();
+      ...context.integrationPoints,
+    ]
+      .join(" ")
+      .toLowerCase();
 
     if (techContextText.length > 0) {
       const techKeywords = this.extractKeywords(techContextText);
       const overlap = this.calculateKeywordOverlap(taskKeywords, techKeywords);
 
       if (overlap < 0.15) {
-        warnings.push('Technical context has low relevance to task');
+        warnings.push("Technical context has low relevance to task");
         score -= 10;
       }
     }
@@ -252,16 +246,16 @@ export class ContextQualityValidator {
     // Check code examples relevance (if provided)
     if (context.contextualReferences?.codeExamples) {
       const exampleTexts = context.contextualReferences.codeExamples
-        .map(ex => `${ex.title} ${ex.description}`.toLowerCase())
-        .join(' ');
+        .map((ex) => `${ex.title} ${ex.description}`.toLowerCase())
+        .join(" ");
 
       const exampleKeywords = this.extractKeywords(exampleTexts);
       const overlap = this.calculateKeywordOverlap(taskKeywords, exampleKeywords);
 
       if (overlap < 0.1) {
-        warnings.push('Code examples may not be relevant to task');
+        warnings.push("Code examples may not be relevant to task");
         score -= 10;
-        suggestions.push('Ensure code examples match task requirements');
+        suggestions.push("Ensure code examples match task requirements");
       }
     }
 
@@ -273,7 +267,7 @@ export class ContextQualityValidator {
       score,
       issues,
       warnings,
-      suggestions
+      suggestions,
     };
   }
 
@@ -292,7 +286,7 @@ export class ContextQualityValidator {
         `Generation time ${metrics.generationTime}s exceeds target of ${QUALITY_THRESHOLDS.GENERATION_TIME_MAX}s`
       );
       score -= 20;
-      suggestions.push('Optimize AI prompts or enable caching to improve generation time');
+      suggestions.push("Optimize AI prompts or enable caching to improve generation time");
     } else if (metrics.generationTime > QUALITY_THRESHOLDS.GENERATION_TIME_MAX * 0.8) {
       warnings.push(`Generation time ${metrics.generationTime}s is approaching limit`);
       score -= 5;
@@ -304,7 +298,7 @@ export class ContextQualityValidator {
         `Token usage ${metrics.estimatedTokens} exceeds target of ${QUALITY_THRESHOLDS.TOKEN_USAGE_MAX}`
       );
       score -= 20;
-      suggestions.push('Reduce prompt size or implement token optimization');
+      suggestions.push("Reduce prompt size or implement token optimization");
     } else if (metrics.estimatedTokens > QUALITY_THRESHOLDS.TOKEN_USAGE_MAX * 0.8) {
       warnings.push(`Token usage ${metrics.estimatedTokens} is approaching limit`);
       score -= 5;
@@ -312,14 +306,14 @@ export class ContextQualityValidator {
 
     // Check for errors
     if (metrics.errors.length > 0) {
-      issues.push(`Generation errors encountered: ${metrics.errors.join(', ')}`);
+      issues.push(`Generation errors encountered: ${metrics.errors.join(", ")}`);
       score -= 30;
     }
 
     // Check cache usage
     if (!metrics.cacheHit && metrics.aiEnhanced) {
-      warnings.push('AI-enhanced context was not cached (performance opportunity)');
-      suggestions.push('Enable context caching to improve performance');
+      warnings.push("AI-enhanced context was not cached (performance opportunity)");
+      suggestions.push("Enable context caching to improve performance");
     }
 
     const passes = issues.length === 0 && score >= 70; // 70% minimum for performance
@@ -329,7 +323,7 @@ export class ContextQualityValidator {
       score,
       issues,
       warnings,
-      suggestions
+      suggestions,
     };
   }
 
@@ -348,17 +342,14 @@ export class ContextQualityValidator {
 
     // Calculate overall score (weighted average)
     const overallScore = Math.round(
-      completeness.score * 0.35 +  // Completeness: 35%
-      accuracy.score * 0.30 +       // Accuracy: 30%
-      relevance.score * 0.25 +      // Relevance: 25%
-      performance.score * 0.10      // Performance: 10%
+      completeness.score * 0.35 + // Completeness: 35%
+        accuracy.score * 0.3 + // Accuracy: 30%
+        relevance.score * 0.25 + // Relevance: 25%
+        performance.score * 0.1 // Performance: 10%
     );
 
     const overallPasses =
-      completeness.passes &&
-      accuracy.passes &&
-      relevance.passes &&
-      performance.passes;
+      completeness.passes && accuracy.passes && relevance.passes && performance.passes;
 
     // Generate recommendations
     const recommendations = this.generateRecommendations(
@@ -376,11 +367,11 @@ export class ContextQualityValidator {
         completeness,
         accuracy,
         relevance,
-        performance
+        performance,
       },
       overallScore,
       overallPasses,
-      recommendations
+      recommendations,
     };
   }
 
@@ -398,28 +389,28 @@ export class ContextQualityValidator {
     // Priority: Critical issues first
     if (!completeness.passes) {
       recommendations.push(
-        '🔴 CRITICAL: Improve context completeness to meet 95% target',
+        "🔴 CRITICAL: Improve context completeness to meet 95% target",
         ...completeness.suggestions
       );
     }
 
     if (!accuracy.passes) {
       recommendations.push(
-        '🔴 CRITICAL: Address accuracy issues to meet 90% target',
+        "🔴 CRITICAL: Address accuracy issues to meet 90% target",
         ...accuracy.suggestions
       );
     }
 
     if (!relevance.passes) {
       recommendations.push(
-        '🟡 HIGH: Improve context relevance to meet 85% target',
+        "🟡 HIGH: Improve context relevance to meet 85% target",
         ...relevance.suggestions
       );
     }
 
     if (!performance.passes) {
       recommendations.push(
-        '🟡 HIGH: Optimize performance to meet PRD targets',
+        "🟡 HIGH: Optimize performance to meet PRD targets",
         ...performance.suggestions
       );
     }
@@ -427,9 +418,9 @@ export class ContextQualityValidator {
     // Add general recommendations if quality is good
     if (completeness.passes && accuracy.passes && relevance.passes && performance.passes) {
       recommendations.push(
-        '✅ Context quality meets all PRD requirements',
-        'Consider adding more code examples for enhanced developer experience',
-        'Review periodically to ensure continued quality'
+        "✅ Context quality meets all PRD requirements",
+        "Consider adding more code examples for enhanced developer experience",
+        "Review periodically to ensure continued quality"
       );
     }
 
@@ -442,17 +433,51 @@ export class ContextQualityValidator {
   private extractKeywords(text: string): Set<string> {
     // Remove common words and extract meaningful keywords
     const commonWords = new Set([
-      'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for',
-      'of', 'with', 'by', 'from', 'as', 'is', 'are', 'was', 'were', 'be',
-      'been', 'being', 'have', 'has', 'had', 'do', 'does', 'did', 'will',
-      'would', 'should', 'could', 'may', 'might', 'can', 'this', 'that'
+      "the",
+      "a",
+      "an",
+      "and",
+      "or",
+      "but",
+      "in",
+      "on",
+      "at",
+      "to",
+      "for",
+      "of",
+      "with",
+      "by",
+      "from",
+      "as",
+      "is",
+      "are",
+      "was",
+      "were",
+      "be",
+      "been",
+      "being",
+      "have",
+      "has",
+      "had",
+      "do",
+      "does",
+      "did",
+      "will",
+      "would",
+      "should",
+      "could",
+      "may",
+      "might",
+      "can",
+      "this",
+      "that",
     ]);
 
     return new Set(
       text
         .toLowerCase()
         .split(/\W+/)
-        .filter(word => word.length > 3 && !commonWords.has(word))
+        .filter((word) => word.length > 3 && !commonWords.has(word))
     );
   }
 
@@ -477,7 +502,7 @@ export class ContextQualityValidator {
       return 0;
     }
 
-    const intersection = new Set([...set1].filter(k => set2.has(k)));
+    const intersection = new Set([...set1].filter((k) => set2.has(k)));
     const union = new Set([...set1, ...set2]);
 
     return intersection.size / union.size;

@@ -1,6 +1,6 @@
-import type { GitHubRepositoryFactory } from '../github/GitHubRepositoryFactory.js';
-import type { Agent } from '../../domain/agent-orchestration-types.js';
-import { AGENT_REGISTRY_LABEL } from '../../domain/agent-orchestration-types.js';
+import type { GitHubRepositoryFactory } from "../github/GitHubRepositoryFactory.js";
+import type { Agent } from "../../domain/agent-orchestration-types.js";
+import { AGENT_REGISTRY_LABEL } from "../../domain/agent-orchestration-types.js";
 
 /**
  * GitHub issue-backed agent registry.
@@ -45,7 +45,7 @@ export class AgentStore {
       owner: config.owner,
       repo: config.repo,
       labels: AGENT_REGISTRY_LABEL,
-      state: 'open',
+      state: "open",
       per_page: 1,
     });
 
@@ -61,12 +61,12 @@ export class AgentStore {
       owner: config.owner,
       repo: config.repo,
       labels: AGENT_REGISTRY_LABEL,
-      state: 'open',
+      state: "open",
       per_page: 1,
     });
 
     if (issues.length > 0) {
-      return { number: issues[0].number, body: issues[0].body || '[]' };
+      return { number: issues[0].number, body: issues[0].body || "[]" };
     }
 
     // Ensure the label exists before creating the issue
@@ -75,8 +75,8 @@ export class AgentStore {
         owner: config.owner,
         repo: config.repo,
         name: AGENT_REGISTRY_LABEL,
-        color: '6f42c1',
-        description: 'Agent orchestration registry',
+        color: "6f42c1",
+        description: "Agent orchestration registry",
       });
     } catch {
       /* label may already exist */
@@ -85,12 +85,12 @@ export class AgentStore {
     const { data: issue } = await octokit.rest.issues.create({
       owner: config.owner,
       repo: config.repo,
-      title: 'Agent Registry',
-      body: '[]',
+      title: "Agent Registry",
+      body: "[]",
       labels: [AGENT_REGISTRY_LABEL],
     });
 
-    return { number: issue.number, body: '[]' };
+    return { number: issue.number, body: "[]" };
   }
 
   /** Read all agents from the registry. */
@@ -106,7 +106,7 @@ export class AgentStore {
   /** Get a single agent by ID. */
   async getAgent(agentId: string): Promise<Agent | undefined> {
     const agents = await this.listAgents();
-    return agents.find(a => a.id === agentId);
+    return agents.find((a) => a.id === agentId);
   }
 
   /** Save the full agent list back to the registry issue. */
@@ -125,8 +125,8 @@ export class AgentStore {
 
   /** Add or update an agent (matched by `id`). */
   async upsertAgent(agent: Agent): Promise<void> {
-    await this.mutateAgents(agents => {
-      const idx = agents.findIndex(a => a.id === agent.id);
+    await this.mutateAgents((agents) => {
+      const idx = agents.findIndex((a) => a.id === agent.id);
       if (idx >= 0) {
         agents[idx] = agent;
       } else {
@@ -139,8 +139,8 @@ export class AgentStore {
   /** Remove an agent by ID. Returns `true` if found and removed. */
   async removeAgent(agentId: string): Promise<boolean> {
     let removed = false;
-    await this.mutateAgents(agents => {
-      const filtered = agents.filter(a => a.id !== agentId);
+    await this.mutateAgents((agents) => {
+      const filtered = agents.filter((a) => a.id !== agentId);
       removed = filtered.length !== agents.length;
       return filtered;
     });
@@ -150,7 +150,7 @@ export class AgentStore {
   /** Remove an agent and all its descendants. Returns count of removed agents. */
   async removeAgentCascade(agentId: string): Promise<number> {
     let removedCount = 0;
-    await this.mutateAgents(agents => {
+    await this.mutateAgents((agents) => {
       const toRemove = new Set([agentId]);
       let found = true;
       while (found) {
@@ -163,7 +163,7 @@ export class AgentStore {
         }
       }
       removedCount = toRemove.size;
-      return agents.filter(a => !toRemove.has(a.id));
+      return agents.filter((a) => !toRemove.has(a.id));
     });
     return removedCount;
   }
@@ -171,7 +171,7 @@ export class AgentStore {
   /** Get direct children of an agent. */
   async getChildren(parentId: string): Promise<Agent[]> {
     const agents = await this.listAgents();
-    return agents.filter(a => a.parentAgentId === parentId);
+    return agents.filter((a) => a.parentAgentId === parentId);
   }
 
   /**
@@ -182,9 +182,7 @@ export class AgentStore {
    * landed after us), re-applies the mutation on the fresh list and retries,
    * up to MAX_MERGE_ATTEMPTS.
    */
-  private async mutateAgents(
-    mutator: (agents: Agent[]) => Agent[],
-  ): Promise<void> {
+  private async mutateAgents(mutator: (agents: Agent[]) => Agent[]): Promise<void> {
     for (let attempt = 0; attempt < AgentStore.MAX_MERGE_ATTEMPTS; attempt++) {
       const agents = await this.listAgents();
       const next = mutator(agents);
@@ -200,8 +198,8 @@ export class AgentStore {
     // Give up after bounded attempts. This is a last-writer-wins race; the
     // registry remains consistent but our update may be lost. Warn loudly.
     process.stderr.write(
-      '[AgentStore] Concurrent registry writes detected — merge attempts exhausted; ' +
-      'some updates may have been lost. Retry the operation.\n',
+      "[AgentStore] Concurrent registry writes detected — merge attempts exhausted; " +
+        "some updates may have been lost. Retry the operation.\n"
     );
   }
 

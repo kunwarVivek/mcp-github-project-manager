@@ -1,5 +1,5 @@
 import type { GitHubRepositoryFactory } from "../infrastructure/github/GitHubRepositoryFactory";
-import { safeCall } from './utils/safeCall';
+import { safeCall } from "./utils/safeCall";
 
 /**
  * Service for managing GitHub repository labels.
@@ -30,25 +30,27 @@ export class LabelService {
         owner: config.owner,
         repo: config.repo,
         name: data.name,
-        color: data.color?.replace('#', '') || 'ededed',
-        description: data.description || ''
+        color: data.color?.replace("#", "") || "ededed",
+        description: data.description || "",
       });
 
       return {
         id: response.data.id,
         name: response.data.name,
         color: response.data.color,
-        description: response.data.description || ''
+        description: response.data.description || "",
       };
     });
   }
 
-  async listLabels(data: { limit?: number } = {}): Promise<Array<{
-    id: number;
-    name: string;
-    color: string;
-    description: string;
-  }>> {
+  async listLabels(data: { limit?: number } = {}): Promise<
+    Array<{
+      id: number;
+      name: string;
+      color: string;
+      description: string;
+    }>
+  > {
     return safeCall(async () => {
       const octokit = this.factory.getOctokit();
       const config = this.factory.getConfig();
@@ -56,14 +58,14 @@ export class LabelService {
       const response = await octokit.rest.issues.listLabelsForRepo({
         owner: config.owner,
         repo: config.repo,
-        per_page: data.limit || 100
+        per_page: data.limit || 100,
       });
 
-      return response.data.map(label => ({
+      return response.data.map((label) => ({
         id: label.id,
         name: label.name,
         color: label.color,
-        description: label.description || ''
+        description: label.description || "",
       }));
     });
   }

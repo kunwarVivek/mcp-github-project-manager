@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
-import { ToolRegistry } from '../../../../infrastructure/tools/ToolRegistry';
+import { describe, expect, it } from "vitest";
+import { ToolRegistry } from "../../../../infrastructure/tools/ToolRegistry";
 
 /**
  * Regression guard for a silent, total breakage.
@@ -13,29 +13,31 @@ import { ToolRegistry } from '../../../../infrastructure/tools/ToolRegistry';
  * These assertions fail loudly if schema generation ever degrades that way
  * again, whatever the cause.
  */
-describe('MCP tool schema generation', () => {
+describe("MCP tool schema generation", () => {
   const tools = ToolRegistry.getInstance().getToolsForMCP();
 
-  it('registers tools at all', () => {
+  it("registers tools at all", () => {
     expect(tools.length).toBeGreaterThan(0);
   });
 
-  it('every tool advertises a non-empty input schema', () => {
+  it("every tool advertises a non-empty input schema", () => {
     const empty = tools
-      .filter((t) => Object.keys((t.inputSchema as { properties?: object }).properties ?? {}).length === 0)
+      .filter(
+        (t) => Object.keys((t.inputSchema as { properties?: object }).properties ?? {}).length === 0
+      )
       .map((t) => t.name);
 
-    expect(empty, `tools with an empty inputSchema: ${empty.join(', ')}`).toEqual([]);
+    expect(empty, `tools with an empty inputSchema: ${empty.join(", ")}`).toEqual([]);
   });
 
-  it('every input schema is a JSON Schema object', () => {
+  it("every input schema is a JSON Schema object", () => {
     for (const tool of tools) {
-      expect(tool.inputSchema, tool.name).toMatchObject({ type: 'object' });
+      expect(tool.inputSchema, tool.name).toMatchObject({ type: "object" });
     }
   });
 
-  it('preserves enums and required fields', () => {
-    const project = tools.find((t) => t.name === 'manage_project');
+  it("preserves enums and required fields", () => {
+    const project = tools.find((t) => t.name === "manage_project");
     expect(project).toBeDefined();
 
     const schema = project!.inputSchema as {
@@ -44,17 +46,17 @@ describe('MCP tool schema generation', () => {
     };
     // `action` is the discriminator on every compound tool — if it survives as
     // a required enum, the converter is doing real work.
-    expect(schema.required).toContain('action');
+    expect(schema.required).toContain("action");
     expect(schema.properties.action.enum?.length).toBeGreaterThan(1);
   });
 
-  it('emits self-contained schemas (no $ref a client must resolve)', () => {
+  it("emits self-contained schemas (no $ref a client must resolve)", () => {
     for (const tool of tools) {
       expect(JSON.stringify(tool.inputSchema), tool.name).not.toContain('"$ref"');
     }
   });
 
-  it('does not mark defaulted fields as required', () => {
+  it("does not mark defaulted fields as required", () => {
     for (const tool of tools) {
       const schema = tool.inputSchema as {
         required?: string[];

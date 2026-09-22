@@ -1,19 +1,19 @@
-const path = require('node:path');
-const fs = require('node:fs');
+const path = require("node:path");
+const fs = require("node:fs");
 
 module.exports = (request, options) => {
   // Handle path aliases
-  if (request.startsWith('@/')) {
+  if (request.startsWith("@/")) {
     const relativePath = request.substring(2);
-    return path.resolve(options.rootDir, 'src', relativePath);
+    return path.resolve(options.rootDir, "src", relativePath);
   }
 
   // Handle .js imports that should resolve to .ts files in Jest
-  if (request.endsWith('.js')) {
-    const tsRequest = request.replace(/\.js$/, '.ts');
+  if (request.endsWith(".js")) {
+    const tsRequest = request.replace(/\.js$/, ".ts");
 
     // Check if this is a relative import
-    if (request.startsWith('./') || request.startsWith('../')) {
+    if (request.startsWith("./") || request.startsWith("../")) {
       // Use the directory of the file that's doing the importing
       const basePath = options.basedir;
       const tsFilePath = path.resolve(basePath, tsRequest);
@@ -33,8 +33,8 @@ module.exports = (request, options) => {
       if (fs.existsSync(tsFilePath)) {
         return options.defaultResolver(tsRequest, {
           ...options,
-          packageFilter: pkg => {
-            if (pkg.type === 'module') {
+          packageFilter: (pkg) => {
+            if (pkg.type === "module") {
               delete pkg.exports;
               delete pkg.type;
             }
@@ -46,11 +46,11 @@ module.exports = (request, options) => {
   }
 
   // Handle TypeScript extensions
-  if (request.endsWith('.ts')) {
+  if (request.endsWith(".ts")) {
     return options.defaultResolver(request, {
       ...options,
-      packageFilter: pkg => {
-        if (pkg.type === 'module') {
+      packageFilter: (pkg) => {
+        if (pkg.type === "module") {
           delete pkg.exports;
           delete pkg.type;
         }

@@ -58,7 +58,8 @@ function toStatusEnum(status?: string): StatusUpdateStatus | undefined {
 export const createStatusUpdateTool: ToolDefinition<CreateStatusUpdateInput, StatusUpdateOutput> = {
   name: "create_status_update",
   title: "Create Status Update",
-  description: "Create a new status update for a GitHub project. Status updates communicate project progress and can include a status indicator (ON_TRACK, AT_RISK, OFF_TRACK, COMPLETE, INACTIVE), start date, and target date.",
+  description:
+    "Create a new status update for a GitHub project. Status updates communicate project progress and can include a status indicator (ON_TRACK, AT_RISK, OFF_TRACK, COMPLETE, INACTIVE), start date, and target date.",
   schema: CreateStatusUpdateInputSchema as unknown as ToolSchema<CreateStatusUpdateInput>,
   outputSchema: StatusUpdateOutputSchema,
   annotations: ANNOTATION_PATTERNS.create,
@@ -91,33 +92,35 @@ export const createStatusUpdateTool: ToolDefinition<CreateStatusUpdateInput, Sta
  * Lists status updates for a GitHub project with pagination support.
  * Status updates are returned in descending order by creation date.
  */
-export const listStatusUpdatesTool: ToolDefinition<ListStatusUpdatesInput, StatusUpdateListOutput> = {
-  name: "list_status_updates",
-  title: "List Status Updates",
-  description: "List status updates for a GitHub project with pagination support. Returns status updates in descending order by creation date.",
-  schema: ListStatusUpdatesInputSchema as unknown as ToolSchema<ListStatusUpdatesInput>,
-  outputSchema: StatusUpdateListOutputSchema,
-  annotations: ANNOTATION_PATTERNS.readOnly,
-  examples: [
-    {
-      name: "List first 10 status updates",
-      description: "Get the most recent status updates for a project",
-      args: {
-        projectId: "PVT_kwDOLhQ7gc4AOEbH",
-        first: 10,
+export const listStatusUpdatesTool: ToolDefinition<ListStatusUpdatesInput, StatusUpdateListOutput> =
+  {
+    name: "list_status_updates",
+    title: "List Status Updates",
+    description:
+      "List status updates for a GitHub project with pagination support. Returns status updates in descending order by creation date.",
+    schema: ListStatusUpdatesInputSchema as unknown as ToolSchema<ListStatusUpdatesInput>,
+    outputSchema: StatusUpdateListOutputSchema,
+    annotations: ANNOTATION_PATTERNS.readOnly,
+    examples: [
+      {
+        name: "List first 10 status updates",
+        description: "Get the most recent status updates for a project",
+        args: {
+          projectId: "PVT_kwDOLhQ7gc4AOEbH",
+          first: 10,
+        },
       },
-    },
-    {
-      name: "Paginate status updates",
-      description: "Get the next page of status updates using a cursor",
-      args: {
-        projectId: "PVT_kwDOLhQ7gc4AOEbH",
-        first: 10,
-        after: "Y3Vyc29yOnYyOpK5MjAyNS0wMS0xNVQxMDowMDowMFo=",
+      {
+        name: "Paginate status updates",
+        description: "Get the next page of status updates using a cursor",
+        args: {
+          projectId: "PVT_kwDOLhQ7gc4AOEbH",
+          first: 10,
+          after: "Y3Vyc29yOnYyOpK5MjAyNS0wMS0xNVQxMDowMDowMFo=",
+        },
       },
-    },
-  ],
-};
+    ],
+  };
 
 /**
  * get_status_update MCP tool (GHAPI-08)
@@ -125,23 +128,25 @@ export const listStatusUpdatesTool: ToolDefinition<ListStatusUpdatesInput, Statu
  * Retrieves a single status update by its node ID. Returns null if the
  * status update is not found.
  */
-export const getStatusUpdateTool: ToolDefinition<GetStatusUpdateInput, StatusUpdateOutput | null> = {
-  name: "get_status_update",
-  title: "Get Status Update",
-  description: "Get a single status update by its node ID. Returns null if the status update is not found.",
-  schema: GetStatusUpdateInputSchema as unknown as ToolSchema<GetStatusUpdateInput>,
-  outputSchema: StatusUpdateOutputSchema.nullable(),
-  annotations: ANNOTATION_PATTERNS.readOnly,
-  examples: [
-    {
-      name: "Get status update by ID",
-      description: "Retrieve a specific status update",
-      args: {
-        statusUpdateId: "PVTSU_lADOLhQ7gc4AOEbHzM4AOrKa",
+export const getStatusUpdateTool: ToolDefinition<GetStatusUpdateInput, StatusUpdateOutput | null> =
+  {
+    name: "get_status_update",
+    title: "Get Status Update",
+    description:
+      "Get a single status update by its node ID. Returns null if the status update is not found.",
+    schema: GetStatusUpdateInputSchema as unknown as ToolSchema<GetStatusUpdateInput>,
+    outputSchema: StatusUpdateOutputSchema.nullable(),
+    annotations: ANNOTATION_PATTERNS.readOnly,
+    examples: [
+      {
+        name: "Get status update by ID",
+        description: "Retrieve a specific status update",
+        args: {
+          statusUpdateId: "PVTSU_lADOLhQ7gc4AOEbHzM4AOrKa",
+        },
       },
-    },
-  ],
-};
+    ],
+  };
 
 // ============================================================================
 // Executor Functions
@@ -156,21 +161,18 @@ export const getStatusUpdateTool: ToolDefinition<GetStatusUpdateInput, StatusUpd
  * @returns The created status update
  * @throws Error if GITHUB_TOKEN is not set or API call fails
  */
-export async function executeCreateStatusUpdate(
-  args: CreateStatusUpdateInput
-): Promise<{ content: Array<{ type: "text"; text: string }>; structuredContent: StatusUpdateOutput }> {
+export async function executeCreateStatusUpdate(args: CreateStatusUpdateInput): Promise<{
+  content: Array<{ type: "text"; text: string }>;
+  structuredContent: StatusUpdateOutput;
+}> {
   const factory = createGitHubFactory();
   const repository = factory.createStatusUpdateRepository();
 
-  const statusUpdate = await repository.createStatusUpdate(
-    args.projectId,
-    args.body,
-    {
-      status: toStatusEnum(args.status),
-      startDate: args.startDate,
-      targetDate: args.targetDate,
-    }
-  );
+  const statusUpdate = await repository.createStatusUpdate(args.projectId, args.body, {
+    status: toStatusEnum(args.status),
+    startDate: args.startDate,
+    targetDate: args.targetDate,
+  });
 
   // Map to output format
   const result: StatusUpdateOutput = {
@@ -206,9 +208,10 @@ export async function executeCreateStatusUpdate(
  * @returns Paginated list of status updates
  * @throws Error if GITHUB_TOKEN is not set or API call fails
  */
-export async function executeListStatusUpdates(
-  args: ListStatusUpdatesInput
-): Promise<{ content: Array<{ type: "text"; text: string }>; structuredContent: StatusUpdateListOutput }> {
+export async function executeListStatusUpdates(args: ListStatusUpdatesInput): Promise<{
+  content: Array<{ type: "text"; text: string }>;
+  structuredContent: StatusUpdateListOutput;
+}> {
   const factory = createGitHubFactory();
   const repository = factory.createStatusUpdateRepository();
 
@@ -259,9 +262,10 @@ export async function executeListStatusUpdates(
  * @returns The status update or null if not found
  * @throws Error if GITHUB_TOKEN is not set or API call fails
  */
-export async function executeGetStatusUpdate(
-  args: GetStatusUpdateInput
-): Promise<{ content: Array<{ type: "text"; text: string }>; structuredContent: StatusUpdateOutput | null }> {
+export async function executeGetStatusUpdate(args: GetStatusUpdateInput): Promise<{
+  content: Array<{ type: "text"; text: string }>;
+  structuredContent: StatusUpdateOutput | null;
+}> {
   const factory = createGitHubFactory();
   const repository = factory.createStatusUpdateRepository();
 

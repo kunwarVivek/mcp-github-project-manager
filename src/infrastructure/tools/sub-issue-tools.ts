@@ -88,9 +88,7 @@ async function resolveIssueNodeId(
   });
 
   if (!response.repository.issue) {
-    throw new Error(
-      `Issue #${issueNumber} not found in ${config.owner}/${config.repo}`
-    );
+    throw new Error(`Issue #${issueNumber} not found in ${config.owner}/${config.repo}`);
   }
 
   return response.repository.issue.id;
@@ -265,9 +263,7 @@ export const removeSubIssueTool: ToolDefinition<RemoveSubIssueInput, RemoveSubIs
  *
  * Resolves issue numbers to node IDs and calls the repository.
  */
-export async function executeAddSubIssue(
-  args: AddSubIssueInput
-): Promise<SubIssueOperationOutput> {
+export async function executeAddSubIssue(args: AddSubIssueInput): Promise<SubIssueOperationOutput> {
   const factory = createFactory(args.owner, args.repo);
   const repository = factory.createSubIssueRepository();
 
@@ -303,20 +299,14 @@ export async function executeAddSubIssue(
  *
  * Resolves parent issue number to node ID and lists sub-issues.
  */
-export async function executeListSubIssues(
-  args: ListSubIssuesInput
-): Promise<SubIssueListOutput> {
+export async function executeListSubIssues(args: ListSubIssuesInput): Promise<SubIssueListOutput> {
   const factory = createFactory(args.owner, args.repo);
   const repository = factory.createSubIssueRepository();
 
   // Resolve issue number to node ID
   const issueNodeId = await resolveIssueNodeId(factory, args.issueNumber);
 
-  const result = await repository.listSubIssues(
-    issueNodeId,
-    args.first ?? 20,
-    args.after
-  );
+  const result = await repository.listSubIssues(issueNodeId, args.first ?? 20, args.after);
 
   return {
     subIssues: result.subIssues.map((item) => ({
@@ -345,9 +335,7 @@ export async function executeListSubIssues(
  *
  * Resolves issue number to node ID and gets parent.
  */
-export async function executeGetParentIssue(
-  args: GetParentIssueInput
-): Promise<ParentIssueOutput> {
+export async function executeGetParentIssue(args: GetParentIssueInput): Promise<ParentIssueOutput> {
   const factory = createFactory(args.owner, args.repo);
   const repository = factory.createSubIssueRepository();
 
@@ -396,11 +384,7 @@ export async function executeReprioritizeSubIssue(
   const [parentNodeId, subIssueNodeId] = nodeIds;
   const afterNodeId = nodeIds.length > 2 ? nodeIds[2] : undefined;
 
-  const result = await repository.reprioritizeSubIssue(
-    parentNodeId,
-    subIssueNodeId,
-    afterNodeId
-  );
+  const result = await repository.reprioritizeSubIssue(parentNodeId, subIssueNodeId, afterNodeId);
 
   return {
     parentIssue: {

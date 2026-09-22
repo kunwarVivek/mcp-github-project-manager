@@ -96,16 +96,26 @@ Output requirements:
  * User prompt template for business value scoring.
  */
 export function formatPrioritizationPrompt(
-  items: Array<{ id: string; title: string; description?: string; priority?: string; labels?: string[] }>,
+  items: Array<{
+    id: string;
+    title: string;
+    description?: string;
+    priority?: string;
+    labels?: string[];
+  }>,
   businessGoals: string[]
 ): string {
-  const itemsList = items.map((item, i) =>
-    `${i + 1}. [${item.id}] ${item.title}${item.description ? `\n   Description: ${item.description}` : ''}${item.priority ? `\n   Current priority: ${item.priority}` : ''}${item.labels?.length ? `\n   Labels: ${item.labels.join(', ')}` : ''}`
-  ).join('\n\n');
+  const itemsList = items
+    .map(
+      (item, i) =>
+        `${i + 1}. [${item.id}] ${item.title}${item.description ? `\n   Description: ${item.description}` : ""}${item.priority ? `\n   Current priority: ${item.priority}` : ""}${item.labels?.length ? `\n   Labels: ${item.labels.join(", ")}` : ""}`
+    )
+    .join("\n\n");
 
-  const goalsSection = businessGoals.length > 0
-    ? `\nBusiness Goals:\n${businessGoals.map((g, i) => `${i + 1}. ${g}`).join('\n')}`
-    : '';
+  const goalsSection =
+    businessGoals.length > 0
+      ? `\nBusiness Goals:\n${businessGoals.map((g, i) => `${i + 1}. ${g}`).join("\n")}`
+      : "";
 
   return `Score the business value of each backlog item.
 ${goalsSection}
@@ -164,9 +174,12 @@ export function formatRiskPrompt(params: {
   recommendedCapacity: number;
   dependencyCount: number;
 }): string {
-  const itemsList = params.sprintItems.map((item, i) =>
-    `${i + 1}. [${item.id}] ${item.title} (${item.points || 3} pts)${item.dependencies?.length ? `\n   Dependencies: ${item.dependencies.join(', ')}` : ''}`
-  ).join('\n');
+  const itemsList = params.sprintItems
+    .map(
+      (item, i) =>
+        `${i + 1}. [${item.id}] ${item.title} (${item.points || 3} pts)${item.dependencies?.length ? `\n   Dependencies: ${item.dependencies.join(", ")}` : ""}`
+    )
+    .join("\n");
 
   const utilizationPercent = Math.round((params.totalPoints / params.recommendedCapacity) * 100);
 
@@ -226,15 +239,18 @@ export function formatSprintSuggestionPrompt(params: {
   availableItems: Array<{ id: string; title: string; points?: number; priority?: string }>;
   capacity: number;
   businessGoals?: string[];
-  riskTolerance: 'low' | 'medium' | 'high';
+  riskTolerance: "low" | "medium" | "high";
 }): string {
-  const itemsList = params.availableItems.map((item, i) =>
-    `${i + 1}. [${item.id}] ${item.title} (${item.points || 3} pts, ${item.priority || 'medium'} priority)`
-  ).join('\n');
+  const itemsList = params.availableItems
+    .map(
+      (item, i) =>
+        `${i + 1}. [${item.id}] ${item.title} (${item.points || 3} pts, ${item.priority || "medium"} priority)`
+    )
+    .join("\n");
 
   const goalsSection = params.businessGoals?.length
-    ? `\nBusiness Goals:\n${params.businessGoals.map((g, i) => `${i + 1}. ${g}`).join('\n')}`
-    : '';
+    ? `\nBusiness Goals:\n${params.businessGoals.map((g, i) => `${i + 1}. ${g}`).join("\n")}`
+    : "";
 
   return `Suggest optimal sprint composition:
 

@@ -1,4 +1,3 @@
-
 import type { GitHubError, OctokitInstance } from "../types";
 import { GitHubErrorHandler } from "../GitHubErrorHandler";
 import type { GitHubConfig } from "../GitHubConfig";
@@ -32,10 +31,7 @@ export abstract class BaseGitHubRepository implements IGitHubRepository {
     return this.config.token;
   }
 
-  protected async withRetry<T>(
-    operation: () => Promise<T>,
-    context?: string
-  ): Promise<T> {
+  protected async withRetry<T>(operation: () => Promise<T>, context?: string): Promise<T> {
     let lastError: unknown;
     let error: unknown;
 
@@ -58,17 +54,14 @@ export abstract class BaseGitHubRepository implements IGitHubRepository {
 
         const headers = (error as GitHubError)?.response?.headers || {};
         const delay = this.errorHandler.calculateRetryDelay(headers);
-        await new Promise(resolve => setTimeout(resolve, delay));
+        await new Promise((resolve) => setTimeout(resolve, delay));
       }
     }
 
     throw this.errorHandler.handleError(lastError, context);
   }
 
-  protected async graphql<T>(
-    query: string,
-    variables: Record<string, unknown> = {}
-  ): Promise<T> {
+  protected async graphql<T>(query: string, variables: Record<string, unknown> = {}): Promise<T> {
     return this.withRetry(
       () =>
         this.octokit.graphql<T>(query, {
@@ -76,7 +69,7 @@ export abstract class BaseGitHubRepository implements IGitHubRepository {
           owner: this.owner,
           repo: this.repo,
         }),
-      'executing GraphQL query'
+      "executing GraphQL query"
     );
   }
 
@@ -86,7 +79,7 @@ export abstract class BaseGitHubRepository implements IGitHubRepository {
   ): Promise<T> {
     const result = await this.withRetry(
       () => operation(this.getRequestParams(params)),
-      'executing REST API call'
+      "executing REST API call"
     );
     return result.data;
   }

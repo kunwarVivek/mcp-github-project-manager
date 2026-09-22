@@ -1,4 +1,4 @@
-import { MCPToolTestUtils, MCPTestHelpers } from '../utils/MCPToolTestUtils';
+import { MCPToolTestUtils, MCPTestHelpers } from "../utils/MCPToolTestUtils";
 
 /**
  * Comprehensive E2E tests for GitHub Project Management Tools
@@ -16,14 +16,14 @@ const hasRealCredentials = (): boolean => {
   const repo = process.env.GITHUB_REPO;
 
   // Skip if empty or if using fake test values from setup.ts
-  if (!token || token === 'test-token' || token === '') return false;
-  if (!owner || owner === 'test-owner') return false;
-  if (!repo || repo === 'test-repo') return false;
+  if (!token || token === "test-token" || token === "") return false;
+  if (!owner || owner === "test-owner") return false;
+  if (!repo || repo === "test-repo") return false;
 
   return true;
 };
 
-describe('GitHub Project Management Tools E2E', () => {
+describe("GitHub Project Management Tools E2E", () => {
   let utils: MCPToolTestUtils | undefined;
   let createdProjectId: string;
   let createdMilestoneId: string;
@@ -34,7 +34,7 @@ describe('GitHub Project Management Tools E2E', () => {
 
   beforeAll(async () => {
     if (!hasRealCredentials()) {
-      console.log('Skipping GitHub Project Management Tools E2E - missing real GitHub credentials');
+      console.log("Skipping GitHub Project Management Tools E2E - missing real GitHub credentials");
       return;
     }
 
@@ -48,61 +48,65 @@ describe('GitHub Project Management Tools E2E', () => {
     }
   }, 10000);
 
-  describe('Project Tools', () => {
-    it('should list all project tools', async () => {
+  describe("Project Tools", () => {
+    it("should list all project tools", async () => {
       if (!utils) {
-        console.log('Skipping: utils not initialized (missing credentials)');
+        console.log("Skipping: utils not initialized (missing credentials)");
         return;
       }
       const tools = await utils.listTools();
 
       // All project operations are consolidated under manage_project
-      const compoundTools = ['manage_project'];
+      const compoundTools = ["manage_project"];
 
       for (const toolName of compoundTools) {
-        const tool = tools.find(t => t.name === toolName);
+        const tool = tools.find((t) => t.name === toolName);
         expect(tool).toBeDefined();
         expect(tool.inputSchema).toBeDefined();
       }
     });
 
-    it('should create a new project', async () => {
+    it("should create a new project", async () => {
       if (!utils) {
-        console.log('Skipping: utils not initialized (missing credentials)');
+        console.log("Skipping: utils not initialized (missing credentials)");
         return;
       }
       const projectData = MCPTestHelpers.createTestData.project();
 
-      const response = await utils.callTool('manage_project', {
-        action: 'create',
+      const response = await utils.callTool("manage_project", {
+        action: "create",
         ...projectData,
       });
 
-      MCPTestHelpers.validateToolResponse(response, ['id', 'title', 'url']);
+      MCPTestHelpers.validateToolResponse(response, ["id", "title", "url"]);
       expect(response.title).toBe(projectData.title);
       expect(response.visibility).toBe(projectData.visibility);
 
       createdProjectId = response.id;
     });
 
-    it('should validate manage_project create arguments', async () => {
+    it("should validate manage_project create arguments", async () => {
       if (!utils) {
-        console.log('Skipping: utils not initialized (missing credentials)');
+        console.log("Skipping: utils not initialized (missing credentials)");
         return;
       }
       // MCP v2 validates args against JSON Schema before the handler runs.
       // An invalid enum value for visibility causes an isError tool result.
-      const raw = await utils.callToolRaw('manage_project', { action: 'create', title: '', visibility: 'invalid' });
+      const raw = await utils.callToolRaw("manage_project", {
+        action: "create",
+        title: "",
+        visibility: "invalid",
+      });
       // Either a JSON-RPC error or a tool-level isError
-      expect(raw.isError || raw.content?.[0]?.text?.includes('error')).toBeTruthy();
+      expect(raw.isError || raw.content?.[0]?.text?.includes("error")).toBeTruthy();
     });
 
-    it('should list projects', async () => {
+    it("should list projects", async () => {
       if (!utils) {
-        console.log('Skipping: utils not initialized (missing credentials)');
+        console.log("Skipping: utils not initialized (missing credentials)");
         return;
       }
-      const response = await utils.callTool('manage_project', { action: 'list' });
+      const response = await utils.callTool("manage_project", { action: "list" });
 
       expect(Array.isArray(response)).toBe(true);
       if (createdProjectId) {
@@ -111,259 +115,263 @@ describe('GitHub Project Management Tools E2E', () => {
       }
     });
 
-    it('should get a specific project', async () => {
+    it("should get a specific project", async () => {
       if (!utils) {
-        console.log('Skipping: utils not initialized (missing credentials)');
+        console.log("Skipping: utils not initialized (missing credentials)");
         return;
       }
       if (!createdProjectId) {
-        console.log('Skipping: No project created to test with');
+        console.log("Skipping: No project created to test with");
         return;
       }
 
-      const response = await utils.callTool('manage_project', {
-        action: 'get',
+      const response = await utils.callTool("manage_project", {
+        action: "get",
         projectId: createdProjectId,
       });
 
-      MCPTestHelpers.validateToolResponse(response, ['id', 'title']);
+      MCPTestHelpers.validateToolResponse(response, ["id", "title"]);
       expect(response.id).toBe(createdProjectId);
     });
 
-    it('should update a project', async () => {
+    it("should update a project", async () => {
       if (!utils) {
-        console.log('Skipping: utils not initialized (missing credentials)');
+        console.log("Skipping: utils not initialized (missing credentials)");
         return;
       }
       if (!createdProjectId) {
-        console.log('Skipping: No project created to test with');
+        console.log("Skipping: No project created to test with");
         return;
       }
 
-      const response = await utils.callTool('manage_project', {
-        action: 'update',
+      const response = await utils.callTool("manage_project", {
+        action: "update",
         projectId: createdProjectId,
-        title: 'Updated Test Project',
-        shortDescription: 'Updated description',
+        title: "Updated Test Project",
+        shortDescription: "Updated description",
       });
 
-      MCPTestHelpers.validateToolResponse(response, ['id', 'title']);
-      expect(response.title).toBe('Updated Test Project');
+      MCPTestHelpers.validateToolResponse(response, ["id", "title"]);
+      expect(response.title).toBe("Updated Test Project");
     });
   });
 
-  describe('Milestone Tools', () => {
-    it('should list milestone tools', async () => {
+  describe("Milestone Tools", () => {
+    it("should list milestone tools", async () => {
       if (!utils) {
-        console.log('Skipping: utils not initialized (missing credentials)');
+        console.log("Skipping: utils not initialized (missing credentials)");
         return;
       }
       const tools = await utils.listTools();
 
-      const tool = tools.find(t => t.name === 'manage_milestones');
+      const tool = tools.find((t) => t.name === "manage_milestones");
       expect(tool).toBeDefined();
       expect(tool.inputSchema).toBeDefined();
     });
 
-    it('should create a milestone', async () => {
+    it("should create a milestone", async () => {
       if (!utils) {
-        console.log('Skipping: utils not initialized (missing credentials)');
+        console.log("Skipping: utils not initialized (missing credentials)");
         return;
       }
       // Use a highly unique title to avoid already_exists from prior runs
       const uniqueTitle = `E2E-MS-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-      const response = await utils.callTool('manage_milestones', {
-        action: 'create',
+      const response = await utils.callTool("manage_milestones", {
+        action: "create",
         title: uniqueTitle,
-        description: 'E2E test milestone',
+        description: "E2E test milestone",
         dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
       });
 
-      MCPTestHelpers.validateToolResponse(response, ['id', 'title']);
+      MCPTestHelpers.validateToolResponse(response, ["id", "title"]);
       expect(response.title).toBe(uniqueTitle);
       createdMilestoneId = response.id;
       createdMilestoneNumber = response.number;
     });
 
-    it('should list milestones', async () => {
+    it("should list milestones", async () => {
       if (!utils) {
-        console.log('Skipping: utils not initialized (missing credentials)');
+        console.log("Skipping: utils not initialized (missing credentials)");
         return;
       }
-      const response = await utils.callTool('manage_milestones', { action: 'list' });
+      const response = await utils.callTool("manage_milestones", { action: "list" });
 
       expect(Array.isArray(response)).toBe(true);
       if (createdMilestoneId) {
-        const milestone = response.find((m: Record<string, unknown>) => m.id === createdMilestoneId);
+        const milestone = response.find(
+          (m: Record<string, unknown>) => m.id === createdMilestoneId
+        );
         expect(milestone).toBeDefined();
       }
     });
 
-    it('should update a milestone', async () => {
+    it("should update a milestone", async () => {
       if (!utils) {
-        console.log('Skipping: utils not initialized (missing credentials)');
+        console.log("Skipping: utils not initialized (missing credentials)");
         return;
       }
       if (!createdMilestoneId) {
-        console.log('Skipping: No milestone created to test with');
+        console.log("Skipping: No milestone created to test with");
         return;
       }
       const updatedTitle = `Updated-MS-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
       // Pass node ID directly — repository resolves to number for REST API
-      const response = await utils.callTool('manage_milestones', {
-        action: 'update',
+      const response = await utils.callTool("manage_milestones", {
+        action: "update",
         milestoneId: createdMilestoneId,
         title: updatedTitle,
-        description: 'Updated milestone description',
+        description: "Updated milestone description",
       });
 
-      MCPTestHelpers.validateToolResponse(response, ['id', 'title']);
+      MCPTestHelpers.validateToolResponse(response, ["id", "title"]);
       expect(response.title).toBe(updatedTitle);
     });
   });
 
-  describe('Issue Tools', () => {
-    it('should list issue tools', async () => {
+  describe("Issue Tools", () => {
+    it("should list issue tools", async () => {
       if (!utils) {
-        console.log('Skipping: utils not initialized (missing credentials)');
+        console.log("Skipping: utils not initialized (missing credentials)");
         return;
       }
       const tools = await utils.listTools();
 
-      const tool = tools.find(t => t.name === 'manage_issues');
+      const tool = tools.find((t) => t.name === "manage_issues");
       expect(tool).toBeDefined();
       expect(tool.inputSchema).toBeDefined();
     });
 
-    it('should create an issue', async () => {
+    it("should create an issue", async () => {
       if (!utils) {
-        console.log('Skipping: utils not initialized (missing credentials)');
+        console.log("Skipping: utils not initialized (missing credentials)");
         return;
       }
       const issueData = MCPTestHelpers.createTestData.issue();
 
-      const response = await utils.callTool('manage_issues', {
-        action: 'create',
+      const response = await utils.callTool("manage_issues", {
+        action: "create",
         ...issueData,
       });
 
-      MCPTestHelpers.validateToolResponse(response, ['id', 'title', 'number']);
+      MCPTestHelpers.validateToolResponse(response, ["id", "title", "number"]);
       expect(response.title).toBe(issueData.title);
 
       createdIssueId = response.id;
       createdIssueNumber = response.number;
     });
 
-    it('should list issues', async () => {
+    it("should list issues", async () => {
       if (!utils) {
-        console.log('Skipping: utils not initialized (missing credentials)');
+        console.log("Skipping: utils not initialized (missing credentials)");
         return;
       }
-      const response = await utils.callTool('manage_issues', { action: 'list' });
+      const response = await utils.callTool("manage_issues", { action: "list" });
 
       expect(Array.isArray(response)).toBe(true);
       expect(response.length).toBeGreaterThan(0);
       // With orderBy DESC, the just-created issue should be in the first page
       if (createdIssueNumber) {
-        const found = response.some((i: Record<string, unknown>) => i.number === createdIssueNumber);
+        const found = response.some(
+          (i: Record<string, unknown>) => i.number === createdIssueNumber
+        );
         expect(found).toBe(true);
       }
     });
 
-    it('should get a specific issue', async () => {
+    it("should get a specific issue", async () => {
       if (!utils) {
-        console.log('Skipping: utils not initialized (missing credentials)');
+        console.log("Skipping: utils not initialized (missing credentials)");
         return;
       }
       if (!createdIssueId) {
-        console.log('Skipping: No issue created to test with');
+        console.log("Skipping: No issue created to test with");
         return;
       }
       // Pass node ID directly — findById now handles both node IDs and numbers
-      const response = await utils.callTool('manage_issues', {
-        action: 'get',
+      const response = await utils.callTool("manage_issues", {
+        action: "get",
         issueId: createdIssueId,
       });
 
-      MCPTestHelpers.validateToolResponse(response, ['id', 'title', 'number']);
+      MCPTestHelpers.validateToolResponse(response, ["id", "title", "number"]);
     });
 
-    it('should update an issue', async () => {
+    it("should update an issue", async () => {
       if (!utils) {
-        console.log('Skipping: utils not initialized (missing credentials)');
+        console.log("Skipping: utils not initialized (missing credentials)");
         return;
       }
       if (!createdIssueId) {
-        console.log('Skipping: No issue created to test with');
+        console.log("Skipping: No issue created to test with");
         return;
       }
       // update uses GraphQL mutation which needs the node ID, not the number
-      const response = await utils.callTool('manage_issues', {
-        action: 'update',
+      const response = await utils.callTool("manage_issues", {
+        action: "update",
         issueId: createdIssueId,
-        title: 'Updated Test Issue',
-        description: 'Updated issue description',
+        title: "Updated Test Issue",
+        description: "Updated issue description",
       });
 
-      MCPTestHelpers.validateToolResponse(response, ['id', 'title']);
-      expect(response.title).toBe('Updated Test Issue');
+      MCPTestHelpers.validateToolResponse(response, ["id", "title"]);
+      expect(response.title).toBe("Updated Test Issue");
     });
   });
 
-  describe('Sprint Tools', () => {
-    it('should list sprint tools', async () => {
+  describe("Sprint Tools", () => {
+    it("should list sprint tools", async () => {
       if (!utils) {
-        console.log('Skipping: utils not initialized (missing credentials)');
+        console.log("Skipping: utils not initialized (missing credentials)");
         return;
       }
       const tools = await utils.listTools();
 
-      const tool = tools.find(t => t.name === 'manage_sprints');
+      const tool = tools.find((t) => t.name === "manage_sprints");
       expect(tool).toBeDefined();
       expect(tool.inputSchema).toBeDefined();
     });
 
-    it('should create a sprint', async () => {
+    it("should create a sprint", async () => {
       if (!utils) {
-        console.log('Skipping: utils not initialized (missing credentials)');
+        console.log("Skipping: utils not initialized (missing credentials)");
         return;
       }
       const sprintData = MCPTestHelpers.createTestData.sprint();
 
-      const response = await utils.callTool('manage_sprints', {
-        action: 'create',
+      const response = await utils.callTool("manage_sprints", {
+        action: "create",
         ...sprintData,
         projectId: createdProjectId,
       });
 
-      MCPTestHelpers.validateToolResponse(response, ['id', 'title']);
+      MCPTestHelpers.validateToolResponse(response, ["id", "title"]);
       expect(response.title).toBe(sprintData.title);
 
       createdSprintId = response.id;
     });
 
-    it('should list sprints', async () => {
+    it("should list sprints", async () => {
       if (!utils) {
-        console.log('Skipping: utils not initialized (missing credentials)');
+        console.log("Skipping: utils not initialized (missing credentials)");
         return;
       }
-      const response = await utils.callTool('manage_sprints', { action: 'list' });
+      const response = await utils.callTool("manage_sprints", { action: "list" });
 
       expect(Array.isArray(response)).toBe(true);
     });
 
-    it('should add issues to sprint', async () => {
+    it("should add issues to sprint", async () => {
       if (!utils) {
-        console.log('Skipping: utils not initialized (missing credentials)');
+        console.log("Skipping: utils not initialized (missing credentials)");
         return;
       }
       if (!createdSprintId || !createdIssueId) {
-        console.log('Skipping: No sprint or issue created to test with');
+        console.log("Skipping: No sprint or issue created to test with");
         return;
       }
 
-      const response = await utils.callTool('manage_sprints', {
-        action: 'add_issues',
+      const response = await utils.callTool("manage_sprints", {
+        action: "add_issues",
         sprintId: createdSprintId,
         issueIds: [createdIssueId],
       });
@@ -372,10 +380,10 @@ describe('GitHub Project Management Tools E2E', () => {
     });
   });
 
-  describe('Roadmap and Planning Tools', () => {
-    it('should list roadmap tools', async () => {
+  describe("Roadmap and Planning Tools", () => {
+    it("should list roadmap tools", async () => {
       if (!utils) {
-        console.log('Skipping: utils not initialized (missing credentials)');
+        console.log("Skipping: utils not initialized (missing credentials)");
         return;
       }
       const tools = await utils.listTools();
@@ -384,25 +392,25 @@ describe('GitHub Project Management Tools E2E', () => {
       // - manage_milestones: get_metrics, get_overdue, get_upcoming
       // - manage_sprints: plan, get_metrics
       // - ai_plan: generate_roadmap
-      const roadmapCompoundTools = ['manage_milestones', 'manage_sprints', 'ai_plan'];
+      const roadmapCompoundTools = ["manage_milestones", "manage_sprints", "ai_plan"];
 
       for (const toolName of roadmapCompoundTools) {
-        const tool = tools.find(t => t.name === toolName);
+        const tool = tools.find((t) => t.name === toolName);
         expect(tool).toBeDefined();
         expect(tool.inputSchema).toBeDefined();
       }
     });
 
-    it('should create a roadmap', async () => {
+    it("should create a roadmap", async () => {
       if (!utils) {
-        console.log('Skipping: utils not initialized (missing credentials)');
+        console.log("Skipping: utils not initialized (missing credentials)");
         return;
       }
-      const response = await utils.callTool('ai_plan', {
-        action: 'generate_roadmap',
-        requirements: 'Create initial project structure and setup development environment',
+      const response = await utils.callTool("ai_plan", {
+        action: "generate_roadmap",
+        requirements: "Create initial project structure and setup development environment",
         constraints: {
-          timeline: '3 months',
+          timeline: "3 months",
           teamSize: 2,
           sprintDurationWeeks: 2,
         },
@@ -414,31 +422,36 @@ describe('GitHub Project Management Tools E2E', () => {
       expect(response.title || response.phases || response.milestones).toBeDefined();
     });
 
-    it('should get milestone metrics', async () => {
+    it("should get milestone metrics", async () => {
       if (!utils) {
-        console.log('Skipping: utils not initialized (missing credentials)');
+        console.log("Skipping: utils not initialized (missing credentials)");
         return;
       }
       if (!createdMilestoneId) {
-        console.log('Skipping: No milestone created to test with');
+        console.log("Skipping: No milestone created to test with");
         return;
       }
 
-      const response = await utils.callTool('manage_milestones', {
-        action: 'get_metrics',
+      const response = await utils.callTool("manage_milestones", {
+        action: "get_metrics",
         milestoneId: String(createdMilestoneNumber),
       });
 
-      MCPTestHelpers.validateToolResponse(response, ['id', 'title', 'totalIssues', 'completionPercentage']);
+      MCPTestHelpers.validateToolResponse(response, [
+        "id",
+        "title",
+        "totalIssues",
+        "completionPercentage",
+      ]);
     });
 
-    it('should get upcoming milestones', async () => {
+    it("should get upcoming milestones", async () => {
       if (!utils) {
-        console.log('Skipping: utils not initialized (missing credentials)');
+        console.log("Skipping: utils not initialized (missing credentials)");
         return;
       }
-      const response = await utils.callTool('manage_milestones', {
-        action: 'get_upcoming',
+      const response = await utils.callTool("manage_milestones", {
+        action: "get_upcoming",
         daysAhead: 90,
         limit: 10,
         includeIssues: false,
@@ -448,43 +461,43 @@ describe('GitHub Project Management Tools E2E', () => {
     });
   });
 
-  describe('Label Tools', () => {
-    it('should list label tools', async () => {
+  describe("Label Tools", () => {
+    it("should list label tools", async () => {
       if (!utils) {
-        console.log('Skipping: utils not initialized (missing credentials)');
+        console.log("Skipping: utils not initialized (missing credentials)");
         return;
       }
       const tools = await utils.listTools();
 
-      const tool = tools.find(t => t.name === 'manage_labels');
+      const tool = tools.find((t) => t.name === "manage_labels");
       expect(tool).toBeDefined();
       expect(tool.inputSchema).toBeDefined();
     });
 
-    it('should create a label', async () => {
+    it("should create a label", async () => {
       if (!utils) {
-        console.log('Skipping: utils not initialized (missing credentials)');
+        console.log("Skipping: utils not initialized (missing credentials)");
         return;
       }
       // Random suffix avoids already_exists from leftover labels in the test repo
       const labelName = `e2e-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
-      const response = await utils.callTool('manage_labels', {
-        action: 'create',
+      const response = await utils.callTool("manage_labels", {
+        action: "create",
         name: labelName,
-        color: 'ff0000',
-        description: 'E2E test label',
+        color: "ff0000",
+        description: "E2E test label",
       });
 
-      MCPTestHelpers.validateToolResponse(response, ['name', 'color']);
+      MCPTestHelpers.validateToolResponse(response, ["name", "color"]);
       expect(response.name).toBe(labelName);
     });
 
-    it('should list labels', async () => {
+    it("should list labels", async () => {
       if (!utils) {
-        console.log('Skipping: utils not initialized (missing credentials)');
+        console.log("Skipping: utils not initialized (missing credentials)");
         return;
       }
-      const response = await utils.callTool('manage_labels', { action: 'list' });
+      const response = await utils.callTool("manage_labels", { action: "list" });
 
       expect(Array.isArray(response)).toBe(true);
     });

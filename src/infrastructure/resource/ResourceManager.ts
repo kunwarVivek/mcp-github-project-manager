@@ -1,5 +1,5 @@
-import { EventEmitter } from 'node:events';
-import { v4 as uuidv4 } from 'uuid';
+import { EventEmitter } from "node:events";
+import { v4 as uuidv4 } from "uuid";
 import {
   type Resource,
   type ResourceType,
@@ -12,12 +12,9 @@ import {
   type ResourceCacheOptions,
   type ResourceUpdateOptions,
   type RelationshipType,
-} from '../../domain/resource-types';
-import type { ResourceCache } from '../cache/ResourceCache';
-import {
-  validateResourceByType,
-  resourceSchemas
-} from '../../domain/resource-schemas';
+} from "../../domain/resource-types";
+import type { ResourceCache } from "../cache/ResourceCache";
+import { validateResourceByType, resourceSchemas } from "../../domain/resource-schemas";
 
 export class ResourceManager extends EventEmitter {
   constructor(private cache: ResourceCache) {
@@ -64,7 +61,7 @@ export class ResourceManager extends EventEmitter {
 
     await this.cache.set(resource.type, resource.id, resource, options?.cacheOptions);
 
-    this.emit('resource', {
+    this.emit("resource", {
       type: ResourceEventType.CREATED,
       resourceId: resource.id,
       resourceType: resource.type,
@@ -75,10 +72,7 @@ export class ResourceManager extends EventEmitter {
     return resource;
   }
 
-  async get<T extends Resource>(
-    type: ResourceType,
-    id: string
-  ): Promise<T> {
+  async get<T extends Resource>(type: ResourceType, id: string): Promise<T> {
     const resource = await this.cache.get<T>(type, id);
 
     if (!resource) {
@@ -105,18 +99,15 @@ export class ResourceManager extends EventEmitter {
     const resources = await this.cache.getByType<T>(type);
 
     return resources.filter(
-      resource =>
+      (resource) =>
         (options?.status === undefined || resource.status === options.status) &&
         (options?.filter === undefined || options.filter(resource))
     );
   }
 
-  async getByIds<T extends Resource>(
-    type: ResourceType,
-    ids: string[]
-  ): Promise<T[]> {
+  async getByIds<T extends Resource>(type: ResourceType, ids: string[]): Promise<T[]> {
     const resources = await Promise.all(
-      ids.map(async id => {
+      ids.map(async (id) => {
         try {
           return await this.get<T>(type, id);
         } catch (e) {
@@ -129,8 +120,8 @@ export class ResourceManager extends EventEmitter {
     );
 
     // Fix the type predicate issue
-    return resources.filter((resource): resource is Awaited<T> =>
-      resource !== null
+    return resources.filter(
+      (resource): resource is Awaited<T> => resource !== null
     ) as unknown as T[];
   }
 
@@ -175,7 +166,10 @@ export class ResourceManager extends EventEmitter {
     }
 
     // Check for optimistic locking
-    if (options?.updateOptions?.optimisticLock && options.updateOptions.expectedVersion !== undefined) {
+    if (
+      options?.updateOptions?.optimisticLock &&
+      options.updateOptions.expectedVersion !== undefined
+    ) {
       if (currentVersion !== options.updateOptions.expectedVersion) {
         throw new ResourceVersionError(
           type,
@@ -188,7 +182,7 @@ export class ResourceManager extends EventEmitter {
 
     await this.cache.set(type, id, updated, options?.cacheOptions);
 
-    this.emit('resource', {
+    this.emit("resource", {
       type: ResourceEventType.UPDATED,
       resourceId: updated.id,
       resourceType: updated.type,
@@ -216,7 +210,7 @@ export class ResourceManager extends EventEmitter {
 
     await this.cache.set(type, id, updated);
 
-    this.emit('resource', {
+    this.emit("resource", {
       type: ResourceEventType.DELETED,
       resourceId: id,
       resourceType: type,
@@ -241,7 +235,7 @@ export class ResourceManager extends EventEmitter {
 
     await this.cache.set(type, id, updated);
 
-    this.emit('resource', {
+    this.emit("resource", {
       type: ResourceEventType.ARCHIVED,
       resourceId: id,
       resourceType: type,
@@ -264,7 +258,7 @@ export class ResourceManager extends EventEmitter {
 
     await this.cache.set(type, id, updated);
 
-    this.emit('resource', {
+    this.emit("resource", {
       type: ResourceEventType.RESTORED,
       resourceId: id,
       resourceType: type,
@@ -285,13 +279,9 @@ export class ResourceManager extends EventEmitter {
     await this.get(targetType, targetId);
 
     // Store the relationship
-    await this.cache.setRelationship(
-      sourceId,
-      relationshipType,
-      targetId
-    );
+    await this.cache.setRelationship(sourceId, relationshipType, targetId);
 
-    this.emit('resource', {
+    this.emit("resource", {
       type: ResourceEventType.RELATIONSHIP_CREATED,
       resourceId: sourceId,
       resourceType: sourceType,
@@ -332,7 +322,7 @@ export class ResourceManager extends EventEmitter {
     // Remove the relationship
     await this.cache.removeRelationship(sourceId, relationshipType, targetId);
 
-    this.emit('resource', {
+    this.emit("resource", {
       type: ResourceEventType.RELATIONSHIP_REMOVED,
       resourceId: sourceId,
       resourceType: sourceType,
@@ -345,19 +335,13 @@ export class ResourceManager extends EventEmitter {
     });
   }
 
-  private validateResource(
-    data: any,
-    rules: ResourceValidationRule[]
-  ): void {
+  private validateResource(data: any, rules: ResourceValidationRule[]): void {
     const errors = rules
-      .filter(rule => !rule.validate(data))
-      .map(rule => rule.getErrorMessage(data));
+      .filter((rule) => !rule.validate(data))
+      .map((rule) => rule.getErrorMessage(data));
 
     if (errors.length > 0) {
-      throw new ResourceValidationError(
-        data.type,
-        `Validation failed: ${errors.join(', ')}`
-      );
+      throw new ResourceValidationError(data.type, `Validation failed: ${errors.join(", ")}`);
     }
   }
 

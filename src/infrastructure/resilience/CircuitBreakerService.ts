@@ -16,7 +16,7 @@ import {
   handleAll,
   CircuitState,
   type CircuitBreakerPolicy,
-} from 'cockatiel';
+} from "cockatiel";
 
 /**
  * Configuration options for the circuit breaker
@@ -38,7 +38,7 @@ export interface CircuitBreakerConfig {
 /**
  * Circuit breaker state type
  */
-export type CircuitBreakerState = 'closed' | 'open' | 'half-open';
+export type CircuitBreakerState = "closed" | "open" | "half-open";
 
 /**
  * CircuitBreakerService wraps Cockatiel's circuit breaker with state tracking
@@ -46,7 +46,7 @@ export type CircuitBreakerState = 'closed' | 'open' | 'half-open';
  */
 export class CircuitBreakerService {
   private readonly circuitBreaker: CircuitBreakerPolicy;
-  private currentState: CircuitBreakerState = 'closed';
+  private currentState: CircuitBreakerState = "closed";
   private readonly name: string;
 
   /**
@@ -69,9 +69,7 @@ export class CircuitBreakerService {
     // Track state changes for observability
     this.circuitBreaker.onStateChange((state: CircuitState) => {
       this.currentState = this.mapCircuitState(state);
-      process.stderr.write(
-        `[CircuitBreaker:${this.name}] State: ${this.currentState}\n`
-      );
+      process.stderr.write(`[CircuitBreaker:${this.name}] State: ${this.currentState}\n`);
     });
   }
 
@@ -105,7 +103,7 @@ export class CircuitBreakerService {
    * @returns true if the circuit is open
    */
   isOpen(): boolean {
-    return this.currentState === 'open';
+    return this.currentState === "open";
   }
 
   /**
@@ -114,13 +112,13 @@ export class CircuitBreakerService {
   private mapCircuitState(state: CircuitState): CircuitBreakerState {
     switch (state) {
       case CircuitState.Closed:
-        return 'closed';
+        return "closed";
       case CircuitState.Open:
-        return 'open';
+        return "open";
       case CircuitState.HalfOpen:
-        return 'half-open';
+        return "half-open";
       default:
-        return 'closed';
+        return "closed";
     }
   }
 }

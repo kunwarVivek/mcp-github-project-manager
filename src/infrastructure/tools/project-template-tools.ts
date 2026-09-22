@@ -318,7 +318,8 @@ export const listOrganizationTemplatesTool: ToolDefinition<
   title: "List Organization Templates",
   description:
     "Lists all project templates in an organization. Returns templates with their metadata, including title, description, and URLs.",
-  schema: ListOrganizationTemplatesInputSchema as unknown as ToolSchema<ListOrganizationTemplatesInput>,
+  schema:
+    ListOrganizationTemplatesInputSchema as unknown as ToolSchema<ListOrganizationTemplatesInput>,
   outputSchema: TemplateListOutputSchema,
   annotations: ANNOTATION_PATTERNS.readOnly,
   examples: [
@@ -355,9 +356,7 @@ export const listOrganizationTemplatesTool: ToolDefinition<
  * @returns The marked template project
  * @throws Error if GITHUB_TOKEN is not set or API call fails
  */
-export async function executeMarkProjectAsTemplate(
-  args: MarkProjectAsTemplateInput
-): Promise<{
+export async function executeMarkProjectAsTemplate(args: MarkProjectAsTemplateInput): Promise<{
   content: Array<{ type: "text"; text: string }>;
   structuredContent: TemplateProjectOutput;
 }> {
@@ -401,9 +400,7 @@ export async function executeMarkProjectAsTemplate(
  * @returns The unmarked project
  * @throws Error if GITHUB_TOKEN is not set or API call fails
  */
-export async function executeUnmarkProjectAsTemplate(
-  args: UnmarkProjectAsTemplateInput
-): Promise<{
+export async function executeUnmarkProjectAsTemplate(args: UnmarkProjectAsTemplateInput): Promise<{
   content: Array<{ type: "text"; text: string }>;
   structuredContent: TemplateProjectOutput;
 }> {
@@ -447,9 +444,7 @@ export async function executeUnmarkProjectAsTemplate(
  * @returns The newly created project
  * @throws Error if GITHUB_TOKEN is not set or API call fails
  */
-export async function executeCopyProjectFromTemplate(
-  args: CopyProjectFromTemplateInput
-): Promise<{
+export async function executeCopyProjectFromTemplate(args: CopyProjectFromTemplateInput): Promise<{
   content: Array<{ type: "text"; text: string }>;
   structuredContent: CopiedProjectOutput;
 }> {
@@ -458,17 +453,14 @@ export async function executeCopyProjectFromTemplate(
   // Resolve the target owner (organization login) to its node ID
   const ownerId = await resolveOrganizationId(factory, args.targetOwner);
 
-  const response = await factory.graphql<CopyProjectV2Response>(
-    COPY_PROJECT_V2_MUTATION,
-    {
-      input: {
-        projectId: args.projectId,
-        ownerId: ownerId,
-        title: args.title,
-        includeDraftIssues: args.includeDraftIssues ?? false,
-      },
-    }
-  );
+  const response = await factory.graphql<CopyProjectV2Response>(COPY_PROJECT_V2_MUTATION, {
+    input: {
+      projectId: args.projectId,
+      ownerId: ownerId,
+      title: args.title,
+      includeDraftIssues: args.includeDraftIssues ?? false,
+    },
+  });
 
   const project = response.copyProjectV2.projectV2;
 

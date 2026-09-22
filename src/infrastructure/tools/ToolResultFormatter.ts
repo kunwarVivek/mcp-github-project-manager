@@ -67,27 +67,30 @@ export class ToolResultFormatter {
     // Handle different types of results
     if (Array.isArray(result)) {
       // Format array results as a table if possible
-      if (result.length > 0 && typeof result[0] === 'object') {
+      if (result.length > 0 && typeof result[0] === "object") {
         markdown += MCPResponseFormatter.formatAsMarkdownTable(result);
       } else {
         // Simple list for arrays of primitives
-        markdown += result.map(item => `- ${JSON.stringify(item)}`).join('\n');
+        markdown += result.map((item) => `- ${JSON.stringify(item)}`).join("\n");
       }
-    } else if (result && typeof result === 'object') {
+    } else if (result && typeof result === "object") {
       // Format key properties as headers with details
-      markdown += Object.entries(result).map(([key, value]) => {
-        const formattedKey = key.charAt(0).toUpperCase() + key.slice(1).replace(/([A-Z])/g, ' $1');
+      markdown += Object.entries(result)
+        .map(([key, value]) => {
+          const formattedKey =
+            key.charAt(0).toUpperCase() + key.slice(1).replace(/([A-Z])/g, " $1");
 
-        if (Array.isArray(value)) {
-          // Format arrays as lists
-          return `## ${formattedKey}\n${value.map(item => `- ${JSON.stringify(item)}`).join('\n')}`;
-        } else if (value && typeof value === 'object') {
-          // Format objects with nested details
-          return `## ${formattedKey}\n\`\`\`json\n${JSON.stringify(value)}\n\`\`\``;
-        } else {
-          return `## ${formattedKey}\n${value}`;
-        }
-      }).join('\n\n');
+          if (Array.isArray(value)) {
+            // Format arrays as lists
+            return `## ${formattedKey}\n${value.map((item) => `- ${JSON.stringify(item)}`).join("\n")}`;
+          } else if (value && typeof value === "object") {
+            // Format objects with nested details
+            return `## ${formattedKey}\n\`\`\`json\n${JSON.stringify(value)}\n\`\`\``;
+          } else {
+            return `## ${formattedKey}\n${value}`;
+          }
+        })
+        .join("\n\n");
     } else {
       // Simple value
       markdown += String(result);
@@ -99,15 +102,11 @@ export class ToolResultFormatter {
     }
 
     // Create MCP response with markdown content
-    return MCPResponseFormatter.format(
-      markdown,
-      MCPContentType.MARKDOWN,
-      {
-        tool: toolName,
-        timestamp: new Date().toISOString(),
-        requestId: options.requestId,
-      }
-    );
+    return MCPResponseFormatter.format(markdown, MCPContentType.MARKDOWN, {
+      tool: toolName,
+      timestamp: new Date().toISOString(),
+      requestId: options.requestId,
+    });
   }
 
   /**
@@ -127,22 +126,26 @@ export class ToolResultFormatter {
       `;
 
       if (Array.isArray(data)) {
-        if (data.length > 0 && typeof data[0] === 'object') {
+        if (data.length > 0 && typeof data[0] === "object") {
           // Table for array of objects
           const keys = Object.keys(data[0]);
           html += `
             <table class="tool-table">
               <thead>
                 <tr>
-                  ${keys.map(key => `<th>${key}</th>`).join('')}
+                  ${keys.map((key) => `<th>${key}</th>`).join("")}
                 </tr>
               </thead>
               <tbody>
-                ${data.map(item => `
+                ${data
+                  .map(
+                    (item) => `
                   <tr>
-                    ${keys.map(key => `<td>${JSON.stringify(item[key])}</td>`).join('')}
+                    ${keys.map((key) => `<td>${JSON.stringify(item[key])}</td>`).join("")}
                   </tr>
-                `).join('')}
+                `
+                  )
+                  .join("")}
               </tbody>
             </table>
           `;
@@ -150,17 +153,19 @@ export class ToolResultFormatter {
           // List for array of primitives
           html += `
             <ul class="tool-list">
-              ${data.map(item => `<li>${JSON.stringify(item)}</li>`).join('')}
+              ${data.map((item) => `<li>${JSON.stringify(item)}</li>`).join("")}
             </ul>
           `;
         }
-      } else if (data && typeof data === 'object') {
+      } else if (data && typeof data === "object") {
         // Format object properties
         html += `
           <div class="tool-object">
-            ${Object.entries(data).map(([key, value]) => {
-              const formattedKey = key.charAt(0).toUpperCase() + key.slice(1).replace(/([A-Z])/g, ' $1');
-              return `
+            ${Object.entries(data)
+              .map(([key, value]) => {
+                const formattedKey =
+                  key.charAt(0).toUpperCase() + key.slice(1).replace(/([A-Z])/g, " $1");
+                return `
                 <div class="tool-property">
                   <h2 class="tool-property-name">${formattedKey}</h2>
                   <div class="tool-property-value">
@@ -168,7 +173,8 @@ export class ToolResultFormatter {
                   </div>
                 </div>
               `;
-            }).join('')}
+              })
+              .join("")}
           </div>
         `;
       } else {
@@ -215,21 +221,17 @@ export class ToolResultFormatter {
     // Format as simple text representation
     let text = `${ToolResultFormatter.formatToolName(toolName)} Result:\n\n`;
 
-    if (typeof result === 'string') {
+    if (typeof result === "string") {
       text += result;
     } else {
       text += JSON.stringify(result);
     }
 
-    return MCPResponseFormatter.format(
-      text,
-      MCPContentType.TEXT,
-      {
-        tool: toolName,
-        timestamp: new Date().toISOString(),
-        requestId: options.requestId,
-      }
-    );
+    return MCPResponseFormatter.format(text, MCPContentType.TEXT, {
+      tool: toolName,
+      timestamp: new Date().toISOString(),
+      requestId: options.requestId,
+    });
   }
 
   /**
@@ -239,10 +241,10 @@ export class ToolResultFormatter {
     if (Array.isArray(value)) {
       return `
         <ul class="tool-list">
-          ${value.map(item => `<li>${JSON.stringify(item)}</li>`).join('')}
+          ${value.map((item) => `<li>${JSON.stringify(item)}</li>`).join("")}
         </ul>
       `;
-    } else if (value && typeof value === 'object') {
+    } else if (value && typeof value === "object") {
       return `<pre>${JSON.stringify(value, null, 2)}</pre>`;
     } else {
       return `<span>${value}</span>`;
@@ -254,8 +256,8 @@ export class ToolResultFormatter {
    */
   private static formatToolName(name: string): string {
     return name
-      .split('_')
-      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-      .join(' ');
+      .split("_")
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(" ");
   }
 }

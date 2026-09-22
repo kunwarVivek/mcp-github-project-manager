@@ -1,8 +1,13 @@
-import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest';;
-import { AgentReclaimScheduler, type AgentReclaimSchedulerConfig } from '../../../services/agent/AgentReclaimScheduler';
-import type { TaskCheckoutService } from '../../../services/agent/TaskCheckoutService';
+import { beforeEach, describe, expect, it, vi, type Mock } from "vitest";
+import {
+  AgentReclaimScheduler,
+  type AgentReclaimSchedulerConfig,
+} from "../../../services/agent/AgentReclaimScheduler";
+import type { TaskCheckoutService } from "../../../services/agent/TaskCheckoutService";
 
-function makeConfig(overrides: Partial<AgentReclaimSchedulerConfig> = {}): AgentReclaimSchedulerConfig {
+function makeConfig(
+  overrides: Partial<AgentReclaimSchedulerConfig> = {}
+): AgentReclaimSchedulerConfig {
   return {
     enabled: true,
     intervalMs: 300000,
@@ -11,7 +16,7 @@ function makeConfig(overrides: Partial<AgentReclaimSchedulerConfig> = {}): Agent
   };
 }
 
-describe('AgentReclaimScheduler', () => {
+describe("AgentReclaimScheduler", () => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let mockCheckout: { reclaimStaleTasks: Mock<any> };
   let scheduler: AgentReclaimScheduler;
@@ -32,11 +37,11 @@ describe('AgentReclaimScheduler', () => {
   function create(overrides: Partial<AgentReclaimSchedulerConfig> = {}): AgentReclaimScheduler {
     return new AgentReclaimScheduler(
       mockCheckout as unknown as TaskCheckoutService,
-      makeConfig(overrides),
+      makeConfig(overrides)
     );
   }
 
-  it('does not arm the interval when disabled', () => {
+  it("does not arm the interval when disabled", () => {
     scheduler = create({ enabled: false });
     scheduler.start();
 
@@ -45,7 +50,7 @@ describe('AgentReclaimScheduler', () => {
     expect(mockCheckout.reclaimStaleTasks).not.toHaveBeenCalled();
   });
 
-  it('does not arm the interval when intervalMs is non-positive', () => {
+  it("does not arm the interval when intervalMs is non-positive", () => {
     scheduler = create({ intervalMs: 0 });
     scheduler.start();
 
@@ -54,7 +59,7 @@ describe('AgentReclaimScheduler', () => {
     expect(mockCheckout.reclaimStaleTasks).not.toHaveBeenCalled();
   });
 
-  it('arms the interval and sweeps on each tick', async () => {
+  it("arms the interval and sweeps on each tick", async () => {
     scheduler = create({ intervalMs: 300000, staleAfterMinutes: 15 });
     scheduler.start();
 
@@ -68,7 +73,7 @@ describe('AgentReclaimScheduler', () => {
     expect(mockCheckout.reclaimStaleTasks).toHaveBeenCalledTimes(2);
   });
 
-  it('stop() disarms the interval', async () => {
+  it("stop() disarms the interval", async () => {
     scheduler = create({ intervalMs: 300000 });
     scheduler.start();
     scheduler.stop();
@@ -78,7 +83,7 @@ describe('AgentReclaimScheduler', () => {
     expect(mockCheckout.reclaimStaleTasks).not.toHaveBeenCalled();
   });
 
-  it('start() is idempotent while already running', () => {
+  it("start() is idempotent while already running", () => {
     scheduler = create({ intervalMs: 300000 });
     scheduler.start();
     const timer = (scheduler as unknown as { timer: NodeJS.Timeout }).timer;
@@ -86,10 +91,10 @@ describe('AgentReclaimScheduler', () => {
     expect((scheduler as unknown as { timer: NodeJS.Timeout }).timer).toBe(timer);
   });
 
-  it('runSweep() calls reclaimStaleTasks and reports the count', async () => {
+  it("runSweep() calls reclaimStaleTasks and reports the count", async () => {
     mockCheckout.reclaimStaleTasks.mockResolvedValue({
       reclaimed: 3,
-      details: [{ agentId: 'a1', taskId: '42' }],
+      details: [{ agentId: "a1", taskId: "42" }],
     });
     scheduler = create({ staleAfterMinutes: 20 });
 
@@ -99,10 +104,16 @@ describe('AgentReclaimScheduler', () => {
     expect(result.reclaimed).toBe(3);
   });
 
-  it('runSweep() is re-entrancy guarded (no overlapping sweeps)', async () => {
-    let resolveSweep: (v: { reclaimed: number; details: Array<{ agentId: string; taskId: string }> }) => void;
+  it("runSweep() is re-entrancy guarded (no overlapping sweeps)", async () => {
+    let resolveSweep: (v: {
+      reclaimed: number;
+      details: Array<{ agentId: string; taskId: string }>;
+    }) => void;
     mockCheckout.reclaimStaleTasks.mockImplementation(
-      () => new Promise(res => { resolveSweep = res; }),
+      () =>
+        new Promise((res) => {
+          resolveSweep = res;
+        })
     );
     scheduler = create();
 
@@ -112,18 +123,18 @@ describe('AgentReclaimScheduler', () => {
     expect(second.reclaimed).toBe(0);
     expect(mockCheckout.reclaimStaleTasks).toHaveBeenCalledTimes(1);
 
-    resolveSweep!({ reclaimed: 1, details: [{ agentId: 'a1', taskId: '7' }] });
+    resolveSweep!({ reclaimed: 1, details: [{ agentId: "a1", taskId: "7" }] });
     await expect(first).resolves.toEqual({ reclaimed: 1 });
   });
 
-  it('runSweep() never throws — a failed sweep is logged and returns 0', async () => {
-    mockCheckout.reclaimStaleTasks.mockRejectedValue(new Error('GitHub API down'));
+  it("runSweep() never throws — a failed sweep is logged and returns 0", async () => {
+    mockCheckout.reclaimStaleTasks.mockRejectedValue(new Error("GitHub API down"));
     scheduler = create();
 
     await expect(scheduler.runSweep()).resolves.toEqual({ reclaimed: 0 });
   });
 
-  it('runSweep() is a no-op when disabled', async () => {
+  it("runSweep() is a no-op when disabled", async () => {
     scheduler = create({ enabled: false });
     const result = await scheduler.runSweep();
 
@@ -131,9 +142,9 @@ describe('AgentReclaimScheduler', () => {
     expect(mockCheckout.reclaimStaleTasks).not.toHaveBeenCalled();
   });
 
-  it('aborts a hung sweep via the time budget and resets the guard', async () => {
+  it("aborts a hung sweep via the time budget and resets the guard", async () => {
     mockCheckout.reclaimStaleTasks.mockImplementation(
-      () => new Promise(() => {}), // never resolves
+      () => new Promise(() => {}) // never resolves
     );
     scheduler = create({ sweepTimeoutMs: 1000 });
 
@@ -146,9 +157,9 @@ describe('AgentReclaimScheduler', () => {
     await expect(scheduler.runSweep()).resolves.toEqual({ reclaimed: 1 });
   });
 
-  it('recovers after a failed sweep (next sweep still runs)', async () => {
+  it("recovers after a failed sweep (next sweep still runs)", async () => {
     mockCheckout.reclaimStaleTasks
-      .mockRejectedValueOnce(new Error('boom'))
+      .mockRejectedValueOnce(new Error("boom"))
       .mockResolvedValueOnce({ reclaimed: 2, details: [] });
     scheduler = create();
 

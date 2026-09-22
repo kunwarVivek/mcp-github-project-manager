@@ -16,8 +16,8 @@
  * ```
  */
 
-import { getCorrelationId, getTraceContext } from './CorrelationContext.js';
-import type { ILogger } from '../logger/index.js';
+import { getCorrelationId, getTraceContext } from "./CorrelationContext.js";
+import type { ILogger } from "../logger/index.js";
 
 /**
  * Structured log entry format
@@ -78,7 +78,7 @@ export class TracingLogger implements ILogger {
    * @param prefix - Optional prefix for log messages (e.g., service name)
    */
   constructor(prefix?: string) {
-    this.prefix = prefix ? `[${prefix}] ` : '';
+    this.prefix = prefix ? `[${prefix}] ` : "";
   }
 
   /**
@@ -88,7 +88,7 @@ export class TracingLogger implements ILogger {
    * @param args - Additional data to include in the log entry
    */
   debug(message: string, ...args: unknown[]): void {
-    this.write('debug', message, args);
+    this.write("debug", message, args);
   }
 
   /**
@@ -98,7 +98,7 @@ export class TracingLogger implements ILogger {
    * @param args - Additional data to include in the log entry
    */
   info(message: string, ...args: unknown[]): void {
-    this.write('info', message, args);
+    this.write("info", message, args);
   }
 
   /**
@@ -108,7 +108,7 @@ export class TracingLogger implements ILogger {
    * @param args - Additional data to include in the log entry
    */
   warn(message: string, ...args: unknown[]): void {
-    this.write('warn', message, args);
+    this.write("warn", message, args);
   }
 
   /**
@@ -118,7 +118,7 @@ export class TracingLogger implements ILogger {
    * @param args - Additional data to include in the log entry
    */
   error(message: string, ...args: unknown[]): void {
-    this.write('error', message, args);
+    this.write("error", message, args);
   }
 
   /**
@@ -133,7 +133,7 @@ export class TracingLogger implements ILogger {
    * Format a log entry as JSON string.
    */
   private formatEntry(level: string, message: string, args: unknown[]): string {
-    const correlationId = getCorrelationId() ?? 'no-trace';
+    const correlationId = getCorrelationId() ?? "no-trace";
     const traceContext = getTraceContext();
 
     const entry: LogEntry = {

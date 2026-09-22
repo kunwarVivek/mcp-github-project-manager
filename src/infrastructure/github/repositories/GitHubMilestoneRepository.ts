@@ -1,8 +1,14 @@
 import { BaseGitHubRepository } from "./BaseRepository";
-import type { Milestone, CreateMilestone, MilestoneRepository, MilestoneId, Issue } from "../../../domain/types";
+import type {
+  Milestone,
+  CreateMilestone,
+  MilestoneRepository,
+  MilestoneId,
+  Issue,
+} from "../../../domain/types";
 import { ResourceStatus } from "../../../domain/resource-types";
 import { GitHubIssueRepository } from "./GitHubIssueRepository";
-import { parseResourceStatus, toStatusString } from '../../../domain/utils/StatusParser';
+import { parseResourceStatus, toStatusString } from "../../../domain/utils/StatusParser";
 
 interface GitHubMilestone {
   id: string;
@@ -45,7 +51,7 @@ export class GitHubMilestoneRepository extends BaseGitHubRepository implements M
     this.factory = {
       createIssueRepository: () => {
         return new GitHubIssueRepository(octokit, config);
-      }
+      },
     };
   }
 
@@ -56,15 +62,17 @@ export class GitHubMilestoneRepository extends BaseGitHubRepository implements M
       title: githubMilestone.title,
       description: githubMilestone.description || "",
       dueDate: githubMilestone.dueOn || undefined,
-      status: parseResourceStatus(githubMilestone.state, 'githubMilestone'),
+      status: parseResourceStatus(githubMilestone.state, "githubMilestone"),
       progress: {
         percent: githubMilestone.progress?.completionPercentage || 0,
         complete: githubMilestone.progress?.closedIssues || 0,
-        total: (githubMilestone.progress?.openIssues || 0) + (githubMilestone.progress?.closedIssues || 0)
+        total:
+          (githubMilestone.progress?.openIssues || 0) +
+          (githubMilestone.progress?.closedIssues || 0),
       },
       createdAt: githubMilestone.createdAt,
       updatedAt: githubMilestone.updatedAt,
-      url: `https://github.com/${this.owner}/${this.repo}/milestone/${githubMilestone.number}`
+      url: `https://github.com/${this.owner}/${this.repo}/milestone/${githubMilestone.number}`,
     };
   }
 
@@ -75,29 +83,26 @@ export class GitHubMilestoneRepository extends BaseGitHubRepository implements M
       title: restMilestone.title,
       description: restMilestone.description || "",
       dueDate: restMilestone.due_on || undefined,
-      status: parseResourceStatus(restMilestone.state, 'githubMilestone'),
+      status: parseResourceStatus(restMilestone.state, "githubMilestone"),
       progress: {
         percent: 0, // REST API doesn't provide progress info
         complete: restMilestone.closed_issues || 0,
-        total: (restMilestone.open_issues || 0) + (restMilestone.closed_issues || 0)
+        total: (restMilestone.open_issues || 0) + (restMilestone.closed_issues || 0),
       },
       createdAt: restMilestone.created_at,
       updatedAt: restMilestone.updated_at,
-      url: `https://github.com/${this.owner}/${this.repo}/milestone/${restMilestone.number}`
+      url: `https://github.com/${this.owner}/${this.repo}/milestone/${restMilestone.number}`,
     };
   }
 
   async create(data: CreateMilestone): Promise<Milestone> {
     // Use REST API for milestone creation since GraphQL doesn't support it
-    const response = await this.rest(
-      (params) => this.octokit.rest.issues.createMilestone(params),
-      {
-        title: data.title,
-        description: data.description,
-        due_on: data.dueDate,
-        state: 'open'
-      }
-    );
+    const response = await this.rest((params) => this.octokit.rest.issues.createMilestone(params), {
+      title: data.title,
+      description: data.description,
+      due_on: data.dueDate,
+      state: "open",
+    });
 
     return this.mapRestMilestoneToMilestone(response);
   }
@@ -107,16 +112,13 @@ export class GitHubMilestoneRepository extends BaseGitHubRepository implements M
     // numeric string ("22") or a GraphQL node ID ("MI_kwDO...").
     const milestoneNumber = await this.resolveNumber(id);
 
-    const response = await this.rest(
-      (params) => this.octokit.rest.issues.updateMilestone(params),
-      {
-        milestone_number: milestoneNumber,
-        title: data.title,
-        description: data.description,
-        due_on: data.dueDate,
-        state: toStatusString(data.status || ResourceStatus.ACTIVE, 'githubMilestone'),
-      }
-    );
+    const response = await this.rest((params) => this.octokit.rest.issues.updateMilestone(params), {
+      milestone_number: milestoneNumber,
+      title: data.title,
+      description: data.description,
+      due_on: data.dueDate,
+      state: toStatusString(data.status || ResourceStatus.ACTIVE, "githubMilestone"),
+    });
 
     return this.mapRestMilestoneToMilestone(response);
   }
@@ -124,12 +126,9 @@ export class GitHubMilestoneRepository extends BaseGitHubRepository implements M
   async delete(id: MilestoneId): Promise<void> {
     const milestoneNumber = await this.resolveNumber(id);
 
-    await this.rest(
-      (params) => this.octokit.rest.issues.deleteMilestone(params),
-      {
-        milestone_number: milestoneNumber
-      }
-    );
+    await this.rest((params) => this.octokit.rest.issues.deleteMilestone(params), {
+      milestone_number: milestoneNumber,
+    });
   }
 
   /** Resolve any milestone ID format to its numeric milestone_number. */
@@ -201,7 +200,18 @@ export class GitHubMilestoneRepository extends BaseGitHubRepository implements M
       }
     `;
 
-    type NodeResponse = { node: { id: string; number: number; title: string; description: string; dueOn: string; state: string; createdAt: string; updatedAt: string } | null };
+    type NodeResponse = {
+      node: {
+        id: string;
+        number: number;
+        title: string;
+        description: string;
+        dueOn: string;
+        state: string;
+        createdAt: string;
+        updatedAt: string;
+      } | null;
+    };
     const response = await this.graphql<NodeResponse>(query, { id: nodeId });
     if (!response.node) return null;
 
@@ -233,14 +243,14 @@ export class GitHubMilestoneRepository extends BaseGitHubRepository implements M
       repo: this.repo,
     });
 
-    return response.repository.milestones.nodes.map(milestone => 
+    return response.repository.milestones.nodes.map((milestone) =>
       this.mapGitHubMilestoneToMilestone(milestone)
     );
   }
 
   async findByDueDate(before: Date): Promise<Milestone[]> {
     const all = await this.findAll();
-    return all.filter(milestone => {
+    return all.filter((milestone) => {
       if (!milestone.dueDate) return false;
       return new Date(milestone.dueDate) <= before;
     });

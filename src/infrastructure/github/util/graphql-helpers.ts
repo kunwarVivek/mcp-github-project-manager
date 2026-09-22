@@ -1,33 +1,33 @@
-import type { FieldType } from '../../../domain/types';
-import type { GraphQLFieldType } from '../graphql-types';
+import type { FieldType } from "../../../domain/types";
+import type { GraphQLFieldType } from "../graphql-types";
 
 /**
  * Maps a domain field type to a GraphQL field type
  */
 export function mapToGraphQLFieldType(fieldType: FieldType): string {
   switch (fieldType) {
-    case 'text':
-      return 'TEXT';
-    case 'number':
-      return 'NUMBER';
-    case 'date':
-      return 'DATE';
-    case 'single_select':
-      return 'SINGLE_SELECT';
-    case 'iteration':
-      return 'ITERATION';
-    case 'milestone':
-      return 'MILESTONE';
-    case 'assignees':
-      return 'ASSIGNEES';
-    case 'labels':
-      return 'LABELS';
-    case 'tracked_by':
-      return 'TRACKED_BY';
-    case 'repository':
-      return 'REPOSITORY';
+    case "text":
+      return "TEXT";
+    case "number":
+      return "NUMBER";
+    case "date":
+      return "DATE";
+    case "single_select":
+      return "SINGLE_SELECT";
+    case "iteration":
+      return "ITERATION";
+    case "milestone":
+      return "MILESTONE";
+    case "assignees":
+      return "ASSIGNEES";
+    case "labels":
+      return "LABELS";
+    case "tracked_by":
+      return "TRACKED_BY";
+    case "repository":
+      return "REPOSITORY";
     default:
-      return 'TEXT';
+      return "TEXT";
   }
 }
 
@@ -36,28 +36,28 @@ export function mapToGraphQLFieldType(fieldType: FieldType): string {
  */
 export function mapFromGraphQLFieldType(fieldType: GraphQLFieldType): FieldType {
   switch (fieldType) {
-    case 'TEXT':
-      return 'text';
-    case 'NUMBER':
-      return 'number';
-    case 'DATE':
-      return 'date';
-    case 'SINGLE_SELECT':
-      return 'single_select';
-    case 'ITERATION':
-      return 'iteration';
-    case 'MILESTONE':
-      return 'milestone';
-    case 'ASSIGNEES':
-      return 'assignees';
-    case 'LABELS':
-      return 'labels';
-    case 'TRACKED_BY':
-      return 'tracked_by';
-    case 'REPOSITORY':
-      return 'repository';
+    case "TEXT":
+      return "text";
+    case "NUMBER":
+      return "number";
+    case "DATE":
+      return "date";
+    case "SINGLE_SELECT":
+      return "single_select";
+    case "ITERATION":
+      return "iteration";
+    case "MILESTONE":
+      return "milestone";
+    case "ASSIGNEES":
+      return "assignees";
+    case "LABELS":
+      return "labels";
+    case "TRACKED_BY":
+      return "tracked_by";
+    case "REPOSITORY":
+      return "repository";
     default:
-      return 'text';
+      return "text";
   }
 }
 

@@ -1,4 +1,4 @@
-import { vi } from 'vitest';
+import { vi } from "vitest";
 /**
  * Unit tests for SprintRiskAssessor
  *
@@ -6,12 +6,12 @@ import { vi } from 'vitest';
  * and fallback behavior when AI is unavailable.
  */
 
-import { SprintRiskAssessor, } from '../../src/services/ai/SprintRiskAssessor';
-import { AIServiceFactory } from '../../src/services/ai/AIServiceFactory';
-import type { BacklogItem, SprintCapacity } from '../../src/domain/sprint-planning-types';
+import { SprintRiskAssessor } from "../../src/services/ai/SprintRiskAssessor";
+import { AIServiceFactory } from "../../src/services/ai/AIServiceFactory";
+import type { BacklogItem, SprintCapacity } from "../../src/domain/sprint-planning-types";
 
 // Mock AIServiceFactory
-vi.mock('../../src/services/ai/AIServiceFactory', () => {
+vi.mock("../../src/services/ai/AIServiceFactory", () => {
   const mockFactory = {
     getMainModel: vi.fn(),
     getFallbackModel: vi.fn(),
@@ -30,7 +30,7 @@ vi.mock('../../src/services/ai/AIServiceFactory', () => {
 const mockGetModel = vi.fn().mockReturnValue(null);
 const mockGetBestAvailableModel = vi.fn().mockReturnValue(null);
 
-describe('SprintRiskAssessor', () => {
+describe("SprintRiskAssessor", () => {
   let assessor: SprintRiskAssessor;
 
   beforeEach(() => {
@@ -38,307 +38,289 @@ describe('SprintRiskAssessor', () => {
     // Re-setup mock for each test
     (AIServiceFactory.getInstance as Mock).mockReturnValue({
       getModel: mockGetModel,
-      getBestAvailableModel: mockGetBestAvailableModel
+      getBestAvailableModel: mockGetBestAvailableModel,
     });
     assessor = new SprintRiskAssessor();
   });
 
-  describe('assessRisks', () => {
-    describe('capacity risks', () => {
-      it('should identify overcommitment risk', async () => {
+  describe("assessRisks", () => {
+    describe("capacity risks", () => {
+      it("should identify overcommitment risk", async () => {
         const result = await assessor.assessRisks({
           sprintItems: [
-            createBacklogItem({ id: '1', points: 15 }),
-            createBacklogItem({ id: '2', points: 15 })
+            createBacklogItem({ id: "1", points: 15 }),
+            createBacklogItem({ id: "2", points: 15 }),
           ],
-          sprintCapacity: createCapacity({ recommendedLoad: 20 })
+          sprintCapacity: createCapacity({ recommendedLoad: 20 }),
         });
 
-        const overcommitRisk = result.risks.find(r =>
-          r.category === 'capacity' && r.title.toLowerCase().includes('overcommit')
+        const overcommitRisk = result.risks.find(
+          (r) => r.category === "capacity" && r.title.toLowerCase().includes("overcommit")
         );
 
         expect(overcommitRisk).toBeDefined();
         expect(overcommitRisk!.probability).toMatch(/high|medium/);
       });
 
-      it('should identify low buffer risk', async () => {
+      it("should identify low buffer risk", async () => {
         // 95% utilization (19/20) triggers the > 0.9 && <= 1.0 check
         const result = await assessor.assessRisks({
-          sprintItems: [
-            createBacklogItem({ id: '1', points: 19 })
-          ],
-          sprintCapacity: createCapacity({ recommendedLoad: 20 })
+          sprintItems: [createBacklogItem({ id: "1", points: 19 })],
+          sprintCapacity: createCapacity({ recommendedLoad: 20 }),
         });
 
-        const bufferRisk = result.risks.find(r =>
-          r.category === 'capacity' && r.title.toLowerCase().includes('buffer')
+        const bufferRisk = result.risks.find(
+          (r) => r.category === "capacity" && r.title.toLowerCase().includes("buffer")
         );
 
         expect(bufferRisk).toBeDefined();
       });
 
-      it('should not flag capacity risk when well under capacity', async () => {
+      it("should not flag capacity risk when well under capacity", async () => {
         const result = await assessor.assessRisks({
-          sprintItems: [
-            createBacklogItem({ id: '1', points: 5 })
-          ],
-          sprintCapacity: createCapacity({ recommendedLoad: 20 })
+          sprintItems: [createBacklogItem({ id: "1", points: 5 })],
+          sprintCapacity: createCapacity({ recommendedLoad: 20 }),
         });
 
-        const overcommitRisk = result.risks.find(r =>
-          r.title.toLowerCase().includes('overcommit')
+        const overcommitRisk = result.risks.find((r) =>
+          r.title.toLowerCase().includes("overcommit")
         );
 
         expect(overcommitRisk).toBeUndefined();
       });
     });
 
-    describe('complexity risks', () => {
-      it('should identify high-complexity items', async () => {
+    describe("complexity risks", () => {
+      it("should identify high-complexity items", async () => {
         const result = await assessor.assessRisks({
           sprintItems: [
-            createBacklogItem({ id: '1', points: 13 }),
-            createBacklogItem({ id: '2', points: 8 })
+            createBacklogItem({ id: "1", points: 13 }),
+            createBacklogItem({ id: "2", points: 8 }),
           ],
-          sprintCapacity: createCapacity({ recommendedLoad: 30 })
+          sprintCapacity: createCapacity({ recommendedLoad: 30 }),
         });
 
-        const complexityRisk = result.risks.find(r =>
-          r.category === 'technical' && r.title.toLowerCase().includes('complex')
+        const complexityRisk = result.risks.find(
+          (r) => r.category === "technical" && r.title.toLowerCase().includes("complex")
         );
 
         expect(complexityRisk).toBeDefined();
-        expect(complexityRisk!.relatedItems).toContain('1');
+        expect(complexityRisk!.relatedItems).toContain("1");
       });
 
-      it('should not flag complexity risk for small items', async () => {
+      it("should not flag complexity risk for small items", async () => {
         const result = await assessor.assessRisks({
           sprintItems: [
-            createBacklogItem({ id: '1', points: 2 }),
-            createBacklogItem({ id: '2', points: 3 })
+            createBacklogItem({ id: "1", points: 2 }),
+            createBacklogItem({ id: "2", points: 3 }),
           ],
-          sprintCapacity: createCapacity({ recommendedLoad: 20 })
+          sprintCapacity: createCapacity({ recommendedLoad: 20 }),
         });
 
-        const complexityRisk = result.risks.find(r =>
-          r.title.toLowerCase().includes('complex')
-        );
+        const complexityRisk = result.risks.find((r) => r.title.toLowerCase().includes("complex"));
 
         expect(complexityRisk).toBeUndefined();
       });
     });
 
-    describe('dependency risks', () => {
-      it('should identify high dependency concentration', async () => {
+    describe("dependency risks", () => {
+      it("should identify high dependency concentration", async () => {
         const result = await assessor.assessRisks({
           sprintItems: [
-            createBacklogItem({ id: '1', dependencies: [] }),
-            createBacklogItem({ id: '2', dependencies: ['1'] }),
-            createBacklogItem({ id: '3', dependencies: ['1', '2'] }),
-            createBacklogItem({ id: '4', dependencies: ['2'] })
+            createBacklogItem({ id: "1", dependencies: [] }),
+            createBacklogItem({ id: "2", dependencies: ["1"] }),
+            createBacklogItem({ id: "3", dependencies: ["1", "2"] }),
+            createBacklogItem({ id: "4", dependencies: ["2"] }),
           ],
-          sprintCapacity: createCapacity({ recommendedLoad: 20 })
+          sprintCapacity: createCapacity({ recommendedLoad: 20 }),
         });
 
-        const depRisk = result.risks.find(r =>
-          r.category === 'dependency'
-        );
+        const depRisk = result.risks.find((r) => r.category === "dependency");
 
         expect(depRisk).toBeDefined();
       });
     });
 
-    describe('scope risks', () => {
-      it('should identify unclear item definitions', async () => {
+    describe("scope risks", () => {
+      it("should identify unclear item definitions", async () => {
         const result = await assessor.assessRisks({
           sprintItems: [
-            createBacklogItem({ id: '1', description: '' }),
-            createBacklogItem({ id: '2', description: 'Short' }),
-            createBacklogItem({ id: '3', description: '' })
+            createBacklogItem({ id: "1", description: "" }),
+            createBacklogItem({ id: "2", description: "Short" }),
+            createBacklogItem({ id: "3", description: "" }),
           ],
-          sprintCapacity: createCapacity({ recommendedLoad: 20 })
+          sprintCapacity: createCapacity({ recommendedLoad: 20 }),
         });
 
-        const scopeRisk = result.risks.find(r =>
-          r.category === 'scope' && r.title.toLowerCase().includes('unclear')
+        const scopeRisk = result.risks.find(
+          (r) => r.category === "scope" && r.title.toLowerCase().includes("unclear")
         );
 
         expect(scopeRisk).toBeDefined();
       });
 
-      it('should not flag scope risk for well-defined items', async () => {
+      it("should not flag scope risk for well-defined items", async () => {
         const result = await assessor.assessRisks({
           sprintItems: [
             createBacklogItem({
-              id: '1',
-              description: 'A very detailed description that explains what this task is about, the acceptance criteria, and edge cases to consider. This provides good clarity for the team.'
-            })
+              id: "1",
+              description:
+                "A very detailed description that explains what this task is about, the acceptance criteria, and edge cases to consider. This provides good clarity for the team.",
+            }),
           ],
-          sprintCapacity: createCapacity({ recommendedLoad: 20 })
+          sprintCapacity: createCapacity({ recommendedLoad: 20 }),
         });
 
-        const scopeRisk = result.risks.find(r =>
-          r.category === 'scope' && r.title.toLowerCase().includes('unclear')
+        const scopeRisk = result.risks.find(
+          (r) => r.category === "scope" && r.title.toLowerCase().includes("unclear")
         );
 
         expect(scopeRisk).toBeUndefined();
       });
     });
 
-    describe('overall risk assessment', () => {
-      it('should calculate overall risk level', async () => {
+    describe("overall risk assessment", () => {
+      it("should calculate overall risk level", async () => {
         const result = await assessor.assessRisks({
-          sprintItems: [
-            createBacklogItem({ id: '1', points: 5 })
-          ],
-          sprintCapacity: createCapacity({ recommendedLoad: 20 })
+          sprintItems: [createBacklogItem({ id: "1", points: 5 })],
+          sprintCapacity: createCapacity({ recommendedLoad: 20 }),
         });
 
-        expect(['high', 'medium', 'low']).toContain(result.overallRisk);
+        expect(["high", "medium", "low"]).toContain(result.overallRisk);
       });
 
-      it('should calculate risk score 0-100', async () => {
+      it("should calculate risk score 0-100", async () => {
         const result = await assessor.assessRisks({
-          sprintItems: [createBacklogItem({ id: '1' })],
-          sprintCapacity: createCapacity({ recommendedLoad: 20 })
+          sprintItems: [createBacklogItem({ id: "1" })],
+          sprintCapacity: createCapacity({ recommendedLoad: 20 }),
         });
 
         expect(result.riskScore).toBeGreaterThanOrEqual(0);
         expect(result.riskScore).toBeLessThanOrEqual(100);
       });
 
-      it('should have higher risk for overcommitted sprints', async () => {
+      it("should have higher risk for overcommitted sprints", async () => {
         const safeResult = await assessor.assessRisks({
-          sprintItems: [createBacklogItem({ id: '1', points: 5 })],
-          sprintCapacity: createCapacity({ recommendedLoad: 20 })
+          sprintItems: [createBacklogItem({ id: "1", points: 5 })],
+          sprintCapacity: createCapacity({ recommendedLoad: 20 }),
         });
 
         const riskyResult = await assessor.assessRisks({
           sprintItems: [
-            createBacklogItem({ id: '1', points: 15 }),
-            createBacklogItem({ id: '2', points: 15 })
+            createBacklogItem({ id: "1", points: 15 }),
+            createBacklogItem({ id: "2", points: 15 }),
           ],
-          sprintCapacity: createCapacity({ recommendedLoad: 20 })
+          sprintCapacity: createCapacity({ recommendedLoad: 20 }),
         });
 
         expect(riskyResult.riskScore).toBeGreaterThan(safeResult.riskScore);
       });
     });
 
-    describe('mitigations', () => {
-      it('should provide mitigations for identified risks', async () => {
+    describe("mitigations", () => {
+      it("should provide mitigations for identified risks", async () => {
         const result = await assessor.assessRisks({
           sprintItems: [
-            createBacklogItem({ id: '1', points: 30 }) // Over capacity
+            createBacklogItem({ id: "1", points: 30 }), // Over capacity
           ],
-          sprintCapacity: createCapacity({ recommendedLoad: 20 })
+          sprintCapacity: createCapacity({ recommendedLoad: 20 }),
         });
 
         expect(result.mitigations.length).toBeGreaterThan(0);
 
         const mitigation = result.mitigations[0];
-        expect(mitigation).toHaveProperty('riskId');
-        expect(mitigation).toHaveProperty('strategy');
-        expect(mitigation).toHaveProperty('action');
-        expect(mitigation).toHaveProperty('effort');
-        expect(mitigation).toHaveProperty('effectiveness');
+        expect(mitigation).toHaveProperty("riskId");
+        expect(mitigation).toHaveProperty("strategy");
+        expect(mitigation).toHaveProperty("action");
+        expect(mitigation).toHaveProperty("effort");
+        expect(mitigation).toHaveProperty("effectiveness");
       });
 
-      it('should have valid mitigation strategies', async () => {
+      it("should have valid mitigation strategies", async () => {
         const result = await assessor.assessRisks({
-          sprintItems: [
-            createBacklogItem({ id: '1', points: 30 })
-          ],
-          sprintCapacity: createCapacity({ recommendedLoad: 20 })
+          sprintItems: [createBacklogItem({ id: "1", points: 30 })],
+          sprintCapacity: createCapacity({ recommendedLoad: 20 }),
         });
 
-        result.mitigations.forEach(m => {
-          expect(['avoid', 'mitigate', 'transfer', 'accept']).toContain(m.strategy);
-        });
-      });
-
-      it('should have valid effort levels', async () => {
-        const result = await assessor.assessRisks({
-          sprintItems: [
-            createBacklogItem({ id: '1', points: 30 })
-          ],
-          sprintCapacity: createCapacity({ recommendedLoad: 20 })
-        });
-
-        result.mitigations.forEach(m => {
-          expect(['low', 'medium', 'high']).toContain(m.effort);
+        result.mitigations.forEach((m) => {
+          expect(["avoid", "mitigate", "transfer", "accept"]).toContain(m.strategy);
         });
       });
 
-      it('should have effectiveness in 0-1 range', async () => {
+      it("should have valid effort levels", async () => {
         const result = await assessor.assessRisks({
-          sprintItems: [
-            createBacklogItem({ id: '1', points: 30 })
-          ],
-          sprintCapacity: createCapacity({ recommendedLoad: 20 })
+          sprintItems: [createBacklogItem({ id: "1", points: 30 })],
+          sprintCapacity: createCapacity({ recommendedLoad: 20 }),
         });
 
-        result.mitigations.forEach(m => {
+        result.mitigations.forEach((m) => {
+          expect(["low", "medium", "high"]).toContain(m.effort);
+        });
+      });
+
+      it("should have effectiveness in 0-1 range", async () => {
+        const result = await assessor.assessRisks({
+          sprintItems: [createBacklogItem({ id: "1", points: 30 })],
+          sprintCapacity: createCapacity({ recommendedLoad: 20 }),
+        });
+
+        result.mitigations.forEach((m) => {
           expect(m.effectiveness).toBeGreaterThanOrEqual(0);
           expect(m.effectiveness).toBeLessThanOrEqual(1);
         });
       });
 
-      it('should link mitigations to risks', async () => {
+      it("should link mitigations to risks", async () => {
         const result = await assessor.assessRisks({
-          sprintItems: [
-            createBacklogItem({ id: '1', points: 30 })
-          ],
-          sprintCapacity: createCapacity({ recommendedLoad: 20 })
+          sprintItems: [createBacklogItem({ id: "1", points: 30 })],
+          sprintCapacity: createCapacity({ recommendedLoad: 20 }),
         });
 
-        result.mitigations.forEach(m => {
-          const relatedRisk = result.risks.find(r => r.id === m.riskId);
+        result.mitigations.forEach((m) => {
+          const relatedRisk = result.risks.find((r) => r.id === m.riskId);
           expect(relatedRisk).toBeDefined();
         });
       });
     });
 
-    describe('confidence scoring', () => {
-      it('should have valid confidence structure', async () => {
+    describe("confidence scoring", () => {
+      it("should have valid confidence structure", async () => {
         const result = await assessor.assessRisks({
-          sprintItems: [createBacklogItem({ id: '1' })],
-          sprintCapacity: createCapacity({ recommendedLoad: 20 })
+          sprintItems: [createBacklogItem({ id: "1" })],
+          sprintCapacity: createCapacity({ recommendedLoad: 20 }),
         });
 
-        expect(result.confidence).toHaveProperty('sectionId');
-        expect(result.confidence).toHaveProperty('score');
-        expect(result.confidence).toHaveProperty('tier');
-        expect(result.confidence).toHaveProperty('factors');
-        expect(result.confidence).toHaveProperty('reasoning');
+        expect(result.confidence).toHaveProperty("sectionId");
+        expect(result.confidence).toHaveProperty("score");
+        expect(result.confidence).toHaveProperty("tier");
+        expect(result.confidence).toHaveProperty("factors");
+        expect(result.confidence).toHaveProperty("reasoning");
       });
 
-      it('should indicate fallback mode when AI unavailable', async () => {
+      it("should indicate fallback mode when AI unavailable", async () => {
         const result = await assessor.assessRisks({
-          sprintItems: [createBacklogItem({ id: '1' })],
-          sprintCapacity: createCapacity({ recommendedLoad: 20 })
+          sprintItems: [createBacklogItem({ id: "1" })],
+          sprintCapacity: createCapacity({ recommendedLoad: 20 }),
         });
 
-        expect(result.confidence.reasoning?.toLowerCase()).toContain('algorithm');
+        expect(result.confidence.reasoning?.toLowerCase()).toContain("algorithm");
       });
 
-      it('should have higher confidence with good item descriptions', async () => {
+      it("should have higher confidence with good item descriptions", async () => {
         const goodDescResult = await assessor.assessRisks({
           sprintItems: [
             createBacklogItem({
-              id: '1',
-              description: 'A very detailed description that explains the task, provides context, lists acceptance criteria, and identifies potential edge cases.'
-            })
+              id: "1",
+              description:
+                "A very detailed description that explains the task, provides context, lists acceptance criteria, and identifies potential edge cases.",
+            }),
           ],
-          sprintCapacity: createCapacity({ recommendedLoad: 20 })
+          sprintCapacity: createCapacity({ recommendedLoad: 20 }),
         });
 
         const badDescResult = await assessor.assessRisks({
-          sprintItems: [
-            createBacklogItem({ id: '1', description: '' })
-          ],
-          sprintCapacity: createCapacity({ recommendedLoad: 20 })
+          sprintItems: [createBacklogItem({ id: "1", description: "" })],
+          sprintCapacity: createCapacity({ recommendedLoad: 20 }),
         });
 
         expect(goodDescResult.confidence.factors.inputCompleteness).toBeGreaterThan(
@@ -347,110 +329,104 @@ describe('SprintRiskAssessor', () => {
       });
     });
 
-    describe('edge cases', () => {
-      it('should handle empty sprint', async () => {
+    describe("edge cases", () => {
+      it("should handle empty sprint", async () => {
         const result = await assessor.assessRisks({
           sprintItems: [],
-          sprintCapacity: createCapacity({ recommendedLoad: 20 })
+          sprintCapacity: createCapacity({ recommendedLoad: 20 }),
         });
 
         expect(result.risks).toHaveLength(0);
-        expect(result.overallRisk).toBe('low');
+        expect(result.overallRisk).toBe("low");
         expect(result.riskScore).toBe(0);
       });
 
-      it('should handle single item', async () => {
+      it("should handle single item", async () => {
         const result = await assessor.assessRisks({
-          sprintItems: [createBacklogItem({ id: '1' })],
-          sprintCapacity: createCapacity({ recommendedLoad: 20 })
+          sprintItems: [createBacklogItem({ id: "1" })],
+          sprintCapacity: createCapacity({ recommendedLoad: 20 }),
         });
 
         expect(result.overallRisk).toBeDefined();
       });
 
-      it('should handle items without points', async () => {
+      it("should handle items without points", async () => {
         const result = await assessor.assessRisks({
-          sprintItems: [
-            createBacklogItem({ id: '1', points: undefined })
-          ],
-          sprintCapacity: createCapacity({ recommendedLoad: 20 })
+          sprintItems: [createBacklogItem({ id: "1", points: undefined })],
+          sprintCapacity: createCapacity({ recommendedLoad: 20 }),
         });
 
         expect(result.overallRisk).toBeDefined();
       });
 
-      it('should handle many items', async () => {
+      it("should handle many items", async () => {
         const items = Array.from({ length: 20 }, (_, i) =>
           createBacklogItem({ id: `${i + 1}`, points: 2 })
         );
 
         const result = await assessor.assessRisks({
           sprintItems: items,
-          sprintCapacity: createCapacity({ recommendedLoad: 50 })
+          sprintCapacity: createCapacity({ recommendedLoad: 50 }),
         });
 
         expect(result.risks.length).toBeGreaterThanOrEqual(0);
       });
     });
 
-    describe('risk structure', () => {
-      it('should have valid risk structure', async () => {
+    describe("risk structure", () => {
+      it("should have valid risk structure", async () => {
         const result = await assessor.assessRisks({
-          sprintItems: [
-            createBacklogItem({ id: '1', points: 30 })
-          ],
-          sprintCapacity: createCapacity({ recommendedLoad: 20 })
+          sprintItems: [createBacklogItem({ id: "1", points: 30 })],
+          sprintCapacity: createCapacity({ recommendedLoad: 20 }),
         });
 
         if (result.risks.length > 0) {
           const risk = result.risks[0];
-          expect(risk).toHaveProperty('id');
-          expect(risk).toHaveProperty('category');
-          expect(risk).toHaveProperty('title');
-          expect(risk).toHaveProperty('description');
-          expect(risk).toHaveProperty('probability');
-          expect(risk).toHaveProperty('impact');
-          expect(risk).toHaveProperty('relatedItems');
+          expect(risk).toHaveProperty("id");
+          expect(risk).toHaveProperty("category");
+          expect(risk).toHaveProperty("title");
+          expect(risk).toHaveProperty("description");
+          expect(risk).toHaveProperty("probability");
+          expect(risk).toHaveProperty("impact");
+          expect(risk).toHaveProperty("relatedItems");
         }
       });
 
-      it('should have valid risk categories', async () => {
+      it("should have valid risk categories", async () => {
         const result = await assessor.assessRisks({
           sprintItems: [
-            createBacklogItem({ id: '1', points: 30 }),
-            createBacklogItem({ id: '2', points: 13 })
+            createBacklogItem({ id: "1", points: 30 }),
+            createBacklogItem({ id: "2", points: 13 }),
           ],
-          sprintCapacity: createCapacity({ recommendedLoad: 20 })
+          sprintCapacity: createCapacity({ recommendedLoad: 20 }),
         });
 
-        result.risks.forEach(risk => {
-          expect(['scope', 'dependency', 'capacity', 'technical', 'external']).toContain(risk.category);
+        result.risks.forEach((risk) => {
+          expect(["scope", "dependency", "capacity", "technical", "external"]).toContain(
+            risk.category
+          );
         });
       });
 
-      it('should have valid probability values', async () => {
+      it("should have valid probability values", async () => {
         const result = await assessor.assessRisks({
-          sprintItems: [
-            createBacklogItem({ id: '1', points: 30 })
-          ],
-          sprintCapacity: createCapacity({ recommendedLoad: 20 })
+          sprintItems: [createBacklogItem({ id: "1", points: 30 })],
+          sprintCapacity: createCapacity({ recommendedLoad: 20 }),
         });
 
-        result.risks.forEach(risk => {
-          expect(['high', 'medium', 'low']).toContain(risk.probability);
+        result.risks.forEach((risk) => {
+          expect(["high", "medium", "low"]).toContain(risk.probability);
         });
       });
 
-      it('should have valid impact values', async () => {
+      it("should have valid impact values", async () => {
         const result = await assessor.assessRisks({
-          sprintItems: [
-            createBacklogItem({ id: '1', points: 30 })
-          ],
-          sprintCapacity: createCapacity({ recommendedLoad: 20 })
+          sprintItems: [createBacklogItem({ id: "1", points: 30 })],
+          sprintCapacity: createCapacity({ recommendedLoad: 20 }),
         });
 
-        result.risks.forEach(risk => {
-          expect(['high', 'medium', 'low']).toContain(risk.impact);
+        result.risks.forEach((risk) => {
+          expect(["high", "medium", "low"]).toContain(risk.impact);
         });
       });
     });
@@ -461,13 +437,13 @@ describe('SprintRiskAssessor', () => {
 function createBacklogItem(overrides: Partial<BacklogItem> = {}): BacklogItem {
   return {
     id: `item-${Math.random().toString(36).substr(2, 9)}`,
-    title: 'Test Task',
-    description: 'A test task for risk assessment',
+    title: "Test Task",
+    description: "A test task for risk assessment",
     points: 3,
-    priority: 'medium',
+    priority: "medium",
     labels: [],
     dependencies: [],
-    ...overrides
+    ...overrides,
   };
 }
 
@@ -479,24 +455,24 @@ function createCapacity(overrides: Partial<SprintCapacity> = {}): SprintCapacity
       totalAvailability: 1.0,
       memberCount: 2,
       members: [
-        { id: '1', name: 'Alice', availability: 1.0 },
-        { id: '2', name: 'Bob', availability: 1.0 }
+        { id: "1", name: "Alice", availability: 1.0 },
+        { id: "2", name: "Bob", availability: 1.0 },
       ],
-      confidence: 0.8
+      confidence: 0.8,
     },
     buffer: {
       percentage: 20,
-      reasoning: 'Standard 20% buffer'
+      reasoning: "Standard 20% buffer",
     },
     confidence: {
-      sectionId: 'sprint-capacity',
-      sectionName: 'Sprint Capacity',
+      sectionId: "sprint-capacity",
+      sectionName: "Sprint Capacity",
       score: 75,
-      tier: 'medium',
+      tier: "medium",
       factors: { inputCompleteness: 0.7, aiSelfAssessment: 0.8, patternMatch: 0.7 },
-      reasoning: 'Test capacity',
-      needsReview: false
+      reasoning: "Test capacity",
+      needsReview: false,
     },
-    ...overrides
+    ...overrides,
   };
 }

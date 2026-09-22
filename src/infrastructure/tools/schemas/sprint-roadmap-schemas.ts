@@ -19,10 +19,7 @@
 
 import { z } from "zod";
 import { SectionConfidenceSchema } from "../../../domain/ai-types";
-import {
-  SPRINT_RISK_CATEGORIES,
-  RISK_PROBABILITIES,
-} from "../../../domain/sprint-planning-types";
+import { SPRINT_RISK_CATEGORIES, RISK_PROBABILITIES } from "../../../domain/sprint-planning-types";
 
 // ============================================================================
 // Common Schemas (Reused across multiple tools)
@@ -41,12 +38,7 @@ export const RiskLevelSchema = z.enum(["high", "medium", "low"]);
 /**
  * Schema for mitigation strategies.
  */
-export const MitigationStrategySchema = z.enum([
-  "avoid",
-  "mitigate",
-  "transfer",
-  "accept",
-]);
+export const MitigationStrategySchema = z.enum(["avoid", "mitigate", "transfer", "accept"]);
 
 /**
  * Schema for effort levels.
@@ -78,11 +70,7 @@ export const TeamMemberInputSchema = z.object({
   /** Display name of the team member */
   name: z.string().min(1, "Team member name is required"),
   /** Availability as a fraction (0-1) */
-  availability: z
-    .number()
-    .min(0)
-    .max(1)
-    .describe("Availability as a fraction (0=none, 1=full)"),
+  availability: z.number().min(0).max(1).describe("Availability as a fraction (0=none, 1=full)"),
   /** Optional skills for skill-based assignment */
   skills: z.array(z.string()).optional(),
 });
@@ -146,10 +134,9 @@ export type SprintMetrics = z.infer<typeof SprintMetricsSchema>;
  */
 export const SprintCapacityInputSchema = z.object({
   /** Velocity in points per sprint, or 'auto' to calculate from history */
-  velocity: z.union([
-    z.number().positive(),
-    z.literal("auto"),
-  ]).describe("Points per sprint or 'auto' to calculate from history"),
+  velocity: z
+    .union([z.number().positive(), z.literal("auto")])
+    .describe("Points per sprint or 'auto' to calculate from history"),
   /** Sprint duration in days */
   sprintDurationDays: z.number().int().positive().describe("Sprint duration in days"),
   /** Team members with availability */
@@ -501,10 +488,12 @@ export type RoadmapConstraints = z.infer<typeof RoadmapConstraintsSchema>;
  */
 export const RoadmapGenerationInputSchema = z.object({
   /** Requirements as string or structured items */
-  requirements: z.union([
-    z.string().min(10, "Requirements description too short"),
-    z.array(RequirementInputSchema).min(1, "At least one requirement needed"),
-  ]).describe("Requirements to plan (string or structured items)"),
+  requirements: z
+    .union([
+      z.string().min(10, "Requirements description too short"),
+      z.array(RequirementInputSchema).min(1, "At least one requirement needed"),
+    ])
+    .describe("Requirements to plan (string or structured items)"),
   /** Optional constraints */
   constraints: RoadmapConstraintsSchema.optional(),
   /** Optional business context */

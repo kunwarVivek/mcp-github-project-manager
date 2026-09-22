@@ -80,11 +80,7 @@ import { WorkProductService } from "./services/agent/WorkProductService";
 import { AgentBudgetService } from "./services/agent/AgentBudgetService";
 import { AgentMetricsService } from "./services/agent/AgentMetricsService";
 import { AgentReclaimScheduler } from "./services/agent/AgentReclaimScheduler";
-import {
-  AGENT_RECLAIM_ENABLED,
-  AGENT_RECLAIM_INTERVAL_MS,
-  AGENT_STALE_AFTER_MINUTES,
-} from "./env";
+import { AGENT_RECLAIM_ENABLED, AGENT_RECLAIM_INTERVAL_MS, AGENT_STALE_AFTER_MINUTES } from "./env";
 
 /**
  * Configure the DI container with all services.
@@ -117,35 +113,35 @@ export function configureContainer(
   // Register extracted services with factory resolution
   // Services that don't use @injectable/@inject decorators need useFactory
   container.register("SubIssueService", {
-    useFactory: (c) => new SubIssueService(c.resolve("GitHubRepositoryFactory"))
+    useFactory: (c) => new SubIssueService(c.resolve("GitHubRepositoryFactory")),
   });
 
   container.register("MilestoneService", {
-    useFactory: (c) => new MilestoneService(c.resolve("GitHubRepositoryFactory"))
+    useFactory: (c) => new MilestoneService(c.resolve("GitHubRepositoryFactory")),
   });
 
   container.register("SprintPlanningService", {
-    useFactory: (c) => new SprintPlanningService(c.resolve("GitHubRepositoryFactory"))
+    useFactory: (c) => new SprintPlanningService(c.resolve("GitHubRepositoryFactory")),
   });
 
   container.register("ProjectStatusService", {
-    useFactory: (c) => new ProjectStatusService(c.resolve("GitHubRepositoryFactory"))
+    useFactory: (c) => new ProjectStatusService(c.resolve("GitHubRepositoryFactory")),
   });
 
   container.register("ProjectTemplateService", {
-    useFactory: (c) => new ProjectTemplateService(c.resolve("GitHubRepositoryFactory"))
+    useFactory: (c) => new ProjectTemplateService(c.resolve("GitHubRepositoryFactory")),
   });
 
   container.register("ProjectLinkingService", {
-    useFactory: (c) => new ProjectLinkingService(c.resolve("GitHubRepositoryFactory"))
+    useFactory: (c) => new ProjectLinkingService(c.resolve("GitHubRepositoryFactory")),
   });
 
   container.register("IssueService", {
-    useFactory: (c) => new IssueService(c.resolve("GitHubRepositoryFactory"))
+    useFactory: (c) => new IssueService(c.resolve("GitHubRepositoryFactory")),
   });
 
   container.register("RoadmapService", {
-    useFactory: (c) => new RoadmapService(c.resolve("GitHubRepositoryFactory"))
+    useFactory: (c) => new RoadmapService(c.resolve("GitHubRepositoryFactory")),
   });
 
   container.register("ProjectAutomationService", {
@@ -156,48 +152,50 @@ export function configureContainer(
         f.createProjectRepository(),
         c.resolve<ILogger>("ILogger")
       );
-    }
+    },
   });
 
   container.register("PullRequestService", {
-    useFactory: (c) => new PullRequestService(c.resolve("GitHubRepositoryFactory"))
+    useFactory: (c) => new PullRequestService(c.resolve("GitHubRepositoryFactory")),
   });
 
   container.register("FieldValueService", {
-    useFactory: (c) => new FieldValueService(c.resolve("GitHubRepositoryFactory"))
+    useFactory: (c) => new FieldValueService(c.resolve("GitHubRepositoryFactory")),
   });
 
   container.register("LabelService", {
-    useFactory: (c) => new LabelService(c.resolve("GitHubRepositoryFactory"))
+    useFactory: (c) => new LabelService(c.resolve("GitHubRepositoryFactory")),
   });
 
   container.register("IterationService", {
-    useFactory: (c) => new IterationService(
-      c.resolve("GitHubRepositoryFactory"),
-      c.resolve("FieldValueService"),
-      c.resolve("ProjectTemplateService"),
-      c.resolve("ProjectLinkingService")
-    )
+    useFactory: (c) =>
+      new IterationService(
+        c.resolve("GitHubRepositoryFactory"),
+        c.resolve("FieldValueService"),
+        c.resolve("ProjectTemplateService"),
+        c.resolve("ProjectLinkingService")
+      ),
   });
 
   // Register facade - depends on all extracted services
   container.register("ProjectManagementService", {
-    useFactory: (c) => new ProjectManagementService(
-      c.resolve("GitHubRepositoryFactory"),
-      c.resolve("SubIssueService"),
-      c.resolve("MilestoneService"),
-      c.resolve("SprintPlanningService"),
-      c.resolve("ProjectStatusService"),
-      c.resolve("ProjectTemplateService"),
-      c.resolve("ProjectLinkingService"),
-      c.resolve("IssueService"),
-      c.resolve("RoadmapService"),
-      c.resolve("ProjectAutomationService"),
-      c.resolve("PullRequestService"),
-      c.resolve("FieldValueService"),
-      c.resolve("LabelService"),
-      c.resolve("IterationService")
-    )
+    useFactory: (c) =>
+      new ProjectManagementService(
+        c.resolve("GitHubRepositoryFactory"),
+        c.resolve("SubIssueService"),
+        c.resolve("MilestoneService"),
+        c.resolve("SprintPlanningService"),
+        c.resolve("ProjectStatusService"),
+        c.resolve("ProjectTemplateService"),
+        c.resolve("ProjectLinkingService"),
+        c.resolve("IssueService"),
+        c.resolve("RoadmapService"),
+        c.resolve("ProjectAutomationService"),
+        c.resolve("PullRequestService"),
+        c.resolve("FieldValueService"),
+        c.resolve("LabelService"),
+        c.resolve("IterationService")
+      ),
   });
 
   // Register AI services
@@ -205,144 +203,135 @@ export function configureContainer(
   container.registerInstance("AIServiceFactory", AIServiceFactory.getInstance(logger));
 
   container.register("RoadmapPlanningService", {
-    useFactory: (c) => new RoadmapPlanningService(
-      c.resolve("AIServiceFactory"),
-      c.resolve("ProjectManagementService"),
-      c.resolve<ILogger>("ILogger")
-    )
+    useFactory: (c) =>
+      new RoadmapPlanningService(
+        c.resolve("AIServiceFactory"),
+        c.resolve("ProjectManagementService"),
+        c.resolve<ILogger>("ILogger")
+      ),
   });
 
   container.register("IssueEnrichmentService", {
-    useFactory: (c) => new IssueEnrichmentService(
-      c.resolve("AIServiceFactory"),
-      c.resolve("ProjectManagementService"),
-      c.resolve<ILogger>("ILogger")
-    )
+    useFactory: (c) =>
+      new IssueEnrichmentService(
+        c.resolve("AIServiceFactory"),
+        c.resolve("ProjectManagementService"),
+        c.resolve<ILogger>("ILogger")
+      ),
   });
 
   container.register("IssueTriagingService", {
-    useFactory: (c) => new IssueTriagingService(
-      c.resolve("AIServiceFactory"),
-      c.resolve("ProjectManagementService"),
-      c.resolve("IssueEnrichmentService"),
-      c.resolve<ILogger>("ILogger")
-    )
+    useFactory: (c) =>
+      new IssueTriagingService(
+        c.resolve("AIServiceFactory"),
+        c.resolve("ProjectManagementService"),
+        c.resolve("IssueEnrichmentService"),
+        c.resolve<ILogger>("ILogger")
+      ),
   });
 
   // Register AI task-generation pipeline services
   // These now accept AIServiceFactory via constructor for proper DI.
   container.register("PRDGenerationService", {
-    useFactory: (c) => new PRDGenerationService(c.resolve("AIServiceFactory"))
+    useFactory: (c) => new PRDGenerationService(c.resolve("AIServiceFactory")),
   });
 
   container.register("TaskContextGenerationService", {
-    useFactory: (c) => new TaskContextGenerationService(
-      c.resolve("AIServiceFactory"),
-      c.resolve<ILogger>("ILogger")
-    )
+    useFactory: (c) =>
+      new TaskContextGenerationService(
+        c.resolve("AIServiceFactory"),
+        c.resolve<ILogger>("ILogger")
+      ),
   });
 
   container.register("TaskGenerationService", {
-    useFactory: (c) => new TaskGenerationService(
-      c.resolve("AIServiceFactory"),
-      c.resolve<ILogger>("ILogger")
-    )
+    useFactory: (c) =>
+      new TaskGenerationService(c.resolve("AIServiceFactory"), c.resolve<ILogger>("ILogger")),
   });
 
   // Register feature management sub-services (SRP decomposition)
   container.register("FeatureAnalysisService", {
-    useFactory: (c) => new FeatureAnalysisService(
-      c.resolve("AIServiceFactory"),
-      c.resolve<ILogger>("ILogger")
-    )
+    useFactory: (c) =>
+      new FeatureAnalysisService(c.resolve("AIServiceFactory"), c.resolve<ILogger>("ILogger")),
   });
 
   container.register("FeaturePRDService", {
-    useFactory: (c) => new FeaturePRDService(
-      c.resolve("FeatureAnalysisService"),
-      c.resolve<ILogger>("ILogger")
-    )
+    useFactory: (c) =>
+      new FeaturePRDService(c.resolve("FeatureAnalysisService"), c.resolve<ILogger>("ILogger")),
   });
 
   container.register("FeatureExpansionService", {
-    useFactory: (c) => new FeatureExpansionService(
-      c.resolve("AIServiceFactory"),
-      c.resolve("TaskGenerationService"),
-      c.resolve<ILogger>("ILogger")
-    )
+    useFactory: (c) =>
+      new FeatureExpansionService(
+        c.resolve("AIServiceFactory"),
+        c.resolve("TaskGenerationService"),
+        c.resolve<ILogger>("ILogger")
+      ),
   });
 
   container.register("TaskLifecycleService", {
-    useFactory: (c) => new TaskLifecycleService(
-      c.resolve("AIServiceFactory"),
-      c.resolve<ILogger>("ILogger")
-    )
+    useFactory: (c) =>
+      new TaskLifecycleService(c.resolve("AIServiceFactory"), c.resolve<ILogger>("ILogger")),
   });
 
   container.register("FeatureManagementService", {
-    useFactory: (c) => new FeatureManagementService(
-      c.resolve("AIServiceFactory"),
-      c.resolve<ILogger>("ILogger")
-    )
+    useFactory: (c) =>
+      new FeatureManagementService(c.resolve("AIServiceFactory"), c.resolve<ILogger>("ILogger")),
   });
 
   // Register agent orchestration services
   container.register("AgentStore", {
-    useFactory: (c) => new AgentStore(c.resolve("GitHubRepositoryFactory"))
+    useFactory: (c) => new AgentStore(c.resolve("GitHubRepositoryFactory")),
   });
 
   container.register("WorkProductStore", {
-    useFactory: (c) => new WorkProductStore(c.resolve("GitHubRepositoryFactory"))
+    useFactory: (c) => new WorkProductStore(c.resolve("GitHubRepositoryFactory")),
   });
 
   container.register("ProjectFieldSetup", {
-    useFactory: (c) => new ProjectFieldSetup(c.resolve("GitHubRepositoryFactory"))
+    useFactory: (c) => new ProjectFieldSetup(c.resolve("GitHubRepositoryFactory")),
   });
 
   container.register("AgentContextService", {
-    useFactory: (c) => new AgentContextService(
-      c.resolve("GitHubRepositoryFactory"),
-      c.resolve("AIServiceFactory")
-    )
+    useFactory: (c) =>
+      new AgentContextService(c.resolve("GitHubRepositoryFactory"), c.resolve("AIServiceFactory")),
   });
 
   container.register("TaskCheckoutService", {
-    useFactory: (c) => new TaskCheckoutService(
-      c.resolve("GitHubRepositoryFactory"),
-      c.resolve("AgentStore"),
-      c.resolve("AgentContextService"),
-      c.resolve("AIServiceFactory")
-    )
+    useFactory: (c) =>
+      new TaskCheckoutService(
+        c.resolve("GitHubRepositoryFactory"),
+        c.resolve("AgentStore"),
+        c.resolve("AgentContextService"),
+        c.resolve("AIServiceFactory")
+      ),
   });
 
   container.register("AgentReclaimScheduler", {
-    useFactory: (c) => new AgentReclaimScheduler(
-      c.resolve("TaskCheckoutService"),
-      {
+    useFactory: (c) =>
+      new AgentReclaimScheduler(c.resolve("TaskCheckoutService"), {
         enabled: AGENT_RECLAIM_ENABLED,
         intervalMs: AGENT_RECLAIM_INTERVAL_MS,
         staleAfterMinutes: AGENT_STALE_AFTER_MINUTES,
-      }
-    )
+      }),
   });
 
   container.register("WorkProductService", {
-    useFactory: (c) => new WorkProductService(
-      c.resolve("GitHubRepositoryFactory"),
-      c.resolve("WorkProductStore")
-    )
+    useFactory: (c) =>
+      new WorkProductService(c.resolve("GitHubRepositoryFactory"), c.resolve("WorkProductStore")),
   });
 
   container.register("AgentBudgetService", {
-    useFactory: (c) => new AgentBudgetService(c.resolve("AgentStore"))
+    useFactory: (c) => new AgentBudgetService(c.resolve("AgentStore")),
   });
 
   container.register("AgentMetricsService", {
-    useFactory: (c) => new AgentMetricsService(
-      c.resolve("GitHubRepositoryFactory"),
-      c.resolve("AgentStore"),
-      c.resolve("WorkProductStore")
-    )
+    useFactory: (c) =>
+      new AgentMetricsService(
+        c.resolve("GitHubRepositoryFactory"),
+        c.resolve("AgentStore"),
+        c.resolve("WorkProductStore")
+      ),
   });
 
   return container;

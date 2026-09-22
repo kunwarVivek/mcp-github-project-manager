@@ -1,4 +1,10 @@
-import { type Resource, ResourceType, RelationshipType, type Relationship, ResourceStatus } from "../../domain/resource-types";
+import {
+  type Resource,
+  ResourceType,
+  RelationshipType,
+  type Relationship,
+  ResourceStatus,
+} from "../../domain/resource-types";
 import type { ResourceCache } from "../cache/ResourceCache";
 
 export class ResourceRelationshipManager {
@@ -34,7 +40,7 @@ export class ResourceRelationshipManager {
       sourceType,
       targetId,
       targetType,
-      relationshipType
+      relationshipType,
     };
 
     // Store in cache with appropriate tags
@@ -65,14 +71,14 @@ export class ResourceRelationshipManager {
     resourceId: string,
     type?: RelationshipType
   ): Promise<Relationship[]> {
-    const relationships = await this.cache.getByTag(`source:${resourceId}`) as Relationship[];
+    const relationships = (await this.cache.getByTag(`source:${resourceId}`)) as Relationship[];
 
     if (!type) {
       return relationships;
     }
 
     // Make sure to compare relationshipType, not the Resource type
-    return relationships.filter(rel => rel.relationshipType === type);
+    return relationships.filter((rel) => rel.relationshipType === type);
   }
 
   /**
@@ -82,14 +88,14 @@ export class ResourceRelationshipManager {
     resourceId: string,
     type?: RelationshipType
   ): Promise<Relationship[]> {
-    const relationships = await this.cache.getByTag(`target:${resourceId}`) as Relationship[];
+    const relationships = (await this.cache.getByTag(`target:${resourceId}`)) as Relationship[];
 
     if (!type) {
       return relationships;
     }
 
     // Make sure to compare relationshipType, not the Resource type
-    return relationships.filter(rel => rel.relationshipType === type);
+    return relationships.filter((rel) => rel.relationshipType === type);
   }
 
   /**
@@ -98,9 +104,9 @@ export class ResourceRelationshipManager {
   async getRelationshipsByType(type: RelationshipType): Promise<Relationship[]> {
     const relationships = await this.cache.getByTag(`type:${type}`);
     // Properly cast the result to Relationship[] instead of just using 'as'
-    return relationships.filter(rel =>
-      rel.type === ResourceType.RELATIONSHIP &&
-      (rel as Relationship).relationshipType === type
+    return relationships.filter(
+      (rel) =>
+        rel.type === ResourceType.RELATIONSHIP && (rel as Relationship).relationshipType === type
     ) as Relationship[];
   }
 
@@ -116,9 +122,7 @@ export class ResourceRelationshipManager {
     const relationships = await this.getOutgoingRelationships(resourceId, relationshipType);
 
     // Filter by target type
-    const matchingRelationships = relationships.filter(
-      rel => rel.targetType === targetType
-    );
+    const matchingRelationships = relationships.filter((rel) => rel.targetType === targetType);
 
     // Get the actual resources
     const resources: T[] = [];
@@ -135,9 +139,7 @@ export class ResourceRelationshipManager {
   /**
    * Find resources that depend on the given resource
    */
-  async getDependentResources<T extends Resource>(
-    resourceId: string
-  ): Promise<T[]> {
+  async getDependentResources<T extends Resource>(resourceId: string): Promise<T[]> {
     // Get incoming dependency relationships
     const relationships = await this.getIncomingRelationships(
       resourceId,
@@ -159,9 +161,7 @@ export class ResourceRelationshipManager {
   /**
    * Find parent resources
    */
-  async getParentResources<T extends Resource>(
-    resourceId: string
-  ): Promise<T[]> {
+  async getParentResources<T extends Resource>(resourceId: string): Promise<T[]> {
     // Get incoming parent-child relationships
     const relationships = await this.getIncomingRelationships(
       resourceId,
@@ -183,9 +183,7 @@ export class ResourceRelationshipManager {
   /**
    * Find child resources
    */
-  async getChildResources<T extends Resource>(
-    resourceId: string
-  ): Promise<T[]> {
+  async getChildResources<T extends Resource>(resourceId: string): Promise<T[]> {
     // Get outgoing parent-child relationships
     const relationships = await this.getOutgoingRelationships(
       resourceId,

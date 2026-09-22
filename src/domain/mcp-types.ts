@@ -20,11 +20,11 @@ export enum MCPContentType {
  */
 export enum MCPErrorCode {
   // JSON-RPC 2.0 Standard Errors (numeric)
-  PARSE_ERROR = -32700,          // Invalid JSON
-  INVALID_REQUEST = -32600,      // Malformed JSON-RPC
-  METHOD_NOT_FOUND = -32601,     // Unknown method/tool
-  INVALID_PARAMS = -32602,       // Parameter validation failed
-  INTERNAL_ERROR = -32603,       // Server-side error
+  PARSE_ERROR = -32700, // Invalid JSON
+  INVALID_REQUEST = -32600, // Malformed JSON-RPC
+  METHOD_NOT_FOUND = -32601, // Unknown method/tool
+  INVALID_PARAMS = -32602, // Parameter validation failed
+  INTERNAL_ERROR = -32603, // Server-side error
 
   // MCP-Specific Errors (-32000 to -32099)
   TOOL_EXECUTION_FAILED = -32000,
@@ -43,9 +43,9 @@ export enum MCPErrorCode {
   PROTOCOL_VERSION_MISMATCH = -31100,
 
   // Legacy aliases for backward compatibility
-  VALIDATION_ERROR = -32602,     // Alias for INVALID_PARAMS
-  UNAUTHORIZED = -31003,         // Alias for GITHUB_UNAUTHORIZED
-  RATE_LIMITED = -31001,         // Alias for GITHUB_RATE_LIMITED
+  VALIDATION_ERROR = -32602, // Alias for INVALID_PARAMS
+  UNAUTHORIZED = -31003, // Alias for GITHUB_UNAUTHORIZED
+  RATE_LIMITED = -31001, // Alias for GITHUB_RATE_LIMITED
 }
 
 /**
@@ -82,8 +82,8 @@ export interface MCPErrorData {
   rateLimit?: {
     limit: number;
     remaining: number;
-    reset: number;  // Unix timestamp
-    retryAfter?: number;  // Seconds until retry
+    reset: number; // Unix timestamp
+    retryAfter?: number; // Seconds until retry
   };
   /** Validation error details */
   validation?: Array<{
@@ -119,18 +119,22 @@ export const MCPErrorSchema = z.object({
 
 // Base MCP Response Schema
 export const MCPResponseSchema = z.object({
-  content: z.array(z.object({
-    type: z.enum(["text", "json", "markdown", "html"]),
-    text: z.string(),
-    contentType: z.nativeEnum(MCPContentType),
-  })),
+  content: z.array(
+    z.object({
+      type: z.enum(["text", "json", "markdown", "html"]),
+      text: z.string(),
+      contentType: z.nativeEnum(MCPContentType),
+    })
+  ),
   metadata: z.object({
     timestamp: z.string(),
     status: z.number(),
-    pagination: z.object({
-      page: z.number(),
-      totalPages: z.number(),
-    }).optional(),
+    pagination: z
+      .object({
+        page: z.number(),
+        totalPages: z.number(),
+      })
+      .optional(),
     requestId: z.string().optional(),
   }),
 });

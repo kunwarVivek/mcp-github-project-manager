@@ -77,7 +77,6 @@ const RESOLVE_REPOSITORY_ID_QUERY = `
 // Helper Functions
 // ============================================================================
 
-
 /**
  * Resolves a repository owner/name to its GitHub node ID.
  *
@@ -95,13 +94,10 @@ async function resolveRepositoryId(
     } | null;
   }
 
-  const response = await factory.graphql<RepositoryIdResponse>(
-    RESOLVE_REPOSITORY_ID_QUERY,
-    {
-      owner,
-      name,
-    }
-  );
+  const response = await factory.graphql<RepositoryIdResponse>(RESOLVE_REPOSITORY_ID_QUERY, {
+    owner,
+    name,
+  });
 
   if (!response.repository) {
     throw new Error(`Repository '${owner}/${name}' not found`);
@@ -152,10 +148,7 @@ interface ConvertDraftIssueResponse {
  * Closes a GitHub ProjectV2. Closed projects are hidden from default views
  * but retain all their data and can be reopened at any time.
  */
-export const closeProjectTool: ToolDefinition<
-  CloseProjectInput,
-  ProjectLifecycleOutput
-> = {
+export const closeProjectTool: ToolDefinition<CloseProjectInput, ProjectLifecycleOutput> = {
   name: "close_project",
   title: "Close Project",
   description:
@@ -180,10 +173,7 @@ export const closeProjectTool: ToolDefinition<
  * Reopens a previously closed GitHub ProjectV2. The project becomes visible
  * in default views again with all its data intact.
  */
-export const reopenProjectTool: ToolDefinition<
-  ReopenProjectInput,
-  ProjectLifecycleOutput
-> = {
+export const reopenProjectTool: ToolDefinition<ReopenProjectInput, ProjectLifecycleOutput> = {
   name: "reopen_project",
   title: "Reopen Project",
   description:
@@ -208,10 +198,7 @@ export const reopenProjectTool: ToolDefinition<
  * Converts a draft issue in a project to a real GitHub issue in the specified
  * repository. The draft's title and body are preserved in the new issue.
  */
-export const convertDraftIssueTool: ToolDefinition<
-  ConvertDraftIssueInput,
-  ConvertedIssueOutput
-> = {
+export const convertDraftIssueTool: ToolDefinition<ConvertDraftIssueInput, ConvertedIssueOutput> = {
   name: "convert_draft_issue",
   title: "Convert Draft Issue to Real Issue",
   description:
@@ -245,23 +232,18 @@ export const convertDraftIssueTool: ToolDefinition<
  * @returns The closed project details
  * @throws Error if GITHUB_TOKEN is not set or API call fails
  */
-export async function executeCloseProject(
-  args: CloseProjectInput
-): Promise<{
+export async function executeCloseProject(args: CloseProjectInput): Promise<{
   content: Array<{ type: "text"; text: string }>;
   structuredContent: ProjectLifecycleOutput;
 }> {
   const factory = createGitHubFactory();
 
-  const response = await factory.graphql<UpdateProjectV2Response>(
-    UPDATE_PROJECT_MUTATION,
-    {
-      input: {
-        projectId: args.projectId,
-        closed: true,
-      },
-    }
-  );
+  const response = await factory.graphql<UpdateProjectV2Response>(UPDATE_PROJECT_MUTATION, {
+    input: {
+      projectId: args.projectId,
+      closed: true,
+    },
+  });
 
   const project = response.updateProjectV2.projectV2;
 
@@ -292,23 +274,18 @@ export async function executeCloseProject(
  * @returns The reopened project details
  * @throws Error if GITHUB_TOKEN is not set or API call fails
  */
-export async function executeReopenProject(
-  args: ReopenProjectInput
-): Promise<{
+export async function executeReopenProject(args: ReopenProjectInput): Promise<{
   content: Array<{ type: "text"; text: string }>;
   structuredContent: ProjectLifecycleOutput;
 }> {
   const factory = createGitHubFactory();
 
-  const response = await factory.graphql<UpdateProjectV2Response>(
-    UPDATE_PROJECT_MUTATION,
-    {
-      input: {
-        projectId: args.projectId,
-        closed: false,
-      },
-    }
-  );
+  const response = await factory.graphql<UpdateProjectV2Response>(UPDATE_PROJECT_MUTATION, {
+    input: {
+      projectId: args.projectId,
+      closed: false,
+    },
+  });
 
   const project = response.updateProjectV2.projectV2;
 
@@ -339,9 +316,7 @@ export async function executeReopenProject(
  * @returns The converted issue details
  * @throws Error if GITHUB_TOKEN is not set, repository not found, or API call fails
  */
-export async function executeConvertDraftIssue(
-  args: ConvertDraftIssueInput
-): Promise<{
+export async function executeConvertDraftIssue(args: ConvertDraftIssueInput): Promise<{
   content: Array<{ type: "text"; text: string }>;
   structuredContent: ConvertedIssueOutput;
 }> {
@@ -350,15 +325,12 @@ export async function executeConvertDraftIssue(
   // Resolve the repository owner/name to its node ID
   const repositoryId = await resolveRepositoryId(factory, args.owner, args.repo);
 
-  const response = await factory.graphql<ConvertDraftIssueResponse>(
-    CONVERT_DRAFT_ISSUE_MUTATION,
-    {
-      input: {
-        itemId: args.itemId,
-        repositoryId: repositoryId,
-      },
-    }
-  );
+  const response = await factory.graphql<ConvertDraftIssueResponse>(CONVERT_DRAFT_ISSUE_MUTATION, {
+    input: {
+      itemId: args.itemId,
+      repositoryId: repositoryId,
+    },
+  });
 
   const item = response.convertProjectV2DraftIssueItemToIssue.item;
   const issue = item.content;

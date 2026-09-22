@@ -1,6 +1,6 @@
-import type { GitHubRepositoryFactory } from '../github/GitHubRepositoryFactory.js';
-import { AGENT_FIELDS, AGENT_STATUS_OPTIONS } from '../../domain/agent-orchestration-types.js';
-import type { CustomField, FieldType } from '../../domain/types.js';
+import type { GitHubRepositoryFactory } from "../github/GitHubRepositoryFactory.js";
+import { AGENT_FIELDS, AGENT_STATUS_OPTIONS } from "../../domain/agent-orchestration-types.js";
+import type { CustomField, FieldType } from "../../domain/types.js";
 
 /** GraphQL response shape for listing project fields. */
 interface ListFieldsResponse {
@@ -38,23 +38,23 @@ export class ProjectFieldSetup {
   /** Ensure all agent orchestration fields exist on the given project. */
   async ensureFields(projectId: string): Promise<{ created: string[]; existing: string[] }> {
     const specs: FieldSpec[] = [
-      { name: AGENT_FIELDS.CLAIMED_BY, type: 'text' },
-      { name: AGENT_FIELDS.CLAIMED_AT, type: 'text' },
+      { name: AGENT_FIELDS.CLAIMED_BY, type: "text" },
+      { name: AGENT_FIELDS.CLAIMED_AT, type: "text" },
       {
         name: AGENT_FIELDS.STATUS,
-        type: 'single_select',
-        options: AGENT_STATUS_OPTIONS.map(o => ({
+        type: "single_select",
+        options: AGENT_STATUS_OPTIONS.map((o) => ({
           name: o.name,
           color: o.color,
           description: o.description,
         })),
       },
-      { name: AGENT_FIELDS.WORK_BRANCH, type: 'text' },
-      { name: AGENT_FIELDS.PR_NUMBER, type: 'number' },
+      { name: AGENT_FIELDS.WORK_BRANCH, type: "text" },
+      { name: AGENT_FIELDS.PR_NUMBER, type: "number" },
     ];
 
     const existingFields = await this.listProjectFields(projectId);
-    const existingNames = new Set(existingFields.map(f => f.name));
+    const existingNames = new Set(existingFields.map((f) => f.name));
 
     const created: string[] = [];
     const existing: string[] = [];
@@ -66,10 +66,10 @@ export class ProjectFieldSetup {
         continue;
       }
 
-      const fieldData: Omit<CustomField, 'id'> = {
+      const fieldData: Omit<CustomField, "id"> = {
         name: spec.name,
         type: spec.type,
-        options: spec.options?.map(o => ({ id: '', ...o })),
+        options: spec.options?.map((o) => ({ id: "", ...o })),
       };
 
       await projectRepo.createField(projectId, fieldData);
@@ -89,7 +89,7 @@ export class ProjectFieldSetup {
    * that have no valid id/name (e.g. stale union members from deleted fields).
    */
   private async listProjectFields(
-    projectId: string,
+    projectId: string
   ): Promise<Array<{ id: string; name: string; dataType: string }>> {
     // ProjectV2.fields is a union (ProjectV2FieldConfiguration) — select
     // __typename plus the fields shared by every member, then map dataType
@@ -172,9 +172,11 @@ export class ProjectFieldSetup {
     return (response.node?.fields.nodes ?? [])
       .filter((node) => node.id && node.name) // Skip corrupt fields with no id/name
       .map((node) => ({
-        id: node.id ?? '',
-        name: node.name ?? '',
-        dataType: node.dataType ?? (node.__typename === 'ProjectV2SingleSelectField' ? 'SINGLE_SELECT' : 'TEXT'),
+        id: node.id ?? "",
+        name: node.name ?? "",
+        dataType:
+          node.dataType ??
+          (node.__typename === "ProjectV2SingleSelectField" ? "SINGLE_SELECT" : "TEXT"),
       }));
   }
 }

@@ -13,7 +13,7 @@ import type {
   LanguageModelV4CallOptions,
   LanguageModelV4GenerateResult,
   LanguageModelV4StreamResult,
-} from '@ai-sdk/provider';
+} from "@ai-sdk/provider";
 
 /**
  * Function that sends a sampling request to the MCP client.
@@ -22,8 +22,8 @@ import type {
 export interface SamplingRequestFn {
   (params: {
     messages: Array<{
-      role: 'user' | 'assistant';
-      content: { type: 'text'; text: string };
+      role: "user" | "assistant";
+      content: { type: "text"; text: string };
     }>;
     systemPrompt?: string;
     maxTokens?: number;
@@ -46,59 +46,56 @@ export interface SamplingRequestFn {
  * The calling MCP client handles the actual LLM call.
  */
 export class SamplingLanguageModel implements LanguageModelV4 {
-  readonly specificationVersion = 'v4' as const;
-  readonly provider = 'mcp-sampling';
+  readonly specificationVersion = "v4" as const;
+  readonly provider = "mcp-sampling";
   readonly modelId: string;
-  readonly defaultObjectGenerationMode = 'json' as const;
+  readonly defaultObjectGenerationMode = "json" as const;
   readonly supportedUrls: Record<string, RegExp[]> = {};
 
   constructor(
     private readonly samplingFn: SamplingRequestFn,
-    modelId = 'client-model',
+    modelId = "client-model"
   ) {
     this.modelId = modelId;
   }
 
-  async doGenerate(
-    options: LanguageModelV4CallOptions,
-  ): Promise<LanguageModelV4GenerateResult> {
+  async doGenerate(options: LanguageModelV4CallOptions): Promise<LanguageModelV4GenerateResult> {
     const messages: Array<{
-      role: 'user' | 'assistant';
-      content: { type: 'text'; text: string };
+      role: "user" | "assistant";
+      content: { type: "text"; text: string };
     }> = [];
     let systemPrompt: string | undefined;
 
     if (options.prompt) {
       for (const msg of options.prompt) {
-        if (msg.role === 'system') {
+        if (msg.role === "system") {
           systemPrompt = msg.content;
-        } else if (msg.role === 'user') {
+        } else if (msg.role === "user") {
           const text = msg.content
-            .map((p) => (p.type === 'text' ? (p as { text: string }).text : '[non-text]'))
-            .join('\n');
-          messages.push({ role: 'user', content: { type: 'text', text } });
-        } else if (msg.role === 'assistant') {
+            .map((p) => (p.type === "text" ? (p as { text: string }).text : "[non-text]"))
+            .join("\n");
+          messages.push({ role: "user", content: { type: "text", text } });
+        } else if (msg.role === "assistant") {
           const text = msg.content
-            .map((p) => (p.type === 'text' ? (p as { text: string }).text : ''))
-            .join('');
+            .map((p) => (p.type === "text" ? (p as { text: string }).text : ""))
+            .join("");
           if (text) {
-            messages.push({ role: 'assistant', content: { type: 'text', text } });
+            messages.push({ role: "assistant", content: { type: "text", text } });
           }
         }
       }
     }
 
     if (messages.length === 0) {
-      messages.push({ role: 'user', content: { type: 'text', text: 'Hello' } });
+      messages.push({ role: "user", content: { type: "text", text: "Hello" } });
     }
     // When responseFormat requests JSON, reinforce in the system prompt.
     // The AI SDK injects the schema into the user prompt; we add a system-level
     // instruction to return raw JSON without markdown fences.
-    if (options.responseFormat?.type === 'json') {
-      const jsonInstruction = 'IMPORTANT: Respond with valid JSON only. No markdown fences, no explanation, no text before or after the JSON object.';
-      systemPrompt = systemPrompt
-        ? `${systemPrompt}\n\n${jsonInstruction}`
-        : jsonInstruction;
+    if (options.responseFormat?.type === "json") {
+      const jsonInstruction =
+        "IMPORTANT: Respond with valid JSON only. No markdown fences, no explanation, no text before or after the JSON object.";
+      systemPrompt = systemPrompt ? `${systemPrompt}\n\n${jsonInstruction}` : jsonInstruction;
     }
 
     const result = await this.samplingFn({
@@ -113,13 +110,10 @@ export class SamplingLanguageModel implements LanguageModelV4 {
       },
     });
 
-    let text =
-      typeof result.content === 'string'
-        ? result.content
-        : (result.content?.text ?? '');
+    let text = typeof result.content === "string" ? result.content : (result.content?.text ?? "");
 
     // Strip markdown JSON fences that clients commonly wrap around JSON responses
-    if (options.responseFormat?.type === 'json') {
+    if (options.responseFormat?.type === "json") {
       text = text.trim();
       // Strip ```json ... ``` or ``` ... ```
       const fenceMatch = text.match(/^```(?:json)?\s*\n?([\s\S]*?)\n?\s*```$/);
@@ -129,8 +123,8 @@ export class SamplingLanguageModel implements LanguageModelV4 {
     }
 
     return {
-      content: [{ type: 'text' as const, text }],
-      finishReason: { unified: 'stop' as const, raw: undefined },
+      content: [{ type: "text" as const, text }],
+      finishReason: { unified: "stop" as const, raw: undefined },
       usage: {
         inputTokens: { total: 0, noCache: undefined, cacheRead: undefined, cacheWrite: undefined },
         outputTokens: { total: 0, text: undefined, reasoning: undefined },
@@ -139,23 +133,21 @@ export class SamplingLanguageModel implements LanguageModelV4 {
     };
   }
 
-  async doStream(
-    options: LanguageModelV4CallOptions,
-  ): Promise<LanguageModelV4StreamResult> {
+  async doStream(options: LanguageModelV4CallOptions): Promise<LanguageModelV4StreamResult> {
     // MCP sampling doesn't support streaming — emit full result as one chunk
     const result = await this.doGenerate(options);
-    const textContent = result.content.find((c) => c.type === 'text');
-    const text = textContent && 'text' in textContent ? textContent.text : '';
+    const textContent = result.content.find((c) => c.type === "text");
+    const text = textContent && "text" in textContent ? textContent.text : "";
 
     const stream = new ReadableStream({
       start(controller) {
         const id = `sampling-${Date.now()}`;
-        controller.enqueue({ type: 'stream-start', warnings: [] });
-        controller.enqueue({ type: 'text-start', id });
-        controller.enqueue({ type: 'text-delta', id, textDelta: text });
-        controller.enqueue({ type: 'text-end', id });
+        controller.enqueue({ type: "stream-start", warnings: [] });
+        controller.enqueue({ type: "text-start", id });
+        controller.enqueue({ type: "text-delta", id, textDelta: text });
+        controller.enqueue({ type: "text-end", id });
         controller.enqueue({
-          type: 'finish',
+          type: "finish",
           usage: result.usage,
           finishReason: result.finishReason,
         });

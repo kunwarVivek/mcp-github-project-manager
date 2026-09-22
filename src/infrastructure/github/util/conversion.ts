@@ -3,13 +3,13 @@ import { ResourceStatus, ResourceType } from "../../../domain/resource-types";
 export class GitHubTypeConverter {
   static toResourceType(githubType: string): ResourceType {
     switch (githubType.toLowerCase()) {
-      case 'issue':
+      case "issue":
         return ResourceType.ISSUE;
-      case 'milestone':
+      case "milestone":
         return ResourceType.MILESTONE;
-      case 'project':
+      case "project":
         return ResourceType.PROJECT;
-      case 'sprint':
+      case "sprint":
         return ResourceType.SPRINT;
       default:
         throw new Error(`Invalid GitHub type: ${githubType}`);
@@ -19,13 +19,13 @@ export class GitHubTypeConverter {
   static toGitHubType(type: ResourceType): string {
     switch (type) {
       case ResourceType.ISSUE:
-        return 'issue';
+        return "issue";
       case ResourceType.MILESTONE:
-        return 'milestone';
+        return "milestone";
       case ResourceType.PROJECT:
-        return 'project';
+        return "project";
       case ResourceType.SPRINT:
-        return 'sprint';
+        return "sprint";
       default:
         throw new Error(`Invalid resource type: ${type}`);
     }
@@ -33,19 +33,19 @@ export class GitHubTypeConverter {
 
   static toResourceStatus(githubStatus: string): ResourceStatus {
     switch (githubStatus.toLowerCase()) {
-      case 'open':
+      case "open":
         return ResourceStatus.ACTIVE;
-      case 'closed':
+      case "closed":
         return ResourceStatus.CLOSED;
-      case 'planned':
+      case "planned":
         return ResourceStatus.PLANNED;
-      case 'in_progress':
+      case "in_progress":
         return ResourceStatus.ACTIVE;
-      case 'completed':
+      case "completed":
         return ResourceStatus.COMPLETED;
-      case 'archived':
+      case "archived":
         return ResourceStatus.ARCHIVED;
-      case 'deleted':
+      case "deleted":
         return ResourceStatus.DELETED;
       default:
         throw new Error(`Invalid GitHub status: ${githubStatus}`);
@@ -55,16 +55,16 @@ export class GitHubTypeConverter {
   static toGitHubStatus(status: ResourceStatus): string {
     switch (status) {
       case ResourceStatus.ACTIVE:
-        return 'open';
+        return "open";
       case ResourceStatus.CLOSED:
       case ResourceStatus.COMPLETED:
-        return 'closed';
+        return "closed";
       case ResourceStatus.PLANNED:
-        return 'draft';
+        return "draft";
       case ResourceStatus.ARCHIVED:
-        return 'archived';
+        return "archived";
       case ResourceStatus.DELETED:
-        return 'closed';
+        return "closed";
       default:
         throw new Error(`Invalid resource status: ${status}`);
     }
@@ -88,7 +88,7 @@ export class GitHubTypeConverter {
 
   static addDuration(startDate: Date, durationWeeks: number): Date {
     const result = new Date(startDate);
-    result.setDate(result.getDate() + (durationWeeks * 7));
+    result.setDate(result.getDate() + durationWeeks * 7);
     return result;
   }
 }

@@ -1,11 +1,9 @@
 import type { GitHubRepositoryFactory } from "../infrastructure/github/GitHubRepositoryFactory";
 import type { GitHubProjectRepository } from "../infrastructure/github/repositories/GitHubProjectRepository";
 import type { CustomField, ProjectView } from "../domain/types";
-import {
-  ResourceNotFoundError,
-} from "../domain/errors";
+import { ResourceNotFoundError } from "../domain/errors";
 import { ResourceType } from "../domain/resource-types";
-import { safeCall } from './utils/safeCall';
+import { safeCall } from "./utils/safeCall";
 
 /**
  * ProjectTemplateService handles project customization operations:
@@ -26,11 +24,8 @@ export class ProjectTemplateService {
     return this.factory.createProjectRepository();
   }
 
-
   // Project README Management
-  async getProjectReadme(data: {
-    projectId: string;
-  }): Promise<{ readme: string }> {
+  async getProjectReadme(data: { projectId: string }): Promise<{ readme: string }> {
     return safeCall(async () => {
       const query = `
         query($projectId: ID!) {
@@ -49,11 +44,11 @@ export class ProjectTemplateService {
       }
 
       const response = await this.factory.graphql<GetReadmeResponse>(query, {
-        projectId: data.projectId
+        projectId: data.projectId,
       });
 
       return {
-        readme: response.node?.readme || ''
+        readme: response.node?.readme || "",
       };
     });
   }
@@ -86,20 +81,18 @@ export class ProjectTemplateService {
       await this.factory.graphql<UpdateReadmeResponse>(mutation, {
         input: {
           projectId: data.projectId,
-          readme: data.readme
-        }
+          readme: data.readme,
+        },
       });
 
       return {
         success: true,
-        message: `Project README updated successfully`
+        message: `Project README updated successfully`,
       };
     });
   }
 
-  async listProjectFields(data: {
-    projectId: string;
-  }): Promise<CustomField[]> {
+  async listProjectFields(data: { projectId: string }): Promise<CustomField[]> {
     return safeCall(async () => {
       const project = await this.projectRepo.findById(data.projectId);
       if (!project) {
@@ -122,13 +115,13 @@ export class ProjectTemplateService {
     return safeCall(async () => {
       return await this.projectRepo.createField(data.projectId, {
         name: data.name,
-        type: data.type as CustomField['type'],
-        options: data.options?.map(opt => ({
-          id: '', // Will be assigned by GitHub
+        type: data.type as CustomField["type"],
+        options: data.options?.map((opt) => ({
+          id: "", // Will be assigned by GitHub
           name: opt.name,
           color: opt.color,
-          description: opt.description
-        }))
+          description: opt.description,
+        })),
       });
     });
   }
@@ -150,10 +143,10 @@ export class ProjectTemplateService {
       }
 
       if (data.options !== undefined) {
-        updateData.options = data.options.map(option => ({
-          id: '', // This will be assigned by GitHub
+        updateData.options = data.options.map((option) => ({
+          id: "", // This will be assigned by GitHub
           name: option.name,
-          color: option.color
+          color: option.color,
         }));
       }
 
@@ -165,20 +158,14 @@ export class ProjectTemplateService {
   async createProjectView(data: {
     projectId: string;
     name: string;
-    layout: 'board' | 'table' | 'timeline' | 'roadmap';
+    layout: "board" | "table" | "timeline" | "roadmap";
   }): Promise<ProjectView> {
     return safeCall(async () => {
-      return await this.projectRepo.createView(
-        data.projectId,
-        data.name,
-        data.layout
-      );
+      return await this.projectRepo.createView(data.projectId, data.name, data.layout);
     });
   }
 
-  async listProjectViews(data: {
-    projectId: string;
-  }): Promise<ProjectView[]> {
+  async listProjectViews(data: { projectId: string }): Promise<ProjectView[]> {
     return safeCall(async () => {
       const query = `
         query($projectId: ID!) {
@@ -203,27 +190,27 @@ export class ProjectTemplateService {
               id: string;
               name: string;
               layout: string;
-            }>
-          }
-        }
+            }>;
+          };
+        };
       }
 
       const response = await this.factory.graphql<ListViewsResponse>(query, {
-        projectId: data.projectId
+        projectId: data.projectId,
       });
 
       if (!response.node?.views?.nodes) {
         return [];
       }
 
-      return response.node.views.nodes.map(view => ({
+      return response.node.views.nodes.map((view) => ({
         id: view.id,
         name: view.name,
-        layout: view.layout.toLowerCase() as 'board' | 'table' | 'timeline' | 'roadmap',
+        layout: view.layout.toLowerCase() as "board" | "table" | "timeline" | "roadmap",
         fields: [], // These would need to be fetched separately if needed
         sortBy: [],
         groupBy: undefined,
-        filters: []
+        filters: [],
       }));
     });
   }
@@ -232,7 +219,7 @@ export class ProjectTemplateService {
     projectId: string;
     viewId: string;
     name?: string;
-    layout?: 'board' | 'table' | 'timeline' | 'roadmap';
+    layout?: "board" | "table" | "timeline" | "roadmap";
   }): Promise<ProjectView> {
     return safeCall(async () => {
       const mutation = `
@@ -253,13 +240,13 @@ export class ProjectTemplateService {
             id: string;
             name: string;
             layout: string;
-          }
-        }
+          };
+        };
       }
 
       const input: Record<string, any> = {
         projectId: data.projectId,
-        id: data.viewId
+        id: data.viewId,
       };
 
       if (data.name) {
@@ -271,7 +258,7 @@ export class ProjectTemplateService {
       }
 
       const response = await this.factory.graphql<UpdateViewResponse>(mutation, {
-        input
+        input,
       });
 
       const view = response.updateProjectV2View.projectV2View;
@@ -279,11 +266,11 @@ export class ProjectTemplateService {
       return {
         id: view.id,
         name: view.name,
-        layout: view.layout.toLowerCase() as 'board' | 'table' | 'timeline' | 'roadmap',
+        layout: view.layout.toLowerCase() as "board" | "table" | "timeline" | "roadmap",
         fields: [],
         sortBy: [],
         groupBy: undefined,
-        filters: []
+        filters: [],
       };
     });
   }
@@ -297,7 +284,7 @@ export class ProjectTemplateService {
 
       return {
         success: true,
-        message: `View ${data.viewId} deleted successfully from project ${data.projectId}`
+        message: `View ${data.viewId} deleted successfully from project ${data.projectId}`,
       };
     });
   }

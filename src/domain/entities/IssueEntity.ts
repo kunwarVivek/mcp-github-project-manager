@@ -24,28 +24,28 @@
  * issue.canBeClosed(); // checks if all acceptance criteria met
  * ```
  */
-import { ResourceStatus } from '../resource-types';
-import type { Issue, CreateIssue } from '../types';
+import { ResourceStatus } from "../resource-types";
+import type { Issue, CreateIssue } from "../types";
 
 /**
  * Priority levels for issues
  */
 export enum IssuePriority {
-  CRITICAL = 'critical',
-  HIGH = 'high',
-  MEDIUM = 'medium',
-  LOW = 'low',
+  CRITICAL = "critical",
+  HIGH = "high",
+  MEDIUM = "medium",
+  LOW = "low",
 }
 
 /**
  * Issue types/categories
  */
 export enum IssueType {
-  BUG = 'bug',
-  FEATURE = 'feature',
-  ENHANCEMENT = 'enhancement',
-  DOCUMENTATION = 'documentation',
-  TASK = 'task',
+  BUG = "bug",
+  FEATURE = "feature",
+  ENHANCEMENT = "enhancement",
+  DOCUMENTATION = "documentation",
+  TASK = "task",
 }
 
 /**
@@ -86,10 +86,7 @@ export class IssueEntity implements Issue {
   // Internal config
   private readonly config: IssueEntityConfig;
 
-  private constructor(
-    data: Issue,
-    config: IssueEntityConfig = DEFAULT_CONFIG
-  ) {
+  private constructor(data: Issue, config: IssueEntityConfig = DEFAULT_CONFIG) {
     this.id = data.id;
     this.number = data.number;
     this.title = data.title;
@@ -105,7 +102,7 @@ export class IssueEntity implements Issue {
 
     // Normalize labels on creation
     if (config.normalizeLabels) {
-      this.labels = this.labels.map(l => l.toLowerCase());
+      this.labels = this.labels.map((l) => l.toLowerCase());
     }
   }
 
@@ -157,16 +154,14 @@ export class IssueEntity implements Issue {
    * Check if the issue is open (active or in progress)
    */
   get isOpen(): boolean {
-    return this.status === ResourceStatus.ACTIVE ||
-           this.status === ResourceStatus.IN_PROGRESS;
+    return this.status === ResourceStatus.ACTIVE || this.status === ResourceStatus.IN_PROGRESS;
   }
 
   /**
    * Check if the issue is closed
    */
   get isClosed(): boolean {
-    return this.status === ResourceStatus.CLOSED ||
-           this.status === ResourceStatus.COMPLETED;
+    return this.status === ResourceStatus.CLOSED || this.status === ResourceStatus.COMPLETED;
   }
 
   /**
@@ -201,9 +196,9 @@ export class IssueEntity implements Issue {
    * Get the priority from labels (e.g., "priority:high" → "high")
    */
   get priority(): IssuePriority | null {
-    const priorityLabel = this.labels.find(l => l.startsWith('priority:'));
+    const priorityLabel = this.labels.find((l) => l.startsWith("priority:"));
     if (priorityLabel) {
-      const priority = priorityLabel.replace('priority:', '') as IssuePriority;
+      const priority = priorityLabel.replace("priority:", "") as IssuePriority;
       return Object.values(IssuePriority).includes(priority) ? priority : null;
     }
     return null;
@@ -213,9 +208,9 @@ export class IssueEntity implements Issue {
    * Get the issue type from labels (e.g., "type:bug" → "bug")
    */
   get issueType(): IssueType | null {
-    const typeLabel = this.labels.find(l => l.startsWith('type:'));
+    const typeLabel = this.labels.find((l) => l.startsWith("type:"));
     if (typeLabel) {
-      const type = typeLabel.replace('type:', '') as IssueType;
+      const type = typeLabel.replace("type:", "") as IssueType;
       return Object.values(IssueType).includes(type) ? type : null;
     }
     return null;
@@ -257,9 +252,7 @@ export class IssueEntity implements Issue {
    * @returns true if label was added, false if already exists or limit reached
    */
   addLabel(label: string): boolean {
-    const normalizedLabel = this.config.normalizeLabels
-      ? label.toLowerCase()
-      : label;
+    const normalizedLabel = this.config.normalizeLabels ? label.toLowerCase() : label;
 
     // Check if label already exists
     if (this.labels.includes(normalizedLabel)) {
@@ -281,9 +274,7 @@ export class IssueEntity implements Issue {
    * @returns true if label was removed, false if not found
    */
   removeLabel(label: string): boolean {
-    const normalizedLabel = this.config.normalizeLabels
-      ? label.toLowerCase()
-      : label;
+    const normalizedLabel = this.config.normalizeLabels ? label.toLowerCase() : label;
 
     const index = this.labels.indexOf(normalizedLabel);
     if (index === -1) {
@@ -299,9 +290,7 @@ export class IssueEntity implements Issue {
    * Check if the issue has a specific label
    */
   hasLabel(label: string): boolean {
-    const normalizedLabel = this.config.normalizeLabels
-      ? label.toLowerCase()
-      : label;
+    const normalizedLabel = this.config.normalizeLabels ? label.toLowerCase() : label;
     return this.labels.includes(normalizedLabel);
   }
 
@@ -384,7 +373,7 @@ export class IssueEntity implements Issue {
    */
   startWork(): void {
     if (!this.isOpen) {
-      throw new Error('Cannot start work on a closed issue');
+      throw new Error("Cannot start work on a closed issue");
     }
     this.status = ResourceStatus.IN_PROGRESS;
     this.touch();
@@ -411,23 +400,22 @@ export class IssueEntity implements Issue {
    * Looks for "blocked" label or "blocked-by:#123" pattern
    */
   get isBlocked(): boolean {
-    return this.hasLabel('blocked') ||
-           this.labels.some(l => l.startsWith('blocked-by:'));
+    return this.hasLabel("blocked") || this.labels.some((l) => l.startsWith("blocked-by:"));
   }
 
   /**
    * Get the issue numbers that block this issue
    */
   get blockedBy(): number[] {
-    const blockingLabels = this.labels.filter(l => l.startsWith('blocked-by:'));
+    const blockingLabels = this.labels.filter((l) => l.startsWith("blocked-by:"));
     return blockingLabels
-      .map(l => {
-        const afterPrefix = l.replace('blocked-by:', '');
+      .map((l) => {
+        const afterPrefix = l.replace("blocked-by:", "");
         // Handle both '#123' and '123' formats
-        const numStr = afterPrefix.startsWith('#') ? afterPrefix.slice(1) : afterPrefix;
+        const numStr = afterPrefix.startsWith("#") ? afterPrefix.slice(1) : afterPrefix;
         return parseInt(numStr, 10);
       })
-      .filter(n => !isNaN(n));
+      .filter((n) => !isNaN(n));
   }
 
   /**

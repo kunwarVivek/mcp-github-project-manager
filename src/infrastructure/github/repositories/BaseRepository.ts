@@ -1,4 +1,3 @@
-
 import type { GitHubError, OctokitInstance } from "../types";
 import { GitHubErrorHandler } from "../GitHubErrorHandler";
 import type { GitHubConfig } from "../GitHubConfig"; // Fixed import path
@@ -41,10 +40,7 @@ export abstract class BaseGitHubRepository implements IGitHubRepository {
   /**
    * Execute operation with automatic retries and rate limit handling
    */
-  protected async withRetry<T>(
-    operation: () => Promise<T>,
-    context?: string
-  ): Promise<T> {
+  protected async withRetry<T>(operation: () => Promise<T>, context?: string): Promise<T> {
     let lastError: unknown;
     let error: unknown;
 
@@ -53,7 +49,7 @@ export abstract class BaseGitHubRepository implements IGitHubRepository {
         // Check if we should throttle due to rate limits
         if (await this.apiUtil.shouldThrottle(this.octokit)) {
           const delay = await this.apiUtil.calculateRequestDelay(this.octokit);
-          await new Promise(resolve => setTimeout(resolve, delay));
+          await new Promise((resolve) => setTimeout(resolve, delay));
         }
 
         return await operation();
@@ -73,7 +69,7 @@ export abstract class BaseGitHubRepository implements IGitHubRepository {
 
         const headers = (error as GitHubError)?.response?.headers || {};
         const delay = this.errorHandler.calculateRetryDelay(headers);
-        await new Promise(resolve => setTimeout(resolve, delay));
+        await new Promise((resolve) => setTimeout(resolve, delay));
       }
     }
 
@@ -83,10 +79,7 @@ export abstract class BaseGitHubRepository implements IGitHubRepository {
   /**
    * Execute GraphQL query with rate limiting support
    */
-  protected async graphql<T>(
-    query: string,
-    variables: Record<string, unknown> = {}
-  ): Promise<T> {
+  protected async graphql<T>(query: string, variables: Record<string, unknown> = {}): Promise<T> {
     return this.withRetry(
       () =>
         this.octokit.graphql<T>(query, {
@@ -94,7 +87,7 @@ export abstract class BaseGitHubRepository implements IGitHubRepository {
           owner: this.owner,
           repo: this.repo,
         }),
-      'executing GraphQL query'
+      "executing GraphQL query"
     );
   }
 
@@ -116,7 +109,7 @@ export abstract class BaseGitHubRepository implements IGitHubRepository {
   ): Promise<T> {
     const headers: Record<string, string> = {};
     if (features.length > 0) {
-      headers['GraphQL-Features'] = features.join(',');
+      headers["GraphQL-Features"] = features.join(",");
     }
 
     return this.withRetry(
@@ -127,7 +120,7 @@ export abstract class BaseGitHubRepository implements IGitHubRepository {
           repo: this.repo,
           headers,
         }),
-      `executing GraphQL query with features: ${features.join(',')}`
+      `executing GraphQL query with features: ${features.join(",")}`
     );
   }
 
@@ -300,20 +293,18 @@ export abstract class BaseGitHubRepository implements IGitHubRepository {
     });
 
     const nameToId = new Map(
-      (response.repository?.labels.nodes ?? []).map((label) => [label.name, label.id]),
+      (response.repository?.labels.nodes ?? []).map((label) => [label.name, label.id])
     );
 
-    return names
-      .map((name) => nameToId.get(name))
-      .filter((id): id is string => id != null);
+    return names.map((name) => nameToId.get(name)).filter((id): id is string => id != null);
   }
 
   /**
    * Handle GraphQL errors consistently
    */
   protected handleGraphQLError(error: unknown): Error {
-    this.logger.error('GraphQL operation failed', error);
-    return this.errorHandler.handleError(error, 'GraphQL operation');
+    this.logger.error("GraphQL operation failed", error);
+    return this.errorHandler.handleError(error, "GraphQL operation");
   }
 
   /**
@@ -325,7 +316,7 @@ export abstract class BaseGitHubRepository implements IGitHubRepository {
   ): Promise<T> {
     const result = await this.withRetry(
       () => operation(this.getRequestParams(params)),
-      'executing REST API call'
+      "executing REST API call"
     );
     return result.data;
   }
@@ -341,10 +332,11 @@ export abstract class BaseGitHubRepository implements IGitHubRepository {
     const finalParams = this.getRequestParams(params);
 
     return this.apiUtil.paginateRequest<T>(
-      (paginationParams) => operation({
-        ...finalParams,
-        ...paginationParams
-      }),
+      (paginationParams) =>
+        operation({
+          ...finalParams,
+          ...paginationParams,
+        }),
       paginationOptions
     );
   }
@@ -362,23 +354,20 @@ export abstract class BaseGitHubRepository implements IGitHubRepository {
     options: {
       pageSize?: number;
       maxItems?: number;
-      initialCursor?: string
+      initialCursor?: string;
     } = {}
   ): Promise<T[]> {
-    return this.apiUtil.paginateGraphQL<T>(
-      async ({ cursor, pageSize }) => {
-        const data = await this.graphql(query, {
-          ...variables,
-          first: pageSize,
-          after: cursor,
-          owner: this.owner,
-          repo: this.repo,
-        });
+    return this.apiUtil.paginateGraphQL<T>(async ({ cursor, pageSize }) => {
+      const data = await this.graphql(query, {
+        ...variables,
+        first: pageSize,
+        after: cursor,
+        owner: this.owner,
+        repo: this.repo,
+      });
 
-        return getNodesAndPageInfo(data);
-      },
-      options
-    );
+      return getNodesAndPageInfo(data);
+    }, options);
   }
 
   /**

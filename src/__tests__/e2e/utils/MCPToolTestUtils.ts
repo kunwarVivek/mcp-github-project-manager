@@ -1,19 +1,19 @@
-import { spawn, type ChildProcess } from 'node:child_process';
-import { join } from 'node:path';
-import { existsSync } from 'node:fs';
+import { spawn, type ChildProcess } from "node:child_process";
+import { join } from "node:path";
+import { existsSync } from "node:fs";
 
 /**
  * Utility class for testing MCP tools through the actual MCP interface
  */
 export class MCPToolTestUtils {
-  private static serverPath = join(process.cwd(), 'build/index.js');
+  private static serverPath = join(process.cwd(), "build/index.js");
   private serverProcess: ChildProcess | null = null;
   private messageId = 1;
 
   constructor() {
     // Ensure build exists
     if (!existsSync(MCPToolTestUtils.serverPath)) {
-      throw new Error('Server build not found. Run `npm run build` first.');
+      throw new Error("Server build not found. Run `npm run build` first.");
     }
   }
 
@@ -22,39 +22,39 @@ export class MCPToolTestUtils {
    */
   async startServer(envOverrides: Record<string, string> = {}): Promise<void> {
     if (this.serverProcess) {
-      throw new Error('Server is already running');
+      throw new Error("Server is already running");
     }
 
     const env = {
       ...process.env,
       ...envOverrides,
       // Ensure we have required environment variables
-      GITHUB_TOKEN: process.env.GITHUB_TOKEN || 'test-token',
-      GITHUB_OWNER: process.env.GITHUB_OWNER || 'test-owner',
-      GITHUB_REPO: process.env.GITHUB_REPO || 'test-repo',
+      GITHUB_TOKEN: process.env.GITHUB_TOKEN || "test-token",
+      GITHUB_OWNER: process.env.GITHUB_OWNER || "test-owner",
+      GITHUB_REPO: process.env.GITHUB_REPO || "test-repo",
       // These suites exercise the stdio protocol, not webhooks. Without this
       // every spawned server binds WEBHOOK_PORT (default 3001); Vitest runs
       // files in parallel, so they collided and failed nondeterministically.
-      SSE_ENABLED: 'false',
+      SSE_ENABLED: "false",
     };
 
-    this.serverProcess = spawn('node', [MCPToolTestUtils.serverPath], {
+    this.serverProcess = spawn("node", [MCPToolTestUtils.serverPath], {
       env,
-      stdio: ['pipe', 'pipe', 'pipe']
+      stdio: ["pipe", "pipe", "pipe"],
     });
 
     // Wait for server to start
     await new Promise((resolve, reject) => {
       const timeout = setTimeout(() => {
-        reject(new Error('Server startup timeout'));
+        reject(new Error("Server startup timeout"));
       }, 10000);
 
-      this.serverProcess!.on('spawn', () => {
+      this.serverProcess!.on("spawn", () => {
         clearTimeout(timeout);
         resolve(void 0);
       });
 
-      this.serverProcess!.on('error', (error) => {
+      this.serverProcess!.on("error", (error) => {
         clearTimeout(timeout);
         reject(error);
       });
@@ -69,18 +69,18 @@ export class MCPToolTestUtils {
    */
   async stopServer(): Promise<void> {
     if (this.serverProcess) {
-      this.serverProcess.kill('SIGTERM');
+      this.serverProcess.kill("SIGTERM");
 
       // Wait for process to exit
       await new Promise<void>((resolve) => {
         const timeout = setTimeout(() => {
           if (this.serverProcess && !this.serverProcess.killed) {
-            this.serverProcess.kill('SIGKILL');
+            this.serverProcess.kill("SIGKILL");
           }
           resolve();
         }, 5000);
 
-        this.serverProcess!.on('exit', () => {
+        this.serverProcess!.on("exit", () => {
           clearTimeout(timeout);
           resolve();
         });
@@ -101,8 +101,8 @@ export class MCPToolTestUtils {
       params: {
         protocolVersion: "2025-03-26",
         capabilities: {},
-        clientInfo: { name: "e2e-test", version: "1.0.0" }
-      }
+        clientInfo: { name: "e2e-test", version: "1.0.0" },
+      },
     };
 
     await this.sendMessage(initRequest);
@@ -113,28 +113,28 @@ export class MCPToolTestUtils {
    */
   private async sendMessage(message: any): Promise<any> {
     if (!this.serverProcess) {
-      throw new Error('Server is not running');
+      throw new Error("Server is not running");
     }
 
     return new Promise((resolve, reject) => {
-      let responseData = '';
+      let responseData = "";
 
       const timeout = setTimeout(() => {
-        reject(new Error('Message timeout'));
+        reject(new Error("Message timeout"));
       }, 30000);
 
       const onData = (data: Buffer) => {
         responseData += data.toString();
-        
+
         // Try to parse JSON response
-        const lines = responseData.split('\n').filter(line => line.trim());
+        const lines = responseData.split("\n").filter((line) => line.trim());
         for (const line of lines) {
           try {
             const response = JSON.parse(line);
             if (response.id === message.id) {
               clearTimeout(timeout);
-              this.serverProcess!.stdout!.off('data', onData);
-              this.serverProcess!.stderr!.off('data', onError);
+              this.serverProcess!.stdout!.off("data", onData);
+              this.serverProcess!.stderr!.off("data", onError);
               resolve(response);
               return;
             }
@@ -148,8 +148,8 @@ export class MCPToolTestUtils {
         // Drain stderr so the child process does not block on a full pipe.
       };
 
-      this.serverProcess!.stdout!.on('data', onData);
-      this.serverProcess!.stderr!.on('data', onError);
+      this.serverProcess!.stdout!.on("data", onData);
+      this.serverProcess!.stderr!.on("data", onError);
 
       // Send the message
       this.serverProcess!.stdin!.write(`${JSON.stringify(message)}\n`);
@@ -164,11 +164,11 @@ export class MCPToolTestUtils {
       jsonrpc: "2.0",
       id: this.messageId++,
       method: "tools/list",
-      params: {}
+      params: {},
     };
 
     const response = await this.sendMessage(request);
-    
+
     if (response.error) {
       throw new Error(`Failed to list tools: ${response.error.message}`);
     }
@@ -186,12 +186,12 @@ export class MCPToolTestUtils {
       method: "tools/call",
       params: {
         name: toolName,
-        arguments: args
-      }
+        arguments: args,
+      },
     };
 
     const response = await this.sendMessage(request);
-    
+
     if (response.error) {
       throw new Error(`Tool ${toolName} failed: ${response.error.message}`);
     }
@@ -209,12 +209,12 @@ export class MCPToolTestUtils {
       method: "tools/call",
       params: {
         name: toolName,
-        arguments: args
-      }
+        arguments: args,
+      },
     };
 
     const response = await this.sendMessage(request);
-    
+
     if (response.error) {
       throw new Error(`Tool ${toolName} failed: ${response.error.message}`);
     }
@@ -226,7 +226,7 @@ export class MCPToolTestUtils {
    * Extract domain data from MCP v2 tool response
    */
   static extractData(result: any): any {
-    if (!result || typeof result !== 'object') return result;
+    if (!result || typeof result !== "object") return result;
     // Check for structuredContent first (MCP v2 with outputSchema)
     if (result.structuredContent) return result.structuredContent;
     // Extract from content[0].text
@@ -247,8 +247,8 @@ export class MCPToolTestUtils {
    */
   async validateToolExists(toolName: string): Promise<boolean> {
     const tools = await this.listTools();
-    const tool = tools.find(t => t.name === toolName);
-    
+    const tool = tools.find((t) => t.name === toolName);
+
     if (!tool) {
       return false;
     }
@@ -260,14 +260,17 @@ export class MCPToolTestUtils {
   /**
    * Test tool with invalid arguments to verify validation
    */
-  async testToolValidation(toolName: string, invalidArgs: any): Promise<{ hasValidation: boolean; errorMessage?: string }> {
+  async testToolValidation(
+    toolName: string,
+    invalidArgs: any
+  ): Promise<{ hasValidation: boolean; errorMessage?: string }> {
     try {
       await this.callTool(toolName, invalidArgs);
       return { hasValidation: false };
     } catch (error) {
-      return { 
-        hasValidation: true, 
-        errorMessage: error instanceof Error ? error.message : String(error)
+      return {
+        hasValidation: true,
+        errorMessage: error instanceof Error ? error.message : String(error),
       };
     }
   }
@@ -277,7 +280,7 @@ export class MCPToolTestUtils {
    */
   static extractContent(response: any): string {
     // Handle different response formats
-    if (typeof response === 'string') {
+    if (typeof response === "string") {
       try {
         const parsed = JSON.parse(response);
         return MCPToolTestUtils.extractContent(parsed);
@@ -288,11 +291,13 @@ export class MCPToolTestUtils {
 
     // Handle MCP tool response format
     if (response.output) {
-      if (typeof response.output === 'string') {
+      if (typeof response.output === "string") {
         try {
           const parsed = JSON.parse(response.output);
           if (parsed.content) {
-            return typeof parsed.content === 'string' ? parsed.content : JSON.stringify(parsed.content);
+            return typeof parsed.content === "string"
+              ? parsed.content
+              : JSON.stringify(parsed.content);
           }
           return response.output;
         } catch {
@@ -304,7 +309,9 @@ export class MCPToolTestUtils {
 
     // Handle direct content
     if (response.content) {
-      return typeof response.content === 'string' ? response.content : JSON.stringify(response.content);
+      return typeof response.content === "string"
+        ? response.content
+        : JSON.stringify(response.content);
     }
 
     return JSON.stringify(response);
@@ -313,7 +320,7 @@ export class MCPToolTestUtils {
   /**
    * Check if we have real (not fake/test) credentials
    */
-  static hasRealCredentials(testType: 'github' | 'ai' | 'both'): boolean {
+  static hasRealCredentials(testType: "github" | "ai" | "both"): boolean {
     const token = process.env.GITHUB_TOKEN;
     const owner = process.env.GITHUB_OWNER;
     const repo = process.env.GITHUB_REPO;
@@ -322,22 +329,28 @@ export class MCPToolTestUtils {
 
     // Check for fake test values from setup.ts
     const hasRealGitHub = !!(
-      token && token !== 'test-token' && token !== '' &&
-      owner && owner !== 'test-owner' &&
-      repo && repo !== 'test-repo'
+      token &&
+      token !== "test-token" &&
+      token !== "" &&
+      owner &&
+      owner !== "test-owner" &&
+      repo &&
+      repo !== "test-repo"
     );
 
     const hasRealAI = !!(
-      (anthropicKey && anthropicKey !== 'sk-ant-test-key' && !anthropicKey.startsWith('sk-ant-test')) ||
-      (openaiKey && openaiKey !== 'sk-test-openai-key' && !openaiKey.startsWith('sk-test'))
+      (anthropicKey &&
+        anthropicKey !== "sk-ant-test-key" &&
+        !anthropicKey.startsWith("sk-ant-test")) ||
+      (openaiKey && openaiKey !== "sk-test-openai-key" && !openaiKey.startsWith("sk-test"))
     );
 
     switch (testType) {
-      case 'github':
+      case "github":
         return hasRealGitHub;
-      case 'ai':
+      case "ai":
         return hasRealAI;
-      case 'both':
+      case "both":
         return hasRealGitHub && hasRealAI;
       default:
         return false;
@@ -347,7 +360,7 @@ export class MCPToolTestUtils {
   /**
    * Check if we should skip tests based on credentials
    */
-  static shouldSkipTest(testType: 'github' | 'ai' | 'both'): boolean {
+  static shouldSkipTest(testType: "github" | "ai" | "both"): boolean {
     // Skip if we don't have real credentials for this test type
     return !MCPToolTestUtils.hasRealCredentials(testType);
   }
@@ -358,7 +371,7 @@ export class MCPToolTestUtils {
    * Tests are always registered but will skip gracefully when credentials
    * are missing. Individual tests should check `if (!utils)` and return early.
    */
-  static createTestSuite(suiteName: string, testType: 'github' | 'ai' | 'both' = 'github') {
+  static createTestSuite(suiteName: string, testType: "github" | "ai" | "both" = "github") {
     return (tests: (utils: MCPToolTestUtils | undefined) => void) => {
       describe(suiteName, () => {
         let utils: MCPToolTestUtils | undefined;
@@ -400,7 +413,7 @@ export const MCPTestHelpers = {
     let actualResponse = response;
 
     // If response has output property, extract it
-    if (response.output && typeof response.output === 'string') {
+    if (response.output && typeof response.output === "string") {
       try {
         actualResponse = JSON.parse(response.output);
       } catch {
@@ -424,14 +437,14 @@ export const MCPTestHelpers = {
       shortDescription: "E2E test project",
       owner: process.env.GITHUB_OWNER || "test-owner",
       visibility: "private" as const,
-      ...overrides
+      ...overrides,
     }),
 
     milestone: (overrides: any = {}) => ({
       title: `Test Milestone ${Date.now()}`,
       description: "E2E test milestone",
       dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-      ...overrides
+      ...overrides,
     }),
 
     issue: (overrides: any = {}) => ({
@@ -439,7 +452,7 @@ export const MCPTestHelpers = {
       description: "E2E test issue",
       assignees: [],
       labels: [],
-      ...overrides
+      ...overrides,
     }),
 
     sprint: (overrides: any = {}) => ({
@@ -448,21 +461,25 @@ export const MCPTestHelpers = {
       startDate: new Date().toISOString(),
       endDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
       goals: ["Complete E2E testing"],
-      ...overrides
-    })
+      ...overrides,
+    }),
   },
 
   /**
    * Wait for a condition to be true
    */
-  async waitFor(condition: () => Promise<boolean>, timeout = 10000, interval = 1000): Promise<void> {
+  async waitFor(
+    condition: () => Promise<boolean>,
+    timeout = 10000,
+    interval = 1000
+  ): Promise<void> {
     const start = Date.now();
 
     while (Date.now() - start < timeout) {
       if (await condition()) {
         return;
       }
-      await new Promise(resolve => setTimeout(resolve, interval));
+      await new Promise((resolve) => setTimeout(resolve, interval));
     }
 
     throw new Error(`Condition not met within ${timeout}ms`);
@@ -472,7 +489,7 @@ export const MCPTestHelpers = {
    * Skip test if required credentials are missing
    * Note: Returns a boolean - caller should use console.log + return pattern
    */
-  skipIfMissingCredentials(testType: 'github' | 'ai' | 'both', testName: string): boolean {
+  skipIfMissingCredentials(testType: "github" | "ai" | "both", testName: string): boolean {
     if (MCPToolTestUtils.shouldSkipTest(testType)) {
       console.log(`Skipping: ${testName} - missing credentials for ${testType} tests`);
       return true;
@@ -483,11 +500,11 @@ export const MCPTestHelpers = {
   /**
    * Check if a test should be skipped and return appropriate action
    */
-  checkCredentials(testType: 'github' | 'ai' | 'both'): { shouldSkip: boolean; reason?: string } {
+  checkCredentials(testType: "github" | "ai" | "both"): { shouldSkip: boolean; reason?: string } {
     const shouldSkip = MCPToolTestUtils.shouldSkipTest(testType);
     return {
       shouldSkip,
-      reason: shouldSkip ? `Missing credentials for ${testType} tests` : undefined
+      reason: shouldSkip ? `Missing credentials for ${testType} tests` : undefined,
     };
-  }
+  },
 };

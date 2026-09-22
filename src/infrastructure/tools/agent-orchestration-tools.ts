@@ -9,28 +9,41 @@
  * - View agent activity and manage token budgets
  */
 
-import { z } from 'zod';
-import type { ToolDefinition, ToolSchema } from './ToolValidator';
-import { ANNOTATION_PATTERNS } from './annotations/tool-annotations';
-import { createGitHubFactory } from './tool-factory';
-import { mapErrorToMCPError } from '../../services/utils/ErrorMapper';
+import { z } from "zod";
+import type { ToolDefinition, ToolSchema } from "./ToolValidator";
+import { ANNOTATION_PATTERNS } from "./annotations/tool-annotations";
+import { createGitHubFactory } from "./tool-factory";
+import { mapErrorToMCPError } from "../../services/utils/ErrorMapper";
 
-import { AgentStore } from '../agent/AgentStore';
-import { WorkProductStore } from '../agent/WorkProductStore';
-import { ProjectFieldSetup } from '../agent/ProjectFieldSetup';
-import { TaskCheckoutService } from '../../services/agent/TaskCheckoutService';
-import { AgentContextService } from '../../services/agent/AgentContextService';
-import { WorkProductService } from '../../services/agent/WorkProductService';
-import { AgentBudgetService } from '../../services/agent/AgentBudgetService';
-import { AgentMetricsService } from '../../services/agent/AgentMetricsService';
-import { DomainEventBus } from '../../domain/events/DomainEventBus';
-import { AgentRegisteredEvent, AgentDeregisteredEvent } from '../../domain/events/AgentEvents';
+import { AgentStore } from "../agent/AgentStore";
+import { WorkProductStore } from "../agent/WorkProductStore";
+import { ProjectFieldSetup } from "../agent/ProjectFieldSetup";
+import { TaskCheckoutService } from "../../services/agent/TaskCheckoutService";
+import { AgentContextService } from "../../services/agent/AgentContextService";
+import { WorkProductService } from "../../services/agent/WorkProductService";
+import { AgentBudgetService } from "../../services/agent/AgentBudgetService";
+import { AgentMetricsService } from "../../services/agent/AgentMetricsService";
+import { DomainEventBus } from "../../domain/events/DomainEventBus";
+import { AgentRegisteredEvent, AgentDeregisteredEvent } from "../../domain/events/AgentEvents";
 
-import type { Agent, AgentActivityEntry, AgentMetrics, BudgetStatus, WorkProduct } from '../../domain/agent-orchestration-types';
-import { AgentSchema, TaskCheckoutResultSchema, AgentTaskContextSchema, WorkProductSchema, BudgetStatusSchema, AgentActivityEntrySchema, AgentMetricsSchema,
+import type {
+  Agent,
+  AgentActivityEntry,
+  AgentMetrics,
+  BudgetStatus,
+  WorkProduct,
+} from "../../domain/agent-orchestration-types";
+import {
+  AgentSchema,
+  TaskCheckoutResultSchema,
+  AgentTaskContextSchema,
+  WorkProductSchema,
+  BudgetStatusSchema,
+  AgentActivityEntrySchema,
+  AgentMetricsSchema,
   MAX_AGENT_HIERARCHY_DEPTH,
   MAX_AGENT_CHILDREN,
-} from '../../domain/agent-orchestration-types';
+} from "../../domain/agent-orchestration-types";
 
 import {
   registerAgentSchema,
@@ -53,7 +66,7 @@ import {
   rejectTaskSchema,
   getAgentMetricsSchema,
   setupAgentFieldsSchema,
-} from './schemas/agent-orchestration-schemas';
+} from "./schemas/agent-orchestration-schemas";
 
 import type {
   RegisterAgentArgs,
@@ -76,9 +89,9 @@ import type {
   RejectTaskArgs,
   GetAgentMetricsArgs,
   SetupAgentFieldsArgs,
-} from './schemas/agent-orchestration-schemas';
+} from "./schemas/agent-orchestration-schemas";
 
-import { SuccessOutputSchema } from './schemas/project-schemas';
+import { SuccessOutputSchema } from "./schemas/project-schemas";
 
 // ============================================================================
 // Output Schemas
@@ -111,24 +124,24 @@ export const registerAgentTool: ToolDefinition<
   RegisterAgentArgs,
   z.infer<typeof AgentOutputSchema>
 > = {
-  name: 'register_agent',
-  title: 'Register Agent',
+  name: "register_agent",
+  title: "Register Agent",
   description:
-    'Register a new AI agent in the orchestration registry. ' +
-    'Use this when an agent starts up and wants to participate in task assignment. ' +
-    'Returns the registered agent record with a unique ID.',
+    "Register a new AI agent in the orchestration registry. " +
+    "Use this when an agent starts up and wants to participate in task assignment. " +
+    "Returns the registered agent record with a unique ID.",
   schema: registerAgentSchema as unknown as ToolSchema<RegisterAgentArgs>,
   outputSchema: AgentOutputSchema,
   annotations: ANNOTATION_PATTERNS.create,
   examples: [
     {
-      name: 'Register a Claude Code engineer',
-      description: 'Register a new agent with engineering capabilities',
+      name: "Register a Claude Code engineer",
+      description: "Register a new agent with engineering capabilities",
       args: {
-        name: 'claude-eng-1',
-        role: 'engineer',
-        runtime: 'claude-code',
-        capabilities: ['typescript', 'react', 'testing'],
+        name: "claude-eng-1",
+        role: "engineer",
+        runtime: "claude-code",
+        capabilities: ["typescript", "react", "testing"],
       },
     },
   ],
@@ -138,19 +151,19 @@ export const listAgentsTool: ToolDefinition<
   ListAgentsArgs,
   z.infer<typeof AgentListOutputSchema>
 > = {
-  name: 'list_agents',
-  title: 'List Agents',
+  name: "list_agents",
+  title: "List Agents",
   description:
-    'List all registered agents, optionally filtered by role or status. ' +
-    'Use this to see which agents are available, working, or blocked.',
+    "List all registered agents, optionally filtered by role or status. " +
+    "Use this to see which agents are available, working, or blocked.",
   schema: listAgentsSchema as unknown as ToolSchema<ListAgentsArgs>,
   outputSchema: AgentListOutputSchema,
   annotations: ANNOTATION_PATTERNS.readOnly,
   examples: [
     {
-      name: 'List all idle engineers',
-      description: 'Find agents ready for new tasks',
-      args: { role: 'engineer', status: 'idle' },
+      name: "List all idle engineers",
+      description: "Find agents ready for new tasks",
+      args: { role: "engineer", status: "idle" },
     },
   ],
 };
@@ -159,20 +172,20 @@ export const deregisterAgentTool: ToolDefinition<
   DeregisterAgentArgs,
   z.infer<typeof DeregisterOutputSchema>
 > = {
-  name: 'deregister_agent',
-  title: 'Deregister Agent',
+  name: "deregister_agent",
+  title: "Deregister Agent",
   description:
-    'Remove an agent from the orchestration registry. ' +
-    'Use this when an agent is shutting down or no longer participating. ' +
-    'The agent must not have an active task.',
+    "Remove an agent from the orchestration registry. " +
+    "Use this when an agent is shutting down or no longer participating. " +
+    "The agent must not have an active task.",
   schema: deregisterAgentSchema as unknown as ToolSchema<DeregisterAgentArgs>,
   outputSchema: DeregisterOutputSchema,
   annotations: ANNOTATION_PATTERNS.delete,
   examples: [
     {
-      name: 'Deregister an agent',
-      description: 'Remove an agent from the registry',
-      args: { agentId: 'agent-abc123' },
+      name: "Deregister an agent",
+      description: "Remove an agent from the registry",
+      args: { agentId: "agent-abc123" },
     },
   ],
 };
@@ -185,21 +198,21 @@ export const checkoutTaskTool: ToolDefinition<
   CheckoutTaskArgs,
   z.infer<typeof TaskCheckoutResultSchema>
 > = {
-  name: 'checkout_task',
-  title: 'Checkout Task',
+  name: "checkout_task",
+  title: "Checkout Task",
   description:
-    'Claim the next available task for an agent. ' +
-    'Uses the specified strategy (priority, age, skills, or milestone deadline) to select. ' +
-    'The task is assigned to the agent and marked in-progress. ' +
-    'Returns issue details, suggested branch name, and context.',
+    "Claim the next available task for an agent. " +
+    "Uses the specified strategy (priority, age, skills, or milestone deadline) to select. " +
+    "The task is assigned to the agent and marked in-progress. " +
+    "Returns issue details, suggested branch name, and context.",
   schema: checkoutTaskSchema as unknown as ToolSchema<CheckoutTaskArgs>,
   outputSchema: TaskCheckoutResultSchema,
   annotations: ANNOTATION_PATTERNS.updateNonIdempotent,
   examples: [
     {
-      name: 'Checkout highest priority task',
-      description: 'Claim the most urgent available task',
-      args: { agentId: 'agent-abc123', strategy: 'highest_priority' },
+      name: "Checkout highest priority task",
+      description: "Claim the most urgent available task",
+      args: { agentId: "agent-abc123", strategy: "highest_priority" },
     },
   ],
 };
@@ -208,20 +221,20 @@ export const releaseTaskTool: ToolDefinition<
   ReleaseTaskArgs,
   z.infer<typeof SuccessOutputSchema>
 > = {
-  name: 'release_task',
-  title: 'Release Task',
+  name: "release_task",
+  title: "Release Task",
   description:
-    'Release a previously checked-out task back to the pool. ' +
-    'Use this when the agent cannot complete the task (blocked, wrong skills, etc). ' +
-    'The task becomes available for other agents to claim.',
+    "Release a previously checked-out task back to the pool. " +
+    "Use this when the agent cannot complete the task (blocked, wrong skills, etc). " +
+    "The task becomes available for other agents to claim.",
   schema: releaseTaskSchema as unknown as ToolSchema<ReleaseTaskArgs>,
   outputSchema: SuccessOutputSchema,
   annotations: ANNOTATION_PATTERNS.updateIdempotent,
   examples: [
     {
-      name: 'Release a blocked task',
-      description: 'Return a task to the unclaimed pool',
-      args: { agentId: 'agent-abc123', taskId: 'issue-42', reason: 'Missing API credentials' },
+      name: "Release a blocked task",
+      description: "Return a task to the unclaimed pool",
+      args: { agentId: "agent-abc123", taskId: "issue-42", reason: "Missing API credentials" },
     },
   ],
 };
@@ -230,23 +243,23 @@ export const completeTaskTool: ToolDefinition<
   CompleteTaskArgs,
   z.infer<typeof SuccessOutputSchema>
 > = {
-  name: 'complete_task',
-  title: 'Complete Task',
+  name: "complete_task",
+  title: "Complete Task",
   description:
-    'Mark a checked-out task as completed. ' +
-    'Use this after submitting a work product and getting approval. ' +
-    'Provide a summary of what was done.',
+    "Mark a checked-out task as completed. " +
+    "Use this after submitting a work product and getting approval. " +
+    "Provide a summary of what was done.",
   schema: completeTaskSchema as unknown as ToolSchema<CompleteTaskArgs>,
   outputSchema: SuccessOutputSchema,
   annotations: ANNOTATION_PATTERNS.updateIdempotent,
   examples: [
     {
-      name: 'Complete a task',
-      description: 'Mark a task as done with a summary',
+      name: "Complete a task",
+      description: "Mark a task as done with a summary",
       args: {
-        agentId: 'agent-abc123',
-        taskId: 'issue-42',
-        summary: 'Implemented login form with validation and tests',
+        agentId: "agent-abc123",
+        taskId: "issue-42",
+        summary: "Implemented login form with validation and tests",
         closeIssue: true,
         autoCheckoutNext: true,
       },
@@ -262,20 +275,20 @@ export const getTaskContextTool: ToolDefinition<
   GetTaskContextArgs,
   z.infer<typeof AgentTaskContextSchema>
 > = {
-  name: 'get_task_context',
-  title: 'Get Task Context',
+  name: "get_task_context",
+  title: "Get Task Context",
   description:
-    'Get enriched context for a task/issue. ' +
-    'Returns issue details, parent issue, milestone, related issues, ' +
-    'acceptance criteria, coding standards, and suggested branch name. ' +
-    'Use this to understand the full scope before starting work.',
+    "Get enriched context for a task/issue. " +
+    "Returns issue details, parent issue, milestone, related issues, " +
+    "acceptance criteria, coding standards, and suggested branch name. " +
+    "Use this to understand the full scope before starting work.",
   schema: getTaskContextSchema as unknown as ToolSchema<GetTaskContextArgs>,
   outputSchema: AgentTaskContextSchema,
   annotations: ANNOTATION_PATTERNS.readOnly,
   examples: [
     {
-      name: 'Get context for issue #42',
-      description: 'Retrieve full context for a task',
+      name: "Get context for issue #42",
+      description: "Retrieve full context for a task",
       args: { issueNumber: 42 },
     },
   ],
@@ -289,27 +302,27 @@ export const agentHeartbeatTool: ToolDefinition<
   AgentHeartbeatArgs,
   z.infer<typeof SuccessOutputSchema>
 > = {
-  name: 'agent_heartbeat',
-  title: 'Agent Heartbeat',
+  name: "agent_heartbeat",
+  title: "Agent Heartbeat",
   description:
-    'Send a heartbeat to report agent liveness and progress. ' +
-    'Agents should send heartbeats periodically while working. ' +
-    'Include progress percentage, current branch, and blocker info if applicable. ' +
-    'Stale agents (no heartbeat for 30 min) may have tasks reclaimed.',
+    "Send a heartbeat to report agent liveness and progress. " +
+    "Agents should send heartbeats periodically while working. " +
+    "Include progress percentage, current branch, and blocker info if applicable. " +
+    "Stale agents (no heartbeat for 30 min) may have tasks reclaimed.",
   schema: agentHeartbeatSchema as unknown as ToolSchema<AgentHeartbeatArgs>,
   outputSchema: SuccessOutputSchema,
   annotations: ANNOTATION_PATTERNS.updateIdempotent,
   examples: [
     {
-      name: 'Report progress',
-      description: 'Send a heartbeat with 60% progress',
+      name: "Report progress",
+      description: "Send a heartbeat with 60% progress",
       args: {
-        agentId: 'agent-abc123',
-        status: 'working',
-        taskId: 'issue-42',
+        agentId: "agent-abc123",
+        status: "working",
+        taskId: "issue-42",
         progress: 60,
-        progressSummary: 'Tests passing, working on edge cases',
-        currentBranch: 'feat/login-form',
+        progressSummary: "Tests passing, working on edge cases",
+        currentBranch: "feat/login-form",
       },
     },
   ],
@@ -323,31 +336,31 @@ export const submitWorkProductTool: ToolDefinition<
   SubmitWorkProductArgs,
   z.infer<typeof WorkProductSchema>
 > = {
-  name: 'submit_work_product',
-  title: 'Submit Work Product',
+  name: "submit_work_product",
+  title: "Submit Work Product",
   description:
-    'Submit a work product (code changes) for a task. ' +
-    'Include branch name, PR number, changed files, and test results. ' +
-    'The work product is recorded on the issue for review.',
+    "Submit a work product (code changes) for a task. " +
+    "Include branch name, PR number, changed files, and test results. " +
+    "The work product is recorded on the issue for review.",
   schema: submitWorkProductSchema as unknown as ToolSchema<SubmitWorkProductArgs>,
   outputSchema: WorkProductSchema,
   annotations: ANNOTATION_PATTERNS.updateNonIdempotent,
   examples: [
     {
-      name: 'Submit a PR',
-      description: 'Submit work product with PR and test results',
+      name: "Submit a PR",
+      description: "Submit work product with PR and test results",
       args: {
-        agentId: 'agent-abc123',
-        taskId: 'issue-42',
+        agentId: "agent-abc123",
+        taskId: "issue-42",
         issueNumber: 42,
-        branch: 'feat/login-form',
+        branch: "feat/login-form",
         prNumber: 99,
-        commitShas: ['abc1234'],
-        filesChanged: ['src/Login.tsx', 'src/Login.test.tsx'],
+        commitShas: ["abc1234"],
+        filesChanged: ["src/Login.tsx", "src/Login.test.tsx"],
         testsPassed: 12,
         testsFailed: 0,
         testsTotal: 12,
-        summary: 'Added login form with email/password validation',
+        summary: "Added login form with email/password validation",
       },
     },
   ],
@@ -361,19 +374,19 @@ export const getAgentActivityTool: ToolDefinition<
   GetAgentActivityArgs,
   z.infer<typeof AgentActivityOutputSchema>
 > = {
-  name: 'get_agent_activity',
-  title: 'Get Agent Activity',
+  name: "get_agent_activity",
+  title: "Get Agent Activity",
   description:
-    'Get an activity dashboard showing all agents and their current state. ' +
-    'Shows each agent\'s current task, progress, heartbeat status, and budget. ' +
-    'Use includeOffline to also show agents that have gone offline.',
+    "Get an activity dashboard showing all agents and their current state. " +
+    "Shows each agent's current task, progress, heartbeat status, and budget. " +
+    "Use includeOffline to also show agents that have gone offline.",
   schema: getAgentActivitySchema as unknown as ToolSchema<GetAgentActivityArgs>,
   outputSchema: AgentActivityOutputSchema,
   annotations: ANNOTATION_PATTERNS.readOnly,
   examples: [
     {
-      name: 'Get activity dashboard',
-      description: 'Show all active agents and their tasks',
+      name: "Get activity dashboard",
+      description: "Show all active agents and their tasks",
       args: { includeOffline: false },
     },
   ],
@@ -383,20 +396,20 @@ export const getBudgetStatusTool: ToolDefinition<
   GetBudgetStatusArgs,
   z.infer<typeof BudgetStatusSchema>
 > = {
-  name: 'get_budget_status',
-  title: 'Get Budget Status',
+  name: "get_budget_status",
+  title: "Get Budget Status",
   description:
-    'Get the token budget status for an agent. ' +
-    'Returns total, used, and remaining tokens plus warning/exhaustion flags. ' +
-    'Agents should check this periodically to avoid budget overruns.',
+    "Get the token budget status for an agent. " +
+    "Returns total, used, and remaining tokens plus warning/exhaustion flags. " +
+    "Agents should check this periodically to avoid budget overruns.",
   schema: getBudgetStatusSchema as unknown as ToolSchema<GetBudgetStatusArgs>,
   outputSchema: BudgetStatusSchema,
   annotations: ANNOTATION_PATTERNS.readOnly,
   examples: [
     {
-      name: 'Check budget',
-      description: 'Get token budget status for an agent',
-      args: { agentId: 'agent-abc123' },
+      name: "Check budget",
+      description: "Get token budget status for an agent",
+      args: { agentId: "agent-abc123" },
     },
   ],
 };
@@ -405,25 +418,25 @@ export const setAgentBudgetTool: ToolDefinition<
   SetAgentBudgetArgs,
   z.infer<typeof BudgetStatusSchema>
 > = {
-  name: 'set_agent_budget',
-  title: 'Set Agent Budget',
+  name: "set_agent_budget",
+  title: "Set Agent Budget",
   description:
-    'Set or update the token budget for an agent. ' +
-    'Configure total tokens, warning fraction (0-1), hard stop behavior, and reset period. ' +
-    'Use this to control agent spending and prevent runaway costs.',
+    "Set or update the token budget for an agent. " +
+    "Configure total tokens, warning fraction (0-1), hard stop behavior, and reset period. " +
+    "Use this to control agent spending and prevent runaway costs.",
   schema: setAgentBudgetSchema as unknown as ToolSchema<SetAgentBudgetArgs>,
   outputSchema: BudgetStatusSchema,
   annotations: ANNOTATION_PATTERNS.updateIdempotent,
   examples: [
     {
-      name: 'Set 500K token budget',
-      description: 'Configure a daily budget with 80% warning',
+      name: "Set 500K token budget",
+      description: "Configure a daily budget with 80% warning",
       args: {
-        agentId: 'agent-abc123',
+        agentId: "agent-abc123",
         totalTokens: 500000,
         warningFraction: 0.8,
         hardStop: true,
-        resetPeriod: 'daily',
+        resetPeriod: "daily",
       },
     },
   ],
@@ -435,13 +448,17 @@ export const setAgentBudgetTool: ToolDefinition<
 
 const CheckWorkStatusOutputSchema = z.object({
   taskId: z.string(),
-  prState: z.enum(['open', 'closed', 'merged', 'draft', 'none']).optional(),
-  reviewStatus: z.enum(['approved', 'changes_requested', 'pending', 'none']).optional(),
-  reviewComments: z.array(z.object({
-    author: z.string(),
-    state: z.string(),
-    body: z.string(),
-  })).optional(),
+  prState: z.enum(["open", "closed", "merged", "draft", "none"]).optional(),
+  reviewStatus: z.enum(["approved", "changes_requested", "pending", "none"]).optional(),
+  reviewComments: z
+    .array(
+      z.object({
+        author: z.string(),
+        state: z.string(),
+        body: z.string(),
+      })
+    )
+    .optional(),
   actionRequired: z.string().optional(),
 });
 
@@ -449,23 +466,23 @@ export const checkWorkStatusTool: ToolDefinition<
   CheckWorkStatusArgs,
   z.infer<typeof CheckWorkStatusOutputSchema>
 > = {
-  name: 'check_work_status',
-  title: 'Check Work Status',
+  name: "check_work_status",
+  title: "Check Work Status",
   description:
-    'Check the status of an agent\'s submitted work — PR state, review status, ' +
-    'and any action required. Use this after submitting a work product to see ' +
-    'if the PR has been approved, changes were requested, or it was merged. ' +
-    'If no prNumber is provided, checks the WorkProductStore for the task\'s issue.',
+    "Check the status of an agent's submitted work — PR state, review status, " +
+    "and any action required. Use this after submitting a work product to see " +
+    "if the PR has been approved, changes were requested, or it was merged. " +
+    "If no prNumber is provided, checks the WorkProductStore for the task's issue.",
   schema: checkWorkStatusSchema as unknown as ToolSchema<CheckWorkStatusArgs>,
   outputSchema: CheckWorkStatusOutputSchema,
   annotations: ANNOTATION_PATTERNS.readOnly,
   examples: [
     {
-      name: 'Check PR review status',
-      description: 'Check if a PR has been reviewed and approved',
+      name: "Check PR review status",
+      description: "Check if a PR has been reviewed and approved",
       args: {
-        agentId: 'agent-abc123',
-        taskId: 'issue-42',
+        agentId: "agent-abc123",
+        taskId: "issue-42",
         prNumber: 99,
       },
     },
@@ -478,29 +495,31 @@ export const checkWorkStatusTool: ToolDefinition<
 
 const ReclaimStaleOutputSchema = z.object({
   reclaimed: z.number(),
-  details: z.array(z.object({
-    agentId: z.string(),
-    taskId: z.string(),
-  })),
+  details: z.array(
+    z.object({
+      agentId: z.string(),
+      taskId: z.string(),
+    })
+  ),
 });
 
 export const reclaimStaleTasksTool: ToolDefinition<
   ReclaimStaleTasksArgs,
   z.infer<typeof ReclaimStaleOutputSchema>
 > = {
-  name: 'reclaim_stale_tasks',
-  title: 'Reclaim Stale Tasks',
+  name: "reclaim_stale_tasks",
+  title: "Reclaim Stale Tasks",
   description:
-    'Reclaim tasks from agents whose heartbeat has gone stale. ' +
-    'Tasks are returned to the unclaimed pool and the agents are marked offline. ' +
-    'Use this to recover work from crashed or hung agents.',
+    "Reclaim tasks from agents whose heartbeat has gone stale. " +
+    "Tasks are returned to the unclaimed pool and the agents are marked offline. " +
+    "Use this to recover work from crashed or hung agents.",
   schema: reclaimStaleTasksSchema as unknown as ToolSchema<ReclaimStaleTasksArgs>,
   outputSchema: ReclaimStaleOutputSchema,
   annotations: ANNOTATION_PATTERNS.updateNonIdempotent,
   examples: [
     {
-      name: 'Reclaim tasks stale for 30+ minutes',
-      description: 'Recover tasks from stale agents',
+      name: "Reclaim tasks stale for 30+ minutes",
+      description: "Recover tasks from stale agents",
       args: { timeoutMinutes: 30 },
     },
   ],
@@ -510,20 +529,20 @@ export const recordUsageTool: ToolDefinition<
   RecordUsageArgs,
   z.infer<typeof BudgetStatusSchema>
 > = {
-  name: 'record_usage',
-  title: 'Record Token Usage',
+  name: "record_usage",
+  title: "Record Token Usage",
   description:
-    'Record token usage for an agent\'s budget. ' +
-    'Agents should call this periodically to report token spend so budgets ' +
-    'are enforced and hard stops trigger before runaway costs.',
+    "Record token usage for an agent's budget. " +
+    "Agents should call this periodically to report token spend so budgets " +
+    "are enforced and hard stops trigger before runaway costs.",
   schema: recordUsageSchema as unknown as ToolSchema<RecordUsageArgs>,
   outputSchema: BudgetStatusSchema,
   annotations: ANNOTATION_PATTERNS.updateIdempotent,
   examples: [
     {
-      name: 'Report 12,000 tokens used',
-      description: 'Record token usage against an agent budget',
-      args: { agentId: 'agent-abc123', tokensUsed: 12000 },
+      name: "Report 12,000 tokens used",
+      description: "Record token usage against an agent budget",
+      args: { agentId: "agent-abc123", tokensUsed: 12000 },
     },
   ],
 };
@@ -532,20 +551,20 @@ export const submitForReviewTool: ToolDefinition<
   SubmitForReviewArgs,
   z.infer<typeof SuccessOutputSchema>
 > = {
-  name: 'submit_for_review',
-  title: 'Submit Task for Review',
+  name: "submit_for_review",
+  title: "Submit Task for Review",
   description:
-    'Submit a checked-out task for review. ' +
-    'The issue moves to the review queue (agent_status = review) and the agent ' +
-    'enters needs_review status. Reviewer agents can then claim it from the queue.',
+    "Submit a checked-out task for review. " +
+    "The issue moves to the review queue (agent_status = review) and the agent " +
+    "enters needs_review status. Reviewer agents can then claim it from the queue.",
   schema: submitForReviewSchema as unknown as ToolSchema<SubmitForReviewArgs>,
   outputSchema: SuccessOutputSchema,
   annotations: ANNOTATION_PATTERNS.updateNonIdempotent,
   examples: [
     {
-      name: 'Submit work for review',
-      description: 'Move a task into the review queue',
-      args: { agentId: 'agent-abc123', taskId: 'issue-42', summary: 'Implemented login form' },
+      name: "Submit work for review",
+      description: "Move a task into the review queue",
+      args: { agentId: "agent-abc123", taskId: "issue-42", summary: "Implemented login form" },
     },
   ],
 };
@@ -554,41 +573,42 @@ export const approveTaskTool: ToolDefinition<
   ApproveTaskArgs,
   z.infer<typeof SuccessOutputSchema>
 > = {
-  name: 'approve_task',
-  title: 'Approve Task',
+  name: "approve_task",
+  title: "Approve Task",
   description:
-    'Approve a task from the review queue. ' +
-    'The issue is marked completed and closed. Use this after reviewing an agent\'s work product.',
+    "Approve a task from the review queue. " +
+    "The issue is marked completed and closed. Use this after reviewing an agent's work product.",
   schema: approveTaskSchema as unknown as ToolSchema<ApproveTaskArgs>,
   outputSchema: SuccessOutputSchema,
   annotations: ANNOTATION_PATTERNS.updateIdempotent,
   examples: [
     {
-      name: 'Approve reviewed work',
-      description: 'Complete a task after review',
-      args: { reviewerId: 'agent-reviewer-1', taskId: 'issue-42', summary: 'LGTM' },
+      name: "Approve reviewed work",
+      description: "Complete a task after review",
+      args: { reviewerId: "agent-reviewer-1", taskId: "issue-42", summary: "LGTM" },
     },
   ],
 };
 
-export const rejectTaskTool: ToolDefinition<
-  RejectTaskArgs,
-  z.infer<typeof SuccessOutputSchema>
-> = {
-  name: 'reject_task',
-  title: 'Reject Task',
+export const rejectTaskTool: ToolDefinition<RejectTaskArgs, z.infer<typeof SuccessOutputSchema>> = {
+  name: "reject_task",
+  title: "Reject Task",
   description:
-    'Reject a task from the review queue. ' +
-    'The issue returns to the unclaimed pool with the reviewer\'s feedback recorded ' +
-    'as a comment, so another agent can pick it up with the feedback in context.',
+    "Reject a task from the review queue. " +
+    "The issue returns to the unclaimed pool with the reviewer's feedback recorded " +
+    "as a comment, so another agent can pick it up with the feedback in context.",
   schema: rejectTaskSchema as unknown as ToolSchema<RejectTaskArgs>,
   outputSchema: SuccessOutputSchema,
   annotations: ANNOTATION_PATTERNS.updateNonIdempotent,
   examples: [
     {
-      name: 'Reject with feedback',
-      description: 'Return a task to the pool with feedback',
-      args: { reviewerId: 'agent-reviewer-1', taskId: 'issue-42', feedback: 'Missing test coverage' },
+      name: "Reject with feedback",
+      description: "Return a task to the pool with feedback",
+      args: {
+        reviewerId: "agent-reviewer-1",
+        taskId: "issue-42",
+        feedback: "Missing test coverage",
+      },
     },
   ],
 };
@@ -604,21 +624,21 @@ export const setupAgentFieldsTool: ToolDefinition<
   SetupAgentFieldsArgs,
   z.infer<typeof SetupAgentFieldsOutputSchema>
 > = {
-  name: 'setup_agent_fields',
-  title: 'Set Up Agent Fields',
+  name: "setup_agent_fields",
+  title: "Set Up Agent Fields",
   description:
-    'Idempotently create the GitHub Project custom fields required for agent ' +
-    'orchestration (agent_claimed_by, agent_claimed_at, agent_status, ' +
-    'agent_work_branch, agent_pr_number). Existing fields are left untouched. ' +
-    'Call this once per project before the first checkout_task.',
+    "Idempotently create the GitHub Project custom fields required for agent " +
+    "orchestration (agent_claimed_by, agent_claimed_at, agent_status, " +
+    "agent_work_branch, agent_pr_number). Existing fields are left untouched. " +
+    "Call this once per project before the first checkout_task.",
   schema: setupAgentFieldsSchema as unknown as ToolSchema<SetupAgentFieldsArgs>,
   outputSchema: SetupAgentFieldsOutputSchema,
   annotations: ANNOTATION_PATTERNS.updateIdempotent,
   examples: [
     {
-      name: 'Provision agent fields',
-      description: 'Ensure agent orchestration fields exist on a project',
-      args: { projectId: 'PVT_kwDOLhQ7gc4AOEbH' },
+      name: "Provision agent fields",
+      description: "Ensure agent orchestration fields exist on a project",
+      args: { projectId: "PVT_kwDOLhQ7gc4AOEbH" },
     },
   ],
 };
@@ -627,19 +647,19 @@ export const getAgentMetricsTool: ToolDefinition<
   GetAgentMetricsArgs,
   z.infer<typeof AgentMetricsOutputSchema>
 > = {
-  name: 'get_agent_metrics',
-  title: 'Get Agent Metrics',
+  name: "get_agent_metrics",
+  title: "Get Agent Metrics",
   description:
-    'Get orchestration metrics across all agents: throughput, cycle time, ' +
-    'budget burn, and staleness. Returns aggregate totals plus a per-agent breakdown. ' +
-    'Use this to monitor the health and productivity of the agent swarm.',
+    "Get orchestration metrics across all agents: throughput, cycle time, " +
+    "budget burn, and staleness. Returns aggregate totals plus a per-agent breakdown. " +
+    "Use this to monitor the health and productivity of the agent swarm.",
   schema: getAgentMetricsSchema as unknown as ToolSchema<GetAgentMetricsArgs>,
   outputSchema: AgentMetricsOutputSchema,
   annotations: ANNOTATION_PATTERNS.readOnly,
   examples: [
     {
-      name: 'Get swarm metrics',
-      description: 'Show aggregate and per-agent metrics',
+      name: "Get swarm metrics",
+      description: "Show aggregate and per-agent metrics",
       args: { staleAfterMinutes: 30 },
     },
   ],
@@ -676,10 +696,8 @@ async function resolveAgentDepth(store: AgentStore, agent: Agent): Promise<numbe
  * Execute the register_agent tool.
  * Creates a new agent record in the registry.
  */
-export async function executeRegisterAgent(
-  args: RegisterAgentArgs,
-): Promise<{
-  content: Array<{ type: 'text'; text: string }>;
+export async function executeRegisterAgent(args: RegisterAgentArgs): Promise<{
+  content: Array<{ type: "text"; text: string }>;
   structuredContent: Agent;
 }> {
   try {
@@ -700,15 +718,14 @@ export async function executeRegisterAgent(
       if (parentDepth + 1 >= MAX_AGENT_HIERARCHY_DEPTH) {
         throw new Error(
           `Cannot nest deeper than ${MAX_AGENT_HIERARCHY_DEPTH} levels: ` +
-            `"${parentAgent.name}" is already at depth ${parentDepth}`,
+            `"${parentAgent.name}" is already at depth ${parentDepth}`
         );
       }
 
       const siblings = await store.getChildren(parentAgent.id);
       if (siblings.length >= MAX_AGENT_CHILDREN) {
         throw new Error(
-          `Agent "${parentAgent.name}" already has the maximum ` +
-            `${MAX_AGENT_CHILDREN} subagents`,
+          `Agent "${parentAgent.name}" already has the maximum ` + `${MAX_AGENT_CHILDREN} subagents`
         );
       }
     }
@@ -719,7 +736,7 @@ export async function executeRegisterAgent(
       role: args.role,
       runtime: args.runtime,
       capabilities: args.capabilities,
-      status: 'idle',
+      status: "idle",
       registeredAt: new Date().toISOString(),
       metadata: args.metadata,
       parentAgentId: args.parentAgentId,
@@ -744,17 +761,19 @@ export async function executeRegisterAgent(
     await store.upsertAgent(agent);
 
     const eventBus = DomainEventBus.getInstance();
-    eventBus.publish(AgentRegisteredEvent.create({
-      agentId: agent.id,
-      agentName: agent.name,
-      role: agent.role,
-      runtime: agent.runtime,
-      capabilities: agent.capabilities,
-      parentAgentId: agent.parentAgentId,
-    }));
+    eventBus.publish(
+      AgentRegisteredEvent.create({
+        agentId: agent.id,
+        agentName: agent.name,
+        role: agent.role,
+        runtime: agent.runtime,
+        capabilities: agent.capabilities,
+        parentAgentId: agent.parentAgentId,
+      })
+    );
 
     return {
-      content: [{ type: 'text', text: `Registered agent "${agent.name}" (${agent.id})` }],
+      content: [{ type: "text", text: `Registered agent "${agent.name}" (${agent.id})` }],
       structuredContent: agent,
     };
   } catch (error) {
@@ -766,10 +785,8 @@ export async function executeRegisterAgent(
  * Execute the list_agents tool.
  * Lists registered agents with optional filtering.
  */
-export async function executeListAgents(
-  args: ListAgentsArgs,
-): Promise<{
-  content: Array<{ type: 'text'; text: string }>;
+export async function executeListAgents(args: ListAgentsArgs): Promise<{
+  content: Array<{ type: "text"; text: string }>;
   structuredContent: { agents: Agent[]; total: number };
 }> {
   try {
@@ -788,7 +805,7 @@ export async function executeListAgents(
     const result = { agents, total: agents.length };
 
     return {
-      content: [{ type: 'text', text: `Found ${agents.length} agent(s)` }],
+      content: [{ type: "text", text: `Found ${agents.length} agent(s)` }],
       structuredContent: result,
     };
   } catch (error) {
@@ -800,10 +817,8 @@ export async function executeListAgents(
  * Execute the deregister_agent tool.
  * Removes an agent from the registry.
  */
-export async function executeDeregisterAgent(
-  args: DeregisterAgentArgs,
-): Promise<{
-  content: Array<{ type: 'text'; text: string }>;
+export async function executeDeregisterAgent(args: DeregisterAgentArgs): Promise<{
+  content: Array<{ type: "text"; text: string }>;
   structuredContent: { success: boolean; agentId: string; message: string };
 }> {
   try {
@@ -815,23 +830,26 @@ export async function executeDeregisterAgent(
 
     if (removedCount > 0 && agent) {
       const eventBus = DomainEventBus.getInstance();
-      eventBus.publish(AgentDeregisteredEvent.create({
-        agentId: args.agentId,
-        agentName: agent.name,
-        reason: 'deregistered',
-      }));
+      eventBus.publish(
+        AgentDeregisteredEvent.create({
+          agentId: args.agentId,
+          agentName: agent.name,
+          reason: "deregistered",
+        })
+      );
     }
 
     const result = {
       success: removedCount > 0,
       agentId: args.agentId,
-      message: removedCount > 0
-        ? `Agent ${args.agentId} and ${removedCount - 1} child agent(s) deregistered`
-        : `Agent ${args.agentId} not found`,
+      message:
+        removedCount > 0
+          ? `Agent ${args.agentId} and ${removedCount - 1} child agent(s) deregistered`
+          : `Agent ${args.agentId} not found`,
     };
 
     return {
-      content: [{ type: 'text', text: result.message }],
+      content: [{ type: "text", text: result.message }],
       structuredContent: result,
     };
   } catch (error) {
@@ -843,10 +861,8 @@ export async function executeDeregisterAgent(
  * Execute the checkout_task tool.
  * Claims the next available task for an agent.
  */
-export async function executeCheckoutTask(
-  args: CheckoutTaskArgs,
-): Promise<{
-  content: Array<{ type: 'text'; text: string }>;
+export async function executeCheckoutTask(args: CheckoutTaskArgs): Promise<{
+  content: Array<{ type: "text"; text: string }>;
   structuredContent: z.infer<typeof TaskCheckoutResultSchema>;
 }> {
   try {
@@ -868,7 +884,7 @@ export async function executeCheckoutTask(
       : result.message;
 
     return {
-      content: [{ type: 'text', text }],
+      content: [{ type: "text", text }],
       structuredContent: result,
     };
   } catch (error) {
@@ -880,10 +896,8 @@ export async function executeCheckoutTask(
  * Execute the release_task tool.
  * Returns a task to the unclaimed pool.
  */
-export async function executeReleaseTask(
-  args: ReleaseTaskArgs,
-): Promise<{
-  content: Array<{ type: 'text'; text: string }>;
+export async function executeReleaseTask(args: ReleaseTaskArgs): Promise<{
+  content: Array<{ type: "text"; text: string }>;
   structuredContent: { success: boolean; message?: string };
 }> {
   try {
@@ -895,7 +909,7 @@ export async function executeReleaseTask(
     await service.releaseTask(args.agentId, args.taskId);
 
     return {
-      content: [{ type: 'text', text: `Released task ${args.taskId} from agent ${args.agentId}` }],
+      content: [{ type: "text", text: `Released task ${args.taskId} from agent ${args.agentId}` }],
       structuredContent: { success: true, message: `Task ${args.taskId} released` },
     };
   } catch (error) {
@@ -907,10 +921,8 @@ export async function executeReleaseTask(
  * Execute the complete_task tool.
  * Marks a task as completed.
  */
-export async function executeCompleteTask(
-  args: CompleteTaskArgs,
-): Promise<{
-  content: Array<{ type: 'text'; text: string }>;
+export async function executeCompleteTask(args: CompleteTaskArgs): Promise<{
+  content: Array<{ type: "text"; text: string }>;
   structuredContent: { success: boolean; message?: string; nextTask?: unknown };
 }> {
   try {
@@ -926,7 +938,7 @@ export async function executeCompleteTask(
     });
 
     return {
-      content: [{ type: 'text', text: result.message }],
+      content: [{ type: "text", text: result.message }],
       structuredContent: {
         success: result.success,
         message: result.message,
@@ -942,10 +954,8 @@ export async function executeCompleteTask(
  * Execute the get_task_context tool.
  * Returns enriched context for a task/issue.
  */
-export async function executeGetTaskContext(
-  args: GetTaskContextArgs,
-): Promise<{
-  content: Array<{ type: 'text'; text: string }>;
+export async function executeGetTaskContext(args: GetTaskContextArgs): Promise<{
+  content: Array<{ type: "text"; text: string }>;
   structuredContent: z.infer<typeof AgentTaskContextSchema>;
 }> {
   try {
@@ -954,13 +964,12 @@ export async function executeGetTaskContext(
 
     // Service takes (issueId, issueNumber) — pass the number as string;
     // the service resolves the node ID internally if needed.
-    const context = await service.getTaskContext(
-      String(args.issueNumber),
-      args.issueNumber,
-    );
+    const context = await service.getTaskContext(String(args.issueNumber), args.issueNumber);
 
     return {
-      content: [{ type: 'text', text: `Context for issue #${args.issueNumber}: ${context.issue.title}` }],
+      content: [
+        { type: "text", text: `Context for issue #${args.issueNumber}: ${context.issue.title}` },
+      ],
       structuredContent: context,
     };
   } catch (error) {
@@ -972,10 +981,8 @@ export async function executeGetTaskContext(
  * Execute the agent_heartbeat tool.
  * Records agent liveness and progress.
  */
-export async function executeAgentHeartbeat(
-  args: AgentHeartbeatArgs,
-): Promise<{
-  content: Array<{ type: 'text'; text: string }>;
+export async function executeAgentHeartbeat(args: AgentHeartbeatArgs): Promise<{
+  content: Array<{ type: "text"; text: string }>;
   structuredContent: { success: boolean; message?: string };
 }> {
   try {
@@ -989,10 +996,10 @@ export async function executeAgentHeartbeat(
       timestamp: new Date().toISOString(),
     });
 
-    const progressText = args.progress != null ? ` (${args.progress}%)` : '';
+    const progressText = args.progress != null ? ` (${args.progress}%)` : "";
     return {
-      content: [{ type: 'text', text: `Heartbeat received for ${args.agentId}${progressText}` }],
-      structuredContent: { success: true, message: 'Heartbeat recorded' },
+      content: [{ type: "text", text: `Heartbeat received for ${args.agentId}${progressText}` }],
+      structuredContent: { success: true, message: "Heartbeat recorded" },
     };
   } catch (error) {
     throw mapErrorToMCPError(error);
@@ -1003,10 +1010,8 @@ export async function executeAgentHeartbeat(
  * Execute the submit_work_product tool.
  * Records a work product on the issue.
  */
-export async function executeSubmitWorkProduct(
-  args: SubmitWorkProductArgs,
-): Promise<{
-  content: Array<{ type: 'text'; text: string }>;
+export async function executeSubmitWorkProduct(args: SubmitWorkProductArgs): Promise<{
+  content: Array<{ type: "text"; text: string }>;
   structuredContent: z.infer<typeof WorkProductSchema>;
 }> {
   try {
@@ -1038,7 +1043,7 @@ export async function executeSubmitWorkProduct(
     await service.submitWorkProduct(product);
 
     return {
-      content: [{ type: 'text', text: `Work product submitted for task ${args.taskId}` }],
+      content: [{ type: "text", text: `Work product submitted for task ${args.taskId}` }],
       structuredContent: product,
     };
   } catch (error) {
@@ -1050,10 +1055,8 @@ export async function executeSubmitWorkProduct(
  * Execute the get_agent_activity tool.
  * Returns activity dashboard for all agents.
  */
-export async function executeGetAgentActivity(
-  args: GetAgentActivityArgs,
-): Promise<{
-  content: Array<{ type: 'text'; text: string }>;
+export async function executeGetAgentActivity(args: GetAgentActivityArgs): Promise<{
+  content: Array<{ type: "text"; text: string }>;
   structuredContent: { agents: AgentActivityEntry[]; total: number; timestamp: string };
 }> {
   try {
@@ -1064,59 +1067,63 @@ export async function executeGetAgentActivity(
     let agents = await store.listAgents();
 
     if (!args.includeOffline) {
-      agents = agents.filter((a) => a.status !== 'offline');
+      agents = agents.filter((a) => a.status !== "offline");
     }
 
     const now = new Date();
-    const entries: AgentActivityEntry[] = await Promise.all(agents.map(async (agent) => {
-      const lastHb = agent.lastHeartbeat ? new Date(agent.lastHeartbeat) : undefined;
-      const ageMs = lastHb ? now.getTime() - lastHb.getTime() : undefined;
-      const isStale = ageMs != null && ageMs > 30 * 60 * 1000;
+    const entries: AgentActivityEntry[] = await Promise.all(
+      agents.map(async (agent) => {
+        const lastHb = agent.lastHeartbeat ? new Date(agent.lastHeartbeat) : undefined;
+        const ageMs = lastHb ? now.getTime() - lastHb.getTime() : undefined;
+        const isStale = ageMs != null && ageMs > 30 * 60 * 1000;
 
-      let budgetStatus: AgentActivityEntry['budgetStatus'];
-      try {
-        const status = await budgetService.getBudgetStatus(agent.id);
-        budgetStatus = {
-          usagePercent: status.usagePercent,
-          isWarning: status.isWarning,
-          isExhausted: status.isExhausted,
+        let budgetStatus: AgentActivityEntry["budgetStatus"];
+        try {
+          const status = await budgetService.getBudgetStatus(agent.id);
+          budgetStatus = {
+            usagePercent: status.usagePercent,
+            isWarning: status.isWarning,
+            isExhausted: status.isExhausted,
+          };
+        } catch {
+          // Budget status is optional; leave undefined on failure
+        }
+
+        return {
+          agent: {
+            id: agent.id,
+            name: agent.name,
+            role: agent.role,
+            runtime: agent.runtime,
+            status: agent.status,
+          },
+          currentTask: agent.currentTaskId
+            ? {
+                issueId: agent.currentTaskId,
+                title: agent.currentTaskTitle ?? "Unknown",
+                // Approximation: no dedicated claimedAt on Agent; lastHeartbeat
+                // is updated on claim, so it's the closest available timestamp.
+                claimedAt: agent.lastHeartbeat ?? agent.registeredAt,
+              }
+            : undefined,
+          lastHeartbeat: agent.lastHeartbeat,
+          heartbeatAge: ageMs != null ? `${Math.round(ageMs / 60000)}m` : undefined,
+          isStale,
+          budgetStatus,
+          completedToday: 0, // Not populated: requires scanning all work products per agent per day
+          heartbeatHistory: Array.isArray(agent.metadata?.heartbeatHistory)
+            ? (
+                agent.metadata.heartbeatHistory as Array<{
+                  timestamp: string;
+                  status: string;
+                  progress?: number;
+                  progressSummary?: string;
+                }>
+              ).slice(0, 10)
+            : undefined,
         };
-      } catch {
-        // Budget status is optional; leave undefined on failure
-      }
-
-      return {
-        agent: {
-          id: agent.id,
-          name: agent.name,
-          role: agent.role,
-          runtime: agent.runtime,
-          status: agent.status,
-        },
-        currentTask: agent.currentTaskId
-          ? {
-              issueId: agent.currentTaskId,
-              title: agent.currentTaskTitle ?? 'Unknown',
-              // Approximation: no dedicated claimedAt on Agent; lastHeartbeat
-              // is updated on claim, so it's the closest available timestamp.
-              claimedAt: agent.lastHeartbeat ?? agent.registeredAt,
-            }
-          : undefined,
-        lastHeartbeat: agent.lastHeartbeat,
-        heartbeatAge: ageMs != null ? `${Math.round(ageMs / 60000)}m` : undefined,
-        isStale,
-        budgetStatus,
-        completedToday: 0, // Not populated: requires scanning all work products per agent per day
-        heartbeatHistory: Array.isArray(agent.metadata?.heartbeatHistory)
-          ? (agent.metadata.heartbeatHistory as Array<{
-              timestamp: string;
-              status: string;
-              progress?: number;
-              progressSummary?: string;
-            }>).slice(0, 10)
-          : undefined,
-      };
-    }));
+      })
+    );
 
     const result = {
       agents: entries,
@@ -1125,7 +1132,7 @@ export async function executeGetAgentActivity(
     };
 
     return {
-      content: [{ type: 'text', text: `${entries.length} agent(s) active` }],
+      content: [{ type: "text", text: `${entries.length} agent(s) active` }],
       structuredContent: result,
     };
   } catch (error) {
@@ -1137,10 +1144,8 @@ export async function executeGetAgentActivity(
  * Execute the get_budget_status tool.
  * Returns token budget status for an agent.
  */
-export async function executeGetBudgetStatus(
-  args: GetBudgetStatusArgs,
-): Promise<{
-  content: Array<{ type: 'text'; text: string }>;
+export async function executeGetBudgetStatus(args: GetBudgetStatusArgs): Promise<{
+  content: Array<{ type: "text"; text: string }>;
   structuredContent: BudgetStatus;
 }> {
   try {
@@ -1153,7 +1158,7 @@ export async function executeGetBudgetStatus(
     return {
       content: [
         {
-          type: 'text',
+          type: "text",
           text: `Budget for ${status.agentName}: ${status.usagePercent.toFixed(1)}% used (${status.remainingTokens} remaining)`,
         },
       ],
@@ -1168,10 +1173,8 @@ export async function executeGetBudgetStatus(
  * Execute the set_agent_budget tool.
  * Configures token budget for an agent.
  */
-export async function executeSetAgentBudget(
-  args: SetAgentBudgetArgs,
-): Promise<{
-  content: Array<{ type: 'text'; text: string }>;
+export async function executeSetAgentBudget(args: SetAgentBudgetArgs): Promise<{
+  content: Array<{ type: "text"; text: string }>;
   structuredContent: BudgetStatus;
 }> {
   try {
@@ -1184,7 +1187,7 @@ export async function executeSetAgentBudget(
       args.totalTokens,
       args.warningFraction,
       args.resetPeriod,
-      args.hardStop,
+      args.hardStop
     );
 
     const status = await service.getBudgetStatus(args.agentId);
@@ -1192,7 +1195,7 @@ export async function executeSetAgentBudget(
     return {
       content: [
         {
-          type: 'text',
+          type: "text",
           text: `Budget set for agent ${args.agentId}: ${args.totalTokens} tokens`,
         },
       ],
@@ -1207,10 +1210,8 @@ export async function executeSetAgentBudget(
  * Execute the check_work_status tool.
  * Checks PR state and review status for a task's work product.
  */
-export async function executeCheckWorkStatus(
-  args: CheckWorkStatusArgs,
-): Promise<{
-  content: Array<{ type: 'text'; text: string }>;
+export async function executeCheckWorkStatus(args: CheckWorkStatusArgs): Promise<{
+  content: Array<{ type: "text"; text: string }>;
   structuredContent: {
     taskId: string;
     prState?: string;
@@ -1239,12 +1240,13 @@ export async function executeCheckWorkStatus(
 
     if (!prNumber) {
       return {
-        content: [{ type: 'text', text: `No PR found for task ${args.taskId}` }],
+        content: [{ type: "text", text: `No PR found for task ${args.taskId}` }],
         structuredContent: {
           taskId: args.taskId,
-          prState: 'none',
-          reviewStatus: 'none',
-          actionRequired: 'No PR associated with this task. Submit a work product with a PR number first.',
+          prState: "none",
+          reviewStatus: "none",
+          actionRequired:
+            "No PR associated with this task. Submit a work product with a PR number first.",
         },
       };
     }
@@ -1266,9 +1268,9 @@ export async function executeCheckWorkStatus(
     // Determine PR state
     let prState: string;
     if (pr.merged) {
-      prState = 'merged';
+      prState = "merged";
     } else if (pr.draft) {
-      prState = 'draft';
+      prState = "draft";
     } else {
       prState = pr.state; // 'open' | 'closed'
     }
@@ -1276,21 +1278,23 @@ export async function executeCheckWorkStatus(
     // Determine review status from the latest substantive review per reviewer
     const reviewMap = new Map<string, { state: string; body: string }>();
     for (const review of reviews) {
-      if (review.state === 'COMMENTED' && !review.body) continue;
-      reviewMap.set(review.user?.login ?? 'unknown', {
+      if (review.state === "COMMENTED" && !review.body) continue;
+      reviewMap.set(review.user?.login ?? "unknown", {
         state: review.state,
-        body: review.body ?? '',
+        body: review.body ?? "",
       });
     }
 
-    let reviewStatus = 'pending';
-    const hasApproval = [...reviewMap.values()].some(r => r.state === 'APPROVED');
-    const hasChangesRequested = [...reviewMap.values()].some(r => r.state === 'CHANGES_REQUESTED');
+    let reviewStatus = "pending";
+    const hasApproval = [...reviewMap.values()].some((r) => r.state === "APPROVED");
+    const hasChangesRequested = [...reviewMap.values()].some(
+      (r) => r.state === "CHANGES_REQUESTED"
+    );
 
     if (hasChangesRequested) {
-      reviewStatus = 'changes_requested';
+      reviewStatus = "changes_requested";
     } else if (hasApproval) {
-      reviewStatus = 'approved';
+      reviewStatus = "approved";
     }
 
     const reviewComments = [...reviewMap.entries()].map(([author, r]) => ({
@@ -1301,22 +1305,22 @@ export async function executeCheckWorkStatus(
 
     // Determine action required
     let actionRequired: string | undefined;
-    if (prState === 'merged') {
-      actionRequired = 'PR merged. Complete the task.';
-    } else if (reviewStatus === 'changes_requested') {
-      actionRequired = 'Address review feedback and push updates.';
-    } else if (reviewStatus === 'approved') {
-      actionRequired = 'PR approved. Ready to merge and complete the task.';
-    } else if (prState === 'draft') {
-      actionRequired = 'Mark PR as ready for review.';
+    if (prState === "merged") {
+      actionRequired = "PR merged. Complete the task.";
+    } else if (reviewStatus === "changes_requested") {
+      actionRequired = "Address review feedback and push updates.";
+    } else if (reviewStatus === "approved") {
+      actionRequired = "PR approved. Ready to merge and complete the task.";
+    } else if (prState === "draft") {
+      actionRequired = "Mark PR as ready for review.";
     } else {
-      actionRequired = 'Waiting for review.';
+      actionRequired = "Waiting for review.";
     }
 
     const summary = `PR #${prNumber}: ${prState}, review: ${reviewStatus}`;
 
     return {
-      content: [{ type: 'text', text: summary }],
+      content: [{ type: "text", text: summary }],
       structuredContent: {
         taskId: args.taskId,
         prState,
@@ -1334,10 +1338,8 @@ export async function executeCheckWorkStatus(
  * Execute the reclaim_stale_tasks tool.
  * Reclaims tasks from agents with stale heartbeats.
  */
-export async function executeReclaimStaleTasks(
-  args: ReclaimStaleTasksArgs,
-): Promise<{
-  content: Array<{ type: 'text'; text: string }>;
+export async function executeReclaimStaleTasks(args: ReclaimStaleTasksArgs): Promise<{
+  content: Array<{ type: "text"; text: string }>;
   structuredContent: { reclaimed: number; details: Array<{ agentId: string; taskId: string }> };
 }> {
   try {
@@ -1349,7 +1351,7 @@ export async function executeReclaimStaleTasks(
     const result = await service.reclaimStaleTasks(args.timeoutMinutes);
 
     return {
-      content: [{ type: 'text', text: `Reclaimed ${result.reclaimed} stale task(s)` }],
+      content: [{ type: "text", text: `Reclaimed ${result.reclaimed} stale task(s)` }],
       structuredContent: result,
     };
   } catch (error) {
@@ -1361,10 +1363,8 @@ export async function executeReclaimStaleTasks(
  * Execute the record_usage tool.
  * Records token usage against an agent's budget.
  */
-export async function executeRecordUsage(
-  args: RecordUsageArgs,
-): Promise<{
-  content: Array<{ type: 'text'; text: string }>;
+export async function executeRecordUsage(args: RecordUsageArgs): Promise<{
+  content: Array<{ type: "text"; text: string }>;
   structuredContent: BudgetStatus;
 }> {
   try {
@@ -1375,10 +1375,12 @@ export async function executeRecordUsage(
     const status = await service.recordReportedUsage(args.agentId, args.tokensUsed);
 
     return {
-      content: [{
-        type: 'text',
-        text: `Recorded ${args.tokensUsed} tokens for ${status.agentName} — ${status.usagePercent.toFixed(1)}% used${status.isExhausted ? ' (BUDGET EXHAUSTED)' : ''}`,
-      }],
+      content: [
+        {
+          type: "text",
+          text: `Recorded ${args.tokensUsed} tokens for ${status.agentName} — ${status.usagePercent.toFixed(1)}% used${status.isExhausted ? " (BUDGET EXHAUSTED)" : ""}`,
+        },
+      ],
       structuredContent: status,
     };
   } catch (error) {
@@ -1390,10 +1392,8 @@ export async function executeRecordUsage(
  * Execute the submit_for_review tool.
  * Moves a task into the review queue.
  */
-export async function executeSubmitForReview(
-  args: SubmitForReviewArgs,
-): Promise<{
-  content: Array<{ type: 'text'; text: string }>;
+export async function executeSubmitForReview(args: SubmitForReviewArgs): Promise<{
+  content: Array<{ type: "text"; text: string }>;
   structuredContent: { success: boolean; message?: string };
 }> {
   try {
@@ -1405,7 +1405,7 @@ export async function executeSubmitForReview(
     const result = await service.submitForReview(args.agentId, args.taskId, args.summary);
 
     return {
-      content: [{ type: 'text', text: result.message }],
+      content: [{ type: "text", text: result.message }],
       structuredContent: result,
     };
   } catch (error) {
@@ -1417,10 +1417,8 @@ export async function executeSubmitForReview(
  * Execute the approve_task tool.
  * Approves a reviewed task and completes it.
  */
-export async function executeApproveTask(
-  args: ApproveTaskArgs,
-): Promise<{
-  content: Array<{ type: 'text'; text: string }>;
+export async function executeApproveTask(args: ApproveTaskArgs): Promise<{
+  content: Array<{ type: "text"; text: string }>;
   structuredContent: { success: boolean; message?: string };
 }> {
   try {
@@ -1432,7 +1430,7 @@ export async function executeApproveTask(
     const result = await service.approveTask(args.reviewerId, args.taskId, args.summary);
 
     return {
-      content: [{ type: 'text', text: result.message }],
+      content: [{ type: "text", text: result.message }],
       structuredContent: result,
     };
   } catch (error) {
@@ -1444,10 +1442,8 @@ export async function executeApproveTask(
  * Execute the reject_task tool.
  * Rejects a reviewed task and returns it to the pool.
  */
-export async function executeRejectTask(
-  args: RejectTaskArgs,
-): Promise<{
-  content: Array<{ type: 'text'; text: string }>;
+export async function executeRejectTask(args: RejectTaskArgs): Promise<{
+  content: Array<{ type: "text"; text: string }>;
   structuredContent: { success: boolean; message?: string };
 }> {
   try {
@@ -1459,7 +1455,7 @@ export async function executeRejectTask(
     const result = await service.rejectTask(args.reviewerId, args.taskId, args.feedback);
 
     return {
-      content: [{ type: 'text', text: result.message }],
+      content: [{ type: "text", text: result.message }],
       structuredContent: result,
     };
   } catch (error) {
@@ -1471,10 +1467,8 @@ export async function executeRejectTask(
  * Execute the setup_agent_fields tool.
  * Idempotently provisions the agent orchestration custom fields on a project.
  */
-export async function executeSetupAgentFields(
-  args: SetupAgentFieldsArgs,
-): Promise<{
-  content: Array<{ type: 'text'; text: string }>;
+export async function executeSetupAgentFields(args: SetupAgentFieldsArgs): Promise<{
+  content: Array<{ type: "text"; text: string }>;
   structuredContent: { created: string[]; existing: string[] };
 }> {
   try {
@@ -1483,12 +1477,13 @@ export async function executeSetupAgentFields(
 
     const result = await setup.ensureFields(args.projectId);
 
-    const text = result.created.length > 0
-      ? `Agent fields created: ${result.created.join(', ')}`
-      : `Agent fields already present: ${result.existing.join(', ')}`;
+    const text =
+      result.created.length > 0
+        ? `Agent fields created: ${result.created.join(", ")}`
+        : `Agent fields already present: ${result.existing.join(", ")}`;
 
     return {
-      content: [{ type: 'text', text }],
+      content: [{ type: "text", text }],
       structuredContent: result,
     };
   } catch (error) {
@@ -1500,10 +1495,8 @@ export async function executeSetupAgentFields(
  * Execute the get_agent_metrics tool.
  * Returns aggregate and per-agent orchestration metrics.
  */
-export async function executeGetAgentMetrics(
-  args: GetAgentMetricsArgs,
-): Promise<{
-  content: Array<{ type: 'text'; text: string }>;
+export async function executeGetAgentMetrics(args: GetAgentMetricsArgs): Promise<{
+  content: Array<{ type: "text"; text: string }>;
   structuredContent: AgentMetrics;
 }> {
   try {
@@ -1518,10 +1511,10 @@ export async function executeGetAgentMetrics(
       `Agents: ${metrics.totalAgents} (${metrics.activeAgents} active, ${metrics.staleAgents} stale, ${metrics.budgetExhaustedAgents} budget-exhausted)\n` +
       `Tasks: ${metrics.totalTasksInProgress} in progress, ${metrics.totalTasksCompleted} completed\n` +
       `Budget: ${metrics.totalTokensUsed}/${metrics.totalTokensBudget} tokens (${metrics.overallBudgetUsagePercent}%)` +
-      (metrics.isTruncated ? '\n(approximate — work-product comment scan hit its page limit)' : '');
+      (metrics.isTruncated ? "\n(approximate — work-product comment scan hit its page limit)" : "");
 
     return {
-      content: [{ type: 'text', text }],
+      content: [{ type: "text", text }],
       structuredContent: metrics,
     };
   } catch (error) {

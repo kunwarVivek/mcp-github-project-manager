@@ -103,25 +103,23 @@ export class ToolValidator {
     } catch (error) {
       if (error instanceof z.ZodError) {
         // Format Zod validation errors
-        const details = error.issues.map(err => ({
-          path: err.path.join('.'),
+        const details = error.issues.map((err) => ({
+          path: err.path.join("."),
           message: err.message,
-          code: err.code
+          code: err.code,
         }));
 
         throw new McpError(
           ErrorCode.InvalidParams,
-          `Invalid parameters for tool ${toolName}: ${error.issues.map(e => e.message).join(", ")}`,
+          `Invalid parameters for tool ${toolName}: ${error.issues.map((e) => e.message).join(", ")}`,
           { details }
         );
       }
 
       // Generic validation error
-      throw new McpError(
-        ErrorCode.InvalidParams,
-        `Invalid parameters for tool ${toolName}`,
-        { cause: String(error) }
-      );
+      throw new McpError(ErrorCode.InvalidParams, `Invalid parameters for tool ${toolName}`, {
+        cause: String(error),
+      });
     }
   }
 
@@ -136,7 +134,8 @@ export class ToolValidator {
     if (error && typeof error === "object" && "status" in error) {
       const octokitError = error as OctokitRequestError;
       const status = octokitError.status;
-      const message = octokitError.message || octokitError.response?.data?.message || "GitHub API error";
+      const message =
+        octokitError.message || octokitError.response?.data?.message || "GitHub API error";
 
       data.github = {
         status,
@@ -163,7 +162,10 @@ export class ToolValidator {
       }
 
       // Handle secondary rate limiting (abuse detection)
-      if (status === 403 && (message.toLowerCase().includes("abuse") || message.toLowerCase().includes("secondary"))) {
+      if (
+        status === 403 &&
+        (message.toLowerCase().includes("abuse") || message.toLowerCase().includes("secondary"))
+      ) {
         const headers = octokitError.response?.headers;
         const retryAfter = headers?.["retry-after"];
         if (retryAfter) {
@@ -183,7 +185,7 @@ export class ToolValidator {
 
       // Handle validation errors (422)
       if (status === 422 && octokitError.response?.data?.errors) {
-        data.validation = octokitError.response.data.errors.map(e => ({
+        data.validation = octokitError.response.data.errors.map((e) => ({
           path: e.field || e.resource || "unknown",
           message: e.message || e.code || "Validation error",
           code: e.code || "validation_failed",
@@ -242,22 +244,29 @@ export class ToolValidator {
       );
     }
 
-    return new McpError(
-      MCPErrorCode.INTERNAL_ERROR,
-      `Unknown error in ${toolName}`,
-      { tool: toolName, error: String(error) }
-    );
+    return new McpError(MCPErrorCode.INTERNAL_ERROR, `Unknown error in ${toolName}`, {
+      tool: toolName,
+      error: String(error),
+    });
   }
 
   /**
    * Transform MCP SDK errors to our custom error format
    */
-  static handleToolError(error: unknown, toolName: string): ReturnType<typeof MCPResponseFormatter.error> {
+  static handleToolError(
+    error: unknown,
+    toolName: string
+  ): ReturnType<typeof MCPResponseFormatter.error> {
     // Use stderr to avoid interfering with MCP protocol on stdout
     process.stderr.write(`[${toolName}] Error: ${error}\n`);
 
     // Check if this is a GitHub API error (has status property)
-    if (error && typeof error === "object" && "status" in error && typeof (error as { status: unknown }).status === "number") {
+    if (
+      error &&
+      typeof error === "object" &&
+      "status" in error &&
+      typeof (error as { status: unknown }).status === "number"
+    ) {
       const mcpError = ToolValidator.mapGitHubError(error, toolName);
       return MCPResponseFormatter.error(
         mcpError.code as MCPErrorCode,
@@ -272,7 +281,9 @@ export class ToolValidator {
         ToolValidator.mapErrorCode(error.code),
         error.message,
         // Safely handle potentially unknown error.data
-        error.data && typeof error.data === 'object' ? error.data as Record<string, unknown> : undefined
+        error.data && typeof error.data === "object"
+          ? (error.data as Record<string, unknown>)
+          : undefined
       );
     }
 

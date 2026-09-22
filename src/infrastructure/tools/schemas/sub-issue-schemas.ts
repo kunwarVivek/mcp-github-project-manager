@@ -87,7 +87,10 @@ export const ReprioritizeSubIssueInputSchema = z.object({
   /** Issue number of the sub-issue to move */
   subIssueNumber: z.number().describe("Sub-issue number to move"),
   /** Issue number to place after (omit to move to beginning) */
-  afterIssueNumber: z.number().optional().describe("Issue number to place after (omit for beginning)"),
+  afterIssueNumber: z
+    .number()
+    .optional()
+    .describe("Issue number to place after (omit for beginning)"),
 });
 
 export type ReprioritizeSubIssueInput = z.infer<typeof ReprioritizeSubIssueInputSchema>;

@@ -23,22 +23,22 @@
  * ```
  */
 
-export { IssueEntity } from './IssueEntity';
-export type { IssueEntityConfig } from './IssueEntity';
-export { IssuePriority, IssueType } from './IssueEntity';
+export { IssueEntity } from "./IssueEntity";
+export type { IssueEntityConfig } from "./IssueEntity";
+export { IssuePriority, IssueType } from "./IssueEntity";
 
-export { MilestoneEntity } from './MilestoneEntity';
-export type { MilestoneEntityConfig } from './MilestoneEntity';
-export { MILESTONE_TRANSITIONS } from './MilestoneEntity';
+export { MilestoneEntity } from "./MilestoneEntity";
+export type { MilestoneEntityConfig } from "./MilestoneEntity";
+export { MILESTONE_TRANSITIONS } from "./MilestoneEntity";
 
-export { SprintEntity } from './SprintEntity';
-export type { SprintEntityConfig } from './SprintEntity';
-export { SprintState } from './SprintEntity';
+export { SprintEntity } from "./SprintEntity";
+export type { SprintEntityConfig } from "./SprintEntity";
+export { SprintState } from "./SprintEntity";
 
-export { ProjectEntity } from './ProjectEntity';
-export type { ProjectEntityConfig } from './ProjectEntity';
-export { ProjectHealth, ActivityLevel, ProjectVisibility } from './ProjectEntity';
+export { ProjectEntity } from "./ProjectEntity";
+export type { ProjectEntityConfig } from "./ProjectEntity";
+export { ProjectHealth, ActivityLevel, ProjectVisibility } from "./ProjectEntity";
 
-export { PullRequestEntity } from './PullRequestEntity';
-export type { PullRequestEntityConfig, PullRequestReview } from './PullRequestEntity';
-export { PullRequestState, ReviewState, MergeMethod } from './PullRequestEntity';
+export { PullRequestEntity } from "./PullRequestEntity";
+export type { PullRequestEntityConfig, PullRequestReview } from "./PullRequestEntity";
+export { PullRequestState, ReviewState, MergeMethod } from "./PullRequestEntity";

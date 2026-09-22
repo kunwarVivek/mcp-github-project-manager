@@ -1,7 +1,7 @@
 import type { GitHubRepositoryFactory } from "../infrastructure/github/GitHubRepositoryFactory";
 import { ResourceNotFoundError, ResourceType } from "../domain/resource-types";
 import type { CustomField, ProjectItem } from "../domain/types";
-import { safeCall } from './utils/safeCall';
+import { safeCall } from "./utils/safeCall";
 import type { FieldValueService } from "./FieldValueService";
 import type { ProjectTemplateService } from "./ProjectTemplateService";
 import type { ProjectLinkingService } from "./ProjectLinkingService";
@@ -39,10 +39,7 @@ export class IterationService {
     this.linkingService = linkingService;
   }
 
-  async getIterationConfiguration(data: {
-    projectId: string;
-    fieldName?: string;
-  }): Promise<{
+  async getIterationConfiguration(data: { projectId: string; fieldName?: string }): Promise<{
     fieldId: string;
     fieldName: string;
     duration: number;
@@ -51,37 +48,44 @@ export class IterationService {
   }> {
     return safeCall(async () => {
       const fields = await this.templateService.listProjectFields({ projectId: data.projectId });
-      const iterationField = fields.find((f: CustomField) =>
-        f.type === 'iteration' && (!data.fieldName || f.name === data.fieldName)
+      const iterationField = fields.find(
+        (f: CustomField) => f.type === "iteration" && (!data.fieldName || f.name === data.fieldName)
       );
 
       if (!iterationField) {
-        throw new ResourceNotFoundError(ResourceType.FIELD, data.fieldName || 'iteration field');
+        throw new ResourceNotFoundError(ResourceType.FIELD, data.fieldName || "iteration field");
       }
 
       if (!iterationField.config) {
-        throw new Error('Invalid iteration field configuration');
+        throw new Error("Invalid iteration field configuration");
       }
 
       return {
         fieldId: iterationField.id,
         fieldName: iterationField.name,
         duration: iterationField.config.iterationDuration || 14,
-        startDay: iterationField.config.iterationStart ? new Date(iterationField.config.iterationStart).getDay() : 1,
-        iterations: (iterationField.config.iterations || []).map((iter: { id: string; title: string; startDate: string; duration: number }) => ({
-          id: iter.id,
-          title: iter.title,
-          startDate: iter.startDate,
-          duration: iter.duration
-        }))
+        startDay: iterationField.config.iterationStart
+          ? new Date(iterationField.config.iterationStart).getDay()
+          : 1,
+        iterations: (iterationField.config.iterations || []).map(
+          (iter: { id: string; title: string; startDate: string; duration: number }) => ({
+            id: iter.id,
+            title: iter.title,
+            startDate: iter.startDate,
+            duration: iter.duration,
+          })
+        ),
       };
     });
   }
 
-  async getCurrentIteration(data: {
-    projectId: string;
-    fieldName?: string;
-  }): Promise<{ id: string; title: string; startDate: string; endDate: string; duration: number } | null> {
+  async getCurrentIteration(data: { projectId: string; fieldName?: string }): Promise<{
+    id: string;
+    title: string;
+    startDate: string;
+    endDate: string;
+    duration: number;
+  } | null> {
     return safeCall(async () => {
       const config = await this.getIterationConfiguration(data);
       const now = new Date();
@@ -97,7 +101,7 @@ export class IterationService {
             title: iteration.title,
             startDate: iteration.startDate,
             endDate: end.toISOString(),
-            duration: iteration.duration
+            duration: iteration.duration,
           };
         }
       }
@@ -114,30 +118,32 @@ export class IterationService {
     return safeCall(async () => {
       const items = await this.linkingService.listProjectItems({
         projectId: data.projectId,
-        limit: data.limit || 50
+        limit: data.limit || 50,
       });
 
       const iterationItems = items.filter((item: ProjectItem) => {
         const fieldValues = item.fieldValues || {};
-        return Object.values(fieldValues).some(v => v === data.iterationId);
+        return Object.values(fieldValues).some((v) => v === data.iterationId);
       });
 
       return {
         items: iterationItems.map((item: ProjectItem) => ({
           id: item.id,
-          title: 'Untitled',
+          title: "Untitled",
           type: item.contentType,
-          status: undefined
-        }))
+          status: undefined,
+        })),
       };
     });
   }
 
-  async getIterationByDate(data: {
-    projectId: string;
-    date: string;
-    fieldName?: string;
-  }): Promise<{ id: string; title: string; startDate: string; endDate: string; duration: number } | null> {
+  async getIterationByDate(data: { projectId: string; date: string; fieldName?: string }): Promise<{
+    id: string;
+    title: string;
+    startDate: string;
+    endDate: string;
+    duration: number;
+  } | null> {
     return safeCall(async () => {
       const config = await this.getIterationConfiguration(data);
       const targetDate = new Date(data.date);
@@ -153,7 +159,7 @@ export class IterationService {
             title: iteration.title,
             startDate: iteration.startDate,
             endDate: end.toISOString(),
-            duration: iteration.duration
+            duration: iteration.duration,
           };
         }
       }
@@ -170,12 +176,12 @@ export class IterationService {
   }): Promise<{ success: boolean; assignedCount: number }> {
     return safeCall(async () => {
       const fields = await this.templateService.listProjectFields({ projectId: data.projectId });
-      const iterationField = fields.find((f: CustomField) =>
-        f.type === 'iteration' && (!data.fieldName || f.name === data.fieldName)
+      const iterationField = fields.find(
+        (f: CustomField) => f.type === "iteration" && (!data.fieldName || f.name === data.fieldName)
       );
 
       if (!iterationField) {
-        throw new ResourceNotFoundError(ResourceType.FIELD, data.fieldName || 'iteration field');
+        throw new ResourceNotFoundError(ResourceType.FIELD, data.fieldName || "iteration field");
       }
 
       let assignedCount = 0;
@@ -186,7 +192,7 @@ export class IterationService {
             projectId: data.projectId,
             itemId: itemId,
             fieldId: iterationField.id,
-            value: { iterationId: data.iterationId }
+            value: { iterationId: data.iterationId },
           });
           assignedCount++;
         } catch {

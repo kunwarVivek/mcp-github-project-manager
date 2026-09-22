@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { PRDDocument } from './prd-types';
+import type { PRDDocument } from "./prd-types";
 
 // ============================================================================
 // Enhanced Task Generation Configuration
@@ -16,7 +16,7 @@ export interface EnhancedTaskGenerationConfig {
   createLifecycleTracking: boolean;
 
   // Context Level Configuration
-  contextLevel: 'minimal' | 'standard' | 'full';
+  contextLevel: "minimal" | "standard" | "full";
   includeBusinessContext: boolean;
   includeTechnicalContext: boolean;
   includeImplementationGuidance: boolean;
@@ -60,7 +60,7 @@ export const EnhancedTaskGenerationConfigSchema = z.object({
   createTraceabilityMatrix: z.boolean(),
   generateUseCases: z.boolean(),
   createLifecycleTracking: z.boolean(),
-  contextLevel: z.enum(['minimal', 'standard', 'full']),
+  contextLevel: z.enum(["minimal", "standard", "full"]),
   includeBusinessContext: z.boolean(),
   includeTechnicalContext: z.boolean(),
   includeImplementationGuidance: z.boolean(),
@@ -69,5 +69,5 @@ export const EnhancedTaskGenerationConfigSchema = z.object({
   parallelContextGeneration: z.boolean().optional(),
   enforceTraceability: z.boolean(),
   requireBusinessJustification: z.boolean(),
-  trackRequirementCoverage: z.boolean()
+  trackRequirementCoverage: z.boolean(),
 });

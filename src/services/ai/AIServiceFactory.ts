@@ -1,25 +1,39 @@
-import { createAnthropic } from '@ai-sdk/anthropic';
-import { createOpenAI } from '@ai-sdk/openai';
-import { createGoogleGenerativeAI } from '@ai-sdk/google';
-import { createPerplexity } from '@ai-sdk/perplexity';
-import type { SamplingRequestFn } from './SamplingLanguageModel';
-import { SamplingLanguageModel } from './SamplingLanguageModel';
-import { type LanguageModel, wrapLanguageModel, type LanguageModelMiddleware } from 'ai';
+import { createAnthropic } from "@ai-sdk/anthropic";
+import { createOpenAI } from "@ai-sdk/openai";
+import { createGoogleGenerativeAI } from "@ai-sdk/google";
+import { createPerplexity } from "@ai-sdk/perplexity";
+import type { SamplingRequestFn } from "./SamplingLanguageModel";
+import { SamplingLanguageModel } from "./SamplingLanguageModel";
+import { type LanguageModel, wrapLanguageModel, type LanguageModelMiddleware } from "ai";
 import {
-  ANTHROPIC_API_KEY, OPENAI_API_KEY, GOOGLE_API_KEY, PERPLEXITY_API_KEY,
-  AI_MAIN_MODEL, AI_RESEARCH_MODEL, AI_FALLBACK_MODEL, AI_PRD_MODEL,
-  AI_MAIN_PROVIDER, AI_MAIN_API_KEY, AI_MAIN_BASE_URL,
-  AI_RESEARCH_PROVIDER, AI_RESEARCH_API_KEY, AI_RESEARCH_BASE_URL,
-  AI_FALLBACK_PROVIDER, AI_FALLBACK_API_KEY, AI_FALLBACK_BASE_URL,
-  AI_PRD_PROVIDER, AI_PRD_API_KEY, AI_PRD_BASE_URL,
+  ANTHROPIC_API_KEY,
+  OPENAI_API_KEY,
+  GOOGLE_API_KEY,
+  PERPLEXITY_API_KEY,
+  AI_MAIN_MODEL,
+  AI_RESEARCH_MODEL,
+  AI_FALLBACK_MODEL,
+  AI_PRD_MODEL,
+  AI_MAIN_PROVIDER,
+  AI_MAIN_API_KEY,
+  AI_MAIN_BASE_URL,
+  AI_RESEARCH_PROVIDER,
+  AI_RESEARCH_API_KEY,
+  AI_RESEARCH_BASE_URL,
+  AI_FALLBACK_PROVIDER,
+  AI_FALLBACK_API_KEY,
+  AI_FALLBACK_BASE_URL,
+  AI_PRD_PROVIDER,
+  AI_PRD_API_KEY,
+  AI_PRD_BASE_URL,
   getOptionalConfigValue,
-} from '../../env';
-import { type ILogger, Logger } from '../../infrastructure/logger';
-import { getTraceContext } from '../../infrastructure/observability/CorrelationContext';
+} from "../../env";
+import { type ILogger, Logger } from "../../infrastructure/logger";
+import { getTraceContext } from "../../infrastructure/observability/CorrelationContext";
 import {
   AIResiliencePolicy,
   type DegradedResult,
-} from '../../infrastructure/resilience/AIResiliencePolicy.js';
+} from "../../infrastructure/resilience/AIResiliencePolicy.js";
 
 /**
  * Middleware that meters token spend and applies resilience protection.
@@ -71,13 +85,17 @@ export const usageMeteringMiddleware: LanguageModelMiddleware = {
 /**
  * AI Provider Types
  */
-export type AIProvider = 'anthropic' | 'openai' | 'google' | 'perplexity' | 'openai-compatible';
+export type AIProvider = "anthropic" | "openai" | "google" | "perplexity" | "openai-compatible";
 
 /** The four model roles the server configures independently. */
-export type AIModelRole = 'main' | 'research' | 'fallback' | 'prd';
+export type AIModelRole = "main" | "research" | "fallback" | "prd";
 
 export const SUPPORTED_PROVIDERS: readonly AIProvider[] = [
-  'anthropic', 'openai', 'google', 'perplexity', 'openai-compatible',
+  "anthropic",
+  "openai",
+  "google",
+  "perplexity",
+  "openai-compatible",
 ] as const;
 
 /**
@@ -90,27 +108,46 @@ const PROVIDER_API_KEYS: Record<AIProvider, () => string> = {
   perplexity: () => PERPLEXITY_API_KEY,
   // No single global key for generic OpenAI-compatible endpoints — always
   // resolved per-role (AI_<ROLE>_API_KEY); this entry is never invoked.
-  'openai-compatible': () => '',
+  "openai-compatible": () => "",
 };
 
 /** Model-name prefixes used only as a fallback hint when no provider is set. */
 const PROVIDER_HINTS: ReadonlyArray<[AIProvider, (m: string) => boolean]> = [
-  ['anthropic', (m) => m.startsWith('claude-')],
-  ['openai', (m) => m.startsWith('gpt-') || m.startsWith('o1') || m.startsWith('o3')],
-  ['google', (m) => m.startsWith('gemini-')],
-  ['perplexity', (m) => m.includes('perplexity') || m.includes('sonar') || m.includes('llama')],
+  ["anthropic", (m) => m.startsWith("claude-")],
+  ["openai", (m) => m.startsWith("gpt-") || m.startsWith("o1") || m.startsWith("o3")],
+  ["google", (m) => m.startsWith("gemini-")],
+  ["perplexity", (m) => m.includes("perplexity") || m.includes("sonar") || m.includes("llama")],
 ];
 
 /** Per-role configuration accessors — read at call time so tests and rotation work. */
-const PER_ROLE_CONFIG: Record<AIModelRole, {
-  provider: () => string;
-  apiKey: () => string;
-  baseURL: () => string;
-}> = {
-  main:     { provider: () => getOptionalConfigValue('AI_MAIN_PROVIDER', ''),     apiKey: () => getOptionalConfigValue('AI_MAIN_API_KEY', ''),     baseURL: () => getOptionalConfigValue('AI_MAIN_BASE_URL', '') },
-  research: { provider: () => getOptionalConfigValue('AI_RESEARCH_PROVIDER', ''), apiKey: () => getOptionalConfigValue('AI_RESEARCH_API_KEY', ''), baseURL: () => getOptionalConfigValue('AI_RESEARCH_BASE_URL', '') },
-  fallback: { provider: () => getOptionalConfigValue('AI_FALLBACK_PROVIDER', ''), apiKey: () => getOptionalConfigValue('AI_FALLBACK_API_KEY', ''), baseURL: () => getOptionalConfigValue('AI_FALLBACK_BASE_URL', '') },
-  prd:      { provider: () => getOptionalConfigValue('AI_PRD_PROVIDER', ''),      apiKey: () => getOptionalConfigValue('AI_PRD_API_KEY', ''),      baseURL: () => getOptionalConfigValue('AI_PRD_BASE_URL', '') },
+const PER_ROLE_CONFIG: Record<
+  AIModelRole,
+  {
+    provider: () => string;
+    apiKey: () => string;
+    baseURL: () => string;
+  }
+> = {
+  main: {
+    provider: () => getOptionalConfigValue("AI_MAIN_PROVIDER", ""),
+    apiKey: () => getOptionalConfigValue("AI_MAIN_API_KEY", ""),
+    baseURL: () => getOptionalConfigValue("AI_MAIN_BASE_URL", ""),
+  },
+  research: {
+    provider: () => getOptionalConfigValue("AI_RESEARCH_PROVIDER", ""),
+    apiKey: () => getOptionalConfigValue("AI_RESEARCH_API_KEY", ""),
+    baseURL: () => getOptionalConfigValue("AI_RESEARCH_BASE_URL", ""),
+  },
+  fallback: {
+    provider: () => getOptionalConfigValue("AI_FALLBACK_PROVIDER", ""),
+    apiKey: () => getOptionalConfigValue("AI_FALLBACK_API_KEY", ""),
+    baseURL: () => getOptionalConfigValue("AI_FALLBACK_BASE_URL", ""),
+  },
+  prd: {
+    provider: () => getOptionalConfigValue("AI_PRD_PROVIDER", ""),
+    apiKey: () => getOptionalConfigValue("AI_PRD_API_KEY", ""),
+    baseURL: () => getOptionalConfigValue("AI_PRD_BASE_URL", ""),
+  },
 };
 
 /**
@@ -121,10 +158,7 @@ const PER_ROLE_CONFIG: Record<AIModelRole, {
  * it silently fell back to Anthropic *and substituted a different model*, so a
  * typo'd or newly-released model ID quietly ran somewhere else entirely.
  */
-export function resolveProvider(
-  modelString: string,
-  role?: AIModelRole,
-): AIProvider | undefined {
+export function resolveProvider(modelString: string, role?: AIModelRole): AIProvider | undefined {
   // 1. Explicit per-role provider (AI_MAIN_PROVIDER, etc.)
   if (role) {
     const explicit = PER_ROLE_CONFIG[role].provider();
@@ -132,7 +166,7 @@ export function resolveProvider(
       const normalized = explicit.trim().toLowerCase() as AIProvider;
       if (SUPPORTED_PROVIDERS.includes(normalized)) return normalized;
       // Unrecognized name ("together", "groq", etc.) with a base URL → openai-compatible
-      return 'openai-compatible';
+      return "openai-compatible";
     }
   }
   // 2. Legacy: AI_<ROLE>_PROVIDER via getOptionalConfigValue (already checked above)
@@ -191,10 +225,10 @@ export class AIServiceFactory {
    */
   private buildConfiguration(): AIServiceConfig {
     return {
-      main: this.parseModelConfig(AI_MAIN_MODEL, 'main'),
-      research: this.parseModelConfig(AI_RESEARCH_MODEL, 'research'),
-      fallback: this.parseModelConfig(AI_FALLBACK_MODEL, 'fallback'),
-      prd: this.parseModelConfig(AI_PRD_MODEL, 'prd')
+      main: this.parseModelConfig(AI_MAIN_MODEL, "main"),
+      research: this.parseModelConfig(AI_RESEARCH_MODEL, "research"),
+      fallback: this.parseModelConfig(AI_FALLBACK_MODEL, "fallback"),
+      prd: this.parseModelConfig(AI_PRD_MODEL, "prd"),
     };
   }
 
@@ -212,14 +246,14 @@ export class AIServiceFactory {
     if (!provider) {
       this.logger.warn(
         `AI Model Warning: cannot determine a provider for model "${modelString}". ` +
-          `Set AI_${(role ?? 'MAIN').toUpperCase()}_PROVIDER to one of ` +
-          `${SUPPORTED_PROVIDERS.join(', ')}.`,
+          `Set AI_${(role ?? "MAIN").toUpperCase()}_PROVIDER to one of ` +
+          `${SUPPORTED_PROVIDERS.join(", ")}.`
       );
       return null;
     }
 
     // Resolve API key: per-role key overrides global provider key
-    let apiKey = '';
+    let apiKey = "";
     let baseURL: string | undefined;
     if (role) {
       const roleConfig = PER_ROLE_CONFIG[role];
@@ -228,14 +262,14 @@ export class AIServiceFactory {
       if (url) baseURL = url;
     }
     // Fall back to global provider key
-    if (!apiKey && provider !== 'openai-compatible') {
+    if (!apiKey && provider !== "openai-compatible") {
       apiKey = PROVIDER_API_KEYS[provider]();
     }
 
     if (!apiKey) {
       this.logger.warn(
-        `AI Provider Warning: No API key for ${provider} (role: ${role ?? 'unknown'}). ` +
-          `Set AI_${(role ?? 'MAIN').toUpperCase()}_API_KEY or the global provider key.`,
+        `AI Provider Warning: No API key for ${provider} (role: ${role ?? "unknown"}). ` +
+          `Set AI_${(role ?? "MAIN").toUpperCase()}_API_KEY or the global provider key.`
       );
       return null;
     }
@@ -246,10 +280,10 @@ export class AIServiceFactory {
   /**
    * Get AI model instance for specific use case
    */
-  public getModel(type: 'main' | 'research' | 'fallback' | 'prd'): LanguageModel | null {
+  public getModel(type: "main" | "research" | "fallback" | "prd"): LanguageModel | null {
     // Typed off wrapLanguageModel's own parameter: `LanguageModel` also admits
     // the plain model-id string, which is not a wrappable model instance.
-    type WrappableModel = Parameters<typeof wrapLanguageModel>[0]['model'];
+    type WrappableModel = Parameters<typeof wrapLanguageModel>[0]["model"];
     const meter = (model: WrappableModel): LanguageModel =>
       wrapLanguageModel({ model, middleware: usageMeteringMiddleware });
 
@@ -265,24 +299,46 @@ export class AIServiceFactory {
     // which meant a key supplied via CLI flag or SECRETS_DIR was resolved,
     // stored, used as a truthiness gate — and then silently ignored.
     switch (config.provider) {
-      case 'anthropic':
-        return meter(createAnthropic({ apiKey: config.apiKey, ...(config.baseURL && { baseURL: config.baseURL }) })(config.model));
+      case "anthropic":
+        return meter(
+          createAnthropic({
+            apiKey: config.apiKey,
+            ...(config.baseURL && { baseURL: config.baseURL }),
+          })(config.model)
+        );
 
-      case 'openai':
-        return meter(createOpenAI({ apiKey: config.apiKey, ...(config.baseURL && { baseURL: config.baseURL }) })(config.model));
+      case "openai":
+        return meter(
+          createOpenAI({
+            apiKey: config.apiKey,
+            ...(config.baseURL && { baseURL: config.baseURL }),
+          })(config.model)
+        );
 
-      case 'google':
-        return meter(createGoogleGenerativeAI({ apiKey: config.apiKey, ...(config.baseURL && { baseURL: config.baseURL }) })(config.model));
+      case "google":
+        return meter(
+          createGoogleGenerativeAI({
+            apiKey: config.apiKey,
+            ...(config.baseURL && { baseURL: config.baseURL }),
+          })(config.model)
+        );
 
-      case 'perplexity':
-        return meter(createPerplexity({ apiKey: config.apiKey, ...(config.baseURL && { baseURL: config.baseURL }) })(config.model));
+      case "perplexity":
+        return meter(
+          createPerplexity({
+            apiKey: config.apiKey,
+            ...(config.baseURL && { baseURL: config.baseURL }),
+          })(config.model)
+        );
 
-      case 'openai-compatible':
+      case "openai-compatible":
         // Any OpenAI-protocol endpoint: OpenRouter, Together, Groq, Ollama, Azure, etc.
-        return meter(createOpenAI({
-          apiKey: config.apiKey,
-          ...(config.baseURL && { baseURL: config.baseURL }),
-        })(config.model));
+        return meter(
+          createOpenAI({
+            apiKey: config.apiKey,
+            ...(config.baseURL && { baseURL: config.baseURL }),
+          })(config.model)
+        );
 
       default:
         throw new Error(`Unsupported AI provider: ${config.provider}`);
@@ -293,28 +349,28 @@ export class AIServiceFactory {
    * Get main AI model (for general task generation)
    */
   public getMainModel(): LanguageModel | null {
-    return this.getModel('main');
+    return this.getModel("main");
   }
 
   /**
    * Get research AI model (for enhanced analysis)
    */
   public getResearchModel(): LanguageModel | null {
-    return this.getModel('research');
+    return this.getModel("research");
   }
 
   /**
    * Get fallback AI model (when main model fails)
    */
   public getFallbackModel(): LanguageModel | null {
-    return this.getModel('fallback');
+    return this.getModel("fallback");
   }
 
   /**
    * Get PRD AI model (for PRD generation)
    */
   public getPRDModel(): LanguageModel | null {
-    return this.getModel('prd');
+    return this.getModel("prd");
   }
 
   /**
@@ -348,7 +404,7 @@ export class AIServiceFactory {
    */
   public setSamplingProvider(samplingFn: SamplingRequestFn): void {
     this.samplingModel = new SamplingLanguageModel(samplingFn) as unknown as LanguageModel;
-    this.logger.info('🔗 MCP sampling registered as zero-config AI fallback (client LLM)');
+    this.logger.info("🔗 MCP sampling registered as zero-config AI fallback (client LLM)");
   }
 
   /**
@@ -365,7 +421,7 @@ export class AIServiceFactory {
     // Never hand out API keys — this is a debugging accessor and one
     // `logger.debug(factory.getConfiguration())` away from printing every key.
     const strip = (c: AIModelConfig | null): AIModelConfig | null =>
-      c ? { ...c, apiKey: c.apiKey ? '[REDACTED]' : '' } : null;
+      c ? { ...c, apiKey: c.apiKey ? "[REDACTED]" : "" } : null;
     return {
       main: strip(this.config.main),
       research: strip(this.config.research),
@@ -391,41 +447,45 @@ export class AIServiceFactory {
 
     // Check each provider
     if (!ANTHROPIC_API_KEY) {
-      missing.push('ANTHROPIC_API_KEY');
+      missing.push("ANTHROPIC_API_KEY");
     } else {
-      available.push('anthropic');
+      available.push("anthropic");
     }
 
     if (!OPENAI_API_KEY) {
-      missing.push('OPENAI_API_KEY');
+      missing.push("OPENAI_API_KEY");
     } else {
-      available.push('openai');
+      available.push("openai");
     }
 
     if (!GOOGLE_API_KEY) {
-      missing.push('GOOGLE_API_KEY');
+      missing.push("GOOGLE_API_KEY");
     } else {
-      available.push('google');
+      available.push("google");
     }
 
     if (!PERPLEXITY_API_KEY) {
-      missing.push('PERPLEXITY_API_KEY');
+      missing.push("PERPLEXITY_API_KEY");
     } else {
-      available.push('perplexity');
+      available.push("perplexity");
     }
 
     // Check which models are available
-    if (this.config.main) availableModels.push('main'); else unavailableModels.push('main');
-    if (this.config.research) availableModels.push('research'); else unavailableModels.push('research');
-    if (this.config.fallback) availableModels.push('fallback'); else unavailableModels.push('fallback');
-    if (this.config.prd) availableModels.push('prd'); else unavailableModels.push('prd');
+    if (this.config.main) availableModels.push("main");
+    else unavailableModels.push("main");
+    if (this.config.research) availableModels.push("research");
+    else unavailableModels.push("research");
+    if (this.config.fallback) availableModels.push("fallback");
+    else unavailableModels.push("fallback");
+    if (this.config.prd) availableModels.push("prd");
+    else unavailableModels.push("prd");
 
     return {
       hasAnyProvider: available.length > 0,
       available,
       missing,
       availableModels,
-      unavailableModels
+      unavailableModels,
     };
   }
 
@@ -443,7 +503,7 @@ export class AIServiceFactory {
    */
   public enableResilience(policy?: AIResiliencePolicy): void {
     this.resiliencePolicy = policy ?? new AIResiliencePolicy();
-    this.logger.info('[AIServiceFactory] Resilience enabled');
+    this.logger.info("[AIServiceFactory] Resilience enabled");
   }
 
   /**
@@ -469,9 +529,9 @@ export class AIServiceFactory {
    *
    * @returns Circuit state: 'closed', 'open', 'half-open', or 'disabled' if resilience not enabled
    */
-  public getCircuitState(): 'closed' | 'open' | 'half-open' | 'disabled' {
+  public getCircuitState(): "closed" | "open" | "half-open" | "disabled" {
     if (!this.resiliencePolicy) {
-      return 'disabled';
+      return "disabled";
     }
     return this.resiliencePolicy.getCircuitState();
   }
@@ -485,10 +545,10 @@ export class AIServiceFactory {
     providers: Array<{ name: string; configured: boolean; healthy: boolean }>;
   } {
     const circuitState = this.getCircuitState();
-    const circuitHealthy = circuitState === 'closed' || circuitState === 'disabled';
+    const circuitHealthy = circuitState === "closed" || circuitState === "disabled";
 
     const providers: Array<{ name: string; configured: boolean; healthy: boolean }> = (
-      ['anthropic', 'openai', 'google', 'perplexity'] as const
+      ["anthropic", "openai", "google", "perplexity"] as const
     ).map((name) => {
       const configured = !!PROVIDER_API_KEYS[name]();
       return { name, configured, healthy: configured && circuitHealthy };
@@ -550,25 +610,25 @@ export class AIServiceFactory {
       openai: false,
       google: false,
       perplexity: false,
-      'openai-compatible': false
+      "openai-compatible": false,
     };
 
     // Test each provider if API key is available
     if (ANTHROPIC_API_KEY) {
       try {
-        const model = this.getModel('main');
+        const model = this.getModel("main");
         if (model) {
           // Simple test generation using generateText from ai package
-          const { generateText } = await import('ai');
+          const { generateText } = await import("ai");
           await generateText({
             model,
-            prompt: 'Test connection',
-            maxOutputTokens: 10
+            prompt: "Test connection",
+            maxOutputTokens: 10,
           });
           results.anthropic = true;
         }
       } catch (error) {
-        this.logger.error('Anthropic connection test failed', error);
+        this.logger.error("Anthropic connection test failed", error);
       }
     }
 

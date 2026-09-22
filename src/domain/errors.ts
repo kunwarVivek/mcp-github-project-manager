@@ -1,5 +1,5 @@
 // Domain error types and error handling utilities
-import { ResourceNotFoundError } from './resource-types';
+import { ResourceNotFoundError } from "./resource-types";
 
 export class DomainError extends Error {
   constructor(message: string) {
@@ -27,7 +27,10 @@ export class UnauthorizedError extends Error {
 }
 
 export class RateLimitError extends Error {
-  constructor(message = "Rate limit exceeded", public resetTime?: Date) {
+  constructor(
+    message = "Rate limit exceeded",
+    public resetTime?: Date
+  ) {
     super(message);
     this.name = "RateLimitError";
   }
@@ -41,21 +44,31 @@ export class ConfigurationError extends Error {
 }
 
 export class IntegrationError extends Error {
-  constructor(message: string, public source?: string) {
+  constructor(
+    message: string,
+    public source?: string
+  ) {
     super(message);
     this.name = "IntegrationError";
   }
 }
 
 export class GitHubAPIError extends Error {
-  constructor(message: string, public status?: number, public response?: any) {
+  constructor(
+    message: string,
+    public status?: number,
+    public response?: any
+  ) {
     super(message);
     this.name = "GitHubAPIError";
   }
 }
 
 export class MCPProtocolError extends Error {
-  constructor(message: string, public code?: string) {
+  constructor(
+    message: string,
+    public code?: string
+  ) {
     super(message);
     this.name = "MCPProtocolError";
   }

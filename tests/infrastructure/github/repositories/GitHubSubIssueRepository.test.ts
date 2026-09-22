@@ -1,4 +1,4 @@
-import { vi } from 'vitest';
+import { vi } from "vitest";
 /**
  * Unit tests for GitHubSubIssueRepository
  *
@@ -10,9 +10,9 @@ import { vi } from 'vitest';
  * - removeSubIssue: Remove sub-issue relationship
  */
 
-import { GitHubSubIssueRepository } from '../../../../src/infrastructure/github/repositories/GitHubSubIssueRepository.js';
-import { GitHubConfig } from '../../../../src/infrastructure/github/GitHubConfig.js';
-import type { Octokit } from '@octokit/rest';
+import { GitHubSubIssueRepository } from "../../../../src/infrastructure/github/repositories/GitHubSubIssueRepository.js";
+import { GitHubConfig } from "../../../../src/infrastructure/github/GitHubConfig.js";
+import type { Octokit } from "@octokit/rest";
 
 // Mock Octokit graphql method
 const mockGraphql = vi.fn();
@@ -23,9 +23,9 @@ const mockOctokit = {
 } as unknown as Octokit;
 
 // Create a real GitHubConfig instance
-const mockConfig = GitHubConfig.create('test-owner', 'test-repo', 'test-token');
+const mockConfig = GitHubConfig.create("test-owner", "test-repo", "test-token");
 
-describe('GitHubSubIssueRepository', () => {
+describe("GitHubSubIssueRepository", () => {
   let repository: GitHubSubIssueRepository;
 
   beforeEach(() => {
@@ -33,97 +33,98 @@ describe('GitHubSubIssueRepository', () => {
     repository = new GitHubSubIssueRepository(mockOctokit, mockConfig);
   });
 
-  describe('addSubIssue', () => {
-    it('returns created relationship', async () => {
+  describe("addSubIssue", () => {
+    it("returns created relationship", async () => {
       mockGraphql.mockResolvedValueOnce({
         addSubIssue: {
           issue: {
-            id: 'I_parent123',
-            title: 'Parent Issue',
+            id: "I_parent123",
+            title: "Parent Issue",
           },
           subIssue: {
-            id: 'I_sub456',
+            id: "I_sub456",
             number: 123,
-            title: 'Sub Issue',
-            state: 'OPEN',
-            url: 'https://github.com/test-owner/test-repo/issues/123',
+            title: "Sub Issue",
+            state: "OPEN",
+            url: "https://github.com/test-owner/test-repo/issues/123",
           },
         },
       });
 
-      const result = await repository.addSubIssue('I_parent123', 'I_sub456', false);
+      const result = await repository.addSubIssue("I_parent123", "I_sub456", false);
 
-      expect(result.issue.id).toBe('I_parent123');
-      expect(result.issue.title).toBe('Parent Issue');
-      expect(result.subIssue.id).toBe('I_sub456');
+      expect(result.issue.id).toBe("I_parent123");
+      expect(result.issue.title).toBe("Parent Issue");
+      expect(result.subIssue.id).toBe("I_sub456");
       expect(result.subIssue.number).toBe(123);
-      expect(result.subIssue.title).toBe('Sub Issue');
-      expect(result.subIssue.state).toBe('OPEN');
-      expect(result.subIssue.url).toBe('https://github.com/test-owner/test-repo/issues/123');
+      expect(result.subIssue.title).toBe("Sub Issue");
+      expect(result.subIssue.state).toBe("OPEN");
+      expect(result.subIssue.url).toBe("https://github.com/test-owner/test-repo/issues/123");
     });
 
-    it('succeeds with replaceParent=true when issue has parent', async () => {
+    it("succeeds with replaceParent=true when issue has parent", async () => {
       mockGraphql.mockResolvedValueOnce({
         addSubIssue: {
           issue: {
-            id: 'I_newParent',
-            title: 'New Parent Issue',
+            id: "I_newParent",
+            title: "New Parent Issue",
           },
           subIssue: {
-            id: 'I_child',
+            id: "I_child",
             number: 456,
-            title: 'Child Issue',
-            state: 'CLOSED',
-            url: 'https://github.com/test-owner/test-repo/issues/456',
+            title: "Child Issue",
+            state: "CLOSED",
+            url: "https://github.com/test-owner/test-repo/issues/456",
           },
         },
       });
 
-      const result = await repository.addSubIssue('I_newParent', 'I_child', true);
+      const result = await repository.addSubIssue("I_newParent", "I_child", true);
 
-      expect(result.issue.id).toBe('I_newParent');
+      expect(result.issue.id).toBe("I_newParent");
       expect(result.subIssue.number).toBe(456);
-      expect(result.subIssue.state).toBe('CLOSED');
+      expect(result.subIssue.state).toBe("CLOSED");
 
       // Verify replaceParent was passed to mutation
       const callArgs = mockGraphql.mock.calls[0][1];
       expect(callArgs.input.replaceParent).toBe(true);
     });
 
-    it('handles GraphQL errors (issue not found)', async () => {
-      mockGraphql.mockRejectedValueOnce(new Error('Issue with id I_invalid not found'));
+    it("handles GraphQL errors (issue not found)", async () => {
+      mockGraphql.mockRejectedValueOnce(new Error("Issue with id I_invalid not found"));
 
-      await expect(repository.addSubIssue('I_invalid', 'I_sub', false))
-        .rejects.toThrow('Issue with id I_invalid not found');
+      await expect(repository.addSubIssue("I_invalid", "I_sub", false)).rejects.toThrow(
+        "Issue with id I_invalid not found"
+      );
     });
 
-    it('includes sub_issues feature header in request', async () => {
+    it("includes sub_issues feature header in request", async () => {
       mockGraphql.mockResolvedValueOnce({
         addSubIssue: {
-          issue: { id: 'I_p', title: 'P' },
-          subIssue: { id: 'I_s', number: 1, title: 'S', state: 'OPEN', url: 'http://url' },
+          issue: { id: "I_p", title: "P" },
+          subIssue: { id: "I_s", number: 1, title: "S", state: "OPEN", url: "http://url" },
         },
       });
 
-      await repository.addSubIssue('I_p', 'I_s', false);
+      await repository.addSubIssue("I_p", "I_s", false);
 
       const callArgs = mockGraphql.mock.calls[0][1];
-      expect(callArgs.headers).toEqual({ 'GraphQL-Features': 'sub_issues' });
+      expect(callArgs.headers).toEqual({ "GraphQL-Features": "sub_issues" });
     });
   });
 
-  describe('listSubIssues', () => {
-    it('returns paginated list with summary', async () => {
+  describe("listSubIssues", () => {
+    it("returns paginated list with summary", async () => {
       mockGraphql.mockResolvedValueOnce({
         node: {
           subIssues: {
             nodes: [
-              { id: 'I_1', number: 1, title: 'First', state: 'OPEN', url: 'http://1' },
-              { id: 'I_2', number: 2, title: 'Second', state: 'CLOSED', url: 'http://2' },
+              { id: "I_1", number: 1, title: "First", state: "OPEN", url: "http://1" },
+              { id: "I_2", number: 2, title: "Second", state: "CLOSED", url: "http://2" },
             ],
             pageInfo: {
               hasNextPage: true,
-              endCursor: 'cursor123',
+              endCursor: "cursor123",
             },
             totalCount: 10,
           },
@@ -135,22 +136,22 @@ describe('GitHubSubIssueRepository', () => {
         },
       });
 
-      const result = await repository.listSubIssues('I_parent', 50);
+      const result = await repository.listSubIssues("I_parent", 50);
 
       expect(result.subIssues).toHaveLength(2);
-      expect(result.subIssues[0].id).toBe('I_1');
+      expect(result.subIssues[0].id).toBe("I_1");
       expect(result.subIssues[0].position).toBe(0);
-      expect(result.subIssues[1].id).toBe('I_2');
+      expect(result.subIssues[1].id).toBe("I_2");
       expect(result.subIssues[1].position).toBe(1);
       expect(result.summary.total).toBe(10);
       expect(result.summary.completed).toBe(3);
       expect(result.summary.percentCompleted).toBe(30);
       expect(result.pageInfo.hasNextPage).toBe(true);
-      expect(result.pageInfo.endCursor).toBe('cursor123');
+      expect(result.pageInfo.endCursor).toBe("cursor123");
       expect(result.totalCount).toBe(10);
     });
 
-    it('handles empty result', async () => {
+    it("handles empty result", async () => {
       mockGraphql.mockResolvedValueOnce({
         node: {
           subIssues: {
@@ -169,7 +170,7 @@ describe('GitHubSubIssueRepository', () => {
         },
       });
 
-      const result = await repository.listSubIssues('I_empty');
+      const result = await repository.listSubIssues("I_empty");
 
       expect(result.subIssues).toHaveLength(0);
       expect(result.totalCount).toBe(0);
@@ -177,13 +178,11 @@ describe('GitHubSubIssueRepository', () => {
       expect(result.pageInfo.endCursor).toBeUndefined();
     });
 
-    it('with cursor returns next page', async () => {
+    it("with cursor returns next page", async () => {
       mockGraphql.mockResolvedValueOnce({
         node: {
           subIssues: {
-            nodes: [
-              { id: 'I_3', number: 3, title: 'Third', state: 'OPEN', url: 'http://3' },
-            ],
+            nodes: [{ id: "I_3", number: 3, title: "Third", state: "OPEN", url: "http://3" }],
             pageInfo: {
               hasNextPage: false,
               endCursor: null,
@@ -198,212 +197,223 @@ describe('GitHubSubIssueRepository', () => {
         },
       });
 
-      const result = await repository.listSubIssues('I_parent', 50, 'cursor123');
+      const result = await repository.listSubIssues("I_parent", 50, "cursor123");
 
       expect(result.subIssues).toHaveLength(1);
       expect(result.subIssues[0].number).toBe(3);
 
       // Verify cursor was passed
       const callArgs = mockGraphql.mock.calls[0][1];
-      expect(callArgs.after).toBe('cursor123');
+      expect(callArgs.after).toBe("cursor123");
     });
 
-    it('throws when issue not found', async () => {
+    it("throws when issue not found", async () => {
       mockGraphql.mockResolvedValueOnce({ node: null });
 
-      await expect(repository.listSubIssues('I_invalid'))
-        .rejects.toThrow('Issue with ID I_invalid not found');
+      await expect(repository.listSubIssues("I_invalid")).rejects.toThrow(
+        "Issue with ID I_invalid not found"
+      );
     });
 
-    it('limits first to 100', async () => {
+    it("limits first to 100", async () => {
       mockGraphql.mockResolvedValueOnce({
         node: {
-          subIssues: { nodes: [], pageInfo: { hasNextPage: false, endCursor: null }, totalCount: 0 },
+          subIssues: {
+            nodes: [],
+            pageInfo: { hasNextPage: false, endCursor: null },
+            totalCount: 0,
+          },
           subIssuesSummary: { total: 0, completed: 0, percentCompleted: 0 },
         },
       });
 
-      await repository.listSubIssues('I_parent', 200);
+      await repository.listSubIssues("I_parent", 200);
 
       const callArgs = mockGraphql.mock.calls[0][1];
       expect(callArgs.first).toBe(100);
     });
 
-    it('includes sub_issues feature header', async () => {
+    it("includes sub_issues feature header", async () => {
       mockGraphql.mockResolvedValueOnce({
         node: {
-          subIssues: { nodes: [], pageInfo: { hasNextPage: false, endCursor: null }, totalCount: 0 },
+          subIssues: {
+            nodes: [],
+            pageInfo: { hasNextPage: false, endCursor: null },
+            totalCount: 0,
+          },
           subIssuesSummary: { total: 0, completed: 0, percentCompleted: 0 },
         },
       });
 
-      await repository.listSubIssues('I_parent');
+      await repository.listSubIssues("I_parent");
 
       const callArgs = mockGraphql.mock.calls[0][1];
-      expect(callArgs.headers).toEqual({ 'GraphQL-Features': 'sub_issues' });
+      expect(callArgs.headers).toEqual({ "GraphQL-Features": "sub_issues" });
     });
   });
 
-  describe('getParentIssue', () => {
-    it('returns parent when exists', async () => {
+  describe("getParentIssue", () => {
+    it("returns parent when exists", async () => {
       mockGraphql.mockResolvedValueOnce({
         node: {
           parent: {
-            id: 'I_parent123',
+            id: "I_parent123",
             number: 100,
-            title: 'Parent Issue',
-            state: 'OPEN',
-            url: 'https://github.com/test-owner/test-repo/issues/100',
+            title: "Parent Issue",
+            state: "OPEN",
+            url: "https://github.com/test-owner/test-repo/issues/100",
           },
         },
       });
 
-      const result = await repository.getParentIssue('I_child456');
+      const result = await repository.getParentIssue("I_child456");
 
       expect(result).not.toBeNull();
-      expect(result!.id).toBe('I_parent123');
+      expect(result!.id).toBe("I_parent123");
       expect(result!.number).toBe(100);
-      expect(result!.title).toBe('Parent Issue');
-      expect(result!.state).toBe('OPEN');
-      expect(result!.url).toBe('https://github.com/test-owner/test-repo/issues/100');
+      expect(result!.title).toBe("Parent Issue");
+      expect(result!.state).toBe("OPEN");
+      expect(result!.url).toBe("https://github.com/test-owner/test-repo/issues/100");
     });
 
-    it('returns null when no parent', async () => {
+    it("returns null when no parent", async () => {
       mockGraphql.mockResolvedValueOnce({
         node: {
           parent: null,
         },
       });
 
-      const result = await repository.getParentIssue('I_orphan');
+      const result = await repository.getParentIssue("I_orphan");
 
       expect(result).toBeNull();
     });
 
-    it('throws when issue not found', async () => {
+    it("throws when issue not found", async () => {
       mockGraphql.mockResolvedValueOnce({ node: null });
 
-      await expect(repository.getParentIssue('I_invalid'))
-        .rejects.toThrow('Issue with ID I_invalid not found');
+      await expect(repository.getParentIssue("I_invalid")).rejects.toThrow(
+        "Issue with ID I_invalid not found"
+      );
     });
 
-    it('includes sub_issues feature header', async () => {
+    it("includes sub_issues feature header", async () => {
       mockGraphql.mockResolvedValueOnce({
         node: { parent: null },
       });
 
-      await repository.getParentIssue('I_child');
+      await repository.getParentIssue("I_child");
 
       const callArgs = mockGraphql.mock.calls[0][1];
-      expect(callArgs.headers).toEqual({ 'GraphQL-Features': 'sub_issues' });
+      expect(callArgs.headers).toEqual({ "GraphQL-Features": "sub_issues" });
     });
   });
 
-  describe('reprioritizeSubIssue', () => {
-    it('moves to beginning when afterId is null', async () => {
+  describe("reprioritizeSubIssue", () => {
+    it("moves to beginning when afterId is null", async () => {
       mockGraphql.mockResolvedValueOnce({
         reprioritizeSubIssue: {
           issue: {
-            id: 'I_parent',
-            title: 'Parent',
+            id: "I_parent",
+            title: "Parent",
           },
           subIssue: {
-            id: 'I_sub',
+            id: "I_sub",
             number: 123,
-            title: 'Sub Issue',
-            state: 'OPEN',
-            url: 'http://url',
+            title: "Sub Issue",
+            state: "OPEN",
+            url: "http://url",
           },
         },
       });
 
-      const result = await repository.reprioritizeSubIssue('I_parent', 'I_sub');
+      const result = await repository.reprioritizeSubIssue("I_parent", "I_sub");
 
-      expect(result.issue.id).toBe('I_parent');
-      expect(result.subIssue.id).toBe('I_sub');
+      expect(result.issue.id).toBe("I_parent");
+      expect(result.subIssue.id).toBe("I_sub");
 
       const callArgs = mockGraphql.mock.calls[0][1];
       expect(callArgs.input.afterId).toBeNull();
     });
 
-    it('moves after specific issue', async () => {
+    it("moves after specific issue", async () => {
       mockGraphql.mockResolvedValueOnce({
         reprioritizeSubIssue: {
           issue: {
-            id: 'I_parent',
-            title: 'Parent',
+            id: "I_parent",
+            title: "Parent",
           },
           subIssue: {
-            id: 'I_sub2',
+            id: "I_sub2",
             number: 200,
-            title: 'Second Sub',
-            state: 'CLOSED',
-            url: 'http://url2',
+            title: "Second Sub",
+            state: "CLOSED",
+            url: "http://url2",
           },
         },
       });
 
-      const result = await repository.reprioritizeSubIssue('I_parent', 'I_sub2', 'I_sub1');
+      const result = await repository.reprioritizeSubIssue("I_parent", "I_sub2", "I_sub1");
 
-      expect(result.subIssue.id).toBe('I_sub2');
+      expect(result.subIssue.id).toBe("I_sub2");
       expect(result.subIssue.number).toBe(200);
 
       const callArgs = mockGraphql.mock.calls[0][1];
-      expect(callArgs.input.afterId).toBe('I_sub1');
+      expect(callArgs.input.afterId).toBe("I_sub1");
     });
 
-    it('includes sub_issues feature header', async () => {
+    it("includes sub_issues feature header", async () => {
       mockGraphql.mockResolvedValueOnce({
         reprioritizeSubIssue: {
-          issue: { id: 'I_p', title: 'P' },
-          subIssue: { id: 'I_s', number: 1, title: 'S', state: 'OPEN', url: 'http://u' },
+          issue: { id: "I_p", title: "P" },
+          subIssue: { id: "I_s", number: 1, title: "S", state: "OPEN", url: "http://u" },
         },
       });
 
-      await repository.reprioritizeSubIssue('I_p', 'I_s');
+      await repository.reprioritizeSubIssue("I_p", "I_s");
 
       const callArgs = mockGraphql.mock.calls[0][1];
-      expect(callArgs.headers).toEqual({ 'GraphQL-Features': 'sub_issues' });
+      expect(callArgs.headers).toEqual({ "GraphQL-Features": "sub_issues" });
     });
   });
 
-  describe('removeSubIssue', () => {
-    it('succeeds removing sub-issue', async () => {
+  describe("removeSubIssue", () => {
+    it("succeeds removing sub-issue", async () => {
       mockGraphql.mockResolvedValueOnce({
         removeSubIssue: {
-          issue: { id: 'I_parent' },
-          subIssue: { id: 'I_sub' },
+          issue: { id: "I_parent" },
+          subIssue: { id: "I_sub" },
         },
       });
 
       // Should not throw
-      await repository.removeSubIssue('I_parent', 'I_sub');
+      await repository.removeSubIssue("I_parent", "I_sub");
 
       expect(mockGraphql).toHaveBeenCalledTimes(1);
       const callArgs = mockGraphql.mock.calls[0][1];
-      expect(callArgs.input.issueId).toBe('I_parent');
-      expect(callArgs.input.subIssueId).toBe('I_sub');
+      expect(callArgs.input.issueId).toBe("I_parent");
+      expect(callArgs.input.subIssueId).toBe("I_sub");
     });
 
-    it('handles not found error', async () => {
-      mockGraphql.mockRejectedValueOnce(new Error('Sub-issue relationship not found'));
+    it("handles not found error", async () => {
+      mockGraphql.mockRejectedValueOnce(new Error("Sub-issue relationship not found"));
 
-      await expect(repository.removeSubIssue('I_parent', 'I_invalid'))
-        .rejects.toThrow('Sub-issue relationship not found');
+      await expect(repository.removeSubIssue("I_parent", "I_invalid")).rejects.toThrow(
+        "Sub-issue relationship not found"
+      );
     });
 
-    it('includes sub_issues feature header', async () => {
+    it("includes sub_issues feature header", async () => {
       mockGraphql.mockResolvedValueOnce({
         removeSubIssue: {
-          issue: { id: 'I_p' },
-          subIssue: { id: 'I_s' },
+          issue: { id: "I_p" },
+          subIssue: { id: "I_s" },
         },
       });
 
-      await repository.removeSubIssue('I_p', 'I_s');
+      await repository.removeSubIssue("I_p", "I_s");
 
       const callArgs = mockGraphql.mock.calls[0][1];
-      expect(callArgs.headers).toEqual({ 'GraphQL-Features': 'sub_issues' });
+      expect(callArgs.headers).toEqual({ "GraphQL-Features": "sub_issues" });
     });
   });
 });

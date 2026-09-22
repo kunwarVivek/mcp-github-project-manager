@@ -65,8 +65,6 @@ export class ResourceCache {
     return ResourceCache.instance;
   }
 
-
-
   /**
    * Set resource with type information for persistence
    */
@@ -87,7 +85,8 @@ export class ResourceCache {
       expiresAt,
       tags,
       namespaces,
-      lastModified: isCacheableResource(value) && value.updatedAt ? value.updatedAt : new Date().toISOString(),
+      lastModified:
+        isCacheableResource(value) && value.updatedAt ? value.updatedAt : new Date().toISOString(),
       version: isCacheableResource(value) && value.version ? value.version : 1,
     };
 
@@ -170,8 +169,6 @@ export class ResourceCache {
 
     return entry.value;
   }
-
-
 
   async getByType<T extends Resource>(
     type: ResourceType,
@@ -292,9 +289,7 @@ export class ResourceCache {
   }
 
   async invalidateByPattern(pattern: string | RegExp): Promise<void> {
-    const regex = typeof pattern === 'string'
-      ? new RegExp(pattern.replace(/\*/g, '.*'))
-      : pattern;
+    const regex = typeof pattern === "string" ? new RegExp(pattern.replace(/\*/g, ".*")) : pattern;
 
     const idsToRemove: string[] = [];
 
@@ -348,7 +343,11 @@ export class ResourceCache {
   }
 
   // Relationship management methods
-  async setRelationship(sourceId: string, relationshipType: string, targetId: string): Promise<void> {
+  async setRelationship(
+    sourceId: string,
+    relationshipType: string,
+    targetId: string
+  ): Promise<void> {
     const relationshipKey = this.getRelationshipKey(sourceId, relationshipType, targetId);
 
     // Create a simple relationship entry
@@ -356,8 +355,8 @@ export class ResourceCache {
       value: {
         sourceId,
         relationshipType,
-        targetId
-      }
+        targetId,
+      },
     };
 
     this.cache.set(relationshipKey, entry);
@@ -368,7 +367,7 @@ export class ResourceCache {
 
     if (!relationships) {
       relationships = {
-        value: new Set<string>()
+        value: new Set<string>(),
       };
       this.cache.set(sourceTypeKey, relationships);
     }
@@ -387,7 +386,11 @@ export class ResourceCache {
     return Array.from(relationships.value);
   }
 
-  async removeRelationship(sourceId: string, relationshipType: string, targetId: string): Promise<void> {
+  async removeRelationship(
+    sourceId: string,
+    relationshipType: string,
+    targetId: string
+  ): Promise<void> {
     const relationshipKey = this.getRelationshipKey(sourceId, relationshipType, targetId);
 
     // Remove the relationship entry
@@ -417,7 +420,7 @@ export class ResourceCache {
 
   private hasMatchingTags(entry: CacheEntry<any>, tags: string[]): boolean {
     if (!entry.tags || entry.tags.length === 0) return false;
-    return tags.some(tag => entry.tags!.includes(tag));
+    return tags.some((tag) => entry.tags!.includes(tag));
   }
 
   private addToTagIndex(id: string, tags: string[]): void {
@@ -521,7 +524,7 @@ export class ResourceCache {
    */
   enablePersistence(cacheDirectory?: string): void {
     if (this.persistence) {
-      process.stderr.write('[ResourceCache] Persistence already enabled\n');
+      process.stderr.write("[ResourceCache] Persistence already enabled\n");
       return;
     }
 
@@ -549,8 +552,8 @@ export class ResourceCache {
       process.exit(0);
     };
 
-    process.once('SIGTERM', cleanup);
-    process.once('SIGINT', cleanup);
+    process.once("SIGTERM", cleanup);
+    process.once("SIGINT", cleanup);
 
     process.stderr.write(
       `[ResourceCache] Persistence enabled (interval: ${this.PERSIST_INTERVAL_MS}ms)\n`
@@ -568,7 +571,7 @@ export class ResourceCache {
       this.persistInterval = undefined;
     }
     this.persistence = undefined;
-    process.stderr.write('[ResourceCache] Persistence disabled\n');
+    process.stderr.write("[ResourceCache] Persistence disabled\n");
   }
 
   /**
@@ -578,7 +581,7 @@ export class ResourceCache {
    */
   async persist(): Promise<void> {
     if (!this.persistence) {
-      process.stderr.write('[ResourceCache] Persistence not enabled\n');
+      process.stderr.write("[ResourceCache] Persistence not enabled\n");
       return;
     }
 
@@ -613,7 +616,7 @@ export class ResourceCache {
    */
   async restore(): Promise<number> {
     if (!this.persistence) {
-      process.stderr.write('[ResourceCache] Persistence not enabled\n');
+      process.stderr.write("[ResourceCache] Persistence not enabled\n");
       return 0;
     }
 
@@ -668,7 +671,7 @@ export class ResourceCache {
    * Stops periodic persistence and performs final persist.
    */
   async shutdown(): Promise<void> {
-    process.stderr.write('[ResourceCache] Shutting down...\n');
+    process.stderr.write("[ResourceCache] Shutting down...\n");
 
     // Stop periodic persistence
     if (this.persistInterval) {
@@ -680,14 +683,14 @@ export class ResourceCache {
     if (this.persistence) {
       try {
         await this.persist();
-        process.stderr.write('[ResourceCache] Final persist complete\n');
+        process.stderr.write("[ResourceCache] Final persist complete\n");
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         process.stderr.write(`[ResourceCache] Final persist failed: ${message}\n`);
       }
     }
 
-    process.stderr.write('[ResourceCache] Shutdown complete\n');
+    process.stderr.write("[ResourceCache] Shutdown complete\n");
   }
 
   /**
@@ -708,13 +711,13 @@ export class ResourceCache {
    * Parse cache key to get type and ID
    */
   private parseCacheKey(cacheKey: string): { type: ResourceType; id: string } | null {
-    const parts = cacheKey.split(':');
+    const parts = cacheKey.split(":");
     if (parts.length < 2) {
       return null;
     }
 
     const type = parts[0] as ResourceType;
-    const id = parts.slice(1).join(':'); // Handle IDs that might contain colons
+    const id = parts.slice(1).join(":"); // Handle IDs that might contain colons
 
     return { type, id };
   }
@@ -754,7 +757,7 @@ export class ResourceCache {
         resourceType: parsed.type,
         lastModified: entry.lastModified || new Date().toISOString(),
         version: entry.version || 1,
-        syncedAt: new Date().toISOString()
+        syncedAt: new Date().toISOString(),
       });
     }
 
@@ -777,7 +780,7 @@ export class ResourceCache {
       resourceType: type,
       lastModified: entry.lastModified || new Date().toISOString(),
       version: entry.version || 1,
-      syncedAt: new Date().toISOString()
+      syncedAt: new Date().toISOString(),
     };
   }
 

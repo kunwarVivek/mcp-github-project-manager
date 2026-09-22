@@ -1,21 +1,21 @@
-import type { ResourceType } from '../../domain/resource-types';
-import type { ResourceEvent } from './GitHubWebhookHandler';
-import { type ILogger, Logger } from '../logger/index';
-import { EventEmitter } from 'node:events';
+import type { ResourceType } from "../../domain/resource-types";
+import type { ResourceEvent } from "./GitHubWebhookHandler";
+import { type ILogger, Logger } from "../logger/index";
+import { EventEmitter } from "node:events";
 
 export interface EventFilter {
   resourceType?: ResourceType;
-  eventType?: ResourceEvent['type'];
+  eventType?: ResourceEvent["type"];
   resourceId?: string;
   tags?: string[];
-  source?: ResourceEvent['source'];
+  source?: ResourceEvent["source"];
 }
 
 export interface EventSubscription {
   id: string;
   clientId: string;
   filters: EventFilter[];
-  transport: 'sse' | 'webhook' | 'internal';
+  transport: "sse" | "webhook" | "internal";
   endpoint?: string;
   lastEventId?: string;
   createdAt: string;
@@ -36,7 +36,7 @@ export class EventSubscriptionManager extends EventEmitter {
   private subscriptions = new Map<string, EventSubscription>();
   private clientSubscriptions = new Map<string, Set<string>>();
   private resourceTypeIndex = new Map<ResourceType, Set<string>>();
-  private eventTypeIndex = new Map<ResourceEvent['type'], Set<string>>();
+  private eventTypeIndex = new Map<ResourceEvent["type"], Set<string>>();
 
   constructor(logger?: ILogger) {
     super();
@@ -47,14 +47,14 @@ export class EventSubscriptionManager extends EventEmitter {
   /**
    * Create a new event subscription
    */
-  subscribe(subscription: Omit<EventSubscription, 'id' | 'createdAt' | 'active'>): string {
+  subscribe(subscription: Omit<EventSubscription, "id" | "createdAt" | "active">): string {
     const subscriptionId = this.generateSubscriptionId();
 
     const fullSubscription: EventSubscription = {
       ...subscription,
       id: subscriptionId,
       createdAt: new Date().toISOString(),
-      active: true
+      active: true,
     };
 
     // Store subscription
@@ -70,7 +70,7 @@ export class EventSubscriptionManager extends EventEmitter {
     this.indexSubscription(subscriptionId, fullSubscription);
 
     this.logger.info(`Created subscription ${subscriptionId} for client ${subscription.clientId}`);
-    this.emit('subscriptionCreated', fullSubscription);
+    this.emit("subscriptionCreated", fullSubscription);
 
     return subscriptionId;
   }
@@ -100,7 +100,7 @@ export class EventSubscriptionManager extends EventEmitter {
     this.subscriptions.delete(subscriptionId);
 
     this.logger.info(`Removed subscription ${subscriptionId} for client ${subscription.clientId}`);
-    this.emit('subscriptionRemoved', subscription);
+    this.emit("subscriptionRemoved", subscription);
 
     return true;
   }
@@ -165,7 +165,9 @@ export class EventSubscriptionManager extends EventEmitter {
       return;
     }
 
-    this.logger.debug(`Notifying ${matchingSubscriptions.length} subscribers for event ${event.id}`);
+    this.logger.debug(
+      `Notifying ${matchingSubscriptions.length} subscribers for event ${event.id}`
+    );
 
     // Group subscriptions by transport type for efficient processing
     const subscriptionsByTransport = this.groupSubscriptionsByTransport(matchingSubscriptions);
@@ -269,7 +271,7 @@ export class EventSubscriptionManager extends EventEmitter {
       totalSubscriptions: this.subscriptions.size,
       activeSubscriptions: 0,
       subscriptionsByTransport: {},
-      subscriptionsByResourceType: {}
+      subscriptionsByResourceType: {},
     };
 
     for (const subscription of this.subscriptions.values()) {
@@ -279,13 +281,15 @@ export class EventSubscriptionManager extends EventEmitter {
 
       // Count by transport
       const transport = subscription.transport;
-      stats.subscriptionsByTransport[transport] = (stats.subscriptionsByTransport[transport] || 0) + 1;
+      stats.subscriptionsByTransport[transport] =
+        (stats.subscriptionsByTransport[transport] || 0) + 1;
 
       // Count by resource type (from filters)
       for (const filter of subscription.filters) {
         if (filter.resourceType) {
           const resourceType = filter.resourceType;
-          stats.subscriptionsByResourceType[resourceType] = (stats.subscriptionsByResourceType[resourceType] || 0) + 1;
+          stats.subscriptionsByResourceType[resourceType] =
+            (stats.subscriptionsByResourceType[resourceType] || 0) + 1;
         }
       }
     }
@@ -362,7 +366,7 @@ export class EventSubscriptionManager extends EventEmitter {
     }
 
     // Event must match at least one filter
-    return subscription.filters.some(filter => this.eventMatchesFilter(event, filter));
+    return subscription.filters.some((filter) => this.eventMatchesFilter(event, filter));
   }
 
   /**
@@ -392,7 +396,7 @@ export class EventSubscriptionManager extends EventEmitter {
     // Check tags (if event has metadata with tags)
     if (filter.tags && filter.tags.length > 0) {
       const eventTags = event.metadata?.tags || [];
-      const hasMatchingTag = filter.tags.some(tag => eventTags.includes(tag));
+      const hasMatchingTag = filter.tags.some((tag) => eventTags.includes(tag));
       if (!hasMatchingTag) {
         return false;
       }
@@ -404,7 +408,9 @@ export class EventSubscriptionManager extends EventEmitter {
   /**
    * Group subscriptions by transport type
    */
-  private groupSubscriptionsByTransport(subscriptions: EventSubscription[]): Map<string, EventSubscription[]> {
+  private groupSubscriptionsByTransport(
+    subscriptions: EventSubscription[]
+  ): Map<string, EventSubscription[]> {
     const grouped = new Map<string, EventSubscription[]>();
 
     for (const subscription of subscriptions) {
@@ -427,14 +433,14 @@ export class EventSubscriptionManager extends EventEmitter {
     event: ResourceEvent
   ): Promise<void> {
     switch (transport) {
-      case 'sse':
-        this.emit('sseEvent', { subscriptions, event });
+      case "sse":
+        this.emit("sseEvent", { subscriptions, event });
         break;
-      case 'webhook':
-        this.emit('webhookEvent', { subscriptions, event });
+      case "webhook":
+        this.emit("webhookEvent", { subscriptions, event });
         break;
-      case 'internal':
-        this.emit('internalEvent', { subscriptions, event });
+      case "internal":
+        this.emit("internalEvent", { subscriptions, event });
         break;
       default:
         this.logger.warn(`Unknown transport type: ${transport}`);

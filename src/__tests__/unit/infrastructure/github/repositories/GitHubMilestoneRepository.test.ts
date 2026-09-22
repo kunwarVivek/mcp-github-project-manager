@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi, type Mocked, type MockedClass, } from 'vitest';
+import { beforeEach, describe, expect, it, vi, type Mocked, type MockedClass } from "vitest";
 import { Octokit } from "@octokit/rest";
 import { GitHubConfig } from "../../../../../infrastructure/github/GitHubConfig";
 import { GitHubMilestoneRepository } from "../../../../../infrastructure/github/repositories/GitHubMilestoneRepository";
@@ -28,13 +28,11 @@ describe("GitHubMilestoneRepository", () => {
           deleteMilestone: vi.fn(),
           getMilestone: vi.fn(),
           listMilestones: vi.fn(),
-        }
-      }
+        },
+      },
     } as any;
 
-    (Octokit as MockedClass<typeof Octokit>).mockImplementation(
-      () => mockOctokit
-    );
+    (Octokit as MockedClass<typeof Octokit>).mockImplementation(() => mockOctokit);
 
     // Create configuration
     config = new GitHubConfig("test-owner", "test-repo", "test-token");
@@ -69,11 +67,11 @@ describe("GitHubMilestoneRepository", () => {
           html_url: "https://github.com/test-owner/test-repo/milestone/1",
           labels_url: "https://api.github.com/repos/test-owner/test-repo/milestones/1/labels",
           node_id: "MDk6TWlsZXN0b25lMQ==",
-          creator: null
+          creator: null,
         },
         status: 201,
         url: "https://api.github.com/repos/test-owner/test-repo/milestones",
-        headers: {}
+        headers: {},
       } as any;
 
       mockOctokit.rest.issues.createMilestone.mockResolvedValueOnce(mockRestResponse);
@@ -95,8 +93,8 @@ describe("GitHubMilestoneRepository", () => {
         progress: {
           percent: 0,
           complete: 3,
-          total: 8
-        }
+          total: 8,
+        },
       });
 
       // Verify the REST API call was made correctly
@@ -115,17 +113,13 @@ describe("GitHubMilestoneRepository", () => {
       const milestoneData: CreateMilestone = {
         title: "Test Milestone",
         description: "Test Description",
-        dueDate: "2024-03-31T00:00:00Z"
+        dueDate: "2024-03-31T00:00:00Z",
       };
 
-      mockOctokit.rest.issues.createMilestone.mockRejectedValueOnce(
-        new Error("Creation failed")
-      );
+      mockOctokit.rest.issues.createMilestone.mockRejectedValueOnce(new Error("Creation failed"));
 
       // Act & Assert
-      await expect(repository.create(milestoneData)).rejects.toThrow(
-        "Creation failed"
-      );
+      await expect(repository.create(milestoneData)).rejects.toThrow("Creation failed");
     });
   });
 
@@ -147,10 +141,10 @@ describe("GitHubMilestoneRepository", () => {
               enabled: true,
               openIssues: 5,
               closedIssues: 3,
-              completionPercentage: 37.5
-            }
-          }
-        }
+              completionPercentage: 37.5,
+            },
+          },
+        },
       };
 
       mockOctokit.graphql.mockResolvedValueOnce(mockResponse);
@@ -172,8 +166,8 @@ describe("GitHubMilestoneRepository", () => {
         progress: {
           percent: 37.5,
           complete: 3,
-          total: 8
-        }
+          total: 8,
+        },
       });
     });
 
@@ -181,8 +175,8 @@ describe("GitHubMilestoneRepository", () => {
       // Arrange
       const mockResponse = {
         repository: {
-          milestone: null
-        }
+          milestone: null,
+        },
       };
 
       mockOctokit.graphql.mockResolvedValueOnce(mockResponse);
@@ -199,7 +193,8 @@ describe("GitHubMilestoneRepository", () => {
     it("should get issues for a milestone", async () => {
       // Arrange - need to mock the factory.createIssueRepository method
       const mockIssueRepository = {
-        findByMilestone: vi.fn().mockImplementation(() => Promise.resolve([
+        findByMilestone: vi.fn().mockImplementation(() =>
+          Promise.resolve([
             {
               id: "issue-123",
               number: 42,
@@ -211,15 +206,16 @@ describe("GitHubMilestoneRepository", () => {
               createdAt: "2023-01-01T00:00:00Z",
               updatedAt: "2023-01-01T00:00:00Z",
               url: "https://github.com/test-owner/test-repo/issues/42",
-              milestoneId: "milestone-123"
-            } as Issue
-          ]))
+              milestoneId: "milestone-123",
+            } as Issue,
+          ])
+        ),
       };
 
       // Mock the private factory field using reflection or replace it directly
       const repository: any = new GitHubMilestoneRepository(mockOctokit, config);
       repository.factory = {
-        createIssueRepository: () => mockIssueRepository
+        createIssueRepository: () => mockIssueRepository,
       };
 
       // Act
@@ -245,7 +241,7 @@ describe("GitHubMilestoneRepository", () => {
           dueOn: "2023-01-01T00:00:00Z",
           state: "open",
           createdAt: "2023-01-01T00:00:00Z",
-          updatedAt: "2023-01-01T00:00:00Z"
+          updatedAt: "2023-01-01T00:00:00Z",
         },
         {
           id: "milestone-2",
@@ -255,23 +251,23 @@ describe("GitHubMilestoneRepository", () => {
           dueOn: "2030-01-01T00:00:00Z",
           state: "open",
           createdAt: "2023-01-01T00:00:00Z",
-          updatedAt: "2023-01-01T00:00:00Z"
-        }
+          updatedAt: "2023-01-01T00:00:00Z",
+        },
       ];
 
       // Mock the findAll method to return these milestones
       const mockResponse = {
         repository: {
           milestones: {
-            nodes: mockMilestones
-          }
-        }
+            nodes: mockMilestones,
+          },
+        },
       };
 
       mockOctokit.graphql.mockResolvedValueOnce(mockResponse);
 
       // Act
-      const cutoffDate = '2024-01-01T00:00:00.000Z';
+      const cutoffDate = "2024-01-01T00:00:00.000Z";
       const result = await repository.findByDueDate(new Date(cutoffDate));
 
       // Assert

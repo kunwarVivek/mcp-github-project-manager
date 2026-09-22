@@ -1,8 +1,4 @@
-import type {
-  TemplateFormat,
-  TemplateSection,
-  ParsedTemplate,
-} from '../../domain/template-types';
+import type { TemplateFormat, TemplateSection, ParsedTemplate } from "../../domain/template-types";
 
 /**
  * Detect template format from content
@@ -21,25 +17,25 @@ export function detectTemplateFormat(content: string): TemplateFormat {
     const parsed = JSON.parse(trimmed);
 
     // Check for JSON Schema indicators
-    if (parsed.$schema || parsed.type === 'object' || parsed.properties) {
-      return 'json-schema';
+    if (parsed.$schema || parsed.type === "object" || parsed.properties) {
+      return "json-schema";
     }
 
     // Check for example-based indicators
     if (parsed.example || parsed.sample || parsed.template?.example) {
-      return 'example-based';
+      return "example-based";
     }
 
     // JSON but not schema or example -> treat as example
-    return 'example-based';
+    return "example-based";
   } catch {
     // Not JSON - check for markdown placeholders
     if (/\{\{[^}]+\}\}/.test(trimmed)) {
-      return 'markdown';
+      return "markdown";
     }
 
     // Plain text - treat as example
-    return 'example-based';
+    return "example-based";
   }
 }
 
@@ -49,7 +45,7 @@ export function detectTemplateFormat(content: string): TemplateFormat {
 export function extractPlaceholders(content: string): string[] {
   const regex = /\{\{([^}]+)\}\}/g;
   const matches = [...content.matchAll(regex)];
-  const placeholders = matches.map(m => m[1].trim());
+  const placeholders = matches.map((m) => m[1].trim());
 
   // Deduplicate while preserving order
   return [...new Set(placeholders)];
@@ -61,7 +57,7 @@ export function extractPlaceholders(content: string): string[] {
  */
 export function extractMarkdownSections(content: string): TemplateSection[] {
   const sections: TemplateSection[] = [];
-  const lines = content.split('\n');
+  const lines = content.split("\n");
 
   let currentSection: Partial<TemplateSection> | null = null;
   let currentContent: string[] = [];
@@ -73,7 +69,7 @@ export function extractMarkdownSections(content: string): TemplateSection[] {
     if (headerMatch) {
       // Save previous section
       if (currentSection) {
-        currentSection.description = currentContent.join('\n').trim();
+        currentSection.description = currentContent.join("\n").trim();
         sections.push(currentSection as TemplateSection);
       }
 
@@ -82,9 +78,9 @@ export function extractMarkdownSections(content: string): TemplateSection[] {
       currentSection = {
         id: `section-${sectionIndex++}`,
         name,
-        description: '',
-        required: !name.toLowerCase().includes('optional'),
-        placeholder: extractPlaceholders(name)[0] || name
+        description: "",
+        required: !name.toLowerCase().includes("optional"),
+        placeholder: extractPlaceholders(name)[0] || name,
       };
       currentContent = [];
     } else if (currentSection) {
@@ -94,7 +90,7 @@ export function extractMarkdownSections(content: string): TemplateSection[] {
 
   // Don't forget last section
   if (currentSection) {
-    currentSection.description = currentContent.join('\n').trim();
+    currentSection.description = currentContent.join("\n").trim();
     sections.push(currentSection as TemplateSection);
   }
 
@@ -114,11 +110,11 @@ export function extractJsonSchemaSections(schema: Record<string, unknown>): Temp
     sections.push({
       id: key,
       name: (prop.title as string) || key,
-      description: (prop.description as string) || '',
+      description: (prop.description as string) || "",
       required: required.includes(key),
       minLength: prop.minLength as number | undefined,
       maxLength: prop.maxLength as number | undefined,
-      defaultValue: prop.default as string | undefined
+      defaultValue: prop.default as string | undefined,
     });
   }
 
@@ -132,7 +128,7 @@ export class TemplateParser {
   /**
    * Parse template content into structured format
    */
-  parse(content: string, name: string = 'Untitled Template'): ParsedTemplate {
+  parse(content: string, name: string = "Untitled Template"): ParsedTemplate {
     const format = detectTemplateFormat(content);
 
     let sections: TemplateSection[] = [];
@@ -140,16 +136,16 @@ export class TemplateParser {
     let description: string | undefined;
 
     switch (format) {
-      case 'markdown':
+      case "markdown":
         sections = extractMarkdownSections(content);
         placeholders = extractPlaceholders(content);
         break;
 
-      case 'json-schema':
+      case "json-schema":
         try {
           const schema = JSON.parse(content);
           sections = extractJsonSchemaSections(schema);
-          placeholders = sections.map(s => s.id);
+          placeholders = sections.map((s) => s.id);
           description = schema.description;
         } catch {
           sections = [];
@@ -157,23 +153,25 @@ export class TemplateParser {
         }
         break;
 
-      case 'example-based':
+      case "example-based":
         // For example-based, we extract structure from the example
         try {
           const example = JSON.parse(content);
           const exampleContent = example.example || example.sample || example;
           sections = this.inferSectionsFromExample(exampleContent);
-          placeholders = sections.map(s => s.id);
+          placeholders = sections.map((s) => s.id);
           description = example.description;
         } catch {
           // Plain text example - minimal structure
-          sections = [{
-            id: 'content',
-            name: 'Content',
-            description: 'Main content based on example',
-            required: true
-          }];
-          placeholders = ['content'];
+          sections = [
+            {
+              id: "content",
+              name: "Content",
+              description: "Main content based on example",
+              required: true,
+            },
+          ];
+          placeholders = ["content"];
         }
         break;
     }
@@ -184,7 +182,7 @@ export class TemplateParser {
       description,
       sections,
       placeholders,
-      rawContent: content
+      rawContent: content,
     };
   }
 
@@ -192,7 +190,7 @@ export class TemplateParser {
    * Infer sections from an example document
    */
   private inferSectionsFromExample(example: unknown): TemplateSection[] {
-    if (typeof example !== 'object' || example === null) {
+    if (typeof example !== "object" || example === null) {
       return [];
     }
 
@@ -200,13 +198,13 @@ export class TemplateParser {
     const obj = example as Record<string, unknown>;
 
     for (const [key, value] of Object.entries(obj)) {
-      const valueStr = typeof value === 'string' ? value : JSON.stringify(value);
+      const valueStr = typeof value === "string" ? value : JSON.stringify(value);
       sections.push({
         id: key,
         name: this.formatSectionName(key),
         description: `Section for ${key}. Example: ${valueStr.substring(0, 100)}...`,
         required: true,
-        minLength: typeof value === 'string' ? Math.floor(value.length * 0.5) : undefined
+        minLength: typeof value === "string" ? Math.floor(value.length * 0.5) : undefined,
       });
     }
 
@@ -218,11 +216,11 @@ export class TemplateParser {
    */
   private formatSectionName(key: string): string {
     return key
-      .replace(/([A-Z])/g, ' $1')
-      .replace(/_/g, ' ')
-      .replace(/^\s/, '')
-      .split(' ')
-      .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-      .join(' ');
+      .replace(/([A-Z])/g, " $1")
+      .replace(/_/g, " ")
+      .replace(/^\s/, "")
+      .split(" ")
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+      .join(" ");
   }
 }

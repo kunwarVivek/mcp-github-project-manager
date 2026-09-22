@@ -85,12 +85,11 @@ export class ToolTelemetry {
 
   private buildMetrics(toolName: string, bucket: ToolBucket): ToolMetrics {
     const sorted = bucket.latencies.slice().sort((a, b) => a - b);
-    const avg = sorted.length > 0
-      ? sorted.reduce((s, v) => s + v, 0) / sorted.length
-      : 0;
-    const p95 = sorted.length > 0
-      ? sorted[Math.min(Math.ceil(sorted.length * 0.95) - 1, sorted.length - 1)]
-      : 0;
+    const avg = sorted.length > 0 ? sorted.reduce((s, v) => s + v, 0) / sorted.length : 0;
+    const p95 =
+      sorted.length > 0
+        ? sorted[Math.min(Math.ceil(sorted.length * 0.95) - 1, sorted.length - 1)]
+        : 0;
 
     return {
       toolName,

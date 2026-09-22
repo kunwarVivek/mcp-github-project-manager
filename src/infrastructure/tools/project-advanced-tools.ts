@@ -241,9 +241,7 @@ function matchesFilter(item: ProjectItemNode, filter: ProjectItemFilter): boolea
 
   // Filter by status (single select field value)
   if (filter.status) {
-    const statusField = item.fieldValues.nodes.find(
-      (fv) => fv.field?.name === "Status"
-    );
+    const statusField = item.fieldValues.nodes.find((fv) => fv.field?.name === "Status");
     if (!statusField || statusField.name !== filter.status) {
       return false;
     }
@@ -278,10 +276,7 @@ function matchesFilter(item: ProjectItemNode, filter: ProjectItemFilter): boolea
  * Reorders an item within a GitHub ProjectV2. If afterId is omitted,
  * the item moves to the first position. Position changes persist across views.
  */
-export const updateItemPositionTool: ToolDefinition<
-  UpdateItemPositionInput,
-  ItemPositionOutput
-> = {
+export const updateItemPositionTool: ToolDefinition<UpdateItemPositionInput, ItemPositionOutput> = {
   name: "update_item_position",
   title: "Update Item Position",
   description:
@@ -428,9 +423,7 @@ export const filterProjectItemsTool: ToolDefinition<
  * @returns Success status and position description
  * @throws Error if GITHUB_TOKEN is not set or API call fails
  */
-export async function executeUpdateItemPosition(
-  args: UpdateItemPositionInput
-): Promise<{
+export async function executeUpdateItemPosition(args: UpdateItemPositionInput): Promise<{
   content: Array<{ type: "text"; text: string }>;
   structuredContent: ItemPositionOutput;
 }> {
@@ -450,10 +443,7 @@ export async function executeUpdateItemPosition(
     input.afterId = args.afterId;
   }
 
-  await factory.graphql<UpdateItemPositionResponse>(
-    UPDATE_ITEM_POSITION_MUTATION,
-    { input }
-  );
+  await factory.graphql<UpdateItemPositionResponse>(UPDATE_ITEM_POSITION_MUTATION, { input });
 
   const position = args.afterId ? `after ${args.afterId}` : "first";
 
@@ -483,29 +473,25 @@ export async function executeUpdateItemPosition(
  * @returns Paginated list of matching issues
  * @throws Error if GITHUB_TOKEN is not set or API call fails
  */
-export async function executeSearchIssuesAdvanced(
-  args: SearchIssuesAdvancedInput
-): Promise<{
+export async function executeSearchIssuesAdvanced(args: SearchIssuesAdvancedInput): Promise<{
   content: Array<{ type: "text"; text: string }>;
   structuredContent: SearchIssuesOutput;
 }> {
   const factory = createGitHubFactory();
 
-  const response = await factory.graphql<SearchIssuesResponse>(
-    SEARCH_ISSUES_ADVANCED_QUERY,
-    {
-      query: args.query,
-      first: args.first ?? 20,
-      after: args.after,
-    }
-  );
+  const response = await factory.graphql<SearchIssuesResponse>(SEARCH_ISSUES_ADVANCED_QUERY, {
+    query: args.query,
+    first: args.first ?? 20,
+    after: args.after,
+  });
 
   const { search } = response;
 
   // Filter out non-issue nodes (search can return empty objects for deleted items)
   const issues: SearchIssueItem[] = search.nodes
-    .filter((node): node is SearchIssueNode =>
-      "id" in node && typeof node.id === "string" && node.id.length > 0
+    .filter(
+      (node): node is SearchIssueNode =>
+        "id" in node && typeof node.id === "string" && node.id.length > 0
     )
     .map((node) => ({
       id: node.id,
@@ -547,22 +533,17 @@ export async function executeSearchIssuesAdvanced(
  * @returns Filtered list of project items with counts
  * @throws Error if GITHUB_TOKEN is not set or API call fails
  */
-export async function executeFilterProjectItems(
-  args: FilterProjectItemsInput
-): Promise<{
+export async function executeFilterProjectItems(args: FilterProjectItemsInput): Promise<{
   content: Array<{ type: "text"; text: string }>;
   structuredContent: FilterProjectItemsOutput;
 }> {
   const factory = createGitHubFactory();
 
-  const response = await factory.graphql<ListProjectItemsResponse>(
-    LIST_PROJECT_ITEMS_QUERY,
-    {
-      projectId: args.projectId,
-      first: args.first ?? 50,
-      after: args.after,
-    }
-  );
+  const response = await factory.graphql<ListProjectItemsResponse>(LIST_PROJECT_ITEMS_QUERY, {
+    projectId: args.projectId,
+    first: args.first ?? 50,
+    after: args.after,
+  });
 
   if (!response.node) {
     throw new Error(`Project '${args.projectId}' not found`);
@@ -571,9 +552,7 @@ export async function executeFilterProjectItems(
   const { items } = response.node;
 
   // Apply client-side filtering
-  const filteredNodes = items.nodes.filter((node) =>
-    matchesFilter(node, args.filter)
-  );
+  const filteredNodes = items.nodes.filter((node) => matchesFilter(node, args.filter));
 
   // Transform to output format
   const projectItems: ProjectItem[] = filteredNodes.map((node) => {

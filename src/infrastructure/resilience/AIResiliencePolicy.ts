@@ -20,8 +20,8 @@ import {
   ExponentialBackoff,
   TaskCancelledError,
   TimeoutStrategy,
-} from 'cockatiel';
-import { CircuitBreakerService, type CircuitBreakerState } from './CircuitBreakerService.js';
+} from "cockatiel";
+import { CircuitBreakerService, type CircuitBreakerState } from "./CircuitBreakerService.js";
 
 /**
  * Configuration options for AI resilience policy
@@ -117,7 +117,7 @@ export class AIResiliencePolicy {
     this.config = { ...DEFAULT_CONFIG, ...config };
 
     // Create circuit breaker for AI calls
-    this.circuitBreaker = new CircuitBreakerService('AI', {
+    this.circuitBreaker = new CircuitBreakerService("AI", {
       halfOpenAfter: this.config.halfOpenAfterMs,
       consecutiveFailures: this.config.consecutiveFailures,
     });
@@ -133,7 +133,7 @@ export class AIResiliencePolicy {
 
     process.stderr.write(
       `[AIResiliencePolicy] Initialized with: maxRetries=${this.config.maxRetries}, ` +
-      `timeoutMs=${this.config.timeoutMs}, consecutiveFailures=${this.config.consecutiveFailures}\n`
+        `timeoutMs=${this.config.timeoutMs}, consecutiveFailures=${this.config.consecutiveFailures}\n`
     );
   }
 
@@ -157,18 +157,16 @@ export class AIResiliencePolicy {
     // Default fallback
     const defaultFallback = (): DegradedResult => ({
       degraded: true,
-      message: 'AI service unavailable',
+      message: "AI service unavailable",
     });
 
     // Create fallback policy
     const fallbackPolicy = fallback(handleAll, () => {
       const result = fallbackFn?.() ?? defaultFallback();
-      const isDegraded = result !== null &&
-        typeof result === 'object' &&
-        'degraded' in result;
+      const isDegraded = result !== null && typeof result === "object" && "degraded" in result;
       process.stderr.write(
         `[AIResiliencePolicy] Fallback triggered: ${
-          isDegraded ? (result as DegradedResult).message : 'custom fallback'
+          isDegraded ? (result as DegradedResult).message : "custom fallback"
         }\n`
       );
       return result;
@@ -176,10 +174,7 @@ export class AIResiliencePolicy {
 
     // Compose policies: fallback(retry(circuitBreaker(timeout(operation))))
     // Using wrap() to compose in correct order
-    const wrappedPolicy = wrap(
-      fallbackPolicy,
-      this.retryPolicy,
-    );
+    const wrappedPolicy = wrap(fallbackPolicy, this.retryPolicy);
 
     // Execute with composed policy, circuit breaker, and timeout
     return wrappedPolicy.execute(async () => {
@@ -187,7 +182,7 @@ export class AIResiliencePolicy {
         return this.timeoutPolicy.execute(async ({ signal }) => {
           // Check if operation was cancelled due to timeout
           if (signal.aborted) {
-            throw new TaskCancelledError('Operation timed out');
+            throw new TaskCancelledError("Operation timed out");
           }
           return operation();
         });
@@ -207,7 +202,7 @@ export class AIResiliencePolicy {
       return this.circuitBreaker.execute(async () => {
         return this.timeoutPolicy.execute(async ({ signal }) => {
           if (signal.aborted) {
-            throw new TaskCancelledError('Operation timed out');
+            throw new TaskCancelledError("Operation timed out");
           }
           return operation();
         });
@@ -260,8 +255,6 @@ export class AIResiliencePolicy {
  * const result = await policy.execute(() => aiService.call());
  * ```
  */
-export function createAIResiliencePolicy(
-  config?: AIResilienceConfig
-): AIResiliencePolicy {
+export function createAIResiliencePolicy(config?: AIResilienceConfig): AIResiliencePolicy {
   return new AIResiliencePolicy(config);
 }

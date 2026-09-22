@@ -101,7 +101,10 @@ export const detectDuplicatesTool: ToolDefinition<DetectDuplicatesInput, DetectD
  * and component grouping (shared labels). Returns relationships with confidence
  * and reasoning.
  */
-export const findRelatedIssuesTool: ToolDefinition<FindRelatedIssuesInput, FindRelatedIssuesOutput> = {
+export const findRelatedIssuesTool: ToolDefinition<
+  FindRelatedIssuesInput,
+  FindRelatedIssuesOutput
+> = {
   name: "find_related_issues",
   title: "Find Related Issues",
   description:
@@ -122,16 +125,14 @@ export const findRelatedIssuesTool: ToolDefinition<FindRelatedIssuesInput, FindR
  * @param args - Issue enrichment input parameters
  * @returns Enriched issue with structured sections and confidence
  */
-export async function executeEnrichIssue(
-  args: EnrichIssueInput
-): Promise<EnrichIssueOutput> {
+export async function executeEnrichIssue(args: EnrichIssueInput): Promise<EnrichIssueOutput> {
   const service = new IssueEnrichmentAIService();
 
   const result = await service.enrichIssue({
     issueTitle: args.issueTitle,
     issueDescription: args.issueDescription,
     projectContext: args.projectContext,
-    repositoryLabels: args.repositoryLabels?.map(l => l.name),
+    repositoryLabels: args.repositoryLabels?.map((l) => l.name),
   });
 
   return result;
@@ -143,26 +144,26 @@ export async function executeEnrichIssue(
  * @param args - Label suggestion input parameters
  * @returns Label suggestions grouped by confidence tier
  */
-export async function executeSuggestLabels(
-  args: SuggestLabelsInput
-): Promise<SuggestLabelsOutput> {
-  const config = args.config ? {
-    preferExisting: args.config.preferExisting,
-    maxSuggestions: args.config.maxSuggestions,
-    includeNewProposals: args.config.includeNewProposals,
-  } : undefined;
+export async function executeSuggestLabels(args: SuggestLabelsInput): Promise<SuggestLabelsOutput> {
+  const config = args.config
+    ? {
+        preferExisting: args.config.preferExisting,
+        maxSuggestions: args.config.maxSuggestions,
+        includeNewProposals: args.config.includeNewProposals,
+      }
+    : undefined;
 
   const service = new LabelSuggestionService(undefined, config);
 
   const result = await service.suggestLabels({
     issueTitle: args.issueTitle,
     issueDescription: args.issueDescription,
-    existingLabels: args.existingLabels.map(l => ({
+    existingLabels: args.existingLabels.map((l) => ({
       name: l.name,
       description: l.description,
       color: l.color,
     })),
-    issueHistory: args.issueHistory?.map(h => ({
+    issueHistory: args.issueHistory?.map((h) => ({
       labels: h.labels,
       title: h.title,
     })),
@@ -180,17 +181,19 @@ export async function executeSuggestLabels(
 export async function executeDetectDuplicates(
   args: DetectDuplicatesInput
 ): Promise<DetectDuplicatesOutput> {
-  const thresholds = args.thresholds ? {
-    high: args.thresholds.high,
-    medium: args.thresholds.medium,
-  } : undefined;
+  const thresholds = args.thresholds
+    ? {
+        high: args.thresholds.high,
+        medium: args.thresholds.medium,
+      }
+    : undefined;
 
   const service = new DuplicateDetectionService(thresholds);
 
   const result = await service.detectDuplicates({
     issueTitle: args.issueTitle,
     issueDescription: args.issueDescription,
-    existingIssues: args.existingIssues.map(issue => ({
+    existingIssues: args.existingIssues.map((issue) => ({
       id: issue.id,
       number: issue.number,
       title: issue.title,
@@ -214,11 +217,13 @@ export async function executeDetectDuplicates(
 export async function executeFindRelatedIssues(
   args: FindRelatedIssuesInput
 ): Promise<FindRelatedIssuesOutput> {
-  const config = args.config ? {
-    includeSemanticSimilarity: args.config.includeSemanticSimilarity,
-    includeDependencies: args.config.includeDependencies,
-    includeComponentGrouping: args.config.includeComponentGrouping,
-  } : undefined;
+  const config = args.config
+    ? {
+        includeSemanticSimilarity: args.config.includeSemanticSimilarity,
+        includeDependencies: args.config.includeDependencies,
+        includeComponentGrouping: args.config.includeComponentGrouping,
+      }
+    : undefined;
 
   const service = new RelatedIssueLinkingService(undefined, config);
 
@@ -227,7 +232,7 @@ export async function executeFindRelatedIssues(
     issueTitle: args.issueTitle,
     issueDescription: args.issueDescription,
     issueLabels: args.issueLabels,
-    repositoryIssues: args.repositoryIssues.map(issue => ({
+    repositoryIssues: args.repositoryIssues.map((issue) => ({
       id: issue.id,
       number: issue.number,
       title: issue.title,

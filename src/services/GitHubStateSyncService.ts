@@ -57,7 +57,7 @@ export class GitHubStateSyncService {
       syncedResources: 0,
       errors: [],
       duration: 0,
-      skippedResources: 0
+      skippedResources: 0,
     };
 
     try {
@@ -80,8 +80,9 @@ export class GitHubStateSyncService {
       result.success = true;
       this.lastSyncTime = new Date();
 
-      this.logger.info(`Initial sync completed: ${result.syncedResources} resources synced, ${result.skippedResources} skipped`);
-
+      this.logger.info(
+        `Initial sync completed: ${result.syncedResources} resources synced, ${result.skippedResources} skipped`
+      );
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Unknown sync error";
       result.errors.push(errorMessage);
@@ -122,9 +123,11 @@ export class GitHubStateSyncService {
       } else {
         // Incremental: use metadata freshness checks to skip up-to-date resources
         const allMetadata = await this.persistence.loadMetadata();
-        const typeMetadata = allMetadata.filter(m => m.resourceType === type);
+        const typeMetadata = allMetadata.filter((m) => m.resourceType === type);
         const result = await this.syncResourceTypeWithMetadata(type, typeMetadata);
-        this.logger.info(`Incremental sync for ${type}: ${result.synced} synced, ${result.skipped} skipped`);
+        this.logger.info(
+          `Incremental sync for ${type}: ${result.synced} synced, ${result.skipped} skipped`
+        );
       }
     } catch (error) {
       this.logger.error(`Failed to sync resource type ${type}:`, error);
@@ -179,18 +182,25 @@ export class GitHubStateSyncService {
   /**
    * Internal sync implementation
    */
-  private async performSyncInternal(existingMetadata: SyncMetadata[]): Promise<Partial<SyncResult>> {
+  private async performSyncInternal(
+    existingMetadata: SyncMetadata[]
+  ): Promise<Partial<SyncResult>> {
     const result: Partial<SyncResult> = {
       syncedResources: 0,
       errors: [],
-      skippedResources: 0
+      skippedResources: 0,
     };
 
     // Group metadata by resource type
     const metadataByType = this.groupMetadataByType(existingMetadata);
 
     // Sync each resource type
-    const resourceTypes = [ResourceType.PROJECT, ResourceType.MILESTONE, ResourceType.ISSUE, ResourceType.SPRINT];
+    const resourceTypes = [
+      ResourceType.PROJECT,
+      ResourceType.MILESTONE,
+      ResourceType.ISSUE,
+      ResourceType.SPRINT,
+    ];
 
     for (const type of resourceTypes) {
       try {
@@ -199,7 +209,7 @@ export class GitHubStateSyncService {
         result.syncedResources = (result.syncedResources || 0) + syncCount.synced;
         result.skippedResources = (result.skippedResources || 0) + syncCount.skipped;
       } catch (error) {
-        const errorMessage = `Failed to sync ${type}: ${error instanceof Error ? error.message : 'Unknown error'}`;
+        const errorMessage = `Failed to sync ${type}: ${error instanceof Error ? error.message : "Unknown error"}`;
         result.errors?.push(errorMessage);
         this.logger.error(errorMessage, error);
       }
@@ -237,7 +247,9 @@ export class GitHubStateSyncService {
     // Check which resources need syncing
     const resourcesNeedingSync = await this.checkResourceChanges(metadata);
 
-    this.logger.info(`${type}: ${resourcesNeedingSync.length} resources need syncing out of ${metadata.length} total`);
+    this.logger.info(
+      `${type}: ${resourcesNeedingSync.length} resources need syncing out of ${metadata.length} total`
+    );
 
     // Sync resources that need updating
     for (const resourceId of resourcesNeedingSync) {
@@ -301,13 +313,17 @@ export class GitHubStateSyncService {
   /**
    * Update metadata for a resource
    */
-  private async updateMetadata(type: ResourceType, resourceId: string, resource: any): Promise<void> {
+  private async updateMetadata(
+    type: ResourceType,
+    resourceId: string,
+    resource: any
+  ): Promise<void> {
     const metadata: SyncMetadata = {
       resourceId,
       resourceType: type,
       lastModified: resource.updatedAt || new Date().toISOString(),
       version: resource.version || 1,
-      syncedAt: new Date().toISOString()
+      syncedAt: new Date().toISOString(),
     };
 
     await this.persistence.saveMetadata(metadata);
@@ -371,7 +387,7 @@ export class GitHubStateSyncService {
   getSyncStatus(): { inProgress: boolean; lastSyncTime?: Date } {
     return {
       inProgress: this.syncInProgress,
-      lastSyncTime: this.lastSyncTime
+      lastSyncTime: this.lastSyncTime,
     };
   }
 }

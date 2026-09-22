@@ -6,23 +6,23 @@
  * progress, and submit work products via GitHub Projects.
  */
 
-import { z } from 'zod';
+import { z } from "zod";
 import {
   AgentRoleSchema,
   AgentRuntimeSchema,
   AgentOperationalStatusSchema,
   CheckoutStrategySchema,
   BudgetResetPeriodSchema,
-} from '../../../domain/agent-orchestration-types';
+} from "../../../domain/agent-orchestration-types";
 
 // ============================================================================
 // Agent Registration Schemas
 // ============================================================================
 
 export const registerAgentSchema = z.object({
-  name: z.string().min(1, 'Agent name is required'),
-  role: AgentRoleSchema.default('engineer'),
-  runtime: AgentRuntimeSchema.default('claude-code'),
+  name: z.string().min(1, "Agent name is required"),
+  role: AgentRoleSchema.default("engineer"),
+  runtime: AgentRuntimeSchema.default("claude-code"),
   capabilities: z.array(z.string()).default([]),
   budgetTokens: z.number().positive().optional(),
   metadata: z.record(z.string(), z.unknown()).optional(),
@@ -37,7 +37,7 @@ export const listAgentsSchema = z.object({
 export type ListAgentsArgs = z.infer<typeof listAgentsSchema>;
 
 export const deregisterAgentSchema = z.object({
-  agentId: z.string().min(1, 'Agent ID is required'),
+  agentId: z.string().min(1, "Agent ID is required"),
 });
 export type DeregisterAgentArgs = z.infer<typeof deregisterAgentSchema>;
 
@@ -46,9 +46,9 @@ export type DeregisterAgentArgs = z.infer<typeof deregisterAgentSchema>;
 // ============================================================================
 
 export const checkoutTaskSchema = z.object({
-  agentId: z.string().min(1, 'Agent ID is required'),
+  agentId: z.string().min(1, "Agent ID is required"),
   projectId: z.string().optional(),
-  strategy: CheckoutStrategySchema.default('highest_priority'),
+  strategy: CheckoutStrategySchema.default("highest_priority"),
   labels: z.array(z.string()).optional(),
   milestone: z.string().optional(),
   /** Skip issues whose declared blockers are still open (dependency-aware). */
@@ -60,7 +60,7 @@ export type CheckoutTaskArgs = z.infer<typeof checkoutTaskSchema>;
 
 export const releaseTaskSchema = z.object({
   agentId: z.string().min(1),
-  taskId: z.string().min(1, 'Task/Issue ID is required'),
+  taskId: z.string().min(1, "Task/Issue ID is required"),
   reason: z.string().optional(),
 });
 export type ReleaseTaskArgs = z.infer<typeof releaseTaskSchema>;
@@ -68,7 +68,7 @@ export type ReleaseTaskArgs = z.infer<typeof releaseTaskSchema>;
 export const completeTaskSchema = z.object({
   agentId: z.string().min(1),
   taskId: z.string().min(1),
-  summary: z.string().min(1, 'Completion summary is required'),
+  summary: z.string().min(1, "Completion summary is required"),
   closeIssue: z.boolean().default(true),
   prNumber: z.number().int().positive().optional(),
   autoCheckoutNext: z.boolean().default(true),
@@ -80,7 +80,7 @@ export type CompleteTaskArgs = z.infer<typeof completeTaskSchema>;
 // ============================================================================
 
 export const getTaskContextSchema = z.object({
-  issueNumber: z.number().int().positive('Issue number required'),
+  issueNumber: z.number().int().positive("Issue number required"),
 });
 export type GetTaskContextArgs = z.infer<typeof getTaskContextSchema>;
 
@@ -90,7 +90,7 @@ export type GetTaskContextArgs = z.infer<typeof getTaskContextSchema>;
 
 export const agentHeartbeatSchema = z.object({
   agentId: z.string().min(1),
-  status: z.enum(['working', 'blocked', 'needs_review']),
+  status: z.enum(["working", "blocked", "needs_review"]),
   taskId: z.string().optional(),
   progress: z.number().min(0).max(100).optional(),
   progressSummary: z.string().optional(),
@@ -168,7 +168,7 @@ export type ReclaimStaleTasksArgs = z.infer<typeof reclaimStaleTasksSchema>;
 
 export const recordUsageSchema = z.object({
   agentId: z.string().min(1),
-  tokensUsed: z.number().nonnegative('Token usage must be non-negative'),
+  tokensUsed: z.number().nonnegative("Token usage must be non-negative"),
 });
 export type RecordUsageArgs = z.infer<typeof recordUsageSchema>;
 
@@ -211,6 +211,6 @@ export type GetAgentMetricsArgs = z.infer<typeof getAgentMetricsSchema>;
 // ============================================================================
 
 export const setupAgentFieldsSchema = z.object({
-  projectId: z.string().min(1, 'Project ID is required'),
+  projectId: z.string().min(1, "Project ID is required"),
 });
 export type SetupAgentFieldsArgs = z.infer<typeof setupAgentFieldsSchema>;

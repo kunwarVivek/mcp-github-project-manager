@@ -1,4 +1,4 @@
-import { redactSecrets } from './index.js';
+import { redactSecrets } from "./index.js";
 
 export enum LogLevel {
   DEBUG = 0,
@@ -16,7 +16,7 @@ export interface LogEntry {
   error?: { name: string; message: string; stack?: string };
 }
 
-export type LogFormat = 'text' | 'json';
+export type LogFormat = "text" | "json";
 
 /**
  * Structured logging adapter. Wraps the existing Logger singleton
@@ -30,8 +30,8 @@ export class StructuredLogger {
   private level: LogLevel;
 
   private constructor() {
-    this.format = (process.env.LOG_FORMAT === 'json') ? 'json' : 'text';
-    this.level = this.parseLevel(process.env.LOG_LEVEL ?? 'info');
+    this.format = process.env.LOG_FORMAT === "json" ? "json" : "text";
+    this.level = this.parseLevel(process.env.LOG_LEVEL ?? "info");
   }
 
   static getInstance(): StructuredLogger {
@@ -48,11 +48,16 @@ export class StructuredLogger {
 
   private parseLevel(level: string): LogLevel {
     switch (level.toLowerCase()) {
-      case 'debug': return LogLevel.DEBUG;
-      case 'info': return LogLevel.INFO;
-      case 'warn': return LogLevel.WARN;
-      case 'error': return LogLevel.ERROR;
-      default: return LogLevel.INFO;
+      case "debug":
+        return LogLevel.DEBUG;
+      case "info":
+        return LogLevel.INFO;
+      case "warn":
+        return LogLevel.WARN;
+      case "error":
+        return LogLevel.ERROR;
+      default:
+        return LogLevel.INFO;
     }
   }
 
@@ -60,12 +65,17 @@ export class StructuredLogger {
     return level >= this.level;
   }
 
-  private emit(level: LogLevel, message: string, context?: Record<string, unknown>, error?: Error): void {
+  private emit(
+    level: LogLevel,
+    message: string,
+    context?: Record<string, unknown>,
+    error?: Error
+  ): void {
     if (!this.shouldLog(level)) return;
 
     const levelName = LogLevel[level];
 
-    if (this.format === 'json') {
+    if (this.format === "json") {
       const entry: LogEntry = {
         timestamp: new Date().toISOString(),
         level: levelName,
@@ -76,15 +86,21 @@ export class StructuredLogger {
       process.stderr.write(`${JSON.stringify(entry)}\n`);
     } else {
       // Delegate to existing Logger (text format)
-      const contextStr = context ? ` ${JSON.stringify(redactSecrets(context))}` : '';
-      const errorStr = error ? ` ${error.message}` : '';
+      const contextStr = context ? ` ${JSON.stringify(redactSecrets(context))}` : "";
+      const errorStr = error ? ` ${error.message}` : "";
       process.stderr.write(`[${levelName}] ${message}${contextStr}${errorStr}\n`);
     }
   }
 
-  debug(message: string, context?: Record<string, unknown>): void { this.emit(LogLevel.DEBUG, message, context); }
-  info(message: string, context?: Record<string, unknown>): void { this.emit(LogLevel.INFO, message, context); }
-  warn(message: string, context?: Record<string, unknown>): void { this.emit(LogLevel.WARN, message, context); }
+  debug(message: string, context?: Record<string, unknown>): void {
+    this.emit(LogLevel.DEBUG, message, context);
+  }
+  info(message: string, context?: Record<string, unknown>): void {
+    this.emit(LogLevel.INFO, message, context);
+  }
+  warn(message: string, context?: Record<string, unknown>): void {
+    this.emit(LogLevel.WARN, message, context);
+  }
   error(message: string, error?: Error | unknown, context?: Record<string, unknown>): void {
     this.emit(LogLevel.ERROR, message, context, error instanceof Error ? error : undefined);
   }

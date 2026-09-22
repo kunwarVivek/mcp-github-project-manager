@@ -1,31 +1,35 @@
-import type { ParsedTemplate, TemplateValidationResult, TemplateSection } from '../../domain/template-types';
-import { TemplateParser, extractPlaceholders } from './TemplateParser';
-import { TemplateEngine } from './TemplateEngine';
+import type {
+  ParsedTemplate,
+  TemplateValidationResult,
+  TemplateSection,
+} from "../../domain/template-types";
+import { TemplateParser, extractPlaceholders } from "./TemplateParser";
+import { TemplateEngine } from "./TemplateEngine";
 
 /**
  * Recommended sections for PRD templates
  */
 const RECOMMENDED_PRD_SECTIONS = [
-  'overview',
-  'objectives',
-  'features',
-  'scope',
-  'timeline',
-  'users',
-  'requirements',
-  'success'
+  "overview",
+  "objectives",
+  "features",
+  "scope",
+  "timeline",
+  "users",
+  "requirements",
+  "success",
 ];
 
 /**
  * Recommended sections for task templates
  */
 const RECOMMENDED_TASK_SECTIONS = [
-  'title',
-  'description',
-  'acceptance',
-  'dependencies',
-  'effort',
-  'priority'
+  "title",
+  "description",
+  "acceptance",
+  "dependencies",
+  "effort",
+  "priority",
 ];
 
 /**
@@ -55,24 +59,23 @@ export class TemplateValidator {
    */
   validateCoverage(
     template: ParsedTemplate,
-    templateType: 'prd' | 'task' = 'prd'
+    templateType: "prd" | "task" = "prd"
   ): {
     covered: string[];
     missing: string[];
     extra: string[];
     coveragePercent: number;
   } {
-    const recommended = templateType === 'prd'
-      ? RECOMMENDED_PRD_SECTIONS
-      : RECOMMENDED_TASK_SECTIONS;
+    const recommended =
+      templateType === "prd" ? RECOMMENDED_PRD_SECTIONS : RECOMMENDED_TASK_SECTIONS;
 
-    const templateSectionNames = template.sections.map(s =>
-      s.name.toLowerCase().replace(/[^a-z]/g, '')
+    const templateSectionNames = template.sections.map((s) =>
+      s.name.toLowerCase().replace(/[^a-z]/g, "")
     );
 
     // Also check placeholders
-    const templatePlaceholders = template.placeholders.map(p =>
-      p.toLowerCase().replace(/[^a-z]/g, '')
+    const templatePlaceholders = template.placeholders.map((p) =>
+      p.toLowerCase().replace(/[^a-z]/g, "")
     );
 
     const allTemplateTerms = [...templateSectionNames, ...templatePlaceholders];
@@ -81,9 +84,7 @@ export class TemplateValidator {
     const missing: string[] = [];
 
     for (const rec of recommended) {
-      const found = allTemplateTerms.some(term =>
-        term.includes(rec) || rec.includes(term)
-      );
+      const found = allTemplateTerms.some((term) => term.includes(rec) || rec.includes(term));
 
       if (found) {
         covered.push(rec);
@@ -94,12 +95,10 @@ export class TemplateValidator {
 
     // Find sections that aren't in recommended (not necessarily bad)
     const extra = template.sections
-      .map(s => s.name)
-      .filter(name => {
-        const normalized = name.toLowerCase().replace(/[^a-z]/g, '');
-        return !recommended.some(rec =>
-          normalized.includes(rec) || rec.includes(normalized)
-        );
+      .map((s) => s.name)
+      .filter((name) => {
+        const normalized = name.toLowerCase().replace(/[^a-z]/g, "");
+        return !recommended.some((rec) => normalized.includes(rec) || rec.includes(normalized));
       });
 
     const coveragePercent = Math.round((covered.length / recommended.length) * 100);
@@ -112,17 +111,17 @@ export class TemplateValidator {
    */
   validateSectionRequirements(sections: TemplateSection[]): {
     valid: boolean;
-    issues: Array<{ section: string; issue: string; severity: 'error' | 'warning' }>;
+    issues: Array<{ section: string; issue: string; severity: "error" | "warning" }>;
   } {
-    const issues: Array<{ section: string; issue: string; severity: 'error' | 'warning' }> = [];
+    const issues: Array<{ section: string; issue: string; severity: "error" | "warning" }> = [];
 
     for (const section of sections) {
       // Check for empty names
       if (!section.name || section.name.trim().length === 0) {
         issues.push({
           section: section.id,
-          issue: 'Section has no name',
-          severity: 'error'
+          issue: "Section has no name",
+          severity: "error",
         });
       }
 
@@ -130,8 +129,8 @@ export class TemplateValidator {
       if (section.minLength && section.minLength > 10000) {
         issues.push({
           section: section.name,
-          issue: 'Minimum length is excessively high (>10000)',
-          severity: 'warning'
+          issue: "Minimum length is excessively high (>10000)",
+          severity: "warning",
         });
       }
 
@@ -139,15 +138,15 @@ export class TemplateValidator {
       if (section.minLength && section.maxLength && section.maxLength < section.minLength) {
         issues.push({
           section: section.name,
-          issue: 'Maximum length is less than minimum length',
-          severity: 'error'
+          issue: "Maximum length is less than minimum length",
+          severity: "error",
         });
       }
     }
 
     return {
-      valid: issues.filter(i => i.severity === 'error').length === 0,
-      issues
+      valid: issues.filter((i) => i.severity === "error").length === 0,
+      issues,
     };
   }
 
@@ -156,7 +155,7 @@ export class TemplateValidator {
    */
   validate(
     templateContent: string,
-    templateType: 'prd' | 'task' = 'prd',
+    templateType: "prd" | "task" = "prd",
     templateName?: string
   ): TemplateValidationResult {
     const errors: string[] = [];
@@ -179,7 +178,7 @@ export class TemplateValidator {
         errors,
         warnings,
         placeholders: [],
-        missingSections: []
+        missingSections: [],
       };
     }
 
@@ -187,15 +186,15 @@ export class TemplateValidator {
     const coverage = this.validateCoverage(template, templateType);
     if (coverage.missing.length > 0) {
       warnings.push(
-        `Missing recommended sections: ${coverage.missing.join(', ')}. ` +
-        `Coverage: ${coverage.coveragePercent}%`
+        `Missing recommended sections: ${coverage.missing.join(", ")}. ` +
+          `Coverage: ${coverage.coveragePercent}%`
       );
     }
 
     // 4. Section requirements validation
     const sectionValidation = this.validateSectionRequirements(template.sections);
     for (const issue of sectionValidation.issues) {
-      if (issue.severity === 'error') {
+      if (issue.severity === "error") {
         errors.push(`${issue.section}: ${issue.issue}`);
       } else {
         warnings.push(`${issue.section}: ${issue.issue}`);
@@ -218,8 +217,8 @@ export class TemplateValidator {
     for (const [normalized, variants] of normalizedPlaceholders) {
       if (variants.length > 1) {
         warnings.push(
-          `Placeholder '${normalized}' has multiple casings: ${variants.join(', ')}. ` +
-          'This may cause confusion.'
+          `Placeholder '${normalized}' has multiple casings: ${variants.join(", ")}. ` +
+            "This may cause confusion."
         );
       }
     }
@@ -229,7 +228,7 @@ export class TemplateValidator {
       errors,
       warnings,
       placeholders,
-      missingSections: coverage.missing
+      missingSections: coverage.missing,
     };
   }
 
@@ -246,11 +245,11 @@ export class TemplateValidator {
         // Generate placeholder content based on section type
         const name = section.name.toLowerCase();
 
-        if (name.includes('list') || name.includes('features') || name.includes('objectives')) {
-          sampleData[section.id] = ['Example item 1', 'Example item 2', 'Example item 3'];
-        } else if (name.includes('date') || name.includes('timeline')) {
-          sampleData[section.id] = new Date().toISOString().split('T')[0];
-        } else if (name.includes('number') || name.includes('count') || name.includes('effort')) {
+        if (name.includes("list") || name.includes("features") || name.includes("objectives")) {
+          sampleData[section.id] = ["Example item 1", "Example item 2", "Example item 3"];
+        } else if (name.includes("date") || name.includes("timeline")) {
+          sampleData[section.id] = new Date().toISOString().split("T")[0];
+        } else if (name.includes("number") || name.includes("count") || name.includes("effort")) {
           sampleData[section.id] = 5;
         } else {
           sampleData[section.id] = `Sample ${section.name} content`;

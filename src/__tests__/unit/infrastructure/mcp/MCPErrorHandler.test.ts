@@ -1,12 +1,8 @@
-import { beforeEach, afterEach, describe, expect, it } from 'vitest';
+import { beforeEach, afterEach, describe, expect, it } from "vitest";
 import { MCPErrorHandler } from "../../../../infrastructure/mcp/MCPErrorHandler";
-import {
-  ValidationError,
-  UnauthorizedError,
-  RateLimitError,
-} from "../../../../domain/errors";
+import { ValidationError, UnauthorizedError, RateLimitError } from "../../../../domain/errors";
 import { MCPErrorCode } from "../../../../domain/mcp-types";
-import { ResourceNotFoundError, ResourceType } from '../../../../domain/resource-types';
+import { ResourceNotFoundError, ResourceType } from "../../../../domain/resource-types";
 
 describe("MCPErrorHandler", () => {
   beforeEach(() => {
@@ -68,7 +64,7 @@ describe("MCPErrorHandler", () => {
       const requestId = "test-123";
       const error = new Error("Something went wrong");
       const response = MCPErrorHandler.handle(error, requestId);
-      
+
       expect(response.requestId).toBe(requestId);
     });
   });

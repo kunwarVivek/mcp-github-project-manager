@@ -7,7 +7,7 @@ export interface BaseProjectResource extends Resource {
 
 export interface ProjectLink {
   id: string;
-  type: 'parent' | 'child' | 'related';
+  type: "parent" | "child" | "related";
   sourceId: string;
   targetId: string;
   metadata?: Record<string, unknown>;
@@ -16,7 +16,7 @@ export interface ProjectLink {
 export interface ProjectField {
   id: string;
   name: string;
-  type: 'text' | 'number' | 'date' | 'select' | 'multi-select';
+  type: "text" | "number" | "date" | "select" | "multi-select";
   options?: string[];
   required?: boolean;
   metadata?: Record<string, unknown>;
@@ -25,7 +25,7 @@ export interface ProjectField {
 export interface ProjectView {
   id: string;
   name: string;
-  type: 'board' | 'list' | 'calendar' | 'timeline';
+  type: "board" | "list" | "calendar" | "timeline";
   config: {
     groupBy?: string;
     sortBy?: string[];
@@ -56,7 +56,7 @@ export interface ProjectStats {
 
 export interface ProjectValidationRule {
   field: string;
-  type: 'required' | 'format' | 'custom';
+  type: "required" | "format" | "custom";
   value?: unknown;
   message: string;
   validate: (value: unknown) => boolean;
@@ -74,26 +74,26 @@ export interface ProjectWorkflow {
 }
 
 export const defaultProjectSettings: ProjectSettings = {
-  defaultView: 'board',
+  defaultView: "board",
   labelColors: {},
   customFields: [],
   notifications: {
     enabled: true,
-    channels: ['email'],
+    channels: ["email"],
   },
 };
 
 export const defaultValidationRules: ProjectValidationRule[] = [
   {
-    field: 'title',
-    type: 'required',
-    message: 'Title is required',
-    validate: (value) => Boolean(value && typeof value === 'string' && value.trim()),
+    field: "title",
+    type: "required",
+    message: "Title is required",
+    validate: (value) => Boolean(value && typeof value === "string" && value.trim()),
   },
   {
-    field: 'status',
-    type: 'format',
-    message: 'Invalid status',
+    field: "status",
+    type: "format",
+    message: "Invalid status",
     validate: (value) => Object.values(ResourceStatus).includes(value as ResourceStatus),
   },
 ];

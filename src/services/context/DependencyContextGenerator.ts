@@ -1,35 +1,36 @@
-import { generateObject } from 'ai';
-import { AIServiceFactory } from '../ai/AIServiceFactory';
-import type {
-  DependencyContext,
-  Dependency
-} from '../../domain/task-context-schemas';
-import type { AITask, TaskDependency, EnhancedTaskDependency } from '../../domain/ai-types';
-import { type ILogger, Logger } from '../../infrastructure/logger';
-import { z } from 'zod';
-import { InputSanitizer } from '../utils/InputSanitizer';
+import { generateObject } from "ai";
+import { AIServiceFactory } from "../ai/AIServiceFactory";
+import type { DependencyContext, Dependency } from "../../domain/task-context-schemas";
+import type { AITask, TaskDependency, EnhancedTaskDependency } from "../../domain/ai-types";
+import { type ILogger, Logger } from "../../infrastructure/logger";
+import { z } from "zod";
+import { InputSanitizer } from "../utils/InputSanitizer";
 
 /**
  * Schema for AI-generated dependency context
  */
 const DependencyContextGenerationSchema = z.object({
-  dependencies: z.array(z.object({
-    dependencyId: z.string(),
-    dependencyTitle: z.string(),
-    dependencyType: z.enum(['blocks', 'required_by', 'relates_to', 'implements']),
-    rationale: z.string().min(20),
-    providedBy: z.string().min(10),
-    integrationGuidance: z.string().min(20),
-    interfaces: z.array(z.string()),
-    canRunInParallel: z.boolean()
-  })),
-  parallelOpportunities: z.array(z.object({
-    taskIds: z.array(z.string()).min(2),
-    reason: z.string().min(20),
-    considerations: z.array(z.string())
-  })),
+  dependencies: z.array(
+    z.object({
+      dependencyId: z.string(),
+      dependencyTitle: z.string(),
+      dependencyType: z.enum(["blocks", "required_by", "relates_to", "implements"]),
+      rationale: z.string().min(20),
+      providedBy: z.string().min(10),
+      integrationGuidance: z.string().min(20),
+      interfaces: z.array(z.string()),
+      canRunInParallel: z.boolean(),
+    })
+  ),
+  parallelOpportunities: z.array(
+    z.object({
+      taskIds: z.array(z.string()).min(2),
+      reason: z.string().min(20),
+      considerations: z.array(z.string()),
+    })
+  ),
   criticalPath: z.array(z.string()),
-  estimatedUnblockDate: z.string().optional()
+  estimatedUnblockDate: z.string().optional(),
 });
 
 /**
@@ -76,13 +77,12 @@ export class DependencyContextGenerator {
         prompt,
         schema: DependencyContextGenerationSchema,
         maxOutputTokens: 1500,
-        temperature: 0.3
+        temperature: 0.3,
       });
 
       return result.object as DependencyContext;
-
     } catch (error) {
-      this.logger.error('Error generating dependency context', error);
+      this.logger.error("Error generating dependency context", error);
       // Fallback to basic analysis
       return this.generateBasicDependencyContext(task, allTasks, dependencies);
     }
@@ -101,7 +101,7 @@ export class DependencyContextGenerator {
 
     // Process each dependency
     for (const dep of taskDeps) {
-      const depTask = allTasks.find(t => t.id === dep.id || t.title === dep.id);
+      const depTask = allTasks.find((t) => t.id === dep.id || t.title === dep.id);
 
       if (depTask) {
         deps.push({
@@ -112,19 +112,19 @@ export class DependencyContextGenerator {
           providedBy: this.identifyWhatIsProvided(depTask),
           integrationGuidance: this.generateIntegrationGuidance(task, depTask),
           interfaces: this.identifyInterfaces(task, depTask),
-          canRunInParallel: this.canRunInParallel(task, depTask)
+          canRunInParallel: this.canRunInParallel(task, depTask),
         });
       } else {
         // Dependency task not found, create basic entry
         deps.push({
           dependencyId: dep.id,
           dependencyTitle: dep.id,
-          dependencyType: 'blocks' as const,
-          rationale: dep.description || 'This task depends on completion of another task',
-          providedBy: 'Required functionality or data',
-          integrationGuidance: 'Integrate with the completed dependency',
+          dependencyType: "blocks" as const,
+          rationale: dep.description || "This task depends on completion of another task",
+          providedBy: "Required functionality or data",
+          integrationGuidance: "Integrate with the completed dependency",
           interfaces: [],
-          canRunInParallel: false
+          canRunInParallel: false,
         });
       }
     }
@@ -139,7 +139,7 @@ export class DependencyContextGenerator {
       dependencies: deps,
       parallelOpportunities,
       criticalPath,
-      estimatedUnblockDate: this.estimateUnblockDate(deps)
+      estimatedUnblockDate: this.estimateUnblockDate(deps),
     };
   }
 
@@ -149,27 +149,34 @@ export class DependencyContextGenerator {
   private determineDependencyType(
     task: AITask,
     depTask: AITask
-  ): 'blocks' | 'required_by' | 'relates_to' | 'implements' {
+  ): "blocks" | "required_by" | "relates_to" | "implements" {
     const taskText = `${task.title} ${task.description}`.toLowerCase();
     const depText = `${depTask.title} ${depTask.description}`.toLowerCase();
 
     // Check if dependency implements something this task uses
-    if (depText.includes('implement') && taskText.includes('use')) {
-      return 'implements';
+    if (depText.includes("implement") && taskText.includes("use")) {
+      return "implements";
     }
 
     // Check if dependency sets up infrastructure
-    if (depText.includes('setup') || depText.includes('configure') || depText.includes('infrastructure')) {
-      return 'blocks';
+    if (
+      depText.includes("setup") ||
+      depText.includes("configure") ||
+      depText.includes("infrastructure")
+    ) {
+      return "blocks";
     }
 
     // Check if tasks are related but not blocking
-    if (taskText.includes(depTask.title.toLowerCase()) || depText.includes(task.title.toLowerCase())) {
-      return 'relates_to';
+    if (
+      taskText.includes(depTask.title.toLowerCase()) ||
+      depText.includes(task.title.toLowerCase())
+    ) {
+      return "relates_to";
     }
 
     // Default to blocking dependency
-    return 'blocks';
+    return "blocks";
   }
 
   /**
@@ -178,19 +185,19 @@ export class DependencyContextGenerator {
   private generateDependencyRationale(task: AITask, depTask: AITask): string {
     const depText = depTask.title.toLowerCase();
 
-    if (depText.includes('setup') || depText.includes('infrastructure')) {
+    if (depText.includes("setup") || depText.includes("infrastructure")) {
       return `${task.title} requires the infrastructure and setup provided by "${depTask.title}" to be completed first`;
     }
 
-    if (depText.includes('api') || depText.includes('endpoint')) {
+    if (depText.includes("api") || depText.includes("endpoint")) {
       return `${task.title} depends on the API endpoints created by "${depTask.title}" to function properly`;
     }
 
-    if (depText.includes('model') || depText.includes('schema') || depText.includes('database')) {
+    if (depText.includes("model") || depText.includes("schema") || depText.includes("database")) {
       return `${task.title} requires the data model and schema defined in "${depTask.title}" to be in place`;
     }
 
-    if (depText.includes('component') || depText.includes('ui')) {
+    if (depText.includes("component") || depText.includes("ui")) {
       return `${task.title} builds upon the UI components created in "${depTask.title}"`;
     }
 
@@ -203,28 +210,28 @@ export class DependencyContextGenerator {
   private identifyWhatIsProvided(depTask: AITask): string {
     const taskText = `${depTask.title} ${depTask.description}`.toLowerCase();
 
-    if (taskText.includes('setup') || taskText.includes('configure')) {
-      return 'Configured environment and infrastructure setup';
+    if (taskText.includes("setup") || taskText.includes("configure")) {
+      return "Configured environment and infrastructure setup";
     }
 
-    if (taskText.includes('api') || taskText.includes('endpoint')) {
-      return 'RESTful API endpoints and data access layer';
+    if (taskText.includes("api") || taskText.includes("endpoint")) {
+      return "RESTful API endpoints and data access layer";
     }
 
-    if (taskText.includes('model') || taskText.includes('schema')) {
-      return 'Data models, schemas, and database structure';
+    if (taskText.includes("model") || taskText.includes("schema")) {
+      return "Data models, schemas, and database structure";
     }
 
-    if (taskText.includes('component') || taskText.includes('ui')) {
-      return 'Reusable UI components and interface elements';
+    if (taskText.includes("component") || taskText.includes("ui")) {
+      return "Reusable UI components and interface elements";
     }
 
-    if (taskText.includes('auth') || taskText.includes('authentication')) {
-      return 'Authentication and authorization functionality';
+    if (taskText.includes("auth") || taskText.includes("authentication")) {
+      return "Authentication and authorization functionality";
     }
 
-    if (taskText.includes('service') || taskText.includes('business logic')) {
-      return 'Business logic and service layer functionality';
+    if (taskText.includes("service") || taskText.includes("business logic")) {
+      return "Business logic and service layer functionality";
     }
 
     return `Functionality implemented in: ${depTask.title}`;
@@ -236,20 +243,20 @@ export class DependencyContextGenerator {
   private generateIntegrationGuidance(_task: AITask, depTask: AITask): string {
     const depText = depTask.title.toLowerCase();
 
-    if (depText.includes('api')) {
-      return 'Import the API client and use the provided endpoints. Ensure proper error handling and authentication.';
+    if (depText.includes("api")) {
+      return "Import the API client and use the provided endpoints. Ensure proper error handling and authentication.";
     }
 
-    if (depText.includes('component')) {
-      return 'Import the component from the shared component library. Follow the component API and props interface.';
+    if (depText.includes("component")) {
+      return "Import the component from the shared component library. Follow the component API and props interface.";
     }
 
-    if (depText.includes('service')) {
-      return 'Inject the service through dependency injection. Use the service interface for type safety.';
+    if (depText.includes("service")) {
+      return "Inject the service through dependency injection. Use the service interface for type safety.";
     }
 
-    if (depText.includes('model') || depText.includes('schema')) {
-      return 'Import the model types and use them for type safety. Follow the defined schema structure.';
+    if (depText.includes("model") || depText.includes("schema")) {
+      return "Import the model types and use them for type safety. Follow the defined schema structure.";
     }
 
     return `Integrate with ${depTask.title} by importing and using the provided interfaces and implementations.`;
@@ -262,27 +269,27 @@ export class DependencyContextGenerator {
     const interfaces: string[] = [];
     const depText = `${depTask.title} ${depTask.description}`.toLowerCase();
 
-    if (depText.includes('api')) {
-      interfaces.push('REST API endpoints', 'Request/Response DTOs', 'Error handling');
+    if (depText.includes("api")) {
+      interfaces.push("REST API endpoints", "Request/Response DTOs", "Error handling");
     }
 
-    if (depText.includes('component')) {
-      interfaces.push('Component props interface', 'Event handlers', 'Styling props');
+    if (depText.includes("component")) {
+      interfaces.push("Component props interface", "Event handlers", "Styling props");
     }
 
-    if (depText.includes('service')) {
-      interfaces.push('Service interface', 'Method signatures', 'Return types');
+    if (depText.includes("service")) {
+      interfaces.push("Service interface", "Method signatures", "Return types");
     }
 
-    if (depText.includes('model') || depText.includes('schema')) {
-      interfaces.push('Entity interfaces', 'DTO types', 'Validation schemas');
+    if (depText.includes("model") || depText.includes("schema")) {
+      interfaces.push("Entity interfaces", "DTO types", "Validation schemas");
     }
 
-    if (depText.includes('database')) {
-      interfaces.push('Repository interface', 'Query methods', 'Transaction handling');
+    if (depText.includes("database")) {
+      interfaces.push("Repository interface", "Query methods", "Transaction handling");
     }
 
-    return interfaces.length > 0 ? interfaces : ['Standard integration interface'];
+    return interfaces.length > 0 ? interfaces : ["Standard integration interface"];
   }
 
   /**
@@ -291,12 +298,12 @@ export class DependencyContextGenerator {
   private canRunInParallel(task: AITask, depTask: AITask): boolean {
     // If dependency is blocking, cannot run in parallel
     const depType = this.determineDependencyType(task, depTask);
-    if (depType === 'blocks' || depType === 'implements') {
+    if (depType === "blocks" || depType === "implements") {
       return false;
     }
 
     // If tasks are just related, they might be able to run in parallel
-    if (depType === 'relates_to') {
+    if (depType === "relates_to") {
       return true;
     }
 
@@ -311,24 +318,26 @@ export class DependencyContextGenerator {
     allTasks: AITask[],
     dependencies: Dependency[]
   ): Array<{ taskIds: string[]; reason: string; considerations: string[] }> {
-    const opportunities: Array<{ taskIds: string[]; reason: string; considerations: string[] }> = [];
+    const opportunities: Array<{ taskIds: string[]; reason: string; considerations: string[] }> =
+      [];
 
     // Find tasks with no dependencies that could run in parallel
-    const independentTasks = allTasks.filter(t =>
-      t.id !== task.id &&
-      (!t.dependencies || t.dependencies.length === 0) &&
-      !dependencies.some(d => d.dependencyId === t.id)
+    const independentTasks = allTasks.filter(
+      (t) =>
+        t.id !== task.id &&
+        (!t.dependencies || t.dependencies.length === 0) &&
+        !dependencies.some((d) => d.dependencyId === t.id)
     );
 
     if (independentTasks.length >= 2) {
       opportunities.push({
-        taskIds: independentTasks.slice(0, 3).map(t => t.id || t.title),
-        reason: 'These tasks have no dependencies and can be worked on simultaneously',
+        taskIds: independentTasks.slice(0, 3).map((t) => t.id || t.title),
+        reason: "These tasks have no dependencies and can be worked on simultaneously",
         considerations: [
-          'Ensure team members are assigned to different tasks',
-          'Coordinate integration points if tasks touch the same modules',
-          'Regular sync meetings to ensure consistency'
-        ]
+          "Ensure team members are assigned to different tasks",
+          "Coordinate integration points if tasks touch the same modules",
+          "Regular sync meetings to ensure consistency",
+        ],
       });
     }
 
@@ -337,13 +346,14 @@ export class DependencyContextGenerator {
     for (const group of sameDepsGroups) {
       if (group.length >= 2) {
         opportunities.push({
-          taskIds: group.map(t => t.id || t.title),
-          reason: 'These tasks share the same dependencies and can start together once prerequisites are met',
+          taskIds: group.map((t) => t.id || t.title),
+          reason:
+            "These tasks share the same dependencies and can start together once prerequisites are met",
           considerations: [
-            'Wait for shared dependencies to complete',
-            'Coordinate to avoid conflicts in shared code areas',
-            'Plan integration strategy upfront'
-          ]
+            "Wait for shared dependencies to complete",
+            "Coordinate to avoid conflicts in shared code areas",
+            "Plan integration strategy upfront",
+          ],
         });
       }
     }
@@ -359,14 +369,17 @@ export class DependencyContextGenerator {
 
     for (const task of tasks) {
       if (task.dependencies && task.dependencies.length > 0) {
-        const depKey = task.dependencies.map(d => d.id).sort().join(',');
+        const depKey = task.dependencies
+          .map((d) => d.id)
+          .sort()
+          .join(",");
         const group = groups.get(depKey) || [];
         group.push(task);
         groups.set(depKey, group);
       }
     }
 
-    return Array.from(groups.values()).filter(group => group.length >= 2);
+    return Array.from(groups.values()).filter((group) => group.length >= 2);
   }
 
   /**
@@ -389,9 +402,11 @@ export class DependencyContextGenerator {
       criticalPath.push(currentTask.id || currentTask.title);
 
       // Find dependencies of current task
-      const taskDeps = dependencies.filter(d => d.dependencyId === (currentTask.id || currentTask.title));
+      const taskDeps = dependencies.filter(
+        (d) => d.dependencyId === (currentTask.id || currentTask.title)
+      );
       for (const dep of taskDeps) {
-        const depTask = allTasks.find(t => (t.id || t.title) === dep.dependencyId);
+        const depTask = allTasks.find((t) => (t.id || t.title) === dep.dependencyId);
         if (depTask && !visited.has(depTask.id || depTask.title)) {
           traverse(depTask);
         }
@@ -407,7 +422,9 @@ export class DependencyContextGenerator {
    */
   private estimateUnblockDate(dependencies: Dependency[]): string | undefined {
     // If no blocking dependencies, return undefined
-    const blockingDeps = dependencies.filter(d => d.dependencyType === 'blocks' && !d.canRunInParallel);
+    const blockingDeps = dependencies.filter(
+      (d) => d.dependencyType === "blocks" && !d.canRunInParallel
+    );
 
     if (blockingDeps.length === 0) {
       return undefined;
@@ -430,10 +447,14 @@ export class DependencyContextGenerator {
     dependencies?: TaskDependency[] | EnhancedTaskDependency[]
   ): string {
     const taskDeps = dependencies || task.dependencies || [];
-    const depTasks = taskDeps.map(dep => {
-      const t = allTasks.find(at => at.id === dep.id || at.title === dep.id);
-      return t ? `- ${InputSanitizer.sanitizeTaskContent(t.title)}: ${InputSanitizer.sanitizeTaskContent(t.description)}` : `- ${dep.id}`;
-    }).join('\n');
+    const depTasks = taskDeps
+      .map((dep) => {
+        const t = allTasks.find((at) => at.id === dep.id || at.title === dep.id);
+        return t
+          ? `- ${InputSanitizer.sanitizeTaskContent(t.title)}: ${InputSanitizer.sanitizeTaskContent(t.description)}`
+          : `- ${dep.id}`;
+      })
+      .join("\n");
 
     return `Analyze the dependencies for this task and provide detailed context:
 
@@ -444,10 +465,10 @@ export class DependencyContextGenerator {
 - Complexity: ${task.complexity}/10
 
 **Dependencies:**
-${depTasks || 'No explicit dependencies listed'}
+${depTasks || "No explicit dependencies listed"}
 
 **All Project Tasks:**
-${allTasks.map(t => `- ${InputSanitizer.sanitizeTaskContent(t.title)} (Priority: ${t.priority}, Complexity: ${t.complexity})`).join('\n')}
+${allTasks.map((t) => `- ${InputSanitizer.sanitizeTaskContent(t.title)} (Priority: ${t.priority}, Complexity: ${t.complexity})`).join("\n")}
 
 Provide:
 1. For each dependency, explain WHY it exists and WHAT it provides

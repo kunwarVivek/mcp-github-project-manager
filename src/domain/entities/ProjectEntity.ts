@@ -21,35 +21,35 @@
  * project.addField(field); // adds a custom field
  * ```
  */
-import { ResourceStatus, ResourceType } from '../resource-types';
-import type { Project, CreateProject, CustomField, ProjectView, } from '../types';
+import { ResourceStatus, ResourceType } from "../resource-types";
+import type { Project, CreateProject, CustomField, ProjectView } from "../types";
 
 /**
  * Project health status
  */
 export enum ProjectHealth {
-  HEALTHY = 'healthy',
-  AT_RISK = 'at-risk',
-  CRITICAL = 'critical',
-  UNKNOWN = 'unknown',
+  HEALTHY = "healthy",
+  AT_RISK = "at-risk",
+  CRITICAL = "critical",
+  UNKNOWN = "unknown",
 }
 
 /**
  * Project activity level
  */
 export enum ActivityLevel {
-  ACTIVE = 'active',
-  MODERATE = 'moderate',
-  STALE = 'stale',
-  INACTIVE = 'inactive',
+  ACTIVE = "active",
+  MODERATE = "moderate",
+  STALE = "stale",
+  INACTIVE = "inactive",
 }
 
 /**
  * Project visibility
  */
 export enum ProjectVisibility {
-  PRIVATE = 'private',
-  PUBLIC = 'public',
+  PRIVATE = "private",
+  PUBLIC = "public",
 }
 
 /**
@@ -97,10 +97,7 @@ export class ProjectEntity implements Project {
   // Internal config
   private readonly config: ProjectEntityConfig;
 
-  private constructor(
-    data: Project,
-    config: ProjectEntityConfig = DEFAULT_CONFIG
-  ) {
+  private constructor(data: Project, config: ProjectEntityConfig = DEFAULT_CONFIG) {
     this.id = data.id;
     this.type = data.type;
     this.title = data.title;
@@ -148,7 +145,7 @@ export class ProjectEntity implements Project {
       id: `project-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       type: ResourceType.PROJECT,
       title: data.title,
-      description: data.shortDescription ?? data.description ?? '',
+      description: data.shortDescription ?? data.description ?? "",
       owner: data.owner,
       number: options.number,
       url: options.url,
@@ -194,8 +191,7 @@ export class ProjectEntity implements Project {
    * Check if the project is active
    */
   get isActive(): boolean {
-    return this.status === ResourceStatus.ACTIVE &&
-           !this.closed;
+    return this.status === ResourceStatus.ACTIVE && !this.closed;
   }
 
   /**
@@ -278,42 +274,42 @@ export class ProjectEntity implements Project {
    * Get a field by name
    */
   getFieldByName(name: string): CustomField | undefined {
-    return this.fields.find(f => f.name.toLowerCase() === name.toLowerCase());
+    return this.fields.find((f) => f.name.toLowerCase() === name.toLowerCase());
   }
 
   /**
    * Get a field by ID
    */
   getFieldById(fieldId: string): CustomField | undefined {
-    return this.fields.find(f => f.id === fieldId);
+    return this.fields.find((f) => f.id === fieldId);
   }
 
   /**
    * Get a view by name
    */
   getViewByName(name: string): ProjectView | undefined {
-    return this.views.find(v => v.name.toLowerCase() === name.toLowerCase());
+    return this.views.find((v) => v.name.toLowerCase() === name.toLowerCase());
   }
 
   /**
    * Get a view by ID
    */
   getViewById(viewId: string): ProjectView | undefined {
-    return this.views.find(v => v.id === viewId);
+    return this.views.find((v) => v.id === viewId);
   }
 
   /**
    * Get fields by type
    */
   getFieldsByType(type: string): CustomField[] {
-    return this.fields.filter(f => f.type === type);
+    return this.fields.filter((f) => f.type === type);
   }
 
   /**
    * Get views by layout
    */
   getViewsByLayout(layout: string): ProjectView[] {
-    return this.views.filter(v => v.layout === layout);
+    return this.views.filter((v) => v.layout === layout);
   }
 
   // =========================================================================
@@ -408,7 +404,7 @@ export class ProjectEntity implements Project {
    * @returns true if field was removed, false if not found
    */
   removeField(fieldId: string): boolean {
-    const index = this.fields.findIndex(f => f.id === fieldId);
+    const index = this.fields.findIndex((f) => f.id === fieldId);
     if (index === -1) {
       return false;
     }
@@ -457,7 +453,7 @@ export class ProjectEntity implements Project {
    * @returns true if view was removed, false if not found
    */
   removeView(viewId: string): boolean {
-    const index = this.views.findIndex(v => v.id === viewId);
+    const index = this.views.findIndex((v) => v.id === viewId);
     if (index === -1) {
       return false;
     }

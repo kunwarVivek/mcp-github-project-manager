@@ -19,7 +19,10 @@ export class PromptRegistry {
       this.prompts.set(id, []);
     }
     this.prompts.get(id)!.push({
-      id, version, template, description,
+      id,
+      version,
+      template,
+      description,
       createdAt: new Date().toISOString(),
     });
   }
@@ -32,14 +35,14 @@ export class PromptRegistry {
 
   /** Get specific version. */
   getVersion(id: string, version: string): PromptVersion | undefined {
-    return this.prompts.get(id)?.find(p => p.version === version);
+    return this.prompts.get(id)?.find((p) => p.version === version);
   }
 
   /** Render a prompt template with variables. */
   render(id: string, variables: Record<string, string>, version?: string): string {
     const prompt = version ? this.getVersion(id, version) : this.getLatest(id);
     if (!prompt) throw new Error(`Prompt '${id}' not found`);
-    return prompt.template.replace(/\{\{(\w+)\}\}/g, (_, key) => variables[key] ?? '');
+    return prompt.template.replace(/\{\{(\w+)\}\}/g, (_, key) => variables[key] ?? "");
   }
 
   /** List all prompt IDs. */

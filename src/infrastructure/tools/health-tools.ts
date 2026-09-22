@@ -5,14 +5,14 @@
  * system health status including GitHub, AI, and cache services.
  */
 
-import { z } from 'zod';
-import type { ToolDefinition, ToolSchema } from './ToolValidator.js';
-import { ToolTelemetry } from './ToolTelemetry.js';
-import { HealthService } from '../health/index.js';
-import { AIServiceFactory } from '../../services/ai/AIServiceFactory.js';
-import { ResourceCache } from '../cache/ResourceCache.js';
-import { GitHubRepositoryFactory } from '../github/GitHubRepositoryFactory.js';
-import { GITHUB_TOKEN, GITHUB_OWNER, GITHUB_REPO } from '../../env.js';
+import { z } from "zod";
+import type { ToolDefinition, ToolSchema } from "./ToolValidator.js";
+import { ToolTelemetry } from "./ToolTelemetry.js";
+import { HealthService } from "../health/index.js";
+import { AIServiceFactory } from "../../services/ai/AIServiceFactory.js";
+import { ResourceCache } from "../cache/ResourceCache.js";
+import { GitHubRepositoryFactory } from "../github/GitHubRepositoryFactory.js";
+import { GITHUB_TOKEN, GITHUB_OWNER, GITHUB_REPO } from "../../env.js";
 
 /**
  * Schema for health_check tool input (no parameters required)
@@ -34,20 +34,22 @@ export const ToolMetricsSchema = z.object({
 });
 
 export const HealthStatusOutputSchema = z.object({
-  status: z.enum(['healthy', 'degraded', 'unhealthy']),
+  status: z.enum(["healthy", "degraded", "unhealthy"]),
   timestamp: z.string(),
   uptime: z.number(),
   services: z.object({
     github: z.object({
       connected: z.boolean(),
-      rateLimit: z.object({
-        remaining: z.number(),
-        limit: z.number(),
-      }).optional(),
+      rateLimit: z
+        .object({
+          remaining: z.number(),
+          limit: z.number(),
+        })
+        .optional(),
     }),
     ai: z.object({
       available: z.boolean(),
-      circuitState: z.enum(['closed', 'open', 'half-open', 'disabled']),
+      circuitState: z.enum(["closed", "open", "half-open", "disabled"]),
       models: z.object({
         available: z.array(z.string()),
         unavailable: z.array(z.string()),
@@ -73,9 +75,10 @@ export type HealthStatusOutput = z.infer<typeof HealthStatusOutputSchema>;
  * - Cache status and persistence info
  */
 export const healthCheckTool: ToolDefinition<HealthCheckArgs, HealthStatusOutput> = {
-  name: 'health_check',
-  title: 'Health Check',
-  description: 'Check system health and service availability. Returns status of GitHub connection, AI services, and cache.',
+  name: "health_check",
+  title: "Health Check",
+  description:
+    "Check system health and service availability. Returns status of GitHub connection, AI services, and cache.",
   schema: healthCheckSchema as unknown as ToolSchema<HealthCheckArgs>,
   outputSchema: HealthStatusOutputSchema,
   annotations: {
@@ -86,8 +89,8 @@ export const healthCheckTool: ToolDefinition<HealthCheckArgs, HealthStatusOutput
   },
   examples: [
     {
-      name: 'Check system health',
-      description: 'Get the current health status of all system services',
+      name: "Check system health",
+      description: "Get the current health status of all system services",
       args: {},
     },
   ],

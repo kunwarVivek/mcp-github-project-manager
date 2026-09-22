@@ -246,13 +246,13 @@ Return as a structured estimate with detailed breakdown.`;
  */
 export function formatTaskPrompt(template: string, variables: Record<string, any>): string {
   let formatted = template;
-  
+
   for (const [key, value] of Object.entries(variables)) {
     const placeholder = `{${key}}`;
-    const stringValue = typeof value === 'object' ? JSON.stringify(value) : String(value);
-    formatted = formatted.replace(new RegExp(placeholder, 'g'), stringValue);
+    const stringValue = typeof value === "object" ? JSON.stringify(value) : String(value);
+    formatted = formatted.replace(new RegExp(placeholder, "g"), stringValue);
   }
-  
+
   return formatted;
 }
 
@@ -264,41 +264,41 @@ export const TASK_PROMPT_CONFIGS = {
     systemPrompt: TASK_GENERATION_SYSTEM_PROMPT,
     userPrompt: GENERATE_TASKS_FROM_PRD_PROMPT,
     maxTokens: 4000,
-    temperature: 0.6
+    temperature: 0.6,
   },
-  
+
   expandTask: {
     systemPrompt: TASK_GENERATION_SYSTEM_PROMPT,
     userPrompt: EXPAND_TASK_INTO_SUBTASKS_PROMPT,
     maxTokens: 2000,
-    temperature: 0.5
+    temperature: 0.5,
   },
-  
+
   analyzeComplexity: {
     systemPrompt: TASK_GENERATION_SYSTEM_PROMPT,
     userPrompt: ANALYZE_TASK_COMPLEXITY_PROMPT,
     maxTokens: 1500,
-    temperature: 0.4
+    temperature: 0.4,
   },
-  
+
   suggestDependencies: {
     systemPrompt: TASK_GENERATION_SYSTEM_PROMPT,
     userPrompt: SUGGEST_TASK_DEPENDENCIES_PROMPT,
     maxTokens: 2000,
-    temperature: 0.5
+    temperature: 0.5,
   },
-  
+
   prioritizeTasks: {
     systemPrompt: TASK_GENERATION_SYSTEM_PROMPT,
     userPrompt: PRIORITIZE_TASKS_PROMPT,
     maxTokens: 2500,
-    temperature: 0.6
+    temperature: 0.6,
   },
-  
+
   estimateEffort: {
     systemPrompt: TASK_GENERATION_SYSTEM_PROMPT,
     userPrompt: ESTIMATE_TASK_EFFORT_PROMPT,
     maxTokens: 1500,
-    temperature: 0.4
-  }
+    temperature: 0.4,
+  },
 };

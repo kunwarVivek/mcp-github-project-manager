@@ -1,19 +1,19 @@
-import { beforeEach, describe, expect, it, vi, type MockedFunction } from 'vitest';
-import { ProjectManagementService } from '../../../services/ProjectManagementService';
-import type { GitHubRepositoryFactory } from '../../../infrastructure/github/GitHubRepositoryFactory';
-import type { SubIssueService } from '../../../services/SubIssueService';
-import type { MilestoneService } from '../../../services/MilestoneService';
-import type { SprintPlanningService } from '../../../services/SprintPlanningService';
-import type { ProjectStatusService } from '../../../services/ProjectStatusService';
-import type { ProjectTemplateService } from '../../../services/ProjectTemplateService';
-import type { ProjectLinkingService } from '../../../services/ProjectLinkingService';
-import type { IssueService } from '../../../services/IssueService';
-import type { RoadmapService } from '../../../services/RoadmapService';
-import type { ProjectAutomationService } from '../../../services/ProjectAutomationService';
-import type { PullRequestService } from '../../../services/PullRequestService';
-import type { FieldValueService } from '../../../services/FieldValueService';
-import type { LabelService } from '../../../services/LabelService';
-import type { IterationService } from '../../../services/IterationService';
+import { beforeEach, describe, expect, it, vi, type MockedFunction } from "vitest";
+import { ProjectManagementService } from "../../../services/ProjectManagementService";
+import type { GitHubRepositoryFactory } from "../../../infrastructure/github/GitHubRepositoryFactory";
+import type { SubIssueService } from "../../../services/SubIssueService";
+import type { MilestoneService } from "../../../services/MilestoneService";
+import type { SprintPlanningService } from "../../../services/SprintPlanningService";
+import type { ProjectStatusService } from "../../../services/ProjectStatusService";
+import type { ProjectTemplateService } from "../../../services/ProjectTemplateService";
+import type { ProjectLinkingService } from "../../../services/ProjectLinkingService";
+import type { IssueService } from "../../../services/IssueService";
+import type { RoadmapService } from "../../../services/RoadmapService";
+import type { ProjectAutomationService } from "../../../services/ProjectAutomationService";
+import type { PullRequestService } from "../../../services/PullRequestService";
+import type { FieldValueService } from "../../../services/FieldValueService";
+import type { LabelService } from "../../../services/LabelService";
+import type { IterationService } from "../../../services/IterationService";
 
 /**
  * ProjectManagementService Unit Tests
@@ -29,7 +29,7 @@ import type { IterationService } from '../../../services/IterationService';
  * Note: The service's actual return format is `"Field ${name} updated successfully"`,
  * NOT `"Field value updated successfully for field '${name}'"`.
  */
-describe('ProjectManagementService', () => {
+describe("ProjectManagementService", () => {
   let service: ProjectManagementService;
   let mockGraphql: MockedFunction<any>;
   let mockFactory: GitHubRepositoryFactory;
@@ -48,7 +48,7 @@ describe('ProjectManagementService', () => {
       createMilestoneRepository: vi.fn(),
       createIssueRepository: vi.fn(),
       createSprintRepository: vi.fn(),
-      createAutomationRuleRepository: vi.fn()
+      createAutomationRuleRepository: vi.fn(),
     } as unknown as GitHubRepositoryFactory;
 
     // Create stub services (not used by setFieldValue/getFieldValue tests)
@@ -63,9 +63,14 @@ describe('ProjectManagementService', () => {
     const mockAutomation = {} as ProjectAutomationService;
     const mockPullRequest = {} as PullRequestService;
     const mockFieldValue = {
-      setFieldValue: vi.fn<any>().mockResolvedValue({ success: true, message: 'Field updated' }),
-      getFieldValue: vi.fn<any>().mockResolvedValue({ fieldId: 'field-1', fieldName: 'Status', value: 'Done', type: 'SINGLE_SELECT' }),
-      clearFieldValue: vi.fn<any>().mockResolvedValue({ success: true, message: 'Field cleared' }),
+      setFieldValue: vi.fn<any>().mockResolvedValue({ success: true, message: "Field updated" }),
+      getFieldValue: vi.fn<any>().mockResolvedValue({
+        fieldId: "field-1",
+        fieldName: "Status",
+        value: "Done",
+        type: "SINGLE_SELECT",
+      }),
+      clearFieldValue: vi.fn<any>().mockResolvedValue({ success: true, message: "Field cleared" }),
     } as unknown as FieldValueService;
     const mockLabel = {} as LabelService;
     const mockIteration = {} as IterationService;
@@ -89,34 +94,39 @@ describe('ProjectManagementService', () => {
     );
   });
 
-  it('should be properly initialized', () => {
+  it("should be properly initialized", () => {
     expect(service).toBeDefined();
   });
 
-  describe('setFieldValue (delegation)', () => {
-    it('should delegate to fieldValueService.setFieldValue', async () => {
-      const data = { projectId: 'P1', itemId: 'I1', fieldId: 'F1', value: 'test' };
+  describe("setFieldValue (delegation)", () => {
+    it("should delegate to fieldValueService.setFieldValue", async () => {
+      const data = { projectId: "P1", itemId: "I1", fieldId: "F1", value: "test" };
       const result = await service.setFieldValue(data);
 
-      expect(result).toEqual({ success: true, message: 'Field updated' });
+      expect(result).toEqual({ success: true, message: "Field updated" });
     });
   });
 
-  describe('getFieldValue (delegation)', () => {
-    it('should delegate to fieldValueService.getFieldValue', async () => {
-      const data = { projectId: 'P1', itemId: 'I1', fieldId: 'F1' };
+  describe("getFieldValue (delegation)", () => {
+    it("should delegate to fieldValueService.getFieldValue", async () => {
+      const data = { projectId: "P1", itemId: "I1", fieldId: "F1" };
       const result = await service.getFieldValue(data);
 
-      expect(result).toEqual({ fieldId: 'field-1', fieldName: 'Status', value: 'Done', type: 'SINGLE_SELECT' });
+      expect(result).toEqual({
+        fieldId: "field-1",
+        fieldName: "Status",
+        value: "Done",
+        type: "SINGLE_SELECT",
+      });
     });
   });
 
-  describe('clearFieldValue (delegation)', () => {
-    it('should delegate to fieldValueService.clearFieldValue', async () => {
-      const data = { projectId: 'P1', itemId: 'I1', fieldId: 'F1' };
+  describe("clearFieldValue (delegation)", () => {
+    it("should delegate to fieldValueService.clearFieldValue", async () => {
+      const data = { projectId: "P1", itemId: "I1", fieldId: "F1" };
       const result = await service.clearFieldValue(data);
 
-      expect(result).toEqual({ success: true, message: 'Field cleared' });
+      expect(result).toEqual({ success: true, message: "Field cleared" });
     });
   });
 });

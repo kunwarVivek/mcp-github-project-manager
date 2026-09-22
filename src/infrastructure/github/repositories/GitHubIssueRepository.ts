@@ -1,7 +1,7 @@
 import { BaseGitHubRepository } from "./BaseRepository";
 import type { Issue, CreateIssue, IssueRepository, IssueId } from "../../../domain/types";
 import { ResourceStatus } from "../../../domain/resource-types";
-import { parseResourceStatus, toStatusString } from '../../../domain/utils/StatusParser';
+import { parseResourceStatus, toStatusString } from "../../../domain/utils/StatusParser";
 
 interface GitHubIssue {
   id: string;
@@ -60,13 +60,13 @@ export class GitHubIssueRepository extends BaseGitHubRepository implements Issue
       number: parseInt(githubIssue.number.toString(), 10),
       title: githubIssue.title,
       description: githubIssue.body || "",
-      status: parseResourceStatus(githubIssue.state, 'githubIssue'),
-      assignees: githubIssue.assignees.nodes.map(node => node.login),
-      labels: githubIssue.labels.nodes.map(node => node.name),
+      status: parseResourceStatus(githubIssue.state, "githubIssue"),
+      assignees: githubIssue.assignees.nodes.map((node) => node.login),
+      labels: githubIssue.labels.nodes.map((node) => node.name),
       milestoneId: githubIssue.milestone?.id,
       createdAt: githubIssue.createdAt,
       updatedAt: githubIssue.updatedAt,
-      url: `https://github.com/${this.owner}/${this.repo}/issues/${githubIssue.number}`
+      url: `https://github.com/${this.owner}/${this.repo}/issues/${githubIssue.number}`,
     };
   }
 
@@ -162,7 +162,7 @@ export class GitHubIssueRepository extends BaseGitHubRepository implements Issue
         id: nodeId,
         title: data.title,
         body: data.description,
-        state: toStatusString(data.status || ResourceStatus.ACTIVE, 'githubIssue'),
+        state: toStatusString(data.status || ResourceStatus.ACTIVE, "githubIssue"),
         assigneeIds: data.assignees,
         labelIds,
         milestoneId: data.milestoneId,
@@ -312,9 +312,7 @@ export class GitHubIssueRepository extends BaseGitHubRepository implements Issue
       repo: this.repo,
     });
 
-    return response.repository.issues.nodes.map(issue =>
-      this.mapGitHubIssueToIssue(issue)
-    );
+    return response.repository.issues.nodes.map((issue) => this.mapGitHubIssueToIssue(issue));
   }
 
   async findByMilestone(milestoneId: string): Promise<Issue[]> {
@@ -352,11 +350,9 @@ export class GitHubIssueRepository extends BaseGitHubRepository implements Issue
     const response = await this.graphql<ListIssuesResponse>(query, {
       owner: this.owner,
       repo: this.repo,
-      milestoneId
+      milestoneId,
     });
 
-    return response.repository.issues.nodes.map(issue =>
-      this.mapGitHubIssueToIssue(issue)
-    );
+    return response.repository.issues.nodes.map((issue) => this.mapGitHubIssueToIssue(issue));
   }
 }

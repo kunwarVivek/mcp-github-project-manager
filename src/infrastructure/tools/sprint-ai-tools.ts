@@ -46,7 +46,10 @@ import {
  * Calculates sprint capacity based on team velocity, availability, and buffer.
  * Returns recommended story points for the sprint with confidence scoring.
  */
-export const calculateSprintCapacityTool: ToolDefinition<SprintCapacityInput, SprintCapacityOutput> = {
+export const calculateSprintCapacityTool: ToolDefinition<
+  SprintCapacityInput,
+  SprintCapacityOutput
+> = {
   name: "calculate_sprint_capacity",
   title: "Calculate Sprint Capacity",
   description:
@@ -64,7 +67,10 @@ export const calculateSprintCapacityTool: ToolDefinition<SprintCapacityInput, Sp
  * AI-powered backlog prioritization using business value, dependencies,
  * risk, and effort factors. Returns prioritized items with reasoning.
  */
-export const prioritizeBacklogTool: ToolDefinition<BacklogPrioritizationInput, PrioritizationOutput> = {
+export const prioritizeBacklogTool: ToolDefinition<
+  BacklogPrioritizationInput,
+  PrioritizationOutput
+> = {
   name: "prioritize_backlog",
   title: "Prioritize Backlog",
   description:
@@ -100,7 +106,10 @@ export const assessSprintRiskTool: ToolDefinition<SprintRiskInput, SprintRiskOut
  * AI-powered sprint composition suggestion. Selects backlog items that fit
  * capacity while respecting dependencies and business priorities.
  */
-export const suggestSprintCompositionTool: ToolDefinition<SprintSuggestionInput, SprintSuggestionOutput> = {
+export const suggestSprintCompositionTool: ToolDefinition<
+  SprintSuggestionInput,
+  SprintSuggestionOutput
+> = {
   name: "suggest_sprint_composition",
   title: "Suggest Sprint Composition",
   description:
@@ -130,13 +139,13 @@ export async function executeCalculateSprintCapacity(
   const result = await analyzer.calculateCapacity({
     velocity: args.velocity,
     sprintDurationDays: args.sprintDurationDays,
-    teamMembers: args.teamMembers.map(m => ({
+    teamMembers: args.teamMembers.map((m) => ({
       id: m.id,
       name: m.name,
       availability: m.availability,
       skills: m.skills,
     })),
-    historicalSprints: args.historicalSprints?.map(s => ({
+    historicalSprints: args.historicalSprints?.map((s) => ({
       sprintId: s.sprintId,
       sprintName: s.sprintName,
       plannedPoints: s.plannedPoints,
@@ -162,7 +171,7 @@ export async function executePrioritizeBacklog(
   const prioritizer = new BacklogPrioritizer();
 
   const result = await prioritizer.prioritize({
-    backlogItems: args.backlogItems.map(item => ({
+    backlogItems: args.backlogItems.map((item) => ({
       id: item.id,
       title: item.title,
       description: item.description,
@@ -185,13 +194,11 @@ export async function executePrioritizeBacklog(
  * @param args - Sprint risk input parameters
  * @returns Risk assessment with mitigations
  */
-export async function executeAssessSprintRisk(
-  args: SprintRiskInput
-): Promise<SprintRiskOutput> {
+export async function executeAssessSprintRisk(args: SprintRiskInput): Promise<SprintRiskOutput> {
   const assessor = new SprintRiskAssessor();
 
   const result = await assessor.assessRisks({
-    sprintItems: args.sprintItems.map(item => ({
+    sprintItems: args.sprintItems.map((item) => ({
       id: item.id,
       title: item.title,
       description: item.description,
@@ -201,7 +208,7 @@ export async function executeAssessSprintRisk(
       dependencies: item.dependencies,
     })),
     sprintCapacity: args.capacity,
-    dependencies: args.dependencies?.map(d => ({
+    dependencies: args.dependencies?.map((d) => ({
       fromTaskId: d.fromItemId,
       toTaskId: d.toItemId,
       type: d.type,
@@ -226,7 +233,7 @@ export async function executeSuggestSprintComposition(
   const service = new SprintSuggestionService();
 
   const result = await service.suggestSprintComposition({
-    backlogItems: args.backlogItems.map(item => ({
+    backlogItems: args.backlogItems.map((item) => ({
       id: item.id,
       title: item.title,
       description: item.description,
@@ -237,7 +244,7 @@ export async function executeSuggestSprintComposition(
     })),
     velocity: args.velocity,
     sprintDurationDays: args.sprintDurationDays,
-    teamMembers: args.teamMembers?.map(m => ({
+    teamMembers: args.teamMembers?.map((m) => ({
       id: m.id,
       name: m.name,
       availability: m.availability,
@@ -271,5 +278,7 @@ export const sprintAIExecutors: Record<string, (args: unknown) => Promise<unknow
   calculate_sprint_capacity: executeCalculateSprintCapacity as (args: unknown) => Promise<unknown>,
   prioritize_backlog: executePrioritizeBacklog as (args: unknown) => Promise<unknown>,
   assess_sprint_risk: executeAssessSprintRisk as (args: unknown) => Promise<unknown>,
-  suggest_sprint_composition: executeSuggestSprintComposition as (args: unknown) => Promise<unknown>,
+  suggest_sprint_composition: executeSuggestSprintComposition as (
+    args: unknown
+  ) => Promise<unknown>,
 };

@@ -11,18 +11,12 @@
  * - AI-16: Visualization data for Gantt rendering
  */
 
-import { generateObject } from 'ai';
-import { z } from 'zod';
-import { AIServiceFactory } from './AIServiceFactory';
-import { InputSanitizer } from '../utils/InputSanitizer';
-import {
-  EstimationCalibrator,
-  complexityToPoints
-} from '../../analysis/EstimationCalibrator';
-import {
-  calculateWeightedScore,
-  getConfidenceTier
-} from './ConfidenceScorer';
+import { generateObject } from "ai";
+import { z } from "zod";
+import { AIServiceFactory } from "./AIServiceFactory";
+import { InputSanitizer } from "../utils/InputSanitizer";
+import { EstimationCalibrator, complexityToPoints } from "../../analysis/EstimationCalibrator";
+import { calculateWeightedScore, getConfidenceTier } from "./ConfidenceScorer";
 import type {
   GeneratedRoadmap,
   RoadmapPhase,
@@ -30,15 +24,15 @@ import type {
   MilestoneDependency,
   RoadmapGenerationInput,
   RequirementItem,
-  RoadmapVisualizationData
-} from '../../domain/roadmap-planning-types';
-import type { SectionConfidence, TaskComplexity } from '../../domain/ai-types';
+  RoadmapVisualizationData,
+} from "../../domain/roadmap-planning-types";
+import type { SectionConfidence, TaskComplexity } from "../../domain/ai-types";
 import {
   ROADMAP_GENERATION_SYSTEM_PROMPT,
   REQUIREMENTS_PARSING_PROMPT,
   formatRequirementsForPrompt,
-  formatConstraintsForPrompt
-} from './prompts/RoadmapPrompts';
+  formatConstraintsForPrompt,
+} from "./prompts/RoadmapPrompts";
 
 // ============================================================================
 // Zod Schemas for AI Structured Output
@@ -53,11 +47,11 @@ const RequirementParseSchema = z.object({
       id: z.string(),
       title: z.string(),
       description: z.string(),
-      priority: z.enum(['critical', 'high', 'medium', 'low']),
+      priority: z.enum(["critical", "high", "medium", "low"]),
       estimatedComplexity: z.number().min(1).max(10),
-      category: z.string()
+      category: z.string(),
     })
-  )
+  ),
 });
 
 /**
@@ -71,7 +65,7 @@ const RoadmapStructureSchema = z.object({
       description: z.string(),
       objectives: z.array(z.string()),
       durationWeeks: z.number(),
-      requirementIds: z.array(z.string())
+      requirementIds: z.array(z.string()),
     })
   ),
   milestones: z.array(
@@ -83,14 +77,14 @@ const RoadmapStructureSchema = z.object({
       weekNumber: z.number(),
       deliverables: z.array(z.string()),
       dependencies: z.array(z.string()),
-      confidence: z.number().min(0).max(1)
+      confidence: z.number().min(0).max(1),
     })
   ),
-  reasoning: z.string()
+  reasoning: z.string(),
 });
 
 type RoadmapStructure = z.infer<typeof RoadmapStructureSchema>;
-type ParsedRequirement = z.infer<typeof RequirementParseSchema>['requirements'][0];
+type ParsedRequirement = z.infer<typeof RequirementParseSchema>["requirements"][0];
 
 // ============================================================================
 // RoadmapAIService
@@ -129,7 +123,7 @@ export class RoadmapAIService {
   async generateRoadmap(input: RoadmapGenerationInput): Promise<GeneratedRoadmap> {
     // 1. Parse requirements if string
     const requirements =
-      typeof input.requirements === 'string'
+      typeof input.requirements === "string"
         ? await this.parseRequirements(input.requirements)
         : input.requirements;
 
@@ -141,10 +135,7 @@ export class RoadmapAIService {
     const sprintWeeks = input.constraints?.sprintDurationWeeks ?? 2;
     const bufferFactor = 1.2; // 20% buffer for integration/testing
 
-    const totalPoints = estimatedRequirements.reduce(
-      (sum, r) => sum + r.estimatedPoints,
-      0
-    );
+    const totalPoints = estimatedRequirements.reduce((sum, r) => sum + r.estimatedPoints, 0);
     const sprints = Math.ceil((totalPoints * bufferFactor) / velocity);
     const totalWeeks = sprints * sprintWeeks;
 
@@ -177,12 +168,12 @@ export class RoadmapAIService {
   generateVisualizationData(roadmap: GeneratedRoadmap): RoadmapVisualizationData {
     // Accessible color palette for phases
     const colors = [
-      '#4299e1', // blue
-      '#48bb78', // green
-      '#ed8936', // orange
-      '#9f7aea', // purple
-      '#ed64a6', // pink
-      '#38b2ac' // teal
+      "#4299e1", // blue
+      "#48bb78", // green
+      "#ed8936", // orange
+      "#9f7aea", // purple
+      "#ed64a6", // pink
+      "#38b2ac", // teal
     ];
 
     return {
@@ -191,7 +182,7 @@ export class RoadmapAIService {
         name: phase.name,
         startWeek: phase.startWeek,
         endWeek: phase.endWeek,
-        color: colors[i % colors.length]
+        color: colors[i % colors.length],
       })),
       milestones: roadmap.milestones.map((m) => {
         // Calculate milestone week position within phase
@@ -207,14 +198,14 @@ export class RoadmapAIService {
           id: m.id,
           title: m.title,
           week: phase ? Math.min(weekNumber, phase.endWeek) : weekNumber,
-          phaseId: m.phaseId
+          phaseId: m.phaseId,
         };
       }),
       dependencies: roadmap.dependencies.map((d) => ({
         from: d.fromMilestoneId,
-        to: d.toMilestoneId
+        to: d.toMilestoneId,
       })),
-      totalWeeks: roadmap.timeline.totalWeeks
+      totalWeeks: roadmap.timeline.totalWeeks,
     };
   }
 
@@ -229,8 +220,7 @@ export class RoadmapAIService {
    * @returns Structured requirement items
    */
   private async parseRequirements(text: string): Promise<RequirementItem[]> {
-    const model =
-      this.aiFactory.getModel('main') || this.aiFactory.getBestAvailableModel();
+    const model = this.aiFactory.getModel("main") || this.aiFactory.getBestAvailableModel();
 
     if (!model) {
       // Fallback: split by lines and create basic requirements
@@ -243,7 +233,7 @@ export class RoadmapAIService {
         system: REQUIREMENTS_PARSING_PROMPT,
         prompt: InputSanitizer.sanitizeText(text, InputSanitizer.MAX_ISSUE_CONTENT_LENGTH),
         schema: RequirementParseSchema,
-        temperature: 0.3
+        temperature: 0.3,
       });
 
       return result.object.requirements.map((r: ParsedRequirement) => ({
@@ -252,7 +242,7 @@ export class RoadmapAIService {
         description: r.description,
         priority: r.priority,
         estimatedPoints: complexityToPoints(r.estimatedComplexity as TaskComplexity),
-        category: r.category
+        category: r.category,
       }));
     } catch {
       // Fallback on error
@@ -265,12 +255,12 @@ export class RoadmapAIService {
    */
   private fallbackParseRequirements(text: string): RequirementItem[] {
     return text
-      .split('\n')
+      .split("\n")
       .filter((line) => line.trim())
       .map((line, i) => ({
-        id: `REQ-${String(i + 1).padStart(3, '0')}`,
-        title: line.trim().replace(/^[-*]\s*/, ''), // Remove leading bullets
-        priority: 'medium' as const
+        id: `REQ-${String(i + 1).padStart(3, "0")}`,
+        title: line.trim().replace(/^[-*]\s*/, ""), // Remove leading bullets
+        priority: "medium" as const,
       }));
   }
 
@@ -297,13 +287,13 @@ export class RoadmapAIService {
    */
   private estimateFromPriority(priority?: string): number {
     switch (priority) {
-      case 'critical':
+      case "critical":
         return 8;
-      case 'high':
+      case "high":
         return 5;
-      case 'medium':
+      case "medium":
         return 3;
-      case 'low':
+      case "low":
         return 2;
       default:
         return 3;
@@ -319,11 +309,10 @@ export class RoadmapAIService {
    */
   private async generateRoadmapStructure(
     requirements: Array<RequirementItem & { estimatedPoints: number }>,
-    constraints: RoadmapGenerationInput['constraints'],
+    constraints: RoadmapGenerationInput["constraints"],
     totalWeeks: number
   ): Promise<RoadmapStructure> {
-    const model =
-      this.aiFactory.getModel('prd') || this.aiFactory.getBestAvailableModel();
+    const model = this.aiFactory.getModel("prd") || this.aiFactory.getBestAvailableModel();
 
     if (!model) {
       return this.getFallbackRoadmapStructure(requirements, totalWeeks);
@@ -346,7 +335,7 @@ IMPORTANT: Follow phase sequencing rules - foundation first, then core, then adv
         system: ROADMAP_GENERATION_SYSTEM_PROMPT,
         prompt,
         schema: RoadmapStructureSchema,
-        temperature: 0.5
+        temperature: 0.5,
       });
 
       return result.object;
@@ -371,10 +360,7 @@ IMPORTANT: Follow phase sequencing rules - foundation first, then core, then adv
     const milestones = [];
 
     for (let i = 0; i < numPhases; i++) {
-      const phaseReqs = requirements.slice(
-        i * reqsPerPhase,
-        (i + 1) * reqsPerPhase
-      );
+      const phaseReqs = requirements.slice(i * reqsPerPhase, (i + 1) * reqsPerPhase);
       const phaseId = `phase-${i + 1}`;
 
       const phaseName = this.getDefaultPhaseName(i, numPhases);
@@ -385,7 +371,7 @@ IMPORTANT: Follow phase sequencing rules - foundation first, then core, then adv
         description: `Implementation phase ${i + 1}: ${phaseName}`,
         objectives: phaseReqs.slice(0, 3).map((r) => r.title),
         durationWeeks: weeksPerPhase,
-        requirementIds: phaseReqs.map((r) => r.id || '')
+        requirementIds: phaseReqs.map((r) => r.id || ""),
       });
 
       milestones.push({
@@ -396,14 +382,14 @@ IMPORTANT: Follow phase sequencing rules - foundation first, then core, then adv
         weekNumber: (i + 1) * weeksPerPhase,
         deliverables: phaseReqs.slice(0, 3).map((r) => r.title),
         dependencies: i > 0 ? [`milestone-${i}`] : [],
-        confidence: 0.6
+        confidence: 0.6,
       });
     }
 
     return {
       phases,
       milestones,
-      reasoning: 'Fallback: grouped requirements into sequential phases'
+      reasoning: "Fallback: grouped requirements into sequential phases",
     };
   }
 
@@ -412,12 +398,12 @@ IMPORTANT: Follow phase sequencing rules - foundation first, then core, then adv
    */
   private getDefaultPhaseName(index: number, total: number): string {
     if (total === 2) {
-      return index === 0 ? 'Foundation' : 'Implementation';
+      return index === 0 ? "Foundation" : "Implementation";
     }
     if (total === 3) {
-      return ['Foundation', 'Core Features', 'Polish'][index];
+      return ["Foundation", "Core Features", "Polish"][index];
     }
-    return ['Foundation', 'Core Features', 'Advanced Features', 'Polish'][index];
+    return ["Foundation", "Core Features", "Advanced Features", "Polish"][index];
   }
 
   // ==========================================================================
@@ -454,9 +440,7 @@ IMPORTANT: Follow phase sequencing rules - foundation first, then core, then adv
         durationWeeks: phase.durationWeeks,
         startWeek: phaseStartWeek,
         endWeek: phaseEndWeek,
-        milestones: structure.milestones
-          .filter((m) => m.phaseId === phase.id)
-          .map((m) => m.id)
+        milestones: structure.milestones.filter((m) => m.phaseId === phase.id).map((m) => m.id),
       };
     });
 
@@ -470,20 +454,19 @@ IMPORTANT: Follow phase sequencing rules - foundation first, then core, then adv
         title: m.title,
         description: m.description,
         phaseId: m.phaseId,
-        targetDate: targetDate.toISOString().split('T')[0],
+        targetDate: targetDate.toISOString().split("T")[0],
         deliverables: m.deliverables,
         dependencies: m.dependencies,
-        confidence: m.confidence
+        confidence: m.confidence,
       };
     });
-
 
     // Build dependency graph
     const dependencies: MilestoneDependency[] = structure.milestones.flatMap((m) =>
       m.dependencies.map((dep) => ({
         fromMilestoneId: dep,
         toMilestoneId: m.id,
-        type: 'blocks' as const
+        type: "blocks" as const,
       }))
     );
 
@@ -497,12 +480,12 @@ IMPORTANT: Follow phase sequencing rules - foundation first, then core, then adv
       milestones,
       dependencies,
       timeline: {
-        startDate: startDate.toISOString().split('T')[0],
-        endDate: endDate.toISOString().split('T')[0],
-        totalWeeks
+        startDate: startDate.toISOString().split("T")[0],
+        endDate: endDate.toISOString().split("T")[0],
+        totalWeeks,
       },
       confidence: this.calculateConfidence(requirements, structure),
-      reasoning: structure.reasoning
+      reasoning: structure.reasoning,
     };
   }
 
@@ -534,20 +517,20 @@ IMPORTANT: Follow phase sequencing rules - foundation first, then core, then adv
     const factors = {
       inputCompleteness: inputScore,
       aiSelfAssessment: deliverableScore,
-      patternMatch: patternScore
+      patternMatch: patternScore,
     };
 
     const score = calculateWeightedScore(factors);
     const tier = getConfidenceTier(score);
 
     return {
-      sectionId: 'roadmap',
-      sectionName: 'Roadmap',
+      sectionId: "roadmap",
+      sectionName: "Roadmap",
       score,
       tier,
       factors,
       reasoning: `Based on ${requirements.length} requirements across ${structure.phases?.length || 0} phases with ${structure.milestones?.length || 0} milestones`,
-      needsReview: score < 70
+      needsReview: score < 70,
     };
   }
 }

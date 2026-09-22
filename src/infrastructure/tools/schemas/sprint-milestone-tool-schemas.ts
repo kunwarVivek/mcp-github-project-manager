@@ -31,16 +31,19 @@ export const createRoadmapSchema = z.object({
         description: z.string().min(1, "Milestone description is required"),
         dueDate: z.string().datetime("Due date must be a valid ISO date string").optional(),
       }),
-      issues: z.array(
-        z.object({
-          title: z.string().min(1, "Issue title is required"),
-          description: z.string().min(1, "Issue description is required"),
-          priority: z.enum(["high", "medium", "low"]).default("medium"),
-          type: z.enum(["bug", "feature", "enhancement", "documentation"]).default("feature"),
-          assignees: z.array(z.string()),
-          labels: z.array(z.string()),
-        })
-      ).optional().default([]),
+      issues: z
+        .array(
+          z.object({
+            title: z.string().min(1, "Issue title is required"),
+            description: z.string().min(1, "Issue description is required"),
+            priority: z.enum(["high", "medium", "low"]).default("medium"),
+            type: z.enum(["bug", "feature", "enhancement", "documentation"]).default("feature"),
+            assignees: z.array(z.string()),
+            labels: z.array(z.string()),
+          })
+        )
+        .optional()
+        .default([]),
     })
   ),
 });
@@ -185,7 +188,9 @@ export type GetUpcomingMilestonesArgs = z.infer<typeof getUpcomingMilestonesSche
 
 export const createLabelSchema = z.object({
   name: z.string().min(1, "Label name is required"),
-  color: z.string().regex(/^[0-9a-fA-F]{6}$/, "Color must be a valid 6-digit hex color code without #"),
+  color: z
+    .string()
+    .regex(/^[0-9a-fA-F]{6}$/, "Color must be a valid 6-digit hex color code without #"),
   description: z.string().optional(),
 });
 
@@ -201,7 +206,10 @@ export type ListLabelsArgs = z.infer<typeof listLabelsSchema>;
 // Milestone Tool Definitions
 // ============================================================================
 
-export const createMilestoneTool: ToolDefinition<CreateMilestoneArgs, z.infer<typeof MilestoneOutputSchema>> = {
+export const createMilestoneTool: ToolDefinition<
+  CreateMilestoneArgs,
+  z.infer<typeof MilestoneOutputSchema>
+> = {
   name: "create_milestone",
   title: "Create Milestone",
   description: "Create a new milestone",
@@ -215,13 +223,16 @@ export const createMilestoneTool: ToolDefinition<CreateMilestoneArgs, z.infer<ty
       args: {
         title: "Beta Release",
         description: "Complete all features for beta release",
-        dueDate: "2025-06-30T00:00:00Z"
-      }
-    }
-  ]
+        dueDate: "2025-06-30T00:00:00Z",
+      },
+    },
+  ],
 };
 
-export const listMilestonesTool: ToolDefinition<ListMilestonesArgs, z.infer<typeof MilestoneListOutputSchema>> = {
+export const listMilestonesTool: ToolDefinition<
+  ListMilestonesArgs,
+  z.infer<typeof MilestoneListOutputSchema>
+> = {
   name: "list_milestones",
   title: "List Milestones",
   description: "List milestones",
@@ -235,13 +246,16 @@ export const listMilestonesTool: ToolDefinition<ListMilestonesArgs, z.infer<type
       args: {
         status: "open",
         sort: "due_date",
-        direction: "asc"
-      }
-    }
-  ]
+        direction: "asc",
+      },
+    },
+  ],
 };
 
-export const updateMilestoneTool: ToolDefinition<UpdateMilestoneArgs, z.infer<typeof MilestoneOutputSchema>> = {
+export const updateMilestoneTool: ToolDefinition<
+  UpdateMilestoneArgs,
+  z.infer<typeof MilestoneOutputSchema>
+> = {
   name: "update_milestone",
   title: "Update Milestone",
   description: "Update a GitHub milestone",
@@ -255,21 +269,24 @@ export const updateMilestoneTool: ToolDefinition<UpdateMilestoneArgs, z.infer<ty
       args: {
         milestoneId: "42",
         title: "Updated Release",
-        dueDate: "2025-08-15T00:00:00Z"
-      }
+        dueDate: "2025-08-15T00:00:00Z",
+      },
     },
     {
       name: "Close milestone",
       description: "Mark a milestone as closed",
       args: {
         milestoneId: "42",
-        state: "closed"
-      }
-    }
-  ]
+        state: "closed",
+      },
+    },
+  ],
 };
 
-export const deleteMilestoneTool: ToolDefinition<DeleteMilestoneArgs, z.infer<typeof DeleteOutputSchema>> = {
+export const deleteMilestoneTool: ToolDefinition<
+  DeleteMilestoneArgs,
+  z.infer<typeof DeleteOutputSchema>
+> = {
   name: "delete_milestone",
   title: "Delete Milestone",
   description: "Delete a GitHub milestone",
@@ -281,17 +298,20 @@ export const deleteMilestoneTool: ToolDefinition<DeleteMilestoneArgs, z.infer<ty
       name: "Delete milestone",
       description: "Delete a milestone by ID",
       args: {
-        milestoneId: "42"
-      }
-    }
-  ]
+        milestoneId: "42",
+      },
+    },
+  ],
 };
 
 // ============================================================================
 // Sprint Tool Definitions
 // ============================================================================
 
-export const createSprintTool: ToolDefinition<CreateSprintArgs, z.infer<typeof SprintOutputSchema>> = {
+export const createSprintTool: ToolDefinition<
+  CreateSprintArgs,
+  z.infer<typeof SprintOutputSchema>
+> = {
   name: "create_sprint",
   title: "Create Sprint",
   description: "Create a new development sprint",
@@ -307,13 +327,16 @@ export const createSprintTool: ToolDefinition<CreateSprintArgs, z.infer<typeof S
         description: "First sprint focused on user authentication features",
         startDate: "2025-06-01T00:00:00Z",
         endDate: "2025-06-15T00:00:00Z",
-        issueIds: ["101", "102", "103"]
-      }
-    }
-  ]
+        issueIds: ["101", "102", "103"],
+      },
+    },
+  ],
 };
 
-export const listSprintsTool: ToolDefinition<ListSprintsArgs, z.infer<typeof SprintListOutputSchema>> = {
+export const listSprintsTool: ToolDefinition<
+  ListSprintsArgs,
+  z.infer<typeof SprintListOutputSchema>
+> = {
   name: "list_sprints",
   title: "List Sprints",
   description: "List all sprints",
@@ -325,13 +348,16 @@ export const listSprintsTool: ToolDefinition<ListSprintsArgs, z.infer<typeof Spr
       name: "List active sprints",
       description: "List all currently active sprints",
       args: {
-        status: "active"
-      }
-    }
-  ]
+        status: "active",
+      },
+    },
+  ],
 };
 
-export const getCurrentSprintTool: ToolDefinition<GetCurrentSprintArgs, z.infer<typeof SprintOutputSchema>> = {
+export const getCurrentSprintTool: ToolDefinition<
+  GetCurrentSprintArgs,
+  z.infer<typeof SprintOutputSchema>
+> = {
   name: "get_current_sprint",
   title: "Get Current Sprint",
   description: "Get the currently active sprint",
@@ -343,13 +369,16 @@ export const getCurrentSprintTool: ToolDefinition<GetCurrentSprintArgs, z.infer<
       name: "Get current sprint with issues",
       description: "Get details of the current sprint including assigned issues",
       args: {
-        includeIssues: true
-      }
-    }
-  ]
+        includeIssues: true,
+      },
+    },
+  ],
 };
 
-export const updateSprintTool: ToolDefinition<UpdateSprintArgs, z.infer<typeof SprintOutputSchema>> = {
+export const updateSprintTool: ToolDefinition<
+  UpdateSprintArgs,
+  z.infer<typeof SprintOutputSchema>
+> = {
   name: "update_sprint",
   title: "Update Sprint",
   description: "Update a development sprint",
@@ -364,13 +393,16 @@ export const updateSprintTool: ToolDefinition<UpdateSprintArgs, z.infer<typeof S
         sprintId: "sprint_1",
         startDate: "2025-07-01T00:00:00Z",
         endDate: "2025-07-15T00:00:00Z",
-        status: "active"
-      }
-    }
-  ]
+        status: "active",
+      },
+    },
+  ],
 };
 
-export const addIssuesToSprintTool: ToolDefinition<AddIssuesToSprintArgs, z.infer<typeof SprintOutputSchema>> = {
+export const addIssuesToSprintTool: ToolDefinition<
+  AddIssuesToSprintArgs,
+  z.infer<typeof SprintOutputSchema>
+> = {
   name: "add_issues_to_sprint",
   title: "Add Issues to Sprint",
   description: "Add issues to an existing sprint",
@@ -383,13 +415,16 @@ export const addIssuesToSprintTool: ToolDefinition<AddIssuesToSprintArgs, z.infe
       description: "Add multiple issues to an existing sprint",
       args: {
         sprintId: "sprint_1",
-        issueIds: ["123", "124", "125"]
-      }
-    }
-  ]
+        issueIds: ["123", "124", "125"],
+      },
+    },
+  ],
 };
 
-export const removeIssuesFromSprintTool: ToolDefinition<RemoveIssuesFromSprintArgs, z.infer<typeof SprintOutputSchema>> = {
+export const removeIssuesFromSprintTool: ToolDefinition<
+  RemoveIssuesFromSprintArgs,
+  z.infer<typeof SprintOutputSchema>
+> = {
   name: "remove_issues_from_sprint",
   title: "Remove Issues from Sprint",
   description: "Remove issues from a sprint",
@@ -402,17 +437,20 @@ export const removeIssuesFromSprintTool: ToolDefinition<RemoveIssuesFromSprintAr
       description: "Remove issues that are no longer in scope for the sprint",
       args: {
         sprintId: "sprint_1",
-        issueIds: ["124", "125"]
-      }
-    }
-  ]
+        issueIds: ["124", "125"],
+      },
+    },
+  ],
 };
 
 // ============================================================================
 // Roadmap Tool Definitions
 // ============================================================================
 
-export const createRoadmapTool: ToolDefinition<CreateRoadmapArgs, z.infer<typeof RoadmapOutputSchema>> = {
+export const createRoadmapTool: ToolDefinition<
+  CreateRoadmapArgs,
+  z.infer<typeof RoadmapOutputSchema>
+> = {
   name: "create_roadmap",
   title: "Create Roadmap",
   description: "Create a project roadmap with milestones and tasks",
@@ -494,10 +532,7 @@ export const planSprintTool: ToolDefinition<PlanSprintArgs, z.infer<typeof Sprin
           title: "Sprint 1: Authentication and Onboarding",
           startDate: "2025-05-01T00:00:00Z",
           endDate: "2025-05-15T00:00:00Z",
-          goals: [
-            "Complete user authentication flow",
-            "Implement onboarding screens",
-          ],
+          goals: ["Complete user authentication flow", "Implement onboarding screens"],
         },
         issueIds: ["1", "2", "3", "5"],
       },
@@ -509,7 +544,10 @@ export const planSprintTool: ToolDefinition<PlanSprintArgs, z.infer<typeof Sprin
 // Metrics Tool Definitions
 // ============================================================================
 
-export const getMilestoneMetricsTool: ToolDefinition<GetMilestoneMetricsArgs, z.infer<typeof MilestoneMetricsOutputSchema>> = {
+export const getMilestoneMetricsTool: ToolDefinition<
+  GetMilestoneMetricsArgs,
+  z.infer<typeof MilestoneMetricsOutputSchema>
+> = {
   name: "get_milestone_metrics",
   title: "Get Milestone Metrics",
   description: "Get progress metrics for a specific milestone",
@@ -528,7 +566,10 @@ export const getMilestoneMetricsTool: ToolDefinition<GetMilestoneMetricsArgs, z.
   ],
 };
 
-export const getSprintMetricsTool: ToolDefinition<GetSprintMetricsArgs, z.infer<typeof SprintMetricsOutputSchema>> = {
+export const getSprintMetricsTool: ToolDefinition<
+  GetSprintMetricsArgs,
+  z.infer<typeof SprintMetricsOutputSchema>
+> = {
   name: "get_sprint_metrics",
   title: "Get Sprint Metrics",
   description: "Get progress metrics for a specific sprint",
@@ -547,7 +588,10 @@ export const getSprintMetricsTool: ToolDefinition<GetSprintMetricsArgs, z.infer<
   ],
 };
 
-export const getOverdueMilestonesTool: ToolDefinition<GetOverdueMilestonesArgs, z.infer<typeof MilestoneListOutputSchema>> = {
+export const getOverdueMilestonesTool: ToolDefinition<
+  GetOverdueMilestonesArgs,
+  z.infer<typeof MilestoneListOutputSchema>
+> = {
   name: "get_overdue_milestones",
   title: "Get Overdue Milestones",
   description: "Get a list of overdue milestones",
@@ -566,7 +610,10 @@ export const getOverdueMilestonesTool: ToolDefinition<GetOverdueMilestonesArgs, 
   ],
 };
 
-export const getUpcomingMilestonesTool: ToolDefinition<GetUpcomingMilestonesArgs, z.infer<typeof MilestoneListOutputSchema>> = {
+export const getUpcomingMilestonesTool: ToolDefinition<
+  GetUpcomingMilestonesArgs,
+  z.infer<typeof MilestoneListOutputSchema>
+> = {
   name: "get_upcoming_milestones",
   title: "Get Upcoming Milestones",
   description: "Get a list of upcoming milestones within a time frame",
@@ -604,13 +651,16 @@ export const createLabelTool: ToolDefinition<CreateLabelArgs, z.infer<typeof Lab
       args: {
         name: "bug",
         color: "ff0000",
-        description: "Something isn't working"
-      }
-    }
-  ]
+        description: "Something isn't working",
+      },
+    },
+  ],
 };
 
-export const listLabelsTool: ToolDefinition<ListLabelsArgs, z.infer<typeof LabelListOutputSchema>> = {
+export const listLabelsTool: ToolDefinition<
+  ListLabelsArgs,
+  z.infer<typeof LabelListOutputSchema>
+> = {
   name: "list_labels",
   title: "List Labels",
   description: "List all GitHub labels",
@@ -622,8 +672,8 @@ export const listLabelsTool: ToolDefinition<ListLabelsArgs, z.infer<typeof Label
       name: "List all labels",
       description: "Get all repository labels",
       args: {
-        limit: 50
-      }
-    }
-  ]
+        limit: 50,
+      },
+    },
+  ],
 };

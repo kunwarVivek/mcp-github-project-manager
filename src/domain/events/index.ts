@@ -7,7 +7,6 @@
 export {
   // Base class
   DomainEvent,
-
   // Issue events
   IssueCreatedEvent,
   IssueStatusChangedEvent,
@@ -23,7 +22,7 @@ export {
   // Project events
   ProjectCreatedEvent,
   ProjectStatusChangedEvent,
-} from './DomainEvent';
+} from "./DomainEvent";
 
 export {
   // Agent events
@@ -37,7 +36,7 @@ export {
   TaskRejectedEvent,
   AgentHeartbeatEvent,
   TaskReclaimedEvent,
-} from './AgentEvents';
+} from "./AgentEvents";
 
 export {
   // Event bus
@@ -45,7 +44,7 @@ export {
   domainEventBus,
 
   // Types
-} from './DomainEventBus';
+} from "./DomainEventBus";
 
 // Type-only re-exports. Required by `isolatedModules`: these are types, and a
 // per-file transpiler (tsx/esbuild/bundlers) would otherwise emit them as real
@@ -56,7 +55,7 @@ export type {
   AgentRegisteredEventData,
   TaskReclaimedEventData,
   TaskReleasedEventData,
-} from './AgentEvents';
+} from "./AgentEvents";
 export type {
   IssueAssignedEventData,
   IssueCreatedEventData,
@@ -69,9 +68,9 @@ export type {
   SprintCreatedEventData,
   SprintIssuesChangedEventData,
   SprintStatusChangedEventData,
-} from './DomainEvent';
+} from "./DomainEvent";
 export type {
   AsyncEventHandler,
   EventHandler,
   SubscriptionOptions,
-} from './DomainEventBus';
+} from "./DomainEventBus";

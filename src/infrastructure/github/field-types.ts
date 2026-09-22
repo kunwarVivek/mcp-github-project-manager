@@ -1,17 +1,17 @@
 import type { FieldType } from "../../domain/types";
 
 // GitHub GraphQL field data types
-export type GraphQLFieldType = 
-  | 'TEXT' 
-  | 'NUMBER' 
-  | 'DATE' 
-  | 'SINGLE_SELECT' 
-  | 'ITERATION'
-  | 'MILESTONE'
-  | 'ASSIGNEES'
-  | 'LABELS'
-  | 'TRACKED_BY'
-  | 'REPOSITORY';
+export type GraphQLFieldType =
+  | "TEXT"
+  | "NUMBER"
+  | "DATE"
+  | "SINGLE_SELECT"
+  | "ITERATION"
+  | "MILESTONE"
+  | "ASSIGNEES"
+  | "LABELS"
+  | "TRACKED_BY"
+  | "REPOSITORY";
 
 export interface CreateProjectV2FieldResponse {
   createProjectV2Field: {
@@ -19,8 +19,8 @@ export interface CreateProjectV2FieldResponse {
       id: string;
       name: string;
       dataType: string;
-    }
-  }
+    };
+  };
 }
 
 export interface UpdateProjectV2FieldResponse {
@@ -29,8 +29,8 @@ export interface UpdateProjectV2FieldResponse {
       id: string;
       name: string;
       dataType: string;
-    }
-  }
+    };
+  };
 }
 
 /**
@@ -38,17 +38,17 @@ export interface UpdateProjectV2FieldResponse {
  */
 export function mapToGraphQLFieldType(type: FieldType): GraphQLFieldType {
   const mappings: Record<FieldType, GraphQLFieldType> = {
-    'text': 'TEXT',
-    'number': 'NUMBER',
-    'date': 'DATE',
-    'single_select': 'SINGLE_SELECT',
-    'iteration': 'ITERATION',
-    'milestone': 'MILESTONE',
-    'assignees': 'ASSIGNEES',
-    'labels': 'LABELS',
-    'tracked_by': 'TRACKED_BY',
-    'repository': 'REPOSITORY',
-    'tracks': 'TRACKED_BY' // Map 'tracks' to 'TRACKED_BY' as it's the closest equivalent
+    text: "TEXT",
+    number: "NUMBER",
+    date: "DATE",
+    single_select: "SINGLE_SELECT",
+    iteration: "ITERATION",
+    milestone: "MILESTONE",
+    assignees: "ASSIGNEES",
+    labels: "LABELS",
+    tracked_by: "TRACKED_BY",
+    repository: "REPOSITORY",
+    tracks: "TRACKED_BY", // Map 'tracks' to 'TRACKED_BY' as it's the closest equivalent
   };
   return mappings[type];
 }
@@ -58,16 +58,16 @@ export function mapToGraphQLFieldType(type: FieldType): GraphQLFieldType {
  */
 export function mapFromGraphQLFieldType(type: GraphQLFieldType): FieldType {
   const mappings: Record<GraphQLFieldType, FieldType> = {
-    'TEXT': 'text',
-    'NUMBER': 'number',
-    'DATE': 'date',
-    'SINGLE_SELECT': 'single_select',
-    'ITERATION': 'iteration',
-    'MILESTONE': 'milestone',
-    'ASSIGNEES': 'assignees',
-    'LABELS': 'labels',
-    'TRACKED_BY': 'tracked_by',
-    'REPOSITORY': 'repository'
+    TEXT: "text",
+    NUMBER: "number",
+    DATE: "date",
+    SINGLE_SELECT: "single_select",
+    ITERATION: "iteration",
+    MILESTONE: "milestone",
+    ASSIGNEES: "assignees",
+    LABELS: "labels",
+    TRACKED_BY: "tracked_by",
+    REPOSITORY: "repository",
   };
   return mappings[type];
 }

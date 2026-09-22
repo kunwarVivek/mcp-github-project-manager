@@ -129,7 +129,10 @@ function registerSuggestIssueLabels(server: McpServer): void {
       description: "Ask the AI to suggest appropriate labels for a GitHub issue.",
       argsSchema: z.object({
         issueTitle: z.string().describe("The issue's title."),
-        issueDescription: z.string().optional().describe("The issue's description/body, if available."),
+        issueDescription: z
+          .string()
+          .optional()
+          .describe("The issue's description/body, if available."),
       }),
     },
     ({ issueTitle, issueDescription }) => {
@@ -190,7 +193,10 @@ function registerAnalyzeSprintRisk(server: McpServer): void {
       }),
     },
     ({ sprintGoals, issueCount, teamSize }) => {
-      const sanitizedGoals = InputSanitizer.sanitizeText(sprintGoals, InputSanitizer.MAX_ISSUE_CONTENT_LENGTH);
+      const sanitizedGoals = InputSanitizer.sanitizeText(
+        sprintGoals,
+        InputSanitizer.MAX_ISSUE_CONTENT_LENGTH
+      );
       return {
         messages: [
           {
@@ -241,7 +247,10 @@ function registerGenerateReleaseNotes(server: McpServer): void {
       }),
     },
     ({ milestone, includeMetrics }) => {
-      const sanitizedMilestone = InputSanitizer.sanitizeText(milestone, InputSanitizer.MAX_ISSUE_CONTENT_LENGTH);
+      const sanitizedMilestone = InputSanitizer.sanitizeText(
+        milestone,
+        InputSanitizer.MAX_ISSUE_CONTENT_LENGTH
+      );
       const wantsMetrics = includeMetrics === "true";
       return {
         messages: [
@@ -283,11 +292,16 @@ function registerTriageIssue(server: McpServer): void {
       description: "Ask the AI to perform first-pass triage on a new GitHub issue.",
       argsSchema: z.object({
         issueTitle: z.string().describe("The issue's title."),
-        issueDescription: z.string().optional().describe("The issue's description/body, if available."),
+        issueDescription: z
+          .string()
+          .optional()
+          .describe("The issue's description/body, if available."),
         existingLabels: z
           .string()
           .optional()
-          .describe("Comma-separated list of labels already available in the repository, if known."),
+          .describe(
+            "Comma-separated list of labels already available in the repository, if known."
+          ),
       }),
     },
     ({ issueTitle, issueDescription, existingLabels }) => {

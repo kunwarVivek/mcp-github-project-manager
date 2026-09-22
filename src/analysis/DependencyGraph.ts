@@ -1,8 +1,8 @@
-import graphlib from 'graphlib';
-import type { Graph as GraphType } from 'graphlib';
+import graphlib from "graphlib";
+import type { Graph as GraphType } from "graphlib";
 const { Graph, alg } = graphlib;
-import type { AITask, } from '../domain/ai-types';
-import { extractKeywords, checkKeywordDependency } from './KeywordExtractor';
+import type { AITask } from "../domain/ai-types";
+import { extractKeywords, checkKeywordDependency } from "./KeywordExtractor";
 
 /**
  * Detected dependency with confidence
@@ -10,22 +10,22 @@ import { extractKeywords, checkKeywordDependency } from './KeywordExtractor';
 export interface DetectedDependency {
   fromTaskId: string;
   toTaskId: string;
-  type: 'blocks' | 'depends_on' | 'related_to';
+  type: "blocks" | "depends_on" | "related_to";
   confidence: number;
   reasoning: string;
-  isImplicit: boolean;  // true if auto-detected, false if explicit
+  isImplicit: boolean; // true if auto-detected, false if explicit
 }
 
 /**
  * Graph analysis result
  */
 export interface GraphAnalysisResult {
-  executionOrder: string[];      // Topological sort order
-  criticalPath: string[];        // Longest dependency chain
-  parallelGroups: string[][];    // Tasks that can run in parallel
-  cycles: string[][];            // Detected circular dependencies
-  orphanTasks: string[];         // Tasks with no dependencies (entry points)
-  leafTasks: string[];           // Tasks nothing depends on (exit points)
+  executionOrder: string[]; // Topological sort order
+  criticalPath: string[]; // Longest dependency chain
+  parallelGroups: string[][]; // Tasks that can run in parallel
+  cycles: string[][]; // Detected circular dependencies
+  orphanTasks: string[]; // Tasks with no dependencies (entry points)
+  leafTasks: string[]; // Tasks nothing depends on (exit points)
 }
 
 /**
@@ -58,7 +58,7 @@ export class DependencyGraph {
     this.tasks.set(task.id, task);
     this.graph.setNode(task.id, {
       title: task.title,
-      complexity: task.complexity
+      complexity: task.complexity,
     });
 
     // Add explicit dependencies
@@ -66,8 +66,8 @@ export class DependencyGraph {
       this.addDependency(dep.id, task.id, {
         type: dep.type,
         confidence: 1.0,
-        reasoning: dep.description || 'Explicitly defined',
-        isImplicit: false
+        reasoning: dep.description || "Explicitly defined",
+        isImplicit: false,
       });
     }
   }
@@ -95,10 +95,10 @@ export class DependencyGraph {
       this.implicitDependencies.push({
         fromTaskId: fromId,
         toTaskId: toId,
-        type: meta.type as 'blocks' | 'depends_on' | 'related_to',
+        type: meta.type as "blocks" | "depends_on" | "related_to",
         confidence: meta.confidence,
         reasoning: meta.reasoning,
-        isImplicit: true
+        isImplicit: true,
       });
     }
   }
@@ -129,20 +129,20 @@ export class DependencyGraph {
           const dep: DetectedDependency = {
             fromTaskId: taskA.id,
             toTaskId: taskB.id,
-            type: 'depends_on',
+            type: "depends_on",
             confidence: result.confidence,
             reasoning: result.reason,
-            isImplicit: true
+            isImplicit: true,
           };
 
           detected.push(dep);
 
           // Add to graph
           this.addDependency(taskA.id, taskB.id, {
-            type: 'depends_on',
+            type: "depends_on",
             confidence: result.confidence,
             reasoning: result.reason,
-            isImplicit: true
+            isImplicit: true,
           });
         }
       }
@@ -169,7 +169,9 @@ export class DependencyGraph {
   getExecutionOrder(): string[] {
     const cycles = this.detectCycles();
     if (cycles.length > 0) {
-      throw new Error(`Cannot determine execution order: circular dependencies found in ${cycles.length} cycle(s)`);
+      throw new Error(
+        `Cannot determine execution order: circular dependencies found in ${cycles.length} cycle(s)`
+      );
     }
 
     try {
@@ -218,7 +220,7 @@ export class DependencyGraph {
 
     // Find the end of critical path
     let maxDist = 0;
-    let endNode = '';
+    let endNode = "";
     for (const [node, dist] of distances) {
       if (dist > maxDist) {
         maxDist = dist;
@@ -285,18 +287,18 @@ export class DependencyGraph {
    * Get orphan tasks (no predecessors - entry points)
    */
   getOrphanTasks(): string[] {
-    return this.graph.nodes().filter((node: string) =>
-      (this.graph.predecessors(node) || []).length === 0
-    );
+    return this.graph
+      .nodes()
+      .filter((node: string) => (this.graph.predecessors(node) || []).length === 0);
   }
 
   /**
    * Get leaf tasks (no successors - exit points)
    */
   getLeafTasks(): string[] {
-    return this.graph.nodes().filter((node: string) =>
-      (this.graph.successors(node) || []).length === 0
-    );
+    return this.graph
+      .nodes()
+      .filter((node: string) => (this.graph.successors(node) || []).length === 0);
   }
 
   /**
@@ -321,7 +323,7 @@ export class DependencyGraph {
       parallelGroups,
       cycles,
       orphanTasks: this.getOrphanTasks(),
-      leafTasks: this.getLeafTasks()
+      leafTasks: this.getLeafTasks(),
     };
   }
 
@@ -344,7 +346,7 @@ export class DependencyGraph {
       return {
         id,
         label: task?.title || id,
-        complexity: task?.complexity || 1
+        complexity: task?.complexity || 1,
       };
     });
 
@@ -353,8 +355,8 @@ export class DependencyGraph {
       return {
         from: e.v,
         to: e.w,
-        type: edgeData?.type || 'depends_on',
-        confidence: edgeData?.confidence || 1.0
+        type: edgeData?.type || "depends_on",
+        confidence: edgeData?.confidence || 1.0,
       };
     });
 

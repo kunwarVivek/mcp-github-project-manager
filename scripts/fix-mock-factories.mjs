@@ -3,8 +3,8 @@
 // Fix mock factories for AIServiceFactory and GitHubRepositoryFactory
 // These need to provide all methods that the tests expect
 
-import { readFileSync, writeFileSync, readdirSync, statSync } from 'node:fs';
-import { join } from 'node:path';
+import { readFileSync, writeFileSync, readdirSync, statSync } from "node:fs";
+import { join } from "node:path";
 
 function findTestFiles(dir) {
   const results = [];
@@ -12,9 +12,18 @@ function findTestFiles(dir) {
     for (const entry of readdirSync(dir)) {
       const full = join(dir, entry);
       const stat = statSync(full);
-      if (stat.isDirectory() && !entry.startsWith('.') && entry !== 'node_modules' && entry !== 'build') {
+      if (
+        stat.isDirectory() &&
+        !entry.startsWith(".") &&
+        entry !== "node_modules" &&
+        entry !== "build"
+      ) {
         results.push(...findTestFiles(full));
-      } else if (entry.endsWith('.test.ts') || entry.endsWith('.spec.ts') || entry.endsWith('.e2e.ts')) {
+      } else if (
+        entry.endsWith(".test.ts") ||
+        entry.endsWith(".spec.ts") ||
+        entry.endsWith(".e2e.ts")
+      ) {
         results.push(full);
       }
     }
@@ -22,7 +31,7 @@ function findTestFiles(dir) {
   return results;
 }
 
-const files = [...findTestFiles('src/__tests__'), ...findTestFiles('tests')];
+const files = [...findTestFiles("src/__tests__"), ...findTestFiles("tests")];
 let totalFiles = 0;
 
 // AIServiceFactory mock with all methods
@@ -65,7 +74,7 @@ const githubRepoFactoryMock = `vi.mock('$PATH', () => {
 });`;
 
 for (const file of files) {
-  let content = readFileSync(file, 'utf8');
+  let content = readFileSync(file, "utf8");
   const original = content;
 
   // Fix AIServiceFactory mock factories

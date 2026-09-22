@@ -3,8 +3,8 @@ import {
   type ConfidenceConfig,
   type ConfidenceFactors,
   type ConfidenceTier,
-  DEFAULT_CONFIDENCE_CONFIG
-} from '../../domain/ai-types';
+  DEFAULT_CONFIDENCE_CONFIG,
+} from "../../domain/ai-types";
 
 /**
  * Calculate input completeness based on provided context
@@ -67,32 +67,38 @@ export function calculateInputCompleteness(input: {
 /**
  * Calculate confidence tier from score
  */
-export function getConfidenceTier(score: number, config: ConfidenceConfig = DEFAULT_CONFIDENCE_CONFIG): ConfidenceTier {
-  if (score >= config.warningScore) return 'high';
-  if (score >= config.errorThreshold) return 'medium';
-  return 'low';
+export function getConfidenceTier(
+  score: number,
+  config: ConfidenceConfig = DEFAULT_CONFIDENCE_CONFIG
+): ConfidenceTier {
+  if (score >= config.warningScore) return "high";
+  if (score >= config.errorThreshold) return "medium";
+  return "low";
 }
 
 /**
  * Calculate weighted confidence score from factors
  */
-export function calculateWeightedScore(factors: ConfidenceFactors, weights?: {
-  inputCompleteness?: number;
-  aiSelfAssessment?: number;
-  patternMatch?: number;
-}): number {
+export function calculateWeightedScore(
+  factors: ConfidenceFactors,
+  weights?: {
+    inputCompleteness?: number;
+    aiSelfAssessment?: number;
+    patternMatch?: number;
+  }
+): number {
   const w = {
     inputCompleteness: weights?.inputCompleteness ?? 0.3,
     aiSelfAssessment: weights?.aiSelfAssessment ?? 0.4,
-    patternMatch: weights?.patternMatch ?? 0.3
+    patternMatch: weights?.patternMatch ?? 0.3,
   };
 
   const totalWeight = w.inputCompleteness + w.aiSelfAssessment + w.patternMatch;
 
   const weightedSum =
-    (factors.inputCompleteness * w.inputCompleteness) +
-    (factors.aiSelfAssessment * w.aiSelfAssessment) +
-    (factors.patternMatch * w.patternMatch);
+    factors.inputCompleteness * w.inputCompleteness +
+    factors.aiSelfAssessment * w.aiSelfAssessment +
+    factors.patternMatch * w.patternMatch;
 
   return Math.round((weightedSum / totalWeight) * 100);
 }
@@ -110,17 +116,21 @@ export function generateClarifyingQuestions(
   // Questions based on low input completeness
   if (factors.inputCompleteness < 0.5) {
     questions.push(`Can you provide more details about the ${sectionName.toLowerCase()}?`);
-    questions.push(`Are there specific examples or use cases for the ${sectionName.toLowerCase()} you can share?`);
+    questions.push(
+      `Are there specific examples or use cases for the ${sectionName.toLowerCase()} you can share?`
+    );
   }
 
   // Questions based on low pattern match
   if (factors.patternMatch < 0.5) {
-    questions.push(`Does the ${sectionName.toLowerCase()} follow any industry standards or existing patterns?`);
+    questions.push(
+      `Does the ${sectionName.toLowerCase()} follow any industry standards or existing patterns?`
+    );
   }
 
   // Questions from AI's uncertain areas
   if (uncertainAreas && uncertainAreas.length > 0) {
-    uncertainAreas.forEach(area => {
+    uncertainAreas.forEach((area) => {
       questions.push(`Could you clarify: ${area}?`);
     });
   }
@@ -153,27 +163,29 @@ export class ConfidenceScorer {
       context?: string;
       requirements?: string[];
     };
-    aiSelfAssessment: number;  // 0-1 from AI model
+    aiSelfAssessment: number; // 0-1 from AI model
     aiReasoning?: string;
     uncertainAreas?: string[];
     patternMatchScore?: number; // 0-1, optional override
   }): SectionConfidence {
     const inputCompleteness = calculateInputCompleteness(params.inputData);
-    const patternMatch = params.patternMatchScore ?? this.calculatePatternMatch(params.sectionName, params.inputData);
+    const patternMatch =
+      params.patternMatchScore ?? this.calculatePatternMatch(params.sectionName, params.inputData);
 
     const factors: ConfidenceFactors = {
       inputCompleteness,
       aiSelfAssessment: params.aiSelfAssessment,
-      patternMatch
+      patternMatch,
     };
 
     const score = calculateWeightedScore(factors);
     const tier = getConfidenceTier(score, this.config);
     const needsReview = score < this.config.warningScore;
 
-    const clarifyingQuestions = tier === 'low'
-      ? generateClarifyingQuestions(params.sectionName, factors, params.uncertainAreas)
-      : undefined;
+    const clarifyingQuestions =
+      tier === "low"
+        ? generateClarifyingQuestions(params.sectionName, factors, params.uncertainAreas)
+        : undefined;
 
     return {
       sectionId: params.sectionId,
@@ -183,7 +195,7 @@ export class ConfidenceScorer {
       factors,
       reasoning: params.aiReasoning,
       clarifyingQuestions,
-      needsReview
+      needsReview,
     };
   }
 
@@ -191,11 +203,14 @@ export class ConfidenceScorer {
    * Calculate pattern match score based on section type and content
    * Uses simple heuristics; could be enhanced with ML in future
    */
-  private calculatePatternMatch(sectionName: string, inputData: {
-    description?: string;
-    examples?: string[];
-    constraints?: string[];
-  }): number {
+  private calculatePatternMatch(
+    sectionName: string,
+    inputData: {
+      description?: string;
+      examples?: string[];
+      constraints?: string[];
+    }
+  ): number {
     const cacheKey = `${sectionName}:${JSON.stringify(inputData).substring(0, 100)}`;
 
     if (this.patternCache.has(cacheKey)) {
@@ -207,22 +222,28 @@ export class ConfidenceScorer {
     // Check for common PRD section patterns
     const sectionLower = sectionName.toLowerCase();
 
-    if (sectionLower.includes('overview') || sectionLower.includes('description')) {
+    if (sectionLower.includes("overview") || sectionLower.includes("description")) {
       // Good overviews have problem statement, solution, and value prop
       if (inputData.description) {
-        if (inputData.description.includes('problem') || inputData.description.includes('challenge')) score += 0.1;
-        if (inputData.description.includes('solution') || inputData.description.includes('will')) score += 0.1;
-        if (inputData.description.includes('value') || inputData.description.includes('benefit')) score += 0.1;
+        if (
+          inputData.description.includes("problem") ||
+          inputData.description.includes("challenge")
+        )
+          score += 0.1;
+        if (inputData.description.includes("solution") || inputData.description.includes("will"))
+          score += 0.1;
+        if (inputData.description.includes("value") || inputData.description.includes("benefit"))
+          score += 0.1;
       }
     }
 
-    if (sectionLower.includes('feature') || sectionLower.includes('requirement')) {
+    if (sectionLower.includes("feature") || sectionLower.includes("requirement")) {
       // Good features have clear actions and acceptance criteria
       if (inputData.examples && inputData.examples.length > 0) score += 0.15;
       if (inputData.constraints && inputData.constraints.length > 0) score += 0.1;
     }
 
-    if (sectionLower.includes('user') || sectionLower.includes('persona')) {
+    if (sectionLower.includes("user") || sectionLower.includes("persona")) {
       // Good personas have goals and pain points
       if (inputData.description && inputData.description.length > 200) score += 0.2;
     }
@@ -251,25 +272,25 @@ export class ConfidenceScorer {
     if (sections.length === 0) {
       return {
         overallScore: 0,
-        overallTier: 'low',
+        overallTier: "low",
         lowConfidenceSections: [],
         totalSections: 0,
-        sectionsNeedingReview: 0
+        sectionsNeedingReview: 0,
       };
     }
 
     const totalScore = sections.reduce((sum, s) => sum + s.score, 0);
     const overallScore = Math.round(totalScore / sections.length);
     const overallTier = getConfidenceTier(overallScore, this.config);
-    const lowConfidenceSections = sections.filter(s => s.tier === 'low');
-    const sectionsNeedingReview = sections.filter(s => s.needsReview).length;
+    const lowConfidenceSections = sections.filter((s) => s.tier === "low");
+    const sectionsNeedingReview = sections.filter((s) => s.needsReview).length;
 
     return {
       overallScore,
       overallTier,
       lowConfidenceSections,
       totalSections: sections.length,
-      sectionsNeedingReview
+      sectionsNeedingReview,
     };
   }
 
