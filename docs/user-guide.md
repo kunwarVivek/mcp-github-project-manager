@@ -26,7 +26,7 @@ The GitHub Project Manager MCP Server provides a Model Context Protocol (MCP) in
 
 2. Install dependencies:
    ```bash
-   npm install
+   pnpm install
    # or
    pnpm install
    ```

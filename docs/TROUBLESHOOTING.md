@@ -223,13 +223,13 @@ echo "GITHUB_REPO: $GITHUB_REPO"
 2. **If running from source:**
    ```bash
    # Rebuild
-   npm install
+   pnpm install
    pnpm run build
    ```
 
 3. **Check Node.js version:**
    ```bash
-   # Requires Node.js 18+
+   # Requires Node.js 22.12+ (24 is the supported target)
    node --version
    ```
 

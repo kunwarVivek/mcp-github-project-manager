@@ -5,6 +5,9 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 
+# pnpm's content-addressable store, when configured with a local store-dir
+.pnpm-store/
+
 # Build output
 build/
 dist/
@@ -18,9 +21,12 @@ dist/
 *.swo
 
 # Environment variables
-.env
-.env.local
-.env.*.local
+# NOTE: .env.example and .env.test are tracked on purpose - they hold no
+# secrets. Every other .env* file is ignored so a real credential file
+# cannot be committed by accident.
+.env*
+!.env.example
+!.env.test
 
 # Test coverage
 coverage/
@@ -56,3 +62,15 @@ GRAPH_REPORT.md
 *.db
 .beads-credential-key
 .beads/proxieddb/
+
+# Husky's generated hook shims (husky writes its own .gitignore inside
+# .husky/_ — listed here as well so the directory stays untracked even if
+# that file is missing)
+.husky/_
+
+# Local Docker Compose overrides
+docker-compose.override.yml
+
+# NOTE: package-lock.json AND pnpm-lock.yaml are both committed on purpose.
+# The project supports npm and pnpm, and CI builds under both - do not
+# ignore either lockfile.

@@ -13,6 +13,16 @@ const prompt = (question) =>
     rl.question(question, resolve);
   });
 
+/**
+ * The repository is installable with npm or pnpm — both lockfiles are
+ * maintained and this script must use whichever package manager the caller
+ * invoked, so that `version` updates the matching lockfile and `publish`
+ * ships the right tree.
+ */
+const isPnpm = /pnpm/i.test(process.env.npm_config_user_agent ?? "");
+const pm = isPnpm ? "pnpm" : "npm";
+const pmRun = isPnpm ? "pnpm run" : "npm run";
+
 async function runPublish() {
   try {
     // Check for uncommitted changes
@@ -27,7 +37,7 @@ async function runPublish() {
 
     // Run tests
     console.log("🧪 Running tests...");
-    execSync("npm test", { stdio: "inherit" });
+    execSync(`${pm} test`, { stdio: "inherit" });
 
     // Read current package version
     const packageJson = JSON.parse(fs.readFileSync("./package.json", "utf8"));
@@ -45,7 +55,7 @@ async function runPublish() {
 
     // Update version
     console.log(`🔖 Updating to a new ${versionType} version...`);
-    execSync(`npm version ${versionType} --no-git-tag-version`, { stdio: "inherit" });
+    execSync(`${pm} version ${versionType} --no-git-tag-version`, { stdio: "inherit" });
 
     // Read new version
     const updatedPackageJson = JSON.parse(fs.readFileSync("./package.json", "utf8"));
@@ -53,7 +63,7 @@ async function runPublish() {
 
     // Build package
     console.log("🔨 Building package...");
-    execSync("npm run build", { stdio: "inherit" });
+    execSync(`${pmRun} build`, { stdio: "inherit" });
 
     // Confirm publishing
     const confirm = await prompt(`Are you sure you want to publish version ${newVersion}? (y/n): `);
@@ -62,35 +72,27 @@ async function runPublish() {
       process.exit(0);
     }
 
-    // Publish to npm
-    console.log("🚀 Publishing to npm...");
-    execSync("npm publish", { stdio: "inherit" });
-
-    // Create Git tag and push
+    // Create Git tag and push. Publishing is deliberately NOT done here:
+    // the tag push triggers .github/workflows/release.yml, which builds,
+    // tests, publishes to npm and creates the GitHub release. Publishing
+    // here as well would make the workflow publish the same version twice
+    // (npm rejects re-publishing an existing version).
     console.log("📌 Creating git tag and pushing...");
-    execSync(`git add package.json package-lock.json`);
+    execSync(`git add package.json ${isPnpm ? "pnpm-lock.yaml" : "package-lock.json"}`);
     execSync(`git commit -m "release: v${newVersion}"`);
     execSync(`git tag v${newVersion}`);
     execSync("git push");
     execSync("git push --tags");
 
-    // Create GitHub Release
-    console.log("📋 Creating GitHub release...");
-    try {
-      const releaseNotes = `## v${newVersion}\n\nSee [CHANGELOG.md](https://github.com/kunwarVivek/mcp-github-project-manager/blob/main/CHANGELOG.md) for details.\n\n📦 **npm:** \`npm install mcp-github-project-manager@${newVersion}\``;
-      execSync(
-        `gh release create v${newVersion} --title "v${newVersion}" --notes "${releaseNotes}"`,
-        { stdio: "inherit" }
-      );
-      console.log("✅ GitHub release created!");
-    } catch (error) {
-      console.log(
-        "⚠️  GitHub release creation failed (gh CLI may not be installed). Create manually at:"
-      );
-      console.log(
-        `   https://github.com/kunwarVivek/mcp-github-project-manager/releases/new?tag=v${newVersion}`
-      );
-    }
+    console.log(`\n✅ v${newVersion} tagged and pushed.`);
+    console.log("   The 'Release' GitHub Actions workflow now builds, tests, publishes to npm");
+    console.log("   and creates the GitHub release. Watch it here:");
+    console.log(
+      `   https://github.com/kunwarVivek/mcp-github-project-manager/actions/workflows/release.yml`
+    );
+    console.log(
+      `   Release page: https://github.com/kunwarVivek/mcp-github-project-manager/releases/tag/v${newVersion}`
+    );
 
     console.log(`\n✅ Successfully published version ${newVersion}!`);
     console.log(`   npm: https://www.npmjs.com/package/mcp-github-project-manager`);

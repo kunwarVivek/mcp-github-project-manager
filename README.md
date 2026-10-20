@@ -219,9 +219,7 @@ npm install mcp-github-project-manager
 git clone https://github.com/kunwarVivek/mcp-github-project-manager.git
 cd mcp-github-project-manager
 
-# Install dependencies
-npm install
-# or
+# Install dependencies (npm or pnpm - use whichever you have)
 pnpm install
 
 # Build the project

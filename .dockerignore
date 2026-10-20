@@ -4,8 +4,12 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
+.pnpm-store/
 
-# Build output - already built in container
+# Build output - the image builds its own inside the container
+build/
+dist/
+*.tsbuildinfo
 
 # Test and coverage
 coverage/
@@ -36,11 +40,8 @@ thoughts/
 *.swp
 *.swo
 
-# Environment (will be provided at runtime)
-.env
-.env.local
-.env.*.local
-.env.test
+# Environment (provided at runtime, never baked into the image)
+.env*
 
 # Documentation (not needed in container)
 docs/
@@ -70,3 +71,13 @@ biome.json
 .husky/
 AGENTS.md
 CLAUDE.md
+.node-version
+tsconfig.typecheck.json
+
+# Local Docker Compose override
+docker-compose.override.yml
+
+# NOTE: package-lock.json and pnpm-lock.yaml are intentionally NOT ignored -
+# the image installs from package-lock.json, and the pnpm lockfile is kept
+# in the context so the Dockerfile can be switched to pnpm without touching
+# this file.

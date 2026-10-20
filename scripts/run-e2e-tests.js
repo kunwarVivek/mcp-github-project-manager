@@ -66,7 +66,10 @@ function checkEnvironment() {
   const buildPath = path.join(process.cwd(), "build", "index.js");
   if (!existsSync(buildPath)) {
     console.log(
-      colorize('⚠️  Build not found. Run with --build flag or run "npm run build" first.', "yellow")
+      colorize(
+        '⚠️  Build not found. Run with --build flag or run "npm run build" / "pnpm run build" first.',
+        "yellow"
+      )
     );
     return false;
   }
@@ -118,8 +121,9 @@ async function runCommand(command, args, options = {}) {
 
 async function buildProject() {
   console.log(colorize("\n🔨 Building project...", "yellow"));
+  const pm = /pnpm/i.test(process.env.npm_config_user_agent ?? "") ? "pnpm" : "npm";
   try {
-    await runCommand("npm", ["run", "build"]);
+    await runCommand(pm, ["run", "build"]);
     console.log(colorize("✅ Build completed successfully.", "green"));
   } catch (error) {
     console.error(colorize("❌ Build failed:", "red"), error.message);

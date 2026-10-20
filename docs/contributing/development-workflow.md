@@ -287,7 +287,7 @@ Solution: Run `pnpm run build` to compile the TypeScript code.
 Error: Cannot find module '@modelcontextprotocol/sdk'
 ```
 
-Solution: Run `npm install` to ensure all dependencies are installed.
+Solution: Run `pnpm install` to ensure all dependencies are installed.
 
 #### TypeScript Errors
 

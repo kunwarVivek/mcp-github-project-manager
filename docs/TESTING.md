@@ -133,7 +133,7 @@ src/__tests__/
 
 ### For All Tests
 - Node.js 22+
-- `npm install` completed
+- `pnpm install` completed
 - `pnpm run build` completed (for E2E tests that spawn server)
 
 ### For E2E Tests (stdio transport)

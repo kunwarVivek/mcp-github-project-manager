@@ -53,13 +53,74 @@ If you have a suggestion for a new feature or enhancement:
 git clone https://github.com/your-username/github-project-manager-mcp.git
 
 # Install dependencies
-npm install
+pnpm install        # or: npm install
 
 # Build the project
-pnpm run build
+pnpm run build      # or: npm run build
 
 # Run tests
-pnpm test
+pnpm test           # or: npm test
+```
+
+### Package manager
+
+**Use whichever you already have** — the project supports both, and every
+script in `package.json` is package-manager agnostic.
+
+| | npm | pnpm |
+|---|---|---|
+| Install | `npm install` | `pnpm install` |
+| Reproducible install | `npm ci` | `pnpm install --frozen-lockfile` |
+| Run a script | `npm run <script>` | `pnpm run <script>` |
+| Lockfile | `package-lock.json` | `pnpm-lock.yaml` |
+
+Both lockfiles are committed and must stay in sync. When you change
+dependencies, update both:
+
+```bash
+npm install --package-lock-only   # refresh package-lock.json
+pnpm import                       # regenerate pnpm-lock.yaml from it
+```
+
+Requirements: **Node 24** (the supported target — see `.node-version`; the
+floor is 22.12) and pnpm **>= 10** if you use pnpm. The package manager is
+deliberately *not* pinned in `package.json`, so nobody is forced onto a
+particular version.
+
+### Releasing
+
+The GitHub Actions workflows are the single publisher — nothing publishes to
+npm outside CI, so a version can never be published twice.
+
+**Bump the version from GitHub (recommended)**
+
+1. Go to **Actions → Bump Version → Run workflow**
+2. Choose `patch` / `minor` / `major`
+3. The workflow bumps `package.json` + `package-lock.json`, moves the
+   `[Unreleased]` CHANGELOG body into the new version section, commits, tags
+   `vX.Y.Z` and pushes
+4. Pushing the tag triggers the **Release** workflow, which verifies the tag
+   matches `package.json`, builds, typechecks, tests, publishes to npm
+   (with provenance) and creates the GitHub release
+
+**Bump the version locally**
+
+```bash
+npm run release      # or: pnpm run release
+```
+
+Runs the tests, asks for `patch`/`minor`/`major`, bumps the version, builds,
+commits, tags and pushes. The pushed tag then triggers the same **Release**
+workflow — do **not** run `npm publish` yourself, the workflow does it (and
+skips publishing if that version is already on the registry).
+
+**Build only**
+
+```bash
+npm run build        # tsc → postbuild (fix .js extensions) → chmod
+npm run typecheck    # src + examples, then src + tests
+npm run lint         # Biome; must exit 0
+npm test             # Vitest
 ```
 
 ### Styleguides

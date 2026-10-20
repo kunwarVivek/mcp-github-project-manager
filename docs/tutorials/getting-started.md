@@ -6,7 +6,7 @@ This tutorial will guide you through the process of setting up and using the Git
 
 Before you begin, make sure you have:
 
-- Node.js 18.x or higher installed
+- Node.js 22.12+ (24 recommended)
 - A GitHub account with appropriate permissions
 - A GitHub Personal Access Token with required scopes:
   - `repo` (Full repository access)
@@ -24,7 +24,7 @@ npm install -g mcp-github-project-manager
 # Or clone the repository for development
 git clone https://github.com/kunwarVivek/mcp-github-project-manager.git
 cd mcp-github-project-manager
-npm install
+pnpm install
 
 # Create environment configuration
 cp .env.example .env

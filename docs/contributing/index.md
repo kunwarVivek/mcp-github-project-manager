@@ -21,7 +21,7 @@ This project adheres to a Code of Conduct that all contributors are expected to 
 
 ### Prerequisites
 
-- Node.js 18.x or higher
+- Node.js 22.12+ (24 recommended)
 - npm or pnpm
 - Git
 - A GitHub account
@@ -40,8 +40,6 @@ This project adheres to a Code of Conduct that all contributors are expected to 
    ```
 4. Install dependencies:
    ```bash
-   npm install
-   # or
    pnpm install
    ```
 5. Create a `.env` file with your GitHub credentials:

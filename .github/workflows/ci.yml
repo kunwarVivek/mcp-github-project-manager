@@ -12,34 +12,51 @@ jobs:
 
     strategy:
       matrix:
-        # vitest 5 supports ^22.12.0 || ^24.0.0 || >=26.0.0 and `ai` 7 requires
-        # node >=22. 22.x is the declared engines floor, 24.x is the active
-        # LTS, 26.x is the current line — test all three.
-        node-version: [22.x, 24.x, 26.x]
+        # Node 24 is the supported target (see .node-version). 22.x is the
+        # declared engines floor and is tested so the floor stays honest;
+        # vitest 5 supports ^22.12.0 || ^24.0.0, ai 7 requires node >=22.
+        node-version: [22.x, 24.x]
+        # The repo is installable with npm or pnpm and both lockfiles are
+        # maintained. Testing both is what catches a dependency that only
+        # resolves under one of them - e.g. a package imported directly but
+        # only present as a hoisted transitive dependency under npm.
+        package-manager: [npm, pnpm]
+
+    name: Node ${{ matrix.node-version }} / ${{ matrix.package-manager }}
 
     steps:
       - uses: actions/checkout@v4
 
       - name: Install pnpm
+        if: matrix.package-manager == 'pnpm'
         uses: pnpm/action-setup@v4
+        with:
+          # pnpm is deliberately not pinned in package.json (public repo -
+          # contributors may use any pnpm >= 10). CI pins its own version.
+          version: 12
 
       - name: Use Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
-          cache: 'pnpm'
+          cache: ${{ matrix.package-manager == 'pnpm' && 'pnpm' || 'npm' }}
 
-      - name: Install dependencies
+      - name: Install dependencies (npm)
+        if: matrix.package-manager == 'npm'
+        run: npm ci
+
+      - name: Install dependencies (pnpm)
+        if: matrix.package-manager == 'pnpm'
         run: pnpm install --frozen-lockfile
 
       - name: Build
-        run: pnpm run build
+        run: ${{ matrix.package-manager }} run build
 
       - name: Typecheck
-        run: pnpm run typecheck
+        run: ${{ matrix.package-manager }} run typecheck
 
       - name: Run tests
-        run: pnpm test
+        run: ${{ matrix.package-manager }} test
 
   lint:
     runs-on: ubuntu-latest
@@ -49,8 +66,10 @@ jobs:
 
       - name: Install pnpm
         uses: pnpm/action-setup@v4
+        with:
+          version: 12
 
-      - name: Use Node.js '22.x'
+      - name: Use Node.js '24.x'
         uses: actions/setup-node@v4
         with:
           node-version: '24.x'

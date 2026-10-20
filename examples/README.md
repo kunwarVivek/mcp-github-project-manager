@@ -37,7 +37,7 @@ This directory contains example code demonstrating how to use the MCP GitHub Pro
 
 ### Prerequisites
 
-1. Node.js 18.x or higher
+1. Node.js 22.12+ (24 recommended)
 2. TypeScript installed (`pnpm install` (provides tsx))
 3. MCP GitHub Project Manager installed (`npm install mcp-github-project-manager`)
 4. Valid GitHub token with appropriate permissions

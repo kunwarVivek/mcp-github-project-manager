@@ -12,7 +12,6 @@
   "engines": {
     "node": ">=22.12.0"
   },
-  "packageManager": "pnpm@12.14.0",
   "keywords": [
     "mcp",
     "mcp-server",
@@ -88,18 +87,18 @@
     "test:ai:watch": "vitest ai-services ai-tools",
     "test:ai:coverage": "vitest run ai-services ai-tools --coverage",
     "test:core": "vitest run --exclude='**/tests/ai-services/**' --exclude='**/tests/ai-tools/**'",
-    "test:all": "pnpm run test && pnpm run test:e2e:tools",
-    "test:all:real": "pnpm run test && pnpm run test:e2e:tools:real",
+    "test:all": "vitest run && vitest run tools",
+    "test:all:real": "vitest run && E2E_REAL_API=true vitest run tools",
     "test:e2e:runner": "node scripts/run-e2e-tests.js",
     "lint": "biome check .",
     "format": "biome format --write .",
     "prepare": "husky",
     "docs:api": "tsx scripts/generate-openapi.ts",
-    "docs:serve": "pnpm dlx http-server docs -o api-explorer.html",
+    "docs:serve": "npx --yes http-server docs -o api-explorer.html",
     "examples": "tsx examples/basic/create-simple-project.ts",
-    "prepublishOnly": "pnpm run build",
+    "prepublishOnly": "npm run build",
     "release": "node scripts/publish.js",
-    "inspect": "pnpm dlx @modelcontextprotocol/inspector node build/index.js",
+    "inspect": "npx --yes @modelcontextprotocol/inspector node build/index.js",
     "lint:fix": "biome check --write ."
   },
   "dependencies": {
@@ -139,10 +138,11 @@
     "@vitest/coverage-v8": "^5.0.5",
     "chalk": "^6.0.1",
     "husky": "^9.1.7",
-    "nock": "^15.0.4",
+    "nock": "^15.0.5",
     "rimraf": "^6.1.3",
     "tsx": "^4.23.15",
     "typescript": "^7.0.2",
+    "vite": "^8.3.4",
     "vitest": "^5.0.5"
   }
 }

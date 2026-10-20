@@ -11,6 +11,13 @@ import { execSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import chalk from "chalk";
 
+/**
+ * The repository is installable with npm or pnpm. Run the matching package
+ * manager so the script works for whoever invokes it.
+ */
+const PM = /pnpm/i.test(process.env.npm_config_user_agent ?? "") ? "pnpm" : "npm";
+const PM_TEST = `${PM} test`;
+
 const REQUIRED_ENV_VARS = {
   github: ["GITHUB_TOKEN", "GITHUB_OWNER", "GITHUB_REPO"],
   ai: ["ANTHROPIC_API_KEY", "OPENAI_API_KEY", "GOOGLE_API_KEY"],
@@ -69,7 +76,7 @@ class TestValidator {
     this.log("Running unit tests...", "info");
 
     try {
-      const output = execSync('pnpm test --testPathPattern="unit" --passWithNoTests --verbose', {
+      const output = execSync(`${PM_TEST} unit --passWithNoTests --verbose`, {
         encoding: "utf8",
         stdio: "pipe",
       });
@@ -108,13 +115,10 @@ class TestValidator {
     }
 
     try {
-      const output = execSync(
-        'pnpm test --testPathPattern="e2e" --passWithNoTests --verbose --testTimeout=30000',
-        {
-          encoding: "utf8",
-          stdio: "pipe",
-        }
-      );
+      const output = execSync(`${PM_TEST} e2e --passWithNoTests --verbose --testTimeout=30000`, {
+        encoding: "utf8",
+        stdio: "pipe",
+      });
 
       // Parse results
       const lines = output.split("\n");

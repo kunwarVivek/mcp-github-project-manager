@@ -13,7 +13,7 @@ npm install -g mcp-github-project-manager
 ```bash
 git clone https://github.com/kunwarVivek/mcp-github-project-manager.git
 cd mcp-github-project-manager
-npm install
+pnpm install
 pnpm run build
 ```
 
