@@ -1,9 +1,9 @@
 import {
-  type Resource,
-  ResourceType,
-  RelationshipType,
   type Relationship,
+  RelationshipType,
+  type Resource,
   ResourceStatus,
+  ResourceType,
 } from "../../domain/resource-types";
 import type { ResourceCache } from "../cache/ResourceCache";
 

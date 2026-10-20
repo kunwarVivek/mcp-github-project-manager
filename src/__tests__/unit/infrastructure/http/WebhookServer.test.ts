@@ -1,9 +1,9 @@
-import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import { EventEmitter } from "node:events";
-import { WebhookServer } from "../../../../infrastructure/http/WebhookServer";
-import type { GitHubWebhookHandler } from "../../../../infrastructure/events/GitHubWebhookHandler";
-import type { EventSubscriptionManager } from "../../../../infrastructure/events/EventSubscriptionManager";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { EventStore } from "../../../../infrastructure/events/EventStore";
+import type { EventSubscriptionManager } from "../../../../infrastructure/events/EventSubscriptionManager";
+import type { GitHubWebhookHandler } from "../../../../infrastructure/events/GitHubWebhookHandler";
+import { WebhookServer } from "../../../../infrastructure/http/WebhookServer";
 import type { ILogger } from "../../../../infrastructure/logger/index";
 import type { SecurityAuditLog } from "../../../../infrastructure/observability/SecurityAuditLog";
 

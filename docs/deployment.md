@@ -14,7 +14,7 @@ npm install -g mcp-github-project-manager
 git clone https://github.com/kunwarVivek/mcp-github-project-manager.git
 cd mcp-github-project-manager
 npm install
-npm run build
+pnpm run build
 ```
 
 ### Docker
@@ -147,7 +147,7 @@ GitHub API has rate limits:
 curl -H "Authorization: token YOUR_TOKEN" https://api.github.com/user
 
 # Verify MCP server starts
-npx mcp-github-project-manager --help
+pnpm dlx mcp-github-project-manager --help
 ```
 
 ### Permission Errors

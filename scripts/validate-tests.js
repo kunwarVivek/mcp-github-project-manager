@@ -212,7 +212,9 @@ class TestValidator {
     // Errors
     if (this.errors.length > 0) {
       this.log(`\nErrors:`, "error");
-      this.errors.forEach((error) => this.log(`  - ${error}`, "error"));
+      this.errors.forEach((error) => {
+        this.log(`  - ${error}`, "error");
+      });
     }
 
     // Final Status

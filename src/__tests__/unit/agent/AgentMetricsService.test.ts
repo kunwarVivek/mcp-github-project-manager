@@ -1,13 +1,13 @@
-import { beforeEach, describe, expect, it, vi, type Mocked, type Mock } from "vitest";
-import { AgentMetricsService } from "../../../services/agent/AgentMetricsService";
-import type { GitHubRepositoryFactory } from "../../../infrastructure/github/GitHubRepositoryFactory";
-import type { AgentStore } from "../../../infrastructure/agent/AgentStore";
-import type { WorkProductStore } from "../../../infrastructure/agent/WorkProductStore";
+import { beforeEach, describe, expect, it, type Mock, type Mocked, vi } from "vitest";
 import {
-  WORK_PRODUCT_MARKER,
   type Agent,
+  WORK_PRODUCT_MARKER,
   type WorkProduct,
 } from "../../../domain/agent-orchestration-types";
+import type { AgentStore } from "../../../infrastructure/agent/AgentStore";
+import type { WorkProductStore } from "../../../infrastructure/agent/WorkProductStore";
+import type { GitHubRepositoryFactory } from "../../../infrastructure/github/GitHubRepositoryFactory";
+import { AgentMetricsService } from "../../../services/agent/AgentMetricsService";
 
 function workProductComment(
   product: WorkProduct,

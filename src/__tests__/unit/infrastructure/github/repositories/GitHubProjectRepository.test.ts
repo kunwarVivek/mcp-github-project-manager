@@ -1,8 +1,9 @@
 // filepath: /Users/vivek/grad-saas/mcp-github-project-manager/src/__tests__/unit/infrastructure/github/repositories/GitHubProjectRepository.test.ts
-import { beforeEach, describe, expect, it, vi, type Mocked, type MockedClass } from "vitest";
+
 import { Octokit } from "@octokit/rest";
-import type { CreateProject } from "../../../../../domain/types";
+import { beforeEach, describe, expect, it, type Mocked, type MockedClass, vi } from "vitest";
 import { ResourceStatus } from "../../../../../domain/resource-types";
+import type { CreateProject } from "../../../../../domain/types";
 import { GitHubConfig } from "../../../../../infrastructure/github/GitHubConfig";
 import { GitHubProjectRepository } from "../../../../../infrastructure/github/repositories/GitHubProjectRepository";
 

@@ -12,11 +12,11 @@
  * Usage:
  * 1. Set environment variables (see .env.example)
  * 2. Update the issueIds array with your actual issue IDs
- * 3. Run: ts-node examples/basic/plan-sprint.ts
+ * 3. Run: pnpm exec tsx examples/basic/plan-sprint.ts
  */
 
 import dotenv from "dotenv";
-import { ProjectManagementService } from "../../src/services/ProjectManagementService.js";
+import { createProjectManagementService } from "../../src/container.js";
 
 // Load environment variables
 dotenv.config();
@@ -33,7 +33,7 @@ for (const envVar of requiredEnvVars) {
 async function planSprint() {
   try {
     // Initialize the service
-    const service = new ProjectManagementService(
+    const service = createProjectManagementService(
       process.env.GITHUB_OWNER ?? "",
       process.env.GITHUB_REPO ?? "",
       process.env.GITHUB_TOKEN ?? ""
@@ -55,6 +55,7 @@ async function planSprint() {
     const result = await service.planSprint({
       sprint: {
         title: "Sprint 1: Project Setup",
+        description: "Complete the initial project setup and implement core functionality",
         startDate: startDate.toISOString(),
         endDate: endDate.toISOString(),
         goals: ["Complete initial project setup", "Implement core functionality"],
@@ -67,7 +68,7 @@ async function planSprint() {
     console.log("Sprint Title:", result.title);
     console.log("Sprint Start:", new Date(result.startDate).toLocaleDateString());
     console.log("Sprint End:", new Date(result.endDate).toLocaleDateString());
-    console.log("Sprint Goals:", result.goals);
+    console.log("Sprint Description:", result.description);
     console.log("Issues:", result.issues);
 
     // Print detailed information
@@ -79,9 +80,9 @@ async function planSprint() {
     process.stderr.write("Error planning sprint:");
     if (error instanceof Error) {
       process.stderr.write(`${error.name}: ${error.message}`);
-      process.stderr.write(error.stack);
+      process.stderr.write(error.stack ?? "");
     } else {
-      process.stderr.write(error);
+      process.stderr.write(String(error));
     }
     process.exit(1);
   }

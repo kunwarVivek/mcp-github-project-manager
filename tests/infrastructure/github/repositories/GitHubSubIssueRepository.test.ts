@@ -1,4 +1,5 @@
 import { vi } from "vitest";
+
 /**
  * Unit tests for GitHubSubIssueRepository
  *
@@ -10,9 +11,9 @@ import { vi } from "vitest";
  * - removeSubIssue: Remove sub-issue relationship
  */
 
-import { GitHubSubIssueRepository } from "../../../../src/infrastructure/github/repositories/GitHubSubIssueRepository.js";
-import { GitHubConfig } from "../../../../src/infrastructure/github/GitHubConfig.js";
 import type { Octokit } from "@octokit/rest";
+import { GitHubConfig } from "../../../../src/infrastructure/github/GitHubConfig.js";
+import { GitHubSubIssueRepository } from "../../../../src/infrastructure/github/repositories/GitHubSubIssueRepository.js";
 
 // Mock Octokit graphql method
 const mockGraphql = vi.fn();

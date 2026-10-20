@@ -8,155 +8,142 @@
  */
 
 import { createProjectManagementService } from "../../../container";
-import { GITHUB_TOKEN, GITHUB_OWNER, GITHUB_REPO, CACHE_DIRECTORY } from "../../../env";
-import { createGitHubFactory } from "../tool-factory";
-import { ProjectFieldSetup } from "../../agent/ProjectFieldSetup";
+import { CACHE_DIRECTORY, GITHUB_OWNER, GITHUB_REPO, GITHUB_TOKEN } from "../../../env";
 import type { ProjectManagementService } from "../../../services/ProjectManagementService";
+import { ProjectFieldSetup } from "../../agent/ProjectFieldSetup";
 import { Logger } from "../../logger";
+import { createGitHubFactory } from "../tool-factory";
 
 const logger = Logger.getInstance();
 
-// Standalone executors — project lifecycle & advanced
-import {
-  executeCloseProject,
-  executeReopenProject,
-  executeConvertDraftIssue,
-} from "../project-lifecycle-tools";
-import {
-  executeUpdateItemPosition,
-  executeSearchIssuesAdvanced,
-  executeFilterProjectItems,
-} from "../project-advanced-tools";
-
-// Standalone executors — sub-issues
-import {
-  executeAddSubIssue,
-  executeListSubIssues,
-  executeGetParentIssue,
-  executeReprioritizeSubIssue,
-  executeRemoveSubIssue,
-} from "../sub-issue-tools";
-
-// Standalone executors — templates & linking
-import {
-  executeMarkProjectAsTemplate,
-  executeUnmarkProjectAsTemplate,
-  executeCopyProjectFromTemplate,
-  executeListOrganizationTemplates,
-} from "../project-template-tools";
-import {
-  executeLinkProjectToRepository,
-  executeUnlinkProjectFromRepository,
-  executeLinkProjectToTeam,
-  executeUnlinkProjectFromTeam,
-  executeListLinkedRepositories,
-  executeListLinkedTeams,
-} from "../project-linking-tools";
-
-// Standalone executors — status updates
-import {
-  executeCreateStatusUpdate,
-  executeListStatusUpdates,
-  executeGetStatusUpdate,
-} from "../status-update-tools";
-
-// Standalone executors — AI generation
-import { executeGeneratePRD } from "../ai-tasks/GeneratePRDTool";
-import { executeEnhancePRD } from "../ai-tasks/EnhancePRDTool";
-import { executeParsePRD } from "../ai-tasks/ParsePRDTool";
-import { executeAddFeature } from "../ai-tasks/AddFeatureTool";
-import { executeGetNextTask } from "../ai-tasks/GetNextTaskTool";
-import { executeAnalyzeTaskComplexity } from "../ai-tasks/AnalyzeTaskComplexityTool";
-import { executeExpandTask } from "../ai-tasks/ExpandTaskTool";
-import { executeCreateTraceabilityMatrix } from "../ai-tasks/CreateTraceabilityMatrixTool";
-
-// Standalone executors — sprint AI
-import {
-  executeCalculateSprintCapacity,
-  executePrioritizeBacklog,
-  executeAssessSprintRisk,
-  executeSuggestSprintComposition,
-} from "../sprint-ai-tools";
-
-// Standalone executors — roadmap AI
-import { executeGenerateRoadmap, executeGenerateRoadmapVisualization } from "../roadmap-ai-tools";
-
-// Standalone executors — issue intelligence
-import {
-  executeSuggestLabels,
-  executeDetectDuplicates,
-  executeFindRelatedIssues,
-} from "../issue-intelligence-tools";
-
-// Standalone executors — agent orchestration
-import {
-  executeRegisterAgent,
-  executeListAgents,
-  executeDeregisterAgent,
-  executeCheckoutTask,
-  executeReleaseTask,
-  executeCompleteTask,
-  executeGetTaskContext,
-  executeAgentHeartbeat,
-  executeSubmitWorkProduct,
-  executeGetAgentActivity,
-  executeGetBudgetStatus,
-  executeSetAgentBudget,
-  executeCheckWorkStatus,
-  executeRecordUsage,
-  executeGetAgentMetrics,
-  executeSubmitForReview,
-  executeApproveTask,
-  executeRejectTask,
-  executeReclaimStaleTasks,
-} from "../agent-orchestration-tools";
-
-// PM coordination services
-import { AgentStore } from "../../agent/AgentStore";
-import { WorkProductStore } from "../../agent/WorkProductStore";
+import type { BudgetStatus } from "../../../domain/agent-orchestration-types";
 import { AgentBudgetService } from "../../../services/agent/AgentBudgetService";
 import { AgentContextService } from "../../../services/agent/AgentContextService";
 import { TaskCheckoutService } from "../../../services/agent/TaskCheckoutService";
-
-// Standalone executors — health
-import { executeHealthCheck } from "../health-tools";
-
 // Services for server-bound handler replication (enrich/triage/events)
 import { AIServiceFactory } from "../../../services/ai/AIServiceFactory";
 import { IssueEnrichmentService } from "../../../services/IssueEnrichmentService";
 import { IssueTriagingService } from "../../../services/IssueTriagingService";
-import { EventSubscriptionManager } from "../../events/EventSubscriptionManager";
+// PM coordination services
+import { AgentStore } from "../../agent/AgentStore";
+import { WorkProductStore } from "../../agent/WorkProductStore";
 import { EventStore } from "../../events/EventStore";
-
-// Type imports for compound args
-import type {
-  ManageProjectArgs,
-  ManageIssuesArgs,
-  ManagePrsArgs,
-  ManageMilestonesArgs,
-  ManageSprintsArgs,
-  ManageLabelsArgs,
-  ManageAutomationArgs,
-  ManageIterationsArgs,
-  ManageEventsArgs,
-  ManageStatusUpdatesArgs,
-  AiGenerateArgs,
-  AiAnalyzeArgs,
-  AiPlanArgs,
-  AgentWorkArgs,
-  AgentManageArgs,
-  SystemArgs,
-  DiscoverToolsArgs,
-} from "./compound-schemas";
-
+import { EventSubscriptionManager } from "../../events/EventSubscriptionManager";
+// Standalone executors — agent orchestration
+import {
+  executeAgentHeartbeat,
+  executeApproveTask,
+  executeCheckoutTask,
+  executeCheckWorkStatus,
+  executeCompleteTask,
+  executeDeregisterAgent,
+  executeGetAgentActivity,
+  executeGetAgentMetrics,
+  executeGetBudgetStatus,
+  executeGetTaskContext,
+  executeListAgents,
+  executeReclaimStaleTasks,
+  executeRecordUsage,
+  executeRegisterAgent,
+  executeRejectTask,
+  executeReleaseTask,
+  executeSetAgentBudget,
+  executeSubmitForReview,
+  executeSubmitWorkProduct,
+} from "../agent-orchestration-tools";
+import { executeAddFeature } from "../ai-tasks/AddFeatureTool";
+import { executeAnalyzeTaskComplexity } from "../ai-tasks/AnalyzeTaskComplexityTool";
+import { executeCreateTraceabilityMatrix } from "../ai-tasks/CreateTraceabilityMatrixTool";
+import { executeEnhancePRD } from "../ai-tasks/EnhancePRDTool";
+import { executeExpandTask } from "../ai-tasks/ExpandTaskTool";
+// Standalone executors — AI generation
+import { executeGeneratePRD } from "../ai-tasks/GeneratePRDTool";
+import { executeGetNextTask } from "../ai-tasks/GetNextTaskTool";
+import { executeParsePRD } from "../ai-tasks/ParsePRDTool";
+// Standalone executors — health
+import { executeHealthCheck } from "../health-tools";
+// Standalone executors — issue intelligence
+import {
+  executeDetectDuplicates,
+  executeEnrichIssue,
+  executeFindRelatedIssues,
+  executeSuggestLabels,
+} from "../issue-intelligence-tools";
+import {
+  executeFilterProjectItems,
+  executeSearchIssuesAdvanced,
+  executeUpdateItemPosition,
+} from "../project-advanced-tools";
+// Standalone executors — project lifecycle & advanced
+import {
+  executeCloseProject,
+  executeConvertDraftIssue,
+  executeReopenProject,
+} from "../project-lifecycle-tools";
+import {
+  executeLinkProjectToRepository,
+  executeLinkProjectToTeam,
+  executeListLinkedRepositories,
+  executeListLinkedTeams,
+  executeUnlinkProjectFromRepository,
+  executeUnlinkProjectFromTeam,
+} from "../project-linking-tools";
+// Standalone executors — templates & linking
+import {
+  executeCopyProjectFromTemplate,
+  executeListOrganizationTemplates,
+  executeMarkProjectAsTemplate,
+  executeUnmarkProjectAsTemplate,
+} from "../project-template-tools";
+// Standalone executors — roadmap AI
+import { executeGenerateRoadmap, executeGenerateRoadmapVisualization } from "../roadmap-ai-tools";
 // Type import — branch protection compound tool (schema lives in ../schemas)
 import type { ManageBranchesArgs } from "../schemas/branch-protection-schemas";
-
 // Type import — releases compound tool (schema lives in ../schemas)
 import type { ManageReleasesArgs } from "../schemas/release-schemas";
-
 // Type import — workflow compound tool (schema lives in ../schemas)
 import type { ManageWorkflowsArgs } from "../schemas/workflow-schemas";
+// Standalone executors — sprint AI
+import {
+  executeAssessSprintRisk,
+  executeCalculateSprintCapacity,
+  executePrioritizeBacklog,
+  executeSuggestSprintComposition,
+} from "../sprint-ai-tools";
+// Standalone executors — status updates
+import {
+  executeCreateStatusUpdate,
+  executeGetStatusUpdate,
+  executeListStatusUpdates,
+} from "../status-update-tools";
+// Standalone executors — sub-issues
+import {
+  executeAddSubIssue,
+  executeGetParentIssue,
+  executeListSubIssues,
+  executeRemoveSubIssue,
+  executeReprioritizeSubIssue,
+} from "../sub-issue-tools";
+// Type imports for compound args
+import type {
+  AgentManageArgs,
+  AgentWorkArgs,
+  AiAnalyzeArgs,
+  AiGenerateArgs,
+  AiPlanArgs,
+  DiscoverToolsArgs,
+  ManageAutomationArgs,
+  ManageEventsArgs,
+  ManageIssuesArgs,
+  ManageIterationsArgs,
+  ManageLabelsArgs,
+  ManageMilestonesArgs,
+  ManageProjectArgs,
+  ManagePrsArgs,
+  ManageSprintsArgs,
+  ManageStatusUpdatesArgs,
+  SystemArgs,
+} from "./compound-schemas";
 
 // ============================================================================
 // Dispatch Helpers
@@ -1035,14 +1022,15 @@ function extractPRDSections(prd: string): Map<string, string> {
   const headingRegex = /^#{1,3}\s+(.+)$/gm;
   let lastHeading = "Overview";
   let lastIndex = 0;
-  let match;
+  let match: RegExpExecArray | null = headingRegex.exec(prd);
 
-  while ((match = headingRegex.exec(prd)) !== null) {
+  while (match !== null) {
     if (match.index > lastIndex) {
       sections.set(lastHeading, prd.slice(lastIndex, match.index).trim());
     }
     lastHeading = match[1].trim();
     lastIndex = match.index + match[0].length;
+    match = headingRegex.exec(prd);
   }
   if (lastIndex < prd.length) {
     sections.set(lastHeading, prd.slice(lastIndex).trim());
@@ -1093,6 +1081,8 @@ export async function executeAiAnalyze(args: AiAnalyzeArgs): Promise<unknown> {
 
   switch (action) {
     // ── Standalone executors ─────────────────────────────────────
+    case "enrich_issue_sections":
+      return route(executeEnrichIssue, rest);
     case "suggest_labels":
       return route(executeSuggestLabels, rest);
     case "detect_duplicates":
@@ -1462,7 +1452,7 @@ export async function executeAgentManage(args: AgentManageArgs): Promise<unknown
           const lastHb = agent.lastHeartbeat ? new Date(agent.lastHeartbeat).getTime() : 0;
           const isStale = agent.status === "working" && now - lastHb > staleThreshold;
           const isBlocked = agent.status === "blocked";
-          let budget;
+          let budget: BudgetStatus | undefined;
           try {
             budget = await budgetService.getBudgetStatus(agent.id);
           } catch (err) {
@@ -1604,7 +1594,7 @@ export async function executeAgentManage(args: AgentManageArgs): Promise<unknown
         if (assignments.length >= maxAssignments) break;
 
         // Check budget
-        let budget;
+        let budget: BudgetStatus | undefined;
         try {
           budget = await budgetService.getBudgetStatus(agent.id);
         } catch {}
@@ -2259,6 +2249,7 @@ const TOOL_CATALOG: Record<
     tool: "ai_analyze",
     actions: [
       "enrich_issue",
+      "enrich_issue_sections",
       "enrich_bulk",
       "triage_issue",
       "triage_all",
@@ -2323,6 +2314,31 @@ const TOOL_CATALOG: Record<
     tool: "system",
     actions: ["health_check", "setup_project_fields"],
     description: "System operations — health check, project field setup",
+  },
+  branches: {
+    tool: "manage_branches",
+    actions: ["get_protection", "update_protection", "delete_protection", "list_branches"],
+    description:
+      "GitHub branch protection — inspect, update, or remove protection rules; list branches",
+  },
+  releases: {
+    tool: "manage_releases",
+    actions: ["create", "list", "get", "update", "delete", "get_latest"],
+    description:
+      "GitHub Releases — create, list, read, update, delete releases; fetch the latest one",
+  },
+  workflows: {
+    tool: "manage_workflows",
+    actions: [
+      "list_workflows",
+      "trigger_dispatch",
+      "get_run",
+      "list_runs",
+      "get_run_logs",
+      "cancel_run",
+    ],
+    description:
+      "GitHub Actions — list workflows, trigger a dispatch, inspect runs and logs, cancel a run",
   },
 };
 

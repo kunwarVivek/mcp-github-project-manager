@@ -1,9 +1,9 @@
+import { ResourceNotFoundError } from "../domain/errors";
+import { ResourceStatus, ResourceType } from "../domain/resource-types";
+import type { Issue } from "../domain/types";
 import type { GitHubRepositoryFactory } from "../infrastructure/github/GitHubRepositoryFactory";
 import type { GitHubIssueRepository } from "../infrastructure/github/repositories/GitHubIssueRepository";
 import type { GitHubMilestoneRepository } from "../infrastructure/github/repositories/GitHubMilestoneRepository";
-import { ResourceStatus, ResourceType } from "../domain/resource-types";
-import type { Issue } from "../domain/types";
-import { ResourceNotFoundError } from "../domain/errors";
 import { safeCall } from "./utils/safeCall";
 
 /**

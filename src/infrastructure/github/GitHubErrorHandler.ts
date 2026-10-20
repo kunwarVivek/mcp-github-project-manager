@@ -1,8 +1,8 @@
-import type { GitHubError } from "./types";
 import { ResourceNotFoundError } from "../../domain/errors";
 import { MCPErrorCode } from "../../domain/mcp-types";
 import { ResourceType } from "../../domain/resource-types";
 import { isGitHubErrorWithCode } from "../../domain/type-guards";
+import type { GitHubError } from "./types";
 
 export class GitHubApiError extends Error {
   constructor(

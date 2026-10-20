@@ -1,10 +1,10 @@
 import { generateObject } from "ai";
-import { AIServiceFactory } from "../ai/AIServiceFactory";
-import type { CodeExample } from "../../domain/task-context-schemas";
-import type { AITask } from "../../domain/ai-types";
-import { type ILogger, Logger } from "../../infrastructure/logger";
-import { InputSanitizer } from "../utils/InputSanitizer";
 import { z } from "zod";
+import type { AITask } from "../../domain/ai-types";
+import type { CodeExample } from "../../domain/task-context-schemas";
+import { type ILogger, Logger } from "../../infrastructure/logger";
+import { AIServiceFactory } from "../ai/AIServiceFactory";
+import { InputSanitizer } from "../utils/InputSanitizer";
 
 /**
  * Schema for AI-generated code examples

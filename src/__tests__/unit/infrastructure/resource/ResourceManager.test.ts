@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { ResourceManager } from "../../../../infrastructure/resource/ResourceManager";
 import {
-  ResourceType,
-  ResourceStatus,
   ResourceNotFoundError,
+  ResourceStatus,
+  ResourceType,
 } from "../../../../domain/resource-types";
+import { ResourceManager } from "../../../../infrastructure/resource/ResourceManager";
 
 // Mock the ResourceCache class
 vi.mock("../../../../infrastructure/cache/ResourceCache", () => {

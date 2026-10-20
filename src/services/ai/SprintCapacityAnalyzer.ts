@@ -8,14 +8,14 @@
  */
 
 import type { EstimationCalibrator } from "../../analysis/EstimationCalibrator";
-import { calculateWeightedScore, getConfidenceTier } from "./ConfidenceScorer";
+import type { ConfidenceFactors, SectionConfidence } from "../../domain/ai-types";
 import type {
   SprintCapacity,
-  TeamMember,
   SprintMetrics,
   TeamAvailability,
+  TeamMember,
 } from "../../domain/sprint-planning-types";
-import type { SectionConfidence, ConfidenceFactors } from "../../domain/ai-types";
+import { calculateWeightedScore, getConfidenceTier } from "./ConfidenceScorer";
 
 /**
  * Availability adjustment for capacity calculation.

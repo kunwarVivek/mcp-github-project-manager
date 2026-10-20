@@ -3,14 +3,14 @@
 
 | Task | Command |
 |------|---------|
-| Build | `npm run build` (tsc → `fix-imports.js` → chmod) |
-| Dev (watch) | `npm run dev` (tsx — `ts-node` cannot load under TS 7) |
-| Unit tests | `npm test` · core only `npm run test:core` · AI `npm run test:ai` |
-| E2E (mock) | `npm run test:e2e` · tools `npm run test:e2e:tools` |
-| E2E (live API) | `E2E_REAL_API=true npm run test:e2e:tools:real` |
-| Coverage | `npm run test:coverage` |
-| Lint / format | `npm run lint` (Biome) · `npm run format` |
-| Inspect MCP server | `npm run inspect` |
+| Build | `pnpm run build` (tsc → `fix-imports.js` → chmod) |
+| Dev (watch) | `pnpm run dev` (tsx — `ts-node` cannot load under TS 7) |
+| Unit tests | `pnpm test` · core only `pnpm run test:core` · AI `pnpm run test:ai` |
+| E2E (mock) | `pnpm run test:e2e` · tools `pnpm run test:e2e:tools` |
+| E2E (live API) | `E2E_REAL_API=true pnpm run test:e2e:tools:real` |
+| Coverage | `pnpm run test:coverage` |
+| Lint / format | `pnpm run lint` (Biome) · `pnpm run format` |
+| Inspect MCP server | `pnpm run inspect` |
 
 ## Architecture (DDD, MCP stdio server)
 
@@ -70,7 +70,7 @@
 
 - ESM extensions: source omits `.js` in imports; `postbuild` runs
   `scripts/fix-imports.js` to add them. Never ship raw `tsc` output — always
-  `npm run build`.
+  `pnpm run build`.
 - `zod` is on v4 (`^4.4.3`), paired with `ai`@^7 / `@ai-sdk/*`@^4 (peer-accept
   `^4.1.8`) and `@modelcontextprotocol/server`@^2. Tool JSON Schema is generated
   by **zod 4's native `z.toJSONSchema({io:'input'})`** in `ToolRegistry`.

@@ -1,4 +1,4 @@
-import type { TemplateFormat, TemplateSection, ParsedTemplate } from "../../domain/template-types";
+import type { ParsedTemplate, TemplateFormat, TemplateSection } from "../../domain/template-types";
 
 /**
  * Detect template format from content

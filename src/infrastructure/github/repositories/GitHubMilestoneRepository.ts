@@ -1,14 +1,14 @@
-import { BaseGitHubRepository } from "./BaseRepository";
-import type {
-  Milestone,
-  CreateMilestone,
-  MilestoneRepository,
-  MilestoneId,
-  Issue,
-} from "../../../domain/types";
 import { ResourceStatus } from "../../../domain/resource-types";
-import { GitHubIssueRepository } from "./GitHubIssueRepository";
+import type {
+  CreateMilestone,
+  Issue,
+  Milestone,
+  MilestoneId,
+  MilestoneRepository,
+} from "../../../domain/types";
 import { parseResourceStatus, toStatusString } from "../../../domain/utils/StatusParser";
+import { BaseGitHubRepository } from "./BaseRepository";
+import { GitHubIssueRepository } from "./GitHubIssueRepository";
 
 interface GitHubMilestone {
   id: string;

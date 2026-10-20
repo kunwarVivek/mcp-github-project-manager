@@ -138,28 +138,28 @@ Comprehensive validation of the full platform capabilities:
 ### Mock Tests (Default)
 ```bash
 # Run all E2E tool tests with mocked APIs
-npm run test:e2e:tools
+pnpm run test:e2e:tools
 
 # Run specific test categories
-npm run test:e2e:tools:github     # GitHub tools only
-npm run test:e2e:tools:ai         # AI tools only
-npm run test:e2e:tools:workflows  # Integration workflows only
+pnpm run test:e2e:tools:github     # GitHub tools only
+pnpm run test:e2e:tools:ai         # AI tools only
+pnpm run test:e2e:tools:workflows  # Integration workflows only
 ```
 
 ### Real API Tests
 ```bash
 # Run all E2E tool tests with real APIs
-npm run test:e2e:tools:real
+pnpm run test:e2e:tools:real
 
 # Run specific categories with real APIs
-npm run test:e2e:tools:real:github
-npm run test:e2e:tools:real:ai
-npm run test:e2e:tools:real:workflows
-npm run test:e2e:tools:real:agent
-npm run test:e2e:tools:real:platform
+pnpm run test:e2e:tools:real:github
+pnpm run test:e2e:tools:real:ai
+pnpm run test:e2e:tools:real:workflows
+pnpm run test:e2e:tools:real:agent
+pnpm run test:e2e:tools:real:platform
 
 # Run complete test suite (unit + integration + E2E)
-npm run test:all:real
+pnpm run test:all:real
 ```
 
 ## Environment Setup
@@ -275,7 +275,7 @@ The platform validation tests verify:
 1. **Check Credentials:** Verify all required environment variables are set
 2. **Review Logs:** Check stderr output for detailed error messages
 3. **Test Individual Tools:** Use specific test patterns to isolate issues
-4. **Validate Server Build:** Ensure `npm run build` completes successfully
+4. **Validate Server Build:** Ensure `pnpm run build` completes successfully
 
 ## Example Usage
 
@@ -310,12 +310,12 @@ const projectResponse = await utils.callTool('create_project', { /* args */ });
 
 **Server Build Errors:**
 ```bash
-npm run build  # Ensure server builds successfully
+pnpm run build  # Ensure server builds successfully
 ```
 
 **Missing Dependencies:**
 ```bash
-npm install jest-junit  # Install test reporting dependency
+pnpm installjest-junit  # Install test reporting dependency
 ```
 
 **Permission Errors:**

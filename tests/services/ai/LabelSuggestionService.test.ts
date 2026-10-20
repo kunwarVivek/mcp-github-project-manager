@@ -1,4 +1,5 @@
-import { vi, type Mock } from "vitest";
+import { type Mock, vi } from "vitest";
+
 /**
  * Unit tests for LabelSuggestionService
  *
@@ -6,9 +7,9 @@ import { vi, type Mock } from "vitest";
  * rationale generation, and fallback behavior.
  */
 
-import { LabelSuggestionService } from "../../../src/services/ai/LabelSuggestionService";
-import { AIServiceFactory } from "../../../src/services/ai/AIServiceFactory";
 import { generateObject } from "ai";
+import { AIServiceFactory } from "../../../src/services/ai/AIServiceFactory";
+import { LabelSuggestionService } from "../../../src/services/ai/LabelSuggestionService";
 
 // Mock dependencies
 vi.mock("../../../src/services/ai/AIServiceFactory", () => {

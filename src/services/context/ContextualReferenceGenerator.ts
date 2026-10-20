@@ -1,20 +1,20 @@
 import { generateObject } from "ai";
-import { AIServiceFactory } from "../ai/AIServiceFactory";
+import type { AITask, FeatureRequirement, PRDDocument } from "../../domain/ai-types";
 import type {
+  CodeExample,
   ContextualReferences,
+  ExternalReference,
   PRDSectionReference,
   RelatedFeature,
   TechnicalSpecReference,
-  CodeExample,
-  ExternalReference,
 } from "../../domain/task-context-schemas";
-import { InputSanitizer } from "../utils/InputSanitizer";
-import type { AITask, PRDDocument, FeatureRequirement } from "../../domain/ai-types";
 import { type ILogger, Logger } from "../../infrastructure/logger";
+import { AIServiceFactory } from "../ai/AIServiceFactory";
 import {
   CONTEXT_GENERATION_CONFIGS,
   formatContextPrompt,
 } from "../ai/prompts/ContextGenerationPrompts";
+import { InputSanitizer } from "../utils/InputSanitizer";
 
 /**
  * Generates contextual references for tasks (FR-4: Contextual References System)

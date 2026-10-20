@@ -1,17 +1,17 @@
 import { z } from "zod";
-import type { ToolDefinition, ToolSchema } from "../ToolValidator.js";
-import { RequirementsTraceabilityService } from "../../../services/RequirementsTraceabilityService.js";
-import type { MCPResponse } from "../../../domain/mcp-types.js";
-import { ToolResultFormatter } from "../ToolResultFormatter.js";
 import {
-  TaskStatus,
-  type TaskPriority,
-  type TaskComplexity,
-  type MockPRD,
   type FeatureRequirement,
+  type MockPRD,
+  type TaskComplexity,
+  type TaskPriority,
+  TaskStatus,
 } from "../../../domain/ai-types.js";
+import type { MCPResponse } from "../../../domain/mcp-types.js";
+import { RequirementsTraceabilityService } from "../../../services/RequirementsTraceabilityService.js";
 import { ANNOTATION_PATTERNS } from "../annotations/tool-annotations.js";
 import { TraceabilityMatrixOutputSchema } from "../schemas/ai-schemas.js";
+import { ToolResultFormatter } from "../ToolResultFormatter.js";
+import type { ToolDefinition, ToolSchema } from "../ToolValidator.js";
 
 // Schema for create_traceability_matrix tool
 const createTraceabilityMatrixSchema = z.object({

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-import fs from "node:fs";
 import { execSync } from "node:child_process";
+import fs from "node:fs";
 import readline from "node:readline";
 
 const rl = readline.createInterface({

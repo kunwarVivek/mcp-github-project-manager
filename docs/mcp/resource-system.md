@@ -155,7 +155,7 @@ The system includes comprehensive tests:
 
 Run tests using:
 ```bash
-npm test
+pnpm test
 ```
 
 ## Adding New Resource Types

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // `import` is hoisted above plain statements, and env.ts snapshots its config
 // into module-level constants at import time — so the environment has to be set
@@ -15,20 +15,20 @@ vi.hoisted(() => {
 });
 
 import {
+  AI_FALLBACK_MODEL,
+  AI_MAIN_MODEL,
+  AI_PRD_MODEL,
+  AI_RESEARCH_MODEL,
+  ANTHROPIC_API_KEY,
+  GOOGLE_API_KEY,
+  OPENAI_API_KEY,
+  PERPLEXITY_API_KEY,
+} from "../../src/env";
+import {
   AIServiceFactory,
   resolveProvider,
   SUPPORTED_PROVIDERS,
 } from "../../src/services/ai/AIServiceFactory";
-import {
-  ANTHROPIC_API_KEY,
-  OPENAI_API_KEY,
-  GOOGLE_API_KEY,
-  PERPLEXITY_API_KEY,
-  AI_MAIN_MODEL,
-  AI_RESEARCH_MODEL,
-  AI_FALLBACK_MODEL,
-  AI_PRD_MODEL,
-} from "../../src/env";
 
 describe("AIServiceFactory", () => {
   let factory: AIServiceFactory;

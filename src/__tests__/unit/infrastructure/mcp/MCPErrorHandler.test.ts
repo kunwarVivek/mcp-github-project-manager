@@ -1,8 +1,8 @@
-import { beforeEach, afterEach, describe, expect, it } from "vitest";
-import { MCPErrorHandler } from "../../../../infrastructure/mcp/MCPErrorHandler";
-import { ValidationError, UnauthorizedError, RateLimitError } from "../../../../domain/errors";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { RateLimitError, UnauthorizedError, ValidationError } from "../../../../domain/errors";
 import { MCPErrorCode } from "../../../../domain/mcp-types";
 import { ResourceNotFoundError, ResourceType } from "../../../../domain/resource-types";
+import { MCPErrorHandler } from "../../../../infrastructure/mcp/MCPErrorHandler";
 
 describe("MCPErrorHandler", () => {
   beforeEach(() => {

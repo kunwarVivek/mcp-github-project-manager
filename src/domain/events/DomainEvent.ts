@@ -29,7 +29,7 @@
  * ```
  */
 
-import { ResourceType, type ResourceStatus } from "../resource-types";
+import { type ResourceStatus, ResourceType } from "../resource-types";
 
 /**
  * Base class for all domain events

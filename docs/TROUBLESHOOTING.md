@@ -224,7 +224,7 @@ echo "GITHUB_REPO: $GITHUB_REPO"
    ```bash
    # Rebuild
    npm install
-   npm run build
+   pnpm run build
    ```
 
 3. **Check Node.js version:**
@@ -273,9 +273,9 @@ echo "GITHUB_REPO: $GITHUB_REPO"
 
 **Solutions:**
 
-1. **Verify npx can run the package:**
+1. **Verify pnpm dlx can run the package:**
    ```bash
-   npx -y mcp-github-project-manager --help
+   pnpm dlx mcp-github-project-manager --help
    ```
 
 2. **Try with bunx:**

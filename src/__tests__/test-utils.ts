@@ -1,15 +1,15 @@
 import { ResourceStatus, ResourceType } from "../domain/resource-types";
 import type {
+  CreateIssue,
+  CreateMilestone,
+  CreateProject,
+  CreateSprint,
+  CustomField,
   Issue,
   Milestone,
   Project,
-  Sprint,
-  CreateIssue,
-  CreateProject,
-  CreateMilestone,
-  CreateSprint,
   ProjectView,
-  CustomField,
+  Sprint,
 } from "../domain/types";
 
 export class TestFactory {

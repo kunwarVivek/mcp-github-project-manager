@@ -1,4 +1,5 @@
 import { vi } from "vitest";
+
 /**
  * Unit tests for TaskLifecycleService
  *
@@ -6,19 +7,19 @@ import { vi } from "vitest";
  * phase determination, and AI-powered recommendations.
  */
 
-import { TaskLifecycleService } from "../../../src/services/feature/TaskLifecycleService";
-import { AIServiceFactory } from "../../../src/services/ai/AIServiceFactory";
 import { generateObject } from "ai";
+import {
+  type AITask,
+  type TaskComplexity,
+  TaskPriority,
+  TaskStatus,
+} from "../../../src/domain/ai-types";
 import type {
   TaskLifecycleState,
   TaskPhaseStatus,
 } from "../../../src/domain/feature-lifecycle-types";
-import {
-  type AITask,
-  TaskPriority,
-  TaskStatus,
-  type TaskComplexity,
-} from "../../../src/domain/ai-types";
+import { AIServiceFactory } from "../../../src/services/ai/AIServiceFactory";
+import { TaskLifecycleService } from "../../../src/services/feature/TaskLifecycleService";
 
 // Mock dependencies
 vi.mock("../../../src/services/ai/AIServiceFactory", () => {

@@ -13,25 +13,25 @@
 
 import { generateObject } from "ai";
 import { z } from "zod";
-import { AIServiceFactory } from "./AIServiceFactory";
-import { InputSanitizer } from "../utils/InputSanitizer";
-import { EstimationCalibrator, complexityToPoints } from "../../analysis/EstimationCalibrator";
-import { calculateWeightedScore, getConfidenceTier } from "./ConfidenceScorer";
+import { complexityToPoints, EstimationCalibrator } from "../../analysis/EstimationCalibrator";
+import type { SectionConfidence, TaskComplexity } from "../../domain/ai-types";
 import type {
   GeneratedRoadmap,
-  RoadmapPhase,
-  RoadmapMilestone,
   MilestoneDependency,
-  RoadmapGenerationInput,
   RequirementItem,
+  RoadmapGenerationInput,
+  RoadmapMilestone,
+  RoadmapPhase,
   RoadmapVisualizationData,
 } from "../../domain/roadmap-planning-types";
-import type { SectionConfidence, TaskComplexity } from "../../domain/ai-types";
+import { InputSanitizer } from "../utils/InputSanitizer";
+import { AIServiceFactory } from "./AIServiceFactory";
+import { calculateWeightedScore, getConfidenceTier } from "./ConfidenceScorer";
 import {
-  ROADMAP_GENERATION_SYSTEM_PROMPT,
-  REQUIREMENTS_PARSING_PROMPT,
-  formatRequirementsForPrompt,
   formatConstraintsForPrompt,
+  formatRequirementsForPrompt,
+  REQUIREMENTS_PARSING_PROMPT,
+  ROADMAP_GENERATION_SYSTEM_PROMPT,
 } from "./prompts/RoadmapPrompts";
 
 // ============================================================================

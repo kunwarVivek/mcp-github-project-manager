@@ -1,15 +1,15 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
-import { FilePersistenceAdapter } from "../../infrastructure/persistence/FilePersistenceAdapter";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { ResourceType } from "../../domain/resource-types";
 import { ResourceCache } from "../../infrastructure/cache/ResourceCache";
+import { EventStore } from "../../infrastructure/events/EventStore";
+import { EventSubscriptionManager } from "../../infrastructure/events/EventSubscriptionManager";
 import {
   GitHubWebhookHandler,
   type ResourceEvent,
 } from "../../infrastructure/events/GitHubWebhookHandler";
-import { EventSubscriptionManager } from "../../infrastructure/events/EventSubscriptionManager";
-import { EventStore } from "../../infrastructure/events/EventStore";
-import { ResourceType } from "../../domain/resource-types";
+import { FilePersistenceAdapter } from "../../infrastructure/persistence/FilePersistenceAdapter";
 
 describe("Persistence and Events Integration", () => {
   const testCacheDir = ".test-cache";

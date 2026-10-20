@@ -1,9 +1,9 @@
-import { type Mocked, type MockedFunction, beforeEach, describe, expect, it, vi } from "vitest";
-import { SubIssueService } from "../../../services/SubIssueService";
-import type { GitHubRepositoryFactory } from "../../../infrastructure/github/GitHubRepositoryFactory";
-import { ResourceStatus } from "../../../domain/resource-types";
+import { beforeEach, describe, expect, it, type Mocked, type MockedFunction, vi } from "vitest";
 import { DomainError } from "../../../domain/errors";
+import { ResourceStatus } from "../../../domain/resource-types";
 import type { Issue } from "../../../domain/types";
+import type { GitHubRepositoryFactory } from "../../../infrastructure/github/GitHubRepositoryFactory";
+import { SubIssueService } from "../../../services/SubIssueService";
 
 // Mock the factory
 vi.mock("../../../infrastructure/github/GitHubRepositoryFactory");

@@ -11,9 +11,9 @@
  * - Atomic write pattern for data safety
  */
 
+import { existsSync } from "node:fs";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
-import { existsSync } from "node:fs";
 
 /**
  * A single cache entry for persistence

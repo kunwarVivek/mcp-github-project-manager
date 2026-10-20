@@ -1,13 +1,13 @@
-import { beforeEach, describe, expect, it, vi, type Mocked } from "vitest";
-import { DependencyContextGenerator } from "../../../services/context/DependencyContextGenerator";
-import { AIServiceFactory } from "../../../services/ai/AIServiceFactory";
+import { generateObject } from "ai";
+import { beforeEach, describe, expect, it, type Mocked, vi } from "vitest";
 import {
   type AITask,
-  TaskStatus,
-  TaskPriority,
   type TaskDependency,
+  TaskPriority,
+  TaskStatus,
 } from "../../../domain/ai-types";
-import { generateObject } from "ai";
+import { AIServiceFactory } from "../../../services/ai/AIServiceFactory";
+import { DependencyContextGenerator } from "../../../services/context/DependencyContextGenerator";
 
 // Mock the AI modules
 vi.mock("ai", () => ({

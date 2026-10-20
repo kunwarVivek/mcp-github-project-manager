@@ -1,7 +1,6 @@
-import type { GitHubRepositoryFactory } from "../infrastructure/github/GitHubRepositoryFactory";
-import { ResourceNotFoundError } from "../domain/resource-types";
-import { ResourceType } from "../domain/resource-types";
 import { ValidationError } from "../domain/errors";
+import { ResourceNotFoundError, ResourceType } from "../domain/resource-types";
+import type { GitHubRepositoryFactory } from "../infrastructure/github/GitHubRepositoryFactory";
 import { safeCall } from "./utils/safeCall";
 
 /** Strategy for building a field-type-specific mutation and variables. */

@@ -1,7 +1,7 @@
-import { describe, it, expect, beforeEach, vi, type Mocked } from "vitest";
+import { beforeEach, describe, expect, it, type Mocked, vi } from "vitest";
+import type { MCPResponse, MCPSuccessResponse } from "../../src/domain/mcp-types";
 import { executeGeneratePRD } from "../../src/infrastructure/tools/ai-tasks/GeneratePRDTool";
 import { PRDGenerationService } from "../../src/services/PRDGenerationService";
-import type { MCPResponse, MCPSuccessResponse } from "../../src/domain/mcp-types";
 
 // Helper function to extract content from MCP response
 function extractContentFromMCPResponse(response: MCPResponse): string {

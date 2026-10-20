@@ -125,7 +125,7 @@ The server is a plain MCP server — any harness that speaks MCP works. Install 
 per [README](../README.md#installing-in-ai-assistants). Example for Claude Code CLI:
 
 ```bash
-claude mcp add github-project-manager -- npx -y mcp-github-project-manager
+claude mcp add github-project-manager -- pnpm dlx mcp-github-project-manager
 ```
 
 With env vars:
@@ -218,8 +218,8 @@ heartbeat → work product → review → approve, budgets, crash-recovery recla
 and metrics:
 
 ```bash
-npm run build
-npm run test:e2e:tools:real:agent
+pnpm run build
+pnpm run test:e2e:tools:real:agent
 ```
 
 It auto-skips when `GITHUB_TOKEN` / `GITHUB_OWNER` / `GITHUB_REPO` are missing or

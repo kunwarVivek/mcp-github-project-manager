@@ -1,4 +1,5 @@
-import { vi, type Mock } from "vitest";
+import { type Mock, vi } from "vitest";
+
 /**
  * Unit tests for IssueEnrichmentAIService
  *
@@ -6,9 +7,9 @@ import { vi, type Mock } from "vitest";
  * confidence scoring, and fallback behavior.
  */
 
-import { IssueEnrichmentAIService } from "../../../src/services/ai/IssueEnrichmentAIService";
-import { AIServiceFactory } from "../../../src/services/ai/AIServiceFactory";
 import { generateObject } from "ai";
+import { AIServiceFactory } from "../../../src/services/ai/AIServiceFactory";
+import { IssueEnrichmentAIService } from "../../../src/services/ai/IssueEnrichmentAIService";
 
 // Mock dependencies
 vi.mock("../../../src/services/ai/AIServiceFactory", () => {

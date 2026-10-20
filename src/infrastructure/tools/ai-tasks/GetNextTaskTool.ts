@@ -1,9 +1,9 @@
 import { z } from "zod";
-import type { ToolDefinition, ToolSchema } from "../ToolValidator.js";
 import type { MCPResponse } from "../../../domain/mcp-types.js";
-import { ToolResultFormatter } from "../ToolResultFormatter.js";
 import { ANNOTATION_PATTERNS } from "../annotations/tool-annotations.js";
 import { NextTaskOutputSchema } from "../schemas/ai-schemas.js";
+import { ToolResultFormatter } from "../ToolResultFormatter.js";
+import type { ToolDefinition, ToolSchema } from "../ToolValidator.js";
 
 // Schema for get_next_task tool
 const getNextTaskSchema = z.object({

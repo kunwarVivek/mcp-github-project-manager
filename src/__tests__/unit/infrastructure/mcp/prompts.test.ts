@@ -1,7 +1,7 @@
-import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import type { McpServer } from "@modelcontextprotocol/server";
-import { InputSanitizer } from "../../../../services/utils/InputSanitizer";
+import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { registerPrompts } from "../../../../infrastructure/mcp/prompts";
+import { InputSanitizer } from "../../../../services/utils/InputSanitizer";
 
 /**
  * Unit tests for the six reusable MCP prompt templates registered by
@@ -91,6 +91,7 @@ describe("registerPrompts", () => {
       const result = callback({ prdContent: "line1\x00\x07line2  " });
 
       expect(spy).toHaveBeenCalledWith("line1\x00\x07line2  ");
+      // biome-ignore lint/suspicious/noControlCharactersInRegex: the assertion is about control characters being stripped, so the pattern must contain them.
       expect(result.messages[1].content.text).not.toMatch(/[\x00-\x08]/);
     });
 

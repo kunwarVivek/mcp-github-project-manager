@@ -1,5 +1,5 @@
-import { MCPResponseFormatter } from "../mcp/MCPResponseFormatter";
 import { MCPContentType, type MCPResponse } from "../../domain/mcp-types";
+import { MCPResponseFormatter } from "../mcp/MCPResponseFormatter";
 
 export interface FormattingOptions {
   contentType?: MCPContentType;

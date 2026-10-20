@@ -1,6 +1,6 @@
 import { z } from "zod";
-import type { TaskPriority, TaskComplexity, AITask, TaskDependency } from "./ai-task-types";
-import { TaskPrioritySchema, TaskComplexitySchema } from "./ai-task-types";
+import type { AITask, TaskComplexity, TaskDependency, TaskPriority } from "./ai-task-types";
+import { TaskComplexitySchema, TaskPrioritySchema } from "./ai-task-types";
 import type { FeatureRequirement } from "./prd-types";
 
 // ============================================================================

@@ -1,19 +1,19 @@
-import { describe, expect, it, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
+import { type AITask, TaskPriority, TaskStatus } from "../../../domain/ai-types";
+import type {
+  ContextQualityMetrics,
+  ContextualReferences,
+  EnhancedAcceptanceCriteria,
+  FeatureContext,
+  ImplementationGuidance,
+  PRDContextSummary,
+  TaskExecutionContext,
+} from "../../../domain/task-context-schemas";
 import {
   ContextQualityValidator,
   QUALITY_THRESHOLDS,
   type QualityReport,
 } from "../../../services/validation/ContextQualityValidator";
-import type {
-  TaskExecutionContext,
-  ContextQualityMetrics,
-  FeatureContext,
-  PRDContextSummary,
-  ImplementationGuidance,
-  ContextualReferences,
-  EnhancedAcceptanceCriteria,
-} from "../../../domain/task-context-schemas";
-import { type AITask, TaskStatus, TaskPriority } from "../../../domain/ai-types";
 
 describe("ContextQualityValidator", () => {
   let validator: ContextQualityValidator;

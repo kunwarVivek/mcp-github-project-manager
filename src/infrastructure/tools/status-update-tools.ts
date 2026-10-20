@@ -7,22 +7,22 @@
  * - get_status_update (GHAPI-08): Get a single status update by ID
  */
 
-import type { ToolDefinition, ToolSchema } from "./ToolValidator";
-import { ANNOTATION_PATTERNS } from "./annotations/tool-annotations";
-import { createGitHubFactory } from "./tool-factory";
-import {
-  CreateStatusUpdateInputSchema,
-  type CreateStatusUpdateInput,
-  ListStatusUpdatesInputSchema,
-  type ListStatusUpdatesInput,
-  GetStatusUpdateInputSchema,
-  type GetStatusUpdateInput,
-  StatusUpdateOutputSchema,
-  type StatusUpdateOutput,
-  StatusUpdateListOutputSchema,
-  type StatusUpdateListOutput,
-} from "./schemas/status-update-schemas";
 import { StatusUpdateStatus } from "../github/repositories/types";
+import { ANNOTATION_PATTERNS } from "./annotations/tool-annotations";
+import {
+  type CreateStatusUpdateInput,
+  CreateStatusUpdateInputSchema,
+  type GetStatusUpdateInput,
+  GetStatusUpdateInputSchema,
+  type ListStatusUpdatesInput,
+  ListStatusUpdatesInputSchema,
+  type StatusUpdateListOutput,
+  StatusUpdateListOutputSchema,
+  type StatusUpdateOutput,
+  StatusUpdateOutputSchema,
+} from "./schemas/status-update-schemas";
+import type { ToolDefinition, ToolSchema } from "./ToolValidator";
+import { createGitHubFactory } from "./tool-factory";
 
 // ============================================================================
 // Helper Functions

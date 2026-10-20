@@ -6,13 +6,13 @@
  */
 
 import { z } from "zod";
-import type { ToolDefinition, ToolSchema } from "./ToolValidator.js";
-import { ToolTelemetry } from "./ToolTelemetry.js";
-import { HealthService } from "../health/index.js";
+import { GITHUB_OWNER, GITHUB_REPO, GITHUB_TOKEN } from "../../env.js";
 import { AIServiceFactory } from "../../services/ai/AIServiceFactory.js";
 import { ResourceCache } from "../cache/ResourceCache.js";
 import { GitHubRepositoryFactory } from "../github/GitHubRepositoryFactory.js";
-import { GITHUB_TOKEN, GITHUB_OWNER, GITHUB_REPO } from "../../env.js";
+import { HealthService } from "../health/index.js";
+import { ToolTelemetry } from "./ToolTelemetry.js";
+import type { ToolDefinition, ToolSchema } from "./ToolValidator.js";
 
 /**
  * Schema for health_check tool input (no parameters required)

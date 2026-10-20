@@ -1,10 +1,10 @@
 import { generateObject } from "ai";
 import { z } from "zod";
-import { InputSanitizer } from "./utils/InputSanitizer";
-import type { AIServiceFactory } from "./ai/AIServiceFactory";
-import type { ProjectManagementService } from "./ProjectManagementService";
-import type { IssueEnrichmentService } from "./IssueEnrichmentService";
 import { type ILogger, Logger } from "../infrastructure/logger";
+import type { AIServiceFactory } from "./ai/AIServiceFactory";
+import type { IssueEnrichmentService } from "./IssueEnrichmentService";
+import type { ProjectManagementService } from "./ProjectManagementService";
+import { InputSanitizer } from "./utils/InputSanitizer";
 
 export interface TriageResult {
   issueId: string;

@@ -1,11 +1,11 @@
+import { z } from "zod";
 import {
   MCPContentType,
-  MCPErrorSchema,
-  MCPErrorCode,
-  type MCPSuccessResponse,
+  type MCPErrorCode,
   type MCPErrorResponse,
+  MCPErrorSchema,
+  type MCPSuccessResponse,
 } from "../../domain/mcp-types";
-import { z } from "zod";
 
 export interface RichContent {
   type: "text" | "json" | "markdown" | "html";

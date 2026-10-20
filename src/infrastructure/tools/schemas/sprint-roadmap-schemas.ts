@@ -19,7 +19,7 @@
 
 import { z } from "zod";
 import { SectionConfidenceSchema } from "../../../domain/ai-types";
-import { SPRINT_RISK_CATEGORIES, RISK_PROBABILITIES } from "../../../domain/sprint-planning-types";
+import { RISK_PROBABILITIES, SPRINT_RISK_CATEGORIES } from "../../../domain/sprint-planning-types";
 
 // ============================================================================
 // Common Schemas (Reused across multiple tools)

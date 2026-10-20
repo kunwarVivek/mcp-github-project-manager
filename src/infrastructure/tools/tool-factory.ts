@@ -1,5 +1,5 @@
+import { getGitHubAppCredentials, getSecret } from "../../env";
 import { GitHubRepositoryFactory } from "../github/GitHubRepositoryFactory";
-import { getSecret, getGitHubAppCredentials } from "../../env";
 
 /**
  * Sentinel owner/repo used only when neither an explicit value nor the

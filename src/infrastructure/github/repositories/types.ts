@@ -1,12 +1,12 @@
 import type { Octokit } from "@octokit/rest";
-import type { BaseGitHubRepository } from "./BaseRepository";
-import type { GitHubConfig } from "../GitHubConfig";
 import type {
   IssueRepository,
   MilestoneRepository,
   ProjectRepository,
   SprintRepository,
 } from "../../../domain/types";
+import type { GitHubConfig } from "../GitHubConfig";
+import type { BaseGitHubRepository } from "./BaseRepository";
 
 export type OctokitWithExtensions = InstanceType<typeof Octokit>;
 

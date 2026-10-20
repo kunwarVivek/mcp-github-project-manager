@@ -1,4 +1,5 @@
 import { vi } from "vitest";
+
 /**
  * Unit tests for HealthService
  *
@@ -9,11 +10,11 @@ import { vi } from "vitest";
  * - AI availability and circuit state
  */
 
-import { HealthService } from "../../../src/infrastructure/health/HealthService.js";
-import type { AIServiceFactory } from "../../../src/services/ai/AIServiceFactory.js";
-import type { ResourceCache, CacheStats } from "../../../src/infrastructure/cache/ResourceCache.js";
-import type { AIResiliencePolicy } from "../../../src/infrastructure/resilience/AIResiliencePolicy.js";
+import type { CacheStats, ResourceCache } from "../../../src/infrastructure/cache/ResourceCache.js";
 import type { GitHubRepositoryFactory } from "../../../src/infrastructure/github/GitHubRepositoryFactory.js";
+import { HealthService } from "../../../src/infrastructure/health/HealthService.js";
+import type { AIResiliencePolicy } from "../../../src/infrastructure/resilience/AIResiliencePolicy.js";
+import type { AIServiceFactory } from "../../../src/services/ai/AIServiceFactory.js";
 
 // Mock types for testing
 type MockAIServiceFactory = {

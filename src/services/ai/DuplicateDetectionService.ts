@@ -10,19 +10,19 @@
  * Falls back to keyword-based detection when embedding API unavailable.
  */
 
-import { embed, embedMany, cosineSimilarity } from "ai";
 import { openai } from "@ai-sdk/openai";
-import { calculateWeightedScore, getConfidenceTier } from "./ConfidenceScorer.js";
-import { InputSanitizer } from "../utils/InputSanitizer";
+import { cosineSimilarity, embed, embedMany } from "ai";
 import { EmbeddingCache } from "../../cache/EmbeddingCache.js";
-import { type ILogger, Logger } from "../../infrastructure/logger";
+import type { ConfidenceFactors, SectionConfidence } from "../../domain/ai-types.js";
 import type {
   DuplicateCandidate,
   DuplicateDetectionResult,
   DuplicateDetectionThresholds,
   IssueInput,
 } from "../../domain/issue-intelligence-types.js";
-import type { SectionConfidence, ConfidenceFactors } from "../../domain/ai-types.js";
+import { type ILogger, Logger } from "../../infrastructure/logger";
+import { InputSanitizer } from "../utils/InputSanitizer";
+import { calculateWeightedScore, getConfidenceTier } from "./ConfidenceScorer.js";
 
 // ============================================================================
 // Constants

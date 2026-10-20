@@ -1,5 +1,5 @@
-import type { ValidationRule } from "../ValidationRuleEngine";
 import type { PRDDocument } from "../../../domain/ai-types";
+import type { ValidationRule } from "../ValidationRuleEngine";
 
 /**
  * Built-in completeness validation rules

@@ -1,21 +1,21 @@
 import * as http from "node:http";
 import * as url from "node:url";
-import type { GitHubWebhookHandler, ResourceEvent } from "../events/GitHubWebhookHandler";
-import type {
-  EventSubscriptionManager,
-  EventSubscription,
-} from "../events/EventSubscriptionManager";
-import type { EventStore } from "../events/EventStore";
-import { type ILogger, Logger } from "../logger/index";
-import { SecurityAuditLog } from "../observability/SecurityAuditLog";
 import {
-  WEBHOOK_PORT,
   SSE_ENABLED,
-  WEBHOOK_TIMEOUT_MS,
   WEBHOOK_ALLOWED_ORIGINS,
+  WEBHOOK_PORT,
   WEBHOOK_RATE_LIMIT,
   WEBHOOK_RATE_WINDOW_MS,
+  WEBHOOK_TIMEOUT_MS,
 } from "../../env";
+import type { EventStore } from "../events/EventStore";
+import type {
+  EventSubscription,
+  EventSubscriptionManager,
+} from "../events/EventSubscriptionManager";
+import type { GitHubWebhookHandler, ResourceEvent } from "../events/GitHubWebhookHandler";
+import { type ILogger, Logger } from "../logger/index";
+import { SecurityAuditLog } from "../observability/SecurityAuditLog";
 
 export interface SSEConnection {
   id: string;

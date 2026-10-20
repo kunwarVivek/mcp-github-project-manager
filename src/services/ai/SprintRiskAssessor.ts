@@ -9,25 +9,25 @@
 
 import { generateObject } from "ai";
 import { z } from "zod";
-import { AIServiceFactory } from "./AIServiceFactory";
-import { InputSanitizer } from "../utils/InputSanitizer";
-import { calculateWeightedScore, getConfidenceTier } from "./ConfidenceScorer";
+import type { DetectedDependency } from "../../analysis/DependencyGraph";
+import type { ConfidenceFactors, SectionConfidence } from "../../domain/ai-types";
 import {
-  type SprintRiskAssessment,
-  type SprintRisk,
-  type MitigationSuggestion,
   type BacklogItem,
+  type MitigationEffort,
+  type MitigationStrategy,
+  type MitigationSuggestion,
+  RISK_PROBABILITIES,
+  type RiskProbability,
+  SPRINT_RISK_CATEGORIES,
   type SprintCapacity,
   type SprintMetrics,
-  type RiskProbability,
-  type MitigationStrategy,
-  type MitigationEffort,
-  SPRINT_RISK_CATEGORIES,
-  RISK_PROBABILITIES,
+  type SprintRisk,
+  type SprintRiskAssessment,
 } from "../../domain/sprint-planning-types";
-import type { DetectedDependency } from "../../analysis/DependencyGraph";
-import type { SectionConfidence, ConfidenceFactors } from "../../domain/ai-types";
-import { SPRINT_RISK_SYSTEM_PROMPT, formatRiskPrompt } from "./prompts/SprintPlanningPrompts";
+import { InputSanitizer } from "../utils/InputSanitizer";
+import { AIServiceFactory } from "./AIServiceFactory";
+import { calculateWeightedScore, getConfidenceTier } from "./ConfidenceScorer";
+import { formatRiskPrompt, SPRINT_RISK_SYSTEM_PROMPT } from "./prompts/SprintPlanningPrompts";
 
 // ============================================================================
 // Zod Schemas for AI Response Validation

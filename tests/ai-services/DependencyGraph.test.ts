@@ -1,10 +1,10 @@
 import { DependencyGraph, detectImplicitDependencies } from "../../src/analysis/DependencyGraph";
 import {
-  extractKeywords,
   checkKeywordDependency,
+  extractKeywords,
   findMatchingPattern,
 } from "../../src/analysis/KeywordExtractor";
-import { type AITask, TaskStatus, TaskPriority } from "../../src/domain/ai-types";
+import { type AITask, TaskPriority, TaskStatus } from "../../src/domain/ai-types";
 
 function createMockTask(id: string, title: string, description: string = ""): AITask {
   return {

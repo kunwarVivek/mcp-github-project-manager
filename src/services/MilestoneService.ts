@@ -1,12 +1,12 @@
+import { ResourceNotFoundError } from "../domain/errors";
+import { ResourceStatus, ResourceType } from "../domain/resource-types";
+import type { CreateMilestone, Issue, Milestone } from "../domain/types";
+import { filterByStatus, parseResourceStatus } from "../domain/utils/StatusParser";
+import { MilestoneMetrics as MilestoneMetricsVO } from "../domain/value-objects/MilestoneMetrics";
 import type { GitHubRepositoryFactory } from "../infrastructure/github/GitHubRepositoryFactory";
 import type { GitHubIssueRepository } from "../infrastructure/github/repositories/GitHubIssueRepository";
 import type { GitHubMilestoneRepository } from "../infrastructure/github/repositories/GitHubMilestoneRepository";
-import { ResourceStatus, ResourceType } from "../domain/resource-types";
-import type { Issue, Milestone, CreateMilestone } from "../domain/types";
-import { ResourceNotFoundError } from "../domain/errors";
 import { safeCall } from "./utils/safeCall";
-import { parseResourceStatus, filterByStatus } from "../domain/utils/StatusParser";
-import { MilestoneMetrics as MilestoneMetricsVO } from "../domain/value-objects/MilestoneMetrics";
 
 /**
  * Metrics for a milestone including completion status and issue counts.

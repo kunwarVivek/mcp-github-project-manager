@@ -1,12 +1,12 @@
 import { z } from "zod";
-import type { ToolDefinition, ToolSchema } from "../ToolValidator";
 import { ANNOTATION_PATTERNS } from "../annotations/tool-annotations";
+import type { ToolDefinition, ToolSchema } from "../ToolValidator";
 import {
-  PullRequestOutputSchema,
-  PullRequestListOutputSchema,
-  PullRequestReviewOutputSchema,
-  PullRequestReviewListOutputSchema,
   MergeResultOutputSchema,
+  PullRequestListOutputSchema,
+  PullRequestOutputSchema,
+  PullRequestReviewListOutputSchema,
+  PullRequestReviewOutputSchema,
 } from "./project-schemas";
 
 // ============================================================================

@@ -1,5 +1,5 @@
-import { vi, beforeAll, afterAll, beforeEach, expect } from "vitest";
 import nock from "nock";
+import { afterAll, beforeAll, beforeEach, expect, vi } from "vitest";
 
 // Check if we should run real E2E tests with actual APIs
 const isRealE2ETest = process.env.E2E_REAL_API === "true";

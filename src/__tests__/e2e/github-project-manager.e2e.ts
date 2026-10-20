@@ -1,9 +1,9 @@
-import type { ProjectManagementService } from "../../services/ProjectManagementService";
 import { createProjectManagementService } from "../../container";
 import { ResourceStatus } from "../../domain/resource-types";
 import type { Sprint } from "../../domain/types";
-import { TestFactory } from "../test-utils";
 import { GitHubTypeConverter } from "../../infrastructure/github/util/conversion";
+import type { ProjectManagementService } from "../../services/ProjectManagementService";
+import { TestFactory } from "../test-utils";
 
 // SKIPPED: These E2E tests require real GitHub API credentials (GITHUB_TOKEN, GITHUB_OWNER, GITHUB_REPO)
 // They make actual API calls to create roadmaps, milestones, issues, and sprints

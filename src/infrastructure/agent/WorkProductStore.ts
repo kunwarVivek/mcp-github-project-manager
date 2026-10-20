@@ -1,6 +1,6 @@
-import type { GitHubRepositoryFactory } from "../github/GitHubRepositoryFactory.js";
 import type { WorkProduct } from "../../domain/agent-orchestration-types.js";
 import { WORK_PRODUCT_MARKER } from "../../domain/agent-orchestration-types.js";
+import type { GitHubRepositoryFactory } from "../github/GitHubRepositoryFactory.js";
 
 /**
  * Stores work products as structured JSON comments on GitHub issues.

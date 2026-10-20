@@ -1,9 +1,9 @@
-import { beforeEach, describe, expect, it, vi, type Mocked, type MockedClass } from "vitest";
 import { Octokit } from "@octokit/rest";
-import { GitHubConfig } from "../../../../../infrastructure/github/GitHubConfig";
-import { GitHubMilestoneRepository } from "../../../../../infrastructure/github/repositories/GitHubMilestoneRepository";
+import { beforeEach, describe, expect, it, type Mocked, type MockedClass, vi } from "vitest";
 import { ResourceStatus } from "../../../../../domain/resource-types";
 import type { CreateMilestone, Issue } from "../../../../../domain/types";
+import { GitHubConfig } from "../../../../../infrastructure/github/GitHubConfig";
+import { GitHubMilestoneRepository } from "../../../../../infrastructure/github/repositories/GitHubMilestoneRepository";
 
 // Mock Octokit and GraphQL response
 vi.mock("@octokit/rest");

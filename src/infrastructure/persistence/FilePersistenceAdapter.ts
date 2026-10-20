@@ -1,7 +1,7 @@
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
-import * as zlib from "node:zlib";
 import { promisify } from "node:util";
+import * as zlib from "node:zlib";
 import type { SyncMetadata } from "../../domain/resource-types";
 import { type ILogger, Logger } from "../logger/index";
 

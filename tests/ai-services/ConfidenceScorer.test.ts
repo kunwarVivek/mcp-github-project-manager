@@ -1,11 +1,11 @@
+import { DEFAULT_CONFIDENCE_CONFIG } from "../../src/domain/ai-types";
 import {
   ConfidenceScorer,
   calculateInputCompleteness,
-  getConfidenceTier,
   calculateWeightedScore,
   generateClarifyingQuestions,
+  getConfidenceTier,
 } from "../../src/services/ai/ConfidenceScorer";
-import { DEFAULT_CONFIDENCE_CONFIG } from "../../src/domain/ai-types";
 
 describe("ConfidenceScorer", () => {
   describe("calculateInputCompleteness", () => {

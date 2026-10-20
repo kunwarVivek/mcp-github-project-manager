@@ -23,22 +23,13 @@
  * ```
  */
 
-export { IssueEntity } from "./IssueEntity";
 export type { IssueEntityConfig } from "./IssueEntity";
-export { IssuePriority, IssueType } from "./IssueEntity";
-
-export { MilestoneEntity } from "./MilestoneEntity";
+export { IssueEntity, IssuePriority, IssueType } from "./IssueEntity";
 export type { MilestoneEntityConfig } from "./MilestoneEntity";
-export { MILESTONE_TRANSITIONS } from "./MilestoneEntity";
-
-export { SprintEntity } from "./SprintEntity";
-export type { SprintEntityConfig } from "./SprintEntity";
-export { SprintState } from "./SprintEntity";
-
-export { ProjectEntity } from "./ProjectEntity";
+export { MILESTONE_TRANSITIONS, MilestoneEntity } from "./MilestoneEntity";
 export type { ProjectEntityConfig } from "./ProjectEntity";
-export { ProjectHealth, ActivityLevel, ProjectVisibility } from "./ProjectEntity";
-
-export { PullRequestEntity } from "./PullRequestEntity";
+export { ActivityLevel, ProjectEntity, ProjectHealth, ProjectVisibility } from "./ProjectEntity";
 export type { PullRequestEntityConfig, PullRequestReview } from "./PullRequestEntity";
-export { PullRequestState, ReviewState, MergeMethod } from "./PullRequestEntity";
+export { MergeMethod, PullRequestEntity, PullRequestState, ReviewState } from "./PullRequestEntity";
+export type { SprintEntityConfig } from "./SprintEntity";
+export { SprintEntity, SprintState } from "./SprintEntity";

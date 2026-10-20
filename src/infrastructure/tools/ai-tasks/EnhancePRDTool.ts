@@ -1,10 +1,10 @@
 import { z } from "zod";
-import type { ToolDefinition, ToolSchema } from "../ToolValidator.js";
-import { PRDGenerationService } from "../../../services/PRDGenerationService.js";
 import type { MCPResponse } from "../../../domain/mcp-types.js";
-import { ToolResultFormatter } from "../ToolResultFormatter.js";
+import { PRDGenerationService } from "../../../services/PRDGenerationService.js";
 import { ANNOTATION_PATTERNS } from "../annotations/tool-annotations.js";
 import { PRDEnhanceOutputSchema } from "../schemas/ai-schemas.js";
+import { ToolResultFormatter } from "../ToolResultFormatter.js";
+import type { ToolDefinition, ToolSchema } from "../ToolValidator.js";
 
 // Schema for enhance_prd tool
 const enhancePRDSchema = z.object({

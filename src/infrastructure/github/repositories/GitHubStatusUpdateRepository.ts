@@ -1,8 +1,8 @@
 import { BaseGitHubRepository } from "./BaseRepository";
 import type {
   StatusUpdate,
-  StatusUpdateOptions,
   StatusUpdateListResult,
+  StatusUpdateOptions,
   StatusUpdateStatus,
 } from "./types";
 

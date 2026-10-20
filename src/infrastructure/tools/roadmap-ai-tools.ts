@@ -2,24 +2,32 @@
  * MCP tools for AI-powered roadmap planning operations.
  *
  * Provides 2 tools (AI-13 to AI-16):
- * - generate_roadmap: Generate project roadmap from requirements (AI-13, AI-14, AI-15)
+ * - generate_roadmap_requirements: Generate project roadmap from requirements (AI-13, AI-14, AI-15)
  * - generate_roadmap_visualization: Generate Gantt-ready visualization data (AI-16)
+ *
+ * The AI-13/14/15 tool is named `generate_roadmap_requirements`, not
+ * `generate_roadmap`: `generate_roadmap` already belongs to the
+ * project-scoped roadmap generator in `schemas/ai-automation-tool-schemas.ts`
+ * (projectId/projectTitle/autoCreate), which is what the `generate_roadmap`
+ * executor implements. The compound action `ai_plan.generate_roadmap` routes
+ * to the requirements-based generator; naming the tool after it keeps the
+ * registry free of the duplicate-name overwrite.
  *
  * These tools expose Phase 10 AI roadmap planning services as MCP tools
  * with proper annotations, input/output schemas, and executors.
  */
 
-import type { ToolDefinition, ToolSchema } from "./ToolValidator";
-import { ANNOTATION_PATTERNS } from "./annotations/tool-annotations";
 import { RoadmapAIService } from "../../services/ai/RoadmapAIService";
+import { ANNOTATION_PATTERNS } from "./annotations/tool-annotations";
 import {
-  RoadmapGenerationInputSchema,
   type RoadmapGenerationInput,
-  RoadmapOutputSchema,
+  RoadmapGenerationInputSchema,
   type RoadmapOutput,
-  RoadmapVisualizationOutputSchema,
+  RoadmapOutputSchema,
   type RoadmapVisualizationOutput,
+  RoadmapVisualizationOutputSchema,
 } from "./schemas/sprint-roadmap-schemas";
+import type { ToolDefinition, ToolSchema } from "./ToolValidator";
 
 // ============================================================================
 // Tool Definitions
@@ -36,7 +44,7 @@ import {
  * - AI-15: Milestone estimation (velocity-grounded dates)
  */
 export const generateRoadmapTool: ToolDefinition<RoadmapGenerationInput, RoadmapOutput> = {
-  name: "generate_roadmap",
+  name: "generate_roadmap_requirements",
   title: "Generate Roadmap",
   description:
     "Generate a project roadmap from requirements. Creates phases, milestones, and dependencies " +
@@ -122,7 +130,7 @@ export const roadmapAITools: ToolDefinition<unknown>[] = [
  * Map of tool names to executor functions.
  */
 export const roadmapAIExecutors: Record<string, (args: unknown) => Promise<unknown>> = {
-  generate_roadmap: executeGenerateRoadmap as (args: unknown) => Promise<unknown>,
+  generate_roadmap_requirements: executeGenerateRoadmap as (args: unknown) => Promise<unknown>,
   generate_roadmap_visualization: executeGenerateRoadmapVisualization as (
     args: unknown
   ) => Promise<unknown>,

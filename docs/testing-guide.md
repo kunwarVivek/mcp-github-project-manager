@@ -26,29 +26,29 @@ tests/
 
 ### All Tests
 ```bash
-npm test
+pnpm test
 ```
 
 ### AI-Specific Tests
 ```bash
 # Run only AI-related tests
-npm run test:ai
+pnpm run test:ai
 
 # Watch mode for AI tests
-npm run test:ai:watch
+pnpm run test:ai:watch
 
 # Coverage for AI tests
-npm run test:ai:coverage
+pnpm run test:ai:coverage
 ```
 
 ### Core Tests (excluding AI)
 ```bash
-npm run test:core
+pnpm run test:core
 ```
 
 ### Integration Tests
 ```bash
-npm run test:integration
+pnpm run test:integration
 ```
 
 ## Test Categories
@@ -258,10 +258,10 @@ vi.mocked(PRDGenerationService).mockImplementation(() => ({
 ### Debug Configuration
 ```bash
 # Enable debug logging for tests
-DEBUG=ai-services:*,test:* npm run test:ai
+DEBUG=ai-services:*,test:* pnpm run test:ai
 
 # Run specific test with verbose output
-npm run test:ai -- --testNamePattern="PRD generation"
+pnpm run test:ai -- --testNamePattern="PRD generation"
 ```
 
 ### Common Issues
@@ -290,7 +290,7 @@ Error: JavaScript heap out of memory
 ```yaml
 - name: Run AI Tests
   run: |
-    npm run test:ai:coverage
+    pnpm run test:ai:coverage
   env:
     # Mock API keys for testing
     ANTHROPIC_API_KEY: test-key

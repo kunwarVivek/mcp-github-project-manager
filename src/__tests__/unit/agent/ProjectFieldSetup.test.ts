@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi, type Mocked } from "vitest";
+import { beforeEach, describe, expect, it, type Mocked, vi } from "vitest";
 import { ProjectFieldSetup } from "../../../infrastructure/agent/ProjectFieldSetup";
 import type { GitHubRepositoryFactory } from "../../../infrastructure/github/GitHubRepositoryFactory";
 

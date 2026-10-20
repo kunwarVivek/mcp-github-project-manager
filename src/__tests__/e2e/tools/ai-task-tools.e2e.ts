@@ -187,7 +187,7 @@ MCPToolTestUtils.createTestSuite(
       const content = MCPToolTestUtils.extractContent(response);
 
       // Parse the response to get tasks
-      let responseData;
+      let responseData: { tasks?: unknown[] };
       try {
         responseData = JSON.parse(content);
       } catch {
@@ -198,9 +198,9 @@ MCPToolTestUtils.createTestSuite(
 
       expect(responseData.tasks).toBeDefined();
       expect(Array.isArray(responseData.tasks)).toBe(true);
-      expect(responseData.tasks.length).toBeGreaterThan(0);
+      expect(responseData.tasks?.length ?? 0).toBeGreaterThan(0);
 
-      parsedTasks = responseData.tasks;
+      parsedTasks = responseData.tasks ?? [];
       projectId = `test-project-${Date.now()}`;
     });
 

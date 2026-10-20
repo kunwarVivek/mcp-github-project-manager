@@ -1,230 +1,221 @@
+import { INTERNAL_ERROR, METHOD_NOT_FOUND, ProtocolError } from "@modelcontextprotocol/server";
 import { z } from "zod";
-import { ProtocolError, INTERNAL_ERROR, METHOD_NOT_FOUND } from "@modelcontextprotocol/server";
 
 /** v2 compatibility aliases (McpError -> ProtocolError, ErrorCode enum -> constants). */
 const McpError = ProtocolError;
 const ErrorCode = { InternalError: INTERNAL_ERROR, MethodNotFound: METHOD_NOT_FOUND } as const;
+
 import type { ZodTypeAny } from "zod";
-import type { ToolDefinition, ToolAnnotations } from "./ToolValidator";
+// Agent orchestration tools
 import {
-  // Original tools
-  createRoadmapTool,
-  planSprintTool,
-  getMilestoneMetricsTool,
-  getSprintMetricsTool,
-  getOverdueMilestonesTool,
-  getUpcomingMilestonesTool,
-  createProjectTool,
-  listProjectsTool,
-  getProjectTool,
-  createMilestoneTool,
-  listMilestonesTool,
-  createIssueTool,
-  listIssuesTool,
-  getIssueTool,
-  updateIssueTool,
-  // Issue comment tools
-  createIssueCommentTool,
-  updateIssueCommentTool,
-  deleteIssueCommentTool,
-  listIssueCommentsTool,
-  // Draft issue tools
-  createDraftIssueTool,
-  updateDraftIssueTool,
-  deleteDraftIssueTool,
-  // Pull Request tools
-  createPullRequestTool,
-  getPullRequestTool,
-  listPullRequestsTool,
-  updatePullRequestTool,
-  mergePullRequestTool,
-  listPullRequestReviewsTool,
-  createPullRequestReviewTool,
-  createSprintTool,
-  listSprintsTool,
-  getCurrentSprintTool,
-  createProjectFieldTool,
-  createProjectViewTool,
-  // New project tools
-  updateProjectTool,
-  deleteProjectTool,
-  getProjectReadmeTool,
-  updateProjectReadmeTool,
-  listProjectFieldsTool,
-  updateProjectFieldTool,
-  // Project item tools
-  addProjectItemTool,
-  removeProjectItemTool,
-  listProjectItemsTool,
-  archiveProjectItemTool,
-  unarchiveProjectItemTool,
-  // Field values tools
-  setFieldValueTool,
-  getFieldValueTool,
-  clearFieldValueTool,
-  // View tools
-  listProjectViewsTool,
-  updateProjectViewTool,
-  deleteProjectViewTool,
-  // Milestone tools
-  updateMilestoneTool,
-  deleteMilestoneTool,
-  // Sprint tools
-  updateSprintTool,
-  addIssuesToSprintTool,
-  removeIssuesFromSprintTool,
-  // Label tools
-  createLabelTool,
-  listLabelsTool,
-  // AI task management tools
-  addFeatureTool,
-  generatePRDTool,
-  parsePRDTool,
-  getNextTaskTool,
-  analyzeTaskComplexityTool,
-  expandTaskTool,
-  enhancePRDTool,
-  createTraceabilityMatrixTool,
-  // Automation service tools
-  createAutomationRuleTool,
-  updateAutomationRuleTool,
-  deleteAutomationRuleTool,
-  getAutomationRuleTool,
-  listAutomationRulesTool,
-  enableAutomationRuleTool,
-  disableAutomationRuleTool,
-  // Iteration management tools
-  getIterationConfigurationTool,
-  getCurrentIterationTool,
-  getIterationItemsTool,
-  getIterationByDateTool,
-  assignItemsToIterationTool,
-  // AI-powered automation tools
-  generateRoadmapTool,
-  enrichIssueTool,
-  enrichIssuesBulkTool,
-  triageIssueTool,
-  triageAllIssuesTool,
-  scheduleTriagingTool,
-  // Status update tools
-  createStatusUpdateTool,
-  listStatusUpdatesTool,
-  getStatusUpdateTool,
-  // Sub-issue management tools
-  addSubIssueTool,
-  listSubIssuesTool,
-  getParentIssueTool,
-  reprioritizeSubIssueTool,
-  removeSubIssueTool,
-  // Project template tools
-  markProjectAsTemplateTool,
-  unmarkProjectAsTemplateTool,
-  copyProjectFromTemplateTool,
-  listOrganizationTemplatesTool,
-} from "./ToolSchemas";
+  agentHeartbeatTool,
+  approveTaskTool,
+  checkoutTaskTool,
+  checkWorkStatusTool,
+  completeTaskTool,
+  deregisterAgentTool,
+  getAgentActivityTool,
+  getAgentMetricsTool,
+  getBudgetStatusTool,
+  getTaskContextTool,
+  listAgentsTool,
+  reclaimStaleTasksTool,
+  recordUsageTool,
+  registerAgentTool,
+  rejectTaskTool,
+  releaseTaskTool,
+  setAgentBudgetTool,
+  setupAgentFieldsTool,
+  submitForReviewTool,
+  submitWorkProductTool,
+} from "./agent-orchestration-tools";
+// Compound tool schemas
+import {
+  agentManageSchema,
+  agentWorkSchema,
+  aiAnalyzeSchema,
+  aiGenerateSchema,
+  aiPlanSchema,
+  discoverToolsSchema,
+  manageAutomationSchema,
+  manageEventsSchema,
+  manageIssuesSchema,
+  manageIterationsSchema,
+  manageLabelsSchema,
+  manageMilestonesSchema,
+  manageProjectSchema,
+  managePrsSchema,
+  manageSprintsSchema,
+  manageStatusUpdatesSchema,
+  systemSchema,
+} from "./compound/compound-schemas";
 
 // Health check tool
 import { healthCheckTool } from "./health-tools";
-
-// Project linking tools
+// Issue Intelligence tools (Phase 11: AI-17 to AI-20)
 import {
-  linkProjectToRepositoryTool,
-  unlinkProjectFromRepositoryTool,
-  linkProjectToTeamTool,
-  unlinkProjectFromTeamTool,
-  listLinkedRepositoriesTool,
-  listLinkedTeamsTool,
-} from "./project-linking-tools";
-
+  detectDuplicatesTool,
+  enrichIssueTool as enrichIssueAITool,
+  findRelatedIssuesTool,
+  suggestLabelsTool,
+} from "./issue-intelligence-tools";
+// Advanced operations tools
+import {
+  filterProjectItemsTool,
+  searchIssuesAdvancedTool,
+  updateItemPositionTool,
+} from "./project-advanced-tools";
 // Project lifecycle tools
 import {
   closeProjectTool,
-  reopenProjectTool,
   convertDraftIssueTool,
+  reopenProjectTool,
 } from "./project-lifecycle-tools";
-
-// Advanced operations tools
+// Project linking tools
 import {
-  updateItemPositionTool,
-  searchIssuesAdvancedTool,
-  filterProjectItemsTool,
-} from "./project-advanced-tools";
-
-// Sprint AI tools (Phase 10)
-import {
-  calculateSprintCapacityTool,
-  prioritizeBacklogTool,
-  assessSprintRiskTool,
-  suggestSprintCompositionTool,
-} from "./sprint-ai-tools";
+  linkProjectToRepositoryTool,
+  linkProjectToTeamTool,
+  listLinkedRepositoriesTool,
+  listLinkedTeamsTool,
+  unlinkProjectFromRepositoryTool,
+  unlinkProjectFromTeamTool,
+} from "./project-linking-tools";
 
 // Roadmap AI tools (Phase 10)
 import {
   generateRoadmapTool as generateAIRoadmapTool,
   generateRoadmapVisualizationTool,
 } from "./roadmap-ai-tools";
-
-// Issue Intelligence tools (Phase 11: AI-17 to AI-20)
-import {
-  enrichIssueTool as enrichIssueAITool,
-  suggestLabelsTool,
-  detectDuplicatesTool,
-  findRelatedIssuesTool,
-} from "./issue-intelligence-tools";
-
-// Agent orchestration tools
-import {
-  registerAgentTool,
-  listAgentsTool,
-  deregisterAgentTool,
-  checkoutTaskTool,
-  releaseTaskTool,
-  completeTaskTool,
-  getTaskContextTool,
-  agentHeartbeatTool,
-  submitWorkProductTool,
-  getAgentActivityTool,
-  getBudgetStatusTool,
-  setAgentBudgetTool,
-  checkWorkStatusTool,
-  reclaimStaleTasksTool,
-  recordUsageTool,
-  submitForReviewTool,
-  approveTaskTool,
-  rejectTaskTool,
-  getAgentMetricsTool,
-  setupAgentFieldsTool,
-} from "./agent-orchestration-tools";
-
-// Compound tool schemas
-import {
-  manageProjectSchema,
-  manageIssuesSchema,
-  managePrsSchema,
-  manageMilestonesSchema,
-  manageSprintsSchema,
-  manageLabelsSchema,
-  manageAutomationSchema,
-  manageIterationsSchema,
-  manageEventsSchema,
-  manageStatusUpdatesSchema,
-  aiGenerateSchema,
-  aiAnalyzeSchema,
-  aiPlanSchema,
-  agentWorkSchema,
-  agentManageSchema,
-  systemSchema,
-  discoverToolsSchema,
-} from "./compound/compound-schemas";
-
 // Branch protection compound tool schema (lives outside compound/ per convention)
 import { manageBranchesSchema } from "./schemas/branch-protection-schemas";
-
 // Releases compound tool schema (lives outside compound/ per convention)
 import { manageReleasesSchema } from "./schemas/release-schemas";
-
 // Workflows compound tool schema (lives outside compound/ per convention)
 import { manageWorkflowsSchema } from "./schemas/workflow-schemas";
+// Sprint AI tools (Phase 10)
+import {
+  assessSprintRiskTool,
+  calculateSprintCapacityTool,
+  prioritizeBacklogTool,
+  suggestSprintCompositionTool,
+} from "./sprint-ai-tools";
+import {
+  // AI task management tools
+  addFeatureTool,
+  addIssuesToSprintTool,
+  // Project item tools
+  addProjectItemTool,
+  // Sub-issue management tools
+  addSubIssueTool,
+  analyzeTaskComplexityTool,
+  archiveProjectItemTool,
+  assignItemsToIterationTool,
+  clearFieldValueTool,
+  copyProjectFromTemplateTool,
+  // Automation service tools
+  createAutomationRuleTool,
+  // Draft issue tools
+  createDraftIssueTool,
+  // Issue comment tools
+  createIssueCommentTool,
+  createIssueTool,
+  // Label tools
+  createLabelTool,
+  createMilestoneTool,
+  createProjectFieldTool,
+  createProjectTool,
+  createProjectViewTool,
+  createPullRequestReviewTool,
+  // Pull Request tools
+  createPullRequestTool,
+  // Original tools
+  createRoadmapTool,
+  createSprintTool,
+  // Status update tools
+  createStatusUpdateTool,
+  createTraceabilityMatrixTool,
+  deleteAutomationRuleTool,
+  deleteDraftIssueTool,
+  deleteIssueCommentTool,
+  deleteMilestoneTool,
+  deleteProjectTool,
+  deleteProjectViewTool,
+  disableAutomationRuleTool,
+  enableAutomationRuleTool,
+  enhancePRDTool,
+  enrichIssuesBulkTool,
+  enrichIssueTool,
+  expandTaskTool,
+  generatePRDTool,
+  // AI-powered automation tools
+  generateRoadmapTool,
+  getAutomationRuleTool,
+  getCurrentIterationTool,
+  getCurrentSprintTool,
+  getFieldValueTool,
+  getIssueTool,
+  getIterationByDateTool,
+  // Iteration management tools
+  getIterationConfigurationTool,
+  getIterationItemsTool,
+  getMilestoneMetricsTool,
+  getNextTaskTool,
+  getOverdueMilestonesTool,
+  getParentIssueTool,
+  getProjectReadmeTool,
+  getProjectTool,
+  getPullRequestTool,
+  getSprintMetricsTool,
+  getStatusUpdateTool,
+  getUpcomingMilestonesTool,
+  listAutomationRulesTool,
+  listIssueCommentsTool,
+  listIssuesTool,
+  listLabelsTool,
+  listMilestonesTool,
+  listOrganizationTemplatesTool,
+  listProjectFieldsTool,
+  listProjectItemsTool,
+  listProjectsTool,
+  // View tools
+  listProjectViewsTool,
+  listPullRequestReviewsTool,
+  listPullRequestsTool,
+  listSprintsTool,
+  listStatusUpdatesTool,
+  listSubIssuesTool,
+  // Project template tools
+  markProjectAsTemplateTool,
+  mergePullRequestTool,
+  parsePRDTool,
+  planSprintTool,
+  removeIssuesFromSprintTool,
+  removeProjectItemTool,
+  removeSubIssueTool,
+  reprioritizeSubIssueTool,
+  scheduleTriagingTool,
+  // Field values tools
+  setFieldValueTool,
+  triageAllIssuesTool,
+  triageIssueTool,
+  unarchiveProjectItemTool,
+  unmarkProjectAsTemplateTool,
+  updateAutomationRuleTool,
+  updateDraftIssueTool,
+  updateIssueCommentTool,
+  updateIssueTool,
+  // Milestone tools
+  updateMilestoneTool,
+  updateProjectFieldTool,
+  updateProjectReadmeTool,
+  // New project tools
+  updateProjectTool,
+  updateProjectViewTool,
+  updatePullRequestTool,
+  // Sprint tools
+  updateSprintTool,
+} from "./ToolSchemas";
+import type { ToolAnnotations, ToolDefinition } from "./ToolValidator";
 
 /**
  * Convert a Zod schema to JSON Schema.
@@ -573,8 +564,10 @@ export class ToolRegistry {
     this.registerTool(generateRoadmapVisualizationTool);
 
     // Register Issue Intelligence tools (Phase 11: AI-17 to AI-20)
-    // Note: enrichIssueAITool uses same name "enrich_issue" as ToolSchemas version
-    // so it will be overwritten with the AI-powered implementation
+    // Note: enrichIssueAITool is named "enrich_issue_sections" — the
+    // "enrich_issue" name belongs to the ai-automation enrichment tool
+    // registered above, and the compound action ai_analyze.enrich_issue
+    // routes to that implementation. Both are distinct features.
     this.registerTool(enrichIssueAITool);
     this.registerTool(suggestLabelsTool);
     this.registerTool(detectDuplicatesTool);

@@ -1,7 +1,7 @@
-import { beforeEach, describe, expect, it, vi, type Mock } from "vitest";
-import { AgentBudgetService } from "../../../services/agent/AgentBudgetService";
-import type { AgentStore } from "../../../infrastructure/agent/AgentStore";
+import { beforeEach, describe, expect, it, type Mock, vi } from "vitest";
 import type { Agent } from "../../../domain/agent-orchestration-types";
+import type { AgentStore } from "../../../infrastructure/agent/AgentStore";
+import { AgentBudgetService } from "../../../services/agent/AgentBudgetService";
 
 function makeAgent(id: string, overrides: Partial<Agent> = {}): Agent {
   return {

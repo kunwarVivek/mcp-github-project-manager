@@ -4,48 +4,6 @@
  * Provides domain events for entity state change notifications.
  */
 
-export {
-  // Base class
-  DomainEvent,
-  // Issue events
-  IssueCreatedEvent,
-  IssueStatusChangedEvent,
-  IssueAssignedEvent,
-  IssueLabelChangedEvent,
-  // Sprint events
-  SprintCreatedEvent,
-  SprintStatusChangedEvent,
-  SprintIssuesChangedEvent,
-  // Milestone events
-  MilestoneCreatedEvent,
-  MilestoneStatusChangedEvent,
-  // Project events
-  ProjectCreatedEvent,
-  ProjectStatusChangedEvent,
-} from "./DomainEvent";
-
-export {
-  // Agent events
-  AgentRegisteredEvent,
-  AgentDeregisteredEvent,
-  TaskCheckedOutEvent,
-  TaskReleasedEvent,
-  TaskCompletedEvent,
-  TaskSubmittedForReviewEvent,
-  TaskApprovedEvent,
-  TaskRejectedEvent,
-  AgentHeartbeatEvent,
-  TaskReclaimedEvent,
-} from "./AgentEvents";
-
-export {
-  // Event bus
-  DomainEventBus,
-  domainEventBus,
-
-  // Types
-} from "./DomainEventBus";
-
 // Type-only re-exports. Required by `isolatedModules`: these are types, and a
 // per-file transpiler (tsx/esbuild/bundlers) would otherwise emit them as real
 // runtime imports that fail to resolve.
@@ -55,6 +13,20 @@ export type {
   AgentRegisteredEventData,
   TaskReclaimedEventData,
   TaskReleasedEventData,
+} from "./AgentEvents";
+
+export {
+  AgentDeregisteredEvent,
+  AgentHeartbeatEvent,
+  // Agent events
+  AgentRegisteredEvent,
+  TaskApprovedEvent,
+  TaskCheckedOutEvent,
+  TaskCompletedEvent,
+  TaskReclaimedEvent,
+  TaskRejectedEvent,
+  TaskReleasedEvent,
+  TaskSubmittedForReviewEvent,
 } from "./AgentEvents";
 export type {
   IssueAssignedEventData,
@@ -69,8 +41,34 @@ export type {
   SprintIssuesChangedEventData,
   SprintStatusChangedEventData,
 } from "./DomainEvent";
+export {
+  // Base class
+  DomainEvent,
+  IssueAssignedEvent,
+  // Issue events
+  IssueCreatedEvent,
+  IssueLabelChangedEvent,
+  IssueStatusChangedEvent,
+  // Milestone events
+  MilestoneCreatedEvent,
+  MilestoneStatusChangedEvent,
+  // Project events
+  ProjectCreatedEvent,
+  ProjectStatusChangedEvent,
+  // Sprint events
+  SprintCreatedEvent,
+  SprintIssuesChangedEvent,
+  SprintStatusChangedEvent,
+} from "./DomainEvent";
 export type {
   AsyncEventHandler,
   EventHandler,
   SubscriptionOptions,
+} from "./DomainEventBus";
+export {
+  // Event bus
+  DomainEventBus,
+  domainEventBus,
+
+  // Types
 } from "./DomainEventBus";

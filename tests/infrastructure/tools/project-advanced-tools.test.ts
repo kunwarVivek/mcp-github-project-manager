@@ -1,4 +1,5 @@
 import { vi } from "vitest";
+
 /**
  * Unit tests for project advanced MCP tools
  *
@@ -11,20 +12,20 @@ import { vi } from "vitest";
  * thoroughly tested to ensure the workaround for GitHub API limitations works.
  */
 
-import {
-  UpdateItemPositionInputSchema,
-  SearchIssuesAdvancedInputSchema,
-  FilterProjectItemsInputSchema,
-} from "../../../src/infrastructure/tools/schemas/project-lifecycle-schemas.js";
-import {
-  updateItemPositionTool,
-  searchIssuesAdvancedTool,
-  filterProjectItemsTool,
-  executeUpdateItemPosition,
-  executeSearchIssuesAdvanced,
-  executeFilterProjectItems,
-} from "../../../src/infrastructure/tools/project-advanced-tools.js";
 import { GitHubRepositoryFactory } from "../../../src/infrastructure/github/GitHubRepositoryFactory.js";
+import {
+  executeFilterProjectItems,
+  executeSearchIssuesAdvanced,
+  executeUpdateItemPosition,
+  filterProjectItemsTool,
+  searchIssuesAdvancedTool,
+  updateItemPositionTool,
+} from "../../../src/infrastructure/tools/project-advanced-tools.js";
+import {
+  FilterProjectItemsInputSchema,
+  SearchIssuesAdvancedInputSchema,
+  UpdateItemPositionInputSchema,
+} from "../../../src/infrastructure/tools/schemas/project-lifecycle-schemas.js";
 
 // Mock the repository factory
 vi.mock("../../../src/infrastructure/github/GitHubRepositoryFactory.js", () => {

@@ -293,4 +293,4 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   });
 }
 
-export { main, parseArgs, buildTestCommand };
+export { buildTestCommand, main, parseArgs };

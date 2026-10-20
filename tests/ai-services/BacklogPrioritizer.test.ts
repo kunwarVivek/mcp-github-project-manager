@@ -1,4 +1,5 @@
-import { vi, type Mock } from "vitest";
+import { type Mock, vi } from "vitest";
+
 /**
  * Unit tests for BacklogPrioritizer
  *
@@ -6,9 +7,9 @@ import { vi, type Mock } from "vitest";
  * assessment and fallback behavior.
  */
 
-import { BacklogPrioritizer } from "../../src/services/ai/BacklogPrioritizer";
-import { AIServiceFactory } from "../../src/services/ai/AIServiceFactory";
 import type { BacklogItem } from "../../src/domain/sprint-planning-types";
+import { AIServiceFactory } from "../../src/services/ai/AIServiceFactory";
+import { BacklogPrioritizer } from "../../src/services/ai/BacklogPrioritizer";
 
 // Mock AIServiceFactory
 vi.mock("../../src/services/ai/AIServiceFactory", () => {

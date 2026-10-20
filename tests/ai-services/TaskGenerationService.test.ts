@@ -1,8 +1,8 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
-import { TaskGenerationService } from "../../src/services/TaskGenerationService";
-import { AIServiceFactory } from "../../src/services/ai/AIServiceFactory";
-import { TaskStatus, TaskPriority, type TaskComplexity } from "../../src/domain/ai-types";
 import { generateObject, generateText } from "ai";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { type TaskComplexity, TaskPriority, TaskStatus } from "../../src/domain/ai-types";
+import { AIServiceFactory } from "../../src/services/ai/AIServiceFactory";
+import { TaskGenerationService } from "../../src/services/TaskGenerationService";
 
 // Mock the AI service factory
 vi.mock("../../src/services/ai/AIServiceFactory", () => {

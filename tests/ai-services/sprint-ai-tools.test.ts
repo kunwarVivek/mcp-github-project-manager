@@ -1,4 +1,5 @@
 import { vi } from "vitest";
+
 /**
  * Unit tests for Sprint AI MCP Tools
  *
@@ -7,24 +8,24 @@ import { vi } from "vitest";
  */
 
 import {
-  calculateSprintCapacityTool,
-  prioritizeBacklogTool,
-  assessSprintRiskTool,
-  suggestSprintCompositionTool,
-  executeCalculateSprintCapacity,
-  executePrioritizeBacklog,
-  executeAssessSprintRisk,
-  executeSuggestSprintComposition,
-  sprintAITools,
-  sprintAIExecutors,
-} from "../../src/infrastructure/tools/sprint-ai-tools";
-import { AIServiceFactory } from "../../src/services/ai/AIServiceFactory";
-import {
-  SprintCapacityInputSchema,
   BacklogPrioritizationInputSchema,
+  SprintCapacityInputSchema,
   SprintRiskInputSchema,
   SprintSuggestionInputSchema,
 } from "../../src/infrastructure/tools/schemas/sprint-roadmap-schemas";
+import {
+  assessSprintRiskTool,
+  calculateSprintCapacityTool,
+  executeAssessSprintRisk,
+  executeCalculateSprintCapacity,
+  executePrioritizeBacklog,
+  executeSuggestSprintComposition,
+  prioritizeBacklogTool,
+  sprintAIExecutors,
+  sprintAITools,
+  suggestSprintCompositionTool,
+} from "../../src/infrastructure/tools/sprint-ai-tools";
+import { AIServiceFactory } from "../../src/services/ai/AIServiceFactory";
 
 // Mock AIServiceFactory
 vi.mock("../../src/services/ai/AIServiceFactory", () => {

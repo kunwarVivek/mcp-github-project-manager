@@ -1,38 +1,37 @@
 import { generateObject } from "ai";
-import { AIServiceFactory } from "./ai/AIServiceFactory";
-import { type ILogger, Logger } from "../infrastructure/logger";
-import { InputSanitizer } from "./utils/InputSanitizer";
-import {
-  CONTEXT_GENERATION_CONFIGS,
-  formatContextPrompt,
-  BusinessContextSchema,
-  TechnicalContextSchema,
-} from "./ai/prompts/ContextGenerationPrompts";
 import type {
   AITask,
-  PRDDocument,
   EnhancedTaskGenerationConfig,
   FeatureRequirement,
+  PRDDocument,
 } from "../domain/ai-types";
 import {
-  type TaskExecutionContext,
   type ContextQualityMetrics,
   calculateCompletenessScore,
+  type TaskExecutionContext,
 } from "../domain/task-context-schemas";
 import {
+  ENHANCED_CONTEXT_LEVEL,
   ENHANCED_TASK_GENERATION,
   INCLUDE_BUSINESS_CONTEXT,
-  INCLUDE_TECHNICAL_CONTEXT,
   INCLUDE_IMPLEMENTATION_GUIDANCE,
-  ENHANCED_CONTEXT_LEVEL,
+  INCLUDE_TECHNICAL_CONTEXT,
 } from "../env";
-
+import { type ILogger, Logger } from "../infrastructure/logger";
+import { AIServiceFactory } from "./ai/AIServiceFactory";
+import {
+  BusinessContextSchema,
+  CONTEXT_GENERATION_CONFIGS,
+  formatContextPrompt,
+  TechnicalContextSchema,
+} from "./ai/prompts/ContextGenerationPrompts";
+import { TokenCounter } from "./ai/TokenCounter";
+import { CodeExampleGenerator } from "./context/CodeExampleGenerator";
 // Import new context generation services
 import { ContextualReferenceGenerator } from "./context/ContextualReferenceGenerator";
 import { DependencyContextGenerator } from "./context/DependencyContextGenerator";
-import { CodeExampleGenerator } from "./context/CodeExampleGenerator";
+import { InputSanitizer } from "./utils/InputSanitizer";
 import { ContextQualityValidator } from "./validation/ContextQualityValidator";
-import { TokenCounter } from "./ai/TokenCounter";
 
 /**
  * Service for generating comprehensive task context using AI and traceability

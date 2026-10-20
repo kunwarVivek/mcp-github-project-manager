@@ -1,4 +1,5 @@
 import { vi } from "vitest";
+
 /**
  * Unit tests for sub-issue MCP tools
  *
@@ -8,26 +9,26 @@ import { vi } from "vitest";
  * - Executor functions (with mocked repositories)
  */
 
+import { GitHubRepositoryFactory } from "../../../src/infrastructure/github/GitHubRepositoryFactory.js";
 import {
   AddSubIssueInputSchema,
-  ListSubIssuesInputSchema,
   GetParentIssueInputSchema,
-  ReprioritizeSubIssueInputSchema,
+  ListSubIssuesInputSchema,
   RemoveSubIssueInputSchema,
+  ReprioritizeSubIssueInputSchema,
 } from "../../../src/infrastructure/tools/schemas/sub-issue-schemas.js";
 import {
   addSubIssueTool,
-  listSubIssuesTool,
-  getParentIssueTool,
-  reprioritizeSubIssueTool,
-  removeSubIssueTool,
   executeAddSubIssue,
-  executeListSubIssues,
   executeGetParentIssue,
-  executeReprioritizeSubIssue,
+  executeListSubIssues,
   executeRemoveSubIssue,
+  executeReprioritizeSubIssue,
+  getParentIssueTool,
+  listSubIssuesTool,
+  removeSubIssueTool,
+  reprioritizeSubIssueTool,
 } from "../../../src/infrastructure/tools/sub-issue-tools.js";
-import { GitHubRepositoryFactory } from "../../../src/infrastructure/github/GitHubRepositoryFactory.js";
 
 // Mock the repository factory
 vi.mock("../../../src/infrastructure/github/GitHubRepositoryFactory.js", () => {

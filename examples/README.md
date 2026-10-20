@@ -38,7 +38,7 @@ This directory contains example code demonstrating how to use the MCP GitHub Pro
 ### Prerequisites
 
 1. Node.js 18.x or higher
-2. TypeScript installed (`npm install -g typescript ts-node`)
+2. TypeScript installed (`pnpm install` (provides tsx))
 3. MCP GitHub Project Manager installed (`npm install mcp-github-project-manager`)
 4. Valid GitHub token with appropriate permissions
 
@@ -54,7 +54,7 @@ export GITHUB_OWNER=your_github_username_or_org
 export GITHUB_REPO=your_repository_name
 
 # Run an example
-ts-node examples/basic/create-simple-project.ts
+pnpm exec tsx examples/basic/create-simple-project.ts
 ```
 
 ### Installation Options
@@ -85,17 +85,17 @@ mcp-github-project-manager --help
 #### Option 3: Run directly with TypeScript
 
 ```bash
-# Run directly with ts-node
-node --loader ts-node/esm src/index.ts
+# Run directly with tsx
+pnpm exec tsx src/index.ts
 
 # Run with command line arguments
-node --loader ts-node/esm src/index.ts --token=your_token --owner=your_username --repo=your_repo
+pnpm exec tsx src/index.ts --token=your_token --owner=your_username --repo=your_repo
 
 # Use the npm dev script (watches for changes)
-npm run dev
+pnpm run dev
 
 # Display help information
-node --loader ts-node/esm src/index.ts --help
+pnpm exec tsx src/index.ts --help
 ```
 
 #### Option 4: Install in AI Assistants
@@ -230,7 +230,7 @@ See the [main README](../README.md#using-docker) for instructions on building th
 If you encounter issues with the MCP server:
 
 1. Try using `bunx` instead of `npx` if you have module resolution issues
-2. On Windows, use `cmd /c npx -y mcp-github-project-manager` as the command
+2. On Windows, use `cmd /c pnpm dlx mcp-github-project-manager` as the command
 3. Check that your GitHub token has the required permissions
 4. Ensure you're using Node.js v18 or higher
 
@@ -245,7 +245,7 @@ See the [main README](../README.md#troubleshooting) for more troubleshooting tip
 Creates a basic project with a single milestone and two issues.
 
 ```bash
-ts-node examples/basic/create-simple-project.ts
+pnpm exec tsx examples/basic/create-simple-project.ts
 ```
 
 ### Plan Sprint
@@ -255,7 +255,7 @@ ts-node examples/basic/create-simple-project.ts
 Plans a sprint with existing issues.
 
 ```bash
-ts-node examples/basic/plan-sprint.ts
+pnpm exec tsx examples/basic/plan-sprint.ts
 ```
 
 ### Track Progress
@@ -265,7 +265,7 @@ ts-node examples/basic/plan-sprint.ts
 Tracks the progress of a sprint.
 
 ```bash
-ts-node examples/basic/track-progress.ts
+pnpm exec tsx examples/basic/track-progress.ts
 ```
 
 ## Advanced Examples

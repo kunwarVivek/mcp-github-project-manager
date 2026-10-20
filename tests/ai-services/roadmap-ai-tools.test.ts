@@ -7,18 +7,18 @@ import { vi } from "vitest";
  */
 
 import {
-  generateRoadmapTool,
-  generateRoadmapVisualizationTool,
   executeGenerateRoadmap,
   executeGenerateRoadmapVisualization,
-  roadmapAITools,
+  generateRoadmapTool,
+  generateRoadmapVisualizationTool,
   roadmapAIExecutors,
+  roadmapAITools,
 } from "../../src/infrastructure/tools/roadmap-ai-tools";
-import { AIServiceFactory } from "../../src/services/ai/AIServiceFactory";
 import {
   RoadmapGenerationInputSchema,
   RoadmapOutputSchema,
 } from "../../src/infrastructure/tools/schemas/sprint-roadmap-schemas";
+import { AIServiceFactory } from "../../src/services/ai/AIServiceFactory";
 
 // Mock AIServiceFactory
 vi.mock("../../src/services/ai/AIServiceFactory", () => {
@@ -52,7 +52,7 @@ describe("Roadmap AI MCP Tools", () => {
   describe("Tool Definitions", () => {
     describe("generateRoadmapTool", () => {
       it("should have correct name", () => {
-        expect(generateRoadmapTool.name).toBe("generate_roadmap");
+        expect(generateRoadmapTool.name).toBe("generate_roadmap_requirements");
       });
 
       it("should have title", () => {
@@ -105,19 +105,19 @@ describe("Roadmap AI MCP Tools", () => {
 
       it("should contain all roadmap tools", () => {
         const names = roadmapAITools.map((t) => t.name);
-        expect(names).toContain("generate_roadmap");
+        expect(names).toContain("generate_roadmap_requirements");
         expect(names).toContain("generate_roadmap_visualization");
       });
     });
 
     describe("roadmapAIExecutors", () => {
       it("should have executor for each tool", () => {
-        expect(roadmapAIExecutors).toHaveProperty("generate_roadmap");
+        expect(roadmapAIExecutors).toHaveProperty("generate_roadmap_requirements");
         expect(roadmapAIExecutors).toHaveProperty("generate_roadmap_visualization");
       });
 
       it("should have functions as executors", () => {
-        expect(typeof roadmapAIExecutors.generate_roadmap).toBe("function");
+        expect(typeof roadmapAIExecutors.generate_roadmap_requirements).toBe("function");
         expect(typeof roadmapAIExecutors.generate_roadmap_visualization).toBe("function");
       });
     });

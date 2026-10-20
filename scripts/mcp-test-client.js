@@ -23,9 +23,9 @@
  */
 
 import { spawn } from "node:child_process";
-import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import readline from "node:readline";
+import { fileURLToPath } from "node:url";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -99,8 +99,8 @@ class MCPTestClient {
       responseBuffer += data.toString();
 
       // Process complete JSON messages
-      let newlineIndex;
-      while ((newlineIndex = responseBuffer.indexOf("\n")) !== -1) {
+      const newlineIndex = responseBuffer.indexOf("\n");
+      while (newlineIndex !== -1) {
         const line = responseBuffer.slice(0, newlineIndex).trim();
         responseBuffer = responseBuffer.slice(newlineIndex + 1);
 

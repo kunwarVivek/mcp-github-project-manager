@@ -1,10 +1,10 @@
 import type {
   ParsedTemplate,
-  TemplateValidationResult,
   TemplateSection,
+  TemplateValidationResult,
 } from "../../domain/template-types";
-import { TemplateParser, extractPlaceholders } from "./TemplateParser";
 import { TemplateEngine } from "./TemplateEngine";
+import { extractPlaceholders, TemplateParser } from "./TemplateParser";
 
 /**
  * Recommended sections for PRD templates

@@ -1,5 +1,5 @@
-import { beforeEach, describe, expect, it, vi, type Mocked, type MockedClass } from "vitest";
 import { Octokit } from "@octokit/rest";
+import { beforeEach, describe, expect, it, type Mocked, type MockedClass, vi } from "vitest";
 import { GitHubConfig } from "../../../../../infrastructure/github/GitHubConfig";
 import { GitHubIssueRepository } from "../../../../../infrastructure/github/repositories/GitHubIssueRepository";
 

@@ -24,55 +24,55 @@
  * | Automation | createAutomationRule, listAutomationRules, … | ProjectAutomationService |
  * | Iterations | getIterationConfiguration, getCurrentIteration, … | IterationService |
  */
-import type { GitHubRepositoryFactory } from "../infrastructure/github/GitHubRepositoryFactory";
+
 import type { ResourceStatus } from "../domain/resource-types";
 import type {
-  Issue,
   CreateIssue,
-  Milestone,
   CreateMilestone,
-  Project,
   CreateProject,
-  Sprint,
   CreateSprint,
   CustomField,
-  ProjectView,
+  Issue,
+  Milestone,
+  Project,
   ProjectItem,
+  ProjectView,
+  Sprint,
 } from "../domain/types";
+import type { GitHubRepositoryFactory } from "../infrastructure/github/GitHubRepositoryFactory";
+import type { FieldValueService } from "./FieldValueService";
+import type { IssueService } from "./IssueService";
+import type { IterationService } from "./IterationService";
+import type { LabelService } from "./LabelService";
+import type { MilestoneMetrics } from "./MilestoneService";
+import { MilestoneService } from "./MilestoneService";
+import type {
+  AutomationRuleDTO,
+  AutomationRuleSummary,
+  CreateAutomationRuleInput,
+  ProjectAutomationService,
+  UpdateAutomationRuleInput,
+} from "./ProjectAutomationService";
+import { ProjectLinkingService } from "./ProjectLinkingService";
+import { ProjectStatusService } from "./ProjectStatusService";
+import { ProjectTemplateService } from "./ProjectTemplateService";
+import type { PullRequestService } from "./PullRequestService";
+import type { RoadmapService } from "./RoadmapService";
+import type { SprintMetrics } from "./SprintPlanningService";
+import { SprintPlanningService } from "./SprintPlanningService";
+import type { IssueDependency, IssueHistoryEntry } from "./SubIssueService";
+import { SubIssueService } from "./SubIssueService";
 // Entity imports removed - services now return plain objects for MCP compatibility
 import { safeCall } from "./utils/safeCall";
 
-import { SubIssueService } from "./SubIssueService";
-import type { IssueDependency, IssueHistoryEntry } from "./SubIssueService";
-import type { IssueService } from "./IssueService";
-import type { RoadmapService } from "./RoadmapService";
-import type {
-  ProjectAutomationService,
-  CreateAutomationRuleInput,
-  UpdateAutomationRuleInput,
-  AutomationRuleDTO,
-  AutomationRuleSummary,
-} from "./ProjectAutomationService";
-import { MilestoneService } from "./MilestoneService";
-import type { MilestoneMetrics } from "./MilestoneService";
-import { SprintPlanningService } from "./SprintPlanningService";
-import type { SprintMetrics } from "./SprintPlanningService";
-import { ProjectStatusService } from "./ProjectStatusService";
-import { ProjectTemplateService } from "./ProjectTemplateService";
-import { ProjectLinkingService } from "./ProjectLinkingService";
-import type { PullRequestService } from "./PullRequestService";
-import type { FieldValueService } from "./FieldValueService";
-import type { LabelService } from "./LabelService";
-import type { IterationService } from "./IterationService";
-
 export type { IssueDependency, IssueHistoryEntry, MilestoneMetrics, SprintMetrics };
 export {
-  SubIssueService,
   MilestoneService,
-  SprintPlanningService,
+  ProjectLinkingService,
   ProjectStatusService,
   ProjectTemplateService,
-  ProjectLinkingService,
+  SprintPlanningService,
+  SubIssueService,
 };
 
 export class ProjectManagementService {

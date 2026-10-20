@@ -6,7 +6,7 @@
  * - ProjectManagementService delegates to extracted services
  * - Service dependencies are properly wired
  */
-import { describe, beforeEach, it, expect } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import { configureContainer, container, createProjectManagementService } from "../../container";
 import { ProjectManagementService } from "../../services/ProjectManagementService";
 

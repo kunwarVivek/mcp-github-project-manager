@@ -1,8 +1,10 @@
-import graphlib from "graphlib";
 import type { Graph as GraphType } from "graphlib";
+import graphlib from "graphlib";
+
 const { Graph, alg } = graphlib;
+
 import type { AITask } from "../domain/ai-types";
-import { extractKeywords, checkKeywordDependency } from "./KeywordExtractor";
+import { checkKeywordDependency, extractKeywords } from "./KeywordExtractor";
 
 /**
  * Detected dependency with confidence

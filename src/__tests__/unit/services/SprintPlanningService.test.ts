@@ -1,10 +1,10 @@
-import { beforeEach, describe, expect, it, vi, type Mocked } from "vitest";
-import { SprintPlanningService } from "../../../services/SprintPlanningService";
-import type { GitHubRepositoryFactory } from "../../../infrastructure/github/GitHubRepositoryFactory";
-import type { GitHubSprintRepository } from "../../../infrastructure/github/repositories/GitHubSprintRepository";
-import type { GitHubIssueRepository } from "../../../infrastructure/github/repositories/GitHubIssueRepository";
+import { beforeEach, describe, expect, it, type Mocked, vi } from "vitest";
 import { ResourceStatus } from "../../../domain/resource-types";
-import type { Sprint, Issue } from "../../../domain/types";
+import type { Issue, Sprint } from "../../../domain/types";
+import type { GitHubRepositoryFactory } from "../../../infrastructure/github/GitHubRepositoryFactory";
+import type { GitHubIssueRepository } from "../../../infrastructure/github/repositories/GitHubIssueRepository";
+import type { GitHubSprintRepository } from "../../../infrastructure/github/repositories/GitHubSprintRepository";
+import { SprintPlanningService } from "../../../services/SprintPlanningService";
 
 // Mock tsyringe decorators
 vi.mock("tsyringe", () => ({

@@ -11,11 +11,11 @@
  */
 
 import {
-  circuitBreaker,
-  ConsecutiveBreaker,
-  handleAll,
-  CircuitState,
   type CircuitBreakerPolicy,
+  CircuitState,
+  ConsecutiveBreaker,
+  circuitBreaker,
+  handleAll,
 } from "cockatiel";
 
 /**

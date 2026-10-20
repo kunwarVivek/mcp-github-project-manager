@@ -12,11 +12,11 @@ import { vi } from "vitest";
 
 import * as fs from "node:fs";
 import * as fsPromises from "node:fs/promises";
-import * as path from "node:path";
 import * as os from "node:os";
+import * as path from "node:path";
 import {
-  CachePersistence,
   type CacheEntry,
+  CachePersistence,
 } from "../../../src/infrastructure/cache/CachePersistence.js";
 
 describe("CachePersistence", () => {

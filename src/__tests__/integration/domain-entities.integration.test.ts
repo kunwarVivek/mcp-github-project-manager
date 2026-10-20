@@ -8,9 +8,7 @@
  * - Entity serialization/deserialization roundtrips correctly
  * - Cross-entity interactions work as expected
  */
-import { describe, it, expect, beforeEach, vi } from "vitest";
-import { ResourceStatus } from "../../domain/resource-types";
-import type { Issue, Milestone, Sprint } from "../../domain/types";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   IssueEntity,
   IssuePriority,
@@ -18,6 +16,8 @@ import {
   MilestoneEntity,
   SprintEntity,
 } from "../../domain/entities";
+import { ResourceStatus } from "../../domain/resource-types";
+import type { Issue, Milestone, Sprint } from "../../domain/types";
 
 describe("Domain Entities Integration", () => {
   // The global setup file (src/__tests__/e2e/setup.ts) is registered as a vitest

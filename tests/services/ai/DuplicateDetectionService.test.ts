@@ -1,4 +1,5 @@
 import { vi } from "vitest";
+
 /**
  * Unit tests for DuplicateDetectionService
  *
@@ -6,8 +7,8 @@ import { vi } from "vitest";
  * with tiered confidence and fallback to keyword-based detection.
  */
 
+import { cosineSimilarity, embed, embedMany } from "ai";
 import { DuplicateDetectionService } from "../../../src/services/ai/DuplicateDetectionService";
-import { embed, embedMany, cosineSimilarity } from "ai";
 
 // Mock dependencies
 vi.mock("ai", () => ({

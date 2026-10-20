@@ -1,7 +1,7 @@
-import type { GitHubError, OctokitInstance } from "../types";
-import { GitHubErrorHandler } from "../GitHubErrorHandler";
-import type { GitHubConfig } from "../GitHubConfig";
 import { ResourceStatus } from "../../../domain/resource-types";
+import type { GitHubConfig } from "../GitHubConfig";
+import { GitHubErrorHandler } from "../GitHubErrorHandler";
+import type { GitHubError, OctokitInstance } from "../types";
 
 export interface IGitHubRepository {
   readonly octokit: OctokitInstance;

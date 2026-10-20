@@ -1,7 +1,7 @@
-import { beforeEach, describe, expect, it, vi, type Mocked } from "vitest";
+import { beforeEach, describe, expect, it, type Mocked, vi } from "vitest";
+import type { Agent } from "../../../domain/agent-orchestration-types";
 import { AgentStore } from "../../../infrastructure/agent/AgentStore";
 import type { GitHubRepositoryFactory } from "../../../infrastructure/github/GitHubRepositoryFactory";
-import type { Agent } from "../../../domain/agent-orchestration-types";
 
 vi.mock("../../../infrastructure/github/GitHubRepositoryFactory", () => {
   const mockFactory = vi.fn().mockImplementation(function () {

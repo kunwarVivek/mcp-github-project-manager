@@ -1,28 +1,28 @@
 import { generateObject, generateText } from "ai";
+import { v4 as uuidv4 } from "uuid";
 import { z } from "zod";
-import { AIServiceFactory } from "./AIServiceFactory";
-import { InputSanitizer } from "../utils/InputSanitizer";
-import { type ILogger, Logger } from "../../infrastructure/logger";
 import {
-  PRDDocumentSchema,
-  AITaskSchema,
-  FeatureRequirementSchema,
+  type AIGenerationMetadata,
   type AITask,
-  type PRDDocument,
+  AITaskSchema,
+  type ConfidenceConfig,
+  DEFAULT_CONFIDENCE_CONFIG,
   type FeatureRequirement,
+  FeatureRequirementSchema,
+  type PRDDocument,
+  PRDDocumentSchema,
+  type SectionConfidence,
   TaskPriority,
   TaskPrioritySchema,
   TaskStatus,
-  type AIGenerationMetadata,
-  type SectionConfidence,
-  type ConfidenceConfig,
-  DEFAULT_CONFIDENCE_CONFIG,
 } from "../../domain/ai-types";
-import { PRD_PROMPT_CONFIGS, formatPrompt } from "./prompts/PRDGenerationPrompts";
-import { TASK_PROMPT_CONFIGS, formatTaskPrompt } from "./prompts/TaskGenerationPrompts";
-import { CONFIDENCE_PROMPT_CONFIGS, withConfidenceAssessment } from "./prompts/ConfidencePrompts";
+import { type ILogger, Logger } from "../../infrastructure/logger";
+import { InputSanitizer } from "../utils/InputSanitizer";
+import { AIServiceFactory } from "./AIServiceFactory";
 import { ConfidenceScorer } from "./ConfidenceScorer";
-import { v4 as uuidv4 } from "uuid";
+import { CONFIDENCE_PROMPT_CONFIGS, withConfidenceAssessment } from "./prompts/ConfidencePrompts";
+import { formatPrompt, PRD_PROMPT_CONFIGS } from "./prompts/PRDGenerationPrompts";
+import { formatTaskPrompt, TASK_PROMPT_CONFIGS } from "./prompts/TaskGenerationPrompts";
 
 /**
  * Core AI Task Processor using Vercel AI SDK

@@ -1,8 +1,8 @@
-import type { GitHubRepositoryFactory } from "../../infrastructure/github/GitHubRepositoryFactory";
 import type { AgentTaskContext } from "../../domain/agent-orchestration-types";
+import type { GitHubRepositoryFactory } from "../../infrastructure/github/GitHubRepositoryFactory";
 import { AIServiceFactory } from "../ai/AIServiceFactory";
-import { safeCall } from "../utils/safeCall";
 import { InputSanitizer } from "../utils/InputSanitizer";
+import { safeCall } from "../utils/safeCall";
 
 // ---------------------------------------------------------------------------
 // GraphQL response types (private to this module)
@@ -383,15 +383,13 @@ function extractAcceptanceCriteria(body: string): string[] {
   // Strategy 2: If no heading found, look for checkbox lines anywhere
   if (criteria.length === 0) {
     const checkboxPattern = /^[\s]*[-*]\s*\[[ x]\]\s*(.+)$/gm;
-    let match: RegExpExecArray | null;
-    // biome-ignore lint/suspicious/noAssignInExpressions: the assignment-in-condition
-    // is the canonical form for iterating a /g regex with exec(); splitting it
-    // would duplicate the exec call or drop the null check.
-    while ((match = checkboxPattern.exec(body)) !== null) {
+    let match: RegExpExecArray | null = checkboxPattern.exec(body);
+    while (match !== null) {
       const text = match[1]?.trim();
       if (text) {
         criteria.push(text);
       }
+      match = checkboxPattern.exec(body);
     }
   }
 

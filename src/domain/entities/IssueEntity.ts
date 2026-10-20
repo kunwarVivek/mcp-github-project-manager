@@ -25,7 +25,7 @@
  * ```
  */
 import { ResourceStatus } from "../resource-types";
-import type { Issue, CreateIssue } from "../types";
+import type { CreateIssue, Issue } from "../types";
 
 /**
  * Priority levels for issues

@@ -1,9 +1,9 @@
-import type { AgentStore } from "../../infrastructure/agent/AgentStore";
-import type { Agent, BudgetStatus, AgentBudget } from "../../domain/agent-orchestration-types";
+import type { Agent, AgentBudget, BudgetStatus } from "../../domain/agent-orchestration-types";
 import {
   DEFAULT_AGENT_BUDGET_TOKENS,
   MAX_AGENT_HIERARCHY_DEPTH,
 } from "../../domain/agent-orchestration-types";
+import type { AgentStore } from "../../infrastructure/agent/AgentStore";
 import { safeCall } from "../utils/safeCall";
 
 /**

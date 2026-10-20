@@ -12,11 +12,11 @@
  * Usage:
  * 1. Set environment variables (see .env.example)
  * 2. Update the sprintId variable with your actual sprint ID
- * 3. Run: ts-node examples/basic/track-progress.ts
+ * 3. Run: pnpm exec tsx examples/basic/track-progress.ts
  */
 
-import { ProjectManagementService } from "../../src/services/ProjectManagementService.js";
 import dotenv from "dotenv";
+import { createProjectManagementService } from "../../src/container.js";
 
 // Load environment variables
 dotenv.config();
@@ -33,7 +33,7 @@ for (const envVar of requiredEnvVars) {
 async function trackSprintProgress() {
   try {
     // Initialize the service
-    const service = new ProjectManagementService(
+    const service = createProjectManagementService(
       process.env.GITHUB_OWNER ?? "",
       process.env.GITHUB_REPO ?? "",
       process.env.GITHUB_TOKEN ?? ""
@@ -48,39 +48,31 @@ async function trackSprintProgress() {
     const metrics = await service.getSprintMetrics(sprintId, true);
 
     console.log("Sprint Metrics:");
-    console.log("Sprint Title:", metrics.sprint.title);
-    console.log("Sprint Status:", metrics.sprint.status);
-    console.log("Start Date:", new Date(metrics.sprint.startDate).toLocaleDateString());
-    console.log("End Date:", new Date(metrics.sprint.endDate).toLocaleDateString());
+    console.log("Sprint Title:", metrics.title);
+    console.log("Sprint Status:", metrics.status);
+    console.log("Start Date:", new Date(metrics.startDate).toLocaleDateString());
+    console.log("End Date:", new Date(metrics.endDate).toLocaleDateString());
 
     // Calculate days remaining
     const now = new Date();
-    const endDate = new Date(metrics.sprint.endDate);
+    const endDate = new Date(metrics.endDate);
     const daysRemaining = Math.ceil((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
 
     console.log("Days Remaining:", daysRemaining > 0 ? daysRemaining : "Sprint ended");
-    console.log("Progress:", `${metrics.progress.completionPercentage}%`);
-    console.log("Open Issues:", metrics.progress.openIssues);
-    console.log("Closed Issues:", metrics.progress.closedIssues);
-
-    // Display issue breakdown
-    console.log("\nIssue Breakdown:");
-    console.log("By Type:");
-    Object.entries(metrics.issueBreakdown.byType).forEach(([type, count]) => {
-      console.log(`  - ${type}: ${count}`);
-    });
-
-    console.log("By Priority:");
-    Object.entries(metrics.issueBreakdown.byPriority).forEach(([priority, count]) => {
-      console.log(`  - ${priority}: ${count}`);
-    });
+    const completionPercentage =
+      metrics.totalIssues > 0
+        ? Math.round((metrics.completedIssues / metrics.totalIssues) * 100)
+        : 0;
+    console.log("Progress:", `${completionPercentage}%`);
+    console.log("Total Issues:", metrics.totalIssues);
+    console.log("Completed Issues:", metrics.completedIssues);
 
     // Display detailed issue information
     if (metrics.issues && metrics.issues.length > 0) {
       console.log("\nIssues:");
       metrics.issues.forEach((issue) => {
-        console.log(`- ${issue.title} (${issue.status})`);
-        console.log(`  Type: ${issue.type}, Priority: ${issue.priority}`);
+        console.log(`- #${issue.number} ${issue.title} (${issue.status})`);
+        console.log(`  Labels: ${issue.labels.join(", ") || "none"}`);
       });
     }
 
@@ -93,9 +85,9 @@ async function trackSprintProgress() {
     process.stderr.write("Error tracking sprint progress:");
     if (error instanceof Error) {
       process.stderr.write(`${error.name}: ${error.message}`);
-      process.stderr.write(error.stack);
+      process.stderr.write(error.stack ?? "");
     } else {
-      process.stderr.write(error);
+      process.stderr.write(String(error));
     }
     process.exit(1);
   }

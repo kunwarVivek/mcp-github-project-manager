@@ -1,9 +1,9 @@
 import {
-  type SectionConfidence,
   type ConfidenceConfig,
   type ConfidenceFactors,
   type ConfidenceTier,
   DEFAULT_CONFIDENCE_CONFIG,
+  type SectionConfidence,
 } from "../../domain/ai-types";
 
 /**

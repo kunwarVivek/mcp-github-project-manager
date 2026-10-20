@@ -1,9 +1,9 @@
 import { TemplateEngine } from "../../src/services/templates/TemplateEngine";
 import {
-  TemplateParser,
   detectTemplateFormat,
-  extractPlaceholders,
   extractMarkdownSections,
+  extractPlaceholders,
+  TemplateParser,
 } from "../../src/services/templates/TemplateParser";
 import { TemplateValidator } from "../../src/services/templates/TemplateValidator";
 

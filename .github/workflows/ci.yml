@@ -12,25 +12,34 @@ jobs:
 
     strategy:
       matrix:
-        node-version: [18.x, 20.x, 22.x]
+        # vitest 5 supports ^22.12.0 || ^24.0.0 || >=26.0.0 and `ai` 7 requires
+        # node >=22. 22.x is the declared engines floor, 24.x is the active
+        # LTS, 26.x is the current line — test all three.
+        node-version: [22.x, 24.x, 26.x]
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
 
       - name: Use Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
-          cache: 'npm'
+          cache: 'pnpm'
 
       - name: Install dependencies
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       - name: Build
-        run: npm run build
+        run: pnpm run build
+
+      - name: Typecheck
+        run: pnpm run typecheck
 
       - name: Run tests
-        run: npm test
+        run: pnpm test
 
   lint:
     runs-on: ubuntu-latest
@@ -38,14 +47,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Use Node.js
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Use Node.js '22.x'
         uses: actions/setup-node@v4
         with:
-          node-version: '22.x'
-          cache: 'npm'
+          node-version: '24.x'
+          cache: 'pnpm'
 
       - name: Install dependencies
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       - name: Lint
-        run: npm run lint --if-present
+        run: pnpm run lint --if-present

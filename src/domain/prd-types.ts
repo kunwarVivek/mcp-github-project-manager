@@ -1,9 +1,9 @@
 import { z } from "zod";
-import type { TaskPriority, TaskComplexity, AIGenerationMetadata } from "./ai-task-types";
+import type { AIGenerationMetadata, TaskComplexity, TaskPriority } from "./ai-task-types";
 import {
-  TaskPrioritySchema,
-  TaskComplexitySchema,
   AIGenerationMetadataSchema,
+  TaskComplexitySchema,
+  TaskPrioritySchema,
 } from "./ai-task-types";
 
 // ============================================================================

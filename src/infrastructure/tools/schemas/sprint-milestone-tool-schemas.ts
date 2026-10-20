@@ -1,17 +1,17 @@
 import { z } from "zod";
-import type { ToolDefinition, ToolSchema } from "../ToolValidator";
 import { ANNOTATION_PATTERNS } from "../annotations/tool-annotations";
+import type { ToolDefinition, ToolSchema } from "../ToolValidator";
 import {
-  MilestoneOutputSchema,
+  DeleteOutputSchema,
+  LabelListOutputSchema,
+  LabelOutputSchema,
   MilestoneListOutputSchema,
   MilestoneMetricsOutputSchema,
-  SprintOutputSchema,
+  MilestoneOutputSchema,
+  RoadmapOutputSchema,
   SprintListOutputSchema,
   SprintMetricsOutputSchema,
-  RoadmapOutputSchema,
-  LabelOutputSchema,
-  LabelListOutputSchema,
-  DeleteOutputSchema,
+  SprintOutputSchema,
 } from "./project-schemas";
 
 // ============================================================================

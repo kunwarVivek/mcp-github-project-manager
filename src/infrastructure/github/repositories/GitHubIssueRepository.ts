@@ -1,7 +1,7 @@
-import { BaseGitHubRepository } from "./BaseRepository";
-import type { Issue, CreateIssue, IssueRepository, IssueId } from "../../../domain/types";
 import { ResourceStatus } from "../../../domain/resource-types";
+import type { CreateIssue, Issue, IssueId, IssueRepository } from "../../../domain/types";
 import { parseResourceStatus, toStatusString } from "../../../domain/utils/StatusParser";
+import { BaseGitHubRepository } from "./BaseRepository";
 
 interface GitHubIssue {
   id: string;

@@ -18,24 +18,27 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Use Node.js
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Use Node.js '22.x'
         uses: actions/setup-node@v4
         with:
-          node-version: '22.x'
-          cache: 'npm'
+          node-version: '24.x'
+          cache: 'pnpm'
           registry-url: 'https://registry.npmjs.org'
 
       - name: Install dependencies
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       - name: Build
-        run: npm run build
+        run: pnpm run build
 
       - name: Run tests
-        run: npm test
+        run: pnpm test
 
       - name: Publish to npm
-        run: npm publish --provenance --access public
+        run: pnpm publish --provenance --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
@@ -48,7 +51,7 @@ jobs:
         run: |
           VERSION="${{ steps.version.outputs.VERSION }}"
           VERSION_NUM="${VERSION#v}"
-          # Extract changelog section for this version
+          # Extract changelog section for version
           CHANGELOG=$(awk "/^## \[${VERSION_NUM}\]/{flag=1; next} /^## \[/{flag=0} flag" CHANGELOG.md)
           # Handle multiline output
           echo "CHANGELOG<<EOF" >> $GITHUB_OUTPUT

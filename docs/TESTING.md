@@ -21,32 +21,32 @@ The test suite contains:
 
 ### Run All Tests
 ```bash
-npm test
+pnpm test
 ```
 
 ### Run Specific Test Categories
 ```bash
 # Unit tests only
-npm test -- --testPathPattern="unit"
+pnpm test -- --testPathPattern="unit"
 
 # Integration tests only
-npm test -- --testPathPattern="integration"
+pnpm test -- --testPathPattern="integration"
 
 # E2E tests only
-npm test -- --testPathPattern="e2e"
+pnpm test -- --testPathPattern="e2e"
 
 # Specific test file
-npm test -- --testPathPattern="stdio-transport"
+pnpm test -- --testPathPattern="stdio-transport"
 ```
 
 ### Watch Mode
 ```bash
-npm run test:watch
+pnpm run test:watch
 ```
 
 ### Coverage Report
 ```bash
-npm run test:coverage
+pnpm run test:coverage
 ```
 
 ## Skipped Tests
@@ -85,7 +85,7 @@ export GITHUB_REPO="your-test-repository"
 The E2E test files use `describe.skip` to skip tests by default. To run them:
 
 1. Edit the test file and change `describe.skip` to `describe`
-2. Run the tests: `npm test -- --testPathPattern="github-project-manager"`
+2. Run the tests: `pnpm test -- --testPathPattern="github-project-manager"`
 3. Remember to revert the change after testing
 
 **Warning:** These tests will create real resources in your GitHub repository. Use a dedicated test repository.
@@ -94,7 +94,7 @@ The E2E test files use `describe.skip` to skip tests by default. To run them:
 
 Integration tests automatically run when `GITHUB_TOKEN` is set:
 ```bash
-GITHUB_TOKEN=your-token npm test -- --testPathPattern="GitHubProjectManager"
+GITHUB_TOKEN=your-token pnpm test -- --testPathPattern="GitHubProjectManager"
 ```
 
 ## Test Structure
@@ -134,11 +134,11 @@ src/__tests__/
 ### For All Tests
 - Node.js 22+
 - `npm install` completed
-- `npm run build` completed (for E2E tests that spawn server)
+- `pnpm run build` completed (for E2E tests that spawn server)
 
 ### For E2E Tests (stdio transport)
 The MCP server E2E tests (`stdio-transport.e2e.ts`, `mcp-protocol-compliance.e2e.ts`) spawn a real server process and communicate via stdio. They require:
-- A successful build (`npm run build`)
+- A successful build (`pnpm run build`)
 - No port conflicts
 - Sufficient test timeout (15-30 seconds)
 
@@ -153,14 +153,14 @@ The MCP server E2E tests (`stdio-transport.e2e.ts`, `mcp-protocol-compliance.e2e
 E2E tests have extended timeouts (10-30 seconds) because they spawn real processes. If tests still timeout:
 ```bash
 # Increase Jest timeout globally
-npm test -- --testTimeout=60000
+pnpm test -- --testTimeout=60000
 ```
 
 ### Server Build Not Found
 ```
-Error: Server build not found. Run `npm run build` first.
+Error: Server build not found. Run `pnpm run build` first.
 ```
-Solution: Run `npm run build` before running E2E tests.
+Solution: Run `pnpm run build` before running E2E tests.
 
 ### Jest Doesn't Exit
 ```
@@ -168,12 +168,12 @@ Jest did not exit one second after the test run has completed.
 ```
 This warning appears with E2E tests that spawn processes. Use `--forceExit` if needed:
 ```bash
-npm test -- --forceExit
+pnpm test -- --forceExit
 ```
 
 ### Detecting Open Handles
 ```bash
-npm test -- --detectOpenHandles
+pnpm test -- --detectOpenHandles
 ```
 
 ## Related Documentation
@@ -186,9 +186,9 @@ npm test -- --detectOpenHandles
 
 Before each production release, verify:
 
-1. **All tests pass**: `npm test` shows 0 failed tests
-2. **Build succeeds**: `npm run build` completes without errors
-3. **Type check passes**: `npm run type-check` (if available) or build includes type checking
+1. **All tests pass**: `pnpm test` shows 0 failed tests
+2. **Build succeeds**: `pnpm run build` completes without errors
+3. **Type check passes**: `pnpm run type-check` (if available) or build includes type checking
 4. **Skipped tests documented**: All skipped tests have documented justification (this file)
 
 Current status: **Ready for release** (2,422 passing, 0 failed, 20 skipped with justification)

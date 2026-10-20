@@ -1,5 +1,5 @@
-import type { TaskCheckoutService } from "./TaskCheckoutService";
 import { type ILogger, Logger } from "../../infrastructure/logger";
+import type { TaskCheckoutService } from "./TaskCheckoutService";
 
 /**
  * Configuration for the auto-reclaim scheduler.

@@ -1,23 +1,23 @@
 import { generateObject } from "ai";
-import { z } from "zod";
 import { v4 as uuidv4 } from "uuid";
-import { AIServiceFactory } from "../ai/AIServiceFactory.js";
-import { InputSanitizer } from "../utils/InputSanitizer";
-import { type ILogger, Logger } from "../../infrastructure/logger";
+import { z } from "zod";
 import {
-  type FeatureRequirement,
-  type FeatureExpansionResult,
   type AITask,
   AITaskSchema,
-  TaskStatus,
-  TaskPriority,
+  type FeatureExpansionResult,
+  type FeatureRequirement,
   type TaskDependency,
+  TaskPriority,
+  TaskStatus,
 } from "../../domain/ai-types.js";
+import { type ILogger, Logger } from "../../infrastructure/logger";
+import { AIServiceFactory } from "../ai/AIServiceFactory.js";
 import {
   FEATURE_PROMPT_CONFIGS,
   formatFeaturePrompt,
 } from "../ai/prompts/FeatureAdditionPrompts.js";
 import { TaskGenerationService } from "../TaskGenerationService.js";
+import { InputSanitizer } from "../utils/InputSanitizer";
 import { safeCall } from "../utils/safeCall";
 
 /**

@@ -1,4 +1,5 @@
 import { vi } from "vitest";
+
 /**
  * Unit tests for FeaturePRDService
  *
@@ -6,13 +7,13 @@ import { vi } from "vitest";
  * and impact assessment.
  */
 
-import { FeaturePRDService } from "../../../src/services/feature/FeaturePRDService";
-import type { FeatureAnalysisService } from "../../../src/services/feature/FeatureAnalysisService";
 import {
   type FeatureAdditionRequest,
   type PRDDocument,
   TaskPriority,
 } from "../../../src/domain/ai-types";
+import type { FeatureAnalysisService } from "../../../src/services/feature/FeatureAnalysisService";
+import { FeaturePRDService } from "../../../src/services/feature/FeaturePRDService";
 
 // Mock FeatureAnalysisService
 vi.mock("../../../src/services/feature/FeatureAnalysisService", () => ({

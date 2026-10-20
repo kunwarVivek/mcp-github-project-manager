@@ -19,27 +19,25 @@ import type {
  * Function that sends a sampling request to the MCP client.
  * Matches the shape of `server.createMessage()`.
  */
-export interface SamplingRequestFn {
-  (params: {
-    messages: Array<{
-      role: "user" | "assistant";
-      content: { type: "text"; text: string };
-    }>;
-    systemPrompt?: string;
-    maxTokens?: number;
-    temperature?: number;
-    modelPreferences?: {
-      hints?: Array<{ name?: string }>;
-      costPriority?: number;
-      speedPriority?: number;
-      intelligencePriority?: number;
-    };
-  }): Promise<{
-    role: string;
-    content: { type: string; text?: string } | string;
-    model?: string;
+export type SamplingRequestFn = (params: {
+  messages: Array<{
+    role: "user" | "assistant";
+    content: { type: "text"; text: string };
   }>;
-}
+  systemPrompt?: string;
+  maxTokens?: number;
+  temperature?: number;
+  modelPreferences?: {
+    hints?: Array<{ name?: string }>;
+    costPriority?: number;
+    speedPriority?: number;
+    intelligencePriority?: number;
+  };
+}) => Promise<{
+  role: string;
+  content: { type: string; text?: string } | string;
+  model?: string;
+}>;
 
 /**
  * Adapts MCP sampling/createMessage into a Vercel AI SDK LanguageModelV4.

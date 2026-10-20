@@ -1,14 +1,14 @@
 import {
-  AgentRegisteredEvent,
   AgentDeregisteredEvent,
-  TaskCheckedOutEvent,
-  TaskReleasedEvent,
-  TaskCompletedEvent,
-  TaskSubmittedForReviewEvent,
-  TaskApprovedEvent,
-  TaskRejectedEvent,
   AgentHeartbeatEvent,
+  AgentRegisteredEvent,
+  TaskApprovedEvent,
+  TaskCheckedOutEvent,
+  TaskCompletedEvent,
   TaskReclaimedEvent,
+  TaskRejectedEvent,
+  TaskReleasedEvent,
+  TaskSubmittedForReviewEvent,
 } from "../../../../domain/events/AgentEvents";
 
 describe("Agent Domain Events", () => {

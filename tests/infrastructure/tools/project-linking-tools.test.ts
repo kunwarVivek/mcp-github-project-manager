@@ -1,4 +1,5 @@
 import { vi } from "vitest";
+
 /**
  * Unit tests for project linking MCP tools
  *
@@ -8,29 +9,29 @@ import { vi } from "vitest";
  * - Executor functions (with mocked repositories)
  */
 
+import { GitHubRepositoryFactory } from "../../../src/infrastructure/github/GitHubRepositoryFactory.js";
 import {
-  LinkProjectToRepositoryInputSchema,
-  UnlinkProjectFromRepositoryInputSchema,
-  LinkProjectToTeamInputSchema,
-  UnlinkProjectFromTeamInputSchema,
-  ListLinkedRepositoriesInputSchema,
-  ListLinkedTeamsInputSchema,
-} from "../../../src/infrastructure/tools/schemas/project-template-linking-schemas.js";
-import {
-  linkProjectToRepositoryTool,
-  unlinkProjectFromRepositoryTool,
-  linkProjectToTeamTool,
-  unlinkProjectFromTeamTool,
-  listLinkedRepositoriesTool,
-  listLinkedTeamsTool,
   executeLinkProjectToRepository,
-  executeUnlinkProjectFromRepository,
   executeLinkProjectToTeam,
-  executeUnlinkProjectFromTeam,
   executeListLinkedRepositories,
   executeListLinkedTeams,
+  executeUnlinkProjectFromRepository,
+  executeUnlinkProjectFromTeam,
+  linkProjectToRepositoryTool,
+  linkProjectToTeamTool,
+  listLinkedRepositoriesTool,
+  listLinkedTeamsTool,
+  unlinkProjectFromRepositoryTool,
+  unlinkProjectFromTeamTool,
 } from "../../../src/infrastructure/tools/project-linking-tools.js";
-import { GitHubRepositoryFactory } from "../../../src/infrastructure/github/GitHubRepositoryFactory.js";
+import {
+  LinkProjectToRepositoryInputSchema,
+  LinkProjectToTeamInputSchema,
+  ListLinkedRepositoriesInputSchema,
+  ListLinkedTeamsInputSchema,
+  UnlinkProjectFromRepositoryInputSchema,
+  UnlinkProjectFromTeamInputSchema,
+} from "../../../src/infrastructure/tools/schemas/project-template-linking-schemas.js";
 
 // Mock the repository factory
 vi.mock("../../../src/infrastructure/github/GitHubRepositoryFactory.js", () => {

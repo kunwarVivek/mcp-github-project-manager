@@ -13,26 +13,26 @@
 import { generateObject } from "ai";
 import { z } from "zod";
 import { DependencyGraph, type GraphAnalysisResult } from "../../analysis/DependencyGraph";
-import { AIServiceFactory } from "./AIServiceFactory";
-import { InputSanitizer } from "../utils/InputSanitizer";
-import { calculateWeightedScore, getConfidenceTier } from "./ConfidenceScorer";
+import {
+  type AITask,
+  type ConfidenceFactors,
+  type SectionConfidence,
+  TaskPriority,
+  TaskStatus,
+} from "../../domain/ai-types";
 import type {
   BacklogItem,
-  PrioritizedItem,
   PrioritizationResult,
-  PriorityTier,
+  PrioritizedItem,
   PriorityFactors,
+  PriorityTier,
 } from "../../domain/sprint-planning-types";
+import { InputSanitizer } from "../utils/InputSanitizer";
+import { AIServiceFactory } from "./AIServiceFactory";
+import { calculateWeightedScore, getConfidenceTier } from "./ConfidenceScorer";
 import {
-  type SectionConfidence,
-  type ConfidenceFactors,
-  type AITask,
-  TaskStatus,
-  TaskPriority,
-} from "../../domain/ai-types";
-import {
-  SPRINT_PRIORITIZATION_SYSTEM_PROMPT,
   formatPrioritizationPrompt,
+  SPRINT_PRIORITIZATION_SYSTEM_PROMPT,
 } from "./prompts/SprintPlanningPrompts";
 
 // ============================================================================

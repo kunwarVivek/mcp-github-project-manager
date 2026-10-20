@@ -1,20 +1,20 @@
 import { EventEmitter } from "node:events";
 import { v4 as uuidv4 } from "uuid";
+import { resourceSchemas, validateResourceByType } from "../../domain/resource-schemas";
 import {
-  type Resource,
-  type ResourceType,
-  ResourceStatus,
-  ResourceEventType,
-  type ResourceValidationRule,
-  ResourceValidationError,
-  ResourceNotFoundError,
-  ResourceVersionError,
-  type ResourceCacheOptions,
-  type ResourceUpdateOptions,
   type RelationshipType,
+  type Resource,
+  type ResourceCacheOptions,
+  ResourceEventType,
+  ResourceNotFoundError,
+  ResourceStatus,
+  type ResourceType,
+  type ResourceUpdateOptions,
+  ResourceValidationError,
+  type ResourceValidationRule,
+  ResourceVersionError,
 } from "../../domain/resource-types";
 import type { ResourceCache } from "../cache/ResourceCache";
-import { validateResourceByType, resourceSchemas } from "../../domain/resource-schemas";
 
 export class ResourceManager extends EventEmitter {
   constructor(private cache: ResourceCache) {

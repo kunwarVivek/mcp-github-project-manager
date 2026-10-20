@@ -1,5 +1,5 @@
-import { MilestoneMetrics } from "../../../../domain/value-objects/MilestoneMetrics";
 import { ResourceStatus } from "../../../../domain/resource-types";
+import { MilestoneMetrics } from "../../../../domain/value-objects/MilestoneMetrics";
 
 describe("MilestoneMetrics Value Object", () => {
   const baseConfig = {

@@ -3,14 +3,13 @@
  */
 
 export {
-  CircuitBreakerService,
-  type CircuitBreakerConfig,
-  type CircuitBreakerState,
-} from "./CircuitBreakerService.js";
-
-export {
+  type AIResilienceConfig,
   AIResiliencePolicy,
   createAIResiliencePolicy,
-  type AIResilienceConfig,
   type DegradedResult,
 } from "./AIResiliencePolicy.js";
+export {
+  type CircuitBreakerConfig,
+  CircuitBreakerService,
+  type CircuitBreakerState,
+} from "./CircuitBreakerService.js";

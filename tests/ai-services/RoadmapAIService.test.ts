@@ -1,4 +1,5 @@
 import { vi } from "vitest";
+
 /**
  * Unit tests for RoadmapAIService
  *
@@ -6,8 +7,8 @@ import { vi } from "vitest";
  * and visualization data generation.
  */
 
-import { RoadmapAIService } from "../../src/services/ai/RoadmapAIService";
 import { AIServiceFactory } from "../../src/services/ai/AIServiceFactory";
+import { RoadmapAIService } from "../../src/services/ai/RoadmapAIService";
 
 // Mock AIServiceFactory
 vi.mock("../../src/services/ai/AIServiceFactory", () => {

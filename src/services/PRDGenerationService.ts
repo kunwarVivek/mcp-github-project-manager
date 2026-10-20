@@ -1,16 +1,16 @@
-import { AITaskProcessor } from "./ai/AITaskProcessor";
+import { v4 as uuidv4 } from "uuid";
+import {
+  type ConfidenceConfig,
+  type FeatureRequirement,
+  type PRDDocument,
+  PRDDocumentSchema,
+  type SectionConfidence,
+  TaskPriority,
+} from "../domain/ai-types";
 import type { AIServiceFactory } from "./ai/AIServiceFactory";
+import { AITaskProcessor } from "./ai/AITaskProcessor";
 import { InputSanitizer } from "./utils/InputSanitizer";
 import { safeCall } from "./utils/safeCall";
-import {
-  type PRDDocument,
-  type FeatureRequirement,
-  PRDDocumentSchema,
-  TaskPriority,
-  type SectionConfidence,
-  type ConfidenceConfig,
-} from "../domain/ai-types";
-import { v4 as uuidv4 } from "uuid";
 
 /**
  * Service for generating and managing Product Requirements Documents (PRDs)

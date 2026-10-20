@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { TaskCheckoutService } from "../../../services/agent/TaskCheckoutService";
-import type { GitHubRepositoryFactory } from "../../../infrastructure/github/GitHubRepositoryFactory";
-import type { AgentStore } from "../../../infrastructure/agent/AgentStore";
-import type { AgentContextService } from "../../../services/agent/AgentContextService";
-import { AgentBudgetService } from "../../../services/agent/AgentBudgetService";
 import type { Agent } from "../../../domain/agent-orchestration-types";
+import type { AgentStore } from "../../../infrastructure/agent/AgentStore";
+import type { GitHubRepositoryFactory } from "../../../infrastructure/github/GitHubRepositoryFactory";
+import { AgentBudgetService } from "../../../services/agent/AgentBudgetService";
+import type { AgentContextService } from "../../../services/agent/AgentContextService";
+import { TaskCheckoutService } from "../../../services/agent/TaskCheckoutService";
 
 function makeAgent(overrides: Partial<Agent> = {}): Agent {
   return {

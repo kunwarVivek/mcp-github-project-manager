@@ -1,19 +1,20 @@
 #!/usr/bin/env node
-import { readFileSync } from "node:fs";
 import { randomUUID } from "node:crypto";
-import { traceContext } from "./infrastructure/observability/CorrelationContext";
-import { AgentBudgetService } from "./services/agent/AgentBudgetService";
-import { AgentStore } from "./infrastructure/agent/AgentStore";
-import { createGitHubFactory } from "./infrastructure/tools/tool-factory";
-import { McpServer, fromJsonSchema } from "@modelcontextprotocol/server";
-import { serveStdio } from "@modelcontextprotocol/server/stdio";
+import { readFileSync } from "node:fs";
 import {
-  ProtocolError,
-  INTERNAL_ERROR,
-  METHOD_NOT_FOUND,
-  INVALID_PARAMS,
   type CallToolResult,
+  fromJsonSchema,
+  INTERNAL_ERROR,
+  INVALID_PARAMS,
+  McpServer,
+  METHOD_NOT_FOUND,
+  ProtocolError,
 } from "@modelcontextprotocol/server";
+import { serveStdio } from "@modelcontextprotocol/server/stdio";
+import { AgentStore } from "./infrastructure/agent/AgentStore";
+import { traceContext } from "./infrastructure/observability/CorrelationContext";
+import { createGitHubFactory } from "./infrastructure/tools/tool-factory";
+import { AgentBudgetService } from "./services/agent/AgentBudgetService";
 
 /**
  * v2 compatibility aliases.
@@ -29,144 +30,137 @@ const ErrorCode = {
   MethodNotFound: METHOD_NOT_FOUND,
   InvalidParams: INVALID_PARAMS,
 } as const;
-import type { ProjectManagementService } from "./services/ProjectManagementService";
+
 import { configureContainer } from "./container";
-import { GitHubStateSyncService } from "./services/GitHubStateSyncService";
+import { MCPContentType } from "./domain/mcp-types";
 import {
-  GITHUB_TOKEN,
-  GITHUB_OWNER,
-  GITHUB_REPO,
-  CLI_OPTIONS,
-  SYNC_ENABLED,
-  SYNC_TIMEOUT_MS,
-  CACHE_DIRECTORY,
-  WEBHOOK_SECRET,
-  WEBHOOK_PORT,
-  SSE_ENABLED,
   AGENT_RECLAIM_ENABLED,
   AGENT_RECLAIM_INTERVAL_MS,
   AGENT_STALE_AFTER_MINUTES,
+  CACHE_DIRECTORY,
+  CLI_OPTIONS,
+  GITHUB_OWNER,
+  GITHUB_REPO,
+  GITHUB_TOKEN,
+  SSE_ENABLED,
+  SYNC_ENABLED,
+  SYNC_TIMEOUT_MS,
+  WEBHOOK_PORT,
+  WEBHOOK_SECRET,
 } from "./env";
-import { ToolRegistry } from "./infrastructure/tools/ToolRegistry";
-import { ToolTelemetry } from "./infrastructure/tools/ToolTelemetry";
-import { ToolValidator } from "./infrastructure/tools/ToolValidator";
-import {
-  executeAddFeature,
-  executeGeneratePRD,
-  executeParsePRD,
-  executeGetNextTask,
-  executeAnalyzeTaskComplexity,
-  executeExpandTask,
-  executeEnhancePRD,
-  executeCreateTraceabilityMatrix,
-  executeAddSubIssue,
-  executeListSubIssues,
-  executeGetParentIssue,
-  executeReprioritizeSubIssue,
-  executeRemoveSubIssue,
-  executeCreateStatusUpdate,
-  executeListStatusUpdates,
-  executeGetStatusUpdate,
-  executeMarkProjectAsTemplate,
-  executeUnmarkProjectAsTemplate,
-  executeCopyProjectFromTemplate,
-  executeListOrganizationTemplates,
-  executeLinkProjectToRepository,
-  executeUnlinkProjectFromRepository,
-  executeLinkProjectToTeam,
-  executeUnlinkProjectFromTeam,
-  executeListLinkedRepositories,
-  executeListLinkedTeams,
-} from "./infrastructure/tools/ToolSchemas";
-
-// Phase 8 - Project Lifecycle Tools
-import {
-  executeCloseProject,
-  executeReopenProject,
-  executeConvertDraftIssue,
-} from "./infrastructure/tools/project-lifecycle-tools";
-
-// Phase 8 - Project Advanced Tools
-import {
-  executeUpdateItemPosition,
-  executeSearchIssuesAdvanced,
-  executeFilterProjectItems,
-} from "./infrastructure/tools/project-advanced-tools";
-
-// Phase 10 - Sprint AI Tools
-import {
-  executeCalculateSprintCapacity,
-  executePrioritizeBacklog,
-  executeAssessSprintRisk,
-  executeSuggestSprintComposition,
-} from "./infrastructure/tools/sprint-ai-tools";
-
-// Phase 10 - Roadmap AI Tools
-import { executeGenerateRoadmapVisualization } from "./infrastructure/tools/roadmap-ai-tools";
-
-// Phase 11 - Issue Intelligence Tools
-import {
-  executeSuggestLabels,
-  executeDetectDuplicates,
-  executeFindRelatedIssues,
-} from "./infrastructure/tools/issue-intelligence-tools";
-
-// Agent orchestration tools
-import {
-  executeRegisterAgent,
-  executeListAgents,
-  executeDeregisterAgent,
-  executeCheckoutTask,
-  executeReleaseTask,
-  executeCompleteTask,
-  executeGetTaskContext,
-  executeAgentHeartbeat,
-  executeSubmitWorkProduct,
-  executeGetAgentActivity,
-  executeGetBudgetStatus,
-  executeSetAgentBudget,
-  executeCheckWorkStatus,
-  executeReclaimStaleTasks,
-  executeRecordUsage,
-  executeSubmitForReview,
-  executeApproveTask,
-  executeRejectTask,
-  executeGetAgentMetrics,
-  executeSetupAgentFields,
-} from "./infrastructure/tools/agent-orchestration-tools";
-
-// Health Tools
-import { executeHealthCheck } from "./infrastructure/tools/health-tools";
-
-// Compound tool executors
-import {
-  executeManageProject,
-  executeManageIssues,
-  executeManagePrs,
-  executeManageMilestones,
-  executeManageSprints,
-  executeManageLabels,
-  executeManageAutomation,
-  executeManageIterations,
-  executeManageEvents,
-  executeManageStatusUpdates,
-  executeAiGenerate,
-  executeAiAnalyze,
-  executeAiPlan,
-  executeAgentWork,
-  executeAgentManage,
-  executeSystem,
-  executeDiscoverTools,
-  executeManageBranches,
-  executeManageReleases,
-  executeManageWorkflows,
-} from "./infrastructure/tools/compound/compound-executors";
-
-import { ToolResultFormatter } from "./infrastructure/tools/ToolResultFormatter";
-import { MCPContentType } from "./domain/mcp-types";
 import { ResourceCache } from "./infrastructure/cache/ResourceCache";
 import { registerPrompts as registerPromptTemplates } from "./infrastructure/mcp/prompts";
 import { registerResources as registerResourceHandlers } from "./infrastructure/mcp/resources";
+// Agent orchestration tools
+import {
+  executeAgentHeartbeat,
+  executeApproveTask,
+  executeCheckoutTask,
+  executeCheckWorkStatus,
+  executeCompleteTask,
+  executeDeregisterAgent,
+  executeGetAgentActivity,
+  executeGetAgentMetrics,
+  executeGetBudgetStatus,
+  executeGetTaskContext,
+  executeListAgents,
+  executeReclaimStaleTasks,
+  executeRecordUsage,
+  executeRegisterAgent,
+  executeRejectTask,
+  executeReleaseTask,
+  executeSetAgentBudget,
+  executeSetupAgentFields,
+  executeSubmitForReview,
+  executeSubmitWorkProduct,
+} from "./infrastructure/tools/agent-orchestration-tools";
+// Compound tool executors
+import {
+  executeAgentManage,
+  executeAgentWork,
+  executeAiAnalyze,
+  executeAiGenerate,
+  executeAiPlan,
+  executeDiscoverTools,
+  executeManageAutomation,
+  executeManageBranches,
+  executeManageEvents,
+  executeManageIssues,
+  executeManageIterations,
+  executeManageLabels,
+  executeManageMilestones,
+  executeManageProject,
+  executeManagePrs,
+  executeManageReleases,
+  executeManageSprints,
+  executeManageStatusUpdates,
+  executeManageWorkflows,
+  executeSystem,
+} from "./infrastructure/tools/compound/compound-executors";
+// Health Tools
+import { executeHealthCheck } from "./infrastructure/tools/health-tools";
+// Phase 11 - Issue Intelligence Tools
+import {
+  executeDetectDuplicates,
+  executeEnrichIssue,
+  executeFindRelatedIssues,
+  executeSuggestLabels,
+} from "./infrastructure/tools/issue-intelligence-tools";
+// Phase 8 - Project Advanced Tools
+import {
+  executeFilterProjectItems,
+  executeSearchIssuesAdvanced,
+  executeUpdateItemPosition,
+} from "./infrastructure/tools/project-advanced-tools";
+// Phase 8 - Project Lifecycle Tools
+import {
+  executeCloseProject,
+  executeConvertDraftIssue,
+  executeReopenProject,
+} from "./infrastructure/tools/project-lifecycle-tools";
+// Phase 10 - Roadmap AI Tools
+import { executeGenerateRoadmapVisualization } from "./infrastructure/tools/roadmap-ai-tools";
+// Phase 10 - Sprint AI Tools
+import {
+  executeAssessSprintRisk,
+  executeCalculateSprintCapacity,
+  executePrioritizeBacklog,
+  executeSuggestSprintComposition,
+} from "./infrastructure/tools/sprint-ai-tools";
+import { ToolRegistry } from "./infrastructure/tools/ToolRegistry";
+import { ToolResultFormatter } from "./infrastructure/tools/ToolResultFormatter";
+import {
+  executeAddFeature,
+  executeAddSubIssue,
+  executeAnalyzeTaskComplexity,
+  executeCopyProjectFromTemplate,
+  executeCreateStatusUpdate,
+  executeCreateTraceabilityMatrix,
+  executeEnhancePRD,
+  executeExpandTask,
+  executeGeneratePRD,
+  executeGetNextTask,
+  executeGetParentIssue,
+  executeGetStatusUpdate,
+  executeLinkProjectToRepository,
+  executeLinkProjectToTeam,
+  executeListLinkedRepositories,
+  executeListLinkedTeams,
+  executeListOrganizationTemplates,
+  executeListStatusUpdates,
+  executeListSubIssues,
+  executeMarkProjectAsTemplate,
+  executeParsePRD,
+  executeRemoveSubIssue,
+  executeReprioritizeSubIssue,
+  executeUnlinkProjectFromRepository,
+  executeUnlinkProjectFromTeam,
+  executeUnmarkProjectAsTemplate,
+} from "./infrastructure/tools/ToolSchemas";
+import { ToolTelemetry } from "./infrastructure/tools/ToolTelemetry";
+import { ToolValidator } from "./infrastructure/tools/ToolValidator";
+import { GitHubStateSyncService } from "./services/GitHubStateSyncService";
+import type { ProjectManagementService } from "./services/ProjectManagementService";
 
 /**
  * Supported MCP protocol versions.
@@ -189,18 +183,19 @@ const SERVER_VERSION: string = (() => {
     return "0.0.0";
   }
 })();
-import { FilePersistenceAdapter } from "./infrastructure/persistence/FilePersistenceAdapter";
-import { GitHubWebhookHandler } from "./infrastructure/events/GitHubWebhookHandler";
-import { EventSubscriptionManager } from "./infrastructure/events/EventSubscriptionManager";
+
 import { EventStore } from "./infrastructure/events/EventStore";
+import { EventSubscriptionManager } from "./infrastructure/events/EventSubscriptionManager";
+import { GitHubWebhookHandler } from "./infrastructure/events/GitHubWebhookHandler";
 import { WebhookServer } from "./infrastructure/http/WebhookServer";
+import { GracefulShutdown } from "./infrastructure/lifecycle/GracefulShutdown";
 import { type ILogger, logger } from "./infrastructure/logger/index";
+import { FilePersistenceAdapter } from "./infrastructure/persistence/FilePersistenceAdapter";
+import type { AgentReclaimScheduler } from "./services/agent/AgentReclaimScheduler";
 import type { AIServiceFactory } from "./services/ai/AIServiceFactory";
-import type { RoadmapPlanningService } from "./services/RoadmapPlanningService";
 import type { IssueEnrichmentService } from "./services/IssueEnrichmentService";
 import type { IssueTriagingService } from "./services/IssueTriagingService";
-import { GracefulShutdown } from "./infrastructure/lifecycle/GracefulShutdown";
-import type { AgentReclaimScheduler } from "./services/agent/AgentReclaimScheduler";
+import type { RoadmapPlanningService } from "./services/RoadmapPlanningService";
 
 class GitHubProjectManagerServer {
   private server: McpServer;
@@ -539,6 +534,7 @@ class GitHubProjectManagerServer {
     r.registerExecutor("assess_sprint_risk", executeAssessSprintRisk);
     r.registerExecutor("suggest_sprint_composition", executeSuggestSprintComposition);
     r.registerExecutor("generate_roadmap_visualization", executeGenerateRoadmapVisualization);
+    r.registerExecutor("enrich_issue_sections", executeEnrichIssue);
     r.registerExecutor("suggest_labels", executeSuggestLabels);
     r.registerExecutor("detect_duplicates", executeDetectDuplicates);
     r.registerExecutor("find_related_issues", executeFindRelatedIssues);

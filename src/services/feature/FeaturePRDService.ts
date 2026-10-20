@@ -1,11 +1,10 @@
 import { v4 as uuidv4 } from "uuid";
-import { type ILogger, Logger } from "../../infrastructure/logger";
-
 import type {
   FeatureAdditionRequest,
   FeatureRequirement,
   PRDDocument,
 } from "../../domain/ai-types.js";
+import { type ILogger, Logger } from "../../infrastructure/logger";
 import { safeCall } from "../utils/safeCall";
 import { FeatureAnalysisService } from "./FeatureAnalysisService.js";
 

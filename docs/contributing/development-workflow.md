@@ -98,7 +98,7 @@ git push origin feature/123-add-sprint-metrics --force
 1. Make your changes following the [coding standards](./index.md#coding-standards)
 2. Run the server locally to test your changes:
    ```bash
-   npm run dev
+   pnpm run dev
    ```
 3. Use the examples in the `examples/` directory to test your changes
 
@@ -176,16 +176,16 @@ Once your pull request is approved:
 
 ```bash
 # Run all tests
-npm test
+pnpm test
 
 # Run tests in watch mode
-npm run test:watch
+pnpm run test:watch
 
 # Run tests with coverage
-npm run test:coverage
+pnpm run test:coverage
 
 # Run E2E tests
-npm run test:e2e
+pnpm run test:e2e
 ```
 
 ### Writing Tests
@@ -279,7 +279,7 @@ All CI checks must pass before a pull request can be merged.
 Error: Cannot find module './build/index.js'
 ```
 
-Solution: Run `npm run build` to compile the TypeScript code.
+Solution: Run `pnpm run build` to compile the TypeScript code.
 
 #### Test Failures
 

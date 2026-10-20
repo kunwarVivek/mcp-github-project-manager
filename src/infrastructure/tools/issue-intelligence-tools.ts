@@ -2,39 +2,46 @@
  * MCP tools for AI-powered issue intelligence operations.
  *
  * Provides 4 tools (AI-17 to AI-20):
- * - enrich_issue: Enhance issue with structured sections and confidence (AI-17)
+ * - enrich_issue_sections: Enhance issue with structured sections and confidence (AI-17)
  * - suggest_labels: Multi-tier label suggestions with rationale (AI-18)
  * - detect_duplicates: Embedding-based duplicate detection (AI-19)
  * - find_related_issues: Multi-type relationship detection (AI-20)
+ *
+ * The AI-17 tool is named `enrich_issue_sections`, not `enrich_issue`:
+ * `enrich_issue` already belongs to the label/priority/complexity enrichment
+ * in `schemas/ai-automation-tool-schemas.ts`, and the compound action
+ * `ai_analyze.enrich_issue` routes to that implementation. Two different
+ * features shared one name and the registry silently overwrote one of them,
+ * which left the AI-17 implementation unreachable at runtime.
  *
  * These tools expose Phase 11 AI Issue Intelligence services as MCP tools
  * with proper annotations, input/output schemas, and executors.
  */
 
-import type { ToolDefinition, ToolSchema } from "./ToolValidator";
-import { ANNOTATION_PATTERNS } from "./annotations/tool-annotations";
+import { DuplicateDetectionService } from "../../services/ai/DuplicateDetectionService";
 import { IssueEnrichmentAIService } from "../../services/ai/IssueEnrichmentAIService";
 import { LabelSuggestionService } from "../../services/ai/LabelSuggestionService";
-import { DuplicateDetectionService } from "../../services/ai/DuplicateDetectionService";
 import { RelatedIssueLinkingService } from "../../services/ai/RelatedIssueLinkingService";
+import { ANNOTATION_PATTERNS } from "./annotations/tool-annotations";
 import {
-  EnrichIssueInputSchema,
-  type EnrichIssueInput,
-  EnrichIssueOutputSchema,
-  type EnrichIssueOutput,
-  SuggestLabelsInputSchema,
-  type SuggestLabelsInput,
-  SuggestLabelsOutputSchema,
-  type SuggestLabelsOutput,
-  DetectDuplicatesInputSchema,
   type DetectDuplicatesInput,
-  DetectDuplicatesOutputSchema,
+  DetectDuplicatesInputSchema,
   type DetectDuplicatesOutput,
-  FindRelatedIssuesInputSchema,
+  DetectDuplicatesOutputSchema,
+  type EnrichIssueInput,
+  EnrichIssueInputSchema,
+  type EnrichIssueOutput,
+  EnrichIssueOutputSchema,
   type FindRelatedIssuesInput,
-  FindRelatedIssuesOutputSchema,
+  FindRelatedIssuesInputSchema,
   type FindRelatedIssuesOutput,
+  FindRelatedIssuesOutputSchema,
+  type SuggestLabelsInput,
+  SuggestLabelsInputSchema,
+  type SuggestLabelsOutput,
+  SuggestLabelsOutputSchema,
 } from "./schemas/issue-intelligence-schemas";
+import type { ToolDefinition, ToolSchema } from "./ToolValidator";
 
 // ============================================================================
 // Tool Definitions
@@ -48,7 +55,7 @@ import {
  * Preserves original content when substantial (>200 chars).
  */
 export const enrichIssueTool: ToolDefinition<EnrichIssueInput, EnrichIssueOutput> = {
-  name: "enrich_issue",
+  name: "enrich_issue_sections",
   title: "Enrich Issue",
   description:
     "Enhance issue with structured sections (Problem/Solution/Context/Impact/AcceptanceCriteria), " +
@@ -264,7 +271,7 @@ export const issueIntelligenceTools: ToolDefinition<unknown>[] = [
  * Map of tool names to executor functions.
  */
 export const issueIntelligenceExecutors: Record<string, (args: unknown) => Promise<unknown>> = {
-  enrich_issue: executeEnrichIssue as (args: unknown) => Promise<unknown>,
+  enrich_issue_sections: executeEnrichIssue as (args: unknown) => Promise<unknown>,
   suggest_labels: executeSuggestLabels as (args: unknown) => Promise<unknown>,
   detect_duplicates: executeDetectDuplicates as (args: unknown) => Promise<unknown>,
   find_related_issues: executeFindRelatedIssues as (args: unknown) => Promise<unknown>,

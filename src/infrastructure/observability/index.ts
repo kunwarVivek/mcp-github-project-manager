@@ -3,21 +3,19 @@
  */
 
 export {
-  startTrace,
   getCorrelationId,
   getTraceContext,
-  traceContext,
+  startTrace,
   type TraceContext,
+  traceContext,
 } from "./CorrelationContext.js";
-
-export {
-  TracingLogger,
-  createTracingLogger,
-  type LogEntry,
-} from "./TracingLogger.js";
-
 export {
   SecurityAuditLog,
   type SecurityEvent,
   type SecurityEventType,
 } from "./SecurityAuditLog.js";
+export {
+  createTracingLogger,
+  type LogEntry,
+  TracingLogger,
+} from "./TracingLogger.js";

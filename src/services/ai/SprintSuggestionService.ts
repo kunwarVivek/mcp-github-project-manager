@@ -9,38 +9,38 @@
 
 import { generateObject } from "ai";
 import { z } from "zod";
-import { AIServiceFactory } from "./AIServiceFactory";
-import { InputSanitizer } from "../utils/InputSanitizer";
-import { type ILogger, Logger } from "../../infrastructure/logger";
-import { SprintCapacityAnalyzer } from "./SprintCapacityAnalyzer";
-import { BacklogPrioritizer } from "./BacklogPrioritizer";
-import { SprintRiskAssessor } from "./SprintRiskAssessor";
 import { DependencyGraph, type GraphAnalysisResult } from "../../analysis/DependencyGraph";
-import { calculateWeightedScore, getConfidenceTier } from "./ConfidenceScorer";
+import type { EstimationCalibrator } from "../../analysis/EstimationCalibrator";
 import {
-  type SprintSuggestion,
-  type SuggestedItem,
-  type BacklogItem,
-  type TeamMember,
-  type SprintCapacity,
-  type PrioritizedItem,
-  type PriorityTier,
-  type SprintMetrics,
-  SPRINT_RISK_CATEGORIES,
-  RISK_PROBABILITIES,
-} from "../../domain/sprint-planning-types";
-import {
-  type SectionConfidence,
-  type ConfidenceFactors,
   type AITask,
-  TaskStatus,
+  type ConfidenceFactors,
+  type SectionConfidence,
   TaskPriority,
+  TaskStatus,
 } from "../../domain/ai-types";
 import {
-  SPRINT_SUGGESTION_SYSTEM_PROMPT,
+  type BacklogItem,
+  type PrioritizedItem,
+  type PriorityTier,
+  RISK_PROBABILITIES,
+  SPRINT_RISK_CATEGORIES,
+  type SprintCapacity,
+  type SprintMetrics,
+  type SprintSuggestion,
+  type SuggestedItem,
+  type TeamMember,
+} from "../../domain/sprint-planning-types";
+import { type ILogger, Logger } from "../../infrastructure/logger";
+import { InputSanitizer } from "../utils/InputSanitizer";
+import { AIServiceFactory } from "./AIServiceFactory";
+import { BacklogPrioritizer } from "./BacklogPrioritizer";
+import { calculateWeightedScore, getConfidenceTier } from "./ConfidenceScorer";
+import {
   formatSprintSuggestionPrompt,
+  SPRINT_SUGGESTION_SYSTEM_PROMPT,
 } from "./prompts/SprintPlanningPrompts";
-import type { EstimationCalibrator } from "../../analysis/EstimationCalibrator";
+import { SprintCapacityAnalyzer } from "./SprintCapacityAnalyzer";
+import { SprintRiskAssessor } from "./SprintRiskAssessor";
 
 // ============================================================================
 // Zod Schemas for AI Response Validation

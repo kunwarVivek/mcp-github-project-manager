@@ -1,4 +1,4 @@
-import { vi, type MockInstance } from "vitest";
+import { type MockInstance, vi } from "vitest";
 /**
  * Unit tests for CorrelationContext
  *
@@ -10,9 +10,9 @@ import { vi, type MockInstance } from "vitest";
  */
 
 import {
-  startTrace,
   getCorrelationId,
   getTraceContext,
+  startTrace,
   traceContext,
 } from "../../../src/infrastructure/observability/CorrelationContext.js";
 

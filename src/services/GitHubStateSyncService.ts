@@ -1,8 +1,8 @@
 import { ResourceType, type SyncMetadata } from "../domain/resource-types";
-import type { GitHubRepositoryFactory } from "../infrastructure/github/GitHubRepositoryFactory";
 import type { ResourceCache } from "../infrastructure/cache/ResourceCache";
-import type { FilePersistenceAdapter } from "../infrastructure/persistence/FilePersistenceAdapter";
+import type { GitHubRepositoryFactory } from "../infrastructure/github/GitHubRepositoryFactory";
 import { type ILogger, Logger } from "../infrastructure/logger/index";
+import type { FilePersistenceAdapter } from "../infrastructure/persistence/FilePersistenceAdapter";
 
 // SyncMetadata moved to domain/resource-types to break the infra->service cycle.
 export type { SyncMetadata };

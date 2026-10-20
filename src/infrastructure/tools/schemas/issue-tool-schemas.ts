@@ -1,13 +1,13 @@
 import { z } from "zod";
-import type { ToolDefinition, ToolSchema } from "../ToolValidator";
 import { ANNOTATION_PATTERNS } from "../annotations/tool-annotations";
+import type { ToolDefinition, ToolSchema } from "../ToolValidator";
 import {
-  IssueOutputSchema,
-  IssueListOutputSchema,
-  IssueCommentOutputSchema,
-  IssueCommentListOutputSchema,
-  DraftIssueOutputSchema,
   DeleteOutputSchema,
+  DraftIssueOutputSchema,
+  IssueCommentListOutputSchema,
+  IssueCommentOutputSchema,
+  IssueListOutputSchema,
+  IssueOutputSchema,
 } from "./project-schemas";
 
 // ============================================================================

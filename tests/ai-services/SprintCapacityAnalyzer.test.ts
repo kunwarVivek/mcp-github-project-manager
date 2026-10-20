@@ -5,8 +5,8 @@
  * historical data, and confidence scoring.
  */
 
-import { SprintCapacityAnalyzer } from "../../src/services/ai/SprintCapacityAnalyzer";
 import type { SprintMetrics, TeamMember } from "../../src/domain/sprint-planning-types";
+import { SprintCapacityAnalyzer } from "../../src/services/ai/SprintCapacityAnalyzer";
 
 describe("SprintCapacityAnalyzer", () => {
   let analyzer: SprintCapacityAnalyzer;

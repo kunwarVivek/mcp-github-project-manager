@@ -1,13 +1,13 @@
+import { ResourceStatus } from "../../../../domain/resource-types";
 import {
-  parseResourceStatus,
-  toStatusString,
+  filterByStatus,
+  getRegisteredStatusMappings,
   isActiveStatus,
   isClosedStatus,
-  filterByStatus,
+  parseResourceStatus,
   registerStatusMapping,
-  getRegisteredStatusMappings,
+  toStatusString,
 } from "../../../../domain/utils/StatusParser";
-import { ResourceStatus } from "../../../../domain/resource-types";
 
 describe("StatusParser", () => {
   describe("parseResourceStatus", () => {

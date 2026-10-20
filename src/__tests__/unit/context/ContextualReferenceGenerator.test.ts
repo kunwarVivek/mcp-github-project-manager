@@ -1,17 +1,17 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
-import { ContextualReferenceGenerator } from "../../../services/context/ContextualReferenceGenerator";
-import { AIServiceFactory } from "../../../services/ai/AIServiceFactory";
+import { generateObject } from "ai";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   type AITask,
-  type PRDDocument,
-  TaskStatus,
-  TaskPriority,
-  type TaskComplexity,
   type FeatureRequirement,
+  type PRDDocument,
+  type TaskComplexity,
+  TaskPriority,
+  TaskStatus,
   type TechnicalRequirement,
 } from "../../../domain/ai-types";
 import type { ContextualReferences } from "../../../domain/task-context-schemas";
-import { generateObject } from "ai";
+import { AIServiceFactory } from "../../../services/ai/AIServiceFactory";
+import { ContextualReferenceGenerator } from "../../../services/context/ContextualReferenceGenerator";
 
 // Mock the AI service factory
 vi.mock("../../../services/ai/AIServiceFactory", () => {

@@ -1,4 +1,4 @@
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const createAnthropic = vi.hoisted(() =>
   // Must return an object: the metering middleware wraps the model.

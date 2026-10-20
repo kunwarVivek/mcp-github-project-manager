@@ -1,6 +1,6 @@
-import type { GitHubRepositoryFactory } from "../github/GitHubRepositoryFactory.js";
 import { AGENT_FIELDS, AGENT_STATUS_OPTIONS } from "../../domain/agent-orchestration-types.js";
 import type { CustomField, FieldType } from "../../domain/types.js";
+import type { GitHubRepositoryFactory } from "../github/GitHubRepositoryFactory.js";
 
 /** GraphQL response shape for listing project fields. */
 interface ListFieldsResponse {

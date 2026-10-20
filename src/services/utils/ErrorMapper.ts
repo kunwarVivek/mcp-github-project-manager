@@ -1,10 +1,10 @@
 import {
   DomainError,
-  ResourceNotFoundError,
-  ValidationError,
-  RateLimitError,
-  UnauthorizedError,
   GitHubAPIError,
+  RateLimitError,
+  ResourceNotFoundError,
+  UnauthorizedError,
+  ValidationError,
 } from "../../domain/errors";
 import { MCPErrorCode } from "../../domain/mcp-types";
 

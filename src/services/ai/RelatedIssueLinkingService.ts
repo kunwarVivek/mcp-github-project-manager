@@ -9,24 +9,23 @@
  * Falls back to keyword/label matching when AI unavailable.
  */
 
-import { embed, embedMany, cosineSimilarity } from "ai";
-import { generateObject } from "ai";
-import { z } from "zod";
 import { openai } from "@ai-sdk/openai";
-import { AIServiceFactory } from "./AIServiceFactory.js";
-import { calculateWeightedScore, getConfidenceTier } from "./ConfidenceScorer.js";
+import { cosineSimilarity, embed, embedMany, generateObject } from "ai";
+import { z } from "zod";
 import { EmbeddingCache } from "../../cache/EmbeddingCache.js";
-import { InputSanitizer } from "../utils/InputSanitizer";
-import { type ILogger, Logger } from "../../infrastructure/logger";
-import { RELATED_ISSUE_SYSTEM_PROMPT } from "./prompts/IssueIntelligencePrompts.js";
+import type { ConfidenceFactors, SectionConfidence } from "../../domain/ai-types.js";
 import type {
-  IssueRelationship,
-  RelatedIssueResult,
-  RelatedIssueLinkingConfig,
   DependencySubType,
   IssueInput,
+  IssueRelationship,
+  RelatedIssueLinkingConfig,
+  RelatedIssueResult,
 } from "../../domain/issue-intelligence-types.js";
-import type { SectionConfidence, ConfidenceFactors } from "../../domain/ai-types.js";
+import { type ILogger, Logger } from "../../infrastructure/logger";
+import { InputSanitizer } from "../utils/InputSanitizer";
+import { AIServiceFactory } from "./AIServiceFactory.js";
+import { calculateWeightedScore, getConfidenceTier } from "./ConfidenceScorer.js";
+import { RELATED_ISSUE_SYSTEM_PROMPT } from "./prompts/IssueIntelligencePrompts.js";
 
 // ============================================================================
 // Constants

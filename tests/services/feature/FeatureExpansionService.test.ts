@@ -1,4 +1,5 @@
 import { vi } from "vitest";
+
 /**
  * Unit tests for FeatureExpansionService
  *
@@ -6,17 +7,17 @@ import { vi } from "vitest";
  * and dependency detection.
  */
 
-import { FeatureExpansionService } from "../../../src/services/feature/FeatureExpansionService";
-import { AIServiceFactory } from "../../../src/services/ai/AIServiceFactory";
-import type { TaskGenerationService } from "../../../src/services/TaskGenerationService";
 import { generateObject } from "ai";
 import {
-  type FeatureRequirement,
   type AITask,
-  TaskStatus,
-  TaskPriority,
+  type FeatureRequirement,
   type TaskComplexity,
+  TaskPriority,
+  TaskStatus,
 } from "../../../src/domain/ai-types";
+import { AIServiceFactory } from "../../../src/services/ai/AIServiceFactory";
+import { FeatureExpansionService } from "../../../src/services/feature/FeatureExpansionService";
+import type { TaskGenerationService } from "../../../src/services/TaskGenerationService";
 
 // Mock dependencies
 vi.mock("../../../src/services/ai/AIServiceFactory", () => {

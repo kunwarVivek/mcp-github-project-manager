@@ -38,6 +38,6 @@ export const AutomationRuleDeleteOutputSchema = z.object({
 
 // Re-export main automation schemas from project-schemas for convenience
 export {
-  AutomationRuleOutputSchema,
   AutomationRuleListOutputSchema,
+  AutomationRuleOutputSchema,
 } from "./project-schemas";

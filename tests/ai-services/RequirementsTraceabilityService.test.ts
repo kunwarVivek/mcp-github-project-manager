@@ -1,11 +1,11 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
-import { RequirementsTraceabilityService } from "../../src/services/RequirementsTraceabilityService";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
-  RequirementType,
   RequirementStatus,
+  RequirementType,
   TaskPriority,
   TaskStatus,
 } from "../../src/domain/ai-types";
+import { RequirementsTraceabilityService } from "../../src/services/RequirementsTraceabilityService";
 
 describe("RequirementsTraceabilityService", () => {
   let service: RequirementsTraceabilityService;

@@ -1,4 +1,5 @@
 import { vi } from "vitest";
+
 /**
  * Unit tests for miscellaneous MCP tools
  *
@@ -8,36 +9,34 @@ import { vi } from "vitest";
  * - Executor functions (with mocked repositories)
  */
 
+import { GitHubRepositoryFactory } from "../../../src/infrastructure/github/GitHubRepositoryFactory.js";
+import {
+  HealthStatusOutputSchema,
+  healthCheckSchema,
+  healthCheckTool,
+} from "../../../src/infrastructure/tools/health-tools.js";
 import {
   createProjectViewSchema,
-  listProjectViewsSchema,
-  updateProjectViewSchema,
-  deleteProjectViewSchema,
-  getProjectReadmeSchema,
-  updateProjectReadmeSchema,
-  subscribeToEventsSchema,
-  getRecentEventsSchema,
-  replayEventsSchema,
-  createRoadmapSchema,
-} from "../../../src/infrastructure/tools/ToolSchemas.js";
-import {
   createProjectViewTool,
-  listProjectViewsTool,
-  updateProjectViewTool,
-  deleteProjectViewTool,
-  getProjectReadmeTool,
-  updateProjectReadmeTool,
-  subscribeToEventsTool,
-  getRecentEventsTool,
-  replayEventsTool,
+  createRoadmapSchema,
   createRoadmapTool,
+  deleteProjectViewSchema,
+  deleteProjectViewTool,
+  getProjectReadmeSchema,
+  getProjectReadmeTool,
+  getRecentEventsSchema,
+  getRecentEventsTool,
+  listProjectViewsSchema,
+  listProjectViewsTool,
+  replayEventsSchema,
+  replayEventsTool,
+  subscribeToEventsSchema,
+  subscribeToEventsTool,
+  updateProjectReadmeSchema,
+  updateProjectReadmeTool,
+  updateProjectViewSchema,
+  updateProjectViewTool,
 } from "../../../src/infrastructure/tools/ToolSchemas.js";
-import {
-  healthCheckTool,
-  healthCheckSchema,
-  HealthStatusOutputSchema,
-} from "../../../src/infrastructure/tools/health-tools.js";
-import { GitHubRepositoryFactory } from "../../../src/infrastructure/github/GitHubRepositoryFactory.js";
 
 // Mock the repository factory
 vi.mock("../../../src/infrastructure/github/GitHubRepositoryFactory.js", () => {

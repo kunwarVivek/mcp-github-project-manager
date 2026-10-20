@@ -1,7 +1,7 @@
-import type { ResourceType } from "../../domain/resource-types";
-import type { ResourceEvent } from "./GitHubWebhookHandler";
-import { type ILogger, Logger } from "../logger/index";
 import { EventEmitter } from "node:events";
+import type { ResourceType } from "../../domain/resource-types";
+import { type ILogger, Logger } from "../logger/index";
+import type { ResourceEvent } from "./GitHubWebhookHandler";
 
 export interface EventFilter {
   resourceType?: ResourceType;

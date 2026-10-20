@@ -1,6 +1,6 @@
-import { Command } from "commander";
 import fs from "node:fs";
 import path from "node:path";
+import { Command } from "commander";
 
 // Read version from package.json
 let VERSION = "0.1.0";

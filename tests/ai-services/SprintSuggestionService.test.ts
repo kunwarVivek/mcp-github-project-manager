@@ -1,4 +1,5 @@
 import { vi } from "vitest";
+
 /**
  * Unit tests for SprintSuggestionService
  *
@@ -6,9 +7,9 @@ import { vi } from "vitest";
  * and risk assessment.
  */
 
-import { SprintSuggestionService } from "../../src/services/ai/SprintSuggestionService";
-import { AIServiceFactory } from "../../src/services/ai/AIServiceFactory";
 import type { BacklogItem } from "../../src/domain/sprint-planning-types";
+import { AIServiceFactory } from "../../src/services/ai/AIServiceFactory";
+import { SprintSuggestionService } from "../../src/services/ai/SprintSuggestionService";
 
 // Mock AIServiceFactory
 vi.mock("../../src/services/ai/AIServiceFactory", () => {

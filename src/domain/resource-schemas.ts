@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { ResourceType, RelationshipType, ResourceStatus } from "./resource-types";
+import { RelationshipType, ResourceStatus, ResourceType } from "./resource-types";
 
 // Base resource schema that all resources must conform to
 export const BaseResourceSchema = z.object({

@@ -1,6 +1,6 @@
 import { z } from "zod";
-import type { ToolDefinition, ToolSchema } from "../ToolValidator";
 import { ANNOTATION_PATTERNS } from "../annotations/tool-annotations";
+import type { ToolDefinition, ToolSchema } from "../ToolValidator";
 import { EventListOutputSchema, SubscriptionOutputSchema } from "./project-schemas";
 
 // ============================================================================

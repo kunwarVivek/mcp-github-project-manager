@@ -385,7 +385,7 @@ Add to your Claude Desktop configuration file:
 ### Claude Code CLI
 
 ```bash
-claude mcp add github-project-manager -- npx -y mcp-github-project-manager
+claude mcp add github-project-manager -- pnpm dlx mcp-github-project-manager
 ```
 
 Then set environment variables in your shell or use a `.env` file.

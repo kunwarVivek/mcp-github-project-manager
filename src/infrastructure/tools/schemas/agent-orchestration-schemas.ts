@@ -8,11 +8,11 @@
 
 import { z } from "zod";
 import {
+  AgentOperationalStatusSchema,
   AgentRoleSchema,
   AgentRuntimeSchema,
-  AgentOperationalStatusSchema,
-  CheckoutStrategySchema,
   BudgetResetPeriodSchema,
+  CheckoutStrategySchema,
 } from "../../../domain/agent-orchestration-types";
 
 // ============================================================================

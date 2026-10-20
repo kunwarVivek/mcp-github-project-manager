@@ -1,6 +1,6 @@
-import type { GitHubRepositoryFactory } from "../infrastructure/github/GitHubRepositoryFactory";
-import type { ProjectItem } from "../domain/types";
 import { ResourceType } from "../domain/resource-types";
+import type { ProjectItem } from "../domain/types";
+import type { GitHubRepositoryFactory } from "../infrastructure/github/GitHubRepositoryFactory";
 import { safeCall } from "./utils/safeCall";
 
 /**

@@ -56,10 +56,10 @@ git clone https://github.com/your-username/github-project-manager-mcp.git
 npm install
 
 # Build the project
-npm run build
+pnpm run build
 
 # Run tests
-npm test
+pnpm test
 ```
 
 ### Styleguides
@@ -118,7 +118,7 @@ docs/              — Documentation
 
 - **Dependency Injection**: Uses `tsyringe` for IoC. `container.ts` has 30 DI registrations wiring services, repositories, and infrastructure.
 - **Compound Tool API**: 16 compound tools (134 actions) replace 131 granular tools. Each compound tool has a schema definition and a `CompoundExecutor` that routes `action` values to internal granular executors.
-- **Test Structure**: Tests live in `src/__tests__/` (unit + integration) and `tests/` (E2E). Run `npm test` for unit tests, `npm run test:e2e:tools` for E2E.
+- **Test Structure**: Tests live in `src/__tests__/` (unit + integration) and `tests/` (E2E). Run `pnpm test` for unit tests, `pnpm run test:e2e:tools` for E2E.
 
 ## Testing
 

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // env.ts snapshots config into module-level constants at import time, and
 // `import` is hoisted above plain statements — so the keys must be set in a
@@ -23,9 +23,9 @@ vi.mock("ai", () => ({
   generateText: vi.fn(),
 }));
 
-import { TaskGenerationService } from "../../services/TaskGenerationService";
 import { generateObject, generateText } from "ai";
-import type { PRDDocument, EnhancedTaskGenerationParams } from "../../domain/ai-types";
+import type { EnhancedTaskGenerationParams, PRDDocument } from "../../domain/ai-types";
+import { TaskGenerationService } from "../../services/TaskGenerationService";
 
 describe("TaskGenerationService - Enhanced Context Generation", () => {
   let service: TaskGenerationService;

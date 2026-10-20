@@ -1,8 +1,8 @@
 import { generateObject } from "ai";
 import { z } from "zod";
+import { type ILogger, Logger } from "../infrastructure/logger";
 import type { AIServiceFactory } from "./ai/AIServiceFactory";
 import type { ProjectManagementService } from "./ProjectManagementService";
-import { type ILogger, Logger } from "../infrastructure/logger";
 import { InputSanitizer } from "./utils/InputSanitizer";
 
 /**

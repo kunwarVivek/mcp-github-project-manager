@@ -1,8 +1,8 @@
 import { join, resolve } from "node:path";
-import { parseCommandLineArgs } from "./cli";
 import * as dotenv from "dotenv";
-import { createDefaultSecretResolver } from "./infrastructure/secrets/SecretProvider";
+import { parseCommandLineArgs } from "./cli";
 import { validateConfig, validateConfigWarnings } from "./domain/config-schema";
+import { createDefaultSecretResolver } from "./infrastructure/secrets/SecretProvider";
 
 // Parse command line arguments only if not in test environment
 const cliOptions =

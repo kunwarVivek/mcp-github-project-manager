@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { MCPResponseFormatter } from "../../../../infrastructure/mcp/MCPResponseFormatter";
 import { MCPContentType } from "../../../../domain/mcp-types";
+import { MCPResponseFormatter } from "../../../../infrastructure/mcp/MCPResponseFormatter";
 
 describe("MCPResponseFormatter", () => {
   // We're testing the format method, which is the core functionality

@@ -12,34 +12,34 @@
  * All tools use GraphQL mutations/queries directly via the factory.
  */
 
-import type { ToolDefinition, ToolSchema } from "./ToolValidator";
-import { ANNOTATION_PATTERNS } from "./annotations/tool-annotations";
-import { createGitHubFactory, requireToken } from "./tool-factory";
 import type { GitHubRepositoryFactory } from "../github/GitHubRepositoryFactory";
+import { ANNOTATION_PATTERNS } from "./annotations/tool-annotations";
 import {
-  LinkProjectToRepositoryInputSchema,
-  type LinkProjectToRepositoryInput,
-  UnlinkProjectFromRepositoryInputSchema,
-  type UnlinkProjectFromRepositoryInput,
-  LinkProjectToTeamInputSchema,
-  type LinkProjectToTeamInput,
-  UnlinkProjectFromTeamInputSchema,
-  type UnlinkProjectFromTeamInput,
-  ListLinkedRepositoriesInputSchema,
-  type ListLinkedRepositoriesInput,
-  ListLinkedTeamsInputSchema,
-  type ListLinkedTeamsInput,
-  LinkedRepositoryOutputSchema,
-  type LinkedRepositoryOutput,
-  LinkedTeamOutputSchema,
-  type LinkedTeamOutput,
-  LinkedRepositoriesListOutputSchema,
   type LinkedRepositoriesListOutput,
-  LinkedTeamsListOutputSchema,
+  LinkedRepositoriesListOutputSchema,
+  type LinkedRepositoryOutput,
+  LinkedRepositoryOutputSchema,
+  type LinkedTeamOutput,
+  LinkedTeamOutputSchema,
   type LinkedTeamsListOutput,
-  LinkOperationOutputSchema,
+  LinkedTeamsListOutputSchema,
   type LinkOperationOutput,
+  LinkOperationOutputSchema,
+  type LinkProjectToRepositoryInput,
+  LinkProjectToRepositoryInputSchema,
+  type LinkProjectToTeamInput,
+  LinkProjectToTeamInputSchema,
+  type ListLinkedRepositoriesInput,
+  ListLinkedRepositoriesInputSchema,
+  type ListLinkedTeamsInput,
+  ListLinkedTeamsInputSchema,
+  type UnlinkProjectFromRepositoryInput,
+  UnlinkProjectFromRepositoryInputSchema,
+  type UnlinkProjectFromTeamInput,
+  UnlinkProjectFromTeamInputSchema,
 } from "./schemas/project-template-linking-schemas";
+import type { ToolDefinition, ToolSchema } from "./ToolValidator";
+import { createGitHubFactory, requireToken } from "./tool-factory";
 
 // ============================================================================
 // Helper Functions

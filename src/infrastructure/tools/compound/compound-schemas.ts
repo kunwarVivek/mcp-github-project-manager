@@ -9,11 +9,11 @@
 
 import { z } from "zod";
 import {
+  AgentOperationalStatusSchema,
   AgentRoleSchema,
   AgentRuntimeSchema,
-  AgentOperationalStatusSchema,
-  CheckoutStrategySchema,
   BudgetResetPeriodSchema,
+  CheckoutStrategySchema,
 } from "../../../domain/agent-orchestration-types";
 
 // ============================================================================
@@ -681,6 +681,7 @@ export const aiAnalyzeSchema = z
     action: z
       .enum([
         "enrich_issue",
+        "enrich_issue_sections",
         "enrich_bulk",
         "triage_issue",
         "triage_all",

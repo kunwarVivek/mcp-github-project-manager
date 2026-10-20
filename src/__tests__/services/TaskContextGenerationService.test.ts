@@ -1,13 +1,13 @@
-import { describe, it, expect, beforeEach } from "vitest";
-import { TaskContextGenerationService } from "../../services/TaskContextGenerationService";
+import { beforeEach, describe, expect, it } from "vitest";
 import {
   type AITask,
-  type PRDDocument,
   type EnhancedTaskGenerationConfig,
-  TaskStatus,
-  TaskPriority,
+  type PRDDocument,
   type TaskComplexity,
+  TaskPriority,
+  TaskStatus,
 } from "../../domain/ai-types";
+import { TaskContextGenerationService } from "../../services/TaskContextGenerationService";
 
 describe("TaskContextGenerationService", () => {
   let service: TaskContextGenerationService;

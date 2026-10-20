@@ -1,6 +1,6 @@
 import { vi } from "vitest";
-import { DomainEventBus } from "../../../../domain/events/DomainEventBus";
 import { IssueCreatedEvent } from "../../../../domain/events/DomainEvent";
+import { DomainEventBus } from "../../../../domain/events/DomainEventBus";
 
 describe("DomainEventBus", () => {
   let eventBus: DomainEventBus;

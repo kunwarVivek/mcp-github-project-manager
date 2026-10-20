@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
-import { GhCliSecretProvider } from "./GhCliSecretProvider";
 import { join } from "node:path";
+import { GhCliSecretProvider } from "./GhCliSecretProvider";
 
 /**
  * A source of secret/config values. Implementations must be synchronous so the

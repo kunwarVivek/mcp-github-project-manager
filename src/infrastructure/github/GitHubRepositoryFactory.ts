@@ -1,17 +1,17 @@
-import { Octokit } from "@octokit/rest";
 import { createAppAuth } from "@octokit/auth-app";
-import type { IGitHubRepository } from "./repositories/BaseRepository";
-import { GitHubErrorHandler } from "./GitHubErrorHandler";
-import type { OctokitInstance } from "./types";
+import { Octokit } from "@octokit/rest";
 import { GitHubConfig } from "./GitHubConfig";
+import { GitHubErrorHandler } from "./GitHubErrorHandler";
+import { RateLimitManager } from "./RateLimitManager";
+import type { IGitHubRepository } from "./repositories/BaseRepository";
+import { GitHubAutomationRuleRepository } from "./repositories/GitHubAutomationRuleRepository";
 import { GitHubIssueRepository } from "./repositories/GitHubIssueRepository";
 import { GitHubMilestoneRepository } from "./repositories/GitHubMilestoneRepository";
 import { GitHubProjectRepository } from "./repositories/GitHubProjectRepository";
 import { GitHubSprintRepository } from "./repositories/GitHubSprintRepository";
-import { GitHubAutomationRuleRepository } from "./repositories/GitHubAutomationRuleRepository";
-import { GitHubSubIssueRepository } from "./repositories/GitHubSubIssueRepository";
 import { GitHubStatusUpdateRepository } from "./repositories/GitHubStatusUpdateRepository";
-import { RateLimitManager } from "./RateLimitManager";
+import { GitHubSubIssueRepository } from "./repositories/GitHubSubIssueRepository";
+import type { OctokitInstance } from "./types";
 
 export interface RepositoryFactoryOptions {
   baseUrl?: string;

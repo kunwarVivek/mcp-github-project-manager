@@ -1,11 +1,11 @@
 import type { PRDDocument } from "../../domain/ai-types";
+import { CLARITY_RULES } from "./rules/ClarityRules";
+import { COMPLETENESS_RULES } from "./rules/CompletenessRules";
 import {
-  ValidationRuleEngine,
   type ValidationResults,
   type ValidationRule,
+  ValidationRuleEngine,
 } from "./ValidationRuleEngine";
-import { COMPLETENESS_RULES } from "./rules/CompletenessRules";
-import { CLARITY_RULES } from "./rules/ClarityRules";
 
 /**
  * PRD-specific validator with built-in rules

@@ -14,19 +14,19 @@
 
 import { generateObject } from "ai";
 import { z } from "zod";
-import { AIServiceFactory } from "./AIServiceFactory";
-import { InputSanitizer } from "../utils/InputSanitizer";
-import { calculateWeightedScore, getConfidenceTier } from "./ConfidenceScorer";
+import type { ConfidenceFactors, ConfidenceTier, SectionConfidence } from "../../domain/ai-types";
 import type {
   LabelSuggestion,
-  LabelSuggestionResult,
   LabelSuggestionConfig,
+  LabelSuggestionResult,
   NewLabelProposal,
 } from "../../domain/issue-intelligence-types";
-import type { SectionConfidence, ConfidenceFactors, ConfidenceTier } from "../../domain/ai-types";
+import { InputSanitizer } from "../utils/InputSanitizer";
+import { AIServiceFactory } from "./AIServiceFactory";
+import { calculateWeightedScore, getConfidenceTier } from "./ConfidenceScorer";
 import {
-  LABEL_SUGGESTION_SYSTEM_PROMPT,
   formatLabelPrompt,
+  LABEL_SUGGESTION_SYSTEM_PROMPT,
 } from "./prompts/IssueIntelligencePrompts";
 
 // ============================================================================

@@ -10,11 +10,11 @@
  *
  * Usage:
  * 1. Set environment variables (see .env.example)
- * 2. Run: ts-node examples/basic/create-simple-project.ts
+ * 2. Run: pnpm exec tsx examples/basic/create-simple-project.ts
  */
 
 import dotenv from "dotenv";
-import { ProjectManagementService } from "../../src/services/ProjectManagementService.js";
+import { createProjectManagementService } from "../../src/container.js";
 
 // Load environment variables
 dotenv.config();
@@ -31,7 +31,7 @@ for (const envVar of requiredEnvVars) {
 async function createSimpleProject() {
   try {
     // Initialize the service
-    const service = new ProjectManagementService(
+    const service = createProjectManagementService(
       process.env.GITHUB_OWNER ?? "",
       process.env.GITHUB_REPO ?? "",
       process.env.GITHUB_TOKEN ?? ""
@@ -87,9 +87,9 @@ async function createSimpleProject() {
     process.stderr.write("Error creating project:");
     if (error instanceof Error) {
       process.stderr.write(`${error.name}: ${error.message}`);
-      process.stderr.write(error.stack);
+      process.stderr.write(error.stack ?? "");
     } else {
-      process.stderr.write(error);
+      process.stderr.write(String(error));
     }
     process.exit(1);
   }

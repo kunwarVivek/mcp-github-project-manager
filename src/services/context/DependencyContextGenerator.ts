@@ -1,9 +1,9 @@
 import { generateObject } from "ai";
-import { AIServiceFactory } from "../ai/AIServiceFactory";
-import type { DependencyContext, Dependency } from "../../domain/task-context-schemas";
-import type { AITask, TaskDependency, EnhancedTaskDependency } from "../../domain/ai-types";
-import { type ILogger, Logger } from "../../infrastructure/logger";
 import { z } from "zod";
+import type { AITask, EnhancedTaskDependency, TaskDependency } from "../../domain/ai-types";
+import type { Dependency, DependencyContext } from "../../domain/task-context-schemas";
+import { type ILogger, Logger } from "../../infrastructure/logger";
+import { AIServiceFactory } from "../ai/AIServiceFactory";
 import { InputSanitizer } from "../utils/InputSanitizer";
 
 /**

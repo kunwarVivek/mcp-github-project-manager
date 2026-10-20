@@ -1,6 +1,6 @@
-import { describe, expect, it, vi, beforeEach } from "vitest";
-import { SecurityAuditLog } from "../../../../infrastructure/observability/SecurityAuditLog";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ILogger } from "../../../../infrastructure/logger/index";
+import { SecurityAuditLog } from "../../../../infrastructure/observability/SecurityAuditLog";
 
 describe("SecurityAuditLog", () => {
   let logger: ILogger;

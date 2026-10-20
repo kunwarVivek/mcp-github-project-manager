@@ -57,7 +57,7 @@ MCP_TOOL_GROUPS=all
 9. [manage_events](#manage_events) (3 actions)
 10. [manage_status_updates](#manage_status_updates) (3 actions)
 11. [ai_generate](#ai_generate) (9 actions)
-12. [ai_analyze](#ai_analyze) (8 actions)
+12. [ai_analyze](#ai_analyze) (9 actions)
 13. [ai_plan](#ai_plan) (6 actions)
 14. [agent_work](#agent_work) (12 actions)
 15. [agent_manage](#agent_manage) (18 actions)
@@ -481,13 +481,14 @@ AI-powered generation: PRDs, task breakdowns, feature addition, and traceability
 
 AI-powered analysis: issue enrichment, triage, label suggestions, and duplicate detection.
 
-**Action enum:** `enrich_issue` | `enrich_bulk` | `triage_issue` | `triage_all` | `schedule_triaging` | `suggest_labels` | `detect_duplicates` | `find_related`
+**Action enum:** `enrich_issue` | `enrich_issue_sections` | `enrich_bulk` | `triage_issue` | `triage_all` | `schedule_triaging` | `suggest_labels` | `detect_duplicates` | `find_related`
 
 ### Per-Action Parameters
 
 | Action | Additional Parameters | Description |
 |--------|----------------------|-------------|
-| `enrich_issue` | `issueNumber` (req) | AI-enrich a single issue |
+| `enrich_issue` | `issueNumber` (req) | AI-enrich a single issue (labels, priority, type, complexity, effort) |
+| `enrich_issue_sections` | `issueTitle` (req), `issueDescription`, `projectContext`, `repositoryLabels` | Enrich an issue into structured sections (Problem / Solution / Context / Impact / AcceptanceCriteria) with per-section confidence |
 | `enrich_bulk` | `issueNumbers` (req) | Bulk enrich multiple issues |
 | `triage_issue` | `issueNumber` (req) | AI triage a single issue |
 | `triage_all` | `limit` | Triage all untriaged issues |
@@ -501,6 +502,9 @@ AI-powered analysis: issue enrichment, triage, label suggestions, and duplicate 
 ```json
 // Enrich an issue with AI
 {"tool": "ai_analyze", "arguments": {"action": "enrich_issue", "issueNumber": 42}}
+
+// Rewrite an issue into structured sections with confidence scores
+{"tool": "ai_analyze", "arguments": {"action": "enrich_issue_sections", "issueTitle": "Add OAuth login", "issueDescription": "Users need SSO"}}
 
 // Triage all untriaged issues
 {"tool": "ai_analyze", "arguments": {"action": "triage_all", "limit": 50}}

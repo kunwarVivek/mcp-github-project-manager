@@ -1,19 +1,19 @@
 import { generateObject } from "ai";
 import { z } from "zod";
-import { AIServiceFactory } from "../ai/AIServiceFactory.js";
-import { type ILogger, Logger } from "../../infrastructure/logger";
-import { InputSanitizer } from "../utils/InputSanitizer";
+import type { AITask } from "../../domain/ai-types.js";
 import {
+  isTaskPhaseStatus,
+  type TaskBlocker,
   type TaskLifecycleState,
   type TaskPhaseInfo,
-  type TaskBlocker,
-  isTaskPhaseStatus,
 } from "../../domain/feature-lifecycle-types.js";
-import type { AITask } from "../../domain/ai-types.js";
+import { type ILogger, Logger } from "../../infrastructure/logger";
+import { AIServiceFactory } from "../ai/AIServiceFactory.js";
 import {
   FEATURE_PROMPT_CONFIGS,
   formatFeaturePrompt,
 } from "../ai/prompts/FeatureAdditionPrompts.js";
+import { InputSanitizer } from "../utils/InputSanitizer";
 import { safeCall } from "../utils/safeCall";
 
 /**
@@ -231,9 +231,10 @@ export class TaskLifecycleService {
     const imperativePattern =
       /(?:^|\n)\s*[-*•\d.]+\s*((?:Review|Implement|Create|Set up|Configure|Test|Deploy|Document|Fix|Update|Add|Remove|Refactor)\s[^.\n]+)/gi;
     const actions: string[] = [];
-    let match;
-    while ((match = imperativePattern.exec(analysis)) !== null) {
+    let match: RegExpExecArray | null = imperativePattern.exec(analysis);
+    while (match !== null) {
       actions.push(match[1].trim());
+      match = imperativePattern.exec(analysis);
     }
     return actions.length > 0
       ? actions.slice(0, 5)
@@ -253,12 +254,13 @@ export class TaskLifecycleService {
     }
     // Fallback: look for sentences with recommendation language
     const recPattern =
-      /(?:recommend|suggest|advise|consider|should|best practice)s?[:\-]?\s*([^.\n]+[.]?)/gi;
+      /(?:recommend|suggest|advise|consider|should|best practice)s?[:-]?\s*([^.\n]+[.]?)/gi;
     const recs: string[] = [];
-    let match;
-    while ((match = recPattern.exec(analysis)) !== null) {
+    let match: RegExpExecArray | null = recPattern.exec(analysis);
+    while (match !== null) {
       const rec = match[1].trim();
       if (rec.length > 10) recs.push(rec);
+      match = recPattern.exec(analysis);
     }
     return recs.length > 0
       ? recs.slice(0, 5)

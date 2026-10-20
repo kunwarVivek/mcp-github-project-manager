@@ -1,4 +1,5 @@
-import { vi, type Mock } from "vitest";
+import { type Mock, vi } from "vitest";
+
 /**
  * Unit tests for RelatedIssueLinkingService
  *
@@ -6,9 +7,9 @@ import { vi, type Mock } from "vitest";
  * dependency detection, and component grouping.
  */
 
-import { RelatedIssueLinkingService } from "../../../src/services/ai/RelatedIssueLinkingService";
+import { cosineSimilarity, embed, embedMany, generateObject } from "ai";
 import { AIServiceFactory } from "../../../src/services/ai/AIServiceFactory";
-import { embed, embedMany, cosineSimilarity, generateObject } from "ai";
+import { RelatedIssueLinkingService } from "../../../src/services/ai/RelatedIssueLinkingService";
 
 // Mock dependencies
 vi.mock("../../../src/services/ai/AIServiceFactory", () => {

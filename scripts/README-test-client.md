@@ -21,7 +21,7 @@ The MCP Test Client provides both automated and interactive testing capabilities
 ./scripts/test-mcp.sh build
 
 # Or manually
-npm run build
+pnpm run build
 ```
 
 ### 2. Set Environment Variables
@@ -172,7 +172,7 @@ The test client includes predefined sample data for the following tools:
 ### Common Issues
 
 1. **"MCP server not found"**
-   - Run `npm run build` to build the project
+   - Run `pnpm run build` to build the project
    - Check that `build/index.js` exists
 
 2. **"Missing required environment variables"**

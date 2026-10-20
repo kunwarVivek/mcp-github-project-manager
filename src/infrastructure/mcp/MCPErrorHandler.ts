@@ -1,10 +1,10 @@
-import { type MCPError, MCPErrorCode, type MCPErrorResponse } from "../../domain/mcp-types";
 import {
-  ValidationError,
+  RateLimitError,
   ResourceNotFoundError,
   UnauthorizedError,
-  RateLimitError,
+  ValidationError,
 } from "../../domain/errors";
+import { type MCPError, MCPErrorCode, type MCPErrorResponse } from "../../domain/mcp-types";
 
 export class MCPErrorHandler {
   /**

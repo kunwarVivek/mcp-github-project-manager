@@ -1,4 +1,5 @@
 import { vi } from "vitest";
+
 /**
  * Unit tests for project template MCP tools
  *
@@ -8,23 +9,23 @@ import { vi } from "vitest";
  * - Executor functions (with mocked repositories)
  */
 
+import { GitHubRepositoryFactory } from "../../../src/infrastructure/github/GitHubRepositoryFactory.js";
 import {
-  MarkProjectAsTemplateInputSchema,
-  UnmarkProjectAsTemplateInputSchema,
-  CopyProjectFromTemplateInputSchema,
-  ListOrganizationTemplatesInputSchema,
-} from "../../../src/infrastructure/tools/schemas/project-template-linking-schemas.js";
-import {
-  markProjectAsTemplateTool,
-  unmarkProjectAsTemplateTool,
   copyProjectFromTemplateTool,
-  listOrganizationTemplatesTool,
-  executeMarkProjectAsTemplate,
-  executeUnmarkProjectAsTemplate,
   executeCopyProjectFromTemplate,
   executeListOrganizationTemplates,
+  executeMarkProjectAsTemplate,
+  executeUnmarkProjectAsTemplate,
+  listOrganizationTemplatesTool,
+  markProjectAsTemplateTool,
+  unmarkProjectAsTemplateTool,
 } from "../../../src/infrastructure/tools/project-template-tools.js";
-import { GitHubRepositoryFactory } from "../../../src/infrastructure/github/GitHubRepositoryFactory.js";
+import {
+  CopyProjectFromTemplateInputSchema,
+  ListOrganizationTemplatesInputSchema,
+  MarkProjectAsTemplateInputSchema,
+  UnmarkProjectAsTemplateInputSchema,
+} from "../../../src/infrastructure/tools/schemas/project-template-linking-schemas.js";
 
 // Mock the repository factory
 vi.mock("../../../src/infrastructure/github/GitHubRepositoryFactory.js", () => {

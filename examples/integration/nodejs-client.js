@@ -1,99 +1,99 @@
 /**
  * Example: NodeJS Integration
  *
- * This example demonstrates how to use the MCP GitHub Project Manager
- * as a module in a Node.js application.
+ * Demonstrates driving the MCP GitHub Project Manager with the MCP v2 client
+ * SDK (`@modelcontextprotocol/client`).
+ *
+ * The server speaks MCP over stdio, so the client spawns it as a child
+ * process and talks JSON-RPC over the child's stdin/stdout.
  */
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { Client } from "@modelcontextprotocol/client";
+import { StdioClientTransport } from "@modelcontextprotocol/client/stdio";
 
-import { spawn } from "node:child_process";
-import { McpClient } from "@modelcontextprotocol/sdk/client/index.js";
-import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
-import { Server } from "../../build/index.js";
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const SERVER_ENTRY = path.resolve(__dirname, "../../build/index.js");
 
-// Example 1: Direct usage within the same process
-async function directUsageExample() {
-  console.log("🚀 Example 1: Direct usage");
+/**
+ * Example 1: spawn the server and list its tools.
+ *
+ * Note there is no in-process "server object" to construct: the server's
+ * entrypoint boots its own stdio transport, so a client always talks to it
+ * as a child process (or over HTTP/SSE when those are enabled).
+ */
+async function listToolsExample() {
+  console.log("🚀 Example 1: connect and list tools");
 
-  // Create an MCP server instance
-  const server = new Server({
-    transport: "stdio",
-    config: {
-      githubToken: process.env.GITHUB_TOKEN,
-      githubOwner: process.env.GITHUB_OWNER,
-      githubRepo: process.env.GITHUB_REPO,
-    },
-  });
-
-  // Start the server
-  server.start();
-
-  // Server is now running, but this approach doesn't allow interaction
-  // from the same process since it's using stdio
-  console.log("Server started but cannot be used in the same process with stdio transport");
-}
-
-// Example 2: Using as a child process
-async function childProcessExample() {
-  console.log("\n🚀 Example 2: Child process integration");
-
-  // Start the server as a child process
-  const serverProcess = spawn("node", ["../../build/index.js"], {
+  const transport = new StdioClientTransport({
+    command: process.execPath,
+    args: [SERVER_ENTRY],
     env: {
       ...process.env,
       GITHUB_TOKEN: process.env.GITHUB_TOKEN,
       GITHUB_OWNER: process.env.GITHUB_OWNER,
       GITHUB_REPO: process.env.GITHUB_REPO,
     },
-    stdio: ["pipe", "pipe", "pipe"],
+    stderr: "pipe",
   });
 
-  // Log server output for debugging
-  serverProcess.stdout.on("data", (data) => {
-    console.log(`Server stdout: ${data}`);
-  });
-
-  serverProcess.stderr.on("data", (data) => {
-    process.stderr.write(`Server stderr: ${data}`);
-  });
-
-  // Wait for server to initialize
-  await new Promise((resolve) => setTimeout(resolve, 1000));
-
-  // Create MCP client connected to the server process
-  const client = new McpClient({
-    transport: new StdioClientTransport(serverProcess.stdin, serverProcess.stdout),
-  });
+  const client = new Client({ name: "nodejs-client-example", version: "1.0.0" });
 
   try {
-    // List available tools
-    console.log("📝 Listing available tools...");
-    const tools = await client.listTools();
-    console.log(`Found ${tools.length} tools:`);
-    tools.forEach((tool) => console.log(`- ${tool.name}: ${tool.description}`));
+    await client.connect(transport);
 
-    // Create a project
+    const { tools } = await client.listTools();
+    console.log(`Found ${tools.length} compound tools:`);
+    for (const tool of tools) {
+      console.log(`- ${tool.name}: ${tool.description?.slice(0, 80) ?? ""}`);
+    }
+
+    // Example 2: call a compound tool. The MCP surface is 20 compound tools
+    // that route on an `action` field — the granular tool names are internal.
     console.log("\n📝 Creating a sample project...");
-    const projectResult = await client.callTool("create_project", {
-      title: "Sample Integration Project",
-      description: "A project created via Node.js integration example",
-      visibility: "PRIVATE",
+    const projectResult = await client.callTool({
+      name: "manage_project",
+      arguments: {
+        action: "create",
+        title: "Sample Integration Project",
+        description: "A project created via Node.js integration example",
+        owner: process.env.GITHUB_OWNER,
+        repo: process.env.GITHUB_REPO,
+      },
     });
 
     console.log("Project created successfully:");
     console.log(JSON.stringify(projectResult, null, 2));
-  } catch (error) {
-    process.stderr.write("❌ Error:", error);
   } finally {
-    // Terminate the server process
-    serverProcess.kill();
-    console.log("Server process terminated");
+    await client.close();
   }
 }
 
-// Example 3: Using with HTTP transport
-async function httpTransportExample() {
-  console.log("\n🚀 Example 3: HTTP transport");
-  console.log("Not implemented in this example - see documentation for HTTP setup");
+/**
+ * Example 3: discover the action surface of a domain.
+ */
+async function discoverToolsExample() {
+  console.log("\n🚀 Example 3: discover_tools");
+
+  const transport = new StdioClientTransport({
+    command: process.execPath,
+    args: [SERVER_ENTRY],
+    env: { ...process.env },
+    stderr: "pipe",
+  });
+
+  const client = new Client({ name: "nodejs-client-example", version: "1.0.0" });
+
+  try {
+    await client.connect(transport);
+    const result = await client.callTool({
+      name: "discover_tools",
+      arguments: { domain: "ai_analysis" },
+    });
+    console.log(JSON.stringify(result, null, 2));
+  } finally {
+    await client.close();
+  }
 }
 
 // Run the examples
@@ -106,14 +106,8 @@ async function main() {
     process.exit(1);
   }
 
-  // Uncomment to run Example 1
-  // await directUsageExample();
-
-  // Run Example 2
-  await childProcessExample();
-
-  // Uncomment to run Example 3
-  // await httpTransportExample();
+  await listToolsExample();
+  // await discoverToolsExample();
 }
 
 main().catch((error) => {

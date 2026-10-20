@@ -1,16 +1,17 @@
 import { vi } from "vitest";
+
 // Unmock ResourceCache for E2E tests
 vi.unmock("../../infrastructure/cache/ResourceCache");
 
-import { ResourceManager } from "../../infrastructure/resource/ResourceManager";
-import { ResourceCache } from "../../infrastructure/cache/ResourceCache";
 import type { BaseProjectResource } from "../../domain/project-types";
 import {
+  ResourceEventType,
   ResourceStatus,
   ResourceType,
-  ResourceEventType,
   ResourceVersionError,
 } from "../../domain/resource-types";
+import { ResourceCache } from "../../infrastructure/cache/ResourceCache";
+import { ResourceManager } from "../../infrastructure/resource/ResourceManager";
 
 describe("Resource System", () => {
   let manager: ResourceManager;

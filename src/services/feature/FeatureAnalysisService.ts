@@ -1,13 +1,13 @@
 import { generateObject } from "ai";
 import { z } from "zod";
-import { AIServiceFactory } from "../ai/AIServiceFactory.js";
+import { type PRDDocument, type TaskComplexity, TaskPriority } from "../../domain/ai-types.js";
 import { type ILogger, Logger } from "../../infrastructure/logger";
-import { TaskPriority, type TaskComplexity, type PRDDocument } from "../../domain/ai-types.js";
-import { InputSanitizer } from "../utils/InputSanitizer";
+import { AIServiceFactory } from "../ai/AIServiceFactory.js";
 import {
   FEATURE_PROMPT_CONFIGS,
   formatFeaturePrompt,
 } from "../ai/prompts/FeatureAdditionPrompts.js";
+import { InputSanitizer } from "../utils/InputSanitizer";
 import { safeCall } from "../utils/safeCall";
 
 /**
@@ -150,12 +150,13 @@ export class FeatureAnalysisService {
 
   extractRisks(analysis: string): string[] {
     const riskPatterns =
-      /(?:risk|concern|challenge|potential issue|caveat|danger|threat)s?[:\-]?\s*([^.\n]+)/gi;
+      /(?:risk|concern|challenge|potential issue|caveat|danger|threat)s?[:-]?\s*([^.\n]+)/gi;
     const risks: string[] = [];
-    let match;
-    while ((match = riskPatterns.exec(analysis)) !== null) {
+    let match: RegExpExecArray | null = riskPatterns.exec(analysis);
+    while (match !== null) {
       const risk = match[1].trim();
       if (risk.length > 5 && risk.length < 200) risks.push(risk);
+      match = riskPatterns.exec(analysis);
     }
     // Fall back to section extraction: look for "Risks:" or "Risk Factors:" sections
     if (risks.length === 0) {
@@ -175,12 +176,13 @@ export class FeatureAnalysisService {
 
   extractDependencies(analysis: string): string[] {
     const depPatterns =
-      /(?:depend(?:s|ency|encies)|requires?|prerequisite|blocked by|needs)[:\-]?\s*([^.\n]+)/gi;
+      /(?:depend(?:s|ency|encies)|requires?|prerequisite|blocked by|needs)[:-]?\s*([^.\n]+)/gi;
     const deps: string[] = [];
-    let match;
-    while ((match = depPatterns.exec(analysis)) !== null) {
+    let match: RegExpExecArray | null = depPatterns.exec(analysis);
+    while (match !== null) {
       const dep = match[1].trim();
       if (dep.length > 3 && dep.length < 200) deps.push(dep);
+      match = depPatterns.exec(analysis);
     }
     if (deps.length === 0) {
       const sectionMatch = analysis.match(

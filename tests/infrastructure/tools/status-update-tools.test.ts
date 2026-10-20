@@ -1,4 +1,5 @@
 import { vi } from "vitest";
+
 /**
  * Unit tests for status update MCP tools
  *
@@ -8,21 +9,21 @@ import { vi } from "vitest";
  * - Executor functions (with mocked repositories)
  */
 
+import { GitHubRepositoryFactory } from "../../../src/infrastructure/github/GitHubRepositoryFactory.js";
+import { StatusUpdateStatus } from "../../../src/infrastructure/github/repositories/types.js";
 import {
   CreateStatusUpdateInputSchema,
-  ListStatusUpdatesInputSchema,
   GetStatusUpdateInputSchema,
+  ListStatusUpdatesInputSchema,
 } from "../../../src/infrastructure/tools/schemas/status-update-schemas.js";
 import {
   createStatusUpdateTool,
-  listStatusUpdatesTool,
-  getStatusUpdateTool,
   executeCreateStatusUpdate,
-  executeListStatusUpdates,
   executeGetStatusUpdate,
+  executeListStatusUpdates,
+  getStatusUpdateTool,
+  listStatusUpdatesTool,
 } from "../../../src/infrastructure/tools/status-update-tools.js";
-import { GitHubRepositoryFactory } from "../../../src/infrastructure/github/GitHubRepositoryFactory.js";
-import { StatusUpdateStatus } from "../../../src/infrastructure/github/repositories/types.js";
 
 // Mock the repository factory
 vi.mock("../../../src/infrastructure/github/GitHubRepositoryFactory.js", () => {

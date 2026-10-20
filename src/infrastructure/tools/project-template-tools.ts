@@ -11,26 +11,26 @@
  * with views, custom fields, draft issues (optional), workflows, and insights.
  */
 
-import type { ToolDefinition, ToolSchema } from "./ToolValidator";
-import { ANNOTATION_PATTERNS } from "./annotations/tool-annotations";
-import { createGitHubFactory } from "./tool-factory";
 import type { GitHubRepositoryFactory } from "../github/GitHubRepositoryFactory";
+import { ANNOTATION_PATTERNS } from "./annotations/tool-annotations";
 import {
-  MarkProjectAsTemplateInputSchema,
-  type MarkProjectAsTemplateInput,
-  UnmarkProjectAsTemplateInputSchema,
-  type UnmarkProjectAsTemplateInput,
-  CopyProjectFromTemplateInputSchema,
-  type CopyProjectFromTemplateInput,
-  ListOrganizationTemplatesInputSchema,
-  type ListOrganizationTemplatesInput,
-  TemplateProjectOutputSchema,
-  type TemplateProjectOutput,
-  CopiedProjectOutputSchema,
   type CopiedProjectOutput,
-  TemplateListOutputSchema,
+  CopiedProjectOutputSchema,
+  type CopyProjectFromTemplateInput,
+  CopyProjectFromTemplateInputSchema,
+  type ListOrganizationTemplatesInput,
+  ListOrganizationTemplatesInputSchema,
+  type MarkProjectAsTemplateInput,
+  MarkProjectAsTemplateInputSchema,
   type TemplateListOutput,
+  TemplateListOutputSchema,
+  type TemplateProjectOutput,
+  TemplateProjectOutputSchema,
+  type UnmarkProjectAsTemplateInput,
+  UnmarkProjectAsTemplateInputSchema,
 } from "./schemas/project-template-linking-schemas";
+import type { ToolDefinition, ToolSchema } from "./ToolValidator";
+import { createGitHubFactory } from "./tool-factory";
 
 // ============================================================================
 // GraphQL Queries and Mutations

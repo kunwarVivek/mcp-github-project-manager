@@ -1,8 +1,8 @@
+import type { CreateIssue, Issue } from "../domain/types";
+import { filterByStatus, parseResourceStatus } from "../domain/utils/StatusParser";
 import type { GitHubRepositoryFactory } from "../infrastructure/github/GitHubRepositoryFactory";
 import type { GitHubIssueRepository } from "../infrastructure/github/repositories/GitHubIssueRepository";
-import type { Issue, CreateIssue } from "../domain/types";
 import { safeCall } from "./utils/safeCall";
-import { parseResourceStatus, filterByStatus } from "../domain/utils/StatusParser";
 
 /** A GitHub issue comment as returned by the REST API. */
 export interface IssueComment {

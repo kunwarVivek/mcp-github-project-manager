@@ -10,26 +10,26 @@
  * does not support server-side filtering for project items.
  */
 
-import type { ToolDefinition, ToolSchema } from "./ToolValidator";
 import { ANNOTATION_PATTERNS } from "./annotations/tool-annotations";
-import { createGitHubFactory } from "./tool-factory";
 import {
-  UpdateItemPositionInputSchema,
-  type UpdateItemPositionInput,
-  SearchIssuesAdvancedInputSchema,
-  type SearchIssuesAdvancedInput,
-  FilterProjectItemsInputSchema,
   type FilterProjectItemsInput,
-  type ProjectItemFilter,
-  ItemPositionOutputSchema,
-  type ItemPositionOutput,
-  SearchIssuesOutputSchema,
-  type SearchIssuesOutput,
-  type SearchIssueItem,
-  FilterProjectItemsOutputSchema,
+  FilterProjectItemsInputSchema,
   type FilterProjectItemsOutput,
+  FilterProjectItemsOutputSchema,
+  type ItemPositionOutput,
+  ItemPositionOutputSchema,
   type ProjectItem,
+  type ProjectItemFilter,
+  type SearchIssueItem,
+  type SearchIssuesAdvancedInput,
+  SearchIssuesAdvancedInputSchema,
+  type SearchIssuesOutput,
+  SearchIssuesOutputSchema,
+  type UpdateItemPositionInput,
+  UpdateItemPositionInputSchema,
 } from "./schemas/project-lifecycle-schemas";
+import type { ToolDefinition, ToolSchema } from "./ToolValidator";
+import { createGitHubFactory } from "./tool-factory";
 
 // ============================================================================
 // GraphQL Queries and Mutations

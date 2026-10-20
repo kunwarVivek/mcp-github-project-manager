@@ -1,7 +1,7 @@
 import * as crypto from "node:crypto";
 import { ResourceType } from "../../domain/resource-types";
+import { WEBHOOK_ALLOW_UNSIGNED, WEBHOOK_SECRET } from "../../env";
 import { type ILogger, Logger } from "../logger/index";
-import { WEBHOOK_SECRET, WEBHOOK_ALLOW_UNSIGNED } from "../../env";
 
 export interface WebhookEvent {
   id: string;

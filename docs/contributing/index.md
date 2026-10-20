@@ -52,7 +52,7 @@ This project adheres to a Code of Conduct that all contributors are expected to 
    ```
 6. Build the project:
    ```bash
-   npm run build
+   pnpm run build
    ```
 
 ## Development Workflow
@@ -68,12 +68,12 @@ This project adheres to a Code of Conduct that all contributors are expected to 
 
 3. Run tests to ensure your changes don't break existing functionality:
    ```bash
-   npm test
+   pnpm test
    ```
 
 4. Run linting to ensure code quality:
    ```bash
-   npm run lint
+   pnpm run lint
    ```
 
 5. Commit your changes with a descriptive commit message:

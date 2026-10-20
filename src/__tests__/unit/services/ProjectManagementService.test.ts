@@ -1,19 +1,19 @@
-import { beforeEach, describe, expect, it, vi, type MockedFunction } from "vitest";
-import { ProjectManagementService } from "../../../services/ProjectManagementService";
+import { beforeEach, describe, expect, it, type MockedFunction, vi } from "vitest";
 import type { GitHubRepositoryFactory } from "../../../infrastructure/github/GitHubRepositoryFactory";
-import type { SubIssueService } from "../../../services/SubIssueService";
+import type { FieldValueService } from "../../../services/FieldValueService";
+import type { IssueService } from "../../../services/IssueService";
+import type { IterationService } from "../../../services/IterationService";
+import type { LabelService } from "../../../services/LabelService";
 import type { MilestoneService } from "../../../services/MilestoneService";
-import type { SprintPlanningService } from "../../../services/SprintPlanningService";
+import type { ProjectAutomationService } from "../../../services/ProjectAutomationService";
+import type { ProjectLinkingService } from "../../../services/ProjectLinkingService";
+import { ProjectManagementService } from "../../../services/ProjectManagementService";
 import type { ProjectStatusService } from "../../../services/ProjectStatusService";
 import type { ProjectTemplateService } from "../../../services/ProjectTemplateService";
-import type { ProjectLinkingService } from "../../../services/ProjectLinkingService";
-import type { IssueService } from "../../../services/IssueService";
-import type { RoadmapService } from "../../../services/RoadmapService";
-import type { ProjectAutomationService } from "../../../services/ProjectAutomationService";
 import type { PullRequestService } from "../../../services/PullRequestService";
-import type { FieldValueService } from "../../../services/FieldValueService";
-import type { LabelService } from "../../../services/LabelService";
-import type { IterationService } from "../../../services/IterationService";
+import type { RoadmapService } from "../../../services/RoadmapService";
+import type { SprintPlanningService } from "../../../services/SprintPlanningService";
+import type { SubIssueService } from "../../../services/SubIssueService";
 
 /**
  * ProjectManagementService Unit Tests

@@ -121,7 +121,7 @@ The response handling system includes comprehensive unit tests:
 
 Run tests using:
 ```bash
-npm test
+pnpm test
 ```
 
 ## Adding New Error Types

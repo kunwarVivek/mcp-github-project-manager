@@ -1,32 +1,30 @@
 import { createAnthropic } from "@ai-sdk/anthropic";
-import { createOpenAI } from "@ai-sdk/openai";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
+import { createOpenAI } from "@ai-sdk/openai";
 import { createPerplexity } from "@ai-sdk/perplexity";
-import type { SamplingRequestFn } from "./SamplingLanguageModel";
-import { SamplingLanguageModel } from "./SamplingLanguageModel";
-import { type LanguageModel, wrapLanguageModel, type LanguageModelMiddleware } from "ai";
+import { type LanguageModel, type LanguageModelMiddleware, wrapLanguageModel } from "ai";
 import {
-  ANTHROPIC_API_KEY,
-  OPENAI_API_KEY,
-  GOOGLE_API_KEY,
-  PERPLEXITY_API_KEY,
-  AI_MAIN_MODEL,
-  AI_RESEARCH_MODEL,
-  AI_FALLBACK_MODEL,
-  AI_PRD_MODEL,
-  AI_MAIN_PROVIDER,
-  AI_MAIN_API_KEY,
-  AI_MAIN_BASE_URL,
-  AI_RESEARCH_PROVIDER,
-  AI_RESEARCH_API_KEY,
-  AI_RESEARCH_BASE_URL,
-  AI_FALLBACK_PROVIDER,
   AI_FALLBACK_API_KEY,
   AI_FALLBACK_BASE_URL,
-  AI_PRD_PROVIDER,
+  AI_FALLBACK_MODEL,
+  AI_FALLBACK_PROVIDER,
+  AI_MAIN_API_KEY,
+  AI_MAIN_BASE_URL,
+  AI_MAIN_MODEL,
+  AI_MAIN_PROVIDER,
   AI_PRD_API_KEY,
   AI_PRD_BASE_URL,
+  AI_PRD_MODEL,
+  AI_PRD_PROVIDER,
+  AI_RESEARCH_API_KEY,
+  AI_RESEARCH_BASE_URL,
+  AI_RESEARCH_MODEL,
+  AI_RESEARCH_PROVIDER,
+  ANTHROPIC_API_KEY,
+  GOOGLE_API_KEY,
   getOptionalConfigValue,
+  OPENAI_API_KEY,
+  PERPLEXITY_API_KEY,
 } from "../../env";
 import { type ILogger, Logger } from "../../infrastructure/logger";
 import { getTraceContext } from "../../infrastructure/observability/CorrelationContext";
@@ -34,6 +32,8 @@ import {
   AIResiliencePolicy,
   type DegradedResult,
 } from "../../infrastructure/resilience/AIResiliencePolicy.js";
+import type { SamplingRequestFn } from "./SamplingLanguageModel";
+import { SamplingLanguageModel } from "./SamplingLanguageModel";
 
 /**
  * Middleware that meters token spend and applies resilience protection.

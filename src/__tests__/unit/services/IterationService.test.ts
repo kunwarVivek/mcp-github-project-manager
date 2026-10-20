@@ -1,12 +1,12 @@
-import { type Mocked, beforeEach, describe, expect, it, vi } from "vitest";
-import { IterationService } from "../../../services/IterationService";
-import type { GitHubRepositoryFactory } from "../../../infrastructure/github/GitHubRepositoryFactory";
-import type { FieldValueService } from "../../../services/FieldValueService";
-import type { ProjectTemplateService } from "../../../services/ProjectTemplateService";
-import type { ProjectLinkingService } from "../../../services/ProjectLinkingService";
+import { beforeEach, describe, expect, it, type Mocked, vi } from "vitest";
 import { DomainError } from "../../../domain/errors";
 import { ResourceType } from "../../../domain/resource-types";
 import type { CustomField, ProjectItem } from "../../../domain/types";
+import type { GitHubRepositoryFactory } from "../../../infrastructure/github/GitHubRepositoryFactory";
+import type { FieldValueService } from "../../../services/FieldValueService";
+import { IterationService } from "../../../services/IterationService";
+import type { ProjectLinkingService } from "../../../services/ProjectLinkingService";
+import type { ProjectTemplateService } from "../../../services/ProjectTemplateService";
 
 vi.mock("../../../infrastructure/github/GitHubRepositoryFactory");
 vi.mock("../../../services/FieldValueService");

@@ -1,8 +1,8 @@
-import type { ProjectManagementService } from "../../services/ProjectManagementService";
 import { createProjectManagementService } from "../../container";
 import { ResourceStatus } from "../../domain/resource-types";
-import { TestFactory } from "../test-utils";
 import type { Issue, Milestone } from "../../domain/types";
+import type { ProjectManagementService } from "../../services/ProjectManagementService";
+import { TestFactory } from "../test-utils";
 
 const hasGitHubCredentials = !!(
   process.env.GITHUB_TOKEN &&

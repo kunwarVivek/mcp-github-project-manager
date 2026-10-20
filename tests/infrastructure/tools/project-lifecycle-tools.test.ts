@@ -1,4 +1,5 @@
 import { vi } from "vitest";
+
 /**
  * Unit tests for project lifecycle MCP tools
  *
@@ -8,20 +9,20 @@ import { vi } from "vitest";
  * - Executor functions (with mocked repositories)
  */
 
-import {
-  CloseProjectInputSchema,
-  ReopenProjectInputSchema,
-  ConvertDraftIssueInputSchema,
-} from "../../../src/infrastructure/tools/schemas/project-lifecycle-schemas.js";
+import { GitHubRepositoryFactory } from "../../../src/infrastructure/github/GitHubRepositoryFactory.js";
 import {
   closeProjectTool,
-  reopenProjectTool,
   convertDraftIssueTool,
   executeCloseProject,
-  executeReopenProject,
   executeConvertDraftIssue,
+  executeReopenProject,
+  reopenProjectTool,
 } from "../../../src/infrastructure/tools/project-lifecycle-tools.js";
-import { GitHubRepositoryFactory } from "../../../src/infrastructure/github/GitHubRepositoryFactory.js";
+import {
+  CloseProjectInputSchema,
+  ConvertDraftIssueInputSchema,
+  ReopenProjectInputSchema,
+} from "../../../src/infrastructure/tools/schemas/project-lifecycle-schemas.js";
 
 // Mock the repository factory
 vi.mock("../../../src/infrastructure/github/GitHubRepositoryFactory.js", () => {

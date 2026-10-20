@@ -11,30 +11,30 @@
  * with proper annotations, input/output schemas, and executors.
  */
 
-import type { ToolDefinition, ToolSchema } from "./ToolValidator";
-import { ANNOTATION_PATTERNS } from "./annotations/tool-annotations";
-import { SprintCapacityAnalyzer } from "../../services/ai/SprintCapacityAnalyzer";
 import { BacklogPrioritizer } from "../../services/ai/BacklogPrioritizer";
+import { SprintCapacityAnalyzer } from "../../services/ai/SprintCapacityAnalyzer";
 import { SprintRiskAssessor } from "../../services/ai/SprintRiskAssessor";
 import { SprintSuggestionService } from "../../services/ai/SprintSuggestionService";
+import { ANNOTATION_PATTERNS } from "./annotations/tool-annotations";
 import {
-  SprintCapacityInputSchema,
-  type SprintCapacityInput,
-  SprintCapacityOutputSchema,
-  type SprintCapacityOutput,
-  BacklogPrioritizationInputSchema,
   type BacklogPrioritizationInput,
-  PrioritizationOutputSchema,
+  BacklogPrioritizationInputSchema,
   type PrioritizationOutput,
-  SprintRiskInputSchema,
+  PrioritizationOutputSchema,
+  type SprintCapacityInput,
+  SprintCapacityInputSchema,
+  type SprintCapacityOutput,
+  SprintCapacityOutputSchema,
   type SprintRiskInput,
-  SprintRiskOutputSchema,
+  SprintRiskInputSchema,
   type SprintRiskOutput,
-  SprintSuggestionInputSchema,
+  SprintRiskOutputSchema,
   type SprintSuggestionInput,
-  SprintSuggestionOutputSchema,
+  SprintSuggestionInputSchema,
   type SprintSuggestionOutput,
+  SprintSuggestionOutputSchema,
 } from "./schemas/sprint-roadmap-schemas";
+import type { ToolDefinition, ToolSchema } from "./ToolValidator";
 
 // ============================================================================
 // Tool Definitions

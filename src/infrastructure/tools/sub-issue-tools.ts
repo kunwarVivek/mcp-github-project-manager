@@ -12,30 +12,30 @@
  * Node ID resolution is handled internally.
  */
 
-import type { ToolDefinition, ToolSchema } from "./ToolValidator";
-import { ANNOTATION_PATTERNS } from "./annotations/tool-annotations";
 import { GitHubRepositoryFactory } from "../github/GitHubRepositoryFactory";
-import { requireToken } from "./tool-factory";
+import { ANNOTATION_PATTERNS } from "./annotations/tool-annotations";
 import {
-  AddSubIssueInputSchema,
   type AddSubIssueInput,
-  ListSubIssuesInputSchema,
-  type ListSubIssuesInput,
-  GetParentIssueInputSchema,
+  AddSubIssueInputSchema,
   type GetParentIssueInput,
-  ReprioritizeSubIssueInputSchema,
-  type ReprioritizeSubIssueInput,
-  RemoveSubIssueInputSchema,
-  type RemoveSubIssueInput,
-  SubIssueOperationOutputSchema,
-  type SubIssueOperationOutput,
-  SubIssueListOutputSchema,
-  type SubIssueListOutput,
-  ParentIssueOutputSchema,
+  GetParentIssueInputSchema,
+  type ListSubIssuesInput,
+  ListSubIssuesInputSchema,
   type ParentIssueOutput,
-  RemoveSubIssueOutputSchema,
+  ParentIssueOutputSchema,
+  type RemoveSubIssueInput,
+  RemoveSubIssueInputSchema,
   type RemoveSubIssueOutput,
+  RemoveSubIssueOutputSchema,
+  type ReprioritizeSubIssueInput,
+  ReprioritizeSubIssueInputSchema,
+  type SubIssueListOutput,
+  SubIssueListOutputSchema,
+  type SubIssueOperationOutput,
+  SubIssueOperationOutputSchema,
 } from "./schemas/sub-issue-schemas";
+import type { ToolDefinition, ToolSchema } from "./ToolValidator";
+import { requireToken } from "./tool-factory";
 
 // ============================================================================
 // Helper Functions

@@ -1,26 +1,26 @@
-import { BaseGitHubRepository } from "./BaseRepository";
+import { ResourceStatus, ResourceType } from "../../../domain/resource-types";
 import type {
-  Project,
   CreateProject,
-  ProjectRepository,
-  ProjectId,
-  ProjectView,
   CustomField,
+  Project,
+  ProjectId,
+  ProjectRepository,
+  ProjectView,
   ViewLayout,
 } from "../../../domain/types";
-import { ResourceType, ResourceStatus } from "../../../domain/resource-types";
 import {
-  mapToGraphQLFieldType,
-  mapFromGraphQLFieldType,
+  type CreateProjectV2ViewResponse,
+  type GraphQLFieldType,
+  mapToGraphQLViewLayout,
+  type UpdateProjectV2ViewResponse,
+} from "../graphql-types";
+import {
   type CreateProjectV2FieldResponse,
+  mapFromGraphQLFieldType,
+  mapToGraphQLFieldType,
   type UpdateProjectV2FieldResponse,
 } from "../util/graphql-helpers";
-import {
-  type GraphQLFieldType,
-  type CreateProjectV2ViewResponse,
-  type UpdateProjectV2ViewResponse,
-  mapToGraphQLViewLayout,
-} from "../graphql-types";
+import { BaseGitHubRepository } from "./BaseRepository";
 
 interface GitHubProject {
   id: string;

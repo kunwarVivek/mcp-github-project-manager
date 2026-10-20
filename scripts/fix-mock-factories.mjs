@@ -3,7 +3,7 @@
 // Fix mock factories for AIServiceFactory and GitHubRepositoryFactory
 // These need to provide all methods that the tests expect
 
-import { readFileSync, writeFileSync, readdirSync, statSync } from "node:fs";
+import { readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 function findTestFiles(dir) {

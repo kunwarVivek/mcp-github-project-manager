@@ -4,7 +4,7 @@
 
 export {
   HealthService,
+  type HealthServiceDependencies,
   type HealthStatus,
   type ServiceHealthStatus,
-  type HealthServiceDependencies,
 } from "./HealthService.js";

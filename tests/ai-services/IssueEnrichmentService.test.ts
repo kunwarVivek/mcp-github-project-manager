@@ -1,8 +1,8 @@
-import { describe, it, expect, beforeEach, vi, type Mock } from "vitest";
-import { IssueEnrichmentService } from "../../src/services/IssueEnrichmentService";
-import { AIServiceFactory } from "../../src/services/ai/AIServiceFactory";
-import { ProjectManagementService } from "../../src/services/ProjectManagementService";
 import { generateObject } from "ai";
+import { beforeEach, describe, expect, it, type Mock, vi } from "vitest";
+import { AIServiceFactory } from "../../src/services/ai/AIServiceFactory";
+import { IssueEnrichmentService } from "../../src/services/IssueEnrichmentService";
+import { ProjectManagementService } from "../../src/services/ProjectManagementService";
 
 // Mock the AI service factory
 vi.mock("../../src/services/ai/AIServiceFactory", () => {

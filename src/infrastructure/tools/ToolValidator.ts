@@ -1,12 +1,12 @@
-import { z } from "zod";
 import {
-  ProtocolError,
   INTERNAL_ERROR,
   INVALID_PARAMS,
-  METHOD_NOT_FOUND,
   INVALID_REQUEST,
+  METHOD_NOT_FOUND,
   PARSE_ERROR,
+  ProtocolError,
 } from "@modelcontextprotocol/server";
+import { z } from "zod";
 
 /**
  * v2 compatibility aliases: `McpError` became `ProtocolError` (same
@@ -23,8 +23,9 @@ const ErrorCode = {
 
 /** The numeric JSON-RPC codes, for signatures that took the old enum type. */
 type ErrorCodeValue = number;
-import { MCPResponseFormatter } from "../mcp/MCPResponseFormatter";
+
 import { MCPErrorCode, type MCPErrorData } from "../../domain/mcp-types";
+import { MCPResponseFormatter } from "../mcp/MCPResponseFormatter";
 import { ParameterCoercion } from "./ParameterCoercion";
 
 export type ToolSchema<T> = z.ZodType<T>;

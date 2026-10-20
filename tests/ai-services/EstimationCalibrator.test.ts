@@ -1,9 +1,9 @@
 import {
-  EstimationCalibrator,
-  getComplexityBand,
-  complexityToPoints,
   calculateRange,
+  complexityToPoints,
+  EstimationCalibrator,
   type EstimationRecord,
+  getComplexityBand,
 } from "../../src/analysis/EstimationCalibrator";
 import type { TaskComplexity } from "../../src/domain/ai-types";
 

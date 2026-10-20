@@ -12,14 +12,14 @@
  */
 
 import {
-  wrap,
-  retry,
-  timeout,
+  ExponentialBackoff,
   fallback,
   handleAll,
-  ExponentialBackoff,
+  retry,
   TaskCancelledError,
   TimeoutStrategy,
+  timeout,
+  wrap,
 } from "cockatiel";
 import { CircuitBreakerService, type CircuitBreakerState } from "./CircuitBreakerService.js";
 

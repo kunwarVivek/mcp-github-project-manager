@@ -1,7 +1,7 @@
-import { spawn, type ChildProcess } from "node:child_process";
-import { describe, it, expect, beforeAll, afterEach, vi } from "vitest";
-import { join } from "node:path";
+import { type ChildProcess, spawn } from "node:child_process";
 import { existsSync } from "node:fs";
+import { join } from "node:path";
+import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
 const projectRoot = process.cwd();
 

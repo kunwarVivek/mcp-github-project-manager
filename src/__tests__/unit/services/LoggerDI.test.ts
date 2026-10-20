@@ -4,9 +4,9 @@
  * Verifies that services properly accept ILogger via constructor injection
  * and that mocked loggers work correctly for testing.
  */
-import { describe, it, expect, vi, type Mock } from "vitest";
-import { type ILogger, NoopLogger } from "../../../infrastructure/logger";
+import { describe, expect, it, type Mock, vi } from "vitest";
 import { TaskPriority, TaskStatus } from "../../../domain/ai-task-types";
+import { type ILogger, NoopLogger } from "../../../infrastructure/logger";
 
 // ---------------------------------------------------------------------------
 // Mock Logger Factory

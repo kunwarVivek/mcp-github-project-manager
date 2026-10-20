@@ -1,15 +1,15 @@
-import type { AgentStore } from "../../infrastructure/agent/AgentStore";
-import type { WorkProductStore } from "../../infrastructure/agent/WorkProductStore";
-import type { GitHubRepositoryFactory } from "../../infrastructure/github/GitHubRepositoryFactory";
 import type {
-  AgentMetrics,
   AgentMetricEntry,
+  AgentMetrics,
   WorkProduct,
 } from "../../domain/agent-orchestration-types";
 import {
   DEFAULT_HEARTBEAT_TIMEOUT_MINUTES,
   WORK_PRODUCT_MARKER,
 } from "../../domain/agent-orchestration-types";
+import type { AgentStore } from "../../infrastructure/agent/AgentStore";
+import type { WorkProductStore } from "../../infrastructure/agent/WorkProductStore";
+import type { GitHubRepositoryFactory } from "../../infrastructure/github/GitHubRepositoryFactory";
 import { safeCall } from "../utils/safeCall";
 
 /**

@@ -1,6 +1,6 @@
 import { vi } from "vitest";
-import { ResourceType, ResourceStatus } from "../domain/resource-types";
-import type { Project, Milestone, Issue } from "../domain/types";
+import { ResourceStatus, ResourceType } from "../domain/resource-types";
+import type { Issue, Milestone, Project } from "../domain/types";
 
 export const mockCache = {
   set: vi.fn(),

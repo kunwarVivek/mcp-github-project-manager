@@ -1,7 +1,7 @@
-import { describe, expect, it } from "vitest";
 import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import { resolve } from "node:path";
+import { describe, expect, it } from "vitest";
 
 const SERVER = resolve(process.cwd(), "build/index.js");
 

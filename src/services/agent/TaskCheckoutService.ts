@@ -1,32 +1,32 @@
-import type { GitHubRepositoryFactory } from "../../infrastructure/github/GitHubRepositoryFactory";
-import type { AgentStore } from "../../infrastructure/agent/AgentStore";
-import { AgentBudgetService } from "./AgentBudgetService";
-import type { AgentContextService } from "./AgentContextService";
 import type {
   Agent,
   AgentHeartbeat,
   AgentTaskContext,
-  TaskCheckoutResult,
   CheckoutStrategy,
+  TaskCheckoutResult,
 } from "../../domain/agent-orchestration-types";
 import {
   AGENT_FIELDS,
   DEFAULT_HEARTBEAT_TIMEOUT_MINUTES,
 } from "../../domain/agent-orchestration-types";
+import {
+  AgentHeartbeatEvent,
+  TaskApprovedEvent,
+  TaskCheckedOutEvent,
+  TaskCompletedEvent,
+  TaskReclaimedEvent,
+  TaskRejectedEvent,
+  TaskReleasedEvent,
+  TaskSubmittedForReviewEvent,
+} from "../../domain/events";
+import { domainEventBus } from "../../domain/events/DomainEventBus";
+import type { AgentStore } from "../../infrastructure/agent/AgentStore";
+import type { GitHubRepositoryFactory } from "../../infrastructure/github/GitHubRepositoryFactory";
 import { AIServiceFactory } from "../ai/AIServiceFactory";
 import { mapErrorToMCPError } from "../utils/ErrorMapper";
 import { InputSanitizer } from "../utils/InputSanitizer";
-import {
-  TaskCheckedOutEvent,
-  TaskReleasedEvent,
-  TaskCompletedEvent,
-  TaskSubmittedForReviewEvent,
-  TaskApprovedEvent,
-  TaskRejectedEvent,
-  AgentHeartbeatEvent,
-  TaskReclaimedEvent,
-} from "../../domain/events";
-import { domainEventBus } from "../../domain/events/DomainEventBus";
+import { AgentBudgetService } from "./AgentBudgetService";
+import type { AgentContextService } from "./AgentContextService";
 
 // ---------------------------------------------------------------------------
 // GraphQL types

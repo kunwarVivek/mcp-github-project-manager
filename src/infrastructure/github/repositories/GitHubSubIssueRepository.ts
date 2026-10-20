@@ -1,9 +1,9 @@
 import { BaseGitHubRepository } from "./BaseRepository";
 import type {
+  ParentIssueResult,
   SubIssueListItem,
   SubIssueListResult,
   SubIssueResult,
-  ParentIssueResult,
 } from "./types";
 
 // ============================================================================

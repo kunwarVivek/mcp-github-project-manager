@@ -22,7 +22,7 @@
  * ```
  */
 import { ResourceStatus, ResourceType } from "../resource-types";
-import type { Project, CreateProject, CustomField, ProjectView } from "../types";
+import type { CreateProject, CustomField, Project, ProjectView } from "../types";
 
 /**
  * Project health status

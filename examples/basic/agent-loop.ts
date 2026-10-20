@@ -12,11 +12,11 @@
  * tool calls an agent should issue for each step. Run it to see the loop
  * end-to-end (requires a running server with GitHub credentials):
  *
- *   node --loader ts-node/esm examples/basic/agent-loop.ts
+ *   pnpm exec tsx examples/basic/agent-loop.ts
  *
  * To execute against a live server, pair this with scripts/mcp-test-client.js.
  */
-import type { Server } from "@modelcontextprotocol/sdk/server/index.js";
+import type { Client } from "@modelcontextprotocol/client";
 
 interface AgentLoopConfig {
   agentName: string;
@@ -139,19 +139,16 @@ export function agentLoopPlan(config: AgentLoopConfig): Array<{
  * Run the reference loop plan against an MCP server via the SDK.
  * Demonstrates calling tools through the standard MCP transport.
  */
-export async function runAgentLoop(server: Server, config: AgentLoopConfig): Promise<void> {
+export async function runAgentLoop(client: Client, config: AgentLoopConfig): Promise<void> {
   const plan = agentLoopPlan(config);
   for (const step of plan) {
     process.stderr.write(`\n→ ${step.description}\n`);
     try {
       // eslint-disable-next-line no-await-in-loop
-      const result = await server.request(
-        {
-          method: "tools/call",
-          params: { name: step.tool, arguments: step.arguments },
-        },
-        (await import("@modelcontextprotocol/sdk/types.js")).CallToolResultSchema
-      );
+      const result = await client.callTool({
+        name: step.tool,
+        arguments: step.arguments,
+      });
       process.stderr.write(`${JSON.stringify(result, null, 2)}\n`);
     } catch (error) {
       process.stderr.write(`Step failed: ${(error as Error).message}\n`);

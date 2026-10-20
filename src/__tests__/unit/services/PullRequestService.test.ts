@@ -1,7 +1,7 @@
-import { type Mocked, type MockedFunction, beforeEach, describe, expect, it, vi } from "vitest";
-import { PullRequestService } from "../../../services/PullRequestService";
-import type { GitHubRepositoryFactory } from "../../../infrastructure/github/GitHubRepositoryFactory";
+import { beforeEach, describe, expect, it, type Mocked, type MockedFunction, vi } from "vitest";
 import { DomainError } from "../../../domain/errors";
+import type { GitHubRepositoryFactory } from "../../../infrastructure/github/GitHubRepositoryFactory";
+import { PullRequestService } from "../../../services/PullRequestService";
 
 vi.mock("../../../infrastructure/github/GitHubRepositoryFactory");
 

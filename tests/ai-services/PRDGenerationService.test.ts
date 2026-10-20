@@ -1,6 +1,6 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
-import { PRDGenerationService } from "../../src/services/PRDGenerationService";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AITaskProcessor } from "../../src/services/ai/AITaskProcessor";
+import { PRDGenerationService } from "../../src/services/PRDGenerationService";
 
 // Mock the AITaskProcessor directly
 vi.mock("../../src/services/ai/AITaskProcessor", () => ({

@@ -1,6 +1,6 @@
-import { spawn, type ChildProcess } from "node:child_process";
-import { join } from "node:path";
+import { type ChildProcess, spawn } from "node:child_process";
 import { existsSync } from "node:fs";
+import { join } from "node:path";
 
 /**
  * Utility class for testing MCP tools through the actual MCP interface

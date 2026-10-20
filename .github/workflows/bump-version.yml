@@ -26,11 +26,14 @@ jobs:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Use Node.js
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Use Node.js '22.x'
         uses: actions/setup-node@v4
         with:
-          node-version: '22.x'
-          cache: 'npm'
+          node-version: '24.x'
+          cache: 'pnpm'
 
       - name: Configure Git
         run: |
@@ -40,7 +43,7 @@ jobs:
       - name: Bump version
         id: bump
         run: |
-          npm version ${{ inputs.version_type }} --no-git-tag-version
+          pnpm version ${{ inputs.version_type }} --no-git-tag-version
           VERSION=$(node -p "require('./package.json').version")
           echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
 
@@ -53,8 +56,7 @@ jobs:
 
       - name: Commit and tag
         run: |
-          VERSION="${{ steps.bump.outputs.VERSION }}"
-          git add package.json package-lock.json CHANGELOG.md
+          git add package.json pnpm-lock.yaml CHANGELOG.md
           git commit -m "release: v$VERSION"
           git tag "v$VERSION"
 

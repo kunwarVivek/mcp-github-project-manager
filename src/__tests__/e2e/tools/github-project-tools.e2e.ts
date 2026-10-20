@@ -1,4 +1,4 @@
-import { MCPToolTestUtils, MCPTestHelpers } from "../utils/MCPToolTestUtils";
+import { MCPTestHelpers, MCPToolTestUtils } from "../utils/MCPToolTestUtils";
 
 /**
  * Comprehensive E2E tests for GitHub Project Management Tools

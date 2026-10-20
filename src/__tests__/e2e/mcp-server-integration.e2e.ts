@@ -1,13 +1,12 @@
 import {
-  ProtocolError,
   INTERNAL_ERROR,
   INVALID_PARAMS,
   METHOD_NOT_FOUND,
   PARSE_ERROR,
+  ProtocolError,
 } from "@modelcontextprotocol/server";
-
-import { ToolRegistry } from "../../infrastructure/tools/ToolRegistry";
 import { createProjectManagementService } from "../../container";
+import { ToolRegistry } from "../../infrastructure/tools/ToolRegistry";
 
 // MCP SDK v2 renamed `McpError` to `ProtocolError` (same (code, message, data)
 // shape) and replaced the `ErrorCode` enum with plain numeric constants.

@@ -13,16 +13,16 @@
 
 import { generateObject } from "ai";
 import { z } from "zod";
-import { AIServiceFactory } from "./AIServiceFactory";
-import { calculateWeightedScore, getConfidenceTier } from "./ConfidenceScorer";
-import { InputSanitizer } from "../utils/InputSanitizer";
+import type { ConfidenceFactors, ConfidenceTier, SectionConfidence } from "../../domain/ai-types";
 import type {
   EnrichedIssue,
   EnrichedIssueSections,
   EnrichedSection,
   IssueEnrichmentConfig,
 } from "../../domain/issue-intelligence-types";
-import type { SectionConfidence, ConfidenceFactors, ConfidenceTier } from "../../domain/ai-types";
+import { InputSanitizer } from "../utils/InputSanitizer";
+import { AIServiceFactory } from "./AIServiceFactory";
+import { calculateWeightedScore, getConfidenceTier } from "./ConfidenceScorer";
 import {
   ENRICHMENT_SYSTEM_PROMPT,
   formatEnrichmentPrompt,

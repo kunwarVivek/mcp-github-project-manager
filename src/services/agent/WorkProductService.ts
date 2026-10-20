@@ -1,7 +1,7 @@
-import type { GitHubRepositoryFactory } from "../../infrastructure/github/GitHubRepositoryFactory";
-import type { WorkProductStore } from "../../infrastructure/agent/WorkProductStore";
 import type { WorkProduct } from "../../domain/agent-orchestration-types";
 import { AGENT_FIELDS } from "../../domain/agent-orchestration-types";
+import type { WorkProductStore } from "../../infrastructure/agent/WorkProductStore";
+import type { GitHubRepositoryFactory } from "../../infrastructure/github/GitHubRepositoryFactory";
 import { safeCall } from "../utils/safeCall";
 
 // ---------------------------------------------------------------------------

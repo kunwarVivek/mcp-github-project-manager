@@ -1,10 +1,10 @@
 import { z } from "zod";
-import type { ToolDefinition, ToolSchema } from "../ToolValidator";
 import { ANNOTATION_PATTERNS } from "../annotations/tool-annotations";
+import type { ToolDefinition, ToolSchema } from "../ToolValidator";
 import {
   AIEnrichmentOutputSchema,
-  AITriageOutputSchema,
   AIRoadmapOutputSchema,
+  AITriageOutputSchema,
   BulkOperationResultSchema,
   SuccessOutputSchema,
 } from "./project-schemas";

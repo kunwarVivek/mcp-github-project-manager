@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // env.ts snapshots config into module-level constants at import time, and
 // `import` is hoisted above plain statements — so the keys must be set in a
@@ -23,9 +23,9 @@ vi.mock("ai", () => ({
   generateText: vi.fn(),
 }));
 
-import { parsePRDTool, executeParsePRD } from "../../infrastructure/tools/ai-tasks/ParsePRDTool";
-import type { MCPResponse, MCPSuccessResponse } from "../../domain/mcp-types";
 import { generateObject, generateText } from "ai";
+import type { MCPResponse, MCPSuccessResponse } from "../../domain/mcp-types";
+import { executeParsePRD, parsePRDTool } from "../../infrastructure/tools/ai-tasks/ParsePRDTool";
 
 // Helper function to extract data from MCP response
 function extractDataFromMCPResponse(response: MCPResponse): any {

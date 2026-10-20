@@ -1,4 +1,5 @@
 import { vi } from "vitest";
+
 /**
  * Unit tests for SprintRiskAssessor
  *
@@ -6,9 +7,9 @@ import { vi } from "vitest";
  * and fallback behavior when AI is unavailable.
  */
 
-import { SprintRiskAssessor } from "../../src/services/ai/SprintRiskAssessor";
-import { AIServiceFactory } from "../../src/services/ai/AIServiceFactory";
 import type { BacklogItem, SprintCapacity } from "../../src/domain/sprint-planning-types";
+import { AIServiceFactory } from "../../src/services/ai/AIServiceFactory";
+import { SprintRiskAssessor } from "../../src/services/ai/SprintRiskAssessor";
 
 // Mock AIServiceFactory
 vi.mock("../../src/services/ai/AIServiceFactory", () => {

@@ -22,7 +22,7 @@
  * ```
  */
 import { ResourceStatus } from "../resource-types";
-import type { Milestone, CreateMilestone } from "../types";
+import type { CreateMilestone, Milestone } from "../types";
 
 /**
  * Milestone state transitions

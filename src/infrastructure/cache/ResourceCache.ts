@@ -1,5 +1,9 @@
-import type { Resource, ResourceCacheOptions, ResourceType } from "../../domain/resource-types";
-import type { SyncMetadata } from "../../domain/resource-types";
+import type {
+  Resource,
+  ResourceCacheOptions,
+  ResourceType,
+  SyncMetadata,
+} from "../../domain/resource-types";
 import { isCacheableResource } from "../../domain/type-guards";
 import { CachePersistence, type CacheEntry as PersistenceCacheEntry } from "./CachePersistence";
 

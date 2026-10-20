@@ -44,7 +44,7 @@ Build and start the MCP server:
 
 ```bash
 # Build the project
-npm run build
+pnpm run build
 
 # Start the server
 npm start

@@ -225,7 +225,7 @@ npm install
 pnpm install
 
 # Build the project
-npm run build
+pnpm run build
 ```
 
 ### Set up environment variables
@@ -350,16 +350,16 @@ If you're developing or running from source:
 
 ```bash
 # Use the npm dev script (watches for changes) — recommended
-npm run dev
+pnpm run dev
 
 # Run directly with tsx
-npx tsx src/index.ts
+pnpm exec tsx src/index.ts
 
 # Run with command line arguments
-npx tsx src/index.ts --token=your_token --owner=your_username --repo=your_repo
+pnpm exec tsx src/index.ts --token=your_token --owner=your_username --repo=your_repo
 
 # Display help information
-npx tsx src/index.ts --help
+pnpm exec tsx src/index.ts --help
 ```
 
 #### Command Line Options
@@ -528,14 +528,14 @@ The enhanced context generation functionality includes comprehensive test covera
 #### **Running Context Generation Tests:**
 ```bash
 # Run all AI-related tests (includes context generation)
-npm run test:ai
+pnpm run test:ai
 
 # Run specific context generation tests
-npm test TaskContextGeneration
-npm test enhanced
+pnpm test TaskContextGeneration
+pnpm test enhanced
 
 # Run all tests
-npm test
+pnpm test
 ```
 
 ## 🧪 Comprehensive E2E Testing Suite
@@ -553,18 +553,18 @@ The MCP GitHub Project Manager includes a comprehensive end-to-end testing suite
 ### **Quick Start:**
 ```bash
 # Run comprehensive E2E tests (mocked APIs)
-npm run test:e2e:tools
+pnpm run test:e2e:tools
 
 # Run with real APIs (requires credentials)
-npm run test:e2e:tools:real
+pnpm run test:e2e:tools:real
 
 # Use the interactive test runner
-npm run test:e2e:runner
+pnpm run test:e2e:runner
 
 # Run specific test categories
-npm run test:e2e:tools:github     # GitHub tools only
-npm run test:e2e:tools:ai         # AI tools only
-npm run test:e2e:tools:workflows  # Integration workflows
+pnpm run test:e2e:tools:github     # GitHub tools only
+pnpm run test:e2e:tools:ai         # AI tools only
+pnpm run test:e2e:tools:workflows  # Integration workflows
 ```
 
 ### **Test Runner Options:**
@@ -598,7 +598,7 @@ PERPLEXITY_API_KEY=pplx-your-perplexity-key
 
 **Enable Real API Testing:**
 ```bash
-E2E_REAL_API=true npm run test:e2e:tools:real
+E2E_REAL_API=true pnpm run test:e2e:tools:real
 ```
 
 ### **Test Features:**
@@ -676,7 +676,7 @@ Or with a direct provider key (simpler):
 For Claude Code CLI, run:
 
 ```bash
-claude mcp add github-project-manager -- npx -y mcp-github-project-manager
+claude mcp add github-project-manager -- pnpm dlx mcp-github-project-manager
 ```
 
 #### Install in Roocode
@@ -1157,28 +1157,28 @@ For an interactive exploration of the API, open the [API Explorer](docs/api-expl
 ### Testing
 ```bash
 # Unit tests
-npm test
+pnpm test
 
 # AI service/tool tests
-npm run test:ai
+pnpm run test:ai
 
 # End-to-end tests
-npm run test:e2e
+pnpm run test:e2e
 
 # E2E MCP tool suite (mocked GitHub/AI)
-npm run test:e2e:tools
+pnpm run test:e2e:tools
 ```
 
 ### Code Quality
 ```bash
 # Lint code
-npm run lint
+pnpm run lint
 
 # Type check
-npx tsc --noEmit
+pnpm exec tsc --noEmit
 
 # Format code
-npm run format
+pnpm run format
 ```
 
 ## Contributing

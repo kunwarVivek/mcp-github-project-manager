@@ -1,4 +1,4 @@
-import { AutomationTriggerType, AutomationActionType } from "../../domain/automation-types";
+import { AutomationActionType, AutomationTriggerType } from "../../domain/automation-types";
 
 // GitHub GraphQL automation types
 export type GitHubProjectRuleTriggerType =

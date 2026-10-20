@@ -1,10 +1,10 @@
+import type { AITask } from "../../domain/ai-types";
 import {
-  type TaskExecutionContext,
   type ContextQualityMetrics,
   calculateCompletenessScore,
   getMissingFields,
+  type TaskExecutionContext,
 } from "../../domain/task-context-schemas";
-import type { AITask } from "../../domain/ai-types";
 
 /**
  * Quality thresholds from PRD requirements

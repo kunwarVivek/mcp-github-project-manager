@@ -10,22 +10,6 @@
  */
 
 import { z } from "zod";
-import type { ToolDefinition, ToolSchema } from "./ToolValidator";
-import { ANNOTATION_PATTERNS } from "./annotations/tool-annotations";
-import { createGitHubFactory } from "./tool-factory";
-import { mapErrorToMCPError } from "../../services/utils/ErrorMapper";
-
-import { AgentStore } from "../agent/AgentStore";
-import { WorkProductStore } from "../agent/WorkProductStore";
-import { ProjectFieldSetup } from "../agent/ProjectFieldSetup";
-import { TaskCheckoutService } from "../../services/agent/TaskCheckoutService";
-import { AgentContextService } from "../../services/agent/AgentContextService";
-import { WorkProductService } from "../../services/agent/WorkProductService";
-import { AgentBudgetService } from "../../services/agent/AgentBudgetService";
-import { AgentMetricsService } from "../../services/agent/AgentMetricsService";
-import { DomainEventBus } from "../../domain/events/DomainEventBus";
-import { AgentRegisteredEvent, AgentDeregisteredEvent } from "../../domain/events/AgentEvents";
-
 import type {
   Agent,
   AgentActivityEntry,
@@ -34,64 +18,75 @@ import type {
   WorkProduct,
 } from "../../domain/agent-orchestration-types";
 import {
-  AgentSchema,
-  TaskCheckoutResultSchema,
-  AgentTaskContextSchema,
-  WorkProductSchema,
-  BudgetStatusSchema,
   AgentActivityEntrySchema,
   AgentMetricsSchema,
-  MAX_AGENT_HIERARCHY_DEPTH,
+  AgentSchema,
+  AgentTaskContextSchema,
+  BudgetStatusSchema,
   MAX_AGENT_CHILDREN,
+  MAX_AGENT_HIERARCHY_DEPTH,
+  TaskCheckoutResultSchema,
+  WorkProductSchema,
 } from "../../domain/agent-orchestration-types";
-
-import {
-  registerAgentSchema,
-  listAgentsSchema,
-  deregisterAgentSchema,
-  checkoutTaskSchema,
-  releaseTaskSchema,
-  completeTaskSchema,
-  getTaskContextSchema,
-  agentHeartbeatSchema,
-  submitWorkProductSchema,
-  getAgentActivitySchema,
-  getBudgetStatusSchema,
-  setAgentBudgetSchema,
-  checkWorkStatusSchema,
-  reclaimStaleTasksSchema,
-  recordUsageSchema,
-  submitForReviewSchema,
-  approveTaskSchema,
-  rejectTaskSchema,
-  getAgentMetricsSchema,
-  setupAgentFieldsSchema,
-} from "./schemas/agent-orchestration-schemas";
-
+import { AgentDeregisteredEvent, AgentRegisteredEvent } from "../../domain/events/AgentEvents";
+import { DomainEventBus } from "../../domain/events/DomainEventBus";
+import { AgentBudgetService } from "../../services/agent/AgentBudgetService";
+import { AgentContextService } from "../../services/agent/AgentContextService";
+import { AgentMetricsService } from "../../services/agent/AgentMetricsService";
+import { TaskCheckoutService } from "../../services/agent/TaskCheckoutService";
+import { WorkProductService } from "../../services/agent/WorkProductService";
+import { mapErrorToMCPError } from "../../services/utils/ErrorMapper";
+import { AgentStore } from "../agent/AgentStore";
+import { ProjectFieldSetup } from "../agent/ProjectFieldSetup";
+import { WorkProductStore } from "../agent/WorkProductStore";
+import { ANNOTATION_PATTERNS } from "./annotations/tool-annotations";
 import type {
-  RegisterAgentArgs,
-  ListAgentsArgs,
-  DeregisterAgentArgs,
-  CheckoutTaskArgs,
-  ReleaseTaskArgs,
-  CompleteTaskArgs,
-  GetTaskContextArgs,
   AgentHeartbeatArgs,
-  SubmitWorkProductArgs,
-  GetAgentActivityArgs,
-  GetBudgetStatusArgs,
-  SetAgentBudgetArgs,
+  ApproveTaskArgs,
+  CheckoutTaskArgs,
   CheckWorkStatusArgs,
+  CompleteTaskArgs,
+  DeregisterAgentArgs,
+  GetAgentActivityArgs,
+  GetAgentMetricsArgs,
+  GetBudgetStatusArgs,
+  GetTaskContextArgs,
+  ListAgentsArgs,
   ReclaimStaleTasksArgs,
   RecordUsageArgs,
-  SubmitForReviewArgs,
-  ApproveTaskArgs,
+  RegisterAgentArgs,
   RejectTaskArgs,
-  GetAgentMetricsArgs,
+  ReleaseTaskArgs,
+  SetAgentBudgetArgs,
   SetupAgentFieldsArgs,
+  SubmitForReviewArgs,
+  SubmitWorkProductArgs,
 } from "./schemas/agent-orchestration-schemas";
-
+import {
+  agentHeartbeatSchema,
+  approveTaskSchema,
+  checkoutTaskSchema,
+  checkWorkStatusSchema,
+  completeTaskSchema,
+  deregisterAgentSchema,
+  getAgentActivitySchema,
+  getAgentMetricsSchema,
+  getBudgetStatusSchema,
+  getTaskContextSchema,
+  listAgentsSchema,
+  reclaimStaleTasksSchema,
+  recordUsageSchema,
+  registerAgentSchema,
+  rejectTaskSchema,
+  releaseTaskSchema,
+  setAgentBudgetSchema,
+  setupAgentFieldsSchema,
+  submitForReviewSchema,
+  submitWorkProductSchema,
+} from "./schemas/agent-orchestration-schemas";
 import { SuccessOutputSchema } from "./schemas/project-schemas";
+import type { ToolDefinition, ToolSchema } from "./ToolValidator";
+import { createGitHubFactory } from "./tool-factory";
 
 // ============================================================================
 // Output Schemas

@@ -1,14 +1,14 @@
-import { describe, expect, it, vi } from "vitest";
-import type { Mock } from "vitest";
-import { ProtocolError } from "@modelcontextprotocol/server";
 import type { McpServer } from "@modelcontextprotocol/server";
-import { registerResources } from "../../../../infrastructure/mcp/resources";
-import type { RegisterResourcesDeps } from "../../../../infrastructure/mcp/resources";
-import type { ProjectManagementService } from "../../../../services/ProjectManagementService";
-import type { ToolRegistry } from "../../../../infrastructure/tools/ToolRegistry";
+import { ProtocolError } from "@modelcontextprotocol/server";
+import type { Mock } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { AgentStore } from "../../../../infrastructure/agent/AgentStore";
-import type { AIServiceFactory } from "../../../../services/ai/AIServiceFactory";
 import type { ILogger } from "../../../../infrastructure/logger/index";
+import type { RegisterResourcesDeps } from "../../../../infrastructure/mcp/resources";
+import { registerResources } from "../../../../infrastructure/mcp/resources";
+import type { ToolRegistry } from "../../../../infrastructure/tools/ToolRegistry";
+import type { AIServiceFactory } from "../../../../services/ai/AIServiceFactory";
+import type { ProjectManagementService } from "../../../../services/ProjectManagementService";
 
 /**
  * Unit tests for the six `github://…` MCP resources registered by
@@ -36,7 +36,10 @@ interface CapturedResource {
   callback: ReadCallback;
 }
 
-function createCapturingServer(): { server: McpServer; resources: Record<string, CapturedResource> } {
+function createCapturingServer(): {
+  server: McpServer;
+  resources: Record<string, CapturedResource>;
+} {
   const resources: Record<string, CapturedResource> = {};
   const fakeServer = {
     registerResource: (
@@ -85,13 +88,15 @@ interface AiValidation {
 }
 
 /** Builds full `RegisterResourcesDeps`, overriding only the fakes a test cares about. */
-function makeDeps(overrides: {
-  logger?: Logger;
-  aiFactory?: { validateConfiguration: Mock };
-  service?: { listProjects?: Mock; getCurrentSprint?: Mock; listMilestones?: Mock };
-  agentStore?: { listAgents: Mock };
-  toolRegistry?: { getToolsForMCP: Mock };
-} = {}): RegisterResourcesDeps {
+function makeDeps(
+  overrides: {
+    logger?: Logger;
+    aiFactory?: { validateConfiguration: Mock };
+    service?: { listProjects?: Mock; getCurrentSprint?: Mock; listMilestones?: Mock };
+    agentStore?: { listAgents: Mock };
+    toolRegistry?: { getToolsForMCP: Mock };
+  } = {}
+): RegisterResourcesDeps {
   const logger = overrides.logger ?? makeLogger();
   const aiFactory = overrides.aiFactory ?? {
     validateConfiguration: vi.fn().mockReturnValue({
@@ -184,7 +189,10 @@ describe("registerResources", () => {
 
       await expect(promise).rejects.toBeInstanceOf(ProtocolError);
       await expect(promise).rejects.toThrow(/Failed to read server configuration: boom/);
-      expect(logger.error).toHaveBeenCalledWith("Failed to read github://config resource", expect.any(Error));
+      expect(logger.error).toHaveBeenCalledWith(
+        "Failed to read github://config resource",
+        expect.any(Error)
+      );
     });
   });
 
@@ -211,9 +219,9 @@ describe("registerResources", () => {
       const { server, resources } = createCapturingServer();
       registerResources(server, makeDeps({ service: { listProjects } }));
 
-      await expect(getCallback(resources, "projects")(new URL("github://projects"))).rejects.toThrow(
-        /Failed to list projects: api down/
-      );
+      await expect(
+        getCallback(resources, "projects")(new URL("github://projects"))
+      ).rejects.toThrow(/Failed to list projects: api down/);
     });
   });
 
@@ -224,7 +232,10 @@ describe("registerResources", () => {
       registerResources(server, makeDeps({ service: { getCurrentSprint } }));
       const uri = new URL("github://sprints/current");
 
-      const data = expectValidResourceResult(await getCallback(resources, "current-sprint")(uri), uri);
+      const data = expectValidResourceResult(
+        await getCallback(resources, "current-sprint")(uri),
+        uri
+      );
 
       expect(data).toBeNull();
     });
@@ -236,7 +247,10 @@ describe("registerResources", () => {
       registerResources(server, makeDeps({ service: { getCurrentSprint } }));
       const uri = new URL("github://sprints/current");
 
-      const data = expectValidResourceResult(await getCallback(resources, "current-sprint")(uri), uri);
+      const data = expectValidResourceResult(
+        await getCallback(resources, "current-sprint")(uri),
+        uri
+      );
 
       expect(data).toEqual(sprint);
     });
@@ -271,9 +285,9 @@ describe("registerResources", () => {
       const { server, resources } = createCapturingServer();
       registerResources(server, makeDeps({ service: { listMilestones } }));
 
-      await expect(getCallback(resources, "milestones")(new URL("github://milestones"))).rejects.toThrow(
-        /Failed to list milestones: rate limited/
-      );
+      await expect(
+        getCallback(resources, "milestones")(new URL("github://milestones"))
+      ).rejects.toThrow(/Failed to list milestones: rate limited/);
     });
   });
 
@@ -325,17 +339,33 @@ describe("registerResources", () => {
       const uri = new URL("github://tools");
 
       const rawData = expectValidResourceResult(await getCallback(resources, "tools")(uri), uri);
-      if (!rawData || typeof rawData !== "object" || !("count" in rawData) || !("tools" in rawData)) {
+      if (
+        !rawData ||
+        typeof rawData !== "object" ||
+        !("count" in rawData) ||
+        !("tools" in rawData)
+      ) {
         throw new Error("expected tools resource payload to be a {count, tools} object");
       }
       const { count, tools } = rawData;
 
       expect(count).toBe(2);
       expect(tools).toEqual([
-        { name: "create_issue", title: "Create Issue", description: "Creates an issue", annotations: { readOnlyHint: false } },
-        { name: "list_issues", title: "List Issues", description: "Lists issues", annotations: { readOnlyHint: true } },
+        {
+          name: "create_issue",
+          title: "Create Issue",
+          description: "Creates an issue",
+          annotations: { readOnlyHint: false },
+        },
+        {
+          name: "list_issues",
+          title: "List Issues",
+          description: "Lists issues",
+          annotations: { readOnlyHint: true },
+        },
       ]);
-      if (!Array.isArray(tools)) throw new Error("expected tools resource payload to include an array");
+      if (!Array.isArray(tools))
+        throw new Error("expected tools resource payload to include an array");
       expect(tools[0]).not.toHaveProperty("inputSchema");
     });
 

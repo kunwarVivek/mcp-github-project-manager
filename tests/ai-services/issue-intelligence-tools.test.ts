@@ -1,4 +1,5 @@
 import { vi } from "vitest";
+
 /**
  * Unit tests for Issue Intelligence MCP Tools
  *
@@ -6,26 +7,26 @@ import { vi } from "vitest";
  * Phase 11 issue intelligence AI features.
  */
 
+import { cosineSimilarity, embed, embedMany, generateObject } from "ai";
 import {
-  enrichIssueTool,
-  suggestLabelsTool,
   detectDuplicatesTool,
-  findRelatedIssuesTool,
-  executeEnrichIssue,
-  executeSuggestLabels,
+  enrichIssueTool,
   executeDetectDuplicates,
+  executeEnrichIssue,
   executeFindRelatedIssues,
-  issueIntelligenceTools,
+  executeSuggestLabels,
+  findRelatedIssuesTool,
   issueIntelligenceExecutors,
+  issueIntelligenceTools,
+  suggestLabelsTool,
 } from "../../src/infrastructure/tools/issue-intelligence-tools";
-import { AIServiceFactory } from "../../src/services/ai/AIServiceFactory";
-import { generateObject, embed, embedMany, cosineSimilarity } from "ai";
 import {
-  EnrichIssueInputSchema,
-  SuggestLabelsInputSchema,
   DetectDuplicatesInputSchema,
+  EnrichIssueInputSchema,
   FindRelatedIssuesInputSchema,
+  SuggestLabelsInputSchema,
 } from "../../src/infrastructure/tools/schemas/issue-intelligence-schemas";
+import { AIServiceFactory } from "../../src/services/ai/AIServiceFactory";
 
 // Mock dependencies
 vi.mock("../../src/services/ai/AIServiceFactory", () => {
@@ -74,7 +75,7 @@ describe("Issue Intelligence MCP Tools", () => {
   describe("Tool Definitions", () => {
     describe("enrichIssueTool", () => {
       it("should have correct name", () => {
-        expect(enrichIssueTool.name).toBe("enrich_issue");
+        expect(enrichIssueTool.name).toBe("enrich_issue_sections");
       });
 
       it("should have title", () => {
@@ -190,7 +191,7 @@ describe("Issue Intelligence MCP Tools", () => {
 
       it("should contain all issue intelligence tools", () => {
         const names = issueIntelligenceTools.map((t) => t.name);
-        expect(names).toContain("enrich_issue");
+        expect(names).toContain("enrich_issue_sections");
         expect(names).toContain("suggest_labels");
         expect(names).toContain("detect_duplicates");
         expect(names).toContain("find_related_issues");
@@ -199,14 +200,14 @@ describe("Issue Intelligence MCP Tools", () => {
 
     describe("issueIntelligenceExecutors", () => {
       it("should have executor for each tool", () => {
-        expect(issueIntelligenceExecutors).toHaveProperty("enrich_issue");
+        expect(issueIntelligenceExecutors).toHaveProperty("enrich_issue_sections");
         expect(issueIntelligenceExecutors).toHaveProperty("suggest_labels");
         expect(issueIntelligenceExecutors).toHaveProperty("detect_duplicates");
         expect(issueIntelligenceExecutors).toHaveProperty("find_related_issues");
       });
 
       it("should have functions as executors", () => {
-        expect(typeof issueIntelligenceExecutors.enrich_issue).toBe("function");
+        expect(typeof issueIntelligenceExecutors.enrich_issue_sections).toBe("function");
         expect(typeof issueIntelligenceExecutors.suggest_labels).toBe("function");
         expect(typeof issueIntelligenceExecutors.detect_duplicates).toBe("function");
         expect(typeof issueIntelligenceExecutors.find_related_issues).toBe("function");

@@ -1,14 +1,14 @@
 import { z } from "zod";
-import type { ToolDefinition, ToolSchema } from "../ToolValidator";
 import { ANNOTATION_PATTERNS } from "../annotations/tool-annotations";
+import type { ToolDefinition, ToolSchema } from "../ToolValidator";
 import {
-  AutomationRuleOutputSchema,
   AutomationRuleListOutputSchema,
-  IterationConfigOutputSchema,
-  IterationOutputSchema,
-  IterationItemsOutputSchema,
+  AutomationRuleOutputSchema,
   BulkOperationResultSchema,
   DeleteOutputSchema,
+  IterationConfigOutputSchema,
+  IterationItemsOutputSchema,
+  IterationOutputSchema,
 } from "./project-schemas";
 
 // ============================================================================

@@ -1,11 +1,11 @@
-import { ProtocolError, INTERNAL_ERROR } from "@modelcontextprotocol/server";
 import type { McpServer } from "@modelcontextprotocol/server";
-import type { ProjectManagementService } from "../../services/ProjectManagementService";
-import type { ToolRegistry } from "../tools/ToolRegistry";
-import type { AgentStore } from "../agent/AgentStore";
+import { INTERNAL_ERROR, ProtocolError } from "@modelcontextprotocol/server";
+import { GITHUB_OWNER, GITHUB_REPO, GITHUB_TOKEN } from "../../env";
 import type { AIServiceFactory } from "../../services/ai/AIServiceFactory";
+import type { ProjectManagementService } from "../../services/ProjectManagementService";
+import type { AgentStore } from "../agent/AgentStore";
 import type { ILogger } from "../logger/index";
-import { GITHUB_TOKEN, GITHUB_OWNER, GITHUB_REPO } from "../../env";
+import type { ToolRegistry } from "../tools/ToolRegistry";
 
 /**
  * v2 compatibility aliases (McpError -> ProtocolError, ErrorCode enum ->

@@ -1,5 +1,5 @@
-import { SprintMetrics } from "../../../../domain/value-objects/SprintMetrics";
 import { ResourceStatus } from "../../../../domain/resource-types";
+import { SprintMetrics } from "../../../../domain/value-objects/SprintMetrics";
 
 describe("SprintMetrics Value Object", () => {
   const baseConfig = {

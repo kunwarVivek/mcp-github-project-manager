@@ -21,10 +21,10 @@
  */
 
 import type { AIServiceFactory } from "../../services/ai/AIServiceFactory.js";
-import type { ResourceCache, CacheStats } from "../cache/ResourceCache.js";
+import type { CacheStats, ResourceCache } from "../cache/ResourceCache.js";
+import type { GitHubRepositoryFactory } from "../github/GitHubRepositoryFactory.js";
 import type { AIResiliencePolicy } from "../resilience/AIResiliencePolicy.js";
 import type { CircuitBreakerState } from "../resilience/CircuitBreakerService.js";
-import type { GitHubRepositoryFactory } from "../github/GitHubRepositoryFactory.js";
 
 /**
  * Health status for individual services

@@ -1,4 +1,5 @@
 import { vi } from "vitest";
+
 /**
  * Unit tests for FeatureAnalysisService
  *
@@ -6,10 +7,10 @@ import { vi } from "vitest";
  * priority, complexity extraction, and error handling.
  */
 
-import { FeatureAnalysisService } from "../../../src/services/feature/FeatureAnalysisService";
-import { AIServiceFactory } from "../../../src/services/ai/AIServiceFactory";
 import { generateObject } from "ai";
 import { TaskPriority } from "../../../src/domain/ai-types";
+import { AIServiceFactory } from "../../../src/services/ai/AIServiceFactory";
+import { FeatureAnalysisService } from "../../../src/services/feature/FeatureAnalysisService";
 
 // Mock dependencies
 vi.mock("../../../src/services/ai/AIServiceFactory", () => {

@@ -1,10 +1,10 @@
 import { generateObject } from "ai";
 import { z } from "zod";
-import { InputSanitizer } from "./utils/InputSanitizer";
+import { isProjectItem } from "../domain/type-guards";
+import { type ILogger, Logger } from "../infrastructure/logger";
 import type { AIServiceFactory } from "./ai/AIServiceFactory";
 import type { ProjectManagementService } from "./ProjectManagementService";
-import { type ILogger, Logger } from "../infrastructure/logger";
-import { isProjectItem } from "../domain/type-guards";
+import { InputSanitizer } from "./utils/InputSanitizer";
 
 export interface IssueEnrichmentResult {
   issueId: string;

@@ -1,8 +1,8 @@
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
-import type { ResourceEvent } from "./GitHubWebhookHandler";
+import { CACHE_DIRECTORY, EVENT_RETENTION_DAYS, MAX_EVENTS_IN_MEMORY } from "../../env";
 import { type ILogger, Logger } from "../logger/index";
-import { EVENT_RETENTION_DAYS, MAX_EVENTS_IN_MEMORY, CACHE_DIRECTORY } from "../../env";
+import type { ResourceEvent } from "./GitHubWebhookHandler";
 
 export interface EventStoreOptions {
   retentionDays: number;

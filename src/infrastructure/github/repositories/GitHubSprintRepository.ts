@@ -1,9 +1,9 @@
-import { BaseGitHubRepository } from "./BaseRepository";
-import { logger } from "../../logger";
-import type { IssueId, Sprint, SprintId, SprintRepository, Issue } from "../../../domain/types";
 import { ResourceStatus } from "../../../domain/resource-types";
-import { GitHubIssueRepository } from "./GitHubIssueRepository";
+import type { Issue, IssueId, Sprint, SprintId, SprintRepository } from "../../../domain/types";
+import { logger } from "../../logger";
 import type { GitHubConfig } from "../GitHubConfig"; // Import the class, not the interface
+import { BaseGitHubRepository } from "./BaseRepository";
+import { GitHubIssueRepository } from "./GitHubIssueRepository";
 
 interface ListIterationFieldsResponse {
   repository: {

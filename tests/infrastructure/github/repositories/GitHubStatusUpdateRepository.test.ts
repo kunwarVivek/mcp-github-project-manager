@@ -1,4 +1,5 @@
 import { vi } from "vitest";
+
 /**
  * Unit tests for GitHubStatusUpdateRepository
  *
@@ -8,10 +9,10 @@ import { vi } from "vitest";
  * - getStatusUpdate: Get single status update by ID
  */
 
-import { GitHubStatusUpdateRepository } from "../../../../src/infrastructure/github/repositories/GitHubStatusUpdateRepository.js";
-import { GitHubConfig } from "../../../../src/infrastructure/github/GitHubConfig.js";
-import { StatusUpdateStatus } from "../../../../src/infrastructure/github/repositories/types.js";
 import type { Octokit } from "@octokit/rest";
+import { GitHubConfig } from "../../../../src/infrastructure/github/GitHubConfig.js";
+import { GitHubStatusUpdateRepository } from "../../../../src/infrastructure/github/repositories/GitHubStatusUpdateRepository.js";
+import { StatusUpdateStatus } from "../../../../src/infrastructure/github/repositories/types.js";
 
 // Mock Octokit graphql method
 const mockGraphql = vi.fn();
