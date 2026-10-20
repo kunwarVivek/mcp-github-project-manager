@@ -102,41 +102,36 @@ export class FieldValueService {
     value: unknown;
   }): Promise<{ success: boolean; message: string }> {
     return safeCall(async () => {
+      // ProjectV2.field() only accepts `name`, so the field is looked up by its node ID.
       const fieldQuery = `
-        query($projectId: ID!, $fieldId: ID!) {
-          node(id: $projectId) {
-            ... on ProjectV2 {
-              field(id: $fieldId) {
-                ... on ProjectV2Field { id name dataType }
-                ... on ProjectV2IterationField { id name dataType }
-                ... on ProjectV2SingleSelectField { id name dataType options { id name } }
-              }
-            }
+        query($fieldId: ID!) {
+          node(id: $fieldId) {
+            ... on ProjectV2Field { id name dataType }
+            ... on ProjectV2IterationField { id name dataType }
+            ... on ProjectV2SingleSelectField { id name dataType options { id name } }
           }
         }
       `;
 
       interface FieldQueryResponse {
         node: {
-          field: {
-            id: string;
-            name: string;
-            dataType: string;
-            options?: Array<{ id: string; name: string }>;
-          };
-        };
+          id?: string;
+          name: string;
+          dataType: string;
+          options?: Array<{ id: string; name: string }>;
+        } | null;
       }
 
       const fieldResponse = await this.factory.graphql<FieldQueryResponse>(fieldQuery, {
-        projectId: data.projectId,
         fieldId: data.fieldId,
       });
 
-      if (!fieldResponse.node?.field) {
+      // A node ID that is not a project field matches no fragment and comes back as {}.
+      if (!fieldResponse.node?.id) {
         throw new ResourceNotFoundError(ResourceType.FIELD, data.fieldId);
       }
 
-      const field = fieldResponse.node.field;
+      const field = fieldResponse.node;
       const strategy = makeStrategy(field.dataType, field.options);
       const mutation = strategy.buildMutation();
       const variables = strategy.buildVariables(

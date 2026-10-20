@@ -30,7 +30,7 @@ describe("FieldValueService", () => {
     it("should set a TEXT field value", async () => {
       mockGraphql
         .mockResolvedValueOnce({
-          node: { field: { id: fieldId, name: "Description", dataType: "TEXT" } },
+          node: { id: fieldId, name: "Description", dataType: "TEXT" },
         })
         .mockResolvedValueOnce({
           updateProjectV2ItemFieldValue: { projectV2Item: { id: itemId } },
@@ -48,7 +48,7 @@ describe("FieldValueService", () => {
     it("should set a NUMBER field value", async () => {
       mockGraphql
         .mockResolvedValueOnce({
-          node: { field: { id: fieldId, name: "Points", dataType: "NUMBER" } },
+          node: { id: fieldId, name: "Points", dataType: "NUMBER" },
         })
         .mockResolvedValueOnce({});
 
@@ -62,7 +62,7 @@ describe("FieldValueService", () => {
     it("should set a DATE field value", async () => {
       mockGraphql
         .mockResolvedValueOnce({
-          node: { field: { id: fieldId, name: "Due", dataType: "DATE" } },
+          node: { id: fieldId, name: "Due", dataType: "DATE" },
         })
         .mockResolvedValueOnce({});
 
@@ -82,15 +82,13 @@ describe("FieldValueService", () => {
       mockGraphql
         .mockResolvedValueOnce({
           node: {
-            field: {
-              id: fieldId,
-              name: "Status",
-              dataType: "SINGLE_SELECT",
-              options: [
-                { id: "opt-1", name: "Todo" },
-                { id: "opt-2", name: "Done" },
-              ],
-            },
+            id: fieldId,
+            name: "Status",
+            dataType: "SINGLE_SELECT",
+            options: [
+              { id: "opt-1", name: "Todo" },
+              { id: "opt-2", name: "Done" },
+            ],
           },
         })
         .mockResolvedValueOnce({});
@@ -105,7 +103,7 @@ describe("FieldValueService", () => {
     it("should set an ITERATION field value", async () => {
       mockGraphql
         .mockResolvedValueOnce({
-          node: { field: { id: fieldId, name: "Sprint", dataType: "ITERATION" } },
+          node: { id: fieldId, name: "Sprint", dataType: "ITERATION" },
         })
         .mockResolvedValueOnce({});
 
@@ -121,17 +119,43 @@ describe("FieldValueService", () => {
       expect(mutationVars.value).toBe("iter-1");
     });
 
+    // ProjectV2.field() only takes `name`; querying it by id is rejected by GitHub,
+    // which made every set_field_value call fail (e.g. moving a board item between columns).
+    it("should look up the field by its node ID, not through ProjectV2.field(id:)", async () => {
+      mockGraphql
+        .mockResolvedValueOnce({ node: { id: fieldId, name: "Description", dataType: "TEXT" } })
+        .mockResolvedValueOnce({});
+
+      await service.setFieldValue({ projectId, itemId, fieldId, value: "hello" });
+
+      const [lookupQuery, lookupVars] = mockGraphql.mock.calls[0];
+      expect(lookupQuery).toContain("node(id: $fieldId)");
+      expect(lookupQuery).not.toContain("field(id:");
+      expect(lookupVars).toEqual({ fieldId });
+    });
+
     it("should throw when field is not found", async () => {
-      mockGraphql.mockResolvedValueOnce({ node: { field: null } });
+      mockGraphql.mockResolvedValueOnce({ node: null });
 
       await expect(
         service.setFieldValue({ projectId, itemId, fieldId, value: "x" })
       ).rejects.toThrow(DomainError);
+      expect(mockGraphql).toHaveBeenCalledTimes(1);
+    });
+
+    it("should throw when the ID belongs to a node that is not a project field", async () => {
+      // No fragment matches, so GitHub returns an empty object for the node.
+      mockGraphql.mockResolvedValueOnce({ node: {} });
+
+      await expect(
+        service.setFieldValue({ projectId, itemId, fieldId: "PVTI_not_a_field", value: "x" })
+      ).rejects.toThrow(DomainError);
+      expect(mockGraphql).toHaveBeenCalledTimes(1);
     });
 
     it("should throw mapped error for unsupported field type", async () => {
       mockGraphql.mockResolvedValueOnce({
-        node: { field: { id: fieldId, name: "Custom", dataType: "UNSUPPORTED" } },
+        node: { id: fieldId, name: "Custom", dataType: "UNSUPPORTED" },
       });
 
       await expect(
