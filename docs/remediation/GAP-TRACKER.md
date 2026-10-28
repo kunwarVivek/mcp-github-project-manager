@@ -136,9 +136,9 @@ report progress, submit work products, and operate within token budgets.
 | ID | Feature | Status |
 |----|---------|--------|
 | G8-01 | Domain types (`agent-orchestration-types.ts`) | DONE — Agent, TaskCheckoutResult, AgentHeartbeat, WorkProduct, TestResults, AgentBudget, BudgetStatus, AgentTaskContext, AgentActivityEntry types with Zod schemas. Subagent hierarchy via `parentAgentId`. |
-| G8-02 | Agent registry infrastructure (`AgentStore`) | DONE — GitHub issue-backed JSON agent registry (pinned issue, label `agent-registry`). CRUD: listAgents, getAgent, upsertAgent, removeAgent, removeAgentCascade, getChildren. |
+| G8-02 | Agent registry infrastructure (`AgentStore`) | DONE — GitHub-backed JSON agent registry (branch `agent-registry`). CRUD: listAgents, getAgent, createAgent, updateAgent (field-level CAS; the original whole-record `upsertAgent` was removed in G13-01), removeAgent, removeAgentCascade, getChildren. |
 | G8-03 | Work product infrastructure (`WorkProductStore`) | DONE — Structured issue comments with `<!-- agent-work-product: -->` markers for machine-parseable retrieval. |
-| G8-04 | Project field setup (`ProjectFieldSetup`) | DONE — Auto-provisions 5 custom project fields: `agent_claimed_by`, `agent_claimed_at`, `agent_status`, `agent_work_branch`, `agent_pr_number`. |
+| G8-04 | Project field setup (`ProjectFieldSetup`) | DONE — Auto-provisions 7 custom project fields: `agent_claimed_by`, `agent_claimed_at`, `agent_status`, `agent_work_branch`, `agent_pr_number`, `agent_heartbeat_at`, `agent_progress` (the last two added in G13-02). |
 | G8-05 | Task checkout service (`TaskCheckoutService`) | DONE — Task claiming with configurable strategies (priority, age, skills, deadline), release, completion. Updates project fields on claim/release/complete. |
 | G8-06 | Agent context service (`AgentContextService`) | DONE — Enriched context assembly: issue details, parent issue, milestone, related issues, coding standards, acceptance criteria, branch suggestion. |
 | G8-07 | Work product service (`WorkProductService`) | DONE — Work product submission with test results, branch, PR number, commit SHAs, file list. Records structured comments on issues. |
@@ -269,6 +269,14 @@ that exist today keep working.
 `reprioritizeSubIssue`, the `ProjectV2FieldConfiguration` union (exactly the four members the
 shared fragment set covers), the iteration-field configuration shape, and every Octokit REST
 call the platform makes.
+
+## G13 — Post-audit hardening (added 2026-10-28)
+
+| ID | Gap | Status |
+|----|-----|--------|
+| G13-01 | Same-agent lost update: `getAgent → modify copy → upsertAgent` overwrote concurrent budget debits/heartbeats of the same agent | DONE — `upsertAgent` removed; `AgentStore.createAgent` + `updateAgent(id, mutator)` apply field-level deltas to the fresh record on every CAS attempt. Regression: `SameAgentLostUpdate.test.ts` (failed 4/4 before the fix). |
+| G13-02 | Hot/cold registry split: every heartbeat was a registry commit | DONE — heartbeat/progress/branch live on the claimed project item (`agent_heartbeat_at`, `agent_progress`); registry written only on cold change; reclaim/metrics/swarm status use the newer beat (`AgentHeartbeatResolver`); `get_activity` drops `heartbeatHistory`, adds `heartbeatSource`. Legacy projects are healed additively on first checkout/heartbeat per process (`AgentFieldProvisioner`, b8r.8): concurrent first calls share one provisioning, a type conflict stays a hard error, a permission failure returns the `setup_fields` / project-admin message. |
+| G13-03 | Per-call token debit failure was swallowed | DONE — retry once, park in in-memory `UnpaidDebitLedger`, log error, `_meta.budgetDebitFailed` on the result; settled (or checkout refused) at the next `checkout_task`. |
 
 ---
 

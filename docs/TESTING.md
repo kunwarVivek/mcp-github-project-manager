@@ -105,6 +105,29 @@ E2E_REAL_API=true npm run test:e2e:tools:real
 Use a dedicated scratch repository: the live suites create a test project,
 issues, milestones and sprints, and they do NOT clean up afterwards.
 
+#### Live agent-orchestration tiers
+
+One full live agent-orchestration run costs about **~4,500 points (reported, not re-measured here)** of the 5,000
+GraphQL points/hour a token gets, so the suite is tiered by `E2E_TIER`
+(read in `agent-orchestration.e2e.ts`; unset means `full`):
+
+| Tier | Command | GraphQL cost (measured) | Covers |
+| --- | --- | --- | --- |
+| smoke | `pnpm run test:e2e:smoke` | **242 points** (measured: `rateLimit.used` 0 → 242 on a fresh hour, 80 s, 14 tests passed) | the product spine: tool surface/schema, `setup_fields`, register worker + reviewer, checkout, heartbeat, `submit_for_review`, reviewer checkout from the review queue, approve, issue closed + claim cleared, deregister |
+| full | `pnpm run test:e2e:full` | ~4,500 points (reported, not re-measured here) | smoke plus budgets, reclaim, rejection, PM flows, concurrency, convergence, blockers, views |
+
+Both need `GITHUB_TOKEN`, `GITHUB_OWNER` and `GITHUB_REPO` (a scratch repo).
+`pnpm run e2e -- --real-api --tier smoke` runs the same through the runner
+(`--tier` selects the agents suite when no `--suite` is given).
+
+Run **smoke** on every change to the agent tools, services or registry, and
+as often as you like. Run **full** before a release or after changing a
+lifecycle the smoke tier does not touch, at most about once per hour per
+token. Check the budget first:
+`gh api graphql -f query='{rateLimit{remaining used cost}}'`. The smoke tests
+are self-sufficient: every full-only test is skipped in smoke and no smoke
+test reads state a full-only test produces.
+
 ### The E2E runner
 
 ```bash
@@ -113,6 +136,7 @@ npm run e2e -- --suite github        # one suite (github, ai, workflows,
                                      # agents, platform, pipeline, basic,
                                      # protocol, stdio, resources, metrics, server)
 npm run e2e -- --real-api            # against the real GitHub API
+npm run e2e -- --real-api --tier smoke  # agent orchestration, smoke tier only
 npm run e2e -- --json /tmp/e2e.json  # machine-readable summary
 ```
 

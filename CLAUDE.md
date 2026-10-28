@@ -26,7 +26,7 @@ exactly like `pnpm run <script>`, and `npm test` like `pnpm test`.
 | Dev (watch) | `pnpm run dev` (tsx — `ts-node` cannot load under TS 7) |
 | Unit tests | `pnpm test` · core only `pnpm run test:core` · AI `pnpm run test:ai` |
 | E2E (mock) | `pnpm run test:e2e` · tools `pnpm run test:e2e:tools` |
-| E2E (live API) | `E2E_REAL_API=true pnpm run test:e2e:tools:real` |
+| E2E (live API) | `E2E_REAL_API=true pnpm run test:e2e:tools:real` · agent orchestration tiers: `pnpm run test:e2e:smoke` (~242 GraphQL pts) · `pnpm run test:e2e:full` (~4,500 of 5,000/h) |
 | E2E runner | `pnpm run e2e` — `--suite <name>`, `--real-api`, `--json <path>` (never `--testPathPattern`: Vitest 5 rejects it) |
 | Action sweep | `pnpm run test:e2e:sweep` · gate `pnpm run test:e2e:coverage` — every one of the 169 actions, no credentials needed |
 | Coverage | `pnpm run test:coverage` |
@@ -127,7 +127,11 @@ exactly like `pnpm run <script>`, and `npm test` like `pnpm test`.
   wraps every model with middleware that accumulates provider-reported usage
   into `CorrelationContext`'s AsyncLocalStorage, and `dispatchTool` debits the
   agent's budget **once per tool call** (never per AI call — `AgentStore` is
-  GitHub-backed, so each debit is a read plus a compare-and-swap commit). This covers only what the
+  GitHub-backed, so each debit is a compare-and-swap commit via `updateAgent`).
+  A failed debit is retried once, then parked in the in-memory `UnpaidDebitLedger`,
+  logged at error level and flagged on the result as `_meta.budgetDebitFailed`; the
+  next `checkout_task` settles it first and refuses if the registry is still
+  unreachable. The ledger is not persisted. This covers only what the
   *server* spends; an agent's own runtime spend never reaches this process, so
   `record_usage` remains the channel for that.
 - `ai`@7 reports usage as `inputTokens: {total,...}` / `outputTokens: {total,...}`
@@ -139,6 +143,20 @@ exactly like `pnpm run <script>`, and `npm test` like `pnpm test`.
   Never reintroduce read-modify-write on an issue body — it is last-write-wins and
   silently drops registrations. A legacy "Agent Registry" issue is imported once
   and rewritten to a pointer (`LegacyAgentRegistry`).
+- Registry writes are **field-level**: `AgentStore` exposes `createAgent` and
+  `updateAgent(id, mutator)` only — the mutator runs on the *fresh* record on every
+  compare-and-swap attempt, so concurrent writers to the same agent never overwrite
+  each other. There is no whole-record upsert; never do `getAgent → modify copy →
+  write back` (it lost budget debits and heartbeats). Budget writes are deltas.
+- Heartbeat/progress/branch are **hot state on the claimed project item**
+  (`agent_heartbeat_at`, `agent_progress`, `agent_work_branch`; `ItemHeartbeatStore`),
+  not registry commits. The registry is touched only on cold changes (status, task) or
+  an idle agent's beat older than the 30-min stale window. Staleness is the newer of
+  item beat and registry beat (`AgentHeartbeatResolver`). Projects missing any `agent_*`
+  field are healed additively on first checkout/heartbeat per process
+  (`AgentFieldProvisioner` → `ProjectFieldSetup.ensureFields`; concurrent first calls
+  share one promise; a type conflict is a hard error; a permission failure returns the
+  `setup_fields` / project-admin message and is retried on the next call).
 
 > `AGENTS.md` and `CLAUDE.md` are kept identical. Edit both together.
 <!-- project-manual:end -->

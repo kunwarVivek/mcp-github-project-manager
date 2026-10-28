@@ -667,7 +667,7 @@ Agent task lifecycle: register, check out tasks, report progress, and complete w
 | `checkout_task` | `agentId` (req), `strategy`, `labels`, `projectId`, `view`, `skipBlocked`, `reviewQueue` | Claim next available task (strategies: `highest_priority` (default), `oldest_first`, `skills_match`, `milestone_deadline`, `ai`; `skipBlocked: true` skips tasks with open blockers; `reviewQueue: true` claims from the review queue for reviewers; `view` claims from a named project view — the view's own order decides which task is handed out first) |
 | `release_task` | `agentId` (req), `taskId` (req), `reason` | Return task to pool |
 | `complete_task` | `agentId` (req), `taskId` (req), `summary` (req) | Mark task completed |
-| `heartbeat` | `agentId` (req), `status`, `taskId`, `progress`, `progressSummary`, `currentBranch`, `blockers` | Report liveness and progress (history retained) |
+| `heartbeat` | `agentId` (req), `status`, `taskId`, `progress`, `progressSummary`, `currentBranch`, `blockers` | Report liveness and progress. Written to the claimed project item (`agent_heartbeat_at`, `agent_progress`, `agent_work_branch`), not committed to the registry. A project missing any `agent_*` field is provisioned additively on first use (same for `checkout_task`); if the token cannot create fields the call errors with a `setup_fields` / project-admin message. Errors too if the agent no longer holds the claim. No history is kept. |
 | `check_work_status` | `agentId` (req), `taskId` (req) | Check PR review/merge status |
 | `get_task_context` | `issueNumber` (req) | Get enriched task context (incl. AI suggestions when configured) |
 | `submit_for_review` | `agentId` (req), `taskId` (req), `summary` | Move a task into the review queue |
@@ -709,7 +709,7 @@ Agent administration: list agents, manage budgets, view activity, submit work pr
 |--------|----------------------|-------------|
 | `list` | `role`, `status` | List registered agents |
 | `deregister` | `agentId` (req) | Remove agent (cascades to children) |
-| `get_activity` | `agentId` | Get agent activity dashboard (incl. heartbeat history) |
+| `get_activity` | `agentId` | Get agent activity dashboard: `lastHeartbeat` (newer of the claimed item's `agent_heartbeat_at` and the registry beat), `heartbeatSource` (`project_item` \| `registry`), `currentTask.progress`/`branch`. `heartbeatHistory` is no longer returned. |
 | `submit_work_product` | `agentId` (req), `taskId` (req), `issueNumber` (req), `branch`, `prNumber`, `commitShas`, `filesChanged`, `testsPassed`, `testsFailed`, `testsTotal`, `summary` | Submit work product |
 | `get_budget` | `agentId` (req) | Check token budget status |
 | `set_budget` | `agentId` (req), `totalTokens` (req), `warningFraction` or `warningThreshold`, `hardStop`, `resetPeriod` | Configure token budget (`warningThreshold` is accepted as a compatibility alias for `warningFraction`) |

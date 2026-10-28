@@ -253,7 +253,7 @@ console.log(issue.labels);       // string[]
 
 | Service | Responsibility |
 |---------|----------------|
-| `TaskCheckoutService` | Task claiming (strategy-driven, dependency-aware, atomic), releasing, completion, review workflow (submit/approve/reject), heartbeat history, stale reclaim — manages agent_status/agent_claimed_by project fields |
+| `TaskCheckoutService` | Task claiming (strategy-driven, dependency-aware, atomic), releasing, completion, review workflow (submit/approve/reject), item-level heartbeats (`ItemHeartbeatStore`; registry written only on cold changes), stale reclaim over the newer of item and registry beat — manages agent_status/agent_claimed_by/agent_heartbeat_at/agent_progress project fields. Registry writes go through `AgentStore.createAgent`/`updateAgent` (field-level CAS) |
 | `AgentContextService` | Enriched task context assembly (issue, parent, milestone, related issues, acceptance criteria) + best-effort AI suggestions (criteria, complexity, guidance) |
 | `WorkProductService` | Work product submission — records structured comments on issues with test results |
 | `AgentBudgetService` | Per-agent token budget tracking, warning thresholds, hard stops, periodic resets, usage recording |
@@ -757,7 +757,7 @@ GitHub project without human dispatch. All state is stored natively in GitHub
 │  • Task claims    → project custom fields (SINGLE_SELECT / TEXT)    │
 │  • Work products  → structured issue comments (JSON marker blocks)  │
 │  • Budgets        → agent registry metadata                         │
-│  • Heartbeats     → agent lastHeartbeat timestamp                   │
+│  • Heartbeats     → item agent_heartbeat_at (hot) / lastHeartbeat   │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -847,7 +847,7 @@ checkout_task ──── strategy-driven selection (priority/age/skills/deadli
     │
     ▼
 work loop ────── agent_heartbeat (every N minutes)
-    │              └── heartbeat history retained (last 50); stale detection after 30 min
+    │              └── beat stored on the claimed item (hot); registry only on cold change; stale after 30 min
     │
     ▼
 submit_work_product ─── structured comment on issue

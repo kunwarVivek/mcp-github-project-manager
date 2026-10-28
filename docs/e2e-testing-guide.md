@@ -191,6 +191,29 @@ npm run test:all:real
 
 Real-API runs consume your GitHub rate limit — use a dedicated test repository.
 
+### Live agent-orchestration tiers
+
+One full live agent-orchestration run costs about **~4,500 points (reported, not re-measured here)** of the 5,000
+GraphQL points/hour a token gets, so the suite is tiered by `E2E_TIER`
+(read in `agent-orchestration.e2e.ts`; unset means `full`):
+
+| Tier | Command | GraphQL cost (measured) | Covers |
+| --- | --- | --- | --- |
+| smoke | `pnpm run test:e2e:smoke` | **242 points** (measured: `rateLimit.used` 0 → 242 on a fresh hour, 80 s, 14 tests passed) | the product spine: tool surface/schema, `setup_fields`, register worker + reviewer, checkout, heartbeat, `submit_for_review`, reviewer checkout from the review queue, approve, issue closed + claim cleared, deregister |
+| full | `pnpm run test:e2e:full` | ~4,500 points (reported, not re-measured here) | smoke plus budgets, reclaim, rejection, PM flows, concurrency, convergence, blockers, views |
+
+Both need `GITHUB_TOKEN`, `GITHUB_OWNER` and `GITHUB_REPO` (a scratch repo).
+`pnpm run e2e -- --real-api --tier smoke` runs the same through the runner
+(`--tier` selects the agents suite when no `--suite` is given).
+
+Run **smoke** on every change to the agent tools, services or registry, and
+as often as you like. Run **full** before a release or after changing a
+lifecycle the smoke tier does not touch, at most about once per hour per
+token. Check the budget first:
+`gh api graphql -f query='{rateLimit{remaining used cost}}'`. The smoke tests
+are self-sufficient: every full-only test is skipped in smoke and no smoke
+test reads state a full-only test produces.
+
 ## Environment Setup
 
 ### Required Environment Variables
