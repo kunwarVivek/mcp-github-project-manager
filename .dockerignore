@@ -12,27 +12,33 @@ dist/
 *.tsbuildinfo
 
 # Test and coverage
+# The runner is Vitest, not Jest. Test sources are excluded from the build
+# context entirely (tsconfig.build.json already excludes them from the
+# compile), so no test code ever reaches the image.
 coverage/
 tests/
+src/__tests__/
 **/*.test.ts
 **/*.test.js
 **/*.spec.ts
 **/*.spec.js
-jest.*.js
-jest.*.mjs
-jest.*.cjs
+**/*.e2e.ts
+vitest.config.ts
 
 # Development files
 .git/
 .gitignore
 .claude/
 .agents/
+.codex/
 .mcp-cache/
 .planning/
 .gitnexus/
 .beads/
 handoffs/
 thoughts/
+CONTEXT.md
+HANDOFF.md
 
 # IDE files
 .idea/
@@ -66,16 +72,25 @@ tmp/
 *.log
 
 # Config files not needed in container
-vitest.config.ts
 biome.json
 .husky/
+.npmignore
+glama.json
 AGENTS.md
 CLAUDE.md
 .node-version
 tsconfig.typecheck.json
+tsconfig.test.json
 
 # Local Docker Compose override
 docker-compose.override.yml
+
+# Legacy toolchain leftovers - the runner is Vitest and the supported package
+# managers are npm and pnpm, so no Jest config or bun lockfile belongs here.
+jest.config.*
+jest.resolver.cjs
+bun.lock
+bun.lockb
 
 # NOTE: package-lock.json and pnpm-lock.yaml are intentionally NOT ignored -
 # the image installs from package-lock.json, and the pnpm lockfile is kept

@@ -23,6 +23,46 @@ const REQUIRED_ENV_VARS = {
   ai: ["ANTHROPIC_API_KEY", "OPENAI_API_KEY", "GOOGLE_API_KEY"],
 };
 
+/**
+ * Parse a Vitest summary out of the captured output.
+ *
+ * Vitest reports "Test Files  122 passed | 4 skipped (126)" and
+ * "      Tests  3068 passed | 20 skipped (3088)". The old implementation
+ * looked for Jest's "Test Suites:" line, which Vitest never prints - so every
+ * count stayed 0 and the validator could not fail.
+ */
+/**
+ * Remove ANSI escape sequences.
+ *
+ * Vitest wraps its summary numbers in colour codes, so "56\x1b[22m passed"
+ * never matches /(\d+) passed/ - without stripping them every count comes
+ * out as 0. The escape character is built at runtime because Biome rejects
+ * control characters inside a regular expression literal.
+ */
+function stripAnsi(text) {
+  return text.replace(new RegExp(`${String.fromCharCode(27)}\\[[0-9;]*m`, "g"), "");
+}
+
+function parseVitestSummary(output) {
+  // Vitest wraps its numbers in ANSI codes, so strip them before matching.
+  const plain = stripAnsi(output);
+  const count = (label, kind) => {
+    // Anchor on the start of the line: a test's own stdout can contain the
+    // word "Tests", and the first match wins otherwise.
+    const line = plain.split("\n").find((l) => new RegExp(`^\\s*${label}\\s`).test(l));
+    if (!line) return 0;
+    const match = line.match(new RegExp(`(\\d+) ${kind}`));
+    return match ? parseInt(match[1], 10) : 0;
+  };
+  return {
+    passed: count("Tests", "passed"),
+    failed: count("Tests", "failed"),
+    skipped: count("Tests", "skipped"),
+    filesPassed: count("Test Files", "passed"),
+    filesFailed: count("Test Files", "failed"),
+  };
+}
+
 class TestValidator {
   constructor() {
     this.results = {
@@ -76,22 +116,20 @@ class TestValidator {
     this.log("Running unit tests...", "info");
 
     try {
-      const output = execSync(`${PM_TEST} unit --passWithNoTests --verbose`, {
+      // "unit" as a positional filter only matches paths containing "unit",
+      // which silently excludes the root tests/ tree - so filter the unit
+      // suites explicitly.
+      const output = execSync(`${PM_TEST} src/__tests__/unit --passWithNoTests`, {
         encoding: "utf8",
         stdio: "pipe",
       });
 
-      // Parse Jest output for test results
-      const lines = output.split("\n");
-      const summaryLine = lines.find((line) => line.includes("Test Suites:"));
-
-      if (summaryLine) {
-        const passedMatch = summaryLine.match(/(\d+) passed/);
-        const failedMatch = summaryLine.match(/(\d+) failed/);
-
-        this.results.unit.passed = passedMatch ? parseInt(passedMatch[1], 10) : 0;
-        this.results.unit.failed = failedMatch ? parseInt(failedMatch[1], 10) : 0;
-      }
+      // Parse VITEST output. Vitest prints
+      //   " Test Files  122 passed | 4 skipped (126)"
+      //   "      Tests  3068 passed | 20 skipped (3088)"
+      // It never prints Jest's "Test Suites:", so parsing for that string is
+      // what made this validator report 0/0 and always pass.
+      Object.assign(this.results.unit, parseVitestSummary(output));
 
       this.log(
         `Unit tests completed: ${this.results.unit.passed} passed, ${this.results.unit.failed} failed`,
@@ -99,7 +137,14 @@ class TestValidator {
       );
       return true;
     } catch (error) {
-      this.log(`Unit tests failed: ${error.message}`, "error");
+      // execSync throws on a non-zero exit; the output still carries the
+      // summary, so report the real counts next to the failure.
+      const output = error.stdout ? String(error.stdout) : "";
+      Object.assign(this.results.unit, parseVitestSummary(output));
+      this.log(
+        `Unit tests failed: ${this.results.unit.failed} failed of ${this.results.unit.passed + this.results.unit.failed + this.results.unit.skipped}`,
+        "error"
+      );
       this.errors.push(`Unit tests: ${error.message}`);
       return false;
     }
@@ -120,19 +165,7 @@ class TestValidator {
         stdio: "pipe",
       });
 
-      // Parse results
-      const lines = output.split("\n");
-      const summaryLine = lines.find((line) => line.includes("Test Suites:"));
-
-      if (summaryLine) {
-        const passedMatch = summaryLine.match(/(\d+) passed/);
-        const failedMatch = summaryLine.match(/(\d+) failed/);
-        const skippedMatch = summaryLine.match(/(\d+) skipped/);
-
-        this.results.e2e.passed = passedMatch ? parseInt(passedMatch[1], 10) : 0;
-        this.results.e2e.failed = failedMatch ? parseInt(failedMatch[1], 10) : 0;
-        this.results.e2e.skipped = skippedMatch ? parseInt(skippedMatch[1], 10) : 0;
-      }
+      Object.assign(this.results.e2e, parseVitestSummary(output));
 
       this.log(
         `E2E tests completed: ${this.results.e2e.passed} passed, ${this.results.e2e.failed} failed, ${this.results.e2e.skipped} skipped`,
@@ -140,14 +173,12 @@ class TestValidator {
       );
       return true;
     } catch (error) {
-      // E2E tests might fail due to missing credentials, which is expected
-      if (error.message.includes("missing credentials") || error.message.includes("Skipping")) {
-        this.log("E2E tests skipped due to missing credentials (expected)", "warning");
-        this.results.e2e.skipped = 1;
-        return true;
-      }
-
-      this.log(`E2E tests failed: ${error.message}`, "error");
+      const output = error.stdout ? String(error.stdout) : "";
+      Object.assign(this.results.e2e, parseVitestSummary(output));
+      this.log(
+        `E2E tests failed: ${this.results.e2e.failed} failed of ${this.results.e2e.passed + this.results.e2e.failed + this.results.e2e.skipped}`,
+        "error"
+      );
       this.errors.push(`E2E tests: ${error.message}`);
       return false;
     }
@@ -199,6 +230,11 @@ class TestValidator {
       this.log(`  ⏭ Skipped: ${this.results.e2e.skipped}`, "warning");
     }
 
+    this.log(
+      `\nTest files: ${this.results.unit.filesPassed} unit file(s) passed, ${this.results.unit.filesFailed} failed`,
+      "info"
+    );
+
     // Overall Status
     const totalPassed = this.results.unit.passed + this.results.e2e.passed;
     const totalFailed = this.results.unit.failed + this.results.e2e.failed;
@@ -238,6 +274,10 @@ class TestValidator {
     const functionalityValid = this.validateGitHubProjectV2Functionality();
     const unitTestsPass = await this.runUnitTests();
     const e2eTestsPass = await this.runE2ETests(credentials);
+
+    if (!functionalityValid || !unitTestsPass || !e2eTestsPass) {
+      this.log("\nAt least one check failed - see the errors above.", "error");
+    }
 
     const success = this.generateReport();
 

@@ -58,6 +58,38 @@ jobs:
       - name: Run tests
         run: ${{ matrix.package-manager }} test
 
+  # Every action of every public tool, without credentials. The tool e2e
+  # suites need live GitHub credentials and skip without them, so this is the
+  # part of the surface CI actually exercises.
+  action-sweep:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 12
+
+      - name: Use Node.js '24.x'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24.x'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm run build
+
+      - name: Sweep every tool action
+        run: pnpm run test:e2e:sweep
+
+      - name: Action coverage gate
+        run: pnpm run test:e2e:coverage
+
   lint:
     runs-on: ubuntu-latest
 

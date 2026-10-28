@@ -7,23 +7,31 @@ docs/
 # Config files
 .env
 .env.example
-.eslintrc
-.eslintignore
-.prettierrc
-.prettierignore
-jest.config.*
+biome.json
+vitest.config.ts
 tsconfig*.json
 .husky/
 
 # Development files
 coverage/
 handoffs/
+HANDOFF.md
+CONTEXT.md
+thoughts/
 .git/
 .github/
 .vscode/
 .idea/
 .planning/
 .claude/
+.agents/
+.codex/
+.beads/
+.gitnexus/
+tests/
+*.test.ts
+*.spec.ts
+*.e2e.ts
 
 # Other files
 *.log

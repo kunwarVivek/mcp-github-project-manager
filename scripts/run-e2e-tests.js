@@ -1,19 +1,26 @@
 #!/usr/bin/env node
 
 /**
- * Comprehensive E2E Test Runner for MCP Tools
+ * Comprehensive E2E Test Runner for the MCP GitHub Project Manager.
  *
- * This script provides an easy way to run the comprehensive E2E test suite
- * with various options and configurations.
+ * Scope flags select a suite by POSITIONAL Vitest filter. Vitest 5 rejects
+ * Jest-only flags (`--testPathPattern` dies with `CACError: Unknown option`),
+ * so the filter is passed as a positional argument and exclusions use
+ * `--exclude=`.
+ *
+ * The runner always uses the project's OWN vitest binary (never `npx`, which
+ * would hit the network), through whichever package manager invoked it.
  */
 
 import { spawn } from "node:child_process";
-import { existsSync } from "node:fs";
+import { existsSync, writeFileSync } from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+/**
+ * The repository is installable with npm or pnpm. Run the matching package
+ * manager so the script works for whoever invokes it.
+ */
+const PM = /pnpm/i.test(process.env.npm_config_user_agent ?? "") ? "pnpm" : "npm";
 
 // ANSI color codes for console output
 const colors = {
@@ -36,27 +43,53 @@ function printHeader() {
   console.log(colorize("=".repeat(50), "cyan"));
 }
 
+/**
+ * The e2e suites, by short name. Each entry is a positional Vitest filter
+ * that matches exactly one file in src/__tests__/e2e.
+ */
+const SUITES = {
+  github: "github-project-tools",
+  ai: "ai-task-tools",
+  workflows: "tool-integration-workflows",
+  agents: "agent-orchestration",
+  platform: "platform-validation",
+  pipeline: "full-pipeline",
+  basic: "basic-validation",
+  protocol: "mcp-protocol-compliance",
+  stdio: "stdio-transport",
+  resources: "resource-system",
+  metrics: "metrics-reporting",
+  server: "mcp-server-integration",
+};
+
 function printUsage() {
   console.log(colorize("\nUsage:", "bright"));
   console.log("  node scripts/run-e2e-tests.js [options]");
 
+  console.log(colorize("\nScope (mutually exclusive):", "bright"));
+  console.log("  --github-only             GitHub project tools");
+  console.log("  --ai-only                 AI tool suites");
+  console.log("  --workflows-only         Tool integration workflows");
+  console.log("  --agent-only              Agent orchestration");
+  console.log("  --platform-only          Platform validation");
+  console.log("  --all                     Every e2e suite (default)");
+  console.log("  --suite <name>            One suite by name (repeatable)");
+  console.log("                             names: " + Object.keys(SUITES).join(", "));
+
   console.log(colorize("\nOptions:", "bright"));
-  console.log("  --help, -h              Show this help message");
-  console.log("  --real-api              Use real APIs instead of mocks");
-  console.log("  --github-only           Run only GitHub tool tests");
-  console.log("  --ai-only               Run only AI tool tests");
-  console.log("  --workflows-only        Run only workflow integration tests");
-  console.log("  --agent-only            Run only agent orchestration tool tests");
-  console.log("  --platform-only         Run only platform validation tests");
-  console.log("  --build                 Build the project before running tests");
-  console.log("  --verbose               Enable verbose output");
-  console.log("  --timeout <seconds>     Set test timeout (default: 60)");
+  console.log("  --help, -h                Show this help message");
+  console.log("  --real-api                Use real APIs instead of mocks");
+  console.log("  --build                   Build the project before running tests");
+  console.log("  --verbose                 Enable verbose output");
+  console.log("  --timeout <seconds>       Per-test timeout (default: 120 - the live API is slow)");
+  console.log("  --json <path>             Also write a machine-readable summary");
 
   console.log(colorize("\nExamples:", "bright"));
   console.log("  node scripts/run-e2e-tests.js");
   console.log("  node scripts/run-e2e-tests.js --real-api --github-only");
   console.log("  node scripts/run-e2e-tests.js --build --verbose");
-  console.log("  node scripts/run-e2e-tests.js --ai-only --timeout 120");
+  console.log("  node scripts/run-e2e-tests.js --suite agents --suite workflows");
+  console.log("  node scripts/run-e2e-tests.js --json /tmp/e2e-summary.json");
 }
 
 function checkEnvironment() {
@@ -121,9 +154,8 @@ async function runCommand(command, args, options = {}) {
 
 async function buildProject() {
   console.log(colorize("\n🔨 Building project...", "yellow"));
-  const pm = /pnpm/i.test(process.env.npm_config_user_agent ?? "") ? "pnpm" : "npm";
   try {
-    await runCommand(pm, ["run", "build"]);
+    await runCommand(PM, ["run", "build"]);
     console.log(colorize("✅ Build completed successfully.", "green"));
   } catch (error) {
     console.error(colorize("❌ Build failed:", "red"), error.message);
@@ -136,18 +168,29 @@ function parseArgs() {
   const options = {
     help: false,
     realApi: false,
-    githubOnly: false,
-    aiOnly: false,
-    workflowsOnly: false,
-    agentOnly: false,
-    platformOnly: false,
+    scope: null,
+    suites: [],
     build: false,
     verbose: false,
-    timeout: 60,
+    timeout: 120,
+    json: null,
+  };
+
+  const scopeFlags = {
+    "--github-only": "github",
+    "--ai-only": "ai",
+    "--workflows-only": "workflows",
+    "--agent-only": "agents",
+    "--platform-only": "platform",
   };
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
+
+    if (arg in scopeFlags) {
+      options.scope = scopeFlags[arg];
+      continue;
+    }
 
     switch (arg) {
       case "--help":
@@ -157,20 +200,25 @@ function parseArgs() {
       case "--real-api":
         options.realApi = true;
         break;
-      case "--github-only":
-        options.githubOnly = true;
+      case "--all":
+        options.scope = null;
+        options.suites = [];
         break;
-      case "--ai-only":
-        options.aiOnly = true;
-        break;
-      case "--workflows-only":
-        options.workflowsOnly = true;
-        break;
-      case "--agent-only":
-        options.agentOnly = true;
-        break;
-      case "--platform-only":
-        options.platformOnly = true;
+      case "--suite":
+        if (i + 1 < args.length) {
+          const name = args[i + 1];
+          if (!SUITES[name]) {
+            console.log(
+              colorize(
+                `⚠️  Unknown suite "${name}". Known: ${Object.keys(SUITES).join(", ")}`,
+                "yellow"
+              )
+            );
+          } else {
+            options.suites.push(name);
+          }
+          i++; // Skip next argument
+        }
         break;
       case "--build":
         options.build = true;
@@ -184,6 +232,12 @@ function parseArgs() {
           i++; // Skip next argument
         }
         break;
+      case "--json":
+        if (i + 1 < args.length) {
+          options.json = args[i + 1];
+          i++; // Skip next argument
+        }
+        break;
       default:
         console.log(colorize(`⚠️  Unknown option: ${arg}`, "yellow"));
     }
@@ -192,61 +246,138 @@ function parseArgs() {
   return options;
 }
 
+/**
+ * Build the vitest invocation.
+ *
+ * Filters are POSITIONAL (Vitest 5) and the timeout is the CLI option
+ * `--testTimeout` - Vitest does not read a VITEST_TIMEOUT env var.
+ */
 function buildTestCommand(options) {
-  // Use Vitest instead of Jest
-  const baseCommand = ["npx", "vitest", "run"];
-  const args = [...baseCommand];
+  const filters = [];
 
-  // Add test pattern based on options
-  if (options.githubOnly) {
-    args.push("--testPathPattern=github-project-tools");
-  } else if (options.aiOnly) {
-    args.push("--testPathPattern=ai-task-tools");
-  } else if (options.workflowsOnly) {
-    args.push("--testPathPattern=tool-integration-workflows");
-  } else if (options.agentOnly) {
-    args.push("--testPathPattern=agent-orchestration");
-  } else if (options.platformOnly) {
-    args.push("--testPathPattern=platform-validation");
+  if (options.suites.length > 0) {
+    for (const name of options.suites) {
+      filters.push(SUITES[name]);
+    }
+  } else if (options.scope) {
+    filters.push(SUITES[options.scope]);
+  } else {
+    filters.push("src/__tests__/e2e");
   }
 
-  // Add reporter based on verbose flag
+  const args = ["vitest", "run", ...filters, `--testTimeout=${options.timeout * 1000}`];
+
   if (options.verbose) {
     args.push("--reporter=verbose");
   }
 
-  // Set environment variables
-  const env = { ...process.env };
+  // npm exec needs the `--` separator; pnpm exec does not accept one.
+  const command = PM === "pnpm" ? "pnpm" : "npm";
+  const commandArgs = PM === "pnpm" ? args : ["exec", "--", ...args];
 
+  const env = { ...process.env };
   if (options.realApi) {
     env.E2E_REAL_API = "true";
   }
 
-  if (options.timeout !== 60) {
-    env.VITEST_TIMEOUT = (options.timeout * 1000).toString();
-  }
+  return { command, args: commandArgs, env, filters };
+}
 
-  return { command: args[0], args: args.slice(1), env };
+/**
+ * Remove ANSI escape sequences.
+ *
+ * Vitest wraps its summary numbers in colour codes, so "56\x1b[22m passed"
+ * never matches /(\d+) passed/ - without stripping them every count comes
+ * out as 0. The escape character is built at runtime because Biome rejects
+ * control characters inside a regular expression literal.
+ */
+function stripAnsi(text) {
+  return text.replace(new RegExp(`${String.fromCharCode(27)}\\[[0-9;]*m`, "g"), "");
+}
+
+function parseVitestSummary(output) {
+  // Vitest prints: " Test Files  122 passed | 4 skipped (126)"
+  // and:           "      Tests  3068 passed | 20 skipped (3088)"
+  // The numbers are wrapped in ANSI codes, so strip them before matching -
+  // otherwise "56\x1b[22m passed" never matches /(\d+) passed/ and every
+  // count comes out as 0.
+  const plain = stripAnsi(output);
+  // Anchor on the start of the line: a test's own stdout can contain the
+  // word "Tests", and the first match wins otherwise.
+  const files = plain.match(/^\s*Test Files\s+(.+)$/m);
+  const tests = plain.match(/^\s*Tests\s+(.+)$/m);
+  const count = (line, kind) => {
+    if (!line) return 0;
+    const match = line[1].match(new RegExp(`(\\d+) ${kind}`));
+    return match ? parseInt(match[1], 10) : 0;
+  };
+  return {
+    filesPassed: count(files, "passed"),
+    filesFailed: count(files, "failed"),
+    filesSkipped: count(files, "skipped"),
+    testsPassed: count(tests, "passed"),
+    testsFailed: count(tests, "failed"),
+    testsSkipped: count(tests, "skipped"),
+  };
 }
 
 async function runTests(options) {
-  const { command, args, env } = buildTestCommand(options);
+  const { command, args, env, filters } = buildTestCommand(options);
 
   console.log(colorize("\n📋 Test Configuration:", "cyan"));
   console.log(`  Mode: ${options.realApi ? "Real API" : "Mock API"}`);
-  console.log(
-    `  Scope: ${options.githubOnly ? "GitHub Tools" : options.aiOnly ? "AI Tools" : options.workflowsOnly ? "Workflows" : options.agentOnly ? "Agent Orchestration Tools" : options.platformOnly ? "Platform Validation" : "All Tools"}`
-  );
-  console.log(`  Timeout: ${options.timeout} seconds`);
+  console.log(`  Package manager: ${PM}`);
+  console.log(`  Filters: ${filters.join(", ")}`);
+  console.log(`  Timeout: ${options.timeout}s`);
   console.log(`  Verbose: ${options.verbose ? "Yes" : "No"}`);
 
-  try {
-    await runCommand(command, args, { env });
-    console.log(colorize("\n✅ All tests completed successfully!", "green"));
-  } catch (error) {
-    console.error(colorize("\n❌ Tests failed:", "red"), error.message);
-    process.exit(1);
+  // Capture the output so the summary can be parsed, and still stream it.
+  let output = "";
+  const child = spawn(command, args, { env, shell: true });
+  child.stdout?.on("data", (chunk) => {
+    const text = chunk.toString();
+    output += text;
+    process.stdout.write(text);
+  });
+  child.stderr?.on("data", (chunk) => {
+    const text = chunk.toString();
+    output += text;
+    process.stderr.write(text);
+  });
+
+  const code = await new Promise((resolve) => {
+    child.on("close", (exitCode) => resolve(exitCode ?? 1));
+    child.on("error", () => resolve(1));
+  });
+
+  const summary = parseVitestSummary(output);
+  console.log(colorize("\n📊 Summary:", "cyan"));
+  console.log(
+    `  Test files: ${summary.filesPassed} passed, ${summary.filesFailed} failed, ${summary.filesSkipped} skipped`
+  );
+  console.log(
+    `  Tests:      ${summary.testsPassed} passed, ${summary.testsFailed} failed, ${summary.testsSkipped} skipped`
+  );
+
+  if (options.json) {
+    const payload = {
+      mode: options.realApi ? "real-api" : "mock",
+      packageManager: PM,
+      filters,
+      timeoutSeconds: options.timeout,
+      exitCode: code,
+      ...summary,
+    };
+    writeFileSync(options.json, `${JSON.stringify(payload, null, 2)}\n`);
+    console.log(colorize(`  JSON summary written to ${options.json}`, "cyan"));
   }
+
+  if (code !== 0) {
+    console.error(colorize("\n❌ Tests failed.", "red"));
+    process.exit(code);
+  }
+
+  console.log(colorize("\n✅ All tests completed successfully!", "green"));
 }
 
 async function main() {
@@ -284,7 +415,7 @@ process.on("uncaughtException", (error) => {
   process.exit(1);
 });
 
-process.on("unhandledRejection", (reason, promise) => {
+process.on("unhandledRejection", (reason) => {
   console.error(colorize("\n💥 Unhandled Rejection:", "red"), reason);
   process.exit(1);
 });
@@ -297,4 +428,4 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   });
 }
 
-export { buildTestCommand, main, parseArgs };
+export { buildTestCommand, main, parseArgs, parseVitestSummary, SUITES };
