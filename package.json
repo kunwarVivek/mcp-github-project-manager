@@ -102,7 +102,7 @@
     "docs:serve": "npx --yes http-server docs -o api-explorer.html",
     "examples": "tsx examples/basic/create-simple-project.ts",
     "prepublishOnly": "npm run build",
-    "release": "node scripts/publish.js",
+    "release": "node scripts/release.js",
     "inspect": "npx --yes @modelcontextprotocol/inspector node build/index.js",
     "lint:fix": "biome check --write ."
   },

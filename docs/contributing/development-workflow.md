@@ -269,14 +269,16 @@ publishes to npm outside CI.
 
 A tag you push yourself (`git push origin vX.Y.Z`) triggers the same workflow.
 
-To bump locally instead:
+To release from your machine — one command that ends with both npm and the
+GitHub release live and verified:
 
 ```bash
-npm run release      # or: pnpm run release
+npm run release      # or: npm run release -- patch|minor|major|X.Y.Z [--yes]
 ```
 
-Do **not** run `npm publish` yourself — the workflow does it, and skips
-publishing if that version is already on the registry.
+It pushes the release commit and tag, then waits for the Release workflow and
+checks both results. Do **not** run `npm publish` yourself, and do not name a
+script `publish` (npm runs it during `npm publish`, i.e. inside the workflow).
 
 ## Continuous Integration
 

@@ -46,36 +46,17 @@ jobs:
           echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
 
       - name: Update CHANGELOG
-        run: |
-          VERSION="${{ steps.bump.outputs.VERSION }}"
-          DATE=$(date +%Y-%m-%d)
-          # Move the [Unreleased] body into the new version section and reset
-          # [Unreleased] to the placeholder. The release workflow extracts the
-          # version section verbatim, so it must be the real content.
-          node -e '
-          const fs = require("fs");
-          const [version, date] = process.argv.slice(1);
-          const file = "CHANGELOG.md";
-          const content = fs.readFileSync(file, "utf8");
-          const re = /^## \[Unreleased\]\n\n([\s\S]*?)(?=^## \[)/m;
-          const match = content.match(re);
-          if (!match) {
-            console.error("CHANGELOG.md has no [Unreleased] section");
-            process.exit(1);
-          }
-          const body = match[1].trim();
-          const section = `## [${version}] - ${date}\n\n${body}\n\n`;
-          fs.writeFileSync(
-            file,
-            content.replace(re, `## [Unreleased]\n\nNo unreleased changes.\n\n${section}`)
-          );
-          ' "$VERSION" "$DATE"
+        # Same cut as `npm run release`: [Unreleased] becomes the version
+        # section the Release workflow publishes as the release notes.
+        run: node scripts/cut-changelog.js "${{ steps.bump.outputs.VERSION }}"
 
       - name: Commit and tag
+        env:
+          VERSION: ${{ steps.bump.outputs.VERSION }}
         run: |
           git add package.json package-lock.json CHANGELOG.md
           git commit -m "release: v$VERSION"
-          git tag "v$VERSION"
+          git tag -a "v$VERSION" -m "v$VERSION"
 
       - name: Push changes and tag
         run: |

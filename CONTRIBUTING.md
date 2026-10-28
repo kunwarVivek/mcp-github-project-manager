@@ -192,16 +192,25 @@ configured on the package (`npm trust list mcp-github-project-manager`); if
 4. **Release** verifies the tag matches `package.json`, builds, typechecks,
    tests, publishes to npm and creates the GitHub release
 
-**Bump the version locally**
+**Release from your machine — one command for npm and GitHub**
 
 ```bash
-npm run release      # or: pnpm run release
+npm run release                  # asks: patch / minor / major / X.Y.Z
+npm run release -- minor --yes   # non-interactive
 ```
 
-Runs the tests, asks for `patch`/`minor`/`major`, bumps the version, builds,
-commits, tags and pushes. The pushed tag then triggers the same **Release**
-workflow — do **not** run `npm publish` yourself, the workflow does it (and
-skips publishing if that version is already on the registry).
+Write the release notes under `## [Unreleased]` in `CHANGELOG.md` first. The
+command checks that the tree is clean and `main` matches `origin/main`, that the
+version is free on npm and as a tag, and that `[Unreleased]` has content. It
+runs build, typecheck, lint and tests, bumps `package.json` +
+`package-lock.json`, turns `[Unreleased]` into the version section, commits,
+tags and pushes. It then **waits for the Release workflow** and verifies that
+the version is installable from npm and that the GitHub release exists; it
+exits non-zero, with the re-run command, if either is missing.
+
+Do **not** run `npm publish` yourself, and do not add a script named
+`publish`: npm runs a `publish` script automatically during `npm publish`,
+so it would fire inside the Release workflow.
 
 **Build only**
 
