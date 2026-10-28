@@ -6,7 +6,7 @@ This document outlines the development workflow for contributing to the GitHub P
 
 The development workflow follows these steps:
 
-1. **Issue Creation**: All work starts with an issue
+1. **Issue Creation**: All work starts with an issue in **beads** (`bd`)
 2. **Branch Creation**: Create a branch for your work
 3. **Development**: Make your changes
 4. **Testing**: Write and run tests
@@ -19,34 +19,50 @@ The development workflow follows these steps:
 
 ### Creating Issues
 
-Before starting work, ensure there's an issue that describes what you're working on:
+Working issues live in **beads** (`bd`), a local Dolt-backed tracker — not in
+GitHub Issues. See [docs/agents/issue-tracker.md](../agents/issue-tracker.md)
+for the full conventions, and
+[ADR-002](../adr/002-beads-as-working-tracker.md) for the rationale.
 
-1. Check if an issue already exists
-2. If not, create a new issue with:
-   - Clear title
-   - Detailed description
-   - Steps to reproduce (for bugs)
-   - Expected behavior
-   - Actual behavior (for bugs)
-   - Any relevant screenshots or logs
+Before starting work, ensure there is an issue describing what you are working
+on:
 
-### Issue Labels
+1. Check if one already exists — `bd search "<query>"` or `bd list --status=open`
+2. If not, create one:
+   ```bash
+   bd create --title="..." --description="..." --type=task --priority=2 \
+             [--parent=<epic-id>] [--labels=needs-triage]
+   ```
+3. Claim it before you start: `bd update <id> --claim`
+4. Close it when done: `bd close <id> --reason="..."`
 
-Issues are categorized with labels:
+Issue ids look like `mcp-github-project-manager-hb8.15` — always pass the full
+id. Priority is `0`–`4` or `P0`–`P4` (`0` = critical, `2` = medium,
+`4` = backlog); `high`/`medium`/`low` are rejected.
 
-- `bug`: Something isn't working as expected
-- `enhancement`: New feature or improvement
-- `documentation`: Documentation improvements
-- `good first issue`: Good for newcomers
-- `help wanted`: Extra attention is needed
-- `question`: Further information is requested
-- `wontfix`: This will not be worked on
+> GitHub Issues on this repository still holds externally reported bugs. That is
+> a *reporting* surface for users; beads is the *working* tracker. Do not mirror
+> between them automatically.
+
+### Triage Labels
+
+Triage state is carried on labels:
+
+| Label | Meaning |
+|-------|---------|
+| `needs-triage` | Maintainer needs to evaluate this issue |
+| `needs-info` | Waiting on the reporter for more information |
+| `ready-for-agent` | Fully specified, ready for an AFK agent |
+| `ready-for-human` | Requires human implementation |
+| `wontfix` | Will not be actioned |
+
+Set them at creation with `--labels`, or later with `bd update <id> --add-label=...`.
 
 ### Issue Assignment
 
-- Comment on an issue if you want to work on it
-- Wait for a maintainer to assign it to you
-- Don't start work on an issue that's assigned to someone else
+- Claim an issue before working on it (`bd update <id> --claim`)
+- Don't start work on an issue that is already claimed
+- `bd ready` lists issues with no unresolved blockers — that is the frontier
 
 ## Branch Workflow
 
@@ -98,9 +114,16 @@ git push origin feature/123-add-sprint-metrics --force
 1. Make your changes following the [coding standards](./index.md#coding-standards)
 2. Run the server locally to test your changes:
    ```bash
-   pnpm run dev
+   npm run dev
    ```
 3. Use the examples in the `examples/` directory to test your changes
+4. Run the full quality gate before opening a PR:
+   ```bash
+   npm run build
+   npm run typecheck
+   npm run lint
+   npm test
+   ```
 
 ### Committing Changes
 
@@ -174,41 +197,49 @@ Once your pull request is approved:
 
 ### Running Tests
 
+The test runner is **Vitest 5** (there is no Jest in this project). Every
+script works with both `npm` and `pnpm`.
+
 ```bash
 # Run all tests
-pnpm test
+npm test
 
 # Run tests in watch mode
-pnpm run test:watch
+npm run test:watch
 
 # Run tests with coverage
-pnpm run test:coverage
+npm run test:coverage
 
 # Run E2E tests
-pnpm run test:e2e
+npm run test:e2e
 ```
 
 ### Writing Tests
 
-1. Create test files in the `__tests__` directory
-2. Name test files with `.test.ts` suffix
-3. Use Jest's describe/it syntax
-4. Mock external dependencies
-5. Test both success and error cases
+1. Create test files under `src/__tests__/` with a `.test.ts` suffix
+2. Use Vitest's `describe`/`it` syntax
+3. Mock external dependencies
+4. Test both success and error cases
+
+Two mocking traps bite regularly:
+
+- A mock that the code under test calls with `new` must be a `function`, not an
+  arrow — `mockImplementation(() => ({}))` fails with "is not a constructor".
+- A `beforeEach(() => x.mockReset())` with an *implicit* return hands the mock
+  back to Vitest, which treats a returned function as a teardown callback and
+  calls it. Always use a block body.
 
 Example:
 
 ```typescript
-import { ProjectManagementService } from '../services/ProjectManagementService';
-import { MockGitHubRepository } from './mocks/MockGitHubRepository';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { ProjectManagementService } from '../../services/ProjectManagementService';
 
 describe('ProjectManagementService', () => {
   let service: ProjectManagementService;
-  let mockRepo: MockGitHubRepository;
 
   beforeEach(() => {
-    mockRepo = new MockGitHubRepository();
-    service = new ProjectManagementService('owner', 'repo', 'token', mockRepo);
+    service = new ProjectManagementService(/* ... */);
   });
 
   describe('createProject', () => {
@@ -225,34 +256,75 @@ describe('ProjectManagementService', () => {
 
 ## Release Process
 
-Releases are managed by the maintainers:
+Releases are managed by the maintainers through GitHub Actions — nothing
+publishes to npm outside CI.
 
-1. Maintainers create a release branch
-2. Version is bumped according to [Semantic Versioning](https://semver.org/)
-3. Changelog is updated
-4. Release notes are created
-5. Release is published
+1. **Bump Version** workflow bumps `package.json` + `package-lock.json`, moves
+   the `[Unreleased]` CHANGELOG body into the new version section, commits,
+   tags `vX.Y.Z` and pushes.
+2. Pushing the tag triggers the **Release** workflow, which verifies the tag
+   matches `package.json`, builds, typechecks, tests, publishes to npm (with
+   provenance) and creates the GitHub release.
+
+To bump locally instead:
+
+```bash
+npm run release      # or: pnpm run release
+```
+
+Do **not** run `npm publish` yourself — the workflow does it, and skips
+publishing if that version is already on the registry.
 
 ## Continuous Integration
 
-The project uses GitHub Actions for CI:
+The project uses GitHub Actions for CI (`.github/workflows/ci.yml`):
 
-- **Build**: Ensures the project builds successfully
-- **Lint**: Checks code style and quality
-- **Test**: Runs unit and integration tests
-- **E2E**: Runs end-to-end tests
-- **Coverage**: Reports test coverage
+- **Build** — ensures the project builds successfully
+- **Typecheck** — type-checks src + examples, then src + tests
+- **Test** — runs the Vitest suite
+- **Lint** — runs Biome
+
+The build/typecheck/test job runs on a matrix of **Node 22.x and 24.x** under
+**both npm and pnpm**. The lint job runs once on Node 24 with pnpm.
 
 All CI checks must pass before a pull request can be merged.
+
+## Code Traversal and Audits — GitNexus
+
+The repository is indexed by **GitNexus**, which gives a call-graph view of the
+code for questions grep cannot answer.
+
+```bash
+# Refresh the index
+node .gitnexus/run.cjs analyze --index-only
+```
+
+Skills live under `.agents/skills/gitnexus-*/SKILL.md`:
+
+| Skill | Use it for |
+|---|---|
+| `gitnexus-exploring` | "How does X work?" — architecture and execution flow |
+| `gitnexus-impact-analysis` | "What breaks if I change X?" — blast radius before editing |
+| `gitnexus-debugging` | "Why is X failing?" — trace an error to its source |
+| `gitnexus-refactoring` | rename, extract, split, move — safely |
+| `gitnexus-guide` | the tool and graph schema reference |
+| `gitnexus-cli` | index / status / wiki commands |
+
+Two rules matter before you commit:
+
+1. **Run impact analysis before editing a symbol.** An empty caller set is
+   *not* proof a symbol is unused — confirm with a text search before deleting
+   or renaming anything.
+2. **Analyse graph changes before committing.** A zero result with
+   `partial: true` or `truncated: true` means "not seen", not "unaffected".
 
 ## Development Tools
 
 ### Recommended VS Code Extensions
 
-- ESLint
-- Prettier
+- Biome (`biomejs.biome`)
+- Vitest (`ZixuanChen.vitest-explorer`)
 - TypeScript Hero
-- Jest Runner
 - GitLens
 
 ### VS Code Settings
@@ -261,11 +333,12 @@ All CI checks must pass before a pull request can be merged.
 {
   "editor.formatOnSave": true,
   "editor.codeActionsOnSave": {
-    "source.fixAll.eslint": true
+    "source.fixAll.biome": "explicit"
   },
   "typescript.preferences.importModuleSpecifier": "relative",
   "typescript.updateImportsOnFileMove.enabled": "always",
-  "jest.autoRun": "off"
+  "vitest.commandLine": "npm",
+  "vitest.enable": true
 }
 ```
 
@@ -279,15 +352,15 @@ All CI checks must pass before a pull request can be merged.
 Error: Cannot find module './build/index.js'
 ```
 
-Solution: Run `pnpm run build` to compile the TypeScript code.
+Solution: Run `npm run build` to compile the TypeScript code.
 
 #### Test Failures
 
 ```
-Error: Cannot find module '@modelcontextprotocol/sdk'
+Error: Cannot find module '@modelcontextprotocol/server'
 ```
 
-Solution: Run `pnpm install` to ensure all dependencies are installed.
+Solution: Run `npm install` to ensure all dependencies are installed.
 
 #### TypeScript Errors
 
@@ -296,6 +369,15 @@ Error: Property 'X' does not exist on type 'Y'
 ```
 
 Solution: Check the type definitions and ensure you're using the correct properties.
+
+#### Vitest Rejects a Flag
+
+```
+CACError: Unknown option '--testPathPattern'
+```
+
+Solution: Vitest does not accept Jest-only flags. Filter with a positional
+pattern (`npm test -- unit`) and exclude with `--exclude='**/tests/x/**'`.
 
 ## Getting Help
 

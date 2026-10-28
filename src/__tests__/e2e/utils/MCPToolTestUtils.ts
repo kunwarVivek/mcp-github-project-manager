@@ -3,6 +3,18 @@ import { existsSync } from "node:fs";
 import { join } from "node:path";
 
 /**
+ * The subset of an issue the e2e suites assert on when reading an issue back
+ * through the MCP surface (`manage_issues` / `get`).
+ */
+export interface McpIssueState {
+  id: string;
+  number: number;
+  title: string;
+  /** Resource status: "active" for an open issue, "closed" for a closed one. */
+  status: string;
+}
+
+/**
  * Utility class for testing MCP tools through the actual MCP interface
  */
 export class MCPToolTestUtils {
@@ -223,6 +235,57 @@ export class MCPToolTestUtils {
   }
 
   /**
+   * Read the Project V2 field values of the item that holds a given issue,
+   * keyed by field name.
+   *
+   * `manage_project` / `filter_items` is the only MCP route that returns
+   * field values by NAME: `manage_project` / `list_fields` goes through
+   * `GitHubProjectRepository.findById`, which returns `fields: []`, so the
+   * field ids needed to read a value are not reachable that way.
+   *
+   * @param projectId Project node id.
+   * @param contentId Node id of the issue held by the project item.
+   * @returns Field values keyed by field name, or `null` when the issue is
+   *          not an item of the project.
+   */
+  async getProjectItemFieldValues(
+    projectId: string,
+    contentId: string
+  ): Promise<Record<string, unknown> | null> {
+    const result = await this.callTool("manage_project", {
+      action: "filter_items",
+      projectId,
+      filter: {},
+    });
+
+    // The compound surface answers with the action's payload; the granular
+    // executor envelope is unwrapped if it is still there.
+    const payload = (result?.structuredContent ?? result) as {
+      items?: Array<{ contentId?: string; fieldValues?: Record<string, unknown> }>;
+    };
+    const items = payload?.items ?? [];
+    const item = items.find((i) => i.contentId === contentId);
+    return item ? (item.fieldValues ?? {}) : null;
+  }
+
+  /**
+   * Fetch a single issue by node id (or by issue number).
+   */
+  async getIssue(issueId: string | number): Promise<McpIssueState | null> {
+    return this.callTool("manage_issues", { action: "get", issueId: String(issueId) });
+  }
+
+  /**
+   * List the comments of an issue, oldest first.
+   */
+  async listIssueComments(
+    issueNumber: number
+  ): Promise<Array<{ id: number; body: string; user: string; createdAt: string }>> {
+    const comments = await this.callTool("manage_issues", { action: "list_comments", issueNumber });
+    return Array.isArray(comments) ? comments : [];
+  }
+
+  /**
    * Extract domain data from MCP v2 tool response
    */
   static extractData(result: any): any {
@@ -366,14 +429,18 @@ export class MCPToolTestUtils {
   }
 
   /**
-   * Create a test suite wrapper that handles server lifecycle
+   * Create a test suite wrapper that handles server lifecycle.
    *
-   * Tests are always registered but will skip gracefully when credentials
-   * are missing. Individual tests should check `if (!utils)` and return early.
+   * The suite is registered with `describe.skipIf`, so a run without real
+   * credentials is reported as SKIPPED by Vitest instead of PASSED. The old
+   * shape (register the tests, then return early inside each `it`) made a
+   * suite that did nothing at all look green in the CI log.
+   *
+   * The individual `if (!utils)` guards stay as a second line of defence.
    */
   static createTestSuite(suiteName: string, testType: "github" | "ai" | "both" = "github") {
     return (tests: (utils: MCPToolTestUtils | undefined) => void) => {
-      describe(suiteName, () => {
+      describe.skipIf(MCPToolTestUtils.shouldSkipTest(testType))(suiteName, () => {
         let utils: MCPToolTestUtils | undefined;
 
         beforeAll(async () => {

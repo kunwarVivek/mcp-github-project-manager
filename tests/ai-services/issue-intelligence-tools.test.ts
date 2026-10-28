@@ -16,7 +16,6 @@ import {
   executeFindRelatedIssues,
   executeSuggestLabels,
   findRelatedIssuesTool,
-  issueIntelligenceExecutors,
   issueIntelligenceTools,
   suggestLabelsTool,
 } from "../../src/infrastructure/tools/issue-intelligence-tools";
@@ -195,22 +194,6 @@ describe("Issue Intelligence MCP Tools", () => {
         expect(names).toContain("suggest_labels");
         expect(names).toContain("detect_duplicates");
         expect(names).toContain("find_related_issues");
-      });
-    });
-
-    describe("issueIntelligenceExecutors", () => {
-      it("should have executor for each tool", () => {
-        expect(issueIntelligenceExecutors).toHaveProperty("enrich_issue_sections");
-        expect(issueIntelligenceExecutors).toHaveProperty("suggest_labels");
-        expect(issueIntelligenceExecutors).toHaveProperty("detect_duplicates");
-        expect(issueIntelligenceExecutors).toHaveProperty("find_related_issues");
-      });
-
-      it("should have functions as executors", () => {
-        expect(typeof issueIntelligenceExecutors.enrich_issue_sections).toBe("function");
-        expect(typeof issueIntelligenceExecutors.suggest_labels).toBe("function");
-        expect(typeof issueIntelligenceExecutors.detect_duplicates).toBe("function");
-        expect(typeof issueIntelligenceExecutors.find_related_issues).toBe("function");
       });
     });
   });

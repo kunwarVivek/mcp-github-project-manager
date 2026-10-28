@@ -2,6 +2,10 @@
 
 This document provides comprehensive documentation for the AI-powered task management and requirements traceability features in the GitHub Project Manager MCP Server.
 
+The AI features are exposed through **three compound tools** — `ai_generate`
+(9 actions), `ai_analyze` (9 actions) and `ai_plan` (6 actions). This page uses
+the `tool/action` notation, e.g. `ai_generate/generate_prd`.
+
 ## Overview
 
 The AI features transform traditional project management by providing intelligent task generation, comprehensive requirements traceability, and AI-powered analysis throughout the project lifecycle.
@@ -17,13 +21,13 @@ The AI features transform traditional project management by providing intelligen
 
 ## AI Tools Overview
 
-### 1. PRD Management Tools
+### 1. PRD Management Tools (`ai_generate`)
 
-#### `generate_prd`
+#### `ai_generate/generate_prd`
 Generates comprehensive Product Requirements Documents from project ideas using AI analysis.
 
 **Features:**
-- Multi-provider AI support (Anthropic, OpenAI, Google, Perplexity)
+- Multi-provider AI support (Anthropic, OpenAI, Google, Perplexity, and any OpenAI-compatible endpoint)
 - Comprehensive PRD structure with all standard sections
 - Quality assessment and completeness scoring
 - Market research integration (optional)
@@ -50,7 +54,7 @@ Generates comprehensive Product Requirements Documents from project ideas using 
 - Quality assessment with completeness score
 - Recommendations for improvement
 
-#### `enhance_prd`
+#### `ai_generate/enhance_prd`
 Improves existing PRDs with AI-powered gap analysis and enhancements.
 
 **Enhancement Types:**
@@ -59,7 +63,7 @@ Improves existing PRDs with AI-powered gap analysis and enhancements.
 - `user_focused`: Enhance user personas and journey mapping
 - `business_focused`: Improve business analysis and ROI
 
-#### `parse_prd`
+#### `ai_generate/parse_prd`
 Parses PRDs and generates actionable development tasks with full traceability.
 
 **Features:**
@@ -69,9 +73,13 @@ Parses PRDs and generates actionable development tasks with full traceability.
 - Complete requirements traceability matrix creation
 - Use case generation from features
 
-### 2. Task Management Tools
+#### `ai_generate/materialize_tasks`
+Materializes AI-generated tasks into real GitHub issues, grouped into
+milestones and sprints and sequenced by the dependency graph.
 
-#### `get_next_task`
+### 2. Task Management Tools (`ai_generate`)
+
+#### `ai_generate/get_next_task`
 Provides AI-powered recommendations for the next task to work on.
 
 **Features:**
@@ -81,7 +89,7 @@ Provides AI-powered recommendations for the next task to work on.
 - Dependency analysis
 - Blocker identification
 
-#### `analyze_task_complexity`
+#### `ai_generate/analyze_complexity`
 Performs detailed AI analysis of task complexity and risk assessment.
 
 **Analysis Includes:**
@@ -91,7 +99,7 @@ Performs detailed AI analysis of task complexity and risk assessment.
 - Team experience considerations
 - Confidence scoring
 
-#### `expand_task`
+#### `ai_generate/expand_task`
 Breaks down complex tasks into manageable subtasks automatically.
 
 **Features:**
@@ -100,9 +108,9 @@ Breaks down complex tasks into manageable subtasks automatically.
 - Acceptance criteria creation
 - Implementation order recommendations
 
-### 3. Feature Lifecycle Management
+### 3. Feature Lifecycle Management (`ai_generate`)
 
-#### `add_feature`
+#### `ai_generate/add_feature`
 Adds new features with complete lifecycle management and impact analysis.
 
 **Features:**
@@ -112,9 +120,33 @@ Adds new features with complete lifecycle management and impact analysis.
 - Complete lifecycle tracking setup
 - Roadmap integration
 
-### 4. Requirements Traceability
+### 4. Analysis Tools (`ai_analyze`)
 
-#### `create_traceability_matrix`
+| Action | Purpose |
+|--------|---------|
+| `ai_analyze/enrich_issue` | AI-enrich a single issue (labels, priority, type, complexity, effort) |
+| `ai_analyze/enrich_issue_sections` | Enrich an issue into structured sections with per-section confidence |
+| `ai_analyze/enrich_bulk` | Bulk enrich multiple issues |
+| `ai_analyze/triage_issue` | AI triage a single issue |
+| `ai_analyze/triage_all` | Triage all untriaged issues |
+| `ai_analyze/suggest_labels` | Suggest labels for an issue |
+| `ai_analyze/detect_duplicates` | Detect duplicate issues |
+| `ai_analyze/find_related` | Find related issues |
+
+### 5. Planning Tools (`ai_plan`)
+
+| Action | Purpose |
+|--------|---------|
+| `ai_plan/calculate_capacity` | Calculate sprint capacity |
+| `ai_plan/prioritize_backlog` | AI-prioritize the backlog |
+| `ai_plan/assess_risk` | Assess sprint risk |
+| `ai_plan/suggest_composition` | Suggest sprint composition |
+| `ai_plan/generate_roadmap` | Generate a project roadmap |
+| `ai_plan/generate_visualization` | Generate visualization data |
+
+### 6. Requirements Traceability (`ai_generate`)
+
+#### `ai_generate/create_traceability_matrix`
 Creates comprehensive requirements traceability matrix with full bidirectional tracking.
 
 **Traceability Hierarchy:**
@@ -175,12 +207,25 @@ PERPLEXITY_API_KEY=your_perplexity_api_key_here
 ```
 
 #### Optional AI Model Configuration
+There are **no default models** — configure the ones you want to use. A role
+with an API key but no model is left unconfigured and the server warns instead
+of silently picking one.
+
 ```bash
-# AI Model Configuration (uses defaults if not specified)
-AI_MAIN_MODEL=claude-3-5-sonnet-20241022
-AI_RESEARCH_MODEL=perplexity-llama-3.1-sonar-large-128k-online
-AI_FALLBACK_MODEL=gpt-4o
-AI_PRD_MODEL=claude-3-5-sonnet-20241022
+# AI Model Configuration (no defaults)
+# AI_MAIN_MODEL=claude-sonnet-4-20250514
+# AI_RESEARCH_MODEL=sonar-pro
+# AI_FALLBACK_MODEL=gpt-4o-mini
+# AI_PRD_MODEL=claude-opus-5
+```
+
+Each role can also override its provider, key and endpoint independently:
+
+```bash
+# AI_MAIN_PROVIDER=openai-compatible
+# AI_MAIN_BASE_URL=https://openrouter.ai/api/v1
+# AI_MAIN_API_KEY=sk-or-v1-...
+# AI_MAIN_MODEL=deepseek/deepseek-chat
 ```
 
 #### Optional Task Generation Configuration
@@ -219,9 +264,10 @@ AUTO_EFFORT_ESTIMATION=true
 
 ### Complete Project Workflow
 
-```bash
-# 1. Generate PRD from project idea
-generate_prd({
+```json
+// 1. Generate PRD from project idea
+{"tool": "ai_generate", "arguments": {
+  "action": "generate_prd",
   "projectIdea": "AI-powered task management system with real-time collaboration and advanced analytics",
   "projectName": "TaskAI Pro",
   "author": "product-team",
@@ -231,82 +277,78 @@ generate_prd({
   "stakeholders": ["engineering", "product", "design", "sales"],
   "includeResearch": true,
   "industryContext": "productivity software"
-})
+}}
 
-# 2. Parse PRD and generate tasks with full traceability
-parse_prd({
+// 2. Parse PRD and generate tasks with full traceability
+{"tool": "ai_generate", "arguments": {
+  "action": "parse_prd",
   "prdContent": "<generated PRD content>",
   "maxTasks": 35,
-  "includeSubtasks": true,
-  "autoEstimate": true,
-  "autoPrioritize": true,
-  "autoDetectDependencies": true,
   "createTraceabilityMatrix": true,
   "includeUseCases": true,
   "projectId": "task-ai-pro"
-})
+}}
 
-# 3. Get next task recommendations
-get_next_task({
+// 3. Get next task recommendations
+{"tool": "ai_generate", "arguments": {
+  "action": "get_next_task",
   "sprintCapacity": 40,
   "teamSkills": ["react", "node.js", "typescript", "python"],
   "maxComplexity": 7,
-  "includeAnalysis": true,
-  "excludeBlocked": true
-})
+  "includeAnalysis": true
+}}
 
-# 4. Analyze complex tasks before starting
-analyze_task_complexity({
+// 4. Analyze complex tasks before starting
+{"tool": "ai_generate", "arguments": {
+  "action": "analyze_complexity",
   "taskTitle": "Implement real-time collaboration engine",
   "taskDescription": "Build WebSocket-based real-time collaboration with conflict resolution, presence indicators, and collaborative editing",
-  "currentEstimate": 24,
   "teamExperience": "mixed",
   "includeBreakdown": true,
-  "includeRisks": true,
-  "includeRecommendations": true
-})
+  "includeRisks": true
+}}
 
-# 5. Break down complex tasks if needed
-expand_task({
+// 5. Break down complex tasks if needed
+{"tool": "ai_generate", "arguments": {
+  "action": "expand_task",
   "taskTitle": "Build advanced analytics dashboard",
   "taskDescription": "Create comprehensive analytics dashboard with custom charts, real-time data, and AI-powered insights",
   "currentComplexity": 8,
-  "maxSubtasks": 6,
   "targetComplexity": 3,
   "includeEstimates": true,
-  "includeDependencies": true,
-  "includeAcceptanceCriteria": true
-})
+  "includeDependencies": true
+}}
 ```
 
 ### Feature Addition Workflow
 
-```bash
-# Add new feature with complete lifecycle management
-add_feature({
+```json
+// Add new feature with complete lifecycle management
+{"tool": "ai_generate", "arguments": {
+  "action": "add_feature",
   "featureIdea": "Advanced Analytics Dashboard with AI Insights",
   "description": "Real-time analytics dashboard with custom charts, predictive analytics, and AI-powered recommendations for project optimization",
   "requestedBy": "product-manager",
   "businessJustification": "Increase user engagement by 40% and provide actionable insights for better project outcomes",
   "targetUsers": ["project-managers", "team-leads", "executives"],
   "autoApprove": true,
-  "expandToTasks": true,
-  "createLifecycle": true
-})
+  "expandToTasks": true
+}}
 
-# This automatically creates:
-# ✅ Business requirement analysis and impact assessment
-# ✅ Use cases with complete actor-goal-scenario structure
-# ✅ 8-12 implementation tasks with full traceability links
-# ✅ Lifecycle tracking for all generated tasks
-# ✅ Integration with existing project roadmap
+// This automatically creates:
+// ✅ Business requirement analysis and impact assessment
+// ✅ Use cases with complete actor-goal-scenario structure
+// ✅ 8-12 implementation tasks with full traceability links
+// ✅ Lifecycle tracking for all generated tasks
+// ✅ Integration with existing project roadmap
 ```
 
 ### Requirements Traceability Management
 
-```bash
-# Create comprehensive traceability matrix
-create_traceability_matrix({
+```json
+// Create comprehensive traceability matrix
+{"tool": "ai_generate", "arguments": {
+  "action": "create_traceability_matrix",
   "projectId": "task-ai-pro",
   "prdContent": "<comprehensive PRD content>",
   "features": [
@@ -337,19 +379,16 @@ create_traceability_matrix({
       "priority": "critical"
     }
   ],
-  "includeUseCases": true,
-  "includeTraceabilityLinks": true,
-  "includeCoverageAnalysis": true,
   "validateCompleteness": true
-})
+}}
 
-# Output provides:
-# ✅ Complete requirements hierarchy (Business → Features → Use Cases → Tasks)
-# ✅ Bidirectional traceability links with impact analysis
-# ✅ Coverage metrics and gap identification
-# ✅ Sample traceability paths showing end-to-end connections
-# ✅ Validation results with completeness scoring
-# ✅ Orphaned task detection and unimplemented requirement tracking
+// Output provides:
+// ✅ Complete requirements hierarchy (Business → Features → Use Cases → Tasks)
+// ✅ Bidirectional traceability links with impact analysis
+// ✅ Coverage metrics and gap identification
+// ✅ Sample traceability paths showing end-to-end connections
+// ✅ Validation results with completeness scoring
+// ✅ Orphaned task detection and unimplemented requirement tracking
 ```
 
 ## Best Practices
@@ -421,7 +460,6 @@ Warning: 15 orphaned tasks detected
 
 Enable debug logging by setting:
 ```bash
-DEBUG=ai-services:*
 LOG_LEVEL=debug
 ```
 
@@ -437,19 +475,20 @@ For issues related to AI features:
 
 1. Check the [troubleshooting section](#troubleshooting)
 2. Review AI provider status and API key configuration
-3. Validate input parameters against tool schemas
+3. Validate input parameters against the tool schemas (`discover_tools` returns them)
 4. Check debug logs for detailed error information
 5. Open an issue with detailed reproduction steps
 
 ## Changelog
 
-### Version 2.0.0 (Current)
-- Added comprehensive AI task management suite
-- Implemented end-to-end requirements traceability
-- Added multi-provider AI support with automatic fallback
-- Created professional use case management
-- Added intelligent task complexity analysis
-- Implemented feature lifecycle management
+### Version 2.x (current)
+- The AI features are exposed through the compound tools `ai_generate`,
+  `ai_analyze` and `ai_plan`
+- Multi-provider AI support with automatic fallback and per-role provider,
+  key and endpoint overrides
+- End-to-end requirements traceability
+- Intelligent task complexity analysis
+- Feature lifecycle management
 
 ### Version 1.x
 - Core GitHub project management functionality

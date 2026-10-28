@@ -2,9 +2,16 @@
 
 This document provides comprehensive testing guidance for the AI-powered task management and requirements traceability features.
 
+The test runner is **Vitest 5**. There is no Jest in this project — see
+[TESTING.md](TESTING.md) for the full suite layout and
+[ADR-004](adr/004-biome-replacing-eslint.md) for the toolchain migration.
+
 ## Test Structure
 
 ### Test Organization
+
+AI service and tool tests live in the legacy root `tests/` tree (still in the
+Vitest include list) alongside newer suites under `src/__tests__/`:
 
 ```
 tests/
@@ -16,39 +23,46 @@ tests/
 ├── ai-tools/                      # MCP tool tests
 │   ├── GeneratePRDTool.test.ts
 │   ├── ParsePRDTool.test.ts
-│   ├── CreateTraceabilityMatrixTool.test.ts
 │   └── [other AI tool tests]
-└── integration/                   # End-to-end tests
-    └── ai-workflow.test.ts
+├── services/ai/                   # AI-backed service tests
+└── infrastructure/                # Resilience, cache, observability tests
+
+src/__tests__/
+├── unit/services/ai/              # Provider resolution, usage metering, key plumbing
+├── services/                      # Task generation, context generation
+└── e2e/tools/ai-task-tools.e2e.ts # Tool-level E2E
 ```
 
 ## Running Tests
 
+All scripts work with both `npm` and `pnpm`.
+
 ### All Tests
 ```bash
-pnpm test
+npm test
 ```
 
 ### AI-Specific Tests
 ```bash
-# Run only AI-related tests
-pnpm run test:ai
+# Run only AI-related tests (vitest run ai-services ai-tools)
+npm run test:ai
 
 # Watch mode for AI tests
-pnpm run test:ai:watch
+npm run test:ai:watch
 
 # Coverage for AI tests
-pnpm run test:ai:coverage
+npm run test:ai:coverage
 ```
 
 ### Core Tests (excluding AI)
 ```bash
-pnpm run test:core
+npm run test:core
 ```
 
 ### Integration Tests
+Vitest filters by positional path pattern:
 ```bash
-pnpm run test:integration
+npm test -- integration
 ```
 
 ## Test Categories
@@ -232,9 +246,14 @@ vi.mocked(PRDGenerationService).mockImplementation(() => ({
 ## Coverage Requirements
 
 ### Minimum Coverage Targets
-- **AI Services**: 85% line coverage
-- **AI Tools**: 80% line coverage
-- **Integration Tests**: 70% path coverage
+Thresholds are enforced by `vitest.config.ts` (v8 provider over `src/**`):
+
+- **lines:** 55
+- **functions:** 57
+- **branches:** 45
+- **statements:** 54
+
+Run `npm run test:coverage` to see where the suite currently stands.
 
 ### Critical Paths
 - AI provider selection and fallback
@@ -258,10 +277,10 @@ vi.mocked(PRDGenerationService).mockImplementation(() => ({
 ### Debug Configuration
 ```bash
 # Enable debug logging for tests
-DEBUG=ai-services:*,test:* pnpm run test:ai
+DEBUG=ai-services:*,test:* npm run test:ai
 
 # Run specific test with verbose output
-pnpm run test:ai -- --testNamePattern="PRD generation"
+npm run test:ai -- --testNamePattern="PRD generation"
 ```
 
 ### Common Issues
@@ -290,7 +309,7 @@ Error: JavaScript heap out of memory
 ```yaml
 - name: Run AI Tests
   run: |
-    pnpm run test:ai:coverage
+    npm run test:ai:coverage
   env:
     # Mock API keys for testing
     ANTHROPIC_API_KEY: test-key
@@ -298,16 +317,15 @@ Error: JavaScript heap out of memory
 ```
 
 ### Test Reporting
-- Coverage reports generated in `coverage/` directory
-- Test results exported in JUnit format
+- Coverage reports are generated in the `coverage/` directory
 - Performance metrics tracked over time
 
 ## Manual Testing
 
 ### AI Tool Validation
 1. **Start MCP Server**: `npm start`
-2. **List Tools**: Verify all 8 AI tools are available
-3. **Test Tool Execution**: Run sample commands
+2. **List Tools**: Verify the AI compound tools (`ai_generate`, `ai_analyze`, `ai_plan`) are present
+3. **Test Tool Execution**: Run sample calls
 4. **Validate Output**: Check response format and content
 
 ### Integration Testing
@@ -352,5 +370,5 @@ Error: JavaScript heap out of memory
 ### Debug Tools
 - Use `console.log` for debugging test data
 - Enable debug logging for specific modules
-- Use Jest's `--verbose` flag for detailed output
+- Use Vitest's `--reporter=verbose` flag for detailed output
 - Use `--detectOpenHandles` to find resource leaks

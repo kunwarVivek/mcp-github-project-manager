@@ -1,8 +1,13 @@
 # Enhanced Field Value Support
 
+> **Scope note.** Field values are written and read through the
+> `manage_project` compound tool (actions `set_field_value`, `get_field_value`,
+> `clear_field_value`) — see [TOOLS.md](../TOOLS.md). This page documents the
+> field-type behaviour behind those actions.
+
 ## Overview
 
-The MCP GitHub Project Manager now supports **100% coverage** of GitHub Project v2 field types for field value operations. This enhancement addresses the critical gap identified in the compliance review and brings complete field type support to the `setFieldValue` and `getFieldValue` methods.
+The MCP GitHub Project Manager supports **100% coverage** of GitHub Project v2 field types for field value operations. This enhancement addresses the critical gap identified in the compliance review and brings complete field type support to the `setFieldValue` and `getFieldValue` methods.
 
 ## Supported Field Types
 

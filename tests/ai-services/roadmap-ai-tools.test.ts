@@ -11,7 +11,6 @@ import {
   executeGenerateRoadmapVisualization,
   generateRoadmapTool,
   generateRoadmapVisualizationTool,
-  roadmapAIExecutors,
   roadmapAITools,
 } from "../../src/infrastructure/tools/roadmap-ai-tools";
 import {
@@ -107,18 +106,6 @@ describe("Roadmap AI MCP Tools", () => {
         const names = roadmapAITools.map((t) => t.name);
         expect(names).toContain("generate_roadmap_requirements");
         expect(names).toContain("generate_roadmap_visualization");
-      });
-    });
-
-    describe("roadmapAIExecutors", () => {
-      it("should have executor for each tool", () => {
-        expect(roadmapAIExecutors).toHaveProperty("generate_roadmap_requirements");
-        expect(roadmapAIExecutors).toHaveProperty("generate_roadmap_visualization");
-      });
-
-      it("should have functions as executors", () => {
-        expect(typeof roadmapAIExecutors.generate_roadmap_requirements).toBe("function");
-        expect(typeof roadmapAIExecutors.generate_roadmap_visualization).toBe("function");
       });
     });
   });

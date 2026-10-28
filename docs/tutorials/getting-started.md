@@ -1,17 +1,22 @@
 # Getting Started with GitHub Project Manager MCP
 
-This tutorial will guide you through the process of setting up and using the GitHub Project Manager MCP Server for basic project management tasks.
+This tutorial walks through installing the server, pointing it at a repository,
+and driving the first project-management operations.
 
 ## Prerequisites
 
 Before you begin, make sure you have:
 
 - Node.js 22.12+ (24 recommended)
+- npm or pnpm
 - A GitHub account with appropriate permissions
 - A GitHub Personal Access Token with required scopes:
   - `repo` (Full repository access)
   - `project` (Project access)
   - `write:org` (Organization access)
+
+> A working `gh` CLI login is enough on its own — the server falls back to
+> `gh auth token` when no token is configured.
 
 ## Step 1: Installation and Setup
 
@@ -24,7 +29,7 @@ npm install -g mcp-github-project-manager
 # Or clone the repository for development
 git clone https://github.com/kunwarVivek/mcp-github-project-manager.git
 cd mcp-github-project-manager
-pnpm install
+npm install        # or: pnpm install
 
 # Create environment configuration
 cp .env.example .env
@@ -44,202 +49,129 @@ Build and start the MCP server:
 
 ```bash
 # Build the project
-pnpm run build
+npm run build      # or: pnpm run build
 
 # Start the server
 npm start
 ```
 
-You should see output indicating that the server is running:
+The server speaks MCP over stdio. It writes diagnostics to **stderr** and
+nothing to stdout — stdout carries the JSON-RPC stream and any stray write
+there corrupts the session. So a silent start is expected; connect an MCP
+client to confirm it is alive.
 
-```
-GitHub Project Manager MCP server running on stdio
-```
-
-## Step 3: Create Your First Project
-
-Let's create a simple project with one milestone. Create a file named `create-project.js`:
-
-```javascript
-const { ProjectManagementService } = require('./build/services/ProjectManagementService');
-require('dotenv').config();
-
-async function createProject() {
-  // Initialize the service with your GitHub credentials
-  const service = new ProjectManagementService(
-    process.env.GITHUB_OWNER,
-    process.env.GITHUB_REPO,
-    process.env.GITHUB_TOKEN
-  );
-
-  try {
-    // Create a project with one milestone
-    const result = await service.createRoadmap({
-      project: {
-        title: "My First Project",
-        description: "A test project created with the MCP API",
-        visibility: "private"
-      },
-      milestones: [
-        {
-          milestone: {
-            title: "Phase 1",
-            description: "Initial phase of the project",
-            dueDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString() // 14 days from now
-          },
-          issues: [
-            {
-              title: "Setup project repository",
-              description: "Create and configure the initial project repository",
-              priority: "high",
-              type: "feature"
-            }
-          ]
-        }
-      ]
-    });
-
-    console.log('Project created successfully!');
-    console.log('Project ID:', result.project.id);
-    console.log('Project Title:', result.project.title);
-    console.log('Milestone:', result.milestones[0].title);
-    console.log('Issue:', result.milestones[0].issues[0].title);
-    
-    return result;
-  } catch (error) {
-    process.stderr.write('Error creating project:', error);
-  }
-}
-
-createProject();
-```
-
-Run the script:
+To inspect the server interactively:
 
 ```bash
-node create-project.js
+npm run inspect
 ```
 
-You should see output confirming that your project was created successfully.
+## Step 3: Register the Server with an MCP Client
 
-## Step 4: Plan a Sprint
+Add the server to your MCP client. For Claude Desktop
+(`~/Library/Application Support/Claude/claude_desktop_config.json`):
 
-Now, let's plan a sprint with our issues. Create a file named `plan-sprint.js`:
-
-```javascript
-const { ProjectManagementService } = require('./build/services/ProjectManagementService');
-require('dotenv').config();
-
-async function planSprint() {
-  // Initialize the service with your GitHub credentials
-  const service = new ProjectManagementService(
-    process.env.GITHUB_OWNER,
-    process.env.GITHUB_REPO,
-    process.env.GITHUB_TOKEN
-  );
-
-  try {
-    // Get the issue ID from the previous step
-    // For this example, we'll assume it's 1, but you should replace this with your actual issue ID
-    const issueId = 1;
-
-    // Plan a sprint with the issue
-    const sprint = await service.planSprint({
-      sprint: {
-        title: "Sprint 1",
-        startDate: new Date().toISOString(),
-        endDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), // 7 days from now
-        goals: [
-          "Complete initial project setup",
-          "Establish development workflow"
-        ]
-      },
-      issueIds: [issueId]
-    });
-
-    console.log('Sprint planned successfully!');
-    console.log('Sprint ID:', sprint.id);
-    console.log('Sprint Title:', sprint.title);
-    console.log('Sprint Goals:', sprint.goals);
-    console.log('Issues:', sprint.issues);
-    
-    return sprint;
-  } catch (error) {
-    process.stderr.write('Error planning sprint:', error);
-  }
-}
-
-planSprint();
-```
-
-Run the script:
-
-```bash
-node plan-sprint.js
-```
-
-## Step 5: Track Progress
-
-Finally, let's check the progress of our sprint. Create a file named `track-progress.js`:
-
-```javascript
-const { ProjectManagementService } = require('./build/services/ProjectManagementService');
-require('dotenv').config();
-
-async function trackProgress() {
-  // Initialize the service with your GitHub credentials
-  const service = new ProjectManagementService(
-    process.env.GITHUB_OWNER,
-    process.env.GITHUB_REPO,
-    process.env.GITHUB_TOKEN
-  );
-
-  try {
-    // Get the sprint ID from the previous step
-    // For this example, we'll assume it's "sprint_1", but you should replace this with your actual sprint ID
-    const sprintId = "sprint_1";
-
-    // Get sprint metrics
-    const metrics = await service.getSprintMetrics(sprintId, true);
-
-    console.log('Sprint Metrics:');
-    console.log('Title:', metrics.sprint.title);
-    console.log('Status:', metrics.sprint.status);
-    console.log('Progress:', `${metrics.progress.completionPercentage}%`);
-    console.log('Open Issues:', metrics.progress.openIssues);
-    console.log('Closed Issues:', metrics.progress.closedIssues);
-    
-    // Display issues if available
-    if (metrics.issues && metrics.issues.length > 0) {
-      console.log('\nIssues:');
-      metrics.issues.forEach(issue => {
-        console.log(`- ${issue.title} (${issue.status})`);
-      });
+```json
+{
+  "mcpServers": {
+    "github-project-manager": {
+      "command": "npx",
+      "args": ["-y", "mcp-github-project-manager"],
+      "env": {
+        "GITHUB_TOKEN": "your_personal_access_token",
+        "GITHUB_OWNER": "your_github_username_or_org",
+        "GITHUB_REPO": "your_repository_name"
+      }
     }
-    
-    return metrics;
-  } catch (error) {
-    process.stderr.write('Error tracking progress:', error);
   }
 }
-
-trackProgress();
 ```
 
-Run the script:
+## Step 4: Discover the Tool Surface
+
+The server exposes **20 compound tools covering 169 actions**. Start with the
+`discover_tools` meta-tool — it lists the tools, their actions, and their
+parameter schemas at runtime:
+
+```json
+{"tool": "discover_tools", "arguments": {}}
+```
+
+```json
+{"tool": "discover_tools", "arguments": {"group": "manage_project"}}
+```
+
+```json
+{"tool": "discover_tools", "arguments": {"group": "manage_project", "action": "create", "includeSchemas": true}}
+```
+
+## Step 5: Create Your First Project
+
+Every compound tool takes an `action` parameter:
+
+```json
+{"tool": "manage_project", "arguments": {
+  "action": "create",
+  "title": "My First Project",
+  "owner": "your_github_username_or_org",
+  "visibility": "private"
+}}
+```
+
+Then add a milestone and an issue:
+
+```json
+{"tool": "manage_milestones", "arguments": {
+  "action": "create",
+  "title": "Phase 1",
+  "dueDate": "2026-12-31"
+}}
+```
+
+```json
+{"tool": "manage_issues", "arguments": {
+  "action": "create",
+  "title": "Setup project repository",
+  "body": "Create and configure the initial project repository",
+  "labels": ["feature"]
+}}
+```
+
+## Step 6: Plan a Sprint
+
+```json
+{"tool": "manage_sprints", "arguments": {
+  "action": "create",
+  "title": "Sprint 1",
+  "startDate": "2026-01-01",
+  "endDate": "2026-01-14",
+  "goals": ["Complete initial project setup"]
+}}
+```
+
+## Step 7: Track Progress
+
+```json
+{"tool": "manage_sprints", "arguments": {
+  "action": "get_metrics",
+  "sprintId": "<sprint-id>"
+}}
+```
+
+## Running the Examples in Code
+
+The `examples/` directory contains runnable TypeScript examples that call the
+services directly (not through MCP):
 
 ```bash
-node track-progress.js
+npm exec tsx examples/basic/create-simple-project.ts
+npm exec tsx examples/basic/plan-sprint.ts
+npm exec tsx examples/basic/track-progress.ts
 ```
 
-## Step 6: Explore the API
-
-Now that you've completed the basic workflow, explore the full API capabilities:
-
-1. Check out the [API Reference](../api-reference/index.md) for all available tools
-2. Try creating more complex projects with multiple milestones
-3. Experiment with different issue types and priorities
-4. Track progress across multiple sprints
+They resolve the service through `createProjectManagementService()` in
+`src/container.ts` and need the same `GITHUB_*` environment variables. See
+[examples/README.md](../../examples/README.md) for the full set.
 
 ## Troubleshooting
 
@@ -254,6 +186,8 @@ Error: Unauthorized: Bad credentials
 - Verify that your GitHub token is correct and has not expired
 - Check that your token has the required scopes
 - Ensure the token is correctly set in your `.env` file
+- Remember the credential chain: `--token` flag → `$SECRETS_DIR/GITHUB_TOKEN` →
+  `GITHUB_TOKEN` → `gh auth token`
 
 ### Rate Limiting
 
@@ -275,11 +209,17 @@ Error: Resource not found: Issue with ID 123 not found
 - Check that you have access to the resources
 - Ensure you're using the correct owner and repository
 
+### A Tool Is Missing
+
+`MCP_TOOL_GROUPS` filters the exposed tool set by **group name** (`core`,
+`ai`, `agents`, `events`, `system`), not by tool name. See
+[CONFIGURATION.md](../CONFIGURATION.md#tool-exposure).
+
 ## Next Steps
 
 Congratulations! You've completed the getting started tutorial. Here are some next steps:
 
-1. Explore the [API Reference](../api-reference/index.md) to learn about all available tools
+1. Explore the [Tool Reference](../TOOLS.md) for all 20 compound tools and their 169 actions
 2. Check out the [Examples](../../examples/README.md) directory for more code samples
-3. Learn about [advanced features](./advanced-features.md) like custom fields and automation
+3. Read the [Agent Harness Integration guide](../agent-harness-integration.md) for autonomous agent workflows
 4. Contribute to the project by following the [Contributing Guide](../contributing/index.md)

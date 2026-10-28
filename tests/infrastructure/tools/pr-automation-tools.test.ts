@@ -7,36 +7,28 @@
  */
 
 import {
-  createAutomationRuleSchema,
-  createAutomationRuleTool,
   createLabelSchema,
   createLabelTool,
   createPullRequestReviewSchema,
   createPullRequestReviewTool,
   createPullRequestSchema,
   createPullRequestTool,
-  deleteAutomationRuleSchema,
-  deleteAutomationRuleTool,
-  disableAutomationRuleSchema,
-  disableAutomationRuleTool,
-  enableAutomationRuleSchema,
-  enableAutomationRuleTool,
-  getAutomationRuleSchema,
-  getAutomationRuleTool,
+  deleteProjectWorkflowSchema,
+  deleteProjectWorkflowTool,
+  getProjectWorkflowSchema,
+  getProjectWorkflowTool,
   getPullRequestSchema,
   getPullRequestTool,
-  listAutomationRulesSchema,
-  listAutomationRulesTool,
   listLabelsSchema,
   listLabelsTool,
+  listProjectWorkflowsSchema,
+  listProjectWorkflowsTool,
   listPullRequestReviewsSchema,
   listPullRequestReviewsTool,
   listPullRequestsSchema,
   listPullRequestsTool,
   mergePullRequestSchema,
   mergePullRequestTool,
-  updateAutomationRuleSchema,
-  updateAutomationRuleTool,
   updatePullRequestSchema,
   updatePullRequestTool,
 } from "../../../src/infrastructure/tools/ToolSchemas.js";
@@ -544,117 +536,16 @@ describe("PR Tools", () => {
   });
 });
 
-describe("Automation Tools", () => {
+describe("Project Automation Workflow Tools", () => {
   describe("Input Schemas", () => {
-    describe("createAutomationRuleSchema", () => {
-      it("rejects missing name", () => {
-        const result = createAutomationRuleSchema.safeParse({
-          projectId: "PVT_kwDOLhQ7gc4AOEbH",
-          enabled: true,
-          triggers: [{ type: "pr_opened" }],
-          actions: [{ type: "add_label", parameters: { labelName: "needs-review" } }],
-        });
-        expect(result.success).toBe(false);
-      });
-
+    describe("listProjectWorkflowsSchema", () => {
       it("rejects missing projectId", () => {
-        const result = createAutomationRuleSchema.safeParse({
-          name: "Auto-label PRs",
-          enabled: true,
-          triggers: [{ type: "pr_opened" }],
-          actions: [{ type: "add_label", parameters: { labelName: "needs-review" } }],
-        });
+        const result = listProjectWorkflowsSchema.safeParse({});
         expect(result.success).toBe(false);
       });
 
-      it("rejects empty name", () => {
-        const result = createAutomationRuleSchema.safeParse({
-          name: "",
-          projectId: "PVT_kwDOLhQ7gc4AOEbH",
-        });
-        expect(result.success).toBe(false);
-      });
-
-      it("accepts valid input with required fields", () => {
-        const result = createAutomationRuleSchema.safeParse({
-          name: "Auto-label PRs",
-          projectId: "PVT_kwDOLhQ7gc4AOEbH",
-          triggers: [{ type: "pr_opened" }],
-          actions: [{ type: "add_label", parameters: { labelName: "needs-review" } }],
-        });
-        expect(result.success).toBe(true);
-        if (result.success) {
-          expect(result.data.name).toBe("Auto-label PRs");
-          expect(result.data.enabled).toBe(true);
-        }
-      });
-
-      it("accepts valid input with all optional fields", () => {
-        const result = createAutomationRuleSchema.safeParse({
-          name: "Auto-label PRs",
-          description: "Automatically label new PRs",
-          projectId: "PVT_kwDOLhQ7gc4AOEbH",
-          enabled: false,
-          triggers: [
-            {
-              type: "issue_labeled",
-              conditions: [{ field: "label", operator: "equals", value: "bug" }],
-            },
-          ],
-          actions: [{ type: "assign_user", parameters: { username: "maintainer" } }],
-        });
-        expect(result.success).toBe(true);
-        if (result.success) {
-          expect(result.data.enabled).toBe(false);
-          expect(result.data.description).toBe("Automatically label new PRs");
-        }
-      });
-
-      it("accepts multiple triggers", () => {
-        const result = createAutomationRuleSchema.safeParse({
-          name: "Multi trigger rule",
-          projectId: "PVT_kwDOLhQ7gc4AOEbH",
-          triggers: [{ type: "pr_opened" }, { type: "pr_merged" }],
-          actions: [{ type: "add_label", parameters: { labelName: "done" } }],
-        });
-        expect(result.success).toBe(true);
-        if (result.success) {
-          expect(result.data.triggers).toHaveLength(2);
-        }
-      });
-
-      it("accepts multiple actions", () => {
-        const result = createAutomationRuleSchema.safeParse({
-          name: "Multi action rule",
-          projectId: "PVT_kwDOLhQ7gc4AOEbH",
-          triggers: [{ type: "pr_opened" }],
-          actions: [
-            { type: "add_label", parameters: { labelName: "needs-review" } },
-            { type: "assign_user", parameters: { username: "reviewer" } },
-          ],
-        });
-        expect(result.success).toBe(true);
-        if (result.success) {
-          expect(result.data.actions).toHaveLength(2);
-        }
-      });
-    });
-
-    describe("listAutomationRulesSchema", () => {
-      it("rejects missing projectId", () => {
-        const result = listAutomationRulesSchema.safeParse({});
-        expect(result.success).toBe(false);
-      });
-
-      it("rejects empty projectId", () => {
-        const result = listAutomationRulesSchema.safeParse({
-          projectId: "",
-        });
-        expect(result.success).toBe(false);
-      });
-
-      it("accepts valid input with projectId", () => {
-        const result = listAutomationRulesSchema.safeParse({
+      it("accepts a project id", () => {
+        const result = listProjectWorkflowsSchema.safeParse({
           projectId: "PVT_kwDOLhQ7gc4AOEbH",
         });
         expect(result.success).toBe(true);
@@ -664,270 +555,98 @@ describe("Automation Tools", () => {
       });
     });
 
-    describe("getAutomationRuleSchema", () => {
-      it("rejects missing ruleId", () => {
-        const result = getAutomationRuleSchema.safeParse({});
+    describe("getProjectWorkflowSchema", () => {
+      it("rejects missing workflowId", () => {
+        const result = getProjectWorkflowSchema.safeParse({});
         expect(result.success).toBe(false);
       });
 
-      it("rejects empty ruleId", () => {
-        const result = getAutomationRuleSchema.safeParse({
-          ruleId: "",
-        });
-        expect(result.success).toBe(false);
-      });
-
-      it("accepts valid input with ruleId", () => {
-        const result = getAutomationRuleSchema.safeParse({
-          ruleId: "AR_kwDOLhQ7gc4AOEbH",
+      it("accepts a workflow id", () => {
+        const result = getProjectWorkflowSchema.safeParse({
+          workflowId: "PVW_lADOLhQ7gc4AOEbH",
         });
         expect(result.success).toBe(true);
         if (result.success) {
-          expect(result.data.ruleId).toBe("AR_kwDOLhQ7gc4AOEbH");
+          expect(result.data.workflowId).toBe("PVW_lADOLhQ7gc4AOEbH");
         }
       });
     });
 
-    describe("updateAutomationRuleSchema", () => {
-      it("rejects missing ruleId", () => {
-        const result = updateAutomationRuleSchema.safeParse({
-          name: "Updated rule name",
-        });
+    describe("deleteProjectWorkflowSchema", () => {
+      it("rejects missing workflowId", () => {
+        const result = deleteProjectWorkflowSchema.safeParse({});
         expect(result.success).toBe(false);
       });
 
-      it("accepts valid input with ruleId only", () => {
-        const result = updateAutomationRuleSchema.safeParse({
-          ruleId: "AR_kwDOLhQ7gc4AOEbH",
+      it("accepts a workflow id", () => {
+        const result = deleteProjectWorkflowSchema.safeParse({
+          workflowId: "PVW_lADOLhQ7gc4AOEbH",
         });
         expect(result.success).toBe(true);
-      });
-
-      it("accepts valid input with name update", () => {
-        const result = updateAutomationRuleSchema.safeParse({
-          ruleId: "AR_kwDOLhQ7gc4AOEbH",
-          name: "Updated rule name",
-        });
-        expect(result.success).toBe(true);
-        if (result.success) {
-          expect(result.data.name).toBe("Updated rule name");
-        }
-      });
-
-      it("accepts valid input with enabled update", () => {
-        const result = updateAutomationRuleSchema.safeParse({
-          ruleId: "AR_kwDOLhQ7gc4AOEbH",
-          enabled: false,
-        });
-        expect(result.success).toBe(true);
-      });
-
-      it("accepts valid input with triggers update", () => {
-        const result = updateAutomationRuleSchema.safeParse({
-          ruleId: "AR_kwDOLhQ7gc4AOEbH",
-          triggers: [{ type: "issue_closed" }],
-        });
-        expect(result.success).toBe(true);
-      });
-
-      it("accepts valid input with actions update", () => {
-        const result = updateAutomationRuleSchema.safeParse({
-          ruleId: "AR_kwDOLhQ7gc4AOEbH",
-          actions: [{ type: "add_label", parameters: { labelName: "closed" } }],
-        });
-        expect(result.success).toBe(true);
-      });
-    });
-
-    describe("deleteAutomationRuleSchema", () => {
-      it("rejects missing ruleId", () => {
-        const result = deleteAutomationRuleSchema.safeParse({});
-        expect(result.success).toBe(false);
-      });
-
-      it("rejects empty ruleId", () => {
-        const result = deleteAutomationRuleSchema.safeParse({
-          ruleId: "",
-        });
-        expect(result.success).toBe(false);
-      });
-
-      it("accepts valid input with ruleId", () => {
-        const result = deleteAutomationRuleSchema.safeParse({
-          ruleId: "AR_kwDOLhQ7gc4AOEbH",
-        });
-        expect(result.success).toBe(true);
-        if (result.success) {
-          expect(result.data.ruleId).toBe("AR_kwDOLhQ7gc4AOEbH");
-        }
-      });
-    });
-
-    describe("enableAutomationRuleSchema", () => {
-      it("rejects missing ruleId", () => {
-        const result = enableAutomationRuleSchema.safeParse({});
-        expect(result.success).toBe(false);
-      });
-
-      it("rejects empty ruleId", () => {
-        const result = enableAutomationRuleSchema.safeParse({
-          ruleId: "",
-        });
-        expect(result.success).toBe(false);
-      });
-
-      it("accepts valid input with ruleId", () => {
-        const result = enableAutomationRuleSchema.safeParse({
-          ruleId: "AR_kwDOLhQ7gc4AOEbH",
-        });
-        expect(result.success).toBe(true);
-        if (result.success) {
-          expect(result.data.ruleId).toBe("AR_kwDOLhQ7gc4AOEbH");
-        }
-      });
-    });
-
-    describe("disableAutomationRuleSchema", () => {
-      it("rejects missing ruleId", () => {
-        const result = disableAutomationRuleSchema.safeParse({});
-        expect(result.success).toBe(false);
-      });
-
-      it("rejects empty ruleId", () => {
-        const result = disableAutomationRuleSchema.safeParse({
-          ruleId: "",
-        });
-        expect(result.success).toBe(false);
-      });
-
-      it("accepts valid input with ruleId", () => {
-        const result = disableAutomationRuleSchema.safeParse({
-          ruleId: "AR_kwDOLhQ7gc4AOEbH",
-        });
-        expect(result.success).toBe(true);
-        if (result.success) {
-          expect(result.data.ruleId).toBe("AR_kwDOLhQ7gc4AOEbH");
-        }
       });
     });
   });
 
   describe("Tool Definitions", () => {
-    describe("createAutomationRuleTool", () => {
+    describe("listProjectWorkflowsTool", () => {
       it("has correct name", () => {
-        expect(createAutomationRuleTool.name).toBe("create_automation_rule");
+        expect(listProjectWorkflowsTool.name).toBe("list_project_workflows");
       });
 
-      it("has correct title", () => {
-        expect(createAutomationRuleTool.title).toBe("Create Automation Rule");
-      });
-
-      it("has create annotation", () => {
-        expect(createAutomationRuleTool.annotations).toEqual({
-          readOnlyHint: false,
+      it("has readOnly annotation", () => {
+        expect(listProjectWorkflowsTool.annotations).toEqual({
+          readOnlyHint: true,
           destructiveHint: false,
-          idempotentHint: false,
+          idempotentHint: true,
           openWorldHint: true,
         });
       });
 
       it("has output schema defined", () => {
-        expect(createAutomationRuleTool.outputSchema).toBeDefined();
+        expect(listProjectWorkflowsTool.outputSchema).toBeDefined();
       });
 
       it("has examples", () => {
-        expect(createAutomationRuleTool.examples).toBeDefined();
-        expect(createAutomationRuleTool.examples!.length).toBeGreaterThan(0);
+        expect(listProjectWorkflowsTool.examples).toBeDefined();
+        expect(listProjectWorkflowsTool.examples?.length).toBeGreaterThan(0);
       });
     });
 
-    describe("listAutomationRulesTool", () => {
+    describe("getProjectWorkflowTool", () => {
       it("has correct name", () => {
-        expect(listAutomationRulesTool.name).toBe("list_automation_rules");
+        expect(getProjectWorkflowTool.name).toBe("get_project_workflow");
       });
 
       it("has readOnly annotation", () => {
-        expect(listAutomationRulesTool.annotations).toEqual({
+        expect(getProjectWorkflowTool.annotations).toEqual({
           readOnlyHint: true,
           destructiveHint: false,
           idempotentHint: true,
           openWorldHint: true,
         });
       });
-    });
 
-    describe("getAutomationRuleTool", () => {
-      it("has correct name", () => {
-        expect(getAutomationRuleTool.name).toBe("get_automation_rule");
-      });
-
-      it("has readOnly annotation", () => {
-        expect(getAutomationRuleTool.annotations).toEqual({
-          readOnlyHint: true,
-          destructiveHint: false,
-          idempotentHint: true,
-          openWorldHint: true,
-        });
+      it("has output schema defined", () => {
+        expect(getProjectWorkflowTool.outputSchema).toBeDefined();
       });
     });
 
-    describe("updateAutomationRuleTool", () => {
+    describe("deleteProjectWorkflowTool", () => {
       it("has correct name", () => {
-        expect(updateAutomationRuleTool.name).toBe("update_automation_rule");
-      });
-
-      it("has updateIdempotent annotation", () => {
-        expect(updateAutomationRuleTool.annotations).toEqual({
-          readOnlyHint: false,
-          destructiveHint: false,
-          idempotentHint: true,
-          openWorldHint: true,
-        });
-      });
-    });
-
-    describe("deleteAutomationRuleTool", () => {
-      it("has correct name", () => {
-        expect(deleteAutomationRuleTool.name).toBe("delete_automation_rule");
+        expect(deleteProjectWorkflowTool.name).toBe("delete_project_workflow");
       });
 
       it("has delete annotation", () => {
-        expect(deleteAutomationRuleTool.annotations).toEqual({
+        expect(deleteProjectWorkflowTool.annotations).toEqual({
           readOnlyHint: false,
           destructiveHint: true,
           idempotentHint: true,
           openWorldHint: true,
         });
       });
-    });
 
-    describe("enableAutomationRuleTool", () => {
-      it("has correct name", () => {
-        expect(enableAutomationRuleTool.name).toBe("enable_automation_rule");
-      });
-
-      it("has updateIdempotent annotation", () => {
-        expect(enableAutomationRuleTool.annotations).toEqual({
-          readOnlyHint: false,
-          destructiveHint: false,
-          idempotentHint: true,
-          openWorldHint: true,
-        });
-      });
-    });
-
-    describe("disableAutomationRuleTool", () => {
-      it("has correct name", () => {
-        expect(disableAutomationRuleTool.name).toBe("disable_automation_rule");
-      });
-
-      it("has updateIdempotent annotation", () => {
-        expect(disableAutomationRuleTool.annotations).toEqual({
-          readOnlyHint: false,
-          destructiveHint: false,
-          idempotentHint: true,
-          openWorldHint: true,
-        });
+      it("has output schema defined", () => {
+        expect(deleteProjectWorkflowTool.outputSchema).toBeDefined();
       });
     });
   });

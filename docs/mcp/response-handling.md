@@ -37,6 +37,23 @@ Supported content types:
 - `text/markdown`
 - `text/html`
 
+## Error Semantics (MCP v2)
+
+The server runs on `@modelcontextprotocol/server` v2. Two error shapes are
+distinct, and the difference matters when you write a client:
+
+| Situation | What the client sees |
+|-----------|----------------------|
+| A tool that runs and fails | `{ content, isError: true }` — a **successful** call with a failed result. The model sees the failure and can recover. |
+| A protocol fault (e.g. calling a tool that does not exist) | A JSON-RPC error |
+
+Arguments are validated against each tool's declared `inputSchema` **before**
+the handler runs, so a malformed call never reaches business logic — and
+`ToolValidator` never sees a missing required field.
+
+`MCPResponseFormatter` and `MCPErrorHandler` shape the content of a tool
+result; they do not decide whether the result is an error.
+
 ## Usage Examples
 
 ### Basic Response Formatting
@@ -121,7 +138,7 @@ The response handling system includes comprehensive unit tests:
 
 Run tests using:
 ```bash
-pnpm test
+npm test
 ```
 
 ## Adding New Error Types

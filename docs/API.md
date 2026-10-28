@@ -27,6 +27,17 @@ Factory for creating AI service instances with Vercel AI SDK. Provides model acc
 
 **Location:** `src/services/ai/AIServiceFactory.ts`
 
+> **MCP sampling — scope of support.** The last-resort AI fallback uses the MCP
+> `sampling/createMessage` request: when no provider key is configured and the
+> client declares the sampling capability, the server routes the completion
+> back to the client. The 2026-07-28 MCP specification marks `roots` and
+> `sampling` as deprecated in favour of the elicitation flow, so this path is
+> intentionally kept at the 2025-era shape: it works with clients that
+> implement `sampling/createMessage` and is simply not offered to clients that
+> only implement the newer elicitation-based flow. A client without a sampling
+> capability gets the documented "no AI provider configured" failure instead
+> of a silent hang.
+
 #### Static Methods
 
 ##### getInstance()
@@ -219,7 +230,8 @@ if ('degraded' in result) {
 
 ### ProjectManagementService
 
-Thin facade (365 lines) for all project management operations. Delegates to 14 injected specialized services.
+Thin facade over all project management operations. Delegates to 14 injected
+specialized services.
 
 **Location:** `src/services/ProjectManagementService.ts`
 
@@ -228,19 +240,19 @@ Thin facade (365 lines) for all project management operations. Delegates to 14 i
 ```typescript
 constructor(
   factory: GitHubRepositoryFactory,
-  issueService: IssueService,
-  pullRequestService: PullRequestService,
-  milestoneService: MilestoneService,
-  sprintService: SprintPlanningService,
   subIssueService: SubIssueService,
+  milestoneService: MilestoneService,
+  sprintPlanningService: SprintPlanningService,
   projectStatusService: ProjectStatusService,
   templateService: ProjectTemplateService,
   linkingService: ProjectLinkingService,
+  issueService: IssueService,
+  roadmapService: RoadmapService,
   automationService: ProjectAutomationService,
+  pullRequestService: PullRequestService,
   fieldValueService: FieldValueService,
   labelService: LabelService,
-  iterationService: IterationService,
-  searchService: SearchService,
+  iterationService: IterationService
 )
 ```
 
@@ -316,6 +328,10 @@ Manages pull request operations: create, list, get, merge, create review, list r
 
 Manages project field values: set field value, get field value, clear field value, list project fields, create/update project fields.
 
+Field values can be set for the field types GitHub's `ProjectV2CustomFieldType`
+covers: `TEXT`, `NUMBER`, `DATE`, `SINGLE_SELECT`, `MULTI_SELECT` and
+`ITERATION`.
+
 #### LabelService
 
 **Location:** `src/services/LabelService.ts`
@@ -332,31 +348,44 @@ Manages project iterations: configure iteration field, list iterations, get curr
 
 ### Agent Services
 
-Services supporting autonomous agent workflows:
+Services supporting autonomous agent workflows (all under `src/services/agent/`):
 
 #### TaskCheckoutService
 
-**Location:** `src/services/agents/TaskCheckoutService.ts`
+**Location:** `src/services/agent/TaskCheckoutService.ts`
 
 Manages agent task checkout/checkin lifecycle: checkout task, checkin task, get checkout status, list active checkouts.
 
 #### AgentContextService
 
-**Location:** `src/services/agents/AgentContextService.ts`
+**Location:** `src/services/agent/AgentContextService.ts`
 
 Generates task context for agents: get task context, get related context, get dependency context.
 
 #### WorkProductService
 
-**Location:** `src/services/agents/WorkProductService.ts`
+**Location:** `src/services/agent/WorkProductService.ts`
 
 Manages agent work products: submit work product, list work products, get work product.
 
 #### AgentBudgetService
 
-**Location:** `src/services/agents/AgentBudgetService.ts`
+**Location:** `src/services/agent/AgentBudgetService.ts`
 
 Tracks agent resource budgets: get budget, update budget, check budget, list budgets, reset budget.
+
+#### AgentMetricsService
+
+**Location:** `src/services/agent/AgentMetricsService.ts`
+
+Aggregate and per-agent orchestration metrics: throughput, cycle time, budget burn, staleness.
+
+#### AgentReclaimScheduler
+
+**Location:** `src/services/agent/AgentReclaimScheduler.ts`
+
+Server-side background sweep that reclaims tasks from agents whose heartbeat has
+gone stale and flags those agents `offline`.
 
 ---
 
@@ -919,16 +948,22 @@ type ResourceType =
 | Variable | Description | Required |
 |----------|-------------|----------|
 | GITHUB_TOKEN | GitHub personal access token | Yes |
+| GITHUB_OWNER | Repository owner | Yes |
+| GITHUB_REPO | Repository name | Yes |
 | ANTHROPIC_API_KEY | Anthropic API key for Claude models | No* |
 | OPENAI_API_KEY | OpenAI API key for GPT models | No* |
 | GOOGLE_API_KEY | Google API key for Gemini models | No* |
 | PERPLEXITY_API_KEY | Perplexity API key | No* |
-| AI_MAIN_MODEL | Main AI model (e.g., claude-3-5-sonnet-20241022) | No |
+| AI_MAIN_MODEL | Main AI model | No |
 | AI_RESEARCH_MODEL | Research AI model | No |
 | AI_FALLBACK_MODEL | Fallback AI model | No |
 | AI_PRD_MODEL | PRD generation AI model | No |
 
 *At least one AI provider key is required for AI features.
+
+There are **no default models** — a role with a key but no model is left
+unconfigured and the server warns rather than silently picking one. See
+[CONFIGURATION.md](CONFIGURATION.md) for the full environment reference.
 
 ### Model Configuration
 
@@ -945,8 +980,8 @@ Models are auto-detected based on name:
 ```bash
 GITHUB_TOKEN=ghp_xxxxx
 ANTHROPIC_API_KEY=sk-ant-xxxxx
-AI_MAIN_MODEL=claude-3-5-sonnet-20241022
-AI_FALLBACK_MODEL=gpt-4o
+AI_MAIN_MODEL=claude-sonnet-4-20250514
+AI_FALLBACK_MODEL=gpt-4o-mini
 ```
 
 ---
@@ -967,5 +1002,4 @@ AI_FALLBACK_MODEL=gpt-4o
 
 ---
 
-*Generated: 2026-08-05*
-*MCP GitHub Project Manager v1.1.0*
+*Refreshed: 2026-10-21 — MCP GitHub Project Manager v2.4.0*

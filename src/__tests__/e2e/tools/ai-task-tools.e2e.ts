@@ -1,3 +1,4 @@
+import { vi } from "vitest";
 import { MCPToolTestUtils } from "../utils/MCPToolTestUtils";
 
 /**
@@ -17,6 +18,13 @@ import { MCPToolTestUtils } from "../utils/MCPToolTestUtils";
  *   expand_task              → ai_generate  action:'expand_task'
  *   create_traceability_matrix → ai_generate action:'create_traceability_matrix'
  */
+
+/**
+ * The live API is slow: a single tool call can take 10-25 seconds. The
+ * global test timeout is 10s, which is right for the unit suites and too
+ * short here - the failures were timeouts, not broken behaviour.
+ */
+vi.setConfig({ testTimeout: 30000 });
 
 const AI_COMPOUND_TOOL = "ai_generate";
 

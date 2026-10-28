@@ -11,7 +11,8 @@ The resource system consists of three main components:
 
 ## Resource Types
 
-Resources are defined using Zod schemas for runtime validation:
+Resources are defined using Zod schemas for runtime validation. This project
+uses **zod 4** — `z.record` requires an explicit key schema:
 
 ```typescript
 import { z } from "zod";
@@ -32,10 +33,14 @@ const ProjectSchema = ResourceSchema.merge(
   z.object({
     name: z.string(),
     description: z.string().optional(),
-    settings: z.record(z.unknown()).optional(),
+    // zod 4: z.record needs an explicit key schema
+    settings: z.record(z.string(), z.unknown()).optional(),
   })
 );
 ```
+
+The canonical `ResourceType` and `ResourceStatus` enums live in
+`src/domain/resource-types.ts`.
 
 ## Resource Cache
 
@@ -155,7 +160,7 @@ The system includes comprehensive tests:
 
 Run tests using:
 ```bash
-pnpm test
+npm test
 ```
 
 ## Adding New Resource Types
@@ -171,9 +176,10 @@ const NewResourceSchema = ResourceSchema.merge(
 );
 ```
 
-2. Add the resource type to the ResourceType enum:
+2. Add the resource type to the `ResourceType` enum:
 ```typescript
-enum ResourceType {
+// src/domain/resource-types.ts
+export enum ResourceType {
   NEW_RESOURCE = "new-resource",
   // ...
 }

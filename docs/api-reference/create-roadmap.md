@@ -1,8 +1,13 @@
 # Create Roadmap Tool
 
+> **Scope note.** `create_roadmap` is a service-layer operation, not a public
+> MCP tool name. The public surface is the 20 compound tools in
+> [TOOLS.md](../TOOLS.md); use `discover_tools` to list the live actions and
+> schemas.
+
 ## Overview
 
-The `create_roadmap` tool allows you to create a complete project roadmap with milestones and issues in a single operation. This is useful for initializing new projects with a predefined structure.
+The `create_roadmap` operation allows you to create a complete project roadmap with milestones and issues in a single operation. This is useful for initializing new projects with a predefined structure.
 
 ## Parameters
 
@@ -163,7 +168,7 @@ const result = await service.createRoadmap({
 
 ## Implementation Details
 
-The `create_roadmap` tool performs the following operations:
+The `create_roadmap` operation performs the following operations:
 
 1. Creates a new GitHub Project with the specified title, description, and visibility
 2. Creates each milestone with the specified properties
@@ -181,9 +186,10 @@ The `create_roadmap` tool performs the following operations:
 
 ## Rate Limiting Considerations
 
-This tool makes multiple GitHub API calls (one for project creation, one per milestone, and one per issue). Be mindful of GitHub API rate limits, especially when creating large roadmaps with many milestones and issues.
+This operation makes multiple GitHub API calls (one for project creation, one per milestone, and one per issue). Be mindful of GitHub API rate limits, especially when creating large roadmaps with many milestones and issues.
 
-## Related Tools
+## Related Documentation
 
 - [Plan Sprint](plan-sprint.md) - Plan sprints with issues from your roadmap
 - [Get Milestone Metrics](get-milestone-metrics.md) - Track progress of roadmap milestones
+- [Tool Reference](../TOOLS.md) - The public MCP tool surface

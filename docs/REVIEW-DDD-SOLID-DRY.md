@@ -1,5 +1,11 @@
 # DDD + SOLID + DRY Review
 
+> **⚠️ HISTORICAL SNAPSHOT (2026-08-08).** This review records the state of the
+> codebase on that date and is kept for history only — its counts (16 compound
+> tools / 134 actions, file sizes, service counts) are stale. **Current source of
+> truth:** [`docs/architecture.md`](architecture.md) for the DDD layout,
+> [`docs/TOOLS.md`](TOOLS.md) for the tool surface, and the code itself.
+
 **Date:** August 8, 2026  
 **Reviewer:** Buffy (AI Assistant)  
 **Project:** MCP GitHub Project Manager  

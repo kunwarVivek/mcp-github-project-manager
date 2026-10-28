@@ -34,7 +34,6 @@ vi.mock("../../src/services/ProjectManagementService", () => ({
       listProjectItems: vi.fn(),
       updateProjectItem: vi.fn(),
       createIssue: vi.fn(),
-      createAutomationRule: vi.fn(),
     };
   }),
 }));

@@ -1,8 +1,14 @@
 # Get Milestone Metrics Tool
 
+> **Scope note.** `get_milestone_metrics` is a service-layer operation, not a
+> public MCP tool name. The public surface is the 20 compound tools in
+> [TOOLS.md](../TOOLS.md) — milestone metrics are read through
+> `manage_milestones` (action `get_metrics`), with `get_overdue` and
+> `get_upcoming` for the list views.
+
 ## Overview
 
-The `get_milestone_metrics` tool retrieves detailed progress metrics for a specific milestone. This is useful for tracking milestone completion, understanding issue distribution, and monitoring progress against deadlines.
+The `get_milestone_metrics` operation retrieves detailed progress metrics for a specific milestone. This is useful for tracking milestone completion, understanding issue distribution, and monitoring progress against deadlines.
 
 ## Parameters
 
@@ -113,7 +119,7 @@ Object.entries(metrics.issueBreakdown.byType).forEach(([type, count]) => {
 
 ## Implementation Details
 
-The `get_milestone_metrics` tool performs the following operations:
+The `get_milestone_metrics` operation performs the following operations:
 
 1. Retrieves the milestone with the specified ID
 2. Fetches all issues associated with the milestone
@@ -138,7 +144,8 @@ The `get_milestone_metrics` tool performs the following operations:
 - Address high priority issues first when a milestone is at risk
 - Use the issue breakdown to ensure balanced progress across different types of work
 
-## Related Tools
+## Related Documentation
 
-- [Get Overdue Milestones](get-overdue-milestones.md) - Find milestones that are past their due date
-- [Get Upcoming Milestones](get-upcoming-milestones.md) - Find milestones with approaching due dates
+- [Overdue and upcoming milestones](../TOOLS.md#manage_milestones) — `manage_milestones/get_overdue` and `get_upcoming`
+- [Create Roadmap](create-roadmap.md) - Create a roadmap with milestones and issues
+- [Tool Reference](../TOOLS.md) - The public MCP tool surface

@@ -2,1192 +2,254 @@
 
 <!-- Keywords: mcp server, model context protocol, github project management, ai agent orchestration, multi-agent coordination, autonomous coding agents, prd generator, sprint planning ai, issue triage automation, github projects v2 api, claude mcp, codex mcp, cursor mcp, llm tools, agentic task management, ai project manager, swarm coordination, github actions, github releases, branch protection, mcp resources, mcp prompts -->
 
-**The agentic task substrate for AI coding agents.** An MCP server that turns GitHub Projects v2 into a fully autonomous project management platform — AI agents self-assign work, track progress, review each other, and ship code, all backed by GitHub-native storage.
-
-> **Use case**: You have AI agents (Claude Code, Codex, Cursor, Windsurf, Roo). They need a task backbone. This is it.
-
 [![npm version](https://img.shields.io/npm/v/mcp-github-project-manager.svg)](https://www.npmjs.com/package/mcp-github-project-manager)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Node.js Version](https://img.shields.io/node/v/mcp-github-project-manager.svg)](https://nodejs.org/)
 
-## Overview
+**The task substrate for AI coding agents.** An [MCP](https://modelcontextprotocol.io) server that turns GitHub Projects v2 into an agentic project-management layer: agents register, self-assign work, heartbeat, submit work products for review, and spend against token budgets — through **20 compound tools exposing 169 actions**, backed entirely by GitHub-native storage. No database, no Redis, no external infra.
 
-This MCP server implements the [Model Context Protocol](https://modelcontextprotocol.io) to provide a complete **agentic project management layer** over GitHub Projects v2. AI agents register, self-assign tasks, coordinate via heartbeats, submit work products for review, and operate within token budgets — all through 20 compound tools exposing 169 actions. Human project managers get AI-powered PRD generation, sprint planning, issue triage, and roadmap creation. Everything is backed by GitHub-native storage (issues, project fields, comments) — no external infrastructure required.
+You bring the agents (Claude Code, Codex, Cursor, Windsurf, Roo, OpenCode, any MCP client). This is the backbone that tells them what to work on and keeps them from colliding.
 
-## Why This Exists
+| Surface | Detail |
+|---|---|
+| Tools | 20 compound tools, 169 actions, `action`-routed |
+| Resources | 6 read-only GitHub-backed views |
+| Prompts | 6 reusable AI templates |
+| Transport | MCP v2 over stdio (webhook/SSE optional) |
+| Storage | GitHub issues, project fields, comments — no external infra |
+| Runtime | Node >= 22.12.0 · MIT license |
 
-AI coding agents are powerful but stateless — they don't know what to work on next, can't coordinate with other agents, and have no persistent task memory. This MCP server solves that by turning GitHub Projects into an **agentic operating layer**:
+## Why this exists
 
-| Problem | Solution |
-|---------|----------|
-| Agents don't know what to work on | **Task checkout** with priority/skills/deadline strategies |
-| Multiple agents step on each other | **Atomic claims** with TOCTOU guards + review workflow |
-| No visibility into agent work | **Heartbeat monitoring** + activity dashboard + work product tracking |
-| Agents burn unlimited tokens | **Per-agent token budgets** with warning thresholds and hard stops |
-| Ideas don't become tasks | **PRD→Tasks→Issues pipeline** with AI-powered breakdown |
-| Sprint planning is manual | **AI sprint planning** with capacity analysis and risk assessment |
-| Issues pile up untriaged | **AI-powered triage** with auto-labeling and priority assignment |
-| Need external databases | **Zero infra** — all state in GitHub issues, projects, and comments |
+- **Agents need a work queue, not a chat window.** `agent_work` / `agent_manage` give agents atomic task checkout, heartbeats, and a review loop instead of "go figure it out."
+- **Budgets must be enforced somewhere the agent cannot skip.** Each agent has a token budget with warning thresholds and a hard stop; the server debits itself, and `record_usage` covers the agent's own runtime spend.
+- **AI plans are worthless if they never become issues.** `ai_generate` runs idea → PRD → tasks → materialized GitHub issues, grouped into milestones and sprints.
+- **Tool lists are a context tax.** 20 tools instead of 169 keeps the schema small; `discover_tools` expands any domain or action on demand.
+- **State should live where the work already is.** The agent registry is a file on a dedicated branch (compare-and-swap writes), task claims are project fields, work products are issue comments — no new infrastructure to operate.
 
-## Works With
+## Quick start
 
-| Agent / Client | Integration |
-|---------------|-------------|
-| **Claude Desktop** | Native MCP client — add to `claude_desktop_config.json` |
-| **Claude Code** | MCP server via stdio transport |
-| **Codex** | MCP-compatible — register as tool provider |
-| **Cursor** | MCP server integration |
-| **Windsurf** | MCP server integration |
-| **Roo Code** | MCP server integration |
-| **VS Code + Copilot** | Via MCP extension |
-| **Custom harnesses** | Any MCP-compatible client — see `examples/basic/agent-loop.ts` |
-| **Oh My Pi / OpenCode** | Native MCP harness with stdio transport |
+Requires Node.js **>= 22.12.0** (Node 24 recommended).
 
-### MCP v2 Protocol Support
-
-Beyond tools, this server implements the full MCP v2 capability surface:
-
-| Capability | Count | Examples |
-|------------|-------|----------|
-| **Tools** | 20 compound (169 actions) | manage_project, ai_generate, agent_work |
-| **Resources** | 6 | github://projects, github://agents, github://config |
-| **Prompts** | 6 | review-prd, triage-issue, analyze-sprint-risk |
-| **Sampling** | ✓ | Client-side LLM for AI features when no API keys |
-
-### What Makes This Special
-
-- **Agentic-First Design**: Built as a task substrate for AI agents, not a human-facing PM tool retrofitted with an API
-- **20 Compound Tools (169 actions)**: Progressive-disclosure API — agents see 20 tools, drill into 169 actions via `discover_tools`
-- **Multi-Agent Swarm**: Agents register, claim tasks atomically, heartbeat, review each other, and converge projects
-- **PRD→Production Pipeline**: Idea → PRD → tasks → GitHub issues → milestones → sprints — fully automated
-- **Zero External Infrastructure**: All state lives in GitHub (issues, projects, comments) — no database, no Redis, no S3
-- **AI-Powered Everything**: Triage, sprint planning, roadmap generation, complexity analysis, duplicate detection — all AI-augmented
-- **Token Budget Enforcement**: Per-agent spending limits prevent runaway AI costs
-- **Self-Healing**: Auto-reclaim tasks from crashed agents, stale heartbeat detection, registry cleanup
-
-## Table of Contents
-
-- [Overview](#overview)
-- [Quick Start](#quick-start)
-- [Key Features](#key-features)
-- [Installation](#installation)
-- [Configuration](#configuration)
-- [Usage](#usage)
-  - [As a command-line tool](#as-a-command-line-tool)
-  - [Running from source with TypeScript](#running-from-source-with-typescript)
-  - [As a Node.js module](#as-a-nodejs-module)
-  - [Integration with MCP clients](#integration-with-mcp-clients)
-  - [Installing in AI Assistants](#installing-in-ai-assistants)
-    - [Claude](#install-in-claude)
-    - [Roocode](#install-in-roocode)
-    - [Windsurf](#install-in-windsurf)
-    - [VS Code](#install-in-vs-code)
-    - [Cursor](#install-in-cursor)
-    - [Using Docker](#using-docker)
-  - [Troubleshooting](#troubleshooting)
-- [Agent Orchestration](#agent-orchestration)
-- [Architecture](#architecture)
-- [Contributing](#contributing)
-- [License](#license)
-- [References](#references)
-- [Current Status](#current-status)
-
-## Quick Start
-
-### Using NPM
 ```bash
-# Install the package globally
+# 1. Install (global, or use npx / pnpm dlx / docker compose — see below)
 npm install -g mcp-github-project-manager
 
-# Set up your environment variables
-export GITHUB_TOKEN="your_github_token"
-export GITHUB_OWNER="your_github_username_or_organization"
-export GITHUB_REPO="your_repository_name"
+# 2. Configure (a working `gh auth login` means you can skip GITHUB_TOKEN)
+export GITHUB_TOKEN="ghp_..."
+export GITHUB_OWNER="your-org-or-user"
+export GITHUB_REPO="your-repo"
 
-# Run the MCP server
+# 3. Run the MCP stdio server
 mcp-github-project-manager
 ```
 
-### Using Docker
-```bash
-# Build the Docker image
-docker build -t mcp-github-project-manager .
+Register it with an MCP client:
 
-# Run with environment variables
-docker run -it \
-  -e GITHUB_TOKEN=your_github_token \
-  -e GITHUB_OWNER=your_github_username_or_organization \
-  -e GITHUB_REPO=your_repository_name \
-  mcp-github-project-manager
+```json
+{
+  "mcpServers": {
+    "github-project-manager": {
+      "command": "npx",
+      "args": ["-y", "mcp-github-project-manager"],
+      "env": {
+        "GITHUB_TOKEN": "ghp_...",
+        "GITHUB_OWNER": "your-org-or-user",
+        "GITHUB_REPO": "your-repo"
+      }
+    }
+  }
+}
 ```
 
-## Key Features
-
-### 🤖 AI-Powered Task Management
-- **PRD Generation** (`generate_prd`): Transform project ideas into comprehensive Product Requirements Documents
-- **Intelligent Task Breakdown** (`parse_prd`): AI-powered parsing of PRDs into actionable development tasks
-- **Smart Feature Addition** (`add_feature`): Add new features with automatic impact analysis and task generation
-- **Task Complexity Analysis** (`analyze_task_complexity`): Detailed AI analysis of task complexity, effort estimation, and risk assessment
-- **Next Task Recommendations** (`get_next_task`): AI-powered recommendations for optimal task prioritization
-- **Task Expansion** (`expand_task`): Break down complex tasks into manageable subtasks automatically
-- **PRD Enhancement** (`enhance_prd`): Improve existing PRDs with AI-powered gap analysis and improvements
-- **Task Materialization** (`materialize_tasks`): Convert generated tasks into real GitHub issues grouped into milestones and sprints with dependency-driven phase ordering
-
-### 🎯 Enhanced Task Context Generation
-- **Traceability-Based Context** (Default): Rich context from requirements traceability without AI dependency
-- **AI-Enhanced Context** (Optional): Comprehensive business, technical, and implementation context using AI
-- **Configurable Context Levels**: Choose between minimal, standard, and full context depth
-- **Business Context**: Extract business objectives, user impact, and success metrics
-- **Technical Context**: Analyze technical constraints, architecture decisions, and integration points
-- **Implementation Guidance**: AI-generated step-by-step implementation recommendations
-- **Contextual References**: Links to relevant PRD sections, features, and technical specifications
-- **Enhanced Acceptance Criteria**: Detailed, testable criteria with verification methods
-- **Graceful Degradation**: Works perfectly without AI keys, falls back to traceability-based context
-
-### 🔗 Complete Requirements Traceability
-- **End-to-End Tracking** (`create_traceability_matrix`): Full traceability from PRD business requirements → features → use cases → tasks
-- **Bidirectional Links**: Complete bidirectional traceability with impact analysis
-- **Use Case Management**: Professional actor-goal-scenario use case generation and tracking
-- **Coverage Analysis**: Comprehensive coverage metrics with gap identification
-- **Orphaned Task Detection**: Identify tasks without requirements links
-- **Change Impact Analysis**: Track requirement changes and their impact across all levels
-
-### 📊 Multi-Provider AI Support
-- **Anthropic Claude**: Primary AI provider for complex reasoning
-- **OpenAI GPT**: Alternative provider with fallback support
-- **Google Gemini**: Additional AI capabilities
-- **Perplexity**: Research and analysis tasks
-- **Automatic Fallback**: Seamless switching between providers
-
-### 🏗️ Core Project Management
-- **Project Management**: Create and manage GitHub Projects (v2)
-- **Issues and Milestones**: Full CRUD operations with advanced filtering
-- **Sprint Planning**: Plan and manage development sprints with AI assistance
-- **Custom Fields and Views**: Create different views (board, table, timeline, roadmap)
-- **Resource Versioning**: Intelligent caching and optimistic locking
-
-### ⚡ Advanced Features
-- **MCP Implementation**: Full MCP specification compliance with Zod validation
-- **GitHub Integration**: GraphQL API integration with intelligent rate limiting
-- **Real-time Sync**: Bidirectional synchronization with GitHub
-- **Webhook Integration**: Real-time updates via GitHub webhooks
-- **Progress Tracking**: Comprehensive metrics and progress reporting
-- **Event System**: Track and replay project events
-
-### 🔧 GitHub API Coverage
-- **GitHub Actions**: List workflows, trigger dispatches, monitor runs, download logs, cancel runs
-- **Releases**: Create, update, delete releases with auto-generated notes
-- **Branch Protection**: Get, update, delete branch protection rules; list branches
-- **Projects v2**: Full field/view/item management, templates, linking
-- **Issues & PRs**: CRUD, comments, sub-issues, advanced search, draft issues
-- **Milestones & Sprints**: Planning, metrics, velocity tracking
-
-### Agent Orchestration
-- **Compound Tool API**: 20 tools with `action` routing replace 169 individual actions — simpler for AI agents
-- **Agent Registry**: Register, list, and deregister autonomous AI agents
-- **Task Checkout**: Claim tasks with configurable selection strategies (priority, age, skills, deadline)
-- **Heartbeat Monitoring**: Periodic liveness and progress reporting with stale-agent detection
-- **Work Product Tracking**: Submit code changes, PRs, test results, and review artifacts
-- **Work Product Validation**: Reviewers inspect work against acceptance criteria — not rubber stamps
-- **Budget Enforcement**: Per-agent token budgets with warning thresholds and hard stops
-- **Activity Dashboard**: Real-time view of all agent statuses, tasks, and budget consumption
-- **Subagent Hierarchy**: Parent-child agent relationships with cascade deregistration
-- **Runtime Discovery**: `discover_tools` meta-tool for exploring available actions and schemas
-- **PM Coordination**: Project managers can assign specific tasks, monitor swarm status, and rebalance workloads
-- **Failure Recovery**: PM decomposes rejected tasks into subtasks, re-assigns to agents
-- **Smart Task Routing**: Capability-matched, budget-aware assignment (`smart_assign`)
-- **Project Convergence**: Auto-approve/reject/decompose in one call (`converge_project`)
-- **Registry Cleanup**: Remove stale agents automatically
-- **Task Materialization**: Bridge from PRD tasks to GitHub issues with milestones, sprints, and project assignment
-
-## Installation
-
-### Option 1: Install from npm (recommended)
-
 ```bash
-# Install the package globally
-npm install -g mcp-github-project-manager
+# Claude Code CLI
+claude mcp add github-project-manager -- npx -y mcp-github-project-manager
 
-# Or install in your project
-npm install mcp-github-project-manager
+# Docker
+docker compose up --build
 ```
 
-### Option 2: Install from source
+Install paths: `npm install -g mcp-github-project-manager`, `npx -y mcp-github-project-manager`, `pnpm dlx mcp-github-project-manager`, or `docker compose up --build`.
 
-```bash
-# Clone the repository
-git clone https://github.com/kunwarVivek/mcp-github-project-manager.git
-cd mcp-github-project-manager
+A GitHub token needs `repo`, `project`, and `write:org` scopes. Full setup options live in the [Deployment Guide](docs/deployment.md) and the [Getting Started tutorial](docs/tutorials/getting-started.md).
 
-# Install dependencies (npm or pnpm - use whichever you have)
-pnpm install
+Works with any stdio MCP client — Claude Desktop, Claude Code, Codex, Cursor, Windsurf, Roo Code, VS Code + Copilot, OpenCode, and custom harnesses.
 
-# Build the project
-pnpm run build
+## The tool surface
+
+Every tool takes an `action` string that routes to the underlying operation, so clients see 20 schemas instead of 169.
+
+| Tool | Group | Actions | Covers |
+|---|---|---|---|
+| `manage_project` | core | 37 | Projects v2: CRUD, fields, views, items, templates, repo/team linking |
+| `manage_issues` | core | 18 | Issue CRUD, comments, drafts, advanced search, sub-issues |
+| `manage_prs` | core | 7 | Create, list, update, merge, reviews |
+| `manage_milestones` | core | 7 | CRUD, metrics, overdue and upcoming |
+| `manage_sprints` | core | 8 | Create, update, plan, add/remove issues, metrics |
+| `manage_labels` | core | 2 | Create and list repository labels |
+| `manage_automation` | core | 7 | Automation rules: create, update, delete, enable, disable |
+| `manage_iterations` | core | 5 | Iteration config, current iteration, items, by-date, assign |
+| `manage_status_updates` | core | 3 | Project status updates: create, list, get |
+| `manage_branches` | core | 4 | Branch protection rules and branch listing |
+| `manage_releases` | core | 6 | Releases: create, list, get, update, delete, latest |
+| `manage_workflows` | core | 6 | GitHub Actions: list, dispatch, run status/logs, cancel |
+| `manage_events` | events | 3 | Subscribe, recent events, replay |
+| `ai_generate` | ai | 9 | PRD generate/enhance/parse, features, next task, complexity, expand, traceability, materialize |
+| `ai_analyze` | ai | 9 | Issue enrichment, triage, label suggestion, duplicate and related detection |
+| `ai_plan` | ai | 6 | Capacity, backlog priority, risk, sprint composition, roadmap, visualization |
+| `agent_work` | agents | 12 | Register, checkout, release, complete, heartbeat, review, task context |
+| `agent_manage` | agents | 18 | Registry, activity, work products, budgets, usage, PM coordination, convergence |
+| `system` | system | 2 | Health check (live GitHub rate-limit probe), project field setup |
+| `discover_tools` | system | meta | Runtime discovery of tools, actions, and parameters |
+
+Call shape — one discriminator, action-specific parameters:
+
+```json
+{ "tool": "manage_project", "arguments": { "action": "create", "title": "Q3 Roadmap", "owner": "myorg" } }
+{ "tool": "manage_issues", "arguments": { "action": "create", "title": "Add login form", "body": "..." } }
+{ "tool": "agent_work", "arguments": { "action": "checkout_task", "agentId": "agent-abc123", "strategy": "highest_priority" } }
+{ "tool": "discover_tools", "arguments": { "domain": "sprints" } }
 ```
 
-### Set up environment variables
+`discover_tools` takes an optional `domain` (projects, issues, pull_requests, milestones, sprints, labels, automation, iterations, events, status_updates, ai_generation, ai_analysis, ai_planning, agents, system) or a free-text `query`. It stays exposed even when tool groups are filtered.
 
-```bash
-# Copy the example environment file
-cp .env.example .env
+Alongside the tools the server exposes **6 read-only resources** (`github://config`, `github://projects`, `github://sprints/current`, `github://milestones`, `github://agents`, `github://tools`) and **6 prompts** (`review-prd`, `explain-task-complexity`, `suggest-issue-labels`, `analyze-sprint-risk`, `generate-release-notes`, `triage-issue`).
 
-# Edit .env with your GitHub token and details
+Full parameter reference: [docs/TOOLS.md](docs/TOOLS.md).
+
+## What it can do
+
+**AI generation** (`ai_generate`) — generate a PRD from an idea, enhance an existing one, parse a PRD into tasks, add a feature with impact analysis, recommend the next task, analyze complexity and risk, expand a task into subtasks, build a traceability matrix, and materialize tasks into real GitHub issues.
+
+**AI analysis** (`ai_analyze`) — enrich one or many issues, triage (single, bulk, or scheduled), suggest labels, detect duplicates, find related issues.
+
+**AI planning** (`ai_plan`) — calculate sprint capacity, prioritize a backlog, assess risk, suggest sprint composition, generate a roadmap or visualization. Given a `projectId` the roadmap is planned from that project's own issues; with `autoCreate` the milestones are created and assigned to them.
+
+**Agent swarm** (`agent_work` / `agent_manage`) — agents register with role, runtime, and capabilities; claim tasks by priority, age, skills, or deadline; heartbeat with progress and blockers; submit work products (branch, PR, files, test results) for review; approve, reject, or decompose. PM-side actions add budgets, usage accounting, stale-agent reclaim, workload rebalancing, smart assignment, and one-call project convergence.
+
+**Deterministic GitHub surface** — projects, issues, pull requests, milestones, sprints, labels, branches, releases, workflows, automation rules, events, and status updates, all with plain `action` routing and no model in the loop.
+
+The AI tools are optional. Without a provider key, everything else works unchanged.
+
+### The agent loop, end to end
+
+```json
+{ "tool": "agent_work", "arguments": { "action": "register", "name": "claude-eng-1", "role": "engineer", "runtime": "claude-code", "capabilities": ["typescript", "testing"] } }
+{ "tool": "agent_work", "arguments": { "action": "checkout_task", "agentId": "agent-abc123", "strategy": "highest_priority" } }
+{ "tool": "agent_work", "arguments": { "action": "get_task_context", "issueNumber": 42 } }
+{ "tool": "agent_work", "arguments": { "action": "heartbeat", "agentId": "agent-abc123", "status": "working", "taskId": "issue-42", "progress": 60, "currentBranch": "feat/42-add-login-form" } }
+{ "tool": "agent_manage", "arguments": { "action": "submit_work_product", "agentId": "agent-abc123", "taskId": "issue-42", "issueNumber": 42, "branch": "feat/42-add-login-form", "prNumber": 99, "summary": "Added login form with validation" } }
+{ "tool": "agent_work", "arguments": { "action": "complete_task", "agentId": "agent-abc123", "taskId": "issue-42", "summary": "Implemented and tested" } }
 ```
+
+A runnable version of this loop (worker + reviewer, every id threaded from the previous response, non-zero exit on any failure) lives in [`examples/basic/agent-loop.ts`](examples/basic/agent-loop.ts); `--plan` prints the call sequence with symbolic references.
+
+Checkout strategies: `highest_priority`, `oldest_first`, `skills_match`, `milestone_deadline`, `ai`. Budgets are set with `agent_manage` and `action: "set_budget"`; reset periods are `daily`, `weekly`, `monthly`, or `never`.
+
+Where the state lives — no external database:
+
+| Data | GitHub-native storage |
+|---|---|
+| Agent registry | `registry.json` on the `agent-registry` branch (Contents API, sha compare-and-swap) |
+| Task claims | Project custom fields (`agent_claimed_by`, `agent_status`, `agent_pr_number`, …) |
+| Work products | Structured issue comments |
+| Budgets and heartbeats | Agent records in the registry |
 
 ## Configuration
 
-### Required Environment Variables
+| Variable | Required | Purpose |
+|---|---|---|
+| `GITHUB_TOKEN` | yes\* | GitHub PAT with `repo`, `project`, `write:org` |
+| `GITHUB_OWNER` | yes | Owner (user or org) of the target repository |
+| `GITHUB_REPO` | yes | Target repository name |
+| `GITHUB_APP_ID`, `GITHUB_APP_PRIVATE_KEY`, `GITHUB_APP_INSTALLATION_ID` | no | GitHub App auth; outranks the PAT when all three are set |
+| `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GOOGLE_API_KEY`, `PERPLEXITY_API_KEY` | no | Unlocks the `ai_*` tools |
+| `AI_{MAIN,PRD,RESEARCH,FALLBACK}_{PROVIDER,MODEL,API_KEY,BASE_URL}` | no | Per-role provider, model, key, endpoint |
+| `MCP_TOOL_GROUPS` | no | Expose only some groups: `core`, `ai`, `agents`, `events`, `system` (default `all`) |
+| `SECRETS_DIR` | no | Read secrets from files named after the variable (Docker/k8s convention) |
+| `WEBHOOK_SECRET`, `WEBHOOK_PORT`, `SSE_ENABLED` | no | Webhook/SSE transport; signature validation fails closed |
+| `SYNC_ENABLED`, `CACHE_DIRECTORY`, `MAX_CACHE_ENTRIES` | no | Bidirectional sync and cache tuning |
+| `LOG_LEVEL`, `LOG_FORMAT` | no | `debug\|info\|warn\|error`, `text` or `json` |
 
-#### GitHub Configuration
-```env
-GITHUB_TOKEN=your_github_token
-GITHUB_OWNER=repository_owner
-GITHUB_REPO=repository_name
-```
+\* **Credential chain** (first hit wins): `--token` CLI flag → `$SECRETS_DIR/GITHUB_TOKEN` file → `GITHUB_TOKEN` env var → `gh auth token`. If you are already logged in with `gh`, you need no token configuration at all. Disable the fallback with `GH_CLI_TOKEN_FALLBACK=false`. CLI flags override env vars everywhere.
 
-The GitHub token requires these permissions:
-- `repo` (Full repository access)
-- `project` (Project access)
-- `write:org` (Organization access)
-
-#### AI Provider Configuration
-AI keys are **optional** — without them, non-AI tools (project management, issues, sprints, agents) work fine. AI-powered features (`ai_generate`, `ai_analyze`, `ai_plan`) need at least one key.
-
-```env
-# Global AI provider keys (set the ones you have)
-ANTHROPIC_API_KEY=your_anthropic_api_key_here
-OPENAI_API_KEY=your_openai_api_key_here
-GOOGLE_API_KEY=your_google_api_key_here
-PERPLEXITY_API_KEY=your_perplexity_api_key_here
-
-# AI Model Configuration (no defaults — configure what you want to use)
-AI_MAIN_MODEL=claude-sonnet-4-20250514    # general tasks
-AI_PRD_MODEL=claude-opus-5                # PRD generation
-AI_RESEARCH_MODEL=sonar-pro               # research
-AI_FALLBACK_MODEL=gpt-4o-mini             # fallback
-```
-
-#### Per-Role Provider Configuration (optional)
-Each model role can independently use a different provider, API key, and endpoint.
-Use `openai-compatible` for OpenRouter, Together, Groq, Ollama, or any OpenAI-protocol endpoint:
-
-```env
-# OpenRouter for cheap daily tasks
-AI_MAIN_PROVIDER=openai-compatible
-AI_MAIN_BASE_URL=https://openrouter.ai/api/v1
-AI_MAIN_API_KEY=sk-or-v1-your-key
-AI_MAIN_MODEL=deepseek/deepseek-chat
-
-# Direct Anthropic for PRD generation
-AI_PRD_PROVIDER=anthropic
-AI_PRD_API_KEY=sk-ant-your-key
-AI_PRD_MODEL=claude-opus-5
-
-# Local Ollama as fallback
-AI_FALLBACK_PROVIDER=openai-compatible
-AI_FALLBACK_BASE_URL=http://localhost:11434/v1
-AI_FALLBACK_API_KEY=ollama
-AI_FALLBACK_MODEL=llama3.1
-```
-
-See the [Configuration Guide](docs/CONFIGURATION.md) for full per-role documentation.
-
-
-### AI Provider Setup
-
-#### Anthropic Claude
-1. Sign up at [Anthropic Console](https://console.anthropic.com/)
-2. Create an API key
-3. Set `ANTHROPIC_API_KEY` in your environment
-
-#### OpenAI
-1. Sign up at [OpenAI Platform](https://platform.openai.com/)
-2. Create an API key
-3. Set `OPENAI_API_KEY` in your environment
-
-#### Google Gemini
-1. Sign up at [Google AI Studio](https://aistudio.google.com/)
-2. Create an API key
-3. Set `GOOGLE_API_KEY` in your environment
-
-#### Perplexity
-1. Sign up at [Perplexity API](https://www.perplexity.ai/settings/api)
-2. Create an API key
-3. Set `PERPLEXITY_API_KEY` in your environment
-
-## Usage
-
-### As a command-line tool
-
-If installed globally:
+Narrow the exposed surface with group filters (group names, not tool names):
 
 ```bash
-# Start the MCP server using stdio transport
-mcp-github-project-manager
-
-# Start with environment variables
-GITHUB_TOKEN=your_token mcp-github-project-manager
-
-# Start with command line arguments
-mcp-github-project-manager --token=your_token --owner=your_username --repo=your_repo
-
-# Use a specific .env file
-mcp-github-project-manager --env-file=.env.production
-
-# Show verbose output
-mcp-github-project-manager --verbose
-
-# Display help information
-mcp-github-project-manager --help
+MCP_TOOL_GROUPS=core        # project management only
+MCP_TOOL_GROUPS=core,ai     # add the AI tools
+MCP_TOOL_GROUPS=all         # default — everything
 ```
 
-### Running from source with TypeScript
+**AI providers**: `anthropic`, `openai`, `google`, `perplexity`, and `openai-compatible` (OpenRouter, Together, Groq, Ollama, LM Studio, Azure OpenAI, …). There are **no default models** — you configure the models you use, per role, so you can run OpenRouter for cheap daily work and a frontier model for PRD generation. A partially configured GitHub App falls back to the PAT rather than locking you out.
 
-If you're developing or running from source:
+Full list: [docs/CONFIGURATION.md](docs/CONFIGURATION.md).
 
-```bash
-# Use the npm dev script (watches for changes) — recommended
-pnpm run dev
+## Running it
 
-# Run directly with tsx
-pnpm exec tsx src/index.ts
+Every script is package-manager agnostic — `npm run X` and `pnpm run X` are identical, and both lockfiles are committed.
 
-# Run with command line arguments
-pnpm exec tsx src/index.ts --token=your_token --owner=your_username --repo=your_repo
+| Task | Command |
+|---|---|
+| Build (tsc → `fix-imports.js` → chmod) | `npm run build` |
+| Typecheck (src + examples, src + tests) | `npm run typecheck` |
+| Lint | `npm run lint` |
+| Format | `npm run format` |
+| Unit tests | `npm test` |
+| Dev (watch) | `npm run dev` |
+| Coverage | `npm run test:coverage` |
+| E2E, mocked GitHub/AI | `npm run test:e2e:tools` |
+| E2E, live API (uses rate limit) | `E2E_REAL_API=true npm run test:e2e:tools:real` |
+| AI suites | `npm run test:ai` |
+| Inspect the server | `npm run inspect` |
 
-# Display help information
-pnpm exec tsx src/index.ts --help
-```
+Point an MCP client at a local build with `{"command": "node", "args": ["build/index.js"]}`.
 
-#### Command Line Options
+Deployment and MCP-client setup: [docs/deployment.md](docs/deployment.md). When something misbehaves: [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md).
 
-| Option | Short | Description |
-|--------|-------|-------------|
-| `--token <token>` | `-t` | GitHub personal access token |
-| `--owner <owner>` | `-o` | GitHub repository owner (username or organization) |
-| `--repo <repo>` | `-r` | GitHub repository name |
-| `--env-file <path>` | `-e` | Path to .env file (default: .env in project root) |
-| `--verbose` | `-v` | Enable verbose logging |
-| `--help` | `-h` | Display help information |
-| `--version` | | Display version information |
+## Architecture at a glance
 
-Command line arguments take precedence over environment variables.
+Four layers, dependencies pointing inward:
 
-### As a Node.js module
+1. **Domain** (`src/domain/`) — types, Zod schemas, errors. No logic.
+2. **Services** (`src/services/`) — business logic; `ProjectManagementService` orchestrates per-feature services, `src/services/ai/` holds the AI SDK providers.
+3. **Infrastructure** (`src/infrastructure/`) — `github/` (Octokit GraphQL/REST), `tools/` (tool definitions, registry, validators, `compound/`), plus cache, persistence, resilience, events, secrets, logger, MCP resources and prompts.
+4. **MCP** (`src/index.ts`) — boots `McpServer` (MCP v2) over stdio; every tool is registered with `registerTool` and shares one `dispatchTool` carrying the shutdown gate, in-flight tracking, and result formatting.
 
-```javascript
-import { Server } from "mcp-github-project-manager";
+`src/container.ts` wires everything with tyringe DI; `src/env.ts` and `src/cli.ts` resolve configuration (CLI flags beat env vars). AI providers plug in behind `AIServiceFactory`: it returns a model per role, wraps it in usage-reporting middleware, and the shared dispatcher debits the calling agent's budget once per tool call.
 
-// Create and start an MCP server instance
-const server = new Server({
-  transport: "stdio", // or "http" for HTTP server
-  config: {
-    githubToken: process.env.GITHUB_TOKEN,
-    githubOwner: process.env.GITHUB_OWNER,
-    githubRepo: process.env.GITHUB_REPO
-  }
-});
+A tool that runs and fails returns `{ content, isError: true }` so the model can recover; a JSON-RPC error is reserved for protocol faults.
 
-server.start();
-```
-
-### Integration with MCP clients
-
-```javascript
-// Example using an MCP client library
-import { McpClient } from "@modelcontextprotocol/client";
-import { spawn } from "child_process";
-
-// Create a child process running the MCP server
-const serverProcess = spawn("mcp-github-project-manager", [], {
-  env: { ...process.env, GITHUB_TOKEN: "your_token" }
-});
-
-// Connect the MCP client to the server
-const client = new McpClient({
-  transport: {
-    type: "process",
-    process: serverProcess
-  }
-});
-
-// Call MCP tools (compound API)
-const result = await client.callTool("manage_project", {
-  action: "create",
-  title: "My Project",
-  owner: "myorg"
-});
-```
-
-For more examples, see the [User Guide](docs/user-guide.md) and the [examples/](examples/) directory.
-
-### Compound Tool API Examples
-
-The MCP server exposes 20 compound tools (169 actions). Each tool accepts an `action` parameter that routes to the underlying operation. Use `discover_tools` to explore capabilities at runtime.
-
-#### Quick Start Workflow
-```json
-// 1. Create a project
-{"tool": "manage_project", "arguments": {"action": "create", "title": "My Project", "owner": "myorg"}}
-
-// 2. Create an issue
-{"tool": "manage_issues", "arguments": {"action": "create", "title": "First Issue", "body": "Description here"}}
-
-// 3. Register an AI agent
-{"tool": "agent_work", "arguments": {"action": "register", "name": "claude-eng-1", "role": "engineer"}}
-
-// 4. Agent checks out a task
-{"tool": "agent_work", "arguments": {"action": "checkout_task", "agentId": "agent-abc123", "strategy": "highest_priority"}}
-
-// 5. Discover available tools at runtime
-{"tool": "discover_tools", "arguments": {}}
-{"tool": "discover_tools", "arguments": {"group": "manage_issues", "action": "create", "includeSchemas": true}}
-```
-
-#### AI-Powered Project Workflow
-```json
-// 1. Generate PRD from project idea
-{"tool": "ai_generate", "arguments": {"action": "generate_prd", "projectIdea": "AI-powered task management with real-time collaboration", "projectName": "TaskAI Pro", "complexity": "high"}}
-
-// 2. Parse PRD into tasks with traceability
-{"tool": "ai_generate", "arguments": {"action": "parse_prd", "prdContent": "<generated PRD>", "maxTasks": 30, "createTraceabilityMatrix": true}}
-
-// 3. Get next task recommendations
-{"tool": "ai_generate", "arguments": {"action": "get_next_task", "sprintCapacity": 40, "teamSkills": ["react", "node.js", "typescript"]}}
-
-// 4. Analyze task complexity
-{"tool": "ai_generate", "arguments": {"action": "analyze_complexity", "taskTitle": "Implement real-time collaboration", "includeRisks": true}}
-
-// 5. Break down complex tasks
-{"tool": "ai_generate", "arguments": {"action": "expand_task", "taskTitle": "Build analytics dashboard", "currentComplexity": 8, "targetComplexity": 3}}
-```
-
-#### Feature Addition Workflow
-```json
-// Add new feature with complete lifecycle
-{"tool": "ai_generate", "arguments": {"action": "add_feature", "featureIdea": "Advanced Analytics Dashboard", "description": "Real-time analytics with AI insights", "expandToTasks": true}}
-// Automatically creates: business requirements, use cases, tasks with traceability, lifecycle tracking
-
-// Create traceability matrix
-{"tool": "ai_generate", "arguments": {"action": "create_traceability_matrix", "projectId": "task-ai-pro", "validateCompleteness": true}}
-```
-
-#### Tool Discovery
-```json
-// List all compound tools
-{"tool": "discover_tools", "arguments": {}}
-
-// Explore a specific tool's actions
-{"tool": "discover_tools", "arguments": {"group": "ai_generate"}}
-
-// Get full schema for a specific action
-{"tool": "discover_tools", "arguments": {"group": "ai_generate", "action": "generate_prd", "includeSchemas": true}}
-```
-
-#### MCP_TOOL_GROUPS Configuration
-
-Control which compound tools are exposed to MCP clients:
-```bash
-# Default: all tools exposed
-MCP_TOOL_GROUPS=all
-
-# Expose only project management tools
-MCP_TOOL_GROUPS=core
-
-# Add AI tools
-MCP_TOOL_GROUPS=core,ai
-```
-
-`discover_tools` is always available regardless of this setting.
-
-**Context Generation Levels:**
-- **Minimal**: Basic traceability context only (fastest)
-- **Standard**: Traceability + basic business context (default)
-- **Full**: Complete AI-enhanced context with implementation guidance
-
-### 🧪 Testing Enhanced Context Generation
-
-The enhanced context generation functionality includes comprehensive test coverage:
-
-#### **Test Files Created:**
-- `src/__tests__/TaskContextGenerationService.test.ts` - Core context generation service tests
-- `src/__tests__/TaskGenerationService.enhanced.test.ts` - Enhanced task generation integration tests
-- `src/__tests__/ParsePRDTool.enhanced.test.ts` - Tool-level context generation tests
-
-#### **Test Coverage:**
-- **Traceability-based context generation** (default behavior)
-- **AI-enhanced context generation** (when AI is available)
-- **Graceful fallback** when AI services are unavailable
-- **Configuration validation** and environment variable handling
-- **Error handling** and resilience testing
-- **Integration testing** with existing task generation pipeline
-
-#### **Running Context Generation Tests:**
-```bash
-# Run all AI-related tests (includes context generation)
-pnpm run test:ai
-
-# Run specific context generation tests
-pnpm test TaskContextGeneration
-pnpm test enhanced
-
-# Run all tests
-pnpm test
-```
-
-## 🧪 Comprehensive E2E Testing Suite
-
-The MCP GitHub Project Manager includes a comprehensive end-to-end testing suite that tests all MCP tools through the actual MCP interface with both mocked and real API calls.
-
-### **Test Coverage:**
-- ✅ **20 Compound Tools (169 actions)** - Complete CRUD operations for projects, milestones, issues, sprints, labels, and more
-- ✅ **9 AI-Powered Actions** - PRD generation, task parsing, complexity analysis, feature management, and traceability
-- ✅ **Complex Workflow Integration** - Multi-tool workflows and real-world project management scenarios
-- ✅ **Real API Testing** - Optional testing with actual GitHub and AI APIs
-- ✅ **Schema Validation** - Comprehensive argument validation for all tools
-- ✅ **Error Handling** - Graceful error handling and recovery testing
-
-### **Quick Start:**
-```bash
-# Run comprehensive E2E tests (mocked APIs)
-pnpm run test:e2e:tools
-
-# Run with real APIs (requires credentials)
-pnpm run test:e2e:tools:real
-
-# Use the interactive test runner
-pnpm run test:e2e:runner
-
-# Run specific test categories
-pnpm run test:e2e:tools:github     # GitHub tools only
-pnpm run test:e2e:tools:ai         # AI tools only
-pnpm run test:e2e:tools:workflows  # Integration workflows
-```
-
-### **Test Runner Options:**
-```bash
-# Interactive test runner with options
-node scripts/run-e2e-tests.js --help
-
-# Examples:
-node scripts/run-e2e-tests.js --real-api --github-only
-node scripts/run-e2e-tests.js --build --verbose --timeout 120
-node scripts/run-e2e-tests.js --ai-only --real-api
-```
-
-### **Environment Setup for Real API Testing:**
-
-**GitHub API (Required for GitHub tools):**
-```bash
-GITHUB_TOKEN=ghp_your_github_token
-GITHUB_OWNER=your-github-username
-GITHUB_REPO=your-test-repository
-```
-
-**AI APIs (Required for AI tools):**
-```bash
-# At least one AI API key required
-ANTHROPIC_API_KEY=sk-ant-your-anthropic-key
-OPENAI_API_KEY=sk-your-openai-key
-GOOGLE_API_KEY=your-google-ai-key
-PERPLEXITY_API_KEY=pplx-your-perplexity-key
-```
-
-**Enable Real API Testing:**
-```bash
-E2E_REAL_API=true pnpm run test:e2e:tools:real
-```
-
-### **Test Features:**
-- **Tool Registration Validation** - Verify all tools are properly registered with correct schemas
-- **MCP Protocol Compliance** - Ensure all tools follow MCP specification
-- **Response Format Validation** - Validate tool responses match expected formats
-- **Workflow Integration Testing** - Test complex multi-tool workflows
-- **Credential Management** - Graceful handling of missing credentials
-- **Performance Monitoring** - Track tool execution performance
-- **Comprehensive Error Testing** - Validate error handling and recovery
-
-### **Documentation:**
-- 📖 [Comprehensive E2E Testing Guide](docs/e2e-testing-guide.md) - Detailed testing documentation
-- 🔧 [Test Configuration](jest.e2e.tools.config.js) - Jest configuration for E2E tests
-- 🛠️ [Test Utilities](src/__tests__/e2e/utils/MCPToolTestUtils.ts) - Reusable test utilities
-
-The E2E test suite ensures that all MCP tools work correctly both individually and in complex workflows, providing confidence in the reliability and integration of the entire system.
-
-#### **Test Scenarios Covered:**
-- ✅ Default traceability-based context (no AI required)
-- ✅ AI-enhanced business context generation
-- ✅ AI-enhanced technical context generation
-- ✅ Implementation guidance generation
-- ✅ Context merging and conflict resolution
-- ✅ Error handling and graceful degradation
-- ✅ Configuration validation and defaults
-- ✅ Tool-level parameter validation
-- ✅ Integration with existing traceability system
-
-### Installing in AI Assistants
-
-#### Install in Claude
-
-To install the MCP server in Claude Desktop:
-
-```json
-{
-  "mcpServers": {
-    "github-project-manager": {
-      "command": "npx",
-      "args": ["-y", "mcp-github-project-manager"],
-      "env": {
-        "GITHUB_TOKEN": "your_github_token",
-        "GITHUB_OWNER": "your_username",
-        "GITHUB_REPO": "your_repo",
-        "AI_MAIN_PROVIDER": "openai-compatible",
-        "AI_MAIN_BASE_URL": "https://openrouter.ai/api/v1",
-        "AI_MAIN_API_KEY": "sk-or-v1-your-key",
-        "AI_MAIN_MODEL": "deepseek/deepseek-chat"
-      }
-    }
-  }
-}
-```
-
-Or with a direct provider key (simpler):
-
-```json
-{
-  "mcpServers": {
-    "github-project-manager": {
-      "command": "npx",
-      "args": ["-y", "mcp-github-project-manager"],
-      "env": {
-        "GITHUB_TOKEN": "your_github_token",
-        "GITHUB_OWNER": "your_username",
-        "GITHUB_REPO": "your_repo",
-        "ANTHROPIC_API_KEY": "your_anthropic_api_key"
-      }
-    }
-  }
-}
-```
-
-For Claude Code CLI, run:
-
-```bash
-claude mcp add github-project-manager -- pnpm dlx mcp-github-project-manager
-```
-
-#### Install in Roocode
-
-Add this to your Roocode configuration:
-
-```json
-{
-  "mcpServers": {
-    "github-project-manager": {
-      "command": "npx",
-      "args": ["-y", "mcp-github-project-manager"],
-      "env": {
-        "GITHUB_TOKEN": "your_github_token",
-        "GITHUB_OWNER": "your_username",
-        "GITHUB_REPO": "your_repo"
-      }
-    }
-  }
-}
-```
-
-#### Install in Windsurf
-
-Add this to your Windsurf MCP config file:
-
-```json
-{
-  "mcpServers": {
-    "github-project-manager": {
-      "command": "npx",
-      "args": ["-y", "mcp-github-project-manager"],
-      "env": {
-        "GITHUB_TOKEN": "your_github_token",
-        "GITHUB_OWNER": "your_username",
-        "GITHUB_REPO": "your_repo"
-      }
-    }
-  }
-}
-```
-
-See [Windsurf MCP docs](https://docs.windsurf.com/windsurf/mcp) for more information.
-
-#### Install in VS Code
-
-Add this to your VS Code MCP config file:
-
-```json
-{
-  "servers": {
-    "github-project-manager": {
-      "type": "stdio",
-      "command": "npx",
-      "args": ["-y", "mcp-github-project-manager"],
-      "env": {
-        "GITHUB_TOKEN": "your_github_token",
-        "GITHUB_OWNER": "your_username",
-        "GITHUB_REPO": "your_repo"
-      }
-    }
-  }
-}
-```
-
-See [VS Code MCP docs](https://code.visualstudio.com/docs/copilot/chat/mcp-servers) for more information.
-
-#### Install in Cursor
-
-Add this to your Cursor MCP config file:
-
-```json
-{
-  "mcpServers": {
-    "github-project-manager": {
-      "command": "npx",
-      "args": ["-y", "mcp-github-project-manager"],
-      "env": {
-        "GITHUB_TOKEN": "your_github_token",
-        "GITHUB_OWNER": "your_username",
-        "GITHUB_REPO": "your_repo"
-      }
-    }
-  }
-}
-```
-
-See [Cursor MCP docs](https://docs.cursor.com/context/model-context-protocol) for more information.
-
-#### Using Docker
-
-If you prefer to run the MCP server in a Docker container:
-
-1. **Build the Docker Image:**
-
-```bash
-docker build -t mcp-gh-project .
-```
-
-2. **Run the container:**
-
-```bash
-docker run -d \
-  -e GITHUB_TOKEN=your_github_token \
-  -e GITHUB_OWNER=your_github_owner \
-  -e GITHUB_REPO=your_repository_name \
-  mcp-gh-project:latest
-```
-
-Or with CLI arguments:
-
-```bash
-docker run -d mcp-gh-project:latest \
-  --github_token your_github_token \
-  --github_owner your_owner \
-  --github_repo your_repo
-```
-
-3. **Configure Your MCP Client:**
-
-```json
-{
-  "mcpServers": {
-    "github-project-manager": {
-      "command": "docker",
-      "args": ["run", "-i", "--rm", "-e", "GITHUB_TOKEN", "-e", "GITHUB_OWNER", "-e", "GITHUB_REPO", "mcp-gh-project:latest"],
-      "env": {
-        "GITHUB_TOKEN": "your_token",
-        "GITHUB_OWNER": "your_owner",
-        "GITHUB_REPO": "your_repo"
-      }
-    }
-  }
-}
-```
-         "env": {
-           "GITHUB_TOKEN": "your_github_token",
-           "GITHUB_OWNER": "your_username",
-           "GITHUB_REPO": "your_repo"
-         }
-       }
-     }
-   }
-   ```
-
-### Troubleshooting
-
-#### Common Issues
-
-1. **Module Not Found Errors**
-
-   If you encounter module resolution issues, try using `bunx` instead of `npx`:
-
-   ```json
-   {
-     "mcpServers": {
-       "github-project-manager": {
-         "command": "bunx",
-         "args": ["-y", "mcp-github-project-manager"]
-       }
-     }
-   }
-   ```
-
-2. **Windows-Specific Configuration**
-
-   On Windows, you may need to use `cmd` to run the command:
-
-   ```json
-   {
-     "mcpServers": {
-       "github-project-manager": {
-         "command": "cmd",
-         "args": [
-           "/c",
-           "npx",
-           "-y",
-           "mcp-github-project-manager"
-         ]
-       }
-     }
-   }
-   ```
-
-3. **Permission Issues**
-
-   If you encounter permission issues, make sure your GitHub token has the required permissions listed in the Configuration section.
-
-## Agent Orchestration
-
-The agent orchestration layer enables autonomous AI agents (Claude Code, Codex, Cursor, etc.) to self-assign tasks, report progress, submit work products, and operate within token budgets — all backed by GitHub-native storage.
-
-### How It Works
-
-Agents interact with the orchestration layer through two compound tools — `agent_work` (task lifecycle) and `agent_manage` (administration):
-
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│                    Agent Orchestration Layer                        │
-│                                                                     │
-│  ┌───────────┐  ┌──────────────┐  ┌─────────────┐  ┌────────────┐  │
-│  │  Agent     │  │  Task        │  │  Work       │  │  Budget    │  │
-│  │  Registry  │  │  Checkout    │  │  Products   │  │  Manager   │  │
-│  └───────────┘  └──────────────┘  └─────────────┘  └────────────┘  │
-│         │              │                │                │          │
-│         ▼              ▼                ▼                ▼          │
-│  ┌─────────────────────────────────────────────────────────────┐    │
-│  │           GitHub-Native Storage (Issues + Projects)         │    │
-│  │  • Agent registry → pinned issue (label: agent-registry)   │    │
-│  │  • Task claims   → project custom fields                   │    │
-│  │  • Work products → structured issue comments               │    │
-│  │  • Budgets       → agent registry metadata                 │    │
-│  └─────────────────────────────────────────────────────────────┘    │
-│                                                                     │
-└─────────────────────────────────────────────────────────────────────┘
-```
-
-### Agent Compound Tools
-
-| Tool | Action | Purpose |
-|------|--------|---------|
-| `agent_work` | `register` | Register an AI agent with role, runtime, and capabilities |
-| `agent_work` | `checkout_task` | Claim the next available task using a selection strategy |
-| `agent_work` | `release_task` | Return a task to the pool (blocked, wrong skills, etc.) |
-| `agent_work` | `complete_task` | Mark a task as completed with a summary |
-| `agent_work` | `heartbeat` | Report liveness, progress %, branch, and blockers |
-| `agent_work` | `check_work_status` | Check the review/merge status of submitted work |
-| `agent_work` | `get_task_context` | Get enriched context for a task |
-| `agent_manage` | `list` | List registered agents, filter by role or status |
-| `agent_manage` | `deregister` | Remove an agent from the registry |
-| `agent_manage` | `get_activity` | Dashboard of all agents: tasks, progress, heartbeat, budget |
-| `agent_manage` | `submit_work_product` | Submit code changes with branch, PR, files, and test results |
-| `agent_manage` | `get_budget` | Check an agent's token budget (used, remaining, warnings) |
-| `agent_manage` | `set_budget` | Configure token budget, warning threshold, hard stop, reset period |
-
-### Quick Start: Autonomous Agent Loop
-
-```json
-// 1. Register the agent
-{"tool": "agent_work", "arguments": {"action": "register", "name": "claude-eng-1", "role": "engineer", "runtime": "claude-code", "capabilities": ["typescript", "react", "testing"]}}
-// → { id: "agent-abc123", status: "idle", ... }
-
-// 2. Check out a task
-{"tool": "agent_work", "arguments": {"action": "checkout_task", "agentId": "agent-abc123", "strategy": "highest_priority"}}
-// → { success: true, issueNumber: 42, issueTitle: "Add login form", branchSuggestion: "feat/42-add-login-form" }
-
-// 3. Get full context
-{"tool": "agent_work", "arguments": {"action": "get_task_context", "issueNumber": 42}}
-// → { issue: {...}, milestone: {...}, acceptanceCriteria: [...], codingStandards: "..." }
-
-// 4. Work on the task, sending heartbeats periodically
-{"tool": "agent_work", "arguments": {"action": "heartbeat", "agentId": "agent-abc123", "status": "working", "taskId": "issue-42", "progress": 60, "progressSummary": "Tests passing, working on edge cases", "currentBranch": "feat/42-add-login-form"}}
-
-// 5. Submit the work product
-{"tool": "agent_manage", "arguments": {"action": "submit_work_product", "agentId": "agent-abc123", "taskId": "issue-42", "issueNumber": 42, "branch": "feat/42-add-login-form", "prNumber": 99, "summary": "Added login form with email/password validation"}}
-
-// 6. Complete the task
-{"tool": "agent_work", "arguments": {"action": "complete_task", "agentId": "agent-abc123", "taskId": "issue-42", "summary": "Implemented login form with validation and tests"}}
-
-// 7. Repeat: checkout next task
-{"tool": "agent_work", "arguments": {"action": "checkout_task", "agentId": "agent-abc123", "strategy": "highest_priority"}}
-```
-
-### Subagent Hierarchy
-
-Agents can register child agents using `parentAgentId`. This enables multi-agent architectures:
-
-```json
-// Parent agent registers itself
-{"tool": "agent_work", "arguments": {"action": "register", "name": "lead-agent", "role": "pm", "runtime": "claude-code"}}
-// → { id: "agent-lead" }
-
-// Parent spawns a sub-agent
-{"tool": "agent_work", "arguments": {"action": "register", "name": "worker-1", "role": "engineer", "runtime": "claude-code", "parentAgentId": "agent-lead", "capabilities": ["typescript", "testing"]}}
-
-// Deregistering the parent cascades to all children
-{"tool": "agent_manage", "arguments": {"action": "deregister", "agentId": "agent-lead"}}
-// → Removes lead-agent and worker-1
-```
-
-### Budget Enforcement
-
-Token budgets prevent runaway AI costs:
-
-```json
-// Set a daily budget with 80% warning
-{"tool": "agent_manage", "arguments": {"action": "set_budget", "agentId": "agent-abc123", "totalTokens": 500000, "warningThreshold": 0.8, "hardStop": true, "resetPeriod": "daily"}}
-
-// Check budget status before expensive operations
-{"tool": "agent_manage", "arguments": {"action": "get_budget", "agentId": "agent-abc123"}}
-// → { usedTokens: 350000, remainingTokens: 150000, usagePercent: 70, isWarning: false, isExhausted: false }
-```
-
-### GitHub-Native Data Model
-
-All orchestration state lives in your GitHub repository — no external database required:
-
-| Data | Storage | Details |
-|------|---------|---------|
-| Agent registry | Pinned issue | JSON body on an issue labeled `agent-registry` |
-| Task claims | Project custom fields | `agent_claimed_by`, `agent_claimed_at`, `agent_status`, `agent_work_branch`, `agent_pr_number` |
-| Work products | Issue comments | Structured comments with `<!-- agent-work-product: -->` markers |
-| Budgets | Agent metadata | Stored in the agent registry alongside each agent record |
-| Heartbeats | Agent metadata | `lastHeartbeat` timestamp on the agent record |
-
-### Configuration
-
-| Constant | Default | Description |
-|----------|---------|-------------|
-| Heartbeat timeout | 30 minutes | Agent is considered stale after this period |
-| Default budget | 500,000 tokens | Initial token budget per agent |
-| Registry label | `agent-registry` | GitHub issue label for the agent registry |
-
-See the [Tool Reference](docs/TOOLS.md#agent-orchestration-tools) for detailed parameter documentation.
-
-
-## Architecture
-
-The server follows Clean Architecture principles with distinct layers:
-
-- **Domain Layer**: Core entities, repository interfaces, and Zod schemas
-- **Infrastructure Layer**: GitHub API integration and implementations
-- **Service Layer**: Business logic coordination
-- **MCP Layer**: Tool definitions and request handling
+Design details: [docs/architecture.md](docs/architecture.md).
 
 ## Contributing
 
-Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+Task tracking uses **[bd](https://github.com/gastownhall/beads)** (beads) — `bd ready`, `bd show <id>`, `bd update <id> --claim`, `bd close <id>`. Code traversal and audits use **GitNexus**: run impact analysis before editing a symbol and change analysis before committing. Refresh the index with `node .gitnexus/run.cjs analyze --index-only` when that runner exists in your checkout; otherwise bootstrap the CLI with `npx`/`bunx`/`pnpm dlx gitnexus@latest analyze`. Per-task recipes live in `.agents/skills/gitnexus-*/SKILL.md`.
 
-1. Fork the repository
-2. Create a feature branch: `git checkout -b feature/amazing-feature`
-3. Commit your changes: `git commit -m 'Add some amazing feature'`
-4. Push to the branch: `git push origin feature/amazing-feature`
-5. Open a Pull Request
+The quality gate, in order: `npm run build` → `npm run typecheck` → `npm run lint` → `npm test`.
+
+Traps that bite contributors:
+
+- **Source imports omit `.js`.** The `postbuild` step adds the extension. Never ship raw `tsc` output — always run the full build.
+- **`isolatedModules` is on.** A type re-exported as a value is a compile error; use `export type` / `import type`, including for decorated constructor parameters.
+- **Vitest rejects foreign test-runner CLI flags.** `--testPathPattern` fails with `CACError: Unknown option`; filter with a positional pattern and exclude with `--exclude='**/tests/x/**'`.
+- **Mocks must use `function`, not an arrow,** wherever the code under test calls `new`. A `beforeEach` with an implicit return is treated as a teardown callback — use a block body.
+
+Start with [CONTRIBUTING.md](CONTRIBUTING.md) and [docs/contributing/index.md](docs/contributing/index.md).
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## References
-
-- [Model Context Protocol](https://modelcontextprotocol.io)
-- [GitHub Projects API](https://docs.github.com/en/issues/planning-and-tracking-with-projects/automating-your-project/using-the-api-to-manage-projects)
-
-## Current Status
-
-### Core Features
-| Feature | Status | Notes |
-|---------|--------|-------|
-| Project Creation | ✅ Complete | Full support for v2 projects |
-| Milestone Management | ✅ Complete | CRUD operations implemented |
-| Sprint Planning | ✅ Complete | Including metrics tracking |
-| Issue Management | ✅ Complete | With custom fields support |
-| Resource Versioning | ✅ Complete | With optimistic locking and schema validation |
-| Webhook Integration | ✅ Complete | Real-time updates; fail-closed HMAC signature validation + SSE streaming |
-
-### AI-Powered Features
-| Feature | Status | Notes |
-|---------|--------|-------|
-| PRD Generation | ✅ Complete | Multi-provider AI support with comprehensive PRD creation |
-| Task Generation | ✅ Complete | AI-powered parsing of PRDs into actionable tasks |
-| Feature Addition | ✅ Complete | Smart feature addition with impact analysis |
-| Task Complexity Analysis | ✅ Complete | Detailed AI analysis with risk assessment |
-| Task Recommendations | ✅ Complete | AI-powered next task recommendations |
-| Task Expansion | ✅ Complete | Break down complex tasks into subtasks |
-| PRD Enhancement | ✅ Complete | AI-powered PRD improvement and gap analysis |
-| Requirements Traceability | ✅ Complete | End-to-end traceability matrix with coverage analysis |
-
-### Requirements Traceability
-| Feature | Status | Notes |
-|---------|--------|-------|
-| Business Requirements Extraction | ✅ Complete | Extract from PRD objectives and success metrics |
-| Use Case Generation | ✅ Complete | Actor-goal-scenario structure with alternatives |
-| Traceability Links | ✅ Complete | Bidirectional links with impact analysis |
-| Coverage Analysis | ✅ Complete | Gap identification and orphaned task detection |
-| Change Tracking | ✅ Complete | Requirement change impact analysis |
-| Verification Tracking | ✅ Complete | Test case mapping and verification status |
-
-### MCP Implementation
-| Component | Status | Notes |
-|-----------|--------|-------|
-| Tool Definitions | ✅ Complete | All core tools implemented with Zod validation |
-| Resource Management | ✅ Complete | Full CRUD operations with versioning |
-| Security | ✅ Complete | Token validation, fail-closed webhook signatures, file-mounted secrets (`SECRETS_DIR`) |
-| Error Handling | ✅ Complete | According to MCP specifications |
-| Transport | ✅ Complete | Stdio and HTTP support |
-
-See [.planning/STATUS.md](.planning/STATUS.md) for detailed implementation status.
-| Resource Management | ✅ Complete | With optimistic locking and relationship tracking |
-| Response Handling | ✅ Complete | Rich content formatting with multiple content types |
-| Error Handling | ✅ Complete | Comprehensive error mapping to MCP error codes |
-| State Management | ✅ Complete | With conflict resolution and rate limiting |
-
-### Recent Improvements
-
-- **Dependency & SDK modernization (2026-07-15)**:
-  - Migrated to Vercel AI SDK v7 and Zod v4 (coupled upgrade; MCP SDK 1.29 accepts Zod 4)
-  - Aligned Octokit type packages with `@octokit/rest` 22
-  - Cleared the critical Handlebars vulnerability and all high-severity advisories
-
-- **Architecture & reliability (2026-07-15)**:
-  - Decomposed the `ProjectManagementService` facade (extracted `IssueService`, `RoadmapService`; automation delegates to `ProjectAutomationService`)
-  - Broke a circular dependency; health check now performs a real GitHub rate-limit probe
-  - Fail-closed webhook signature validation; file-mounted secrets (`SECRETS_DIR`) with rotation
-  - Size-bounded cache eviction (`MAX_CACHE_ENTRIES`) and a namespace-index cleanup fix
-
-- **Enhanced Resource System**:
-  - Added Zod schema validation for all resource types
-  - Implemented resource relationship tracking
-  - Created a centralized ResourceFactory for consistent resource access
-
-- **Improved GitHub API Integration**:
-  - Added intelligent rate limiting with automatic throttling
-  - Implemented pagination support for REST and GraphQL APIs
-  - Enhanced error handling with specific error types
-
-- **Advanced Tool System**:
-  - Created tool definition registry with Zod validation
-  - Implemented standardized tool response formatting
-  - Added example-based documentation for all tools
-
-- **Rich Response Formatting**:
-  - Added support for multiple content types (JSON, Markdown, HTML, Text)
-  - Implemented progress updates for long-running operations
-  - Added pagination support for large result sets
-
-### Identified Functional Gaps
-
-Remaining gaps prioritized for future development (updated 2026-07-15). The live,
-code-verified status is in [`docs/remediation/GAP-TRACKER.md`](docs/remediation/GAP-TRACKER.md).
-
-1. **Distributed Caching**:
-   - ResourceCache now has persistence (`CachePersistence`) and size-bounded
-     oldest-first eviction (`MAX_CACHE_ENTRIES`). Still single-instance only —
-     no distributed/shared cache for multi-instance deployments.
-
-2. **Performance Optimization**:
-   - No query batching for related resources
-   - Missing background refresh for frequently accessed resources
-   - Incomplete prefetching for related resources
-
-3. **Data Visualization and Reporting** (roadmap phase 11, not yet built):
-   - No built-in visualization generators for metrics
-   - Missing report generation capabilities
-   - Limited time-series data analysis
-
-Resolved since earlier snapshots: real-time webhook integration + SSE streaming,
-automation-rule management, cache persistence + eviction, and a fail-closed
-webhook signature check.
+[MIT](LICENSE) — see [CHANGELOG.md](CHANGELOG.md) for the release history.
 
 ## Documentation
 
-### Getting Started
-- [Deployment Guide](docs/deployment.md) - Installation, Docker, and MCP client setup
-- [Configuration Guide](docs/CONFIGURATION.md) - All configuration options
-- [Troubleshooting Guide](docs/TROUBLESHOOTING.md) - Common issues and solutions
-
-### Reference
-- [Tool Reference](docs/TOOLS.md) - 20 compound tools (169 actions) documented
-- [Architecture](docs/architecture.md) - System design and patterns
-- [API Reference](docs/API.md) - Service and infrastructure APIs
-
-### Guides
-- [Tutorials](docs/tutorials/getting-started.md) - Step-by-step guides
-- [User Guide](docs/user-guide.md) - Detailed usage instructions
-- [Testing Guide](docs/TESTING.md) - Test suite documentation
-
-### Development
-- [Contributing](docs/contributing/index.md) - Development guidelines
-- [MCP Integration](docs/mcp/) - MCP-specific details
-
-### Interactive Documentation
-
-For an interactive exploration of the API, open the [API Explorer](docs/api-explorer.html) in your browser.
-
-## Development
-
-### Testing
-```bash
-# Unit tests
-pnpm test
-
-# AI service/tool tests
-pnpm run test:ai
-
-# End-to-end tests
-pnpm run test:e2e
-
-# E2E MCP tool suite (mocked GitHub/AI)
-pnpm run test:e2e:tools
-```
-
-### Code Quality
-```bash
-# Lint code
-pnpm run lint
-
-# Type check
-pnpm exec tsc --noEmit
-
-# Format code
-pnpm run format
-```
-
-## Contributing
-
-We welcome contributions to the GitHub Project Manager MCP Server! Please see our [Contributing Guide](docs/contributing/index.md) for details on:
-
-- [Development Workflow](docs/contributing/development-workflow.md)
-- [Code Standards](docs/contributing/index.md#coding-standards)
-- [Testing Guidelines](docs/contributing/index.md#testing-guidelines)
-- [Documentation Guidelines](docs/contributing/index.md#documentation-guidelines)
-
-## License
-
-[MIT](LICENSE)
+| Guide | What it covers |
+|---|---|
+| [Tool Reference](docs/TOOLS.md) | 20 compound tools, 169 actions, per-action parameters |
+| [Configuration](docs/CONFIGURATION.md) | Every environment variable and per-role AI setup |
+| [Deployment](docs/deployment.md) | Install paths, Docker, MCP client configuration |
+| [Architecture](docs/architecture.md) | Layers, patterns, data flow, agent orchestration |
+| [User Guide](docs/user-guide.md) | Day-to-day usage |
+| [Tutorials](docs/tutorials/getting-started.md) | Step-by-step walkthroughs |
+| [Troubleshooting](docs/TROUBLESHOOTING.md) | Common failures and fixes |
+| [Contributing](docs/contributing/index.md) | Development workflow and standards |

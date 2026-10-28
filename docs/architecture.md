@@ -41,8 +41,7 @@ MCP GitHub Project Manager follows Clean Architecture principles with clear sepa
 
 ### Domain Layer (`src/domain/`)
 
-Core business entities, type definitions, validation schemas, and repository interfaces.
-22 files grouped by concern:
+Core business entities, type definitions, validation schemas, and repository interfaces, grouped by concern:
 
 **Core types**
 
@@ -62,6 +61,7 @@ Core business entities, type definitions, validation schemas, and repository int
 | `MilestoneEntity` | Rich domain entity for GitHub Milestones with computed properties (`isOverdue`, `daysUntilDue`, `progressPercent`) and business logic (`updateProgress`, `close`, `addIssue`) |
 | `SprintEntity` | Rich domain entity for Sprints with computed properties (`durationInDays`, `daysRemaining`, `isCurrent`, `velocity`) and business logic (`start`, `complete`, `addIssue`, `moveIssueTo`) |
 | `ProjectEntity` | Rich domain entity for GitHub Projects with computed properties (`health`, `activityLevel`, `isStale`) and business logic (`addField`, `close`, `archive`) |
+| `PullRequestEntity` | Rich domain entity for GitHub Pull Requests |
 
 **AI types**
 
@@ -82,7 +82,7 @@ Core business entities, type definitions, validation schemas, and repository int
 | `sprint-planning-types.ts` | Sprint capacity, velocity, risk, and planning types |
 | `roadmap-planning-types.ts` | Roadmap themes, milestones, and AI planning types |
 | `issue-intelligence-types.ts` | Issue triage, enrichment, label suggestions, and duplicate detection types |
-| `automation-types.ts` | Project automation rule definitions and trigger types |
+| `automation-types.ts` | Project automation workflow definitions (GitHub `ProjectV2Workflow`) |
 | `template-types.ts` | Project template descriptors and field/view definitions |
 | `task-context-schemas.ts` | Zod schemas for rich task-context payloads (business, technical, implementation) |
 
@@ -99,6 +99,14 @@ Core business entities, type definitions, validation schemas, and repository int
 | `resource-schemas.ts` | Zod schemas for issue, milestone, project, and sprint validation |
 | `type-guards.ts` | Runtime type-guard functions for domain entities |
 | `config-schema.ts` | Zod schemas for server configuration; validates env vars at startup |
+
+**Domain events and value objects**
+
+| Directory / File | Purpose |
+|------------------|---------|
+| `events/` | `DomainEvent`, `AgentEvents`, `DomainEventBus` — in-process domain event plumbing |
+| `value-objects/` | `SprintMetrics`, `MilestoneMetrics` — computed metric value objects |
+| `entities/` | Rich domain entities (see below) |
 
 ### Domain Entities Layer (`src/domain/entities/`)
 
@@ -142,7 +150,7 @@ External integrations and technical concerns. 16 subdirectories:
 | Directory | Purpose |
 |-----------|---------|
 | `github/` | GitHub REST/GraphQL API integration — repositories, `GitHubRepositoryFactory`, `RateLimitManager`, error handling |
-| `tools/` | MCP tool definitions: 20 compound tools (169 actions) exposed to MCP clients, with `CompoundExecutor` routing to internal granular executors. `ToolRegistry`, `ToolValidator`, schemas |
+| `tools/` | MCP tool definitions: 20 compound tools (169 actions) exposed to MCP clients, with `CompoundExecutor` routing to internal granular executors. `compound/` holds the compound schemas and executors; `schemas/` holds the per-domain granular schemas. `ToolRegistry`, `ToolValidator` |
 | `cache/` | In-memory caching with TTL and LRU eviction (`ResourceCache`), persistence adapter |
 | `resilience/` | Circuit breaker (`CircuitBreakerService`), retry policies, `AIResiliencePolicy` |
 | `events/` | Webhook handling (`GitHubWebhookHandler`), `EventStore` with persistence, `EventSubscriptionManager` |
@@ -156,11 +164,11 @@ External integrations and technical concerns. 16 subdirectories:
 | `resource/` | `ResourceFactory`, `ResourceManager`, `ResourceRelationshipManager`, `OptimisticLockManager` |
 | `observability/` | `CorrelationContext` (request tracing), `TracingLogger` |
 | `http/` | `WebhookServer` — HTTP server for incoming webhooks and SSE connections |
-| `agent/` | `AgentStore` (issue-backed agent registry with optimistic concurrency), `WorkProductStore` (structured issue comments), `ProjectFieldSetup` (custom field provisioning for agent claims) |
+| `agent/` | `AgentStore` (agent registry: `registry.json` on the `agent-registry` branch, Contents API with sha compare-and-swap), `LegacyAgentRegistry` (one-time import of the old registry issue), `WorkProductStore` (structured issue comments), `ProjectFieldSetup` (custom field provisioning for agent claims) |
 
 ### Service Layer (`src/services/`)
 
-Business logic coordination. 27 top-level services plus supporting subdirectories.
+Business logic coordination, split into focused, independently-testable services.
 
 `ProjectManagementService` is a thin facade that delegates to focused,
 independently-testable services.
@@ -255,24 +263,36 @@ console.log(issue.labels);       // string[]
 
 | Directory | Contents |
 |-----------|----------|
-| `ai/` | 14 files — `AIServiceFactory`, `AITaskProcessor`, `TokenCounter`, `AIResponseCache`, `ConfidenceScorer`, `BacklogPrioritizer`, `LabelSuggestionService`, `DuplicateDetectionService`, `IssueEnrichmentAIService`, `RelatedIssueLinkingService`, `RoadmapAIService`, `SprintCapacityAnalyzer`, `SprintRiskAssessor`, `SprintSuggestionService`; plus `prompts/` (9 prompt templates) |
-| `context/` | 3 files — `DependencyContextGenerator`, `CodeExampleGenerator`, `ContextualReferenceGenerator` |
-| `validation/` | 1 file — `ContextQualityValidator` |
-| `templates/` | 3 files — `TemplateEngine`, `TemplateParser`, `TemplateValidator` |
-| `utils/` | 2 files — `InputSanitizer`, `ErrorMapper` |
+| `ai/` | `AIServiceFactory`, `AITaskProcessor`, `TokenCounter`, `AIResponseCache`, `ConfidenceScorer`, `BacklogPrioritizer`, `LabelSuggestionService`, `DuplicateDetectionService`, `IssueEnrichmentAIService`, `RelatedIssueLinkingService`, `RoadmapAIService`, `SprintCapacityAnalyzer`, `SprintRiskAssessor`, `SprintSuggestionService`; plus `prompts/` (prompt templates and the `PromptRegistry`) |
+| `agent/` | `TaskCheckoutService`, `AgentContextService`, `WorkProductService`, `AgentBudgetService`, `AgentMetricsService`, `AgentReclaimScheduler` |
+| `context/` | `DependencyContextGenerator`, `CodeExampleGenerator`, `ContextualReferenceGenerator` |
+| `feature/` | `FeatureAnalysisService`, `FeaturePRDService`, `FeatureExpansionService`, `TaskLifecycleService` |
+| `validation/` | `ContextQualityValidator` |
+| `templates/` | `TemplateEngine`, `TemplateParser`, `TemplateValidator` |
+| `utils/` | `InputSanitizer`, `ErrorMapper`, `safeCall` |
 
 ### MCP Layer (`src/index.ts`)
 
-Model Context Protocol integration:
+Model Context Protocol integration, on `@modelcontextprotocol/server` v2
+(2026-07-28 spec):
+
 - **Compound tool API** — 20 compound tools (169 actions) registered via `ToolRegistry`; each routes through `CompoundExecutor` to internal granular executors
 - **Progressive disclosure** — `discover_tools` meta-tool lets agents explore available actions and schemas at runtime
-- **Capability profiles** — `MCP_TOOL_GROUPS` env var controls which compound tools are exposed (default: `all`)
+- **Capability profiles** — the `MCP_TOOL_GROUPS` env var selects which compound tool **groups** are exposed (default: `all`); only `discover_tools` is always exposed
 - **Resources** — 6 registered resources (github://config, github://projects, github://sprints/current, github://milestones, github://agents, github://tools)
 - **Prompts** — 6 registered prompts for consistent AI interaction templates
-- Resource exposure
-- Request/response handling
-- Error formatting via `MCPErrorHandler`
-- **Graceful shutdown** — `GracefulShutdown` tracks in-flight requests, installs SIGTERM/SIGINT handlers, drains active work before exit
+- **Argument validation** — MCP v2 validates arguments against the declared `inputSchema` *before* the handler runs, so `ToolValidator` never sees a missing required field
+- **Error semantics** — a tool that runs and fails returns `{ content, isError: true }` so the model can see and recover from it; a JSON-RPC error is reserved for protocol faults (e.g. unknown tool)
+- **Request tracking and shutdown** — every tool call goes through one `dispatchTool` that carries the shutdown gate, in-flight tracking, telemetry, and result formatting; `GracefulShutdown` tracks in-flight requests, installs SIGTERM/SIGINT handlers, and drains active work before exit
+
+### Entry Points and Composition
+
+| File | Role |
+|------|------|
+| `src/index.ts` | Entry point — boots the `McpServer` and serves it over stdio via `serveStdio`, which negotiates the protocol revision per connection |
+| `src/container.ts` | tsyringe DI container — registers the repository factory, services, and infrastructure (37 registrations) |
+| `src/env.ts` | Configuration resolution, secret chain, and startup validation against the *resolved* config |
+| `src/cli.ts` | Command-line flag parsing (`--token`, `--owner`, `--repo`, `--env-file`, `--verbose`); CLI flags override env vars |
 
 ## Bounded Contexts
 
@@ -543,12 +563,19 @@ secrets (`SECRETS_DIR`) override both.
 
 **AI Models**
 
+There are no built-in default models — you configure the models you use. A role
+with a key but no model is left unconfigured and the server warns instead of
+silently picking one.
+
 | Variable | Default | Purpose |
 |----------|---------|---------|
-| `AI_MAIN_MODEL` | `claude-3-5-sonnet-20241022` | Primary model for generation |
-| `AI_RESEARCH_MODEL` | `perplexity-llama-3.1-sonar-large-128k-online` | Research/online model |
-| `AI_FALLBACK_MODEL` | `gpt-4o` | Fallback when primary unavailable |
-| `AI_PRD_MODEL` | `claude-3-5-sonnet-20241022` | Model for PRD generation |
+| `AI_MAIN_MODEL` | _(none)_ | Primary model for general tasks |
+| `AI_RESEARCH_MODEL` | _(none)_ | Model for research/online tasks |
+| `AI_FALLBACK_MODEL` | _(none)_ | Fallback when primary unavailable |
+| `AI_PRD_MODEL` | _(none)_ | Model for PRD generation |
+
+Each role also accepts `AI_<ROLE>_PROVIDER`, `AI_<ROLE>_API_KEY` and
+`AI_<ROLE>_BASE_URL` for per-role provider, key and endpoint overrides.
 
 **AI Task Generation**
 
@@ -617,15 +644,15 @@ See [CONFIGURATION.md](CONFIGURATION.md) for full details.
 ## Compound Tool Architecture
 
 The MCP server uses progressive disclosure to reduce tool-selection overhead
-for AI agents: 169 granular operations are grouped into 20 compound tools,
-each accepting an `action` parameter.
+for AI agents: 169 actions are grouped into 20 compound tools, each accepting
+an `action` parameter.
 
 ```
 MCP Client (Claude/Codex/Cursor)
   │  sees only 20 compound tools
   ▼
 ToolRegistry.getToolsForMCP()
-  │  returns compound tools filtered by MCP_TOOL_GROUPS
+  │  returns compound tools filtered by MCP_TOOL_GROUPS (by group name)
   ▼
 CompoundExecutor.execute(action, args)
   │  validates action, routes to internal executor
@@ -635,29 +662,34 @@ Existing execute* functions (unchanged)
 
 ### Tool Groups
 
-| Compound Tool | Actions | Domain |
-|---------------|---------|--------|
-| `manage_project` | 37 | Project CRUD, fields, views, items, templates, linking |
-| `manage_issues` | 18 | Issue CRUD, comments, drafts, search, sub-issues |
-| `manage_prs` | 7 | PR CRUD, merge, reviews |
-| `manage_milestones` | 7 | Milestone CRUD, metrics, deadlines |
-| `manage_sprints` | 8 | Sprint planning, metrics, velocity |
-| `manage_labels` | 2 | Label CRUD |
-| `manage_automation` | 7 | Automation rules |
-| `manage_iterations` | 5 | Iteration field management |
-| `manage_events` | 3 | Event subscription, replay |
-| `manage_status_updates` | 3 | Project status updates |
-| `ai_generate` | 9 | PRD generation, task breakdown, traceability, task materialization |
-| `ai_analyze` | 8 | Issue enrichment, triage, duplicates |
-| `ai_plan` | 6 | Capacity, backlog, risk, roadmap |
-| `agent_work` | 12 | Agent registration, task lifecycle, review workflow |
-| `agent_manage` | 18 | Agent admin, budgets, work products, reclaim, metrics, PM coordination |
-| `discover_tools` | — | Runtime tool/action/schema discovery (meta-tool) |
+| Compound Tool | Actions | Group | Domain |
+|---------------|---------|-------|--------|
+| `manage_project` | 37 | `core` | Project CRUD, fields, views, items, templates, linking |
+| `manage_issues` | 18 | `core` | Issue CRUD, comments, drafts, search, sub-issues |
+| `manage_prs` | 7 | `core` | PR CRUD, merge, reviews |
+| `manage_milestones` | 7 | `core` | Milestone CRUD, metrics, deadlines |
+| `manage_sprints` | 8 | `core` | Sprint planning, metrics, velocity |
+| `manage_labels` | 2 | `core` | Label CRUD |
+| `manage_automation` | 7 | `core` | Automation rules |
+| `manage_iterations` | 5 | `core` | Iteration field management |
+| `manage_status_updates` | 3 | `core` | Project status updates |
+| `manage_branches` | 4 | `core` | Branch protection rules, branch listing |
+| `manage_releases` | 6 | `core` | Release CRUD, latest release |
+| `manage_workflows` | 6 | `core` | GitHub Actions workflows and runs |
+| `manage_events` | 3 | `events` | Event subscription, replay |
+| `ai_generate` | 9 | `ai` | PRD generation, task breakdown, traceability, task materialization |
+| `ai_analyze` | 9 | `ai` | Issue enrichment, triage, duplicates, label suggestions |
+| `ai_plan` | 6 | `ai` | Capacity, backlog, risk, roadmap |
+| `agent_work` | 12 | `agents` | Agent registration, task lifecycle, review workflow |
+| `agent_manage` | 18 | `agents` | Agent admin, budgets, work products, reclaim, metrics, PM coordination |
+| `system` | 2 | `system` | Health check, agent field provisioning |
+| `discover_tools` | — | `system` | Runtime tool/action/schema discovery (meta-tool) |
 
 ### Capability Profiles
 
-The `MCP_TOOL_GROUPS` environment variable controls which compound tools are
-exposed to MCP clients. This enables tailored profiles for different use cases:
+The `MCP_TOOL_GROUPS` environment variable selects which compound tool
+**groups** are exposed to MCP clients. It filters by group name, not by tool
+name — a tool name in this variable exposes nothing.
 
 | Profile | `MCP_TOOL_GROUPS` value | Use case |
 |---------|------------------------|----------|
@@ -668,7 +700,8 @@ exposed to MCP clients. This enables tailored profiles for different use cases:
 | Minimal | `core,events` | Simple issue/PR bots with event tracking |
 
 `discover_tools` is always available regardless of `MCP_TOOL_GROUPS` setting,
-allowing agents to introspect available capabilities at runtime.
+allowing agents to introspect available capabilities at runtime. Every other
+tool — including `system` — is subject to the filter.
 
 ## Agent Orchestration Layer
 
@@ -684,12 +717,15 @@ GitHub project without human dispatch. All state is stored natively in GitHub
 │  agent_work:   register · checkout_task · release_task ·            │
 │                complete_task · heartbeat · check_work_status ·      │
 │                get_task_context · submit_for_review ·               │
-│                approve_task · reject_task                           │
+│                approve_task · reject_task ·                         │
+│                validate_work_product · get_handoff_context          │
 │  agent_manage: list · deregister · get_activity ·                   │
 │                submit_work_product · get_budget · set_budget ·      │
 │                reclaim_stale · record_usage · get_metrics ·         │
 │                setup_fields · assign_task · get_swarm_status ·      │
-│                rebalance_workload                                   │
+│                rebalance_workload · decompose_task · smart_assign · │
+│                converge_project · converge_until_done ·              │
+│                cleanup_registry                                     │
 └───────────────────────────┬─────────────────────────────────────────┘
                             │
 ┌───────────────────────────▼─────────────────────────────────────────┐
@@ -709,15 +745,15 @@ GitHub project without human dispatch. All state is stored natively in GitHub
 │  ┌────────────┐ ┌──────────────────┐ ┌───────────────────────────┐  │
 │  │ AgentStore │ │ WorkProductStore │ │ ProjectFieldSetup         │  │
 │  │ registry   │ │ issue comments   │ │ custom field provisioning │  │
-│  │ (JSON in   │ │ with markers     │ │ (agent_claimed_by, etc.)  │  │
-│  │ pinned     │ └──────────────────┘ └───────────────────────────┘  │
-│  │ issue)     │                                                     │
+│  │ (file on   │ │ with markers     │ │ (agent_claimed_by, etc.)  │  │
+│  │ a branch,  │ └──────────────────┘ └───────────────────────────┘  │
+│  │ sha CAS)   │                                                     │
 │  └────────────┘                                                     │
 └───────────────────────────┬─────────────────────────────────────────┘
                             │
 ┌───────────────────────────▼─────────────────────────────────────────┐
 │                  GitHub-Native Storage                               │
-│  • Agent registry → issue body (label: agent-registry)              │
+│  • Agent registry → registry.json on the agent-registry branch (CAS)│
 │  • Task claims    → project custom fields (SINGLE_SELECT / TEXT)    │
 │  • Work products  → structured issue comments (JSON marker blocks)  │
 │  • Budgets        → agent registry metadata                         │
@@ -738,10 +774,62 @@ The orchestration layer uses five custom project fields (auto-provisioned by
 | `agent_work_branch` | TEXT | Git branch name the agent is working on |
 | `agent_pr_number` | TEXT | Pull request number for the submitted work |
 
-Agent records are stored as a JSON array in the body of a pinned issue
-labeled `agent-registry`. Work products are stored as structured issue
-comments with a `<!-- agent-work-product: -->` HTML comment marker for
+Agent records are stored as one file, `registry.json`, on a dedicated orphan
+branch `agent-registry` (`AGENT_REGISTRY_BRANCH` / `AGENT_REGISTRY_FILE`),
+written through the GitHub Contents API. Work products are stored as structured
+issue comments with a `<!-- agent-work-product: -->` HTML comment marker for
 machine-parseable retrieval.
+
+**Why a file on a branch, not an issue body.** An issue body is last-write-wins:
+two writers could both read the registry, both write, and both succeed while one
+registration silently vanished (an agent registered and was "not found" a moment
+later). `PUT /contents` is a compare-and-swap — the request carries the blob sha
+that was read and GitHub answers **409** when the file changed since — so a lost
+update is impossible by construction. `AgentStore.mutateAgents` reads the file
+and its sha, applies the mutation, and writes with that sha; on a conflict it
+re-reads, re-applies the mutation on the fresh list and retries with jittered
+exponential backoff (50 attempts by default). Exhaustion **throws**; a mutation
+that changes nothing writes nothing. Two writers of the same agent end with the
+record that was committed last, whole — never a mix of the two.
+
+**Evidence behind the design (live GitHub API).** Eight parallel `PUT`s carrying
+the same sha: exactly one 200, six 409s (the eighth never reached GitHub — a
+local DNS failure). Reading
+`getContent(ref=agent-registry)` right after a write returned the written sha in
+25 of 25 cycles (and `git.getRef` the new commit in 25 of 25), so a registration
+is visible to the very next read from any process and the plain branch-name read
+is used. An empty repository (no commits) is refused with an explanatory error:
+the Git Data API cannot bootstrap a branch there, and a Contents API write would
+turn the registry branch into the default branch.
+
+**Bootstrap and one-time migration.** The first access creates the branch (blob,
+tree, parentless commit, then `git.createRef`); `createRef` is the arbiter, so
+two processes racing to bootstrap yield one branch (the loser gets 422
+"Reference already exists" and re-reads). When a legacy registry issue (title
+`Agent Registry`, or label `agent-registry`) exists, its agents are imported into
+the new branch — duplicate issues folded with the record written last winning,
+a corrupt canonical body failing closed, a corrupt duplicate skipped — and each
+imported issue's body is rewritten to a human-readable pointer to
+`agent-registry:registry.json` (not JSON, so it is never imported again). The
+issue itself is kept. `AgentStore.registryExists()` stays read-only: true when
+the branch exists or a legacy registry issue is still waiting to be migrated.
+
+**Permissions.** Registry writes need the `contents: write` permission, and no
+branch ruleset or protection may block the `agent-registry` branch. A rejected
+write raises an error naming the branch and the permission.
+
+**Native GitHub primitives, not emulations.** The orchestration layer uses
+GitHub's own models wherever they exist: the "blocked by" relation is the
+`Issue.blockedBy` / `Issue.blocking` edge (written with `addBlockedBy` /
+`removeBlockedBy`) instead of a `blocked-by:#N` label; the issue kind is the
+`Issue.issueType` written with `updateIssueIssueType` instead of a `type:`
+label; a task's board membership is `Issue.projectItems(includeArchived: true)`,
+which is how a task that is already claimed on another board is recognised; a
+project's access is `updateProjectV2Collaborators`; and a claiming pool is a
+project view (`ProjectV2View.filter` / `sortByFields`), whose order the claim
+path follows. The label emulations remain the fallback for a deployment whose
+schema does not know the native field, so a board wired up before the native
+API existed keeps working.
 
 ### Autonomous Loop
 
@@ -803,4 +891,4 @@ All types are defined in `src/domain/agent-orchestration-types.ts`:
 
 ---
 
-*Last updated: 2026-08-08 (bounded contexts documented)*
+*Last updated: 2026-10-21 — tool surface, DDD layout and MCP v2 semantics refreshed against the code.*

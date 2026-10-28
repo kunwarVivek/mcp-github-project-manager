@@ -15,7 +15,7 @@ Thank you for your interest in contributing to the GitHub Project Manager MCP Se
 
 ## Code of Conduct
 
-This project adheres to a Code of Conduct that all contributors are expected to follow. Please read [CODE_OF_CONDUCT.md](../../CODE_OF_CONDUCT.md) before contributing.
+This project adheres to a Code of Conduct that all contributors are expected to follow. If you see behaviour that violates it, report it to the project maintainers via [GitHub Issues](https://github.com/kunwarVivek/mcp-github-project-manager/issues).
 
 ## Getting Started
 
@@ -31,16 +31,16 @@ This project adheres to a Code of Conduct that all contributors are expected to 
 1. Fork the repository on GitHub
 2. Clone your fork locally:
    ```bash
-   git clone https://github.com/your-username/github-project-manager-mcp.git
-   cd github-project-manager-mcp
+   git clone https://github.com/your-username/mcp-github-project-manager.git
+   cd mcp-github-project-manager
    ```
 3. Add the original repository as a remote:
    ```bash
-   git remote add upstream https://github.com/original-owner/github-project-manager-mcp.git
+   git remote add upstream https://github.com/kunwarVivek/mcp-github-project-manager.git
    ```
-4. Install dependencies:
+4. Install dependencies (npm or pnpm — both are supported):
    ```bash
-   pnpm install
+   npm install
    ```
 5. Create a `.env` file with your GitHub credentials:
    ```env
@@ -50,7 +50,7 @@ This project adheres to a Code of Conduct that all contributors are expected to 
    ```
 6. Build the project:
    ```bash
-   pnpm run build
+   npm run build
    ```
 
 ## Development Workflow
@@ -64,17 +64,15 @@ This project adheres to a Code of Conduct that all contributors are expected to 
 
 2. Make your changes, following the [coding standards](#coding-standards)
 
-3. Run tests to ensure your changes don't break existing functionality:
+3. Run the full quality gate:
    ```bash
-   pnpm test
+   npm run build      # tsc → postbuild (fix .js extensions) → chmod
+   npm run typecheck  # src + examples, then src + tests
+   npm run lint       # Biome; must exit 0
+   npm test           # Vitest 5
    ```
 
-4. Run linting to ensure code quality:
-   ```bash
-   pnpm run lint
-   ```
-
-5. Commit your changes with a descriptive commit message:
+4. Commit your changes with a descriptive commit message:
    ```bash
    git commit -m "feat: add new feature" # for features
    git commit -m "fix: resolve issue with X" # for bugfixes
@@ -83,21 +81,49 @@ This project adheres to a Code of Conduct that all contributors are expected to 
    git commit -m "refactor: improve code structure" # for refactoring
    ```
 
-6. Push your branch to your fork:
+5. Push your branch to your fork:
    ```bash
    git push origin feature/your-feature-name
    ```
 
-7. Create a pull request from your fork to the original repository
+6. Create a pull request from your fork to the original repository
 
 ## Pull Request Process
 
 1. Ensure your PR includes a clear description of the changes and the purpose
 2. Update documentation if necessary
 3. Add tests for new functionality
-4. Ensure all tests pass
+4. Ensure the full quality gate passes (build → typecheck → lint → test)
 5. Make sure your code follows the project's coding standards
 6. Respond to any feedback from reviewers
+
+## Task Tracking
+
+Working issues for this repo live in **beads** (`bd`), not in GitHub Issues:
+
+```bash
+bd ready                     # issues with no unresolved blockers
+bd show <id>                 # full detail, including dependencies
+bd update <id> --claim       # claim the work
+bd close <id>                # complete it
+```
+
+GitHub Issues remains the surface for externally reported bugs — do not mirror
+between the two automatically. See
+[docs/agents/issue-tracker.md](../agents/issue-tracker.md) for the conventions.
+
+## Code Traversal and Audits
+
+The repository is indexed by **GitNexus**. Refresh the index with:
+
+```bash
+node .gitnexus/run.cjs analyze --index-only
+```
+
+Use the skills under `.agents/skills/gitnexus-*/SKILL.md` to explore
+architecture, measure the blast radius of a change, and trace bugs. Before
+editing a symbol, run impact analysis; before committing, analyse graph
+changes.
 
 ## Coding Standards
 
@@ -113,13 +139,18 @@ This project follows strict coding standards to maintain code quality and consis
 
 ### Code Style
 
-- Use 2 spaces for indentation
-- Use single quotes for strings
-- Use semicolons at the end of statements
+`biome.json` is the source of truth — Biome owns both linting and formatting:
+
+- 2 spaces for indentation
+- Double quotes for strings
+- Semicolons at the end of statements
+- Line width 100
 - Use PascalCase for class names and interfaces
 - Use camelCase for variables, functions, and methods
 - Use UPPER_CASE for constants
 - Add JSDoc comments for public APIs
+
+Run `npm run format` to apply the formatter, `npm run lint` to check.
 
 ### Architecture Guidelines
 
@@ -133,23 +164,24 @@ This project follows strict coding standards to maintain code quality and consis
 ### Unit Tests
 
 - Write unit tests for all new functionality
-- Use Jest for testing
+- Use **Vitest 5** for testing (there is no Jest in this project)
+- New test files go under `src/__tests__/` with a `.test.ts` suffix
 - Mock external dependencies
-- Aim for high test coverage (at least 80%)
+- Use `function` (not an arrow) for any mock the code under test calls with `new`
 
 Example unit test:
 
 ```typescript
-import { ProjectManagementService } from '../services/ProjectManagementService';
-import { MockGitHubRepository } from './mocks/MockGitHubRepository';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { ProjectManagementService } from '../../services/ProjectManagementService';
 
 describe('ProjectManagementService', () => {
   let service: ProjectManagementService;
-  let mockRepo: MockGitHubRepository;
+  let mockRepo: { mockCreateProject: { mockResolvedValue: (v: unknown) => void } };
 
   beforeEach(() => {
-    mockRepo = new MockGitHubRepository();
-    service = new ProjectManagementService('owner', 'repo', 'token', mockRepo);
+    mockRepo = { mockCreateProject: { mockResolvedValue: vi.fn() } };
+    service = new ProjectManagementService(/* ... */);
   });
 
   it('should create a project successfully', async () => {
@@ -180,7 +212,7 @@ describe('ProjectManagementService', () => {
 
 ### E2E Tests
 
-- Write end-to-end tests for critical workflows
+- Write end-to-end tests for critical workflows under `src/__tests__/e2e/`
 - Test the full system from API to response
 
 ## Documentation Guidelines
@@ -246,7 +278,7 @@ async createProject(data: CreateProject): Promise<Project> {
 
 If you need help with contributing:
 
-1. Check the [documentation](../README.md)
+1. Check the [documentation index](../TOOLS.md) and [architecture](../architecture.md)
 2. Look for existing issues that might be related
 3. Create a new issue with your question
 4. Reach out to the maintainers

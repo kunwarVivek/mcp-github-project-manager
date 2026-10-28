@@ -2,14 +2,17 @@
 
 This document provides comprehensive documentation for the 20 compound MCP tools exposed by the MCP GitHub Project Manager. Each compound tool groups related actions behind a single `action` parameter, reducing tool-selection overhead for AI agents while preserving full access to all 169 underlying operations.
 
+> This file is the **reference** for the tool surface. The README links here rather
+> than duplicating it.
+
 ## Overview
 
 | Metric | Value |
 |--------|-------|
 | Compound Tools | 20 |
 | Total Actions | 169 |
-| SDK Version | 2.0 |
-| All tools have | Behavior annotations, Output schemas |
+| MCP SDK | `@modelcontextprotocol/server` v2 (2026-07-28 spec) |
+| All tools have | Behavior annotations, an `action` parameter, and a JSON Schema input |
 
 ### Design: Progressive Disclosure
 
@@ -17,54 +20,76 @@ MCP clients see 20 tools. Each tool accepts an `action` string that routes to th
 
 ### Behavior Annotations
 
-All tools are annotated with behavior hints that help MCP clients understand their impact:
+Annotations are declared **per tool**, not per action — a tool that mixes reads
+and writes is annotated for the strongest behaviour it allows.
 
-| Annotation | Meaning | Example |
-|------------|---------|---------|
-| `readOnlyHint: true` | Does not modify data | `manage_project` (action: `list`, `get`) |
-| `destructiveHint: true` | Permanently deletes data | `manage_project` (action: `delete`) |
-| `idempotentHint: true` | Safe to retry | `manage_project` (action: `update`) |
-| `openWorldHint: true` | Makes external calls | `ai_generate` (all actions) |
+| Annotation | Meaning | Tools |
+|------------|---------|-------|
+| `readOnlyHint: true` | The tool only reads | `discover_tools` |
+| `destructiveHint: true` | The tool can permanently delete data | `manage_project`, `manage_issues`, `manage_milestones`, `manage_automation`, `manage_branches`, `manage_releases`, `manage_workflows`, `agent_manage` |
+| `idempotentHint: true` | Safe to retry | `discover_tools`, `system` |
+| `openWorldHint: true` | Makes external calls | every tool that talks to GitHub or an AI provider |
+
+### Error Semantics
+
+A tool that runs and fails returns `{ content, isError: true }` — the model sees
+the failure and can recover from it. A JSON-RPC error is reserved for protocol
+faults, such as calling a tool that does not exist. Under MCP v2 the server
+validates arguments against the declared `inputSchema` **before** the handler
+runs, so a malformed call never reaches business logic.
 
 ### Tool Selection via `MCP_TOOL_GROUPS`
 
-The `MCP_TOOL_GROUPS` environment variable controls which compound tools are exposed to the MCP client. Set it to a comma-separated list of group tags, or `all` (default) to expose everything.
+The `MCP_TOOL_GROUPS` environment variable controls which compound tools are exposed to the MCP client. It filters by **group name** — not by tool name. Set it to a comma-separated list of group names, or `all` (default) to expose everything.
 
-Available group tags: `core`, `ai`, `agents`, `events`, `system`
+Available group names: `core`, `ai`, `agents`, `events`, `system`.
+
+> A tool name in `MCP_TOOL_GROUPS` (e.g. `manage_issues`) exposes **nothing** —
+> the value must be a group name (`core`, `ai`, `agents`, `events`, `system`).
 
 ```bash
-# Expose only core project management tools
+# Expose only the core project management group
 MCP_TOOL_GROUPS=core
 
 # Expose everything (default)
 MCP_TOOL_GROUPS=all
 ```
 
-`discover_tools` is always available regardless of this setting.
+`discover_tools` is always available regardless of this setting. Every other
+tool — including the `system` tool — is subject to the filter.
+
+| Group | Tools in the group |
+|-------|--------------------|
+| `core` | `manage_project`, `manage_issues`, `manage_prs`, `manage_milestones`, `manage_sprints`, `manage_labels`, `manage_automation`, `manage_iterations`, `manage_status_updates`, `manage_branches`, `manage_releases`, `manage_workflows` |
+| `ai` | `ai_generate`, `ai_analyze`, `ai_plan` |
+| `agents` | `agent_work`, `agent_manage` |
+| `events` | `manage_events` |
+| `system` | `system`, `discover_tools` (only `discover_tools` is force-exposed) |
 
 ---
 
 ## Compound Tools
 
-1. [manage_project](#manage_project) (37 actions)
-2. [manage_issues](#manage_issues) (18 actions)
+1. [manage_project](#manage_project) (38 actions)
+2. [manage_issues](#manage_issues) (22 actions)
 3. [manage_prs](#manage_prs) (7 actions)
 4. [manage_milestones](#manage_milestones) (7 actions)
 5. [manage_sprints](#manage_sprints) (8 actions)
 6. [manage_labels](#manage_labels) (2 actions)
-7. [manage_automation](#manage_automation) (7 actions)
+7. [manage_automation](#manage_automation) (3 actions)
 8. [manage_iterations](#manage_iterations) (5 actions)
 9. [manage_events](#manage_events) (3 actions)
 10. [manage_status_updates](#manage_status_updates) (3 actions)
 11. [ai_generate](#ai_generate) (9 actions)
-12. [ai_analyze](#ai_analyze) (9 actions)
+12. [ai_analyze](#ai_analyze) (8 actions)
 13. [ai_plan](#ai_plan) (6 actions)
 14. [agent_work](#agent_work) (12 actions)
 15. [agent_manage](#agent_manage) (18 actions)
-16. [discover_tools](#discover_tools) (meta-tool)
-17. [manage_workflows](#manage_workflows) (6 actions)
-18. [manage_releases](#manage_releases) (6 actions)
-19. [manage_branches](#manage_branches) (4 actions)
+16. [system](#system) (2 actions)
+17. [discover_tools](#discover_tools) (meta-tool)
+18. [manage_workflows](#manage_workflows) (6 actions)
+19. [manage_releases](#manage_releases) (6 actions)
+20. [manage_branches](#manage_branches) (4 actions)
 
 ---
 
@@ -72,7 +97,7 @@ MCP_TOOL_GROUPS=all
 
 Manage GitHub Projects v2: create, configure, and organize projects with fields, views, items, templates, and linking.
 
-**Action enum:** `create` | `list` | `get` | `update` | `delete` | `get_readme` | `update_readme` | `create_field` | `list_fields` | `update_field` | `create_view` | `list_views` | `update_view` | `delete_view` | `add_item` | `remove_item` | `list_items` | `archive_item` | `unarchive_item` | `set_field_value` | `get_field_value` | `clear_field_value` | `close` | `reopen` | `mark_as_template` | `unmark_as_template` | `copy_from_template` | `list_templates` | `link_to_repo` | `unlink_from_repo` | `link_to_team` | `unlink_from_team` | `list_linked_repos` | `list_linked_teams` | `update_item_position` | `filter_items` | `setup_agent_fields`
+**Action enum:** `create` | `list` | `get` | `update` | `delete` | `get_readme` | `update_readme` | `create_field` | `list_fields` | `update_field` | `create_view` | `list_views` | `update_view` | `delete_view` | `add_item` | `remove_item` | `list_items` | `archive_item` | `unarchive_item` | `set_field_value` | `get_field_value` | `clear_field_value` | `close` | `reopen` | `mark_as_template` | `unmark_as_template` | `copy_from_template` | `list_templates` | `link_to_repo` | `unlink_from_repo` | `link_to_team` | `unlink_from_team` | `list_linked_repos` | `list_linked_teams` | `update_item_position` | `filter_items` | `setup_agent_fields` | `set_collaborators`
 
 ### Common Parameters
 
@@ -92,12 +117,12 @@ Manage GitHub Projects v2: create, configure, and organize projects with fields,
 | `delete` | `projectId` (req) | Delete project (destructive) |
 | `get_readme` | `projectId` (req) | Get project README |
 | `update_readme` | `projectId` (req), `readme` (req) | Update project README |
-| `create_field` | `projectId` (req), `name` (req), `dataType` (req), `description`, `options` | Create custom field |
+| `create_field` | `projectId` (req), `name` (req), `type` (req), `description`, `options` | Create custom field — `type` is one of `text`, `number`, `date`, `single_select`, `multi_select`, `iteration` |
 | `list_fields` | `projectId` (req) | List project fields |
 | `update_field` | `projectId` (req), `fieldId` (req), `name`, `options` | Update field |
-| `create_view` | `projectId` (req), `name` (req), `layout` (req), `groupByField`, `sortByField`, `filterQuery` | Create view |
-| `list_views` | `projectId` (req) | List views |
-| `update_view` | `projectId` (req), `viewId` (req), ... | Update view |
+| `create_view` | `projectId` (req), `name` (req), `layout` (req), `groupByField`, `sortByField`, `filterQuery` | Create view — `layout` is one of `board`, `table`, `roadmap` |
+| `list_views` | `projectId` (req), `name`, `viewId` | List views, with the configuration GitHub stores for each view — `name` / `viewId` narrow the result to a single view |
+| `update_view` | `projectId` (req), `viewId` (req), `layout` | Update view — `layout` is one of `board`, `table`, `roadmap` |
 | `delete_view` | `projectId` (req), `viewId` (req) | Delete view |
 | `add_item` | `projectId` (req), `contentId` (req) | Add issue/PR to project |
 | `remove_item` | `projectId` (req), `itemId` (req) | Remove item |
@@ -122,6 +147,76 @@ Manage GitHub Projects v2: create, configure, and organize projects with fields,
 | `update_item_position` | `projectId` (req), `itemId` (req), `position` (req) | Reorder item |
 | `filter_items` | `projectId` (req), `filterQuery` (req) | Filter items |
 | `setup_agent_fields` | `projectId` (req) | Provision agent orchestration fields |
+| `set_collaborators` | `projectId` (req), `collaborators` (req), `org` | Set the roles of a project's collaborators — one entry per user or team |
+
+### Field Types and View Layouts
+
+The values below are the ones GitHub's GraphQL API accepts — the tool schemas
+enumerate them, so an unsupported value is rejected before the call is made.
+
+**Field types** (`create_field` → `type`):
+
+| Value | GraphQL type | Notes |
+|-------|--------------|-------|
+| `text` | `TEXT` | Plain text |
+| `number` | `NUMBER` | Numeric |
+| `date` | `DATE` | `YYYY-MM-DD` |
+| `single_select` | `SINGLE_SELECT` | One option; pass `options` |
+| `multi_select` | `MULTI_SELECT` | Several options; pass `options` |
+| `iteration` | `ITERATION` | Sprint/iteration field |
+
+These are exactly the members of GitHub's `ProjectV2CustomFieldType`. The
+other project fields — **Assignees, Labels, Milestone, Repository, Tracked
+by, Tracks** — are built-in fields that GitHub adds to every project
+itself; the API cannot create them, so they are not offered here.
+
+**View layouts** (`create_view` / `update_view` → `layout`):
+
+| Value | GraphQL layout |
+|-------|----------------|
+| `board` | `BOARD_LAYOUT` |
+| `table` | `TABLE_LAYOUT` |
+| `roadmap` | `ROADMAP_LAYOUT` |
+
+These are exactly the members of GitHub's `ProjectV2ViewLayout`. There is no
+timeline layout.
+
+### Project Access (`set_collaborators`)
+
+`set_collaborators` sets the role of a project's collaborators through
+GitHub's native `updateProjectV2Collaborators` mutation. Each entry names
+one actor and the role it should hold:
+
+```json
+{"tool": "manage_project", "arguments": {"action": "set_collaborators", "projectId": "PVT_kwDOAB...", "collaborators": [{"userLogin": "octocat", "role": "WRITER"}, {"teamSlug": "platform", "role": "READER"}]}}
+```
+
+- `userLogin` or `teamSlug` — exactly one of the two per entry. `org` is the
+  organization that owns the team; it defaults to the configured owner.
+- `role` — one of `ADMIN`, `WRITER`, `READER`, `NONE`, exactly the members
+  of GitHub's `ProjectV2Roles` enum. `NONE` takes the access away.
+
+The roles are exactly the members of GitHub's `ProjectV2Roles` enum, so no
+other value is accepted. The answer lists the project's collaborators — the
+users and teams that have access — with the role that was granted for the
+ones this call touched. GitHub has no read path for collaborator roles
+(`ProjectV2` has no `collaborators` field), so a role that was not granted
+by this call comes back unknown rather than guessed.
+
+### Views as Server-Side Pools (`list_views`)
+
+`list_views` answers with the configuration GitHub stores for each view:
+
+| Field | GitHub field | Meaning |
+|-------|--------------|---------|
+| `filter` | `ProjectV2View.filter` | The server-side filter expression the view selects its items with (`null` when the view has none) |
+| `groupByFields` | `ProjectV2View.groupByFields` | The names of the fields the view groups by, in order |
+| `sortBy` | `ProjectV2View.sortByFields` | The fields the view sorts by, with the direction of each (`ASC` / `DESC`) |
+| `visibleFields` | `ProjectV2View.configuration.visibleFields` | The names of the fields the view shows, in configured order |
+
+Because the filter lives in GitHub, a named view is a pool the server
+selects from: pass `name` (or `viewId`) to get the configuration of that
+one view.
 
 ### Examples
 
@@ -133,7 +228,7 @@ Manage GitHub Projects v2: create, configure, and organize projects with fields,
 {"tool": "manage_project", "arguments": {"action": "list", "status": "active", "limit": 20}}
 
 // Create a custom field
-{"tool": "manage_project", "arguments": {"action": "create_field", "projectId": "PVT_kwDOAB...", "name": "Priority", "dataType": "SINGLE_SELECT", "options": [{"name": "P0", "color": "red"}, {"name": "P1", "color": "yellow"}, {"name": "P2", "color": "green"}]}}
+{"tool": "manage_project", "arguments": {"action": "create_field", "projectId": "PVT_kwDOAB...", "name": "Priority", "type": "single_select", "options": [{"name": "P0", "color": "red"}, {"name": "P1", "color": "yellow"}, {"name": "P2", "color": "green"}]}}
 ```
 
 ---
@@ -174,6 +269,10 @@ Manage GitHub issues: CRUD, comments, draft issues, advanced search, and sub-iss
 | `get_parent_issue` | `issueNumber` (req) | Get parent issue |
 | `reprioritize_sub_issue` | `issueNumber` (req), `subIssueNumber` (req), `position` (req) | Reorder sub-issue |
 | `remove_sub_issue` | `issueNumber` (req), `subIssueNumber` (req) | Remove sub-issue |
+| `list_dependencies` | `issueId` (req), `dependencyDirection` | The native "blocked by" edges — `blocked_by` (default) lists the issues that block this one, `blocking` the ones it blocks |
+| `add_blocker` | `issueId` (req), `blockingIssueId` (req) | Make an issue blocked by another one (native edge) |
+| `remove_blocker` | `issueId` (req), `blockingIssueId` (req) | Remove a native "blocked by" edge |
+| `list_issue_types` | — | The issue types the organization defines (native issue types) |
 
 ### Examples
 
@@ -317,33 +416,32 @@ Manage repository labels.
 
 ## manage_automation
 
-Manage project automation rules: create, update, enable/disable, and delete.
+Manage project automations: list, read and delete the automation workflows of a GitHub project.
 
-**Action enum:** `create_rule` | `update_rule` | `delete_rule` | `get_rule` | `list_rules` | `enable_rule` | `disable_rule`
+Workflows are GitHub `ProjectV2Workflow` objects. The Projects API exposes them read-only apart from
+deletion - they are authored in the GitHub UI - so there is no create, update, enable or disable action.
+
+**Action enum:** `list_workflows` | `get_workflow` | `delete_workflow`
 
 ### Per-Action Parameters
 
 | Action | Additional Parameters | Description |
 |--------|----------------------|-------------|
-| `create_rule` | `projectId` (req), `name` (req), `trigger` (req), `conditions`, `actions` (req) | Create automation rule |
-| `update_rule` | `ruleId` (req), `name`, `trigger`, `conditions`, `actions` | Update rule |
-| `delete_rule` | `ruleId` (req) | Delete rule (destructive) |
-| `get_rule` | `ruleId` (req) | Get rule details |
-| `list_rules` | `projectId` (req) | List rules |
-| `enable_rule` | `ruleId` (req) | Enable rule |
-| `disable_rule` | `ruleId` (req) | Disable rule |
+| `list_workflows` | `projectId` (req) | List the workflows of a project |
+| `get_workflow` | `workflowId` (req) | Get workflow details |
+| `delete_workflow` | `workflowId` (req) | Delete workflow (destructive) |
 
 ### Examples
 
 ```json
-// Create an automation rule
-{"tool": "manage_automation", "arguments": {"action": "create_rule", "projectId": "PVT_kwDOAB...", "name": "Auto-assign reviewers", "trigger": "pr_opened", "actions": [{"type": "add_assignee", "value": "reviewer-team"}]}}
+// List the workflows of a project
+{"tool": "manage_automation", "arguments": {"action": "list_workflows", "projectId": "PVT_kwDOAB..."}}
 
-// List rules
-{"tool": "manage_automation", "arguments": {"action": "list_rules", "projectId": "PVT_kwDOAB..."}}
+// Get one workflow
+{"tool": "manage_automation", "arguments": {"action": "get_workflow", "workflowId": "PVW_kwDOAB..."}}
 
-// Disable a rule
-{"tool": "manage_automation", "arguments": {"action": "disable_rule", "ruleId": "rule-123"}}
+// Delete a workflow
+{"tool": "manage_automation", "arguments": {"action": "delete_workflow", "workflowId": "PVW_kwDOAB..."}}
 ```
 
 ---
@@ -481,21 +579,24 @@ AI-powered generation: PRDs, task breakdowns, feature addition, and traceability
 
 AI-powered analysis: issue enrichment, triage, label suggestions, and duplicate detection.
 
-**Action enum:** `enrich_issue` | `enrich_issue_sections` | `enrich_bulk` | `triage_issue` | `triage_all` | `schedule_triaging` | `suggest_labels` | `detect_duplicates` | `find_related`
+**Action enum:** `enrich_issue` | `enrich_issue_sections` | `enrich_bulk` | `triage_issue` | `triage_all` | `suggest_labels` | `detect_duplicates` | `find_related`
 
 ### Per-Action Parameters
 
 | Action | Additional Parameters | Description |
 |--------|----------------------|-------------|
-| `enrich_issue` | `issueNumber` (req) | AI-enrich a single issue (labels, priority, type, complexity, effort) |
+| `enrich_issue` | `issueTitle` (req), `issueDescription`, `projectContext`, `autoApply` | AI-enrich a single issue (labels, priority, type, complexity, effort) |
 | `enrich_issue_sections` | `issueTitle` (req), `issueDescription`, `projectContext`, `repositoryLabels` | Enrich an issue into structured sections (Problem / Solution / Context / Impact / AcceptanceCriteria) with per-section confidence |
-| `enrich_bulk` | `issueNumbers` (req) | Bulk enrich multiple issues |
-| `triage_issue` | `issueNumber` (req) | AI triage a single issue |
-| `triage_all` | `limit` | Triage all untriaged issues |
-| `schedule_triaging` | `interval`, `batchSize` | Schedule automatic triaging |
-| `suggest_labels` | `issueNumber` (req) | Suggest labels for an issue |
-| `detect_duplicates` | `issueNumber` (req) | Detect duplicate issues |
-| `find_related` | `issueNumber` (req), `limit` | Find related issues |
+| `enrich_bulk` | `issueIds` (req) | Bulk enrich multiple issues |
+| `triage_issue` | `issueTitle` (req), `issueDescription`, `projectContext` | AI triage a single issue |
+| `triage_all` | `projectId`, `onlyUntriaged` | Triage all untriaged issues |
+| `suggest_labels` | `issueTitle` (req), `issueDescription`, `existingLabels` (req), `issueHistory`, `config` | Suggest labels for an issue |
+| `detect_duplicates` | `issueTitle` (req), `issueDescription`, `existingIssues` (req), `thresholds`, `maxResults` | Detect duplicate issues |
+| `find_related` | `issueId` (req), `issueTitle` (req), `issueDescription`, `repositoryIssues` (req), `issueLabels`, `relationConfig` | Find related issues |
+
+> A missing required parameter is reported as a tool error naming it, e.g.
+> `existingLabels is required for suggest_labels` — the compound schema is flat,
+> so per-action requirements are enforced by the action, not by the schema.
 
 ### Examples
 
@@ -525,24 +626,29 @@ AI-powered planning: capacity analysis, backlog prioritization, risk assessment,
 
 | Action | Additional Parameters | Description |
 |--------|----------------------|-------------|
-| `calculate_capacity` | `sprintId` (req), `teamMembers` | Calculate sprint capacity |
-| `prioritize_backlog` | `projectId` (req), `criteria` | AI-prioritize the backlog |
-| `assess_risk` | `sprintId` (req) | Assess sprint risk |
-| `suggest_composition` | `sprintId` (req), `capacity` | Suggest sprint composition |
-| `generate_roadmap` | `projectId` (req), `timeframe`, `themes` | Generate project roadmap |
-| `generate_visualization` | `projectId` (req), `type` | Generate visualization data |
+| `calculate_capacity` | `velocity`, `sprintDurationDays`, `teamMembers` (req), `historicalSprints` | Calculate sprint capacity |
+| `prioritize_backlog` | `backlogItems` (req), `sprintCapacity`, `businessGoals`, `riskTolerance` | AI-prioritize the backlog |
+| `assess_risk` | `sprintItems` (req), `capacity`, `dependencies` | Assess sprint risk |
+| `suggest_composition` | `backlogItems` (req), `velocity`, `sprintDurationDays`, `teamMembers`, `businessGoals`, `riskTolerance` | Suggest sprint composition |
+| `generate_roadmap` | `requirements` (req), `constraints`, `businessContext` — or `projectId` (+ `projectTitle`, `autoCreate`) to plan from an existing project and create the milestones | Generate project roadmap |
+| `generate_visualization` | `roadmap` (req) | Generate visualization data |
+
+`teamMembers[]` accepts `name`, `availabilityPercent` (0-100), `skills` and the
+optional `role`, `timezone`, `hoursPerDay`, `daysOff`; `historicalSprints[]`
+accepts `sprintId`, `name`, `startDate`, `endDate`, `plannedPoints`,
+`completedPoints`.
 
 ### Examples
 
 ```json
 // Calculate sprint capacity
-{"tool": "ai_plan", "arguments": {"action": "calculate_capacity", "sprintId": "sprint-5"}}
+{"tool": "ai_plan", "arguments": {"action": "calculate_capacity", "velocity": 20, "sprintDurationDays": 14, "teamMembers": [{"name": "ada", "availabilityPercent": 80, "skills": ["typescript"]}]}}
 
 // Prioritize backlog
-{"tool": "ai_plan", "arguments": {"action": "prioritize_backlog", "projectId": "PVT_kwDOAB...", "criteria": ["business_value", "urgency"]}}
+{"tool": "ai_plan", "arguments": {"action": "prioritize_backlog", "backlogItems": [{"id": "1", "title": "Fix login", "points": 3}], "sprintCapacity": 20, "businessGoals": ["ship v1"]}}
 
-// Generate roadmap
-{"tool": "ai_plan", "arguments": {"action": "generate_roadmap", "projectId": "PVT_kwDOAB...", "timeframe": "6 months"}}
+// Plan a roadmap for an existing project and create its milestones
+{"tool": "ai_plan", "arguments": {"action": "generate_roadmap", "projectId": "PVT_kwDOAB...", "autoCreate": true}}
 ```
 
 ---
@@ -558,7 +664,7 @@ Agent task lifecycle: register, check out tasks, report progress, and complete w
 | Action | Additional Parameters | Description |
 |--------|----------------------|-------------|
 | `register` | `name` (req), `role` (req), `runtime`, `capabilities`, `parentAgentId` | Register an AI agent |
-| `checkout_task` | `agentId` (req), `strategy`, `labels`, `projectId`, `skipBlocked`, `reviewQueue` | Claim next available task (strategies: `highest_priority` (default), `oldest_first`, `skills_match`, `milestone_deadline`, `ai`; `skipBlocked: true` skips tasks with open blockers; `reviewQueue: true` claims from the review queue for reviewers) |
+| `checkout_task` | `agentId` (req), `strategy`, `labels`, `projectId`, `view`, `skipBlocked`, `reviewQueue` | Claim next available task (strategies: `highest_priority` (default), `oldest_first`, `skills_match`, `milestone_deadline`, `ai`; `skipBlocked: true` skips tasks with open blockers; `reviewQueue: true` claims from the review queue for reviewers; `view` claims from a named project view — the view's own order decides which task is handed out first) |
 | `release_task` | `agentId` (req), `taskId` (req), `reason` | Return task to pool |
 | `complete_task` | `agentId` (req), `taskId` (req), `summary` (req) | Mark task completed |
 | `heartbeat` | `agentId` (req), `status`, `taskId`, `progress`, `progressSummary`, `currentBranch`, `blockers` | Report liveness and progress (history retained) |
@@ -593,7 +699,7 @@ Agent task lifecycle: register, check out tasks, report progress, and complete w
 
 ## agent_manage
 
-Agent administration: list agents, manage budgets, view activity, and submit work products.
+Agent administration: list agents, manage budgets, view activity, submit work products, redistribute work, and drive PM convergence.
 
 **Action enum:** `list` | `deregister` | `get_activity` | `submit_work_product` | `get_budget` | `set_budget` | `reclaim_stale` | `record_usage` | `get_metrics` | `setup_fields` | `assign_task` | `get_swarm_status` | `rebalance_workload` | `decompose_task` | `smart_assign` | `converge_project` | `converge_until_done` | `cleanup_registry`
 
@@ -606,17 +712,17 @@ Agent administration: list agents, manage budgets, view activity, and submit wor
 | `get_activity` | `agentId` | Get agent activity dashboard (incl. heartbeat history) |
 | `submit_work_product` | `agentId` (req), `taskId` (req), `issueNumber` (req), `branch`, `prNumber`, `commitShas`, `filesChanged`, `testsPassed`, `testsFailed`, `testsTotal`, `summary` | Submit work product |
 | `get_budget` | `agentId` (req) | Check token budget status |
-| `set_budget` | `agentId` (req), `totalTokens` (req), `warningThreshold`, `hardStop`, `resetPeriod` | Configure token budget |
+| `set_budget` | `agentId` (req), `totalTokens` (req), `warningFraction` or `warningThreshold`, `hardStop`, `resetPeriod` | Configure token budget (`warningThreshold` is accepted as a compatibility alias for `warningFraction`) |
 | `reclaim_stale` | `timeoutMinutes` | Reclaim tasks from agents with stale heartbeats (default 30 min). Also run automatically by the server-side **auto-reclaim scheduler** (see below). |
 | `record_usage` | `agentId` (req), `tokensUsed` (req) | Report token usage against an agent's budget |
 | `get_metrics` | `staleAfterMinutes` | Aggregate + per-agent metrics (throughput, cycle time, budget burn, staleness) |
 | `setup_fields` | `projectId` (req) | Idempotently provision the agent orchestration fields (`agent_claimed_by`, `agent_claimed_at`, `agent_status`, `agent_work_branch`, `agent_pr_number`) on a project |
 | `assign_task` | `agentId` (req), `projectId` (req), `issueNumber` (req) | PM assigns a specific issue to a specific agent, bypassing self-service checkout |
 | `get_swarm_status` | `staleAfterMinutes` | Dashboard of all agents: tasks, heartbeats, budgets, blocked/stale detection |
-| `rebalance_workload` | — | Redistribute tasks from overloaded agents to idle ones |
+| `rebalance_workload` | `projectId` (req), `staleAfterMinutes`, `agentIds`, `roleFilter`, `maxAssignments` | Reclaim stale work, then redistribute available project tasks to eligible idle agents via smart assignment |
 | `decompose_task` | `projectId` (req), `issueNumber` (req), `subtasks` (req: array of {title, description, acceptanceCriteria?}) | PM splits a rejected task into sub-issues linked to parent |
 | `smart_assign` | `projectId` (req), `agentIds`, `roleFilter`, `maxAssignments` | Capability-matched, budget-aware task assignment |
-| `converge_project` | `projectId` (req) | Auto-approve passing work, auto-reject failing, auto-decompose fix subtasks |
+| `converge_project` | `projectId` (req), `reviewerId` | Auto-approve passing work and auto-reject failing work through normal lifecycle cleanup when `reviewerId` is supplied; otherwise applies equivalent claim/status cleanup before fallback comments |
 | `converge_until_done` | `projectId` (req), `iteration`, `maxIterations` | Multi-iteration convergence: progress report + next actions |
 | `cleanup_registry` | `staleAfterMinutes` | Remove stale agents with no heartbeat |
 
@@ -638,7 +744,9 @@ Agent administration: list agents, manage budgets, view activity, and submit wor
 {"tool": "agent_manage", "arguments": {"action": "submit_work_product", "agentId": "agent-abc123", "taskId": "issue-42", "issueNumber": 42, "branch": "feat/42-login", "prNumber": 99, "summary": "Added login form"}}
 
 // Set agent budget
-{"tool": "agent_manage", "arguments": {"action": "set_budget", "agentId": "agent-abc123", "totalTokens": 500000, "warningThreshold": 0.8, "hardStop": true, "resetPeriod": "daily"}}
+{"tool": "agent_manage", "arguments": {"action": "set_budget", "agentId": "agent-abc123", "totalTokens": 500000, "warningFraction": 0.8, "hardStop": true, "resetPeriod": "daily"}}
+// Compatibility alias for older clients
+{"tool": "agent_manage", "arguments": {"action": "set_budget", "agentId": "agent-abc123", "totalTokens": 500000, "warningThreshold": 0.8}}
 ```
 
 ```json
@@ -787,9 +895,9 @@ Manage branches and branch protection rules.
 
 ---
 
-## System Tools
+## system
 
-The `system` group provides infrastructure operations:
+Infrastructure operations exposed by the `system` group.
 
 **Action enum:** `health_check` | `setup_project_fields`
 
@@ -808,13 +916,13 @@ The `system` group provides infrastructure operations:
 ## Granular Tools (Internal)
 
 The compound API is the recommended interface for MCP clients:
-- **Fewer tools** — 20 instead of 131 reduces tool-selection overhead for AI agents
+- **Fewer tools** — 20 tools covering 169 actions, instead of one tool per operation
 - **Progressive disclosure** — `discover_tools` lets agents explore capabilities at runtime
 - **Same underlying operations** — compound tools delegate directly to the same internal executors
-- **Configurable exposure** — `MCP_TOOL_GROUPS` (group tags: `core`, `ai`, `agents`, `events`, `system`) lets you limit which tool groups are visible
+- **Configurable exposure** — `MCP_TOOL_GROUPS` (group names: `core`, `ai`, `agents`, `events`, `system`) lets you limit which tool groups are visible
 
 To restore granular tool exposure (not recommended), consult the `ToolRegistry` source in `src/infrastructure/tools/`.
 
 ---
 
-*MCP SDK: 2.0*
+*Reference for `mcp-github-project-manager` v2.4.0 — MCP SDK v2 (2026-07-28 spec).*

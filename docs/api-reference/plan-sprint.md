@@ -1,8 +1,13 @@
 # Plan Sprint Tool
 
+> **Scope note.** `plan_sprint` is a service-layer operation, not a public MCP
+> tool name. The public surface is the 20 compound tools in
+> [TOOLS.md](../TOOLS.md) — sprints are managed through `manage_sprints`
+> (actions `create`, `update`, `add_issues`, `remove_issues`, `plan`).
+
 ## Overview
 
-The `plan_sprint` tool allows you to create a new sprint and assign issues to it. This is useful for organizing work into time-boxed iterations and tracking progress against sprint goals.
+The `plan_sprint` operation allows you to create a new sprint and assign issues to it. This is useful for organizing work into time-boxed iterations and tracking progress against sprint goals.
 
 ## Parameters
 
@@ -116,7 +121,7 @@ try {
 
 ## Implementation Details
 
-The `plan_sprint` tool performs the following operations:
+The `plan_sprint` operation performs the following operations:
 
 1. Creates a new sprint with the specified title, dates, and goals
 2. Validates that all specified issues exist
@@ -141,7 +146,8 @@ A sprint can have one of the following statuses:
 | active | Sprint is currently in progress |
 | completed | Sprint has been completed |
 
-## Related Tools
+## Related Documentation
 
-- [Get Sprint Metrics](get-sprint-metrics.md) - Track progress of sprint
+- [Get Milestone Metrics](get-milestone-metrics.md) - Track progress of a milestone
 - [Create Roadmap](create-roadmap.md) - Create a roadmap with milestones and issues
+- [Tool Reference](../TOOLS.md) - The public MCP tool surface

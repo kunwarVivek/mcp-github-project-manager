@@ -19,7 +19,7 @@ agentic harness — Claude Code, Codex, Cursor, or a custom agent loop — with
 ├─────────────────────────────────────────────────────────────────────┤
 │  GitHub = the task substrate (source of truth, human-visible)       │
 │  · issues = tasks   · project v2 custom fields = claim state        │
-│  · pinned issue = agent registry   · comments = work products       │
+│  · registry branch = agent registry   · comments = work products    │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -31,7 +31,9 @@ required.
 
 A worker agent cycles through these steps (see
 [`examples/basic/agent-loop.ts`](../examples/basic/agent-loop.ts) for a runnable
-reference):
+reference loop — `--project <id> [--create-demo-task] [--reject]` runs a worker and a
+reviewer against a live server, `--plan` prints the sequence — and the exported
+`runAgentLoop(client, config)` helper):
 
 1. **`agent_work/register`** — join the registry (name, role, runtime, capabilities).
 2. **`agent_work/checkout_task`** — claim the next task using a strategy:
@@ -41,7 +43,8 @@ reference):
    - `milestone_deadline` — soonest milestone `dueOn` first
    - `ai` — LLM-ranked selection (falls back to deterministic ranking when AI is unavailable)
    - `reviewQueue: true` — for reviewer agents; claims from the review queue instead
-   - `skipBlocked: true` — skips tasks whose declared blockers (`Blocked by #N`, `Depends on #N`, `blocked` label) are still open
+   - `skipBlocked: true` — skips tasks whose declared blockers are still open. The native `blocked by` edge decides; the `Blocked by #N` / `Depends on #N` / `blocked` label references are the fallback
+   - `view: "<name>"` — claims from a named project view: the view's own order decides which task is handed out first (`manage_project/list_views` shows the filter and the order the view stores)
 3. **`agent_work/get_task_context`** — pull enriched context (issue, parent, milestone, related issues, coding standards from `CLAUDE.md`/`AGENTS.md`, acceptance criteria, and — when AI is configured — suggested criteria, complexity estimate, and implementation guidance).
 4. **`agent_work/heartbeat`** — report liveness/progress. History is retained (last 50, most recent first) and surfaced in `get_activity`.
 5. **`agent_work/submit_for_review`** — move the task into the review queue.
@@ -122,10 +125,11 @@ Returns progress report + suggested next actions. Call in a loop, incrementing
 ## Harness setup
 
 The server is a plain MCP server — any harness that speaks MCP works. Install it
-per [README](../README.md#installing-in-ai-assistants). Example for Claude Code CLI:
+per [CONFIGURATION.md](CONFIGURATION.md#mcp-client-configuration-examples).
+Example for Claude Code CLI:
 
 ```bash
-claude mcp add github-project-manager -- pnpm dlx mcp-github-project-manager
+claude mcp add github-project-manager -- npx -y mcp-github-project-manager
 ```
 
 With env vars:
@@ -170,9 +174,18 @@ The layer is safe under concurrent use by multiple harnesses:
 - **Atomic claims** — checkout re-verifies the claim is still free immediately
   before writing (`agent_claimed_by` TOCTOU guard); concurrent claims lose
   cleanly instead of double-assigning.
-- **Registry concurrency** — `AgentStore` uses read-modify-write with a
-  verify-and-merge retry, so parallel heartbeats/registrations never silently
-  drop a registered agent.
+- **One task, one board** — a task that is already claimed on another project
+  board is not handed out a second time: the claim path reads every board the
+  issue is tracked on (including archived items) and skips it.
+- **Registry concurrency** — the registry is `registry.json` on the
+  `agent-registry` branch, written through the Contents API with sha
+  compare-and-swap. A write against a stale sha is rejected (409); `AgentStore`
+  re-reads, re-applies the change on the fresh list and retries, so parallel
+  heartbeats/registrations never silently drop a registered agent, and sustained
+  contention raises an error instead of losing the update. The token needs
+  `contents: write` and the `agent-registry` branch must not be locked by a
+  ruleset. A repository that still has the old "Agent Registry" issue is
+  migrated on first use: its agents are imported and the issue becomes a pointer.
 - **Stale recovery** — `agent_manage/reclaim_stale` returns tasks from agents
   whose heartbeats have lapsed (default timeout 30 min) to the unclaimed pool
   and marks those agents offline.
@@ -218,8 +231,8 @@ heartbeat → work product → review → approve, budgets, crash-recovery recla
 and metrics:
 
 ```bash
-pnpm run build
-pnpm run test:e2e:tools:real:agent
+npm run build        # or: pnpm run build
+npm run test:e2e:tools:real:agent
 ```
 
 It auto-skips when `GITHUB_TOKEN` / `GITHUB_OWNER` / `GITHUB_REPO` are missing or
@@ -227,6 +240,6 @@ fake. See [docs/e2e-testing-guide.md](e2e-testing-guide.md) for the broader suit
 
 ## Reference
 
-- Tool reference: [docs/TOOLS.md](TOOLS.md#agent-orchestration-tools)
+- Tool reference: [docs/TOOLS.md](TOOLS.md#agent_work)
 - Architecture: [docs/architecture.md](architecture.md)
 - Example loop: [`examples/basic/agent-loop.ts`](../examples/basic/agent-loop.ts)

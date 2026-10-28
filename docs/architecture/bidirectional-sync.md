@@ -134,13 +134,13 @@ The system recalibrates task estimates and project timelines through:
 
 ```
 # 3. Get next task recommendations
-get_next_task({
+{"tool": "ai_generate", "arguments": {
+  "action": "get_next_task",
   "sprintCapacity": 40,
   "teamSkills": ["react", "node.js", "typescript", "python"],
   "maxComplexity": 7,
-  "includeAnalysis": true,
-  "excludeBlocked": true
-})
+  "includeAnalysis": true
+}}
 ```
 
 The AI features can analyze task progress and provide updated recommendations as the project evolves.

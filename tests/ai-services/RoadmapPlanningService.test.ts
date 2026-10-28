@@ -34,7 +34,6 @@ vi.mock("../../src/services/ProjectManagementService", () => ({
       listProjectItems: vi.fn(),
       updateProjectItem: vi.fn(),
       createIssue: vi.fn(),
-      createAutomationRule: vi.fn(),
     };
   }),
 }));
@@ -70,6 +69,7 @@ describe("RoadmapPlanningService", () => {
       listProjectItems: vi.fn(),
       createMilestone: vi.fn(),
       updateProjectItem: vi.fn(),
+      updateIssue: vi.fn(),
     };
 
     (ProjectManagementService as Mock).mockImplementation(() => mockProjectService);
@@ -335,6 +335,91 @@ describe("RoadmapPlanningService", () => {
 
       expect(result.createdMilestones).toBe(0);
       expect(mockProjectService.createMilestone).not.toHaveBeenCalled();
+    });
+
+    it("assigns the created milestone to the project's issues and counts them", async () => {
+      mockProjectService.listProjectItems.mockResolvedValue([
+        { id: "item-1", contentId: "I_issue1" },
+        { id: "item-2", contentId: "I_issue2" },
+      ]);
+      mockProjectService.createMilestone.mockResolvedValue({ id: "milestone-1", number: 1 });
+      mockProjectService.updateIssue.mockResolvedValue({ id: "I_issue1" });
+
+      const result = await service.createRoadmapInGitHub({
+        projectId: "project-123",
+        roadmap: {
+          milestones: [
+            {
+              title: "MVP Launch",
+              description: "Launch",
+              dueDate: "2025-06-01",
+              issueIds: ["item-1", "item-2"],
+            },
+          ],
+        },
+      });
+
+      expect(result.createdMilestones).toBe(1);
+      expect(result.updatedIssues).toBe(2);
+      expect(result.failures).toEqual([]);
+      // The plan references project ITEM ids; the milestone is set on the issue
+      expect(mockProjectService.updateIssue).toHaveBeenCalledWith("I_issue1", {
+        milestoneId: "milestone-1",
+      });
+      expect(mockProjectService.updateIssue).toHaveBeenCalledWith("I_issue2", {
+        milestoneId: "milestone-1",
+      });
+    });
+
+    it("reports a failed issue update instead of swallowing it", async () => {
+      mockProjectService.listProjectItems.mockResolvedValue([
+        { id: "item-1", contentId: "I_issue1" },
+      ]);
+      mockProjectService.createMilestone.mockResolvedValue({ id: "milestone-1", number: 1 });
+      mockProjectService.updateIssue.mockRejectedValue(new Error("GitHub API error"));
+
+      const result = await service.createRoadmapInGitHub({
+        projectId: "project-123",
+        roadmap: {
+          milestones: [
+            {
+              title: "MVP Launch",
+              description: "Launch",
+              dueDate: "2025-06-01",
+              issueIds: ["item-1"],
+            },
+          ],
+        },
+      });
+
+      expect(result.createdMilestones).toBe(1);
+      expect(result.updatedIssues).toBe(0);
+      expect(result.failures).toEqual([{ target: "issue:item-1", error: "GitHub API error" }]);
+    });
+
+    it("reports an issue that is not an item of the project", async () => {
+      mockProjectService.listProjectItems.mockResolvedValue([]);
+      mockProjectService.createMilestone.mockResolvedValue({ id: "milestone-1", number: 1 });
+
+      const result = await service.createRoadmapInGitHub({
+        projectId: "project-123",
+        roadmap: {
+          milestones: [
+            {
+              title: "MVP Launch",
+              description: "Launch",
+              dueDate: "2025-06-01",
+              issueIds: ["unknown-item"],
+            },
+          ],
+        },
+      });
+
+      expect(result.updatedIssues).toBe(0);
+      expect(result.failures).toEqual([
+        { target: "issue:unknown-item", error: "Issue is not an item of this project" },
+      ]);
+      expect(mockProjectService.updateIssue).not.toHaveBeenCalled();
     });
   });
 

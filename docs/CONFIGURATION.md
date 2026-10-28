@@ -10,10 +10,14 @@ The MCP GitHub Project Manager can be configured through:
 3. MCP client configuration (Claude, Cursor, VS Code, etc.)
 4. Command-line arguments
 
-Configuration sources are applied in this order of precedence:
-1. Command-line arguments (highest priority)
-2. Environment variables
-3. `.env` file (lowest priority)
+Configuration sources are applied in this order of precedence (highest first):
+1. Command-line arguments (`--token`, `--owner`, `--repo`)
+2. File-mounted secrets (`SECRETS_DIR/<NAME>`)
+3. Environment variables (including anything loaded from a `.env` file)
+
+> Startup validation runs against the **resolved** configuration, not raw
+> `process.env`. A token supplied only by file or CLI flag still satisfies the
+> required-field check.
 
 ---
 
@@ -28,6 +32,32 @@ These variables are **required** for the MCP server to function:
 | `GITHUB_TOKEN` | GitHub personal access token | `ghp_xxxxxxxxxxxxxxxxxxxx` |
 | `GITHUB_OWNER` | GitHub username or organization | `your-username` |
 | `GITHUB_REPO` | Repository name | `my-project` |
+
+#### Credential Chain
+
+`GITHUB_TOKEN` is resolved through a chain — the first hit wins:
+
+1. `--token` CLI flag
+2. `$SECRETS_DIR/GITHUB_TOKEN` file (when `SECRETS_DIR` is set)
+3. `GITHUB_TOKEN` environment variable
+4. `gh auth token` — a working `gh` CLI login means **no configuration at all**
+
+The `gh` fallback can be disabled with `GH_CLI_TOKEN_FALLBACK=false`. It is also
+switched off automatically under `NODE_ENV=test`, so tests never shell out.
+
+#### GitHub App Authentication (optional)
+
+When all three of these are set, the server authenticates as a GitHub App
+installation instead of using the PAT:
+
+| Variable | Description |
+|----------|-------------|
+| `GITHUB_APP_ID` | App ID |
+| `GITHUB_APP_PRIVATE_KEY` | App private key (literal `\n` escapes are converted to newlines) |
+| `GITHUB_APP_INSTALLATION_ID` | Installation ID |
+
+A **partial** App configuration falls back to the PAT rather than failing, so a
+half-set environment cannot lock the server out.
 
 #### GITHUB_TOKEN
 
@@ -65,11 +95,11 @@ At least one AI API key is required for AI-powered features (PRD generation, tas
 | `GOOGLE_API_KEY` | Google | Gemini models |
 | `PERPLEXITY_API_KEY` | Perplexity | Research and analysis tasks |
 
-**Provider Priority:** The system uses automatic fallback if a provider is unavailable:
-1. Anthropic Claude (primary)
-2. OpenAI GPT (fallback)
-3. Google Gemini (secondary fallback)
-4. Perplexity (for research tasks)
+**Provider selection:** there is no hardcoded provider order and no default
+model. Each AI role (`main`, `research`, `fallback`, `prd`) is configured
+independently — see [Per-Role AI Provider Configuration](#per-role-ai-provider-configuration).
+A role with a key but no model is left unconfigured and the server warns rather
+than silently picking a model.
 
 ### AI Model Configuration
 
@@ -189,22 +219,29 @@ overrides falls back to the global key and its model-prefix-detected provider.
 | `NODE_ENV` | `development` | Environment: `development`, `test`, `production` |
 | `LOG_LEVEL` | `info` | Logging level: `debug`, `info`, `warn`, `error` |
 | `LOG_FORMAT` | `text` | Log output format: `text` (human-readable) or `json` (structured JSON to stderr) |
+| `GH_CLI_TOKEN_FALLBACK` | `true` | Allow the `gh auth token` credential fallback. Automatically off under `NODE_ENV=test`. |
 
 ### Tool Exposure
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `MCP_TOOL_GROUPS` | `all` | Comma-separated list of group tags to expose to MCP clients. Set to `all` to expose all 16 tools. Available tags: `core`, `ai`, `agents`, `events`, `system`. `discover_tools` and `system` are always available regardless of this setting. |
+| `MCP_TOOL_GROUPS` | `all` | Comma-separated list of **group names** to expose to MCP clients. Set to `all` to expose all 20 tools. Valid group names: `core`, `ai`, `agents`, `events`, `system`. |
+
+> `MCP_TOOL_GROUPS` filters by **group name**, not by tool name. A tool name
+> (e.g. `manage_issues`) exposes **nothing** — only the group names below match.
 
 **Available groups:**
 
 | Group | Tools included |
 |-------|---------------|
-| `core` | `manage_project`, `manage_issues`, `manage_prs`, `manage_milestones`, `manage_sprints`, `manage_labels`, `manage_automation`, `manage_iterations`, `manage_status_updates` |
+| `core` | `manage_project`, `manage_issues`, `manage_prs`, `manage_milestones`, `manage_sprints`, `manage_labels`, `manage_automation`, `manage_iterations`, `manage_status_updates`, `manage_branches`, `manage_releases`, `manage_workflows` |
 | `ai` | `ai_generate`, `ai_analyze`, `ai_plan` |
 | `agents` | `agent_work`, `agent_manage` |
 | `events` | `manage_events` |
-| `system` | `system`, `discover_tools` (always enabled) |
+| `system` | `system`, `discover_tools` |
+
+`discover_tools` is always exposed regardless of this setting. Every other
+tool — including the `system` tool — is filtered.
 
 **Example profiles:**
 ```bash
@@ -241,17 +278,25 @@ in `src/infrastructure/secrets/` and add it to the resolver chain.
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `SYNC_ENABLED` | `true` | Enable bidirectional GitHub state sync |
-| `SYNC_TIMEOUT_MS` | _(impl default)_ | Sync operation timeout |
-| `CACHE_DIRECTORY` | `.mcp-cache` | Directory for cache persistence |
+| `SYNC_TIMEOUT_MS` | `30000` | Sync operation timeout (ms) |
+| `SYNC_INTERVAL_MS` | `0` | Background sync interval in ms; `0` disables the interval |
+| `SYNC_RESOURCES` | `PROJECT,MILESTONE,ISSUE,SPRINT` | Comma-separated resource types to sync |
 | `WEBHOOK_SECRET` | _(unset)_ | HMAC secret for GitHub webhook signature validation |
 | `WEBHOOK_ALLOW_UNSIGNED` | `false` | **Security:** when no `WEBHOOK_SECRET` is set, webhooks are rejected (fail closed). Set `true` only in trusted dev to accept unsigned webhooks. |
 | `WEBHOOK_PORT` | `3001` | Port for the webhook HTTP listener |
+| `WEBHOOK_TIMEOUT_MS` | `5000` | Webhook request timeout (ms) |
+| `WEBHOOK_ALLOWED_ORIGINS` | `""` | Comma-separated list of allowed CORS origins |
+| `WEBHOOK_RATE_LIMIT` | `100` | Max webhook requests per window |
+| `WEBHOOK_RATE_WINDOW_MS` | `60000` | Webhook rate-limit window (ms) |
 | `SSE_ENABLED` | `true` | Enable server-sent events streaming |
+| `EVENT_RETENTION_DAYS` | `7` | Days to retain stored events |
+| `MAX_EVENTS_IN_MEMORY` | `1000` | Max events held in memory |
 
 ### Cache
 
 | Variable | Default | Description |
 |----------|---------|-------------|
+| `CACHE_DIRECTORY` | `.mcp-cache` | Directory for persistent cache/event state |
 | `MAX_CACHE_ENTRIES` | `10000` | Maximum in-memory resource-cache entries before oldest-first eviction |
 
 ### Agent Orchestration
@@ -267,10 +312,19 @@ posts an audit comment on each reclaimed issue. One crash no longer blocks a tas
 | `AGENT_RECLAIM_INTERVAL_MS` | `300000` (5 min) | How often the reclaim sweep runs. `0` disables the loop. |
 | `AGENT_STALE_AFTER_MINUTES` | `30` | Heartbeat age after which a working agent is considered stale and its task reclaimed |
 
-> **Note:** the first sweep may create the `agent-registry` issue + label in the repo
-> (the registry's documented bootstrap mechanism), the same side effect as any
-> `register_agent` / `list_agents` call. Set `AGENT_RECLAIM_ENABLED=false` if you never
-> use the agent layer.
+> **Note:** the sweep itself is read-only — a repository that has no agent registry (no
+> `agent-registry` branch and no legacy registry issue) is skipped, so the sweep never
+> creates the branch. The registry is created by the first `register_agent` /
+> `list_agents` call (its documented bootstrap mechanism). Set
+> `AGENT_RECLAIM_ENABLED=false` if you never use the agent layer.
+>
+> **Registry storage:** the registry is the file `registry.json` on the orphan branch
+> `agent-registry`, written through the GitHub Contents API with sha compare-and-swap.
+> The token therefore needs **`contents: write`** (fine-grained: Repository permissions →
+> Contents: Read and write; classic: `repo`), and no branch ruleset or protection may block
+> writes to `agent-registry`. The repository must have at least one commit. On first use
+> an existing legacy "Agent Registry" issue is migrated into the branch and its body is
+> replaced with a pointer.
 
 The remaining agent constants are compile-time (defined in
 `src/domain/agent-orchestration-types.ts`) and can be overridden by forking the source:
@@ -279,12 +333,17 @@ The remaining agent constants are compile-time (defined in
 |----------|---------|-------------|
 | `DEFAULT_HEARTBEAT_TIMEOUT_MINUTES` | `30` | Minutes before an agent is considered stale (no heartbeat) |
 | `DEFAULT_AGENT_BUDGET_TOKENS` | `500,000` | Default token budget per agent |
-| `AGENT_REGISTRY_LABEL` | `agent-registry` | GitHub issue label used for the agent registry |
+| `AGENT_REGISTRY_BRANCH` | `agent-registry` | Orphan branch that holds the agent registry file (`registry.json`) |
+| `AGENT_REGISTRY_FILE` | `registry.json` | Path of the registry file on that branch |
+| `AGENT_REGISTRY_LABEL` | `agent-registry` | Label of the legacy registry issue; used only to find an old registry to migrate |
 
 Agent orchestration custom fields (`agent_claimed_by`, `agent_claimed_at`, `agent_status`,
 `agent_work_branch`, `agent_pr_number`) are auto-provisioned in your GitHub Project by
 `ProjectFieldSetup` when `AUTO_CREATE_PROJECT_FIELDS=true` (the default), or on demand via
 the `manage_project/setup_agent_fields` (or `agent_manage/setup_fields`) action.
+They use the field types GitHub's `ProjectV2CustomFieldType` accepts: `text`
+(`agent_claimed_by`, `agent_claimed_at`, `agent_work_branch`), `single_select`
+(`agent_status`) and `number` (`agent_pr_number`).
 
 ---
 
@@ -320,8 +379,8 @@ GOOGLE_API_KEY=xxxx
 PERPLEXITY_API_KEY=pplx-xxxx
 
 # AI Model Configuration (Optional)
-AI_MAIN_MODEL=claude-3-5-sonnet-20241022
-AI_FALLBACK_MODEL=gpt-4o
+# AI_MAIN_MODEL=claude-sonnet-4-20250514
+# AI_FALLBACK_MODEL=gpt-4o-mini
 
 # Server Configuration (Optional)
 NODE_ENV=development
@@ -498,29 +557,42 @@ docker run -it \
 
 ### Using Docker Compose
 
-Create a `docker-compose.yml`:
+The repository ships a `docker-compose.yml` at the root. It builds the image,
+passes the required GitHub variables through from your shell environment, and
+mounts a named volume for the cache:
 
 ```yaml
-version: '3.8'
 services:
   mcp-server:
     build: .
+    container_name: mcp-github-pm
+    restart: unless-stopped
     environment:
       - GITHUB_TOKEN=${GITHUB_TOKEN}
       - GITHUB_OWNER=${GITHUB_OWNER}
       - GITHUB_REPO=${GITHUB_REPO}
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - NODE_ENV=production
-      - LOG_LEVEL=info
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - AI_MAIN_MODEL=${AI_MAIN_MODEL:-}
+      - WEBHOOK_PORT=${WEBHOOK_PORT:-3000}
+      - LOG_FORMAT=${LOG_FORMAT:-json}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+    ports:
+      - "${WEBHOOK_PORT:-3000}:${WEBHOOK_PORT:-3000}"
+    volumes:
+      - mcp-cache:/app/cache
+    # stdio transport — MCP clients connect via docker attach or exec
     stdin_open: true
-    tty: true
+    tty: false
+
+volumes:
+  mcp-cache:
+    driver: local
 ```
 
 Then run:
 
 ```bash
-docker-compose up
+docker compose up
 ```
 
 ### Environment File with Docker
@@ -637,6 +709,13 @@ GITHUB_OWNER=your-username
 GITHUB_REPO=your-repository
 
 # ===========================
+# GitHub App auth (optional) — all three, or none
+# ===========================
+# GITHUB_APP_ID=
+# GITHUB_APP_PRIVATE_KEY=
+# GITHUB_APP_INSTALLATION_ID=
+
+# ===========================
 # AI Provider Configuration
 # At least one is required for AI features
 # ===========================
@@ -647,11 +726,20 @@ PERPLEXITY_API_KEY=pplx-xxxx
 
 # ===========================
 # AI Model Configuration
+# No defaults — configure the models you want to use
 # ===========================
-AI_MAIN_MODEL=claude-3-5-sonnet-20241022
-AI_RESEARCH_MODEL=perplexity-llama-3.1-sonar-large-128k-online
-AI_FALLBACK_MODEL=gpt-4o
-AI_PRD_MODEL=claude-3-5-sonnet-20241022
+# AI_MAIN_MODEL=your-main-model
+# AI_RESEARCH_MODEL=your-research-model
+# AI_FALLBACK_MODEL=your-fallback-model
+# AI_PRD_MODEL=your-prd-model
+
+# ===========================
+# Per-role AI provider overrides (optional)
+# ===========================
+# AI_MAIN_PROVIDER=openai-compatible
+# AI_MAIN_BASE_URL=https://openrouter.ai/api/v1
+# AI_MAIN_API_KEY=sk-or-v1-...
+# AI_MAIN_MODEL=deepseek/deepseek-chat
 
 # ===========================
 # AI Task Generation
@@ -693,10 +781,26 @@ AGENT_STALE_AFTER_MINUTES=30
 NODE_ENV=development
 LOG_LEVEL=info
 LOG_FORMAT=text
+# GH_CLI_TOKEN_FALLBACK=true
+
+# ===========================
+# Secrets / Webhooks / Cache
+# ===========================
+# SECRETS_DIR=/run/secrets
+# WEBHOOK_SECRET=your_webhook_secret
+# WEBHOOK_ALLOW_UNSIGNED=false
+# WEBHOOK_PORT=3001
+# SYNC_ENABLED=true
+# SSE_ENABLED=true
+# CACHE_DIRECTORY=.mcp-cache
+# MAX_CACHE_ENTRIES=10000
+
 # ===========================
 # Tool Exposure
 # ===========================
-# Comma-separated list of compound tool groups to expose (default: all)
+# Comma-separated list of compound tool GROUP names to expose (default: all).
+# These are group names, not tool names — a tool name here exposes nothing.
+# Available groups: core, ai, agents, events, system
 MCP_TOOL_GROUPS=all
 ```
 
@@ -705,6 +809,7 @@ MCP_TOOL_GROUPS=all
 ## See Also
 
 - [Troubleshooting Guide](TROUBLESHOOTING.md) - Common issues and solutions
-- [Tool Reference](TOOLS.md) - 16 compound tools (134 actions) documented
+- [Tool Reference](TOOLS.md) - 20 compound tools (169 actions) documented
 - [API Reference](API.md) - Service and infrastructure APIs
 - [User Guide](user-guide.md) - Getting started guide
+- [Deployment Guide](deployment.md) - Docker and client installation

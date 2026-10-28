@@ -36,6 +36,19 @@ echo "GITHUB_OWNER: $GITHUB_OWNER"
 echo "GITHUB_REPO: $GITHUB_REPO"
 ```
 
+### Which Token Is Actually Being Used?
+
+`GITHUB_TOKEN` is resolved through a chain — first hit wins:
+
+1. `--token` CLI flag
+2. `$SECRETS_DIR/GITHUB_TOKEN` file (when `SECRETS_DIR` is set)
+3. `GITHUB_TOKEN` environment variable
+4. `gh auth token` — a working `gh` CLI login means no configuration is needed
+
+If the server authenticates with a token you did not expect, check for a
+`$SECRETS_DIR/GITHUB_TOKEN` file and for an active `gh` login. Disable the
+fallback with `GH_CLI_TOKEN_FALLBACK=false`.
+
 ---
 
 ## Common Issues
@@ -223,8 +236,8 @@ echo "GITHUB_REPO: $GITHUB_REPO"
 2. **If running from source:**
    ```bash
    # Rebuild
-   pnpm install
-   pnpm run build
+   npm install
+   npm run build
    ```
 
 3. **Check Node.js version:**
@@ -273,9 +286,9 @@ echo "GITHUB_REPO: $GITHUB_REPO"
 
 **Solutions:**
 
-1. **Verify pnpm dlx can run the package:**
+1. **Verify the package can run:**
    ```bash
-   pnpm dlx mcp-github-project-manager --help
+   npx -y mcp-github-project-manager --help
    ```
 
 2. **Try with bunx:**
@@ -493,11 +506,38 @@ Use `cmd` wrapper in MCP config:
 
 1. **Verify project ID format:**
    - Projects v2 use GraphQL node IDs (e.g., `PVT_xxxxx`)
-   - Get ID from project URL or use `list_projects`
+   - Get the ID from the project URL, or list projects with
+     `manage_project` (action: `list`)
 
 2. **Check project access:**
    - Verify you have access in GitHub UI
    - Ensure token has `project` scope
+
+---
+
+## Tool and Tool-Group Issues
+
+### A Tool Is Missing From the Client
+
+`MCP_TOOL_GROUPS` filters the exposed tool set by **group name**, not by tool
+name. Check:
+
+```bash
+echo "MCP_TOOL_GROUPS=$MCP_TOOL_GROUPS"
+```
+
+Valid group names are `core`, `ai`, `agents`, `events`, `system`, or `all`
+(default). A tool name in this variable (e.g. `manage_issues`) exposes
+**nothing**. Only `discover_tools` is always exposed regardless of the setting.
+
+### A Tool Call Returned an Error Result
+
+Under MCP v2 a tool that runs and fails returns `{ content, isError: true }` —
+the failure is visible to the model so it can recover, and it is **not** a
+JSON-RPC error. JSON-RPC errors are reserved for protocol faults, such as
+calling a tool that does not exist. Arguments are validated against the
+declared `inputSchema` before the handler runs, so a malformed call never
+reaches business logic. See [TOOLS.md](TOOLS.md#error-semantics).
 
 ---
 
@@ -528,8 +568,8 @@ Debug logs show:
 [DEBUG] GitHub API request: GET /repos/owner/repo
 [DEBUG] Response: 200 OK (123ms)
 [DEBUG] Rate limit: 4999/5000 remaining
-[DEBUG] Tool invocation: create_issue
-[DEBUG] Parameters: { title: "...", body: "..." }
+[DEBUG] Tool invocation: manage_issues
+[DEBUG] Parameters: { action: "create", title: "...", body: "..." }
 ```
 
 ---
@@ -592,5 +632,6 @@ Report bugs and feature requests at:
 ## See Also
 
 - [Configuration Guide](CONFIGURATION.md) - Complete configuration reference
-- [Tool Reference](TOOLS.md) - 16 compound tools (134 actions)
+- [Tool Reference](TOOLS.md) - 20 compound tools (169 actions)
 - [API Reference](API.md) - Service and infrastructure APIs
+- [Deployment Guide](deployment.md) - Docker and client installation

@@ -148,54 +148,36 @@ To set a project description, use a separate UpdateProjectV2Input mutation after
 
 ### Tool Definitions
 
-1. **Project Management Tools**
-```typescript
-interface CreateProjectTool {
-  name: 'create_project';
-  description: 'Create a new GitHub Project';
-  parameters: {
-    title: string;
-    description?: string;
-    visibility?: 'public' | 'private';
-  };
-  returns: Project;
-}
+MCP clients see **compound tools**, not one tool per operation. Each compound
+tool takes an `action` parameter that routes to an internal executor. The
+project-facing definitions look like this:
 
-interface UpdateProjectTool {
-  name: 'update_project';
-  description: 'Update an existing GitHub Project';
-  parameters: {
-    projectId: string;
-    updates: Partial<Project>;
-  };
-  returns: Project;
-}
+```typescript
+// The public tool: manage_project, action: "create"
+const manageProjectSchema = z.object({
+  action: z.enum(["create", "list", "get", "update", "delete", /* ... */]),
+  title: z.string().optional(),
+  owner: z.string().optional(),
+  shortDescription: z.string().optional(),
+  visibility: z.enum(["private", "public"]).optional(),
+  projectId: z.string().optional(),
+});
 ```
 
-2. **Resource Management Tools**
 ```typescript
-interface AddProjectItemTool {
-  name: 'add_project_item';
-  description: 'Add an item to a GitHub Project';
-  parameters: {
-    projectId: string;
-    item: ProjectItem;
-  };
-  returns: void;
-}
-
-interface UpdateFieldValueTool {
-  name: 'update_field_value';
-  description: 'Update a field value for a project item';
-  parameters: {
-    projectId: string;
-    itemId: string;
-    fieldId: string;
-    value: any;
-  };
-  returns: void;
-}
+// The public tool: manage_project, action: "add_item" / "set_field_value"
+const manageProjectItemSchema = z.object({
+  action: z.enum(["add_item", "remove_item", "list_items", "set_field_value", "get_field_value"]),
+  projectId: z.string(),
+  contentId: z.string().optional(),
+  itemId: z.string().optional(),
+  fieldId: z.string().optional(),
+  value: z.unknown().optional(),
+});
 ```
+
+The full surface is documented in [TOOLS.md](../TOOLS.md), and
+`discover_tools` returns the live schemas at runtime.
 
 ### Resource Management
 
@@ -369,6 +351,7 @@ async function updateFieldValue(
 
 ## References
 
+- [Tool Reference](../TOOLS.md) — the 20 compound tools and their 169 actions
 - [GitHub Projects API Documentation](https://docs.github.com/en/rest/projects)
 - [MCP Specification](https://modelcontextprotocol.io)
-- [Architecture Documentation](../../ARCHITECTURE.md)
+- [Architecture Documentation](../architecture.md)

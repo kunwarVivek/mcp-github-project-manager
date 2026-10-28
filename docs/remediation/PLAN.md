@@ -1,5 +1,11 @@
 # Remediation Plan — Layered, Bottom-Up
 
+> **⚠️ HISTORICAL SNAPSHOT (2026-08-05).** This plan records the layered
+> remediation that was executed against the `remediation/spec-reconciliation`
+> branch. It is kept for history only. **Current source of truth:** the code
+> itself, plus [`docs/architecture.md`](../architecture.md),
+> [`docs/TOOLS.md`](../TOOLS.md) and [`docs/CONFIGURATION.md`](../CONFIGURATION.md).
+
 > **Status (2026-08-05):** All layers (A through F) and D1 completed. PMS decomposed to 365 lines, 14 injected services. Post-remediation doc reconciliation in progress.
 
 **Branch:** `remediation/spec-reconciliation`
@@ -107,3 +113,28 @@ Presented for go/no-go **before** any build. Not scheduled until approved.
 - `.planning/STATUS.md` says phases 10-12 "Not Started" — reality: phase 10 partial (ProjectAutomationService exists), 11 absent, 12 shipped (v1.1.0). Reconcile.
 - `.planning/REQUIREMENTS.md` "99/99 complete" over-claims (DEBT-07 god-class not done until D1 lands). Reconcile.
 - Ensure PRD→FRD linkage is comprehensive across `.planning`.
+
+## 2026-10-21 — Live-API conformance + native-capability adoption
+
+**Method:** GitNexus graph audit + live-schema introspection (`gh api graphql __type`) against the real
+GitHub API, then bottom-up remediation per domain, with the live-API e2e suite as the acceptance gate.
+
+**Closed (G12-01 … G12-12, G12-19):**
+- The automation-rule surface targeted an API that does not exist (`ProjectV2Rule`, `createProjectV2Rule`).
+  Replaced by the real `ProjectV2Workflow` (read + delete only — GitHub exposes no create mutation for it).
+  The published surface: 169 → 164 actions.
+- `update_project_view`, the field/option payloads, the creatable field-type set and the view layouts now
+  match the live schema exactly.
+- The item field-value reader selects all 13 `ProjectV2ItemFieldValue` members (was 2).
+- `pulls.listReviews` paginates and picks the newest review per author by `submitted_at` (the live API
+  returns reviews oldest-first, so the deciding review was lost).
+- The agent registry is found by title, not by the flaky REST `labels` filter — one registry per repository.
+- The registry body is read **directly** from the issue: the issue list serves it from a cache, and the
+  read-modify-write on that stale copy silently dropped a freshly registered agent (the live-API suite
+  lost its reviewer agent, which broke the review queue and the release-after-approval path).
+
+**Gates at this point:** build 0 · typecheck 0 · lint 0 · unit 3147 pass / 36 skip · action sweep 164/164.
+
+**In flight:** the five native capabilities the platform emulated (native issue dependencies, native issue
+types, project roles/collaborators, views as server-side claiming pools, reverse issue→project membership)
+— beads `mcp-github-project-manager-5mf.35/.36/.38/.39/.40`.

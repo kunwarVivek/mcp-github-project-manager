@@ -1,12 +1,14 @@
 # Coding Conventions
 
-**Analysis Date:** 2026-01-29
+**Analysis Date:** 2026-10-21
+
+**Updated:** 2026-10-21 — the lint/format section now describes Biome 2.5 (the repo's single linter + formatter). The previous snapshot described a toolchain the project no longer uses.
 
 ## Naming Patterns
 
 **Files:**
 - PascalCase for classes and services: `ProjectManagementService.ts`, `GitHubProjectRepository.ts`
-- kebab-case for config files: `jest.config.cjs`, `tsconfig.build.json`
+- kebab-case for config files: `vitest.config.ts`, `tsconfig.build.json`
 - PascalCase with suffix for types: `ai-types.ts`, `resource-types.ts`, `mcp-types.ts`
 - Test files: `*.test.ts` pattern (not `.spec.ts`)
 
@@ -32,21 +34,23 @@
 ## Code Style
 
 **Formatting:**
-- Prettier configured via npm scripts: `npm run format`
-- Command: `prettier --write "src/**/*.ts"`
-- 2-space indentation (TypeScript default)
-- Semicolons required
-- Single quotes for strings
+- Handled by **Biome 2.5** (`biome.json`) — there is no separate formatter config
+- Command: `npm run format` → `biome format --write .` (identical under pnpm)
+- 2-space indentation, `indentStyle: space`
+- Line width: 100
+- Double quotes, semicolons always, trailing commas `es5`
 
 **Linting:**
-- ESLint with TypeScript support: `npm run lint`
-- Command: `eslint . --ext .ts`
-- Packages: `@typescript-eslint/eslint-plugin`, `@typescript-eslint/parser`
-- Integrations: `eslint-config-prettier`, `eslint-plugin-prettier`, `eslint-plugin-jest`
+- Handled by **Biome 2.5** — `npm run lint` → `biome check .`; `npm run lint:fix` → `biome check --write .`
+- Rules: `recommended: true`, plus `suspicious.noExplicitAny: "warn"` and `complexity.useArrowFunction: "off"`
+- `javascript.parser.unsafeParameterDecoratorsEnabled: true` — required for tsyringe decorator metadata
+- `pnpm run lint` must exit 0
+- Biome is git-VCS aware (`vcs.useIgnoreFile: true`), so ignored paths are skipped
 
 **TypeScript:**
 - Strict mode enabled (`"strict": true`)
-- ES2022 target with ESNext modules
+- ES2022 target, ESNext modules, `moduleResolution: "bundler"`
+- `isolatedModules: true` — see the type-only import rule below
 - Experimental decorators enabled (for tsyringe DI)
 - Path alias: `@/*` maps to `src/*`
 
@@ -61,11 +65,15 @@
 **Path Style:**
 - Relative paths for local imports: `import { GitHubRepositoryFactory } from "../infrastructure/github/GitHubRepositoryFactory"`
 - No barrel files (direct imports to specific files)
-- `.js` extension not used in imports (ESM compatibility handled by bundler)
+- `.js` extension not used in imports in source — the postbuild step (`scripts/fix-imports.js`) adds them
 
 **Path Aliases:**
 - `@/*` configured but not consistently used
 - Most code uses relative paths: `../../domain/types`
+
+**Type-only imports (required by `isolatedModules`):**
+- A type re-exported as a value is an error. `tsc` elides those; `tsx`/esbuild/bundlers emit a real runtime import that then fails to resolve.
+- Always use `export type` / `import type` — **including for decorated constructor params**, whose types `emitDecoratorMetadata` references at runtime.
 
 **Example Import Block:**
 ```typescript
@@ -108,19 +116,30 @@ export class ValidationError extends Error {
 - Domain errors mapped to MCP error codes via `MCPErrorHandler`
 - Error codes defined in `MCPErrorCode` enum: `VALIDATION_ERROR`, `RESOURCE_NOT_FOUND`, `UNAUTHORIZED`, `RATE_LIMITED`, `INTERNAL_ERROR`
 
+**MCP v2 tool failure convention:**
+- An execution failure returns `{content, isError: true}` so the model can see it and recover
+- A JSON-RPC error is reserved for **protocol faults** (e.g. unknown tool, malformed request). Per spec, a tool that ran and failed is a successful call with a failed result.
+- MCP SDK v2 renamed `McpError` to `ProtocolError` (identical `(code, message, data)` shape) and replaced the `ErrorCode` enum with plain numeric constants. `src/index.ts` keeps v2 compatibility aliases so the existing throw sites stay intact.
+
 **Try-Catch Pattern:**
 ```typescript
 try {
   // operation
 } catch (error) {
   process.stderr.write(`Error in tool: ${error}\n`);
-  // Return formatted error response, not throw
-  return ToolResultFormatter.formatSuccess('tool_name', {
+  // Return a failed tool result, not throw
+  return {
     content: [{ type: 'text', text: `Error: ${errorMessage}` }],
-    success: false
-  });
+    isError: true,
+  };
 }
 ```
+
+## Configuration & Secrets
+
+- Every credential read goes through `getSecret()` / `requireToken()` (`src/env.ts`, `src/infrastructure/tools/tool-factory.ts`)
+- **Never** read `process.env.GITHUB_TOKEN` directly — that bypasses the CLI flag → `SECRETS_DIR` file → env var → `gh auth token` chain
+- `getSecret()` reads fresh (rotation-aware) rather than snapshotting at startup
 
 ## Logging
 
@@ -131,6 +150,7 @@ try {
 - Uses `process.stderr.write()` directly
 - Singleton pattern: `Logger.getInstance()`
 - Prefix support: `createLogger('MCP')`
+- Secrets are redacted: `redactSecrets()` strips token/secret/password/apiKey/authorization-shaped keys from anything the logger stringifies, and `GitHubConfig.token` is non-enumerable so `JSON.stringify` cannot emit the PAT
 
 **Interface:**
 ```typescript
@@ -184,7 +204,7 @@ getRepositoryFactory(): GitHubRepositoryFactory {
 **Return Values:**
 - Async functions return `Promise<T>`
 - Service methods return domain objects or void
-- Tool handlers return `MCPResponse`
+- Tool handlers return `CallToolResult` (`content`, optional `structuredContent`, optional `isError`)
 
 **Example:**
 ```typescript
@@ -209,7 +229,7 @@ async createRoadmap(data: {
 **Exports:**
 - Named exports preferred over default exports
 - Re-exports for error types: `export { ResourceNotFoundError };`
-- Type exports alongside implementations
+- Type exports alongside implementations (as `export type` — see `isolatedModules`)
 
 **Classes:**
 - One class per file (matches filename)
@@ -221,7 +241,7 @@ async createRoadmap(data: {
 
 ## Validation
 
-**Framework:** Zod (`zod` package)
+**Framework:** Zod 4 (`zod` package)
 
 **Pattern:**
 ```typescript
@@ -234,6 +254,12 @@ const createProjectSchema = z.object({
 
 export type CreateProjectArgs = z.infer<typeof createProjectSchema>;
 ```
+
+**zod 4 notes:**
+- `z.record` needs an explicit key schema: `z.record(z.string(), v)`
+- `ZodError.errors` → `.issues`
+- `.nonstrict()` was removed; objects strip unknown keys by default
+- Tool JSON Schema is produced by `z.toJSONSchema(schema, { io: 'input' })` in `ToolRegistry` — not by a separate JSON-Schema package
 
 **Validation in Services:**
 ```typescript
@@ -249,8 +275,12 @@ const validatedData = CreateRoadmapSchema.parse(data);
 
 **Error Handling:**
 - Wrap async operations in try-catch
-- Return error responses rather than throwing in tool handlers
+- Return error results rather than throwing in tool handlers
+
+## AI SDK Usage
+
+- `ai`@7 reports usage as **objects**, not numbers: `inputTokens: {total, ...}` / `outputTokens: {total, ...}`. Reading them as numbers yields `NaN`. Use `result.usage?.inputTokens?.total`.
 
 ---
 
-*Convention analysis: 2026-01-29*
+*Convention analysis: 2026-10-21*

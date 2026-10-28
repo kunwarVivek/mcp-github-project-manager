@@ -1,3 +1,4 @@
+import { vi } from "vitest";
 /**
  * Platform Validation E2E Tests
  *
@@ -76,6 +77,14 @@ function data(response: any): any {
 
   return response;
 }
+
+/**
+ * The live API is slow: a single tool call that creates a project, a field or
+ * an agent can take 10-25 seconds. The global test timeout is 10s, which is
+ * right for the unit suites and too short here - the failures were timeouts,
+ * not broken behaviour.
+ */
+vi.setConfig({ testTimeout: 30000 });
 
 describe("Platform Validation E2E", () => {
   let utils: MCPToolTestUtils | undefined;

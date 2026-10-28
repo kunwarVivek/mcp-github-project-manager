@@ -35,7 +35,6 @@ vi.mock("../../src/services/ProjectManagementService", () => ({
       listProjectItems: vi.fn(),
       updateProjectItem: vi.fn(),
       createIssue: vi.fn(),
-      createAutomationRule: vi.fn(),
       listIssues: vi.fn().mockResolvedValue([]),
       updateIssue: vi.fn().mockResolvedValue({}),
       createIssueComment: vi
@@ -87,7 +86,6 @@ describe("IssueTriagingService", () => {
     mockProjectService = {
       listProjectItems: vi.fn(),
       updateProjectItem: vi.fn(),
-      createAutomationRule: vi.fn(),
       listIssues: vi.fn().mockResolvedValue([]),
       updateIssue: vi.fn().mockResolvedValue({}),
       createIssueComment: vi
@@ -422,74 +420,6 @@ describe("IssueTriagingService", () => {
       // Only issue-2 should be triaged (issue-1 has 'triaged' label)
       expect(result.triaged).toBe(1);
       expect(result.results).toHaveLength(1);
-    });
-  });
-
-  describe("scheduleTriaging", () => {
-    it("should create hourly triaging automation rule", async () => {
-      mockProjectService.createAutomationRule.mockResolvedValue({
-        id: "rule-123",
-        name: "Hourly Issue Triaging",
-        enabled: true,
-      });
-
-      const result = await service.scheduleTriaging({
-        projectId: "project-123",
-        schedule: "hourly",
-        autoApply: true,
-      });
-
-      expect(result.ruleId).toBe("rule-123");
-      expect(mockProjectService.createAutomationRule).toHaveBeenCalledWith(
-        expect.objectContaining({
-          name: "Automated Triage (hourly)",
-          projectId: "project-123",
-        })
-      );
-    });
-
-    it("should create daily triaging automation rule", async () => {
-      mockProjectService.createAutomationRule.mockResolvedValue({
-        id: "rule-456",
-        name: "Daily Issue Triaging",
-        enabled: true,
-      });
-
-      const result = await service.scheduleTriaging({
-        projectId: "project-456",
-        schedule: "daily",
-        autoApply: false,
-      });
-
-      expect(result.ruleId).toBe("rule-456");
-      expect(mockProjectService.createAutomationRule).toHaveBeenCalledWith(
-        expect.objectContaining({
-          name: "Automated Triage (daily)",
-          projectId: "project-456",
-        })
-      );
-    });
-
-    it("should create weekly triaging automation rule", async () => {
-      mockProjectService.createAutomationRule.mockResolvedValue({
-        id: "rule-789",
-        name: "Weekly Issue Triaging",
-        enabled: true,
-      });
-
-      const result = await service.scheduleTriaging({
-        projectId: "project-789",
-        schedule: "weekly",
-        autoApply: true,
-      });
-
-      expect(result.ruleId).toBe("rule-789");
-      expect(mockProjectService.createAutomationRule).toHaveBeenCalledWith(
-        expect.objectContaining({
-          name: "Automated Triage (weekly)",
-          projectId: "project-789",
-        })
-      );
     });
   });
 

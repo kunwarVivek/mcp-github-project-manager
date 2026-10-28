@@ -27,6 +27,8 @@ exactly like `pnpm run <script>`, and `npm test` like `pnpm test`.
 | Unit tests | `pnpm test` · core only `pnpm run test:core` · AI `pnpm run test:ai` |
 | E2E (mock) | `pnpm run test:e2e` · tools `pnpm run test:e2e:tools` |
 | E2E (live API) | `E2E_REAL_API=true pnpm run test:e2e:tools:real` |
+| E2E runner | `pnpm run e2e` — `--suite <name>`, `--real-api`, `--json <path>` (never `--testPathPattern`: Vitest 5 rejects it) |
+| Action sweep | `pnpm run test:e2e:sweep` · gate `pnpm run test:e2e:coverage` — every one of the 169 actions, no credentials needed |
 | Coverage | `pnpm run test:coverage` |
 | Lint / format | `pnpm run lint` (Biome) · `pnpm run format` |
 | Inspect MCP server | `pnpm run inspect` |
@@ -125,11 +127,18 @@ exactly like `pnpm run <script>`, and `npm test` like `pnpm test`.
   wraps every model with middleware that accumulates provider-reported usage
   into `CorrelationContext`'s AsyncLocalStorage, and `dispatchTool` debits the
   agent's budget **once per tool call** (never per AI call — `AgentStore` is
-  GitHub-backed and does unlocked read-modify-write). This covers only what the
+  GitHub-backed, so each debit is a read plus a compare-and-swap commit). This covers only what the
   *server* spends; an agent's own runtime spend never reaches this process, so
   `record_usage` remains the channel for that.
 - `ai`@7 reports usage as `inputTokens: {total,...}` / `outputTokens: {total,...}`
   — **objects, not numbers**. Reading them as numbers yields `NaN`.
+- The agent registry is **not an issue body**: it is `registry.json` on the orphan
+  branch `agent-registry`, written through the GitHub Contents API with sha
+  compare-and-swap (`AgentStore`). The token needs **`contents: write`** and no
+  branch ruleset may block that branch; a repo with no commits cannot host it.
+  Never reintroduce read-modify-write on an issue body — it is last-write-wins and
+  silently drops registrations. A legacy "Agent Registry" issue is imported once
+  and rewritten to a pointer (`LegacyAgentRegistry`).
 
 > `AGENTS.md` and `CLAUDE.md` are kept identical. Edit both together.
 <!-- project-manual:end -->
@@ -137,7 +146,7 @@ exactly like `pnpm run <script>`, and `npm test` like `pnpm test`.
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 
-This project is indexed by GitNexus as **mcp-github-project-manager** (13281 symbols, 30563 relationships, 676 execution flows).
+This project is indexed by GitNexus as **mcp-github-project-manager** (13683 symbols, 31596 relationships, 671 execution flows).
 
 > Index stale? Run `node .gitnexus/run.cjs analyze --index-only` from the project root — it auto-selects an available runner. No `.gitnexus/run.cjs` yet? Bootstrap with `npx`, `bunx`, or `pnpm dlx` — e.g. `bunx gitnexus@latest analyze` (npm 11 npx crash; #1939).
 

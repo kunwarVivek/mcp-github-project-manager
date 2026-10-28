@@ -268,6 +268,20 @@ Tracks the progress of a sprint.
 pnpm exec tsx examples/basic/track-progress.ts
 ```
 
+### Agent Loop
+
+[`basic/agent-loop.ts`](basic/agent-loop.ts)
+
+A runnable worker + reviewer cycle over MCP: it spawns `node build/index.js` with your environment, then registers, claims, heartbeats, submits a work product, hands over for review, and approves (or `--reject`s) from a second agent, threading every id from the previous response. Any tool error or missing id exits non-zero; an empty queue is reported as a clean exit; the agents it registered are deregistered in a `finally` block.
+
+```bash
+pnpm run build
+# claim only from one project; --create-demo-task provisions the agent fields and seeds a demo issue
+pnpm exec tsx examples/basic/agent-loop.ts --project <projectId> --create-demo-task
+# print the call sequence with symbolic references ($workerRegister.id, ...) instead of running it
+pnpm exec tsx examples/basic/agent-loop.ts --plan
+```
+
 ## Advanced Examples
 
 Coming soon:

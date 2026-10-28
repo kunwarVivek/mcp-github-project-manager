@@ -1,100 +1,203 @@
 # Testing Guide
 
-This document provides an overview of the test suite, how to run tests, and documentation of skipped tests with their justifications.
+This document covers the test suite layout, how to run tests, and the tests that
+are intentionally skipped (with their justifications).
+
+The project uses **Vitest 5**. There is no `jest.config.*` and no `ts-jest` in the
+tree any more — do not reintroduce them. See
+[ADR-004](adr/004-biome-replacing-eslint.md) for the toolchain migration, and
+[testing-guide.md](testing-guide.md) for the AI-feature-specific guide.
 
 ## Test Suite Overview
 
-The test suite contains:
-- **2,422 passing tests** across unit, integration, and E2E test categories (4 suites)
-- **20 skipped tests** (documented with justifications below)
-- **0 failing tests** (required for production release)
-
-### Test Categories
-
 | Category | Description | Location |
 |----------|-------------|----------|
-| Unit Tests | Test individual components in isolation | `src/__tests__/unit/` |
-| Integration Tests | Test service layer interactions | `src/__tests__/integration/` |
-| E2E Tests | Test full MCP server and stdio transport | `src/__tests__/e2e/` |
+| Unit tests | Individual components in isolation | `src/__tests__/unit/` |
+| Integration tests | Service-layer interactions and wiring | `src/__tests__/integration/` |
+| E2E tests | Full MCP server over stdio, tool suites | `src/__tests__/e2e/` |
+| Legacy suite | Older service/infrastructure suites | `tests/` |
+
+Test files live in **both** `src/__tests__/**` and the legacy root `tests/**` tree.
+Vitest picks up both (see `vitest.config.ts`, `test.include`):
+
+```ts
+include: [
+  "src/__tests__/**/*.test.ts",
+  "src/__tests__/**/*.spec.ts",
+  "src/__tests__/**/*.e2e.ts",
+  "tests/**/*.test.ts",
+  "tests/**/*.spec.ts",
+]
+```
+
+> New tests belong under `src/__tests__/`. The root `tests/` tree is kept working
+> but is not where new files go.
+
+For the current pass/fail/skip totals, run the suite — the numbers change with
+every commit and a stale count in a doc is worse than no count:
+
+```bash
+npm test        # or: pnpm test
+```
 
 ## Running Tests
 
+Every script works with **both** npm and pnpm (`npm run X` ≡ `pnpm run X`).
+
 ### Run All Tests
+
 ```bash
+npm test
+# or
 pnpm test
 ```
 
-### Run Specific Test Categories
+### Run a Subset
+
+Vitest filters by **positional path pattern**, not by a `--testPathPattern` flag
+(Vitest rejects Jest-only CLI options outright with `CACError: Unknown option`):
+
 ```bash
-# Unit tests only
-pnpm test -- --testPathPattern="unit"
+# Everything under src/__tests__/unit/
+npm test -- unit
 
-# Integration tests only
-pnpm test -- --testPathPattern="integration"
+# Everything under src/__tests__/integration/
+npm test -- integration
 
-# E2E tests only
-pnpm test -- --testPathPattern="e2e"
+# Everything under src/__tests__/e2e/
+npm test -- e2e
 
-# Specific test file
-pnpm test -- --testPathPattern="stdio-transport"
+# One file, by name fragment
+npm test -- stdio-transport
+
+# Exclude a subtree
+npm test -- --exclude='**/tests/ai-services/**'
 ```
 
 ### Watch Mode
+
 ```bash
-pnpm run test:watch
+npm run test:watch
 ```
 
-### Coverage Report
+### Coverage
+
 ```bash
-pnpm run test:coverage
+npm run test:coverage
+```
+
+Coverage thresholds are enforced in `vitest.config.ts` (v8 provider, over
+`src/**`): lines 55, functions 57, branches 45, statements 54.
+
+### E2E
+
+```bash
+npm run test:e2e        # vitest run e2e
+npm run test:e2e:tools  # vitest run tools
+```
+
+### Live-API E2E (consumes GitHub rate limit)
+
+```bash
+E2E_REAL_API=true npm run test:e2e:tools:real
+```
+
+Use a dedicated scratch repository: the live suites create a test project,
+issues, milestones and sprints, and they do NOT clean up afterwards.
+
+### The E2E runner
+
+```bash
+npm run e2e                          # every e2e suite
+npm run e2e -- --suite github        # one suite (github, ai, workflows,
+                                     # agents, platform, pipeline, basic,
+                                     # protocol, stdio, resources, metrics, server)
+npm run e2e -- --real-api            # against the real GitHub API
+npm run e2e -- --json /tmp/e2e.json  # machine-readable summary
+```
+
+The runner uses the project's own Vitest binary and filters suites by
+POSITIONAL pattern. Vitest 5 rejects Jest-only flags, so `--testPathPattern`
+is not an option here (it dies with `CACError: Unknown option`).
+
+### The action sweep - every action, no credentials
+
+```bash
+npm run test:e2e:sweep     # drives all 20 tools / 169 actions
+npm run test:e2e:coverage  # renders the matrix and gates on it
+```
+
+The tool e2e suites need live GitHub credentials and skip without them, so
+without the sweep most of the MCP surface is never executed. The sweep calls
+every action of every public tool through the real dispatch path with the
+GitHub API stubbed, and fails when an action is advertised but not routed, or
+crashes on a missing argument instead of reporting one. CI runs it.
+
+### AI-only Tests
+
+```bash
+npm run test:ai          # vitest run ai-services ai-tools
+npm run test:ai:watch
+npm run test:ai:coverage
+```
+
+### Core Tests (everything except the AI suites)
+
+```bash
+npm run test:core
 ```
 
 ## Skipped Tests
 
-The following tests are intentionally skipped due to their requirements for real external resources.
+The following tests are intentionally skipped because they need real external
+resources. The skip is by design, not a broken suite.
 
 ### E2E Tests Requiring GitHub Credentials
 
-These tests require real GitHub API credentials (`GITHUB_TOKEN`, `GITHUB_OWNER`, `GITHUB_REPO`) because they make actual API calls to create/modify GitHub resources.
+These make real API calls that create/modify resources in the target repository.
 
-| Test Suite | Location | Tests Skipped | Reason |
-|------------|----------|---------------|--------|
-| GitHub Project Manager E2E | `src/__tests__/e2e/github-project-manager.e2e.ts` | 7 | Creates real roadmaps, milestones, issues, and sprints |
-| Resource Management E2E | `src/__tests__/e2e/resource-management.e2e.ts` | 6 | Tests resource lifecycle with real GitHub API |
-| Metrics and Reporting E2E | `src/__tests__/e2e/metrics-reporting.e2e.ts` | 5 | Creates real milestones and issues for metrics testing |
+| Test suite | Location | Reason |
+|------------|----------|--------|
+| GitHub Project Manager E2E | `src/__tests__/e2e/github-project-manager.e2e.ts` | Creates real roadmaps, milestones, issues, sprints |
+| Resource Management E2E | `src/__tests__/e2e/resource-management.e2e.ts` | Exercises the resource lifecycle against the real GitHub API |
+| Metrics and Reporting E2E | `src/__tests__/e2e/metrics-reporting.e2e.ts` | Creates real milestones and issues for metrics testing |
 
 ### Integration Tests with Conditional Skip
 
-| Test Suite | Location | Tests Skipped | Reason |
-|------------|----------|---------------|--------|
-| GitHubProjectManager Integration | `src/__tests__/integration/GitHubProjectManager.test.ts` | 2 | Conditionally skipped when `GITHUB_TOKEN` is not set |
+| Test suite | Location | Reason |
+|------------|----------|--------|
+| GitHubProjectManager integration | `src/__tests__/integration/GitHubProjectManager.test.ts` | Skipped when `GITHUB_TOKEN` is not set |
 
 ## Running Tests with Real Credentials
 
-To run the normally-skipped E2E tests with real GitHub credentials:
-
 ### 1. Set Environment Variables
+
 ```bash
 export GITHUB_TOKEN="your-github-token"
 export GITHUB_OWNER="your-github-username-or-org"
 export GITHUB_REPO="your-test-repository"
 ```
 
-### 2. Enable E2E Tests
+### 2. Enable the E2E Tests
 
-The E2E test files use `describe.skip` to skip tests by default. To run them:
+The credentialed E2E files use `describe.skip` to skip by default. To run them:
 
-1. Edit the test file and change `describe.skip` to `describe`
-2. Run the tests: `pnpm test -- --testPathPattern="github-project-manager"`
-3. Remember to revert the change after testing
+1. Change `describe.skip` to `describe` in the test file.
+2. Run the file:
+   ```bash
+   npm test -- github-project-manager
+   ```
+3. Revert the change afterwards.
 
-**Warning:** These tests will create real resources in your GitHub repository. Use a dedicated test repository.
+**Warning:** these tests create real resources in your GitHub repository. Use a
+dedicated test repository.
 
 ### 3. Integration Tests with Credentials
 
-Integration tests automatically run when `GITHUB_TOKEN` is set:
+Integration tests run automatically when `GITHUB_TOKEN` is set:
+
 ```bash
-GITHUB_TOKEN=your-token pnpm test -- --testPathPattern="GitHubProjectManager"
+GITHUB_TOKEN=your-token npm test -- GitHubProjectManager
 ```
 
 ## Test Structure
@@ -105,90 +208,126 @@ src/__tests__/
 │   ├── github-project-manager.e2e.ts    # [SKIPPED] Real GitHub API
 │   ├── resource-management.e2e.ts       # [SKIPPED] Real GitHub API
 │   ├── metrics-reporting.e2e.ts         # [SKIPPED] Real GitHub API
-│   ├── mcp-protocol-compliance.e2e.ts   # Spawns real server process
-│   ├── mcp-server-integration.e2e.ts    # Spawns real server process
-│   └── stdio-transport.e2e.ts           # Spawns real server process
+│   ├── mcp-protocol-compliance.e2e.ts   # Spawns a real server process
+│   ├── mcp-server-integration.e2e.ts    # Spawns a real server process
+│   ├── stdio-transport.e2e.ts           # Spawns a real server process
+│   ├── stdout-purity.e2e.ts             # Asserts stdout carries no stray output
+│   └── tools/                           # Tool-level E2E suites
+│       ├── github-project-tools.e2e.ts
+│       ├── ai-task-tools.e2e.ts
+│       ├── tool-integration-workflows.e2e.ts
+│       ├── platform-validation.e2e.ts
+│       ├── agent-orchestration.e2e.ts
+│       ├── basic-validation.e2e.ts
+│       └── full-pipeline.e2e.ts
 ├── integration/                   # Service integration tests
-│   └── GitHubProjectManager.test.ts     # [CONDITIONAL] Needs GITHUB_TOKEN
+│   ├── GitHubProjectManager.test.ts     # [CONDITIONAL] Needs GITHUB_TOKEN
+│   ├── facade-wiring.test.ts
+│   ├── facade-domain-entities.integration.test.ts
+│   ├── domain-entities.integration.test.ts
+│   └── persistence-and-events.test.ts
 ├── unit/                          # Unit tests
-│   ├── application/               # Application layer tests
+│   ├── agent/                     # Agent orchestration
 │   ├── context/                   # Context generator tests
-│   │   ├── ContextualReferenceGenerator.test.ts
-│   │   └── DependencyContextGenerator.test.ts
 │   ├── domain/                    # Domain model tests
 │   ├── infrastructure/            # Infrastructure tests
-│   ├── services/                  # Service tests (extracted services)
-│   │   ├── IssueService.test.ts
-│   │   ├── PullRequestService.test.ts
-│   │   ├── FieldValueService.test.ts
-│   │   ├── LabelService.test.ts
-│   │   ├── IterationService.test.ts
-│   │   └── ...
+│   ├── services/                  # Service tests
 │   └── validation/                # Validator tests
-│       └── ContextQualityValidator.test.ts
+├── services/                      # Service-level tests
+├── tools/                         # Tool-level tests
+├── setup.ts                       # Global setup
+├── test-utils.ts                  # Shared helpers
 └── test-utils/                    # Test utilities and mocks
+
+tests/                             # Legacy suite (still in the Vitest include list)
+├── ai-services/
+├── ai-tools/
+├── services/
+├── infrastructure/
+└── cache/
 ```
 
 ## Test Requirements
 
 ### For All Tests
-- Node.js 22+
-- `pnpm install` completed
-- `pnpm run build` completed (for E2E tests that spawn server)
+
+- Node.js 22.12+ (24 is the supported target)
+- Dependencies installed (`npm install` or `pnpm install`)
+- A successful build for the E2E suites that spawn a server process
+  (`npm run build`)
 
 ### For E2E Tests (stdio transport)
-The MCP server E2E tests (`stdio-transport.e2e.ts`, `mcp-protocol-compliance.e2e.ts`) spawn a real server process and communicate via stdio. They require:
-- A successful build (`pnpm run build`)
+
+`stdio-transport.e2e.ts` and `mcp-protocol-compliance.e2e.ts` spawn a real
+server process and talk to it over stdio. They require:
+
+- A successful build (`npm run build`)
 - No port conflicts
-- Sufficient test timeout (15-30 seconds)
+- A generous timeout — the default is 10 s, raised per-suite where needed
 
 ### For GitHub API Tests
-- Valid `GITHUB_TOKEN` with repo permissions
+
+- A valid `GITHUB_TOKEN` with repo permissions
 - `GITHUB_OWNER` set to your username or organization
 - `GITHUB_REPO` set to a test repository
 
 ## Troubleshooting
 
-### Tests Timeout
-E2E tests have extended timeouts (10-30 seconds) because they spawn real processes. If tests still timeout:
+### Tests Time Out
+
+E2E tests have extended timeouts because they spawn real processes. To raise the
+global timeout:
+
 ```bash
-# Increase Jest timeout globally
-pnpm test -- --testTimeout=60000
+npm test -- --testTimeout=60000
 ```
 
 ### Server Build Not Found
-```
-Error: Server build not found. Run `pnpm run build` first.
-```
-Solution: Run `pnpm run build` before running E2E tests.
 
-### Jest Doesn't Exit
 ```
-Jest did not exit one second after the test run has completed.
+Error: Server build not found. Run `npm run build` first.
 ```
-This warning appears with E2E tests that spawn processes. Use `--forceExit` if needed:
+
+Solution: run `npm run build` before the E2E tests.
+
+### The Run Never Ends
+
+E2E suites that spawn processes can leave handles open. Force the run to end:
+
 ```bash
-pnpm test -- --forceExit
+npm test -- --forceExit
 ```
 
 ### Detecting Open Handles
+
 ```bash
-pnpm test -- --detectOpenHandles
+npm test -- --detectOpenHandles
 ```
+
+### Mocking Traps (Vitest 5)
+
+- A mock that the code under test calls with `new` must be a `function`, not an
+  arrow — `mockImplementation(() => ({}))` fails with "is not a constructor".
+- A `beforeEach(() => x.mockReset())` with an *implicit* return hands the mock
+  back to Vitest, which treats a returned function as a teardown callback and
+  calls it. Always use a block body: `beforeEach(() => { x.mockReset(); })`.
 
 ## Related Documentation
 
-- [AI Features Testing Guide](./testing-guide.md) - Detailed testing guide for AI-powered features
-- [E2E Testing Guide](./e2e-testing-guide.md) - Comprehensive E2E testing documentation
-- [API Reference](./API.md) - API documentation for all tools
+- [testing-guide.md](testing-guide.md) — testing guide for AI-powered features
+- [e2e-testing-guide.md](e2e-testing-guide.md) — E2E tool testing
+- [API.md](API.md) — service and infrastructure API reference
+- [CONTRIBUTING.md](../CONTRIBUTING.md) — the full quality gate
 
 ## Production Release Verification
 
-Before each production release, verify:
+Before a production release, verify:
 
-1. **All tests pass**: `pnpm test` shows 0 failed tests
-2. **Build succeeds**: `pnpm run build` completes without errors
-3. **Type check passes**: `pnpm run type-check` (if available) or build includes type checking
-4. **Skipped tests documented**: All skipped tests have documented justification (this file)
+1. **Build succeeds**: `npm run build`
+2. **Typecheck passes**: `npm run typecheck`
+3. **Lint passes**: `npm run lint` (Biome — must exit 0)
+4. **Tests pass**: `npm test` reports 0 failures
+5. **Skipped tests documented**: every skipped suite has a justification (this file)
 
-Current status: **Ready for release** (2,422 passing, 0 failed, 20 skipped with justification)
+The gate runs in that order, and CI runs it on Node 22.x and 24.x under **both**
+npm and pnpm.

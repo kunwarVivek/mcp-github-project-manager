@@ -47,7 +47,7 @@ vi.mock("../../../src/infrastructure/github/GitHubRepositoryFactory.js", () => {
         createMilestoneRepository: vi.fn(),
         createProjectRepository: vi.fn(),
         createSprintRepository: vi.fn(),
-        createAutomationRuleRepository: vi.fn(),
+        createProjectWorkflowRepository: vi.fn(),
         createSubIssueRepository: vi.fn(),
         createStatusUpdateRepository: vi.fn(),
         getOctokit: vi.fn(),
@@ -121,7 +121,8 @@ describe("Misc Tools - Project View Tools", () => {
       });
 
       it("accepts all layout options", () => {
-        const layouts = ["board", "table", "timeline", "roadmap"] as const;
+        // GitHub's ProjectV2ViewLayout knows exactly three layouts.
+        const layouts = ["board", "table", "roadmap"] as const;
         for (const layout of layouts) {
           const result = createProjectViewSchema.safeParse({
             projectId: "PVT_kwDOLhQ7gc4AOEbH",
@@ -130,6 +131,15 @@ describe("Misc Tools - Project View Tools", () => {
           });
           expect(result.success).toBe(true);
         }
+      });
+
+      it("rejects a layout GitHub does not have", () => {
+        const result = createProjectViewSchema.safeParse({
+          projectId: "PVT_kwDOLhQ7gc4AOEbH",
+          name: "Test View",
+          layout: "timeline",
+        });
+        expect(result.success).toBe(false);
       });
     });
 

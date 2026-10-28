@@ -2,14 +2,33 @@
 
 This guide covers the comprehensive end-to-end testing suite for all MCP (Model Context Protocol) tools in the GitHub Project Manager.
 
+The test runner is **Vitest 5** — there is no Jest config in this project. See
+[TESTING.md](TESTING.md) for the full suite layout.
+
 ## Overview
 
 The E2E test suite provides comprehensive testing for:
-- **40+ GitHub Project Management Tools** - Complete CRUD operations for projects, milestones, issues, sprints, etc.
-- **8 AI Task Management Tools** - PRD generation, task parsing, complexity analysis, etc.
-- **Complex Workflow Integration** - Multi-tool workflows and real-world scenarios
-- **Platform Validation** - Full platform capability testing
+- **The public compound tool surface** — all 20 tools / 169 actions (see [TOOLS.md](TOOLS.md))
+- **Complex Workflow Integration** — Multi-tool workflows and real-world scenarios
+- **Platform Validation** — Full platform capability testing
 - **Real API Testing** - Optional testing with actual GitHub and AI APIs
+
+## The action sweep
+
+The suites below need live GitHub credentials; without them they skip, which
+is why CI also runs a credential-free **action sweep**
+(`src/__tests__/e2e/tools/action-sweep.e2e.ts`):
+
+```bash
+npm run test:e2e:sweep     # every action of every public tool
+npm run test:e2e:coverage  # the coverage matrix + the gate
+```
+
+It drives the same registry and the same compound executors the server uses,
+with the GitHub API stubbed at the HTTP boundary, and asserts per action that
+it is routed and that it fails gracefully rather than crashing. The catalog
+is derived from the registry at runtime - 20 tools, 169 actions - so the
+numbers the README publishes are checked, not assumed.
 
 ## Test Structure
 
@@ -20,6 +39,8 @@ src/__tests__/e2e/tools/
 ├── tool-integration-workflows.e2e.ts # Complex multi-tool workflows
 ├── platform-validation.e2e.ts       # Full platform capability validation
 ├── agent-orchestration.e2e.ts       # Agent orchestration lifecycle
+├── basic-validation.e2e.ts          # Basic protocol validation
+├── full-pipeline.e2e.ts             # PRD → issues end-to-end pipeline
 └── utils/
     └── MCPToolTestUtils.ts           # Test utilities and helpers
 ```
@@ -28,50 +49,52 @@ src/__tests__/e2e/tools/
 
 ### 1. GitHub Project Management Tools (`github-project-tools.e2e.ts`)
 
-Tests all GitHub-related MCP tools:
+Tests the GitHub-facing compound tools. Each compound tool takes an `action`
+parameter, so a "create project" call is `manage_project` with
+`action: "create"`.
 
-**Project Tools:**
-- `create_project`, `list_projects`, `get_project`, `update_project`, `delete_project`
-- `create_project_field`, `list_project_fields`, `update_project_field`
-- `create_project_view`, `list_project_views`, `update_project_view`
-- `add_project_item`, `remove_project_item`, `list_project_items`
-- `set_field_value`, `get_field_value`
+**Project tools** (`manage_project`):
+- `create`, `list`, `get`, `update`, `delete`
+- `create_field`, `list_fields`, `update_field`
+- `create_view`, `list_views`, `update_view`, `delete_view`
+- `add_item`, `remove_item`, `list_items`, `filter_items`
+- `set_field_value`, `get_field_value`, `clear_field_value`
 
-**Milestone Tools:**
-- `create_milestone`, `list_milestones`, `update_milestone`, `delete_milestone`
+**Milestone tools** (`manage_milestones`):
+- `create`, `list`, `update`, `delete`, `get_metrics`, `get_overdue`, `get_upcoming`
 
-**Issue Tools:**
-- `create_issue`, `list_issues`, `get_issue`, `update_issue`
+**Issue tools** (`manage_issues`):
+- `create`, `list`, `get`, `update`, `create_comment`, `list_comments`, `search_advanced`
 
-**Sprint Tools:**
-- `create_sprint`, `list_sprints`, `get_current_sprint`, `update_sprint`
-- `add_issues_to_sprint`, `remove_issues_from_sprint`
+**Sprint tools** (`manage_sprints`):
+- `create`, `list`, `get_current`, `update`, `add_issues`, `remove_issues`, `get_metrics`, `plan`
 
-**Roadmap and Planning Tools:**
-- `create_roadmap`, `plan_sprint`, `get_milestone_metrics`, `get_sprint_metrics`
-- `get_overdue_milestones`, `get_upcoming_milestones`
+**Roadmap and planning tools**:
+- `ai_generate/parse_prd`, `ai_generate/materialize_tasks`
+- `manage_milestones/get_metrics`, `manage_sprints/get_metrics`
+- `manage_milestones/get_overdue`, `manage_milestones/get_upcoming`
 
-**Label Tools:**
-- `create_label`, `list_labels`
+**Label tools** (`manage_labels`):
+- `create`, `list`
 
 ### 2. AI Task Management Tools (`ai-task-tools.e2e.ts`)
 
-Tests all AI-powered MCP tools:
+Tests the AI compound tools.
 
-**PRD Generation:**
+**PRD Generation** (`ai_generate`):
 - `generate_prd` - Generate Product Requirements Documents from ideas
 - `enhance_prd` - Enhance existing PRDs with additional details
 - `parse_prd` - Parse PRDs and generate tasks
 
-**Task Management:**
+**Task Management** (`ai_generate`):
 - `get_next_task` - Get task recommendations for teams
-- `analyze_task_complexity` - Analyze and score task complexity
+- `analyze_complexity` - Analyze and score task complexity
 - `expand_task` - Break down tasks into subtasks
 
-**Feature Management:**
+**Feature Management** (`ai_generate`):
 - `add_feature` - Add new features to existing projects
 
-**Requirements Traceability:**
+**Requirements Traceability** (`ai_generate`):
 - `create_traceability_matrix` - Create comprehensive traceability matrices
 
 ### 3. Tool Integration Workflows (`tool-integration-workflows.e2e.ts`)
@@ -130,37 +153,43 @@ Comprehensive validation of the full platform capabilities:
 - Sprint creation and listing
 
 **Platform Integration:**
-- All 16 compound tools accessible
+- All 20 compound tools accessible
 - Domain entities created during test
 
 ## Running Tests
 
+All scripts work with both `npm` and `pnpm`.
+
 ### Mock Tests (Default)
 ```bash
 # Run all E2E tool tests with mocked APIs
-pnpm run test:e2e:tools
+npm run test:e2e:tools
 
 # Run specific test categories
-pnpm run test:e2e:tools:github     # GitHub tools only
-pnpm run test:e2e:tools:ai         # AI tools only
-pnpm run test:e2e:tools:workflows  # Integration workflows only
+npm run test:e2e:tools:github     # GitHub tools only
+npm run test:e2e:tools:ai         # AI tools only
+npm run test:e2e:tools:workflows  # Integration workflows only
+npm run test:e2e:tools:agent      # Agent orchestration only
+npm run test:e2e:tools:platform   # Platform validation only
 ```
 
 ### Real API Tests
 ```bash
 # Run all E2E tool tests with real APIs
-pnpm run test:e2e:tools:real
+npm run test:e2e:tools:real
 
 # Run specific categories with real APIs
-pnpm run test:e2e:tools:real:github
-pnpm run test:e2e:tools:real:ai
-pnpm run test:e2e:tools:real:workflows
-pnpm run test:e2e:tools:real:agent
-pnpm run test:e2e:tools:real:platform
+npm run test:e2e:tools:real:github
+npm run test:e2e:tools:real:ai
+npm run test:e2e:tools:real:workflows
+npm run test:e2e:tools:real:agent
+npm run test:e2e:tools:real:platform
 
 # Run complete test suite (unit + integration + E2E)
-pnpm run test:all:real
+npm run test:all:real
 ```
+
+Real-API runs consume your GitHub rate limit — use a dedicated test repository.
 
 ## Environment Setup
 
@@ -181,11 +210,11 @@ OPENAI_API_KEY=sk-your-openai-key
 GOOGLE_API_KEY=your-google-ai-key
 PERPLEXITY_API_KEY=pplx-your-perplexity-key
 
-# AI model configuration (optional)
-AI_MAIN_MODEL=claude-3-5-sonnet-20241022
-AI_RESEARCH_MODEL=perplexity-llama-3.1-sonar-large-128k-online
-AI_FALLBACK_MODEL=gpt-4o
-AI_PRD_MODEL=claude-3-5-sonnet-20241022
+# AI model configuration (optional — there are no built-in defaults)
+AI_MAIN_MODEL=your-main-model
+AI_RESEARCH_MODEL=your-research-model
+AI_FALLBACK_MODEL=your-fallback-model
+AI_PRD_MODEL=your-prd-model
 ```
 
 **For Real API Testing:**
@@ -205,8 +234,7 @@ For real API testing, your GitHub token needs these permissions:
 ## Test Features
 
 ### Comprehensive Tool Coverage
-- ✅ **40+ GitHub Tools** - Complete CRUD operations
-- ✅ **8 AI Tools** - Full AI workflow testing
+- ✅ **The 20 compound tools** - complete CRUD and workflow coverage
 - ✅ **Schema Validation** - Argument validation for all tools
 - ✅ **Error Handling** - Graceful error handling and recovery
 - ✅ **Real API Integration** - Optional real API testing
@@ -241,15 +269,18 @@ The platform validation tests verify:
 | Budget Enforcement | Set, check, record usage |
 | Review Workflow | Submit → Approve cycle |
 | Sprint Planning | Create and list sprints |
-| Tool Accessibility | All 16 compound tools available |
+| Tool Accessibility | All 20 compound tools available |
 
 ## Test Configuration
 
-### Jest Configuration (`jest.e2e.tools.config.js`)
-- **Test Timeout:** 60 seconds for comprehensive E2E tests
-- **Concurrency:** Sequential execution to avoid conflicts
-- **Coverage:** Disabled for E2E tests (focused on integration)
-- **Reporting:** JUnit XML reports for CI/CD integration
+### Vitest Configuration (`vitest.config.ts`)
+- **Test Timeout:** 10 seconds by default; E2E suites raise it per-suite where a real server process is spawned
+- **Include:** `src/__tests__/**` (`*.test.ts`, `*.spec.ts`, `*.e2e.ts`) and the legacy root `tests/**` tree
+- **Environment:** `node`
+- **Setup files:** `reflect-metadata`, `src/__tests__/e2e/setup.ts`
+- **Coverage:** disabled for E2E runs — E2E focuses on integration, not line coverage
+
+> There is no `jest.e2e.tools.config.js`. Configuration lives in `vitest.config.ts`.
 
 ### Environment Detection
 - **Mock Mode:** Default - uses mocked APIs for fast, reliable testing
@@ -275,7 +306,7 @@ The platform validation tests verify:
 1. **Check Credentials:** Verify all required environment variables are set
 2. **Review Logs:** Check stderr output for detailed error messages
 3. **Test Individual Tools:** Use specific test patterns to isolate issues
-4. **Validate Server Build:** Ensure `pnpm run build` completes successfully
+4. **Validate Server Build:** Ensure `npm run build` completes successfully
 
 ## Example Usage
 
@@ -285,7 +316,8 @@ The platform validation tests verify:
 const utils = new MCPToolTestUtils();
 await utils.startServer();
 
-const response = await utils.callTool('create_project', {
+const response = await utils.callTool('manage_project', {
+  action: 'create',
   title: 'Test Project',
   visibility: 'private'
 });
@@ -297,11 +329,12 @@ await utils.stopServer();
 ### Workflow Testing
 ```typescript
 // Test complete workflow
-const prdResponse = await utils.callTool('generate_prd', { /* args */ });
-const parseResponse = await utils.callTool('parse_prd', { 
+const prdResponse = await utils.callTool('ai_generate', { action: 'generate_prd' /* args */ });
+const parseResponse = await utils.callTool('ai_generate', {
+  action: 'parse_prd',
   prdContent: MCPToolTestUtils.extractContent(prdResponse)
 });
-const projectResponse = await utils.callTool('create_project', { /* args */ });
+const projectResponse = await utils.callTool('manage_project', { action: 'create' /* args */ });
 ```
 
 ## Troubleshooting
@@ -310,12 +343,12 @@ const projectResponse = await utils.callTool('create_project', { /* args */ });
 
 **Server Build Errors:**
 ```bash
-pnpm run build  # Ensure server builds successfully
+npm run build  # Ensure server builds successfully
 ```
 
 **Missing Dependencies:**
 ```bash
-pnpm installjest-junit  # Install test reporting dependency
+npm install    # or: pnpm install
 ```
 
 **Permission Errors:**
