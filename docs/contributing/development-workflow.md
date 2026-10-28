@@ -261,10 +261,13 @@ publishes to npm outside CI.
 
 1. **Bump Version** workflow bumps `package.json` + `package-lock.json`, moves
    the `[Unreleased]` CHANGELOG body into the new version section, commits,
-   tags `vX.Y.Z` and pushes.
-2. Pushing the tag triggers the **Release** workflow, which verifies the tag
-   matches `package.json`, builds, typechecks, tests, publishes to npm (with
-   provenance) and creates the GitHub release.
+   tags `vX.Y.Z`, pushes, and dispatches the **Release** workflow on the tag.
+2. **Release** verifies the tag matches `package.json` and that CHANGELOG has
+   the version's section, builds, typechecks, tests, publishes to npm through
+   Trusted Publishing (OIDC — no npm token; provenance attached) and creates
+   the GitHub release, so npm and GitHub always carry the same version.
+
+A tag you push yourself (`git push origin vX.Y.Z`) triggers the same workflow.
 
 To bump locally instead:
 

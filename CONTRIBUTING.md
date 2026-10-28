@@ -171,8 +171,15 @@ Two rules matter before you commit:
 
 ### Releasing
 
-The GitHub Actions workflows are the single publisher — nothing publishes to
-npm outside CI, so a version can never be published twice.
+The **Release** workflow (`.github/workflows/release.yml`) is the single
+publisher: one run builds, typechecks and tests the tagged commit, checks that
+`CHANGELOG.md` has a section for the version, publishes to npm and creates the
+GitHub release, so npm and GitHub always carry the same version. npm trusts
+that workflow through **Trusted Publishing (OIDC)**: no npm token is stored,
+and every version carries a provenance attestation. The trust link is
+configured on the package (`npm trust list mcp-github-project-manager`); if
+`release.yml` is ever renamed, the link must be recreated with
+`npm trust github --file <new-name>.yml --repo kunwarVivek/mcp-github-project-manager --allow-publish`.
 
 **Bump the version from GitHub (recommended)**
 
@@ -180,10 +187,10 @@ npm outside CI, so a version can never be published twice.
 2. Choose `patch` / `minor` / `major`
 3. The workflow bumps `package.json` + `package-lock.json`, moves the
    `[Unreleased]` CHANGELOG body into the new version section, commits, tags
-   `vX.Y.Z` and pushes
-4. Pushing the tag triggers the **Release** workflow, which verifies the tag
-   matches `package.json`, builds, typechecks, tests, publishes to npm
-   (with provenance) and creates the GitHub release
+   `vX.Y.Z`, pushes, and dispatches **Release** on the new tag (a tag pushed
+   by a workflow's own token never triggers another workflow by itself)
+4. **Release** verifies the tag matches `package.json`, builds, typechecks,
+   tests, publishes to npm and creates the GitHub release
 
 **Bump the version locally**
 
