@@ -7,6 +7,7 @@ import type {
 } from "../../domain/agent-orchestration-types";
 import {
   AGENT_FIELDS,
+  AGENT_REGISTRY_BRANCH,
   DEFAULT_HEARTBEAT_TIMEOUT_MINUTES,
 } from "../../domain/agent-orchestration-types";
 import {
@@ -20,15 +21,30 @@ import {
   TaskSubmittedForReviewEvent,
 } from "../../domain/events";
 import { domainEventBus } from "../../domain/events/DomainEventBus";
-import type { AgentStore } from "../../infrastructure/agent/AgentStore";
+import { AgentNotFoundError, type AgentStore } from "../../infrastructure/agent/AgentStore";
+import {
+  ClaimNotHeldError,
+  ItemHeartbeatStore,
+  MissingAgentFieldError,
+} from "../../infrastructure/agent/ItemHeartbeatStore";
+import { ProjectFieldSetup } from "../../infrastructure/agent/ProjectFieldSetup";
 import type { GitHubRepositoryFactory } from "../../infrastructure/github/GitHubRepositoryFactory";
 import { isMissingNativeCapability } from "../../infrastructure/github/native-capability";
 import { projectFieldUnionSelection } from "../../infrastructure/github/project-field-fragments";
+import { type ILogger, Logger } from "../../infrastructure/logger";
 import { AIServiceFactory } from "../ai/AIServiceFactory";
 import { mapErrorToMCPError } from "../utils/ErrorMapper";
 import { InputSanitizer } from "../utils/InputSanitizer";
 import { AgentBudgetService } from "./AgentBudgetService";
 import type { AgentContextService } from "./AgentContextService";
+import { AgentFieldProvisioner, AgentFieldProvisioningError } from "./AgentFieldProvisioner";
+import { AgentHeartbeatResolver, claimantChain } from "./AgentHeartbeatResolver";
+
+/** Milliseconds since `iso`; `Infinity` when absent or unparsable (nothing proves it is recent). */
+function ageMs(iso: string | undefined, now: number): number {
+  const at = iso ? new Date(iso).getTime() : Number.NaN;
+  return Number.isNaN(at) ? Number.POSITIVE_INFINITY : now - at;
+}
 
 // ---------------------------------------------------------------------------
 // GraphQL types
@@ -253,6 +269,10 @@ export class TaskCheckoutService {
   private readonly contextService: AgentContextService;
   private readonly aiFactory: AIServiceFactory;
   private readonly budgetService: AgentBudgetService;
+  private readonly heartbeats: ItemHeartbeatStore;
+  private readonly fieldProvisioner: AgentFieldProvisioner;
+  private readonly heartbeatResolver: AgentHeartbeatResolver;
+  private readonly logger: ILogger;
 
   /**
    * @param factory - GitHub repository factory for API access.
@@ -262,19 +282,30 @@ export class TaskCheckoutService {
    *     When omitted, defaults to the global singleton via `AIServiceFactory.getInstance()`.
    * @param budgetService - Budget gate for checkout. When omitted, one is built
    *     over the same agent store.
+   * @param heartbeats - Hot heartbeat state on project items. When omitted, one
+   *     is built over `factory`.
+   * @param fieldProvisioner - Additively creates missing `agent_*` project
+   *     fields on first use. When omitted, one is built over `factory`.
    */
   constructor(
     factory: GitHubRepositoryFactory,
     agentStore: AgentStore,
     contextService: AgentContextService,
     aiFactory?: AIServiceFactory,
-    budgetService?: AgentBudgetService
+    budgetService?: AgentBudgetService,
+    heartbeats?: ItemHeartbeatStore,
+    fieldProvisioner?: AgentFieldProvisioner
   ) {
     this.factory = factory;
     this.agentStore = agentStore;
     this.contextService = contextService;
     this.aiFactory = aiFactory ?? AIServiceFactory.getInstance();
     this.budgetService = budgetService ?? new AgentBudgetService(agentStore);
+    this.heartbeats = heartbeats ?? new ItemHeartbeatStore(factory);
+    this.fieldProvisioner =
+      fieldProvisioner ?? new AgentFieldProvisioner(new ProjectFieldSetup(factory));
+    this.heartbeatResolver = new AgentHeartbeatResolver(this.heartbeats);
+    this.logger = Logger.getInstance();
   }
 
   /**
@@ -301,9 +332,25 @@ export class TaskCheckoutService {
         };
       }
 
+      // Pay any metered debit a tool call could not write to the registry
+      // (see debitMeteredWithRetry). Until it is paid the budget below cannot
+      // be trusted, so an unsettled debit refuses the checkout.
+      const settlement = await this.budgetService.settleUnpaidDebits(agentId);
+      if (settlement.outstanding.length > 0) {
+        const owed = settlement.outstanding.reduce((sum, debit) => sum + debit.tokens, 0);
+        return {
+          success: false,
+          message:
+            `Cannot check out: ${settlement.outstanding.length} metered token debit(s) totalling ${owed} tokens ` +
+            `could not be written to the agent registry (last error: ${settlement.outstanding[0]?.error}). ` +
+            `The budget cannot be enforced until they are recorded. Retry checkout_task shortly; if it keeps failing, ` +
+            `check that the token has contents: write on the ${AGENT_REGISTRY_BRANCH} branch.`,
+        };
+      }
+
       // Budget gate. Without this, an agent flipped to 'budget_exhausted' by
       // recordUsage could simply check out again: step 4 below sets
-      // `agent.status = 'working'` unconditionally, silently clearing the
+      // the status to 'working' unconditionally, silently clearing the
       // exhausted state. `hardStop` defaults to true and enforced nothing.
       const budgetStatus = await this.budgetService.getBudgetStatus(agentId);
       if (budgetStatus.isExhausted) {
@@ -364,11 +411,25 @@ export class TaskCheckoutService {
         };
       }
 
-      const claimed = await this.claimProjectItemAtomic(
-        projectItem.project.id,
-        projectItem.id,
-        agentId
-      );
+      const claimedAt = new Date().toISOString();
+      let claimed: boolean;
+      try {
+        await this.fieldProvisioner.ensure(projectItem.project.id);
+        claimed = await this.claimProjectItemAtomic(
+          projectItem.project.id,
+          projectItem.id,
+          agentId,
+          claimedAt
+        );
+      } catch (error) {
+        if (
+          error instanceof MissingAgentFieldError ||
+          error instanceof AgentFieldProvisioningError
+        ) {
+          return { success: false, message: error.message };
+        }
+        throw error;
+      }
       if (!claimed) {
         return {
           success: false,
@@ -376,12 +437,15 @@ export class TaskCheckoutService {
         };
       }
 
-      // 4. Update agent record
-      agent.currentTaskId = String(candidate.issue.number);
-      agent.currentTaskTitle = candidate.issue.title;
-      agent.status = "working";
-      agent.lastHeartbeat = new Date().toISOString();
-      await this.agentStore.upsertAgent(agent);
+      // 4. Update agent record. Field-level, on the record as stored now: a
+      //    debit or budget change that landed since it was read is kept.
+      await this.agentStore.updateAgent(agentId, (fresh) => ({
+        ...fresh,
+        currentTaskId: String(candidate.issue.number),
+        currentTaskTitle: candidate.issue.title,
+        status: "working",
+        lastHeartbeat: claimedAt,
+      }));
 
       // 5. Build enriched context
       let context: AgentTaskContext | undefined;
@@ -464,10 +528,11 @@ export class TaskCheckoutService {
       }
 
       // Update agent record
-      agent.currentTaskId = undefined;
-      agent.currentTaskTitle = undefined;
-      agent.status = "idle";
-      await this.agentStore.upsertAgent(agent);
+      await this.agentStore.updateAgent(agentId, (fresh) =>
+        fresh.currentTaskId === taskId
+          ? { ...fresh, currentTaskId: undefined, currentTaskTitle: undefined, status: "idle" }
+          : fresh
+      );
 
       // Publish domain event
       domainEventBus.publish(
@@ -550,10 +615,11 @@ export class TaskCheckoutService {
       }
 
       // Update agent record
-      agent.currentTaskId = undefined;
-      agent.currentTaskTitle = undefined;
-      agent.status = "idle";
-      await this.agentStore.upsertAgent(agent);
+      await this.agentStore.updateAgent(agentId, (fresh) =>
+        fresh.currentTaskId === taskId
+          ? { ...fresh, currentTaskId: undefined, currentTaskTitle: undefined, status: "idle" }
+          : fresh
+      );
 
       // Publish domain event
       domainEventBus.publish(
@@ -589,54 +655,79 @@ export class TaskCheckoutService {
     }
   }
 
-  /** Process a heartbeat from an agent. Updates timestamp, status, and progress. */
+  /**
+   * Process a heartbeat from an agent.
+   *
+   * Hot/cold split: the beat of an agent that holds a task lands on the
+   * claimed project item (`agent_heartbeat_at`, `agent_progress`,
+   * `agent_work_branch`) — one writer per item, no registry commit. The
+   * registry is written only when a cold field changes (status, current task)
+   * or, for an agent holding no task, when its stored `lastHeartbeat` is older
+   * than the stale threshold. History is not kept: only the latest beat exists.
+   *
+   * A project missing a field to write, or an item no longer claimed by the
+   * agent, is reported as `success: false` with what to do about it.
+   */
   async processHeartbeat(
     heartbeat: AgentHeartbeat
   ): Promise<{ success: boolean; message: string }> {
     try {
-      const agent = await this.agentStore.getAgent(heartbeat.agentId);
+      const registry = await this.agentStore.listAgents();
+      const agent = registry.find((a) => a.id === heartbeat.agentId);
       if (!agent) {
         return { success: false, message: `Agent not found: ${heartbeat.agentId}` };
       }
 
-      agent.lastHeartbeat = heartbeat.timestamp;
-      agent.status = heartbeat.status;
-
-      if (heartbeat.taskId) {
-        agent.currentTaskId = heartbeat.taskId;
+      const taskId = heartbeat.taskId ?? agent.currentTaskId;
+      const issueNumber = taskId ? Number.parseInt(taskId, 10) : Number.NaN;
+      if (Number.isInteger(issueNumber) && issueNumber > 0) {
+        const write = () =>
+          this.heartbeats.writeHeartbeat({
+            issueNumber,
+            claimantIds: claimantChain(agent, new Map(registry.map((a) => [a.id, a]))),
+            timestamp: heartbeat.timestamp,
+            progress: heartbeat.progress,
+            workBranch: heartbeat.currentBranch,
+          });
+        try {
+          try {
+            await write();
+          } catch (error) {
+            if (!(error instanceof MissingAgentFieldError)) throw error;
+            // A legacy project: create the missing fields (additive), drop the
+            // cached target that lacks them, and write once more.
+            await this.fieldProvisioner.heal(error.projectId);
+            this.heartbeats.forget(issueNumber);
+            await write();
+          }
+        } catch (error) {
+          if (
+            error instanceof MissingAgentFieldError ||
+            error instanceof ClaimNotHeldError ||
+            error instanceof AgentFieldProvisioningError
+          ) {
+            return { success: false, message: error.message };
+          }
+          throw error;
+        }
       }
 
-      // Store progress info in metadata
-      if (heartbeat.progress != null || heartbeat.progressSummary || heartbeat.currentBranch) {
-        agent.metadata = {
-          ...agent.metadata,
-          ...(heartbeat.progress != null && { progress: heartbeat.progress }),
-          ...(heartbeat.progressSummary && { progressSummary: heartbeat.progressSummary }),
-          ...(heartbeat.currentBranch && { currentBranch: heartbeat.currentBranch }),
-          ...(heartbeat.estimatedCompletionMinutes != null && {
-            estimatedCompletionMinutes: heartbeat.estimatedCompletionMinutes,
-          }),
-          ...(heartbeat.blockerDescription && { blockerDescription: heartbeat.blockerDescription }),
+      const staleMs = DEFAULT_HEARTBEAT_TIMEOUT_MINUTES * 60_000;
+      await this.agentStore.updateAgent(agent.id, (fresh) => {
+        const taskChanged =
+          heartbeat.taskId !== undefined && fresh.currentTaskId !== heartbeat.taskId;
+        const coldChanged = fresh.status !== heartbeat.status || taskChanged;
+        const holdsTask = (heartbeat.taskId ?? fresh.currentTaskId) !== undefined;
+        const idleStale = !holdsTask && ageMs(fresh.lastHeartbeat, Date.now()) >= staleMs;
+        if (!coldChanged && !idleStale) return fresh;
+
+        return {
+          ...fresh,
+          status: heartbeat.status,
+          currentTaskId: heartbeat.taskId ?? fresh.currentTaskId,
+          lastHeartbeat: heartbeat.timestamp,
         };
-      }
-
-      // Append to bounded heartbeat history (most recent first)
-      const history = Array.isArray(agent.metadata?.heartbeatHistory)
-        ? (agent.metadata.heartbeatHistory as Array<Record<string, unknown>>)
-        : [];
-      history.unshift({
-        timestamp: heartbeat.timestamp,
-        status: heartbeat.status,
-        ...(heartbeat.progress != null && { progress: heartbeat.progress }),
-        ...(heartbeat.progressSummary && { progressSummary: heartbeat.progressSummary }),
-        ...(heartbeat.currentBranch && { currentBranch: heartbeat.currentBranch }),
       });
-      agent.metadata = {
-        ...agent.metadata,
-        heartbeatHistory: history.slice(0, 50),
-      };
-
-      await this.agentStore.upsertAgent(agent);
 
       // Publish domain event
       domainEventBus.publish(
@@ -651,13 +742,11 @@ export class TaskCheckoutService {
         })
       );
 
-      // Propagate heartbeat to parent agent
+      // A subagent's beat keeps its parent alive. A parent holding the task is
+      // covered by the item write above (the item names the root as claimant);
+      // an idle parent only needs its registry beat refreshed when stale.
       if (agent.parentAgentId) {
-        const parent = await this.agentStore.getAgent(agent.parentAgentId);
-        if (parent) {
-          parent.lastHeartbeat = heartbeat.timestamp;
-          await this.agentStore.upsertAgent(parent);
-        }
+        await this.refreshIdleHeartbeat(agent.parentAgentId, heartbeat.timestamp, staleMs);
       }
 
       return { success: true, message: `Heartbeat processed for agent ${heartbeat.agentId}` };
@@ -666,9 +755,36 @@ export class TaskCheckoutService {
     }
   }
 
+  /** Refresh the registry `lastHeartbeat` of an agent that holds no task, when it has gone stale. */
+  private async refreshIdleHeartbeat(
+    agentId: string,
+    timestamp: string,
+    staleMs: number
+  ): Promise<void> {
+    try {
+      await this.agentStore.updateAgent(agentId, (fresh) =>
+        fresh.currentTaskId || ageMs(fresh.lastHeartbeat, Date.now()) < staleMs
+          ? fresh
+          : { ...fresh, lastHeartbeat: timestamp }
+      );
+    } catch (error) {
+      // A parent deregistered meanwhile has nothing to keep alive.
+      if (!(error instanceof AgentNotFoundError)) throw error;
+    }
+  }
+
   /**
    * Reclaim tasks from agents whose heartbeat has gone stale.
    * Returns the number of tasks reclaimed.
+   *
+   * Staleness of a working agent comes from its claimed item
+   * (`agent_heartbeat_at`); the registry value is only a floor (it is set at
+   * checkout and on cold changes, never newer than the item). A registry value
+   * that is itself still fresh proves liveness, so only agents whose registry
+   * value is stale are looked up on the board — one batched GraphQL request
+   * per 25 candidate issues, nothing at all when no candidate exists. If that
+   * read fails the sweep fails: reclaiming on the registry value alone could
+   * un-claim live work.
    */
   async reclaimStaleTasks(
     timeoutMinutes: number = DEFAULT_HEARTBEAT_TIMEOUT_MINUTES
@@ -686,26 +802,57 @@ export class TaskCheckoutService {
       const timeoutMs = timeoutMinutes * 60_000;
       const reclaimed: Array<{ agentId: string; taskId: string }> = [];
 
+      // Skip agents that never heartbeated. This intentionally includes
+      // subagents (parentAgentId) that inherit the parent's task claim
+      // without ever heartbeating themselves — their parent's heartbeat
+      // governs the shared claim, and reclaiming the child would wrongly
+      // un-claim the parent's task.
+      const candidates = agents.filter(
+        (a) => a.currentTaskId && a.lastHeartbeat && ageMs(a.lastHeartbeat, now) >= timeoutMs
+      );
+      if (candidates.length === 0) {
+        return { reclaimed: 0, details: [] };
+      }
+
+      const resolved = await this.heartbeatResolver.resolve(agents, candidates);
       const config = this.factory.getConfig();
       const octokit = this.factory.getOctokit();
 
-      for (const agent of agents) {
-        if (!agent.currentTaskId) continue;
-        // Skip agents that never heartbeated. This intentionally includes
-        // subagents (parentAgentId) that inherit the parent's task claim
-        // without ever heartbeating themselves — their parent's heartbeat
-        // governs the shared claim, and reclaiming the child would wrongly
-        // un-claim the parent's task.
-        if (!agent.lastHeartbeat) continue;
+      for (const agent of candidates) {
+        const latest = resolved.get(agent.id)?.lastHeartbeat ?? agent.lastHeartbeat;
+        if (ageMs(latest, now) < timeoutMs) continue;
 
-        const elapsed = now - new Date(agent.lastHeartbeat).getTime();
-        if (elapsed < timeoutMs) continue;
+        // Release the registry claim first, guarded against the agent having
+        // moved on since it was judged stale.
+        const taskId = agent.currentTaskId as string;
+        let released = false;
+        try {
+          await this.agentStore.updateAgent(agent.id, (fresh) => {
+            released =
+              fresh.currentTaskId === taskId && fresh.lastHeartbeat === agent.lastHeartbeat;
+            return released
+              ? {
+                  ...fresh,
+                  currentTaskId: undefined,
+                  currentTaskTitle: undefined,
+                  status: "offline",
+                }
+              : fresh;
+          });
+        } catch (error) {
+          if (error instanceof AgentNotFoundError) continue;
+          throw error;
+        }
+        if (!released) continue;
 
-        // Release the task
-        const taskId = agent.currentTaskId;
         const issueNumber = parseInt(taskId, 10);
         if (!Number.isNaN(issueNumber)) {
-          await this.clearClaimFields(issueNumber, "unclaimed").catch(() => {});
+          await this.clearClaimFields(issueNumber, "unclaimed").catch((error) => {
+            this.logger.warn(
+              `Reclaimed task #${issueNumber} from ${agent.id} but could not clear its board claim`,
+              error
+            );
+          });
 
           // Audit trail: humans and other agents see why the task was released.
           await octokit.rest.issues
@@ -726,11 +873,6 @@ export class TaskCheckoutService {
             })
             .catch(() => {});
         }
-
-        agent.currentTaskId = undefined;
-        agent.currentTaskTitle = undefined;
-        agent.status = "offline";
-        await this.agentStore.upsertAgent(agent);
 
         // Publish domain event
         domainEventBus.publish(
@@ -788,8 +930,9 @@ export class TaskCheckoutService {
           .catch(() => {});
       }
 
-      agent.status = "needs_review";
-      await this.agentStore.upsertAgent(agent);
+      await this.agentStore.updateAgent(agentId, (fresh) =>
+        fresh.currentTaskId === taskId ? { ...fresh, status: "needs_review" } : fresh
+      );
 
       // Publish domain event
       domainEventBus.publish(
@@ -931,22 +1074,29 @@ export class TaskCheckoutService {
     reviewer: Agent
   ): Promise<void> {
     const agents = await this.agentStore.listAgents();
-    const owners = new Map<string, Agent>();
+    const ownerIds = new Set<string>();
 
     if (reviewer.currentTaskId === taskId) {
-      owners.set(reviewer.id, reviewer);
+      ownerIds.add(reviewer.id);
     }
     for (const agent of agents) {
       if (agent.currentTaskId === taskId) {
-        owners.set(agent.id, agent);
+        ownerIds.add(agent.id);
       }
     }
 
-    for (const owner of owners.values()) {
-      owner.currentTaskId = undefined;
-      owner.currentTaskTitle = undefined;
-      owner.status = "idle";
-      await this.agentStore.upsertAgent(owner);
+    for (const ownerId of ownerIds) {
+      try {
+        await this.agentStore.updateAgent(ownerId, (fresh) =>
+          // Another writer may have moved the agent on since the listing.
+          fresh.currentTaskId === taskId
+            ? { ...fresh, currentTaskId: undefined, currentTaskTitle: undefined, status: "idle" }
+            : fresh
+        );
+      } catch (error) {
+        // An owner deregistered meanwhile no longer holds anything to release.
+        if (!(error instanceof AgentNotFoundError)) throw error;
+      }
     }
   }
 
@@ -1223,7 +1373,7 @@ export class TaskCheckoutService {
           if (b.dueOn == null) return -1;
           return a.dueOn - b.dueOn;
         });
-        const best = candidates[0]!;
+        const best = candidates[0];
         return {
           issue: best.issue,
           rationale:
@@ -1235,7 +1385,7 @@ export class TaskCheckoutService {
 
       case "skills_match": {
         candidates.sort((a, b) => b.skillScore - a.skillScore || b.priorityScore - a.priorityScore);
-        const best = candidates[0]!;
+        const best = candidates[0];
         return {
           issue: best.issue,
           rationale: `Best skill match (${best.skillScore} matching capability/label pairs)`,
@@ -1254,10 +1404,9 @@ export class TaskCheckoutService {
         };
       }
 
-      case "highest_priority":
       default: {
         candidates.sort((a, b) => b.priorityScore - a.priorityScore || b.skillScore - a.skillScore);
-        const best = candidates[0]!;
+        const best = candidates[0];
         return {
           issue: best.issue,
           rationale:
@@ -1333,7 +1482,8 @@ export class TaskCheckoutService {
   private async claimProjectItemAtomic(
     projectId: string,
     itemId: string,
-    agentId: string
+    agentId: string,
+    claimedAt: string
   ): Promise<boolean> {
     // Fresh read to confirm the item is still unclaimed
     const fresh = await this.readItemFields(projectId, itemId);
@@ -1341,6 +1491,12 @@ export class TaskCheckoutService {
     if (claimedBy?.text) return false;
 
     const fields = await this.loadFieldMap(projectId);
+
+    // Fail before any write: a project without the heartbeat field cannot
+    // carry hot state, and silently skipping it would let reclaim treat live
+    // work as stale.
+    const heartbeatField = fields.get(AGENT_FIELDS.HEARTBEAT_AT);
+    if (!heartbeatField) throw new MissingAgentFieldError(projectId, [AGENT_FIELDS.HEARTBEAT_AT]);
 
     // Set agent_claimed_by (TEXT)
     const claimedByField = fields.get(AGENT_FIELDS.CLAIMED_BY);
@@ -1360,9 +1516,18 @@ export class TaskCheckoutService {
         projectId,
         itemId,
         fieldId: claimedAtField.id,
-        value: new Date().toISOString(),
+        value: claimedAt,
       });
     }
+
+    // Set agent_heartbeat_at (TEXT — ISO timestamp): reclaim reads staleness
+    // from the item, so a claim that has not beaten yet must already carry one.
+    await this.factory.graphql(UPDATE_TEXT_FIELD, {
+      projectId,
+      itemId,
+      fieldId: heartbeatField.id,
+      value: claimedAt,
+    });
 
     // Set agent_status (SINGLE_SELECT → 'in_progress')
     const statusField = fields.get(AGENT_FIELDS.STATUS);
@@ -1471,7 +1636,7 @@ export class TaskCheckoutService {
     const items = resp.repository.issue?.projectItems.nodes;
     if (!items || items.length === 0) return;
 
-    const item = items[0]!;
+    const item = items[0];
     const projectId = item.project.id;
     const itemId = item.id;
 
@@ -1496,6 +1661,16 @@ export class TaskCheckoutService {
         fieldId: claimedAtField.id,
       });
     }
+
+    // Clear the hot heartbeat state with the claim, so a board never shows a
+    // finished task as freshly beating.
+    for (const name of [AGENT_FIELDS.HEARTBEAT_AT, AGENT_FIELDS.PROGRESS]) {
+      const hotField = fields.get(name);
+      if (hotField) {
+        await this.factory.graphql(CLEAR_FIELD, { projectId, itemId, fieldId: hotField.id });
+      }
+    }
+    this.heartbeats.forget(issueNumber);
 
     // Set agent_status
     const statusField = fields.get(AGENT_FIELDS.STATUS);

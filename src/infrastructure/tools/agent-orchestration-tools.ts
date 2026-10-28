@@ -23,6 +23,7 @@ import {
   AgentSchema,
   AgentTaskContextSchema,
   BudgetStatusSchema,
+  DEFAULT_HEARTBEAT_TIMEOUT_MINUTES,
   MAX_AGENT_CHILDREN,
   MAX_AGENT_HIERARCHY_DEPTH,
   TaskCheckoutResultSchema,
@@ -32,11 +33,13 @@ import { AgentDeregisteredEvent, AgentRegisteredEvent } from "../../domain/event
 import { DomainEventBus } from "../../domain/events/DomainEventBus";
 import { AgentBudgetService } from "../../services/agent/AgentBudgetService";
 import { AgentContextService } from "../../services/agent/AgentContextService";
+import { AgentHeartbeatResolver } from "../../services/agent/AgentHeartbeatResolver";
 import { AgentMetricsService } from "../../services/agent/AgentMetricsService";
 import { TaskCheckoutService } from "../../services/agent/TaskCheckoutService";
 import { WorkProductService } from "../../services/agent/WorkProductService";
 import { mapErrorToMCPError } from "../../services/utils/ErrorMapper";
 import { AgentStore } from "../agent/AgentStore";
+import { ItemHeartbeatStore } from "../agent/ItemHeartbeatStore";
 import { ProjectFieldSetup } from "../agent/ProjectFieldSetup";
 import { WorkProductStore } from "../agent/WorkProductStore";
 import type { OctokitInstance } from "../github/types";
@@ -754,7 +757,7 @@ export async function executeRegisterAgent(args: RegisterAgentArgs): Promise<{
       agent.currentTaskTitle = parentAgent.currentTaskTitle;
     }
 
-    await store.upsertAgent(agent);
+    await store.createAgent(agent);
 
     const eventBus = DomainEventBus.getInstance();
     eventBus.publish(
@@ -988,10 +991,14 @@ export async function executeAgentHeartbeat(args: AgentHeartbeatArgs): Promise<{
     const contextService = new AgentContextService(factory);
     const service = new TaskCheckoutService(factory, store, contextService);
 
-    await service.processHeartbeat({
+    const outcome = await service.processHeartbeat({
       ...args,
       timestamp: new Date().toISOString(),
     });
+    if (!outcome.success) {
+      // e.g. a project missing agent_heartbeat_at (run setup_fields) or a claim that was lost.
+      throw new Error(outcome.message);
+    }
 
     const progressText = args.progress != null ? ` (${args.progress}%)` : "";
     return {
@@ -1061,18 +1068,23 @@ export async function executeGetAgentActivity(args: GetAgentActivityArgs): Promi
     const store = new AgentStore(factory);
     const budgetService = new AgentBudgetService(store);
 
-    let agents = await store.listAgents();
+    const registry = await store.listAgents();
+    const agents = args.includeOffline ? registry : registry.filter((a) => a.status !== "offline");
 
-    if (!args.includeOffline) {
-      agents = agents.filter((a) => a.status !== "offline");
-    }
+    // Latest heartbeat only (no history): the claimed item for a working
+    // agent, the registry for an idle one.
+    const heartbeats = await new AgentHeartbeatResolver(new ItemHeartbeatStore(factory)).resolve(
+      registry,
+      agents
+    );
 
     const now = new Date();
     const entries: AgentActivityEntry[] = await Promise.all(
       agents.map(async (agent) => {
-        const lastHb = agent.lastHeartbeat ? new Date(agent.lastHeartbeat) : undefined;
+        const heartbeat = heartbeats.get(agent.id);
+        const lastHb = heartbeat?.lastHeartbeat ? new Date(heartbeat.lastHeartbeat) : undefined;
         const ageMs = lastHb ? now.getTime() - lastHb.getTime() : undefined;
-        const isStale = ageMs != null && ageMs > 30 * 60 * 1000;
+        const isStale = ageMs != null && ageMs > DEFAULT_HEARTBEAT_TIMEOUT_MINUTES * 60 * 1000;
 
         let budgetStatus: AgentActivityEntry["budgetStatus"];
         try {
@@ -1098,26 +1110,19 @@ export async function executeGetAgentActivity(args: GetAgentActivityArgs): Promi
             ? {
                 issueId: agent.currentTaskId,
                 title: agent.currentTaskTitle ?? "Unknown",
-                // Approximation: no dedicated claimedAt on Agent; lastHeartbeat
-                // is updated on claim, so it's the closest available timestamp.
+                progress: heartbeat?.progress,
+                branch: heartbeat?.workBranch,
+                // Approximation: no dedicated claimedAt on Agent; the registry
+                // lastHeartbeat is set on claim, so it's the closest available timestamp.
                 claimedAt: agent.lastHeartbeat ?? agent.registeredAt,
               }
             : undefined,
-          lastHeartbeat: agent.lastHeartbeat,
+          lastHeartbeat: heartbeat?.lastHeartbeat,
+          heartbeatSource: heartbeat?.source,
           heartbeatAge: ageMs != null ? `${Math.round(ageMs / 60000)}m` : undefined,
           isStale,
           budgetStatus,
           completedToday: 0, // Not populated: requires scanning all work products per agent per day
-          heartbeatHistory: Array.isArray(agent.metadata?.heartbeatHistory)
-            ? (
-                agent.metadata.heartbeatHistory as Array<{
-                  timestamp: string;
-                  status: string;
-                  progress?: number;
-                  progressSummary?: string;
-                }>
-              ).slice(0, 10)
-            : undefined,
         };
       })
     );

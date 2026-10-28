@@ -209,7 +209,7 @@ export class WorkProductService {
     const items = itemResp.repository.issue?.projectItems.nodes;
     if (!items || items.length === 0) return;
 
-    const item = items[0]!;
+    const item = items[0];
     const projectId = item.project.id;
     const itemId = item.id;
 

@@ -50,11 +50,12 @@ function makeAgent(id: string, overrides: Partial<Agent> = {}): Agent {
 describe("AgentMetricsService", () => {
   let service: AgentMetricsService;
   let mockFactory: Mocked<GitHubRepositoryFactory>;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let mockStore: { listAgents: Mock<any> };
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let mockWpStore: { listForIssue: Mock<any> };
-  let octokit: any;
+  let graphqlMock: Mock;
+  let mockStore: { listAgents: Mock<() => Promise<Agent[]>> };
+  let mockWpStore: { listForIssue: Mock<() => Promise<WorkProduct[]>> };
+  let octokit: {
+    rest: { issues: { listCommentsForRepo: Mock<() => Promise<{ data: unknown[] }>> } };
+  };
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -67,9 +68,11 @@ describe("AgentMetricsService", () => {
       },
     };
 
+    graphqlMock = vi.fn(async () => ({ repository: {} }));
     mockFactory = {
       getConfig: vi.fn(() => ({ owner: "o", repo: "r" })),
       getOctokit: vi.fn(() => octokit),
+      graphql: graphqlMock,
     } as unknown as Mocked<GitHubRepositoryFactory>;
 
     mockStore = { listAgents: vi.fn(async () => []) };
@@ -98,12 +101,26 @@ describe("AgentMetricsService", () => {
         currentTaskId: "42",
         currentTaskTitle: "Task 42",
         lastHeartbeat: fresh,
-        budget: { totalTokens: 1000, usedTokens: 400, warningThreshold: 0.8, hardStop: true },
+        budget: {
+          totalTokens: 1000,
+          meteredTokens: 400,
+          reportedTokens: 0,
+          usedTokens: 400,
+          warningFraction: 0.8,
+          hardStop: true,
+        },
       }),
       makeAgent("agent-stale", {
         status: "offline",
         lastHeartbeat: stale,
-        budget: { totalTokens: 1000, usedTokens: 2000, warningThreshold: 0.8, hardStop: true },
+        budget: {
+          totalTokens: 1000,
+          meteredTokens: 2000,
+          reportedTokens: 0,
+          usedTokens: 2000,
+          warningFraction: 0.8,
+          hardStop: true,
+        },
       }),
     ]);
 
@@ -133,15 +150,98 @@ describe("AgentMetricsService", () => {
     expect(metrics.totalTasksInProgress).toBe(1);
     expect(metrics.totalTasksCompleted).toBe(1);
 
-    const busy = metrics.agents.find((a) => a.agentId === "agent-busy")!;
+    const busy = metrics.agents.find((a) => a.agentId === "agent-busy");
+    if (!busy) throw new Error("agent-busy missing from metrics");
     expect(busy.tasksCompleted).toBe(1);
     expect(busy.budgetUsagePercent).toBe(40);
     expect(busy.isStale).toBe(false);
 
-    const staleAgent = metrics.agents.find((a) => a.agentId === "agent-stale")!;
+    const staleAgent = metrics.agents.find((a) => a.agentId === "agent-stale");
+    if (!staleAgent) throw new Error("agent-stale missing from metrics");
     expect(staleAgent.isStale).toBe(true);
   });
 
+  describe("staleness of a working agent comes from its claimed item", () => {
+    const minutesAgo = (minutes: number): string =>
+      new Date(Date.now() - minutes * 60_000).toISOString();
+
+    function boardShows(items: Record<number, { claimedBy: string; at?: string }>): void {
+      graphqlMock.mockImplementation(async (query: string) => {
+        const repository: Record<string, unknown> = {};
+        for (const match of query.matchAll(/(i\d+): issue\(number: (\d+)\)/g)) {
+          const item = items[Number(match[2])];
+          repository[match[1]] = {
+            projectItems: {
+              nodes: item
+                ? [
+                    {
+                      id: `item-${match[2]}`,
+                      project: { id: "p1" },
+                      fieldValues: {
+                        nodes: [
+                          { field: { name: "agent_claimed_by" }, text: item.claimedBy },
+                          ...(item.at
+                            ? [{ field: { name: "agent_heartbeat_at" }, text: item.at }]
+                            : []),
+                        ],
+                      },
+                    },
+                  ]
+                : [],
+            },
+          };
+        }
+        return { repository };
+      });
+    }
+
+    it("is not stale when the item beat is recent although the registry beat is old", async () => {
+      mockStore.listAgents.mockResolvedValue([
+        makeAgent("a", { status: "working", currentTaskId: "42", lastHeartbeat: minutesAgo(120) }),
+      ]);
+      boardShows({ 42: { claimedBy: "a", at: minutesAgo(2) } });
+
+      const metrics = await service.getMetrics(30);
+
+      expect(metrics.staleAgents).toBe(0);
+      expect(metrics.agents[0].isStale).toBe(false);
+    });
+
+    it("is stale when both the item beat and the registry beat are old", async () => {
+      mockStore.listAgents.mockResolvedValue([
+        makeAgent("a", { status: "working", currentTaskId: "42", lastHeartbeat: minutesAgo(120) }),
+      ]);
+      boardShows({ 42: { claimedBy: "a", at: minutesAgo(90) } });
+
+      const metrics = await service.getMetrics(30);
+
+      expect(metrics.staleAgents).toBe(1);
+    });
+
+    it("falls back to the registry beat when the item has no heartbeat yet", async () => {
+      mockStore.listAgents.mockResolvedValue([
+        makeAgent("a", { status: "working", currentTaskId: "42", lastHeartbeat: minutesAgo(120) }),
+      ]);
+      boardShows({ 42: { claimedBy: "a" } });
+
+      const metrics = await service.getMetrics(30);
+
+      expect(metrics.staleAgents).toBe(1);
+    });
+
+    it("reads the board once for all working agents and never for idle ones", async () => {
+      mockStore.listAgents.mockResolvedValue([
+        makeAgent("a", { status: "working", currentTaskId: "42", lastHeartbeat: minutesAgo(1) }),
+        makeAgent("b", { status: "working", currentTaskId: "43", lastHeartbeat: minutesAgo(1) }),
+        makeAgent("c", { status: "idle", lastHeartbeat: minutesAgo(5) }),
+      ]);
+      boardShows({ 42: { claimedBy: "a" }, 43: { claimedBy: "b" } });
+
+      await service.getMetrics(30);
+
+      expect(graphqlMock).toHaveBeenCalledTimes(1);
+    });
+  });
   it("skips pull requests when scanning for work products", async () => {
     mockStore.listAgents.mockResolvedValue([makeAgent("agent-1")]);
     octokit.rest.issues.listCommentsForRepo.mockResolvedValue({

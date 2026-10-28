@@ -54,6 +54,7 @@ import { AgentContextService } from "./services/agent/AgentContextService";
 import { AgentMetricsService } from "./services/agent/AgentMetricsService";
 import { AgentReclaimScheduler } from "./services/agent/AgentReclaimScheduler";
 import { TaskCheckoutService } from "./services/agent/TaskCheckoutService";
+import { UnpaidDebitLedger } from "./services/agent/UnpaidDebitLedger";
 import { WorkProductService } from "./services/agent/WorkProductService";
 import { AIServiceFactory } from "./services/ai/AIServiceFactory";
 import { FeatureManagementService } from "./services/FeatureManagementService";
@@ -170,7 +171,6 @@ export function configureContainer(
   container.register("IterationService", {
     useFactory: (c) =>
       new IterationService(
-        c.resolve("GitHubRepositoryFactory"),
         c.resolve("FieldValueService"),
         c.resolve("ProjectTemplateService"),
         c.resolve("ProjectLinkingService")
@@ -225,7 +225,6 @@ export function configureContainer(
       new IssueTriagingService(
         c.resolve("AIServiceFactory"),
         c.resolve("ProjectManagementService"),
-        c.resolve("IssueEnrichmentService"),
         c.resolve<ILogger>("ILogger")
       ),
   });
@@ -275,8 +274,7 @@ export function configureContainer(
   });
 
   container.register("FeatureManagementService", {
-    useFactory: (c) =>
-      new FeatureManagementService(c.resolve("AIServiceFactory"), c.resolve<ILogger>("ILogger")),
+    useFactory: (c) => new FeatureManagementService(c.resolve("AIServiceFactory")),
   });
 
   // Register agent orchestration services
@@ -303,7 +301,8 @@ export function configureContainer(
         c.resolve("GitHubRepositoryFactory"),
         c.resolve("AgentStore"),
         c.resolve("AgentContextService"),
-        c.resolve("AIServiceFactory")
+        c.resolve("AIServiceFactory"),
+        c.resolve("AgentBudgetService")
       ),
   });
 
@@ -321,8 +320,15 @@ export function configureContainer(
       new WorkProductService(c.resolve("GitHubRepositoryFactory"), c.resolve("WorkProductStore")),
   });
 
+  // One ledger per process: tool executors build their services per call and
+  // default to the same shared instance.
+  container.register("UnpaidDebitLedger", {
+    useFactory: () => UnpaidDebitLedger.shared(),
+  });
+
   container.register("AgentBudgetService", {
-    useFactory: (c) => new AgentBudgetService(c.resolve("AgentStore")),
+    useFactory: (c) =>
+      new AgentBudgetService(c.resolve("AgentStore"), c.resolve("UnpaidDebitLedger")),
   });
 
   container.register("AgentMetricsService", {
@@ -376,7 +382,7 @@ export function createProjectManagementService(
     new PullRequestService(factory),
     fieldValueService,
     new LabelService(factory),
-    new IterationService(factory, fieldValueService, templateService, linkingService)
+    new IterationService(fieldValueService, templateService, linkingService)
   );
 }
 

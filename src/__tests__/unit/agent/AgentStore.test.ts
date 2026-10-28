@@ -5,7 +5,11 @@ import {
   AGENT_REGISTRY_FILE,
   AGENT_REGISTRY_LABEL,
 } from "../../../domain/agent-orchestration-types";
-import { AgentStore } from "../../../infrastructure/agent/AgentStore";
+import {
+  AgentAlreadyExistsError,
+  AgentNotFoundError,
+  AgentStore,
+} from "../../../infrastructure/agent/AgentStore";
 import { FakeGitHub } from "../../helpers/FakeGitHub";
 
 function makeAgent(id: string, overrides: Partial<Agent> = {}): Agent {
@@ -36,7 +40,7 @@ describe("AgentStore", () => {
     it("creates the registry branch on first write, as a parentless commit holding registry.json", async () => {
       expect(github.hasBranch(AGENT_REGISTRY_BRANCH)).toBe(false);
 
-      await store.upsertAgent(makeAgent("agent-1"));
+      await store.createAgent(makeAgent("agent-1"));
 
       expect(github.hasBranch(AGENT_REGISTRY_BRANCH)).toBe(true);
       expect(github.registryAgents().map((a) => a.id)).toEqual(["agent-1"]);
@@ -46,36 +50,72 @@ describe("AgentStore", () => {
     });
 
     it("does not create a registry issue or label", async () => {
-      await store.upsertAgent(makeAgent("agent-1"));
+      await store.createAgent(makeAgent("agent-1"));
 
       expect(github.issues).toHaveLength(0);
       expect(github.createdLabels).toEqual([]);
     });
   });
 
-  describe("upsertAgent", () => {
+  describe("createAgent", () => {
     it("adds a new agent to an empty registry", async () => {
-      await store.upsertAgent(makeAgent("agent-1"));
+      await store.createAgent(makeAgent("agent-1"));
 
       const body = github.registryAgents();
       expect(body).toHaveLength(1);
       expect(body[0].id).toBe("agent-1");
     });
 
-    it("updates an existing agent matched by id", async () => {
-      github.seedRegistry([makeAgent("agent-1", { status: "idle" })]);
-      await store.upsertAgent(makeAgent("agent-1", { status: "working" }));
+    it("refuses an id that already exists and leaves the stored agent untouched", async () => {
+      github.seedRegistry([makeAgent("agent-1", { status: "working" })]);
 
-      const body = github.registryAgents();
-      expect(body).toHaveLength(1);
-      expect(body[0].status).toBe("working");
+      await expect(store.createAgent(makeAgent("agent-1", { status: "idle" }))).rejects.toThrow(
+        AgentAlreadyExistsError
+      );
+
+      expect(github.registryAgents()[0].status).toBe("working");
+      expect(github.contentWrites).toHaveLength(0);
+    });
+  });
+
+  describe("updateAgent", () => {
+    it("applies the mutator to the stored agent and returns the committed record", async () => {
+      github.seedRegistry([makeAgent("agent-1", { status: "idle" })]);
+
+      const updated = await store.updateAgent("agent-1", (fresh) => ({
+        ...fresh,
+        status: "working",
+      }));
+
+      expect(updated.status).toBe("working");
+      expect(github.registryAgents()[0].status).toBe("working");
     });
 
-    it("writes nothing when the agent is already stored exactly as given", async () => {
+    it("changes only the agent addressed", async () => {
+      github.seedRegistry([makeAgent("agent-1"), makeAgent("agent-2")]);
+
+      await store.updateAgent("agent-2", (fresh) => ({ ...fresh, status: "blocked" }));
+
+      expect(github.registryAgents().map((a) => [a.id, a.status])).toEqual([
+        ["agent-1", "idle"],
+        ["agent-2", "blocked"],
+      ]);
+    });
+
+    it("throws a typed not-found error for an unregistered agent, writing nothing", async () => {
+      github.seedRegistry([makeAgent("agent-1")]);
+
+      await expect(store.updateAgent("ghost", (fresh) => fresh)).rejects.toThrow(
+        AgentNotFoundError
+      );
+      expect(github.contentWrites).toHaveLength(0);
+    });
+
+    it("writes nothing when the mutator returns the agent unchanged", async () => {
       github.seedRegistry([makeAgent("agent-1")]);
       const before = github.commitCount(AGENT_REGISTRY_BRANCH);
 
-      await store.upsertAgent(makeAgent("agent-1"));
+      await store.updateAgent("agent-1", (fresh) => fresh);
 
       expect(github.contentWrites).toHaveLength(0);
       expect(github.commitCount(AGENT_REGISTRY_BRANCH)).toBe(before);
@@ -176,7 +216,7 @@ describe("AgentStore", () => {
     it("sees a registration made through another store instance on the very next read", async () => {
       const other = new AgentStore(github.asFactory(), { sleep: instantly });
 
-      await other.upsertAgent(makeAgent("late"));
+      await other.createAgent(makeAgent("late"));
 
       expect((await store.getAgent("late"))?.id).toBe("late");
     });
@@ -204,7 +244,7 @@ describe("AgentStore", () => {
     it("on a write: a corrupt registry is never overwritten", async () => {
       github.seedRegistry("{not-json");
 
-      await expect(store.upsertAgent(makeAgent("agent-1"))).rejects.toThrow(/malformed JSON/);
+      await expect(store.createAgent(makeAgent("agent-1"))).rejects.toThrow(/malformed JSON/);
       expect(github.fileText(AGENT_REGISTRY_BRANCH, AGENT_REGISTRY_FILE)).toBe("{not-json");
     });
 
@@ -264,7 +304,7 @@ describe("AgentStore", () => {
         message: "Resource not accessible by integration",
       });
 
-      const failure = await store.upsertAgent(makeAgent("agent-1")).then(
+      const failure = await store.createAgent(makeAgent("agent-1")).then(
         () => undefined,
         (error: unknown) => error
       );
@@ -283,7 +323,7 @@ describe("AgentStore", () => {
         message: "Repository rule violations found\n\nChanges must be made through a pull request.",
       });
 
-      await expect(store.upsertAgent(makeAgent("agent-1"))).rejects.toThrow(
+      await expect(store.createAgent(makeAgent("agent-1"))).rejects.toThrow(
         new RegExp(`ruleset or branch protection.*${AGENT_REGISTRY_BRANCH}`)
       );
       expect(github.contentWrites).toHaveLength(1);
@@ -295,7 +335,7 @@ describe("AgentStore", () => {
         message: "Resource not accessible by integration",
       });
 
-      await expect(store.upsertAgent(makeAgent("agent-1"))).rejects.toThrow(
+      await expect(store.createAgent(makeAgent("agent-1"))).rejects.toThrow(
         /create the agent-registry branch.*contents: write/s
       );
     });
@@ -304,7 +344,7 @@ describe("AgentStore", () => {
       const empty = new FakeGitHub([], { emptyRepository: true });
 
       await expect(
-        new AgentStore(empty.asFactory()).upsertAgent(makeAgent("agent-1"))
+        new AgentStore(empty.asFactory()).createAgent(makeAgent("agent-1"))
       ).rejects.toThrow(/no commits yet.*initial commit/s);
       expect(empty.hasBranch(AGENT_REGISTRY_BRANCH)).toBe(false);
     });

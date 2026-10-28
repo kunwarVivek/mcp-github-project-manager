@@ -41,6 +41,28 @@ function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
+/** The agent addressed by an update is not (or no longer) registered. */
+export class AgentNotFoundError extends Error {
+  readonly agentId: string;
+
+  constructor(agentId: string) {
+    super(`Agent not found: ${agentId}`);
+    this.name = "AgentNotFoundError";
+    this.agentId = agentId;
+  }
+}
+
+/** A create-only registration collided with an existing agent id. */
+export class AgentAlreadyExistsError extends Error {
+  readonly agentId: string;
+
+  constructor(agentId: string) {
+    super(`Agent already registered: ${agentId}`);
+    this.name = "AgentAlreadyExistsError";
+    this.agentId = agentId;
+  }
+}
+
 /**
  * GitHub-backed agent registry.
  *
@@ -311,24 +333,53 @@ export class AgentStore {
    * Replace the whole registry with `agents`, as one compare-and-swap write.
    *
    * Intended for administrative repair/tests; operational code should prefer
-   * upsertAgent/removeAgent/removeAgentCascade for targeted changes.
+   * createAgent/updateAgent/removeAgent/removeAgentCascade for targeted changes.
    */
   async saveAgents(agents: Agent[]): Promise<void> {
     const replacement = AgentStore.validateAgentRecords(agents, "saveAgents replacement");
     await this.mutateAgents(() => replacement);
   }
 
-  /** Add or update an agent (matched by `id`). */
-  async upsertAgent(agent: Agent): Promise<void> {
+  /**
+   * Add a new agent. Create-only: an existing `id` is never replaced.
+   *
+   * @throws {AgentAlreadyExistsError} when an agent with this id is registered.
+   */
+  async createAgent(agent: Agent): Promise<void> {
     await this.mutateAgents((agents) => {
-      const idx = agents.findIndex((a) => a.id === agent.id);
-      if (idx >= 0) {
-        agents[idx] = agent;
-      } else {
-        agents.push(agent);
+      if (agents.some((a) => a.id === agent.id)) {
+        throw new AgentAlreadyExistsError(agent.id);
       }
+      agents.push(agent);
       return agents;
     });
+  }
+
+  /**
+   * Change one agent, field-level.
+   *
+   * `mutator` receives the agent exactly as stored at the moment of EACH write
+   * attempt — on a lost compare-and-swap it is re-run on the winner's record —
+   * so it must derive its result from its argument only: counters are applied
+   * as deltas (`used += n`), never copied from an earlier snapshot, and an
+   * unrelated field another writer changed in the meantime is preserved. A
+   * mutator that returns the record unchanged writes nothing.
+   *
+   * @returns the agent as committed (or as found, when the mutator changed nothing).
+   * @throws {AgentNotFoundError} when the agent is not registered (any more).
+   */
+  async updateAgent(agentId: string, mutator: (fresh: Agent) => Agent): Promise<Agent> {
+    let result: Agent | undefined;
+    await this.mutateAgents((agents) => {
+      const idx = agents.findIndex((a) => a.id === agentId);
+      const current = agents[idx];
+      if (!current) throw new AgentNotFoundError(agentId);
+      result = mutator(structuredClone(current));
+      agents[idx] = result;
+      return agents;
+    });
+    if (!result) throw new AgentNotFoundError(agentId);
+    return result;
   }
 
   /** Remove an agent by ID. Returns `true` if found and removed. */

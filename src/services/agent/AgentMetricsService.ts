@@ -5,9 +5,11 @@ import type {
 } from "../../domain/agent-orchestration-types";
 import { DEFAULT_HEARTBEAT_TIMEOUT_MINUTES } from "../../domain/agent-orchestration-types";
 import type { AgentStore } from "../../infrastructure/agent/AgentStore";
+import { ItemHeartbeatStore } from "../../infrastructure/agent/ItemHeartbeatStore";
 import { WorkProductStore } from "../../infrastructure/agent/WorkProductStore";
 import type { GitHubRepositoryFactory } from "../../infrastructure/github/GitHubRepositoryFactory";
 import { safeCall } from "../utils/safeCall";
+import { AgentHeartbeatResolver } from "./AgentHeartbeatResolver";
 
 /**
  * Computes agent orchestration metrics: throughput, cycle time, budget burn,
@@ -19,6 +21,7 @@ import { safeCall } from "../utils/safeCall";
 export class AgentMetricsService {
   private readonly factory: GitHubRepositoryFactory;
   private readonly agentStore: AgentStore;
+  private readonly heartbeatResolver: AgentHeartbeatResolver;
 
   private static readonly CACHE_TTL_MS = 5 * 60_000; // 5 minutes
   private workProductCache: {
@@ -37,6 +40,7 @@ export class AgentMetricsService {
   ) {
     this.factory = factory;
     this.agentStore = agentStore;
+    this.heartbeatResolver = new AgentHeartbeatResolver(new ItemHeartbeatStore(factory));
   }
 
   /** Compute aggregate + per-agent metrics. */
@@ -56,6 +60,8 @@ export class AgentMetricsService {
       const { completedByAgent, cycleTimesByAgent, isTruncated } =
         await this.collectAllAgentWorkProducts();
 
+      // Working agents beat onto their claimed item, idle ones into the registry.
+      const heartbeats = await this.heartbeatResolver.resolve(agents);
       let totalTasksInProgress = 0;
       let totalTasksCompleted = 0;
       let totalTokensBudget = 0;
@@ -65,7 +71,8 @@ export class AgentMetricsService {
       let activeAgents = 0;
 
       const entries: AgentMetricEntry[] = agents.map((agent) => {
-        const lastHb = agent.lastHeartbeat ? new Date(agent.lastHeartbeat).getTime() : undefined;
+        const latest = heartbeats.get(agent.id)?.lastHeartbeat;
+        const lastHb = latest ? new Date(latest).getTime() : undefined;
         const isStale = lastHb != null && now - lastHb > staleMs;
         const budget = agent.budget;
         const isExhausted =

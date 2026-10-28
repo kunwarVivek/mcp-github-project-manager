@@ -86,6 +86,8 @@ export class ProjectFieldSetup {
       },
       { name: AGENT_FIELDS.WORK_BRANCH, type: "text", dataType: "TEXT" },
       { name: AGENT_FIELDS.PR_NUMBER, type: "number", dataType: "NUMBER" },
+      { name: AGENT_FIELDS.HEARTBEAT_AT, type: "text", dataType: "TEXT" },
+      { name: AGENT_FIELDS.PROGRESS, type: "number", dataType: "NUMBER" },
     ];
 
     const existingFields = await this.listProjectFields(projectId);

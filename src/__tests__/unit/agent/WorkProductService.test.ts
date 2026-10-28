@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, type Mocked, vi } from "vitest";
+import { beforeEach, describe, expect, it, type Mock, type Mocked, vi } from "vitest";
 import type { WorkProduct } from "../../../domain/agent-orchestration-types";
 import type { WorkProductStore } from "../../../infrastructure/agent/WorkProductStore";
 import type { GitHubRepositoryFactory } from "../../../infrastructure/github/GitHubRepositoryFactory";
@@ -54,12 +54,14 @@ function makeProduct(overrides: Partial<WorkProduct> = {}): WorkProduct {
 describe("WorkProductService", () => {
   let service: WorkProductService;
   let mockFactory: Mocked<GitHubRepositoryFactory>;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let mockStore: { submit: Mock<any>; listForIssue: Mock<any> };
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let graphqlMock: Mock<any>;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let octokit: any;
+  let mockStore: {
+    submit: Mock<() => Promise<void>>;
+    listForIssue: Mock<() => Promise<WorkProduct[]>>;
+  };
+  let graphqlMock: Mock<(query: string, vars: Record<string, unknown>) => Promise<unknown>>;
+  let octokit: {
+    rest: { issues: { listForRepo: Mock<() => Promise<{ data: unknown[] }>> } };
+  };
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -74,7 +76,7 @@ describe("WorkProductService", () => {
       },
     };
 
-    graphqlMock = vi.fn(async (_query: string, vars: Record<string, any>) => {
+    graphqlMock = vi.fn(async (_query: string, vars: Record<string, unknown>) => {
       if (vars.projectId) return LIST_FIELDS_RESPONSE;
       if (vars.issueNumber != null) {
         return {
@@ -88,7 +90,7 @@ describe("WorkProductService", () => {
         };
       }
       return { repository: { issue: null } };
-    }) as unknown as Mock<any>;
+    });
 
     mockFactory = {
       getConfig: vi.fn(() => ({ owner: "o", repo: "r" })),

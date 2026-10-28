@@ -88,7 +88,7 @@ describe("legacy registry issue migration", () => {
     await newStore(github).listAgents();
     const issueWrites = github.writes.length;
 
-    await newStore(github).upsertAgent(makeAgent("new-agent"));
+    await newStore(github).createAgent(makeAgent("new-agent"));
     const second = await newStore(github).listAgents();
 
     expect(second.map((a) => a.id)).toEqual(["legacy-1", "new-agent"]);
@@ -179,7 +179,7 @@ describe("legacy registry issue migration", () => {
 
     github.pauseWrites();
     const first = newStore(github).listAgents();
-    const second = newStore(github).upsertAgent(makeAgent("racer"));
+    const second = newStore(github).createAgent(makeAgent("racer"));
     await github.waitForPendingWrites(2);
     github.releaseOneWrite(1);
     github.releaseWrites();

@@ -15,7 +15,8 @@ import { serveStdio } from "@modelcontextprotocol/server/stdio";
 import { AgentStore } from "./infrastructure/agent/AgentStore";
 import { traceContext } from "./infrastructure/observability/CorrelationContext";
 import { createGitHubFactory } from "./infrastructure/tools/tool-factory";
-import { AgentBudgetService } from "./services/agent/AgentBudgetService";
+import { AgentBudgetService, type BudgetDebitFailure } from "./services/agent/AgentBudgetService";
+import type { UnpaidDebitLedger } from "./services/agent/UnpaidDebitLedger";
 
 /**
  * v2 compatibility aliases.
@@ -50,6 +51,7 @@ import {
   WEBHOOK_SECRET,
 } from "./env";
 import { ResourceCache } from "./infrastructure/cache/ResourceCache";
+import { withBudgetDebitFailure } from "./infrastructure/mcp/budget-debit-meta";
 import { registerPrompts as registerPromptTemplates } from "./infrastructure/mcp/prompts";
 import { registerResources as registerResourceHandlers } from "./infrastructure/mcp/resources";
 import { registerCompoundExecutors } from "./infrastructure/tools/compound/register-executors";
@@ -84,7 +86,10 @@ const SERVER_VERSION: string = (() => {
 
 import { EventStore } from "./infrastructure/events/EventStore";
 import { EventSubscriptionManager } from "./infrastructure/events/EventSubscriptionManager";
-import { GitHubWebhookHandler } from "./infrastructure/events/GitHubWebhookHandler";
+import {
+  GitHubWebhookHandler,
+  type ResourceEvent,
+} from "./infrastructure/events/GitHubWebhookHandler";
 import { WebhookServer } from "./infrastructure/http/WebhookServer";
 import { GracefulShutdown } from "./infrastructure/lifecycle/GracefulShutdown";
 import { type ILogger, logger } from "./infrastructure/logger/index";
@@ -106,6 +111,8 @@ class GitHubProjectManagerServer {
 
   // AI-powered automation services
   private aiFactory: AIServiceFactory;
+  /** Metered debits the registry refused; shared with the services through the container. */
+  private unpaidDebits: UnpaidDebitLedger;
 
   // Persistence and sync components
   private cache: ResourceCache;
@@ -162,6 +169,7 @@ class GitHubProjectManagerServer {
     const di = configureContainer(GITHUB_TOKEN, GITHUB_OWNER, GITHUB_REPO);
     this.service = di.resolve("ProjectManagementService");
     this.aiFactory = di.resolve("AIServiceFactory");
+    this.unpaidDebits = di.resolve("UnpaidDebitLedger");
 
     // Enable AI resilience (circuit breaker + retry + timeout) for all
     // executeWithResilience() calls. Opt-in: existing direct generateText/
@@ -373,7 +381,10 @@ class GitHubProjectManagerServer {
    * result, and only that form is visible to the model so it can recover.
    */
   private get agentBudgetService(): AgentBudgetService {
-    this._agentBudgetService ??= new AgentBudgetService(new AgentStore(createGitHubFactory()));
+    this._agentBudgetService ??= new AgentBudgetService(
+      new AgentStore(createGitHubFactory()),
+      this.unpaidDebits
+    );
     return this._agentBudgetService;
   }
 
@@ -410,6 +421,7 @@ class GitHubProjectManagerServer {
           : undefined;
       const usage = { tokens: 0 };
       let budgetWarningLine: string | undefined;
+      let debitFailure: BudgetDebitFailure | undefined;
 
       const result = await traceContext.run(
         {
@@ -428,18 +440,23 @@ class GitHubProjectManagerServer {
       // so every debit is a read plus a compare-and-swap commit, and per-call
       // debits would pay that round trip (and contend on the registry) per LLM
       // call.
-      // Never let a budget write failure fail a tool call that already ran.
+      // The debit is retried once. A debit that still cannot be written never
+      // fails the tool call that already ran: it is parked in the unpaid-debit
+      // ledger (settled, or the checkout refused, at the agent's next
+      // checkout_task), logged at error level, and reported in `_meta`.
       if (agentId && usage.tokens > 0) {
-        const budgetStatus = await this.agentBudgetService
-          .recordMeteredUsage(agentId, usage.tokens)
-          .catch((error) => {
-            this.logger.warn(`Failed to debit ${usage.tokens} tokens to agent ${agentId}`, error);
-            return undefined;
-          });
+        const outcome = await this.agentBudgetService.debitMeteredWithRetry(agentId, usage.tokens);
 
-        // Surface budget warnings inline so the model learns to slow down
-        if (budgetStatus?.isWarning) {
-          budgetWarningLine = `⚠️ Agent budget at ${budgetStatus.usagePercent.toFixed(1)}% — consider wrapping up.`;
+        if (outcome.ok) {
+          // Surface budget warnings inline so the model learns to slow down
+          if (outcome.status.isWarning) {
+            budgetWarningLine = `⚠️ Agent budget at ${outcome.status.usagePercent.toFixed(1)}% — consider wrapping up.`;
+          }
+        } else {
+          debitFailure = outcome.failure;
+          this.logger.error(
+            `Failed to debit ${outcome.failure.tokens} tokens to agent ${outcome.failure.agentId} after a retry; held as an unpaid debit: ${outcome.failure.error}`
+          );
         }
       }
 
@@ -470,10 +487,11 @@ class GitHubProjectManagerServer {
         content.push({ type: "text" as const, text: budgetWarningLine });
       }
 
-      return {
+      const response: CallToolResult = {
         content,
         ...(structuredContent ? { structuredContent } : {}),
       };
+      return debitFailure ? withBudgetDebitFailure(response, debitFailure) : response;
     } catch (error) {
       const telemetryCatchLatency = Date.now() - telemetryStart;
       ToolTelemetry.getInstance().recordCall(toolName, telemetryCatchLatency, true);
@@ -517,7 +535,7 @@ class GitHubProjectManagerServer {
   /**
    * Handle internal events (e.g., cache invalidation)
    */
-  private handleInternalEvent(event: any): void {
+  private handleInternalEvent(event: ResourceEvent): void {
     // Invalidate cache for the affected resource
     if (event.resourceType && event.resourceId) {
       this.cache.invalidate(event.resourceType, event.resourceId);

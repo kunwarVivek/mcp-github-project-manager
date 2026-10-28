@@ -51,9 +51,9 @@ describe("AgentStore concurrency and registry integrity", () => {
       github.pauseWrites();
 
       // A reaches the server first, B second: both read the empty registry.
-      const writeA = writerA.upsertAgent(makeAgent("agent-a"));
+      const writeA = writerA.createAgent(makeAgent("agent-a"));
       await github.waitForPendingWrites(1);
-      const writeB = writerB.upsertAgent(makeAgent("agent-b"));
+      const writeB = writerB.createAgent(makeAgent("agent-b"));
       await github.waitForPendingWrites(2);
 
       // Release ONLY A's write and let A finish: it reports success.
@@ -84,9 +84,8 @@ describe("AgentStore concurrency and registry integrity", () => {
       const writerB = newStore(github);
 
       github.pauseWrites();
-      const writeA = writerA.upsertAgent(makeAgent("agent-a"));
-      await github.waitForPendingWrites(1);
-      const writeB = writerB.upsertAgent(makeAgent("agent-b"));
+      const writeA = writerA.createAgent(makeAgent("agent-a"));
+      const writeB = writerB.createAgent(makeAgent("agent-b"));
       await github.waitForPendingWrites(2);
 
       github.releaseWrites("reversed");
@@ -107,7 +106,7 @@ describe("AgentStore concurrency and registry integrity", () => {
       github.pauseWrites();
 
       const writes = Array.from({ length: count }, (_, i) =>
-        newStore(github).upsertAgent(makeAgent(`agent-${i}`))
+        newStore(github).createAgent(makeAgent(`agent-${i}`))
       );
       await github.waitForPendingWrites(count);
       github.releaseWrites();
@@ -130,7 +129,7 @@ describe("AgentStore concurrency and registry integrity", () => {
 
       await Promise.all(
         Array.from({ length: count }, (_, i) =>
-          newStore(github).upsertAgent(makeAgent(`agent-${i}`))
+          newStore(github).createAgent(makeAgent(`agent-${i}`))
         )
       );
 
@@ -143,9 +142,9 @@ describe("AgentStore concurrency and registry integrity", () => {
       github.seedRegistry([makeAgent("old-1"), makeAgent("old-2"), makeAgent("old-3")]);
 
       await Promise.all([
-        newStore(github).upsertAgent(makeAgent("new-1")),
+        newStore(github).createAgent(makeAgent("new-1")),
         newStore(github).removeAgent("old-1"),
-        newStore(github).upsertAgent(makeAgent("new-2")),
+        newStore(github).createAgent(makeAgent("new-2")),
         newStore(github).removeAgentCascade("old-2"),
       ]);
 
@@ -159,51 +158,99 @@ describe("AgentStore concurrency and registry integrity", () => {
   });
 
   describe("two concurrent writers of the SAME agent", () => {
-    const recordA = makeAgent("agent-x", {
-      name: "written-by-A",
-      status: "working",
-      currentTaskId: "task-A",
-    });
-    const recordB = makeAgent("agent-x", {
-      name: "written-by-B",
-      status: "needs_review",
-      currentTaskId: "task-B",
+    const budgeted = (): Agent =>
+      makeAgent("agent-x", {
+        budget: {
+          totalTokens: 10_000,
+          meteredTokens: 0,
+          reportedTokens: 0,
+          usedTokens: 0,
+          warningFraction: 0.8,
+          hardStop: true,
+        },
+      });
+
+    beforeEach(() => {
+      github.seedRegistry([budgeted()]);
     });
 
-    async function run(order: "queued" | "reversed"): Promise<Agent[]> {
+    async function race(
+      order: "queued" | "reversed",
+      first: (fresh: Agent) => Agent,
+      second: (fresh: Agent) => Agent
+    ): Promise<{ agent: Agent; outcomes: string[] }> {
       github.pauseWrites();
-      const writeA = newStore(github).upsertAgent(recordA);
-      const writeB = newStore(github).upsertAgent(recordB);
+      const writeA = newStore(github).updateAgent("agent-x", first);
+      const writeB = newStore(github).updateAgent("agent-x", second);
       await github.waitForPendingWrites(2);
       github.releaseWrites(order);
       await Promise.all([writeA, writeB]);
-      return github.registryAgents();
+      return {
+        agent: github.registryAgents()[0],
+        outcomes: github.contentWrites.map((w) => w.outcome),
+      };
     }
 
-    it("never mixes or drops: the last committed record is stored whole (A first, B last)", async () => {
-      const agents = await run("queued");
+    it.each(["queued", "reversed"] as const)(
+      "keeps both writers' fields when they change different fields (%s)",
+      async (order) => {
+        const { agent, outcomes } = await race(
+          order,
+          (fresh) => ({ ...fresh, status: "working", currentTaskId: "task-A" }),
+          (fresh) => ({ ...fresh, lastHeartbeat: "2026-10-28T10:00:00.000Z" })
+        );
 
-      expect(agents).toEqual([recordB]);
-      expect(github.contentWrites.map((w) => w.outcome)).toEqual([
-        "committed",
-        "conflict",
-        "committed",
-      ]);
-    });
+        expect(agent.status).toBe("working");
+        expect(agent.currentTaskId).toBe("task-A");
+        expect(agent.lastHeartbeat).toBe("2026-10-28T10:00:00.000Z");
+        // One write lost the compare-and-swap and was re-applied on the winner's record.
+        expect(outcomes).toContain("conflict");
+      }
+    );
 
-    it("never mixes or drops: the last committed record is stored whole (B first, A last)", async () => {
-      const agents = await run("reversed");
+    it.each(["queued", "reversed"] as const)(
+      "counts both of two concurrent debits (%s)",
+      async (order) => {
+        const debit = (tokens: number) => (fresh: Agent) => {
+          const budget = fresh.budget as NonNullable<Agent["budget"]>;
+          return {
+            ...fresh,
+            budget: {
+              ...budget,
+              meteredTokens: budget.meteredTokens + tokens,
+              usedTokens: budget.usedTokens + tokens,
+            },
+          };
+        };
 
-      expect(agents).toEqual([recordA]);
-    });
+        const { agent } = await race(order, debit(100), debit(50));
 
-    it("the loser retried on top of the winner's commit instead of overwriting it blindly", async () => {
-      await run("queued");
+        expect(agent.budget?.meteredTokens).toBe(150);
+        expect(agent.budget?.usedTokens).toBe(150);
+      }
+    );
 
-      const committed = github.contentWrites.filter((w) => w.outcome === "committed");
-      expect(committed).toHaveLength(2);
-      // The second commit replaced the blob that the FIRST commit produced.
-      expect(committed[1].replacedSha).not.toBe(committed[0].replacedSha);
+    it("re-runs each mutator on the record the winner committed, not on its first read", async () => {
+      const seen: Array<string | undefined> = [];
+      github.pauseWrites();
+      const writeA = newStore(github).updateAgent("agent-x", (fresh) => ({
+        ...fresh,
+        status: "blocked",
+      }));
+      const writeB = newStore(github).updateAgent("agent-x", (fresh) => {
+        seen.push(fresh.status);
+        return { ...fresh, currentTaskTitle: "B's title" };
+      });
+      await github.waitForPendingWrites(2);
+      github.releaseWrites("queued");
+      await Promise.all([writeA, writeB]);
+
+      // B's mutator ran twice: once on the stale record, once on A's commit.
+      expect(seen).toEqual(["idle", "blocked"]);
+      expect(github.registryAgents()[0]).toMatchObject({
+        status: "blocked",
+        currentTaskTitle: "B's title",
+      });
     });
   });
 
@@ -214,8 +261,8 @@ describe("AgentStore concurrency and registry integrity", () => {
       const writerB = newStore(fresh);
 
       fresh.pauseWrites();
-      const writeA = writerA.upsertAgent(makeAgent("agent-a"));
-      const writeB = writerB.upsertAgent(makeAgent("agent-b"));
+      const writeA = writerA.createAgent(makeAgent("agent-a"));
+      const writeB = writerB.createAgent(makeAgent("agent-b"));
       // Both found no branch and both built their bootstrap commit.
       await fresh.waitForPendingWrites(2);
 
@@ -271,7 +318,7 @@ describe("AgentStore concurrency and registry integrity", () => {
         github.seedRegistry([makeAgent(`rival-${rival++}`)]);
       };
 
-      await expect(store.upsertAgent(makeAgent("victim"))).rejects.toThrow(
+      await expect(store.createAgent(makeAgent("victim"))).rejects.toThrow(
         /4 writes in a row lost the compare-and-swap/
       );
 
@@ -300,7 +347,7 @@ describe("AgentStore concurrency and registry integrity", () => {
         github.seedRegistry([...github.registryAgents(), makeAgent(`rival-${rivalWrites}`)]);
       };
 
-      await store.upsertAgent(makeAgent("victim"));
+      await store.createAgent(makeAgent("victim"));
 
       expect(
         github

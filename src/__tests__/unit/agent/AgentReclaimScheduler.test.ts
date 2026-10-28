@@ -17,8 +17,11 @@ function makeConfig(
 }
 
 describe("AgentReclaimScheduler", () => {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let mockCheckout: { reclaimStaleTasks: Mock<any> };
+  let mockCheckout: {
+    reclaimStaleTasks: Mock<
+      () => Promise<{ reclaimed: number; details: Array<{ agentId: string; taskId: string }> }>
+    >;
+  };
   let scheduler: AgentReclaimScheduler;
 
   beforeEach(() => {
@@ -108,7 +111,7 @@ describe("AgentReclaimScheduler", () => {
     let resolveSweep: (v: {
       reclaimed: number;
       details: Array<{ agentId: string; taskId: string }>;
-    }) => void;
+    }) => void = () => {};
     mockCheckout.reclaimStaleTasks.mockImplementation(
       () =>
         new Promise((res) => {
@@ -123,7 +126,7 @@ describe("AgentReclaimScheduler", () => {
     expect(second.reclaimed).toBe(0);
     expect(mockCheckout.reclaimStaleTasks).toHaveBeenCalledTimes(1);
 
-    resolveSweep!({ reclaimed: 1, details: [{ agentId: "a1", taskId: "7" }] });
+    resolveSweep({ reclaimed: 1, details: [{ agentId: "a1", taskId: "7" }] });
     await expect(first).resolves.toEqual({ reclaimed: 1 });
   });
 

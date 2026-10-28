@@ -422,13 +422,11 @@ export interface AgentActivityEntry {
     isExhausted: boolean;
   };
   completedToday: number;
-  /** Recent heartbeat history (most recent first). */
-  heartbeatHistory?: Array<{
-    timestamp: string;
-    status: string;
-    progress?: number;
-    progressSummary?: string;
-  }>;
+  /**
+   * Where `lastHeartbeat` came from: the claimed project item for a working
+   * agent, the registry for an idle one.
+   */
+  heartbeatSource?: "project_item" | "registry";
 }
 
 export const AgentActivityEntrySchema = z.object({
@@ -460,16 +458,7 @@ export const AgentActivityEntrySchema = z.object({
     })
     .optional(),
   completedToday: z.number(),
-  heartbeatHistory: z
-    .array(
-      z.object({
-        timestamp: z.string(),
-        status: z.string(),
-        progress: z.number().optional(),
-        progressSummary: z.string().optional(),
-      })
-    )
-    .optional(),
+  heartbeatSource: z.enum(["project_item", "registry"]).optional(),
 });
 
 // ============================================================================
@@ -525,6 +514,10 @@ export const AGENT_FIELDS = {
   STATUS: "agent_status",
   WORK_BRANCH: "agent_work_branch",
   PR_NUMBER: "agent_pr_number",
+  /** ISO timestamp (TEXT, not DATE: a DATE field is day-granular) of the last heartbeat on the claimed item. */
+  HEARTBEAT_AT: "agent_heartbeat_at",
+  /** 0-100 progress of the claimed item, as last reported by its agent. */
+  PROGRESS: "agent_progress",
 } as const;
 
 /** Valid values for the agent_status project field. */

@@ -47,6 +47,8 @@ const ALL_FIELDS_RESPONSE: InspectedFieldsResponse = {
         { id: "f-c", name: "agent_status", dataType: "SINGLE_SELECT" },
         { id: "f-d", name: "agent_work_branch", dataType: "TEXT" },
         { id: "f-e", name: "agent_pr_number", dataType: "NUMBER" },
+        { id: "f-f", name: "agent_heartbeat_at", dataType: "TEXT" },
+        { id: "f-g", name: "agent_progress", dataType: "NUMBER" },
       ],
     },
   },
@@ -86,6 +88,8 @@ describe("ProjectFieldSetup", () => {
       "agent_status",
       "agent_work_branch",
       "agent_pr_number",
+      "agent_heartbeat_at",
+      "agent_progress",
     ]);
     expect(result.created).toEqual([]);
     expect(result.optionsAdded).toEqual([]);
@@ -103,7 +107,9 @@ describe("ProjectFieldSetup", () => {
     expect(result.created).toContain("agent_claimed_at");
     expect(result.created).toContain("agent_work_branch");
     expect(result.created).toContain("agent_pr_number");
-    expect(createField).toHaveBeenCalledTimes(4);
+    expect(result.created).toContain("agent_heartbeat_at");
+    expect(result.created).toContain("agent_progress");
+    expect(createField).toHaveBeenCalledTimes(6);
   });
 
   it("creates agent_status with the full option set", async () => {
@@ -154,6 +160,8 @@ describe("ProjectFieldSetup", () => {
               },
               { id: "f-d", name: "agent_work_branch", dataType: "TEXT" },
               { id: "f-e", name: "agent_pr_number", dataType: "NUMBER" },
+              { id: "f-f", name: "agent_heartbeat_at", dataType: "TEXT" },
+              { id: "f-g", name: "agent_progress", dataType: "NUMBER" },
             ],
           },
         },
@@ -193,5 +201,27 @@ describe("ProjectFieldSetup", () => {
     });
 
     await expect(setup.ensureFields("project-1")).rejects.toThrow(/incompatible data type/i);
+  });
+
+  it("provisions only the hot heartbeat fields on a project that predates them", async () => {
+    graphqlMock.mockResolvedValue({
+      node: {
+        fields: {
+          nodes: (ALL_FIELDS_RESPONSE.node?.fields.nodes ?? []).filter(
+            (field) => field.name !== "agent_heartbeat_at" && field.name !== "agent_progress"
+          ),
+        },
+      },
+    });
+
+    const result = await setup.ensureFields("project-1");
+
+    expect(result.created).toEqual(["agent_heartbeat_at", "agent_progress"]);
+    expect(createField).toHaveBeenCalledTimes(2);
+    expect(createField.mock.calls[0][1]).toMatchObject({
+      name: "agent_heartbeat_at",
+      type: "text",
+    });
+    expect(createField.mock.calls[1][1]).toMatchObject({ name: "agent_progress", type: "number" });
   });
 });

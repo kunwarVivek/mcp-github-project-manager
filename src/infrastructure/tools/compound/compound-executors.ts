@@ -18,9 +18,15 @@ import { createGitHubFactory } from "../tool-factory";
 
 const logger = Logger.getInstance();
 
-import { AGENT_FIELDS, type BudgetStatus } from "../../../domain/agent-orchestration-types";
+import {
+  AGENT_FIELDS,
+  type BudgetStatus,
+  DEFAULT_HEARTBEAT_TIMEOUT_MINUTES,
+} from "../../../domain/agent-orchestration-types";
+import { type TaskComplexity, type TaskPriority, TaskStatus } from "../../../domain/ai-task-types";
 import { AgentBudgetService } from "../../../services/agent/AgentBudgetService";
 import { AgentContextService } from "../../../services/agent/AgentContextService";
+import { AgentHeartbeatResolver } from "../../../services/agent/AgentHeartbeatResolver";
 import { TaskCheckoutService } from "../../../services/agent/TaskCheckoutService";
 // Services for server-bound handler replication (enrich/triage/events)
 import { AIServiceFactory } from "../../../services/ai/AIServiceFactory";
@@ -28,7 +34,8 @@ import { IssueEnrichmentService } from "../../../services/IssueEnrichmentService
 import { IssueTriagingService } from "../../../services/IssueTriagingService";
 import { RoadmapPlanningService } from "../../../services/RoadmapPlanningService";
 // PM coordination services
-import { AgentStore } from "../../agent/AgentStore";
+import { AgentNotFoundError, AgentStore } from "../../agent/AgentStore";
+import { ItemHeartbeatStore } from "../../agent/ItemHeartbeatStore";
 import { WorkProductStore } from "../../agent/WorkProductStore";
 import { EventStore } from "../../events/EventStore";
 import { EventSubscriptionManager } from "../../events/EventSubscriptionManager";
@@ -245,11 +252,7 @@ function getRoadmapPlanningService(): RoadmapPlanningService {
 let _triagingService: IssueTriagingService | null = null;
 function getTriagingService(): IssueTriagingService {
   if (!_triagingService) {
-    _triagingService = new IssueTriagingService(
-      AIServiceFactory.getInstance(),
-      getPMS(),
-      getEnrichmentService()
-    );
+    _triagingService = new IssueTriagingService(AIServiceFactory.getInstance(), getPMS());
   }
   return _triagingService;
 }
@@ -330,10 +333,17 @@ async function releaseConvergedTaskOwner(store: AgentStore, taskId: string): Pro
   const owner = agents.find((agent) => agent.currentTaskId === taskId);
   if (!owner) return;
 
-  owner.currentTaskId = undefined;
-  owner.currentTaskTitle = undefined;
-  owner.status = "idle";
-  await store.upsertAgent(owner);
+  try {
+    await store.updateAgent(owner.id, (fresh) =>
+      // The owner may have moved on since the listing; only release the task it still holds.
+      fresh.currentTaskId === taskId
+        ? { ...fresh, currentTaskId: undefined, currentTaskTitle: undefined, status: "idle" }
+        : fresh
+    );
+  } catch (error) {
+    // An owner deregistered meanwhile no longer holds anything to release.
+    if (!(error instanceof AgentNotFoundError)) throw error;
+  }
 }
 
 async function clearConvergedProjectState(
@@ -363,7 +373,12 @@ async function clearConvergedProjectState(
   });
   const fields = new Map((fieldsResp.node?.fields.nodes ?? []).map((field) => [field.name, field]));
 
-  for (const fieldName of [AGENT_FIELDS.CLAIMED_BY, AGENT_FIELDS.CLAIMED_AT]) {
+  for (const fieldName of [
+    AGENT_FIELDS.CLAIMED_BY,
+    AGENT_FIELDS.CLAIMED_AT,
+    AGENT_FIELDS.HEARTBEAT_AT,
+    AGENT_FIELDS.PROGRESS,
+  ]) {
     const field = fields.get(fieldName);
     if (!field) continue;
     await factory.graphql(CLEAR_CONVERGENCE_FIELD, {
@@ -958,7 +973,7 @@ async function executeMaterializeTasks(args: {
   addToProject?: boolean;
   prdContent?: string;
 }): Promise<unknown> {
-  const { tasks, projectId, labelPrefix = "ai-generated", addToProject = true, prdContent } = args;
+  const { tasks, projectId, labelPrefix = "ai-generated", prdContent } = args;
 
   if (!tasks || tasks.length === 0) {
     return { created: 0, milestones: [], sprints: [], issues: [], message: "No tasks provided" };
@@ -986,10 +1001,10 @@ async function executeMaterializeTasks(args: {
       id: taskId,
       title: task.title,
       description: task.description,
-      complexity: (task.complexity || 5) as any,
+      complexity: (task.complexity || 5) as TaskComplexity,
       estimatedHours: task.estimatedHours || 8,
-      priority: (task.priority || "medium") as any,
-      status: "pending" as any,
+      priority: (task.priority || "medium") as TaskPriority,
+      status: TaskStatus.PENDING,
       dependencies: (task.dependencies || []).map((d) => ({
         id: d.id,
         type: (d.type || "blocks") as "blocks" | "depends_on" | "related_to",
@@ -1684,11 +1699,17 @@ export async function executeAgentManage(args: AgentManageArgs): Promise<unknown
       const budgetService = new AgentBudgetService(store);
       const agents = await store.listAgents();
       const now = Date.now();
-      const staleThreshold = (args.staleAfterMinutes || 30) * 60 * 1000;
+      const staleThreshold =
+        (args.staleAfterMinutes || DEFAULT_HEARTBEAT_TIMEOUT_MINUTES) * 60 * 1000;
+      // Working agents beat onto their claimed item, idle ones into the registry.
+      const heartbeats = await new AgentHeartbeatResolver(new ItemHeartbeatStore(factory)).resolve(
+        agents
+      );
 
       const agentStatuses = await Promise.all(
         agents.map(async (agent) => {
-          const lastHb = agent.lastHeartbeat ? new Date(agent.lastHeartbeat).getTime() : 0;
+          const latestHeartbeat = heartbeats.get(agent.id)?.lastHeartbeat;
+          const lastHb = latestHeartbeat ? new Date(latestHeartbeat).getTime() : 0;
           const isStale = agent.status === "working" && now - lastHb > staleThreshold;
           const isBlocked = agent.status === "blocked";
           let budget: BudgetStatus | undefined;
@@ -1706,7 +1727,7 @@ export async function executeAgentManage(args: AgentManageArgs): Promise<unknown
             currentTask: agent.currentTaskId
               ? { id: agent.currentTaskId, title: agent.currentTaskTitle }
               : null,
-            lastHeartbeat: agent.lastHeartbeat,
+            lastHeartbeat: latestHeartbeat,
             heartbeatAge: lastHb ? `${Math.round((now - lastHb) / 60000)}m ago` : "never",
             isStale,
             isBlocked,
@@ -1773,8 +1794,6 @@ export async function executeAgentManage(args: AgentManageArgs): Promise<unknown
       // Capability-matched, budget-aware task assignment
       // PM specifies a projectId; the system finds the best agent for each unassigned issue
       const factory = createGitHubFactory();
-      const config = factory.getConfig();
-      const octokit = factory.getOctokit();
       const store = new AgentStore(factory);
       const budgetService = new AgentBudgetService(store);
       const contextService = new AgentContextService(factory);
@@ -2027,7 +2046,7 @@ export async function executeAgentManage(args: AgentManageArgs): Promise<unknown
       return {
         parentIssue: issueNumber,
         subtasks: created,
-        summary: `Decomposed #${issueNumber} into ${created.length} subtask(s): ${created.map((s) => "#" + s.number).join(", ")}`,
+        summary: `Decomposed #${issueNumber} into ${created.length} subtask(s): ${created.map((s) => `#${s.number}`).join(", ")}`,
       };
     }
 
@@ -2152,7 +2171,7 @@ export async function executeAgentManage(args: AgentManageArgs): Promise<unknown
                   owner: config.owner,
                   repo: config.repo,
                   issue_number: issue.number,
-                  body: `## Auto-Rejected by Convergence Loop\n\nFindings:\n${findings.map((f) => "- " + f).join("\n")}\n\n**Rejected at:** ${new Date().toISOString()}`,
+                  body: `## Auto-Rejected by Convergence Loop\n\nFindings:\n${findings.map((f) => `- ${f}`).join("\n")}\n\n**Rejected at:** ${new Date().toISOString()}`,
                 })
                 .catch((err) => {
                   logger.warn(
@@ -2172,7 +2191,7 @@ export async function executeAgentManage(args: AgentManageArgs): Promise<unknown
                 owner: config.owner,
                 repo: config.repo,
                 title: subtaskTitle,
-                body: `**Parent task:** #${issue.number} — ${issue.title}\n\nFix the failing tests identified in the convergence review.\n\n### Findings\n${findings.map((f) => "- " + f).join("\n")}`,
+                body: `**Parent task:** #${issue.number} — ${issue.title}\n\nFix the failing tests identified in the convergence review.\n\n### Findings\n${findings.map((f) => `- ${f}`).join("\n")}`,
                 labels: issue.labels.nodes.map((l) => l.name),
               });
               report.decomposed.push({ parent: issue.number, subtasks: [sub.number] });

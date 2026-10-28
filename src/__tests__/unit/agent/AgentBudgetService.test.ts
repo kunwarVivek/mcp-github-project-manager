@@ -1,7 +1,9 @@
-import { beforeEach, describe, expect, it, type Mock, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Agent } from "../../../domain/agent-orchestration-types";
 import type { AgentStore } from "../../../infrastructure/agent/AgentStore";
 import { AgentBudgetService } from "../../../services/agent/AgentBudgetService";
+import { UnpaidDebitLedger } from "../../../services/agent/UnpaidDebitLedger";
+import { InMemoryAgentStore } from "../../helpers/InMemoryAgentStore";
 
 function makeAgent(id: string, overrides: Partial<Agent> = {}): Agent {
   return {
@@ -18,16 +20,12 @@ function makeAgent(id: string, overrides: Partial<Agent> = {}): Agent {
 
 describe("AgentBudgetService", () => {
   let service: AgentBudgetService;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let mockStore: { getAgent: Mock<any>; upsertAgent: Mock<any> };
+  let mockStore: InMemoryAgentStore;
 
   beforeEach(() => {
     vi.clearAllMocks();
-    mockStore = {
-      getAgent: vi.fn(),
-      upsertAgent: vi.fn(async () => {}),
-    };
-    service = new AgentBudgetService(mockStore as unknown as AgentStore);
+    mockStore = new InMemoryAgentStore();
+    service = new AgentBudgetService(mockStore as unknown as AgentStore, new UnpaidDebitLedger());
   });
 
   describe("getBudgetStatus", () => {
@@ -107,8 +105,8 @@ describe("AgentBudgetService", () => {
       expect(status.usedTokens).toBe(0);
       expect(status.meteredTokens).toBe(0);
       expect(status.reportedTokens).toBe(0);
-      // upsertAgent should have been called (reset persisted)
-      expect(mockStore.upsertAgent).toHaveBeenCalledWith(
+      // the reset was persisted
+      expect(mockStore.writes).toContainEqual(
         expect.objectContaining({
           budget: expect.objectContaining({
             meteredTokens: 0,
@@ -158,13 +156,13 @@ describe("AgentBudgetService", () => {
 
   describe("setBudget", () => {
     it("sets total tokens and returns updated status", async () => {
-      mockStore.getAgent.mockResolvedValue(makeAgent("agent-1"));
+      mockStore.agents.set("agent-1", makeAgent("agent-1"));
 
       const status = await service.setBudget("agent-1", 100_000, 0.9, "daily");
 
       expect(status.totalTokens).toBe(100_000);
       expect(status.resetPeriod).toBe("daily");
-      expect(mockStore.upsertAgent).toHaveBeenCalledWith(
+      expect(mockStore.writes).toContainEqual(
         expect.objectContaining({
           budget: expect.objectContaining({ totalTokens: 100_000, resetPeriod: "daily" }),
         })
@@ -172,7 +170,8 @@ describe("AgentBudgetService", () => {
     });
 
     it("updates hardStop", async () => {
-      mockStore.getAgent.mockResolvedValue(
+      mockStore.agents.set(
+        "agent-1",
         makeAgent("agent-1", {
           budget: {
             totalTokens: 1000,
@@ -187,7 +186,7 @@ describe("AgentBudgetService", () => {
 
       await service.setBudget("agent-1", 1000, undefined, undefined, false);
 
-      expect(mockStore.upsertAgent).toHaveBeenCalledWith(
+      expect(mockStore.writes).toContainEqual(
         expect.objectContaining({
           budget: expect.objectContaining({ hardStop: false }),
         })
@@ -267,20 +266,21 @@ describe("AgentBudgetService", () => {
 
   describe("metered vs reported isolation", () => {
     it("metered and reported usage tracked independently", async () => {
-      const agent = makeAgent("agent-1", {
-        budget: {
-          totalTokens: 10000,
-          meteredTokens: 0,
-          reportedTokens: 0,
-          usedTokens: 0,
-          warningFraction: 0.8,
-          hardStop: true,
-        },
-      });
-      mockStore.getAgent.mockResolvedValue(agent);
+      mockStore.agents.set(
+        "agent-1",
+        makeAgent("agent-1", {
+          budget: {
+            totalTokens: 10000,
+            meteredTokens: 0,
+            reportedTokens: 0,
+            usedTokens: 0,
+            warningFraction: 0.8,
+            hardStop: true,
+          },
+        })
+      );
 
       await service.recordMeteredUsage("agent-1", 300);
-      // Agent state was mutated in-place by the service
       await service.recordReportedUsage("agent-1", 100);
 
       const status = await service.getBudgetStatus("agent-1");
@@ -291,31 +291,34 @@ describe("AgentBudgetService", () => {
 
     it("record_usage cannot double-count with metered spend", async () => {
       // Start with some metered spend
-      const agent = makeAgent("agent-1", {
-        budget: {
-          totalTokens: 10000,
-          meteredTokens: 500,
-          reportedTokens: 0,
-          usedTokens: 500,
-          warningFraction: 0.8,
-          hardStop: true,
-        },
-      });
-      mockStore.getAgent.mockResolvedValue(agent);
+      mockStore.agents.set(
+        "agent-1",
+        makeAgent("agent-1", {
+          budget: {
+            totalTokens: 10000,
+            meteredTokens: 500,
+            reportedTokens: 0,
+            usedTokens: 500,
+            warningFraction: 0.8,
+            hardStop: true,
+          },
+        })
+      );
+      const stored = () => mockStore.agents.get("agent-1")?.budget;
 
       // recordReportedUsage (what record_usage tool calls) only touches reportedTokens
       await service.recordReportedUsage("agent-1", 200);
 
-      expect(agent.budget!.reportedTokens).toBe(200);
-      expect(agent.budget!.meteredTokens).toBe(500); // unchanged
-      expect(agent.budget!.usedTokens).toBe(700); // sum
+      expect(stored()?.reportedTokens).toBe(200);
+      expect(stored()?.meteredTokens).toBe(500); // unchanged
+      expect(stored()?.usedTokens).toBe(700); // sum
 
       // recordMeteredUsage only touches meteredTokens
       await service.recordMeteredUsage("agent-1", 100);
 
-      expect(agent.budget!.meteredTokens).toBe(600);
-      expect(agent.budget!.reportedTokens).toBe(200); // unchanged
-      expect(agent.budget!.usedTokens).toBe(800); // sum
+      expect(stored()?.meteredTokens).toBe(600);
+      expect(stored()?.reportedTokens).toBe(200); // unchanged
+      expect(stored()?.usedTokens).toBe(800); // sum
     });
   });
 
@@ -358,7 +361,7 @@ describe("AgentBudgetService", () => {
       const reset = await service.resetBudgetIfDue("agent-1");
 
       expect(reset).toBe(true);
-      expect(mockStore.upsertAgent).toHaveBeenCalledWith(
+      expect(mockStore.writes).toContainEqual(
         expect.objectContaining({
           budget: expect.objectContaining({
             meteredTokens: 0,
@@ -395,17 +398,11 @@ describe("AgentBudgetService", () => {
 describe("resolveBudgetOwner (hierarchy walk)", () => {
   let service: AgentBudgetService;
   let agents: Map<string, Agent>;
-  let store: { getAgent: Mock<any>; upsertAgent: Mock<any> };
 
   beforeEach(() => {
-    agents = new Map();
-    store = {
-      getAgent: vi.fn(async (id) => agents.get(id as string)),
-      upsertAgent: vi.fn(async (a) => {
-        agents.set((a as Agent).id, a as Agent);
-      }),
-    };
-    service = new AgentBudgetService(store as unknown as AgentStore);
+    const store = new InMemoryAgentStore();
+    agents = store.agents;
+    service = new AgentBudgetService(store as unknown as AgentStore, new UnpaidDebitLedger());
   });
 
   // Regression: this walked a single hop, so a grandchild debited its parent
@@ -430,9 +427,10 @@ describe("resolveBudgetOwner (hierarchy walk)", () => {
     const status = await service.recordMeteredUsage("grandchild", 250);
 
     expect(status.agentId).toBe("root");
-    expect(agents.get("root")!.budget!.meteredTokens).toBe(250);
-    expect(agents.get("root")!.budget!.usedTokens).toBe(250);
-    expect(agents.get("child")!.budget).toBeUndefined();
+    const rootBudget = agents.get("root")?.budget;
+    expect(rootBudget?.meteredTokens).toBe(250);
+    expect(rootBudget?.usedTokens).toBe(250);
+    expect(agents.get("child")?.budget).toBeUndefined();
   });
 
   it("reports the root budget for a deeply nested agent", async () => {
@@ -472,5 +470,119 @@ describe("resolveBudgetOwner (hierarchy walk)", () => {
     const status = await service.getBudgetStatus("orphan");
 
     expect(status.agentId).toBe("orphan");
+  });
+});
+
+describe("metered debit failure handling", () => {
+  let store: InMemoryAgentStore;
+  let ledger: UnpaidDebitLedger;
+  let service: AgentBudgetService;
+
+  const budgeted = (id: string, extra: Partial<Agent> = {}): Agent =>
+    makeAgent(id, {
+      budget: {
+        totalTokens: 1000,
+        meteredTokens: 0,
+        reportedTokens: 0,
+        usedTokens: 0,
+        warningFraction: 0.8,
+        hardStop: true,
+      },
+      ...extra,
+    });
+
+  beforeEach(() => {
+    store = new InMemoryAgentStore([budgeted("root"), budgeted("solo")]);
+    store.agents.set("kid", makeAgent("kid", { parentAgentId: "root" }));
+    ledger = new UnpaidDebitLedger();
+    service = new AgentBudgetService(store as unknown as AgentStore, ledger);
+  });
+
+  it("retries a failed debit once and records it when the retry succeeds", async () => {
+    store.updateAgent.mockRejectedValueOnce(new Error("registry hiccup"));
+
+    const outcome = await service.debitMeteredWithRetry("solo", 120);
+
+    expect(outcome.ok).toBe(true);
+    expect(store.updateAgent).toHaveBeenCalledTimes(2);
+    expect(ledger.size).toBe(0);
+    expect(store.agents.get("solo")?.budget?.usedTokens).toBe(120);
+  });
+
+  it("parks a debit that fails twice in the ledger and reports it, without throwing", async () => {
+    store.updateAgent
+      .mockRejectedValueOnce(new Error("down"))
+      .mockRejectedValueOnce(new Error("down"));
+
+    const outcome = await service.debitMeteredWithRetry("solo", 120);
+
+    expect(outcome).toEqual({
+      ok: false,
+      failure: { agentId: "solo", tokens: 120, error: expect.stringContaining("down") },
+    });
+    expect(store.updateAgent).toHaveBeenCalledTimes(2);
+    expect(ledger.pending()).toHaveLength(1);
+    expect(ledger.pending()[0]).toMatchObject({
+      agentId: "solo",
+      budgetOwnerId: "solo",
+      tokens: 120,
+    });
+    expect(store.agents.get("solo")?.budget?.usedTokens).toBe(0);
+  });
+
+  it("settles a parked debit once the registry is writable again, and the counters include it", async () => {
+    store.updateAgent
+      .mockRejectedValueOnce(new Error("down"))
+      .mockRejectedValueOnce(new Error("down"));
+    await service.debitMeteredWithRetry("solo", 120);
+
+    const settlement = await service.settleUnpaidDebits("solo");
+
+    expect(settlement).toEqual({ settledTokens: 120, outstanding: [] });
+    expect(ledger.size).toBe(0);
+    const status = await service.getBudgetStatus("solo");
+    expect(status.meteredTokens).toBe(120);
+    expect(status.usedTokens).toBe(120);
+  });
+
+  it("leaves the debit outstanding while settlement keeps failing", async () => {
+    store.updateAgent
+      .mockRejectedValueOnce(new Error("down"))
+      .mockRejectedValueOnce(new Error("down"))
+      .mockRejectedValueOnce(new Error("still down"));
+    await service.debitMeteredWithRetry("solo", 120);
+
+    const settlement = await service.settleUnpaidDebits("solo");
+
+    expect(settlement.settledTokens).toBe(0);
+    expect(settlement.outstanding).toHaveLength(1);
+    expect(settlement.outstanding[0]?.error).toContain("still down");
+    expect(ledger.pending()[0]?.attempts).toBe(2);
+  });
+
+  it("settles a subagent's debit when its budget owner checks out, and not for an unrelated agent", async () => {
+    store.updateAgent
+      .mockRejectedValueOnce(new Error("down"))
+      .mockRejectedValueOnce(new Error("down"));
+    await service.debitMeteredWithRetry("kid", 80);
+    expect(ledger.pending()[0]?.budgetOwnerId).toBe("root");
+
+    expect(await service.settleUnpaidDebits("solo")).toEqual({ settledTokens: 0, outstanding: [] });
+    expect(ledger.size).toBe(1);
+
+    expect(await service.settleUnpaidDebits("root")).toEqual({
+      settledTokens: 80,
+      outstanding: [],
+    });
+    expect(store.agents.get("root")?.budget?.usedTokens).toBe(80);
+  });
+
+  it("drops a debit whose agent was deregistered: nobody can be owed it", async () => {
+    ledger.record({ agentId: "ghost", tokens: 50, error: "down" });
+
+    const settlement = await service.settleUnpaidDebits("solo");
+
+    expect(settlement).toEqual({ settledTokens: 0, outstanding: [] });
+    expect(ledger.size).toBe(0);
   });
 });
