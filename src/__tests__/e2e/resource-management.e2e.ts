@@ -14,16 +14,13 @@ describe.skip("Resource Management E2E Tests", () => {
   let service: ProjectManagementService;
 
   beforeAll(() => {
-    if (!hasGitHubCredentials) {
+    const { GITHUB_TOKEN: token, GITHUB_OWNER: owner, GITHUB_REPO: repo } = process.env;
+    if (!hasGitHubCredentials || !token || !owner || !repo) {
       console.log(
         "Skipping Resource Management E2E tests - requires real GitHub API credentials (GITHUB_TOKEN, GITHUB_OWNER, GITHUB_REPO)"
       );
       return;
     }
-
-    const token = process.env.GITHUB_TOKEN!;
-    const owner = process.env.GITHUB_OWNER!;
-    const repo = process.env.GITHUB_REPO!;
 
     service = createProjectManagementService(owner, repo, token);
   });

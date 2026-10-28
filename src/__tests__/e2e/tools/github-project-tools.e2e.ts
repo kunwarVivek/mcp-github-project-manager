@@ -1,5 +1,6 @@
 import { vi } from "vitest";
 import { MCPTestHelpers, MCPToolTestUtils } from "../utils/MCPToolTestUtils";
+import { asArray, asRecord } from "../utils/payload";
 
 /**
  * Comprehensive E2E tests for GitHub Project Management Tools
@@ -23,6 +24,20 @@ const hasRealCredentials = (): boolean => {
 
   return true;
 };
+
+function asString(value: unknown, what: string): string {
+  if (typeof value !== "string") {
+    throw new Error(`Expected ${what} to be a string, got ${JSON.stringify(value)}`);
+  }
+  return value;
+}
+
+function asNumber(value: unknown, what: string): number {
+  if (typeof value !== "number") {
+    throw new Error(`Expected ${what} to be a number, got ${JSON.stringify(value)}`);
+  }
+  return value;
+}
 
 /**
  * The live API is slow: a single tool call that creates a project, a field or
@@ -71,7 +86,7 @@ describe("GitHub Project Management Tools E2E", () => {
       for (const toolName of compoundTools) {
         const tool = tools.find((t) => t.name === toolName);
         expect(tool).toBeDefined();
-        expect(tool.inputSchema).toBeDefined();
+        expect(tool?.inputSchema).toBeDefined();
       }
     });
 
@@ -82,16 +97,19 @@ describe("GitHub Project Management Tools E2E", () => {
       }
       const projectData = MCPTestHelpers.createTestData.project();
 
-      const response = await utils.callTool("manage_project", {
-        action: "create",
-        ...projectData,
-      });
+      const response = asRecord(
+        await utils.callTool("manage_project", {
+          action: "create",
+          ...projectData,
+        }),
+        "created project"
+      );
 
       MCPTestHelpers.validateToolResponse(response, ["id", "title", "url"]);
       expect(response.title).toBe(projectData.title);
       expect(response.visibility).toBe(projectData.visibility);
 
-      createdProjectId = response.id;
+      createdProjectId = asString(response.id, "project id");
     });
 
     it("should validate manage_project create arguments", async () => {
@@ -107,7 +125,10 @@ describe("GitHub Project Management Tools E2E", () => {
         visibility: "invalid",
       });
       // Either a JSON-RPC error or a tool-level isError
-      expect(raw.isError || raw.content?.[0]?.text?.includes("error")).toBeTruthy();
+      const firstBlock = raw.content?.[0];
+      expect(
+        raw.isError || (firstBlock?.type === "text" && firstBlock.text.includes("error"))
+      ).toBeTruthy();
     });
 
     it("should list projects", async () => {
@@ -115,11 +136,14 @@ describe("GitHub Project Management Tools E2E", () => {
         console.log("Skipping: utils not initialized (missing credentials)");
         return;
       }
-      const response = await utils.callTool("manage_project", { action: "list" });
+      const response = asArray(
+        await utils.callTool("manage_project", { action: "list" }),
+        "projects"
+      );
 
       expect(Array.isArray(response)).toBe(true);
       if (createdProjectId) {
-        const project = response.find((p: Record<string, unknown>) => p.id === createdProjectId);
+        const project = response.find((p) => asRecord(p, "project").id === createdProjectId);
         expect(project).toBeDefined();
       }
     });
@@ -134,10 +158,13 @@ describe("GitHub Project Management Tools E2E", () => {
         return;
       }
 
-      const response = await utils.callTool("manage_project", {
-        action: "get",
-        projectId: createdProjectId,
-      });
+      const response = asRecord(
+        await utils.callTool("manage_project", {
+          action: "get",
+          projectId: createdProjectId,
+        }),
+        "project"
+      );
 
       MCPTestHelpers.validateToolResponse(response, ["id", "title"]);
       expect(response.id).toBe(createdProjectId);
@@ -153,12 +180,15 @@ describe("GitHub Project Management Tools E2E", () => {
         return;
       }
 
-      const response = await utils.callTool("manage_project", {
-        action: "update",
-        projectId: createdProjectId,
-        title: "Updated Test Project",
-        shortDescription: "Updated description",
-      });
+      const response = asRecord(
+        await utils.callTool("manage_project", {
+          action: "update",
+          projectId: createdProjectId,
+          title: "Updated Test Project",
+          shortDescription: "Updated description",
+        }),
+        "updated project"
+      );
 
       MCPTestHelpers.validateToolResponse(response, ["id", "title"]);
       expect(response.title).toBe("Updated Test Project");
@@ -175,7 +205,7 @@ describe("GitHub Project Management Tools E2E", () => {
 
       const tool = tools.find((t) => t.name === "manage_milestones");
       expect(tool).toBeDefined();
-      expect(tool.inputSchema).toBeDefined();
+      expect(tool?.inputSchema).toBeDefined();
     });
 
     it("should create a milestone", async () => {
@@ -185,17 +215,20 @@ describe("GitHub Project Management Tools E2E", () => {
       }
       // Use a highly unique title to avoid already_exists from prior runs
       const uniqueTitle = `E2E-MS-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-      const response = await utils.callTool("manage_milestones", {
-        action: "create",
-        title: uniqueTitle,
-        description: "E2E test milestone",
-        dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-      });
+      const response = asRecord(
+        await utils.callTool("manage_milestones", {
+          action: "create",
+          title: uniqueTitle,
+          description: "E2E test milestone",
+          dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+        }),
+        "created milestone"
+      );
 
       MCPTestHelpers.validateToolResponse(response, ["id", "title"]);
       expect(response.title).toBe(uniqueTitle);
-      createdMilestoneId = response.id;
-      createdMilestoneNumber = response.number;
+      createdMilestoneId = asString(response.id, "milestone id");
+      createdMilestoneNumber = asNumber(response.number, "milestone number");
     });
 
     it("should list milestones", async () => {
@@ -203,13 +236,14 @@ describe("GitHub Project Management Tools E2E", () => {
         console.log("Skipping: utils not initialized (missing credentials)");
         return;
       }
-      const response = await utils.callTool("manage_milestones", { action: "list" });
+      const response = asArray(
+        await utils.callTool("manage_milestones", { action: "list" }),
+        "milestones"
+      );
 
       expect(Array.isArray(response)).toBe(true);
       if (createdMilestoneId) {
-        const milestone = response.find(
-          (m: Record<string, unknown>) => m.id === createdMilestoneId
-        );
+        const milestone = response.find((m) => asRecord(m, "milestone").id === createdMilestoneId);
         expect(milestone).toBeDefined();
       }
     });
@@ -225,12 +259,15 @@ describe("GitHub Project Management Tools E2E", () => {
       }
       const updatedTitle = `Updated-MS-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
       // Pass node ID directly — repository resolves to number for REST API
-      const response = await utils.callTool("manage_milestones", {
-        action: "update",
-        milestoneId: createdMilestoneId,
-        title: updatedTitle,
-        description: "Updated milestone description",
-      });
+      const response = asRecord(
+        await utils.callTool("manage_milestones", {
+          action: "update",
+          milestoneId: createdMilestoneId,
+          title: updatedTitle,
+          description: "Updated milestone description",
+        }),
+        "updated milestone"
+      );
 
       MCPTestHelpers.validateToolResponse(response, ["id", "title"]);
       expect(response.title).toBe(updatedTitle);
@@ -247,7 +284,7 @@ describe("GitHub Project Management Tools E2E", () => {
 
       const tool = tools.find((t) => t.name === "manage_issues");
       expect(tool).toBeDefined();
-      expect(tool.inputSchema).toBeDefined();
+      expect(tool?.inputSchema).toBeDefined();
     });
 
     it("should create an issue", async () => {
@@ -257,16 +294,19 @@ describe("GitHub Project Management Tools E2E", () => {
       }
       const issueData = MCPTestHelpers.createTestData.issue();
 
-      const response = await utils.callTool("manage_issues", {
-        action: "create",
-        ...issueData,
-      });
+      const response = asRecord(
+        await utils.callTool("manage_issues", {
+          action: "create",
+          ...issueData,
+        }),
+        "created issue"
+      );
 
       MCPTestHelpers.validateToolResponse(response, ["id", "title", "number"]);
       expect(response.title).toBe(issueData.title);
 
-      createdIssueId = response.id;
-      createdIssueNumber = response.number;
+      createdIssueId = asString(response.id, "issue id");
+      createdIssueNumber = asNumber(response.number, "issue number");
     });
 
     it("should list issues", async () => {
@@ -274,15 +314,13 @@ describe("GitHub Project Management Tools E2E", () => {
         console.log("Skipping: utils not initialized (missing credentials)");
         return;
       }
-      const response = await utils.callTool("manage_issues", { action: "list" });
+      const response = asArray(await utils.callTool("manage_issues", { action: "list" }), "issues");
 
       expect(Array.isArray(response)).toBe(true);
       expect(response.length).toBeGreaterThan(0);
       // With orderBy DESC, the just-created issue should be in the first page
       if (createdIssueNumber) {
-        const found = response.some(
-          (i: Record<string, unknown>) => i.number === createdIssueNumber
-        );
+        const found = response.some((i) => asRecord(i, "issue").number === createdIssueNumber);
         expect(found).toBe(true);
       }
     });
@@ -315,12 +353,15 @@ describe("GitHub Project Management Tools E2E", () => {
         return;
       }
       // update uses GraphQL mutation which needs the node ID, not the number
-      const response = await utils.callTool("manage_issues", {
-        action: "update",
-        issueId: createdIssueId,
-        title: "Updated Test Issue",
-        description: "Updated issue description",
-      });
+      const response = asRecord(
+        await utils.callTool("manage_issues", {
+          action: "update",
+          issueId: createdIssueId,
+          title: "Updated Test Issue",
+          description: "Updated issue description",
+        }),
+        "updated issue"
+      );
 
       MCPTestHelpers.validateToolResponse(response, ["id", "title"]);
       expect(response.title).toBe("Updated Test Issue");
@@ -337,7 +378,7 @@ describe("GitHub Project Management Tools E2E", () => {
 
       const tool = tools.find((t) => t.name === "manage_sprints");
       expect(tool).toBeDefined();
-      expect(tool.inputSchema).toBeDefined();
+      expect(tool?.inputSchema).toBeDefined();
     });
 
     it("should create a sprint", async () => {
@@ -347,16 +388,19 @@ describe("GitHub Project Management Tools E2E", () => {
       }
       const sprintData = MCPTestHelpers.createTestData.sprint();
 
-      const response = await utils.callTool("manage_sprints", {
-        action: "create",
-        ...sprintData,
-        projectId: createdProjectId,
-      });
+      const response = asRecord(
+        await utils.callTool("manage_sprints", {
+          action: "create",
+          ...sprintData,
+          projectId: createdProjectId,
+        }),
+        "created sprint"
+      );
 
       MCPTestHelpers.validateToolResponse(response, ["id", "title"]);
       expect(response.title).toBe(sprintData.title);
 
-      createdSprintId = response.id;
+      createdSprintId = asString(response.id, "sprint id");
     });
 
     it("should list sprints", async () => {
@@ -406,7 +450,7 @@ describe("GitHub Project Management Tools E2E", () => {
       for (const toolName of roadmapCompoundTools) {
         const tool = tools.find((t) => t.name === toolName);
         expect(tool).toBeDefined();
-        expect(tool.inputSchema).toBeDefined();
+        expect(tool?.inputSchema).toBeDefined();
       }
     });
 
@@ -415,16 +459,19 @@ describe("GitHub Project Management Tools E2E", () => {
         console.log("Skipping: utils not initialized (missing credentials)");
         return;
       }
-      const response = await utils.callTool("ai_plan", {
-        action: "generate_roadmap",
-        requirements: "Create initial project structure and setup development environment",
-        constraints: {
-          timeline: "3 months",
-          teamSize: 2,
-          sprintDurationWeeks: 2,
-        },
-        businessContext: `E2E test roadmap project ${Date.now()}`,
-      });
+      const response = asRecord(
+        await utils.callTool("ai_plan", {
+          action: "generate_roadmap",
+          requirements: "Create initial project structure and setup development environment",
+          constraints: {
+            timeline: "3 months",
+            teamSize: 2,
+            sprintDurationWeeks: 2,
+          },
+          businessContext: `E2E test roadmap project ${Date.now()}`,
+        }),
+        "roadmap"
+      );
 
       expect(response).toBeDefined();
       // AI-generated roadmap returns structured phases and milestones
@@ -480,7 +527,7 @@ describe("GitHub Project Management Tools E2E", () => {
 
       const tool = tools.find((t) => t.name === "manage_labels");
       expect(tool).toBeDefined();
-      expect(tool.inputSchema).toBeDefined();
+      expect(tool?.inputSchema).toBeDefined();
     });
 
     it("should create a label", async () => {
@@ -490,12 +537,15 @@ describe("GitHub Project Management Tools E2E", () => {
       }
       // Random suffix avoids already_exists from leftover labels in the test repo
       const labelName = `e2e-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
-      const response = await utils.callTool("manage_labels", {
-        action: "create",
-        name: labelName,
-        color: "ff0000",
-        description: "E2E test label",
-      });
+      const response = asRecord(
+        await utils.callTool("manage_labels", {
+          action: "create",
+          name: labelName,
+          color: "ff0000",
+          description: "E2E test label",
+        }),
+        "created label"
+      );
 
       MCPTestHelpers.validateToolResponse(response, ["name", "color"]);
       expect(response.name).toBe(labelName);

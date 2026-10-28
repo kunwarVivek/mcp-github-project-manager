@@ -27,6 +27,7 @@ import { vi } from "vitest";
  */
 
 import { MCPToolTestUtils } from "../utils/MCPToolTestUtils";
+import { asArray, asRecord, isRecord, type JsonObject } from "../utils/payload";
 
 const hasRealCredentials = (): boolean => {
   const token = process.env.GITHUB_TOKEN;
@@ -46,17 +47,16 @@ const hasAICredentials = (): boolean => {
   );
 };
 
-function data(response: any): any {
-  if (!response || typeof response !== "object") return response;
-  if (response.structuredContent) return response.structuredContent;
-  if (Array.isArray(response.content) && response.content[0]?.text) {
-    try {
-      return JSON.parse(response.content[0].text);
-    } catch {
-      return response.content[0].text;
-    }
+function requireString(value: unknown, what: string): string {
+  if (typeof value !== "string") {
+    throw new Error(`Expected ${what} to be a string, got ${JSON.stringify(value)}`);
   }
-  return response;
+  return value;
+}
+
+/** Keep only the object entries of an array payload; non-arrays yield []. */
+function objectsOf(value: unknown): JsonObject[] {
+  return Array.isArray(value) ? value.filter(isRecord) : [];
 }
 
 /**
@@ -74,9 +74,9 @@ describe("Full Pipeline E2E: Prompt → PRD → Tasks → Issues → Agent → P
   // Pipeline state
   let projectId = "";
   let prdContent = "";
-  let tasks: any[] = [];
-  let materializedIssues: any[] = [];
-  let materializedResult: any = {};
+  let tasks: JsonObject[] = [];
+  let materializedIssues: JsonObject[] = [];
+  let materializedResult: JsonObject = {};
   let engineerAgentId = "";
   let reviewerAgentId = "";
   let pmAgentId = "";
@@ -111,14 +111,17 @@ describe("Full Pipeline E2E: Prompt → PRD → Tasks → Issues → Agent → P
   it("Stage 1: Create project and setup agent fields", async () => {
     if (!utils) return;
 
-    const project = await utils.callTool("manage_project", {
-      action: "create",
-      title: `Pipeline E2E ${runId}`,
-      shortDescription: "Full pipeline end-to-end test",
-      visibility: "private",
-    });
+    const project = asRecord(
+      await utils.callTool("manage_project", {
+        action: "create",
+        title: `Pipeline E2E ${runId}`,
+        shortDescription: "Full pipeline end-to-end test",
+        visibility: "private",
+      }),
+      "created project"
+    );
     expect(project.id).toBeDefined();
-    projectId = project.id;
+    projectId = requireString(project.id, "project.id");
 
     // Setup agent fields so checkout can find and claim issues
     await utils.callTool("agent_manage", { action: "setup_fields", projectId });
@@ -142,10 +145,14 @@ describe("Full Pipeline E2E: Prompt → PRD → Tasks → Issues → Agent → P
     });
 
     // PRD may come as string or object with content
-    prdContent =
-      typeof result === "string"
-        ? result
-        : result?.content || result?.prd || JSON.stringify(result);
+    if (typeof result === "string") {
+      prdContent = result;
+    } else {
+      const fields = isRecord(result) ? result : {};
+      const candidate = fields.content || fields.prd;
+      prdContent =
+        typeof candidate === "string" && candidate !== "" ? candidate : JSON.stringify(result);
+    }
 
     expect(prdContent.length).toBeGreaterThan(100);
   }, 60000);
@@ -167,9 +174,14 @@ describe("Full Pipeline E2E: Prompt → PRD → Tasks → Issues → Agent → P
     });
 
     // Extract tasks from result
-    tasks = result?.tasks || result?.summary?.tasks || [];
-    if (tasks.length === 0 && Array.isArray(result)) {
-      tasks = result;
+    if (Array.isArray(result)) {
+      tasks = objectsOf(result);
+    } else if (isRecord(result)) {
+      const summary = result.summary;
+      tasks = objectsOf(result.tasks);
+      if (tasks.length === 0 && isRecord(summary)) {
+        tasks = objectsOf(summary.tasks);
+      }
     }
 
     expect(tasks.length).toBeGreaterThan(0);
@@ -182,26 +194,30 @@ describe("Full Pipeline E2E: Prompt → PRD → Tasks → Issues → Agent → P
   it("Stage 4: Materialize tasks → milestones, sprints, issues", async () => {
     if (!utils || !projectId || tasks.length === 0) return;
 
-    const result = await utils.callTool("ai_generate", {
-      action: "materialize_tasks",
-      projectId,
-      labelPrefix: `pipeline-${runId}`,
-      prdContent,
-      tasks: tasks.map((t: any) => ({
-        id: t.id,
-        title: t.title,
-        description: t.description || t.title,
-        complexity: t.complexity,
-        estimatedHours: t.estimatedHours,
-        priority: t.priority,
-        dependencies: t.dependencies,
-        acceptanceCriteria: t.acceptanceCriteria,
-        tags: t.tags,
-      })),
-    });
+    const result = asRecord(
+      await utils.callTool("ai_generate", {
+        action: "materialize_tasks",
+        projectId,
+        labelPrefix: `pipeline-${runId}`,
+        prdContent,
+        tasks: tasks.map((t) => ({
+          id: t.id,
+          title: t.title,
+          description: t.description || t.title,
+          complexity: t.complexity,
+          estimatedHours: t.estimatedHours,
+          priority: t.priority,
+          dependencies: t.dependencies,
+          acceptanceCriteria: t.acceptanceCriteria,
+          tags: t.tags,
+        })),
+      }),
+      "materialize_tasks result"
+    );
 
-    expect(result.issues?.length).toBeGreaterThan(0);
-    materializedIssues = result.issues || [];
+    const issues = objectsOf(result.issues);
+    expect(issues.length).toBeGreaterThan(0);
+    materializedIssues = issues;
     materializedResult = result;
   }, 120000);
 
@@ -212,38 +228,47 @@ describe("Full Pipeline E2E: Prompt → PRD → Tasks → Issues → Agent → P
   it("Stage 5: Register engineer, reviewer, and PM agents", async () => {
     if (!utils || materializedIssues.length === 0) return;
 
-    const engineer = await utils.callTool("agent_work", {
-      action: "register",
-      name: `engineer-${runId}`,
-      role: "engineer",
-      runtime: "claude-code",
-      capabilities: ["typescript", "testing"],
-    });
+    const engineer = asRecord(
+      await utils.callTool("agent_work", {
+        action: "register",
+        name: `engineer-${runId}`,
+        role: "engineer",
+        runtime: "claude-code",
+        capabilities: ["typescript", "testing"],
+      }),
+      "engineer registration"
+    );
     expect(engineer.id).toBeDefined();
-    engineerAgentId = engineer.id;
-    agentIds.push(engineer.id);
+    engineerAgentId = requireString(engineer.id, "engineer.id");
+    agentIds.push(engineerAgentId);
 
-    const reviewer = await utils.callTool("agent_work", {
-      action: "register",
-      name: `reviewer-${runId}`,
-      role: "reviewer",
-      runtime: "claude-code",
-      capabilities: ["code-review"],
-    });
+    const reviewer = asRecord(
+      await utils.callTool("agent_work", {
+        action: "register",
+        name: `reviewer-${runId}`,
+        role: "reviewer",
+        runtime: "claude-code",
+        capabilities: ["code-review"],
+      }),
+      "reviewer registration"
+    );
     expect(reviewer.id).toBeDefined();
-    reviewerAgentId = reviewer.id;
-    agentIds.push(reviewer.id);
+    reviewerAgentId = requireString(reviewer.id, "reviewer.id");
+    agentIds.push(reviewerAgentId);
 
-    const pm = await utils.callTool("agent_work", {
-      action: "register",
-      name: `pm-${runId}`,
-      role: "pm",
-      runtime: "claude-code",
-      capabilities: ["coordination", "planning"],
-    });
+    const pm = asRecord(
+      await utils.callTool("agent_work", {
+        action: "register",
+        name: `pm-${runId}`,
+        role: "pm",
+        runtime: "claude-code",
+        capabilities: ["coordination", "planning"],
+      }),
+      "pm registration"
+    );
     expect(pm.id).toBeDefined();
-    pmAgentId = pm.id;
-    agentIds.push(pm.id);
+    pmAgentId = requireString(pm.id, "pm.id");
+    agentIds.push(pmAgentId);
   }, 30000);
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -253,14 +278,21 @@ describe("Full Pipeline E2E: Prompt → PRD → Tasks → Issues → Agent → P
   it("Stage 6: PM assigns a specific task to engineer via assign_task", async () => {
     if (!utils || !engineerAgentId || !pmAgentId || materializedIssues.length === 0) return;
 
-    assignedIssueNumber = materializedIssues[0].number;
+    const issueNumber = materializedIssues[0].number;
+    if (typeof issueNumber !== "number") {
+      throw new Error(`Expected issue number, got ${JSON.stringify(issueNumber)}`);
+    }
+    assignedIssueNumber = issueNumber;
 
-    const assignment = await utils.callTool("agent_manage", {
-      action: "assign_task",
-      agentId: engineerAgentId,
-      projectId,
-      issueNumber: assignedIssueNumber,
-    });
+    const assignment = asRecord(
+      await utils.callTool("agent_manage", {
+        action: "assign_task",
+        agentId: engineerAgentId,
+        projectId,
+        issueNumber: assignedIssueNumber,
+      }),
+      "assign_task result"
+    );
 
     expect(assignment.success).toBe(true);
     expect(assignment.issueNumber).toBe(assignedIssueNumber);
@@ -274,28 +306,34 @@ describe("Full Pipeline E2E: Prompt → PRD → Tasks → Issues → Agent → P
     if (!utils || !engineerAgentId || !assignedIssueNumber) return;
 
     // Heartbeat
-    const heartbeat = await utils.callTool("agent_work", {
-      action: "heartbeat",
-      agentId: engineerAgentId,
-      status: "working",
-      progress: 80,
-      progressSummary: "Implementation complete, writing tests",
-    });
+    const heartbeat = asRecord(
+      await utils.callTool("agent_work", {
+        action: "heartbeat",
+        agentId: engineerAgentId,
+        status: "working",
+        progress: 80,
+        progressSummary: "Implementation complete, writing tests",
+      }),
+      "heartbeat result"
+    );
     expect(heartbeat.success).toBe(true);
 
     // Submit work product
-    const wp = await utils.callTool("agent_manage", {
-      action: "submit_work_product",
-      agentId: engineerAgentId,
-      taskId: String(assignedIssueNumber),
-      issueNumber: assignedIssueNumber,
-      branch: `eng-${runId}/task`,
-      filesChanged: ["src/todo.ts", "src/todo.test.ts"],
-      testsPassed: 5,
-      testsFailed: 0,
-      testsTotal: 5,
-      summary: "Implemented task with full test coverage",
-    });
+    const wp = asRecord(
+      await utils.callTool("agent_manage", {
+        action: "submit_work_product",
+        agentId: engineerAgentId,
+        taskId: String(assignedIssueNumber),
+        issueNumber: assignedIssueNumber,
+        branch: `eng-${runId}/task`,
+        filesChanged: ["src/todo.ts", "src/todo.test.ts"],
+        testsPassed: 5,
+        testsFailed: 0,
+        testsTotal: 5,
+        summary: "Implemented task with full test coverage",
+      }),
+      "submit_work_product result"
+    );
     expect(wp.id).toBeDefined();
   }, 30000);
 
@@ -306,20 +344,26 @@ describe("Full Pipeline E2E: Prompt → PRD → Tasks → Issues → Agent → P
   it("Stage 8: Submit for review and reviewer approves", async () => {
     if (!utils || !engineerAgentId || !reviewerAgentId || !assignedIssueNumber) return;
 
-    const submitted = await utils.callTool("agent_work", {
-      action: "submit_for_review",
-      agentId: engineerAgentId,
-      taskId: String(assignedIssueNumber),
-      summary: "Ready for review — all tests passing",
-    });
+    const submitted = asRecord(
+      await utils.callTool("agent_work", {
+        action: "submit_for_review",
+        agentId: engineerAgentId,
+        taskId: String(assignedIssueNumber),
+        summary: "Ready for review — all tests passing",
+      }),
+      "submit_for_review result"
+    );
     expect(submitted.success).toBe(true);
 
-    const approved = await utils.callTool("agent_work", {
-      action: "approve_task",
-      reviewerId: reviewerAgentId,
-      taskId: String(assignedIssueNumber),
-      summary: "LGTM — clean implementation",
-    });
+    const approved = asRecord(
+      await utils.callTool("agent_work", {
+        action: "approve_task",
+        reviewerId: reviewerAgentId,
+        taskId: String(assignedIssueNumber),
+        summary: "LGTM — clean implementation",
+      }),
+      "approve_task result"
+    );
     expect(approved.success).toBe(true);
   }, 30000);
 
@@ -330,16 +374,21 @@ describe("Full Pipeline E2E: Prompt → PRD → Tasks → Issues → Agent → P
   it("Stage 9: PM checks swarm status after delivery", async () => {
     if (!utils || !pmAgentId) return;
 
-    const status = await utils.callTool("agent_manage", {
-      action: "get_swarm_status",
-    });
+    const status = asRecord(
+      await utils.callTool("agent_manage", {
+        action: "get_swarm_status",
+      }),
+      "swarm status"
+    );
 
     expect(status.totalAgents).toBeGreaterThanOrEqual(3);
     expect(status.agents).toBeDefined();
     expect(Array.isArray(status.agents)).toBe(true);
 
     // Find our engineer in the swarm
-    const engineer = status.agents.find((a: any) => a.id === engineerAgentId);
+    const engineer = asArray(status.agents, "status.agents").find(
+      (a) => isRecord(a) && a.id === engineerAgentId
+    );
     expect(engineer).toBeDefined();
   }, 30000);
 
@@ -355,8 +404,8 @@ describe("Full Pipeline E2E: Prompt → PRD → Tasks → Issues → Agent → P
       prdGenerated: prdContent.length > 100,
       tasksGenerated: tasks.length,
       issuesMaterialized: materializedIssues.length,
-      milestonesCreated: materializedResult.milestones?.length || 0,
-      sprintsCreated: materializedResult.sprints?.length || 0,
+      milestonesCreated: objectsOf(materializedResult.milestones).length,
+      sprintsCreated: objectsOf(materializedResult.sprints).length,
       pmAssignedTask: assignedIssueNumber > 0,
       engineerRegistered: !!engineerAgentId,
       reviewerRegistered: !!reviewerAgentId,

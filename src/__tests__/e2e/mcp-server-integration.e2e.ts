@@ -20,7 +20,7 @@ const ErrorCode = {
 } as const;
 
 describe("MCP Server E2E Tests", () => {
-  let toolRegistry: any;
+  let toolRegistry: ToolRegistry;
 
   beforeAll(() => {
     const token = process.env.GITHUB_TOKEN || "test-token";
@@ -35,12 +35,12 @@ describe("MCP Server E2E Tests", () => {
     it("should have all required tools registered", () => {
       const tools = toolRegistry.getToolsForMCP();
       // Compound tools are the MCP-facing surface
-      expect(tools.find((t: any) => t.name === "manage_project")).toBeDefined();
-      expect(tools.find((t: any) => t.name === "manage_issues")).toBeDefined();
-      expect(tools.find((t: any) => t.name === "manage_milestones")).toBeDefined();
-      expect(tools.find((t: any) => t.name === "manage_sprints")).toBeDefined();
-      expect(tools.find((t: any) => t.name === "ai_generate")).toBeDefined();
-      expect(tools.find((t: any) => t.name === "discover_tools")).toBeDefined();
+      expect(tools.find((t) => t.name === "manage_project")).toBeDefined();
+      expect(tools.find((t) => t.name === "manage_issues")).toBeDefined();
+      expect(tools.find((t) => t.name === "manage_milestones")).toBeDefined();
+      expect(tools.find((t) => t.name === "manage_sprints")).toBeDefined();
+      expect(tools.find((t) => t.name === "ai_generate")).toBeDefined();
+      expect(tools.find((t) => t.name === "discover_tools")).toBeDefined();
     });
 
     it("should validate tool parameters", () => {
@@ -71,9 +71,10 @@ describe("MCP Server E2E Tests", () => {
 
     it("should handle rate limit errors gracefully", async () => {
       // Mock a rate limit error from GitHub
-      const rateLimitError = new Error("API rate limit exceeded");
-      rateLimitError.name = "HttpError";
-      (rateLimitError as any).status = 403;
+      const rateLimitError = Object.assign(new Error("API rate limit exceeded"), {
+        name: "HttpError",
+        status: 403,
+      });
 
       try {
         // Convert the error
@@ -128,7 +129,7 @@ function convertToMcpError(error: Error): InstanceType<typeof McpError> {
   }
 
   // Rate limit error
-  if (error.name === "HttpError" && (error as any).status === 403) {
+  if (error.name === "HttpError" && "status" in error && error.status === 403) {
     return new McpError(ErrorCode.ParseError, "GitHub API rate limit exceeded");
   }
 
@@ -149,7 +150,7 @@ function convertToMcpError(error: Error): InstanceType<typeof McpError> {
   return new McpError(ErrorCode.InternalError, error.message);
 }
 
-function formatSuccessResponse(operation: string, result: any) {
+function formatSuccessResponse(operation: string, result: unknown) {
   return {
     data: result,
     metadata: {
@@ -159,11 +160,16 @@ function formatSuccessResponse(operation: string, result: any) {
   };
 }
 
+/** The numeric `code` member of an error, or 0 when it has none. */
+function errorCode(error: Error): number {
+  return "code" in error && typeof error.code === "number" ? error.code : 0;
+}
+
 function formatErrorResponse(operation: string, error: Error) {
   return {
     error: {
       message: error.message,
-      code: (error as any).code || ErrorCode.InternalError,
+      code: errorCode(error) || ErrorCode.InternalError,
       operation,
     },
   };

@@ -38,6 +38,7 @@ import { vi } from "vitest";
  */
 
 import { MCPToolTestUtils } from "../utils/MCPToolTestUtils";
+import { asArray, asRecord, isRecord, type JsonObject } from "../utils/payload";
 
 // Check for real credentials
 const hasRealCredentials = (): boolean => {
@@ -54,28 +55,53 @@ const hasRealCredentials = (): boolean => {
 /**
  * Unwrap MCP tool response to get the actual payload
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function data(response: any): any {
-  if (!response || typeof response !== "object") return response;
+function data(response: unknown): unknown {
+  if (!isRecord(response)) return response;
 
   if (response.structuredContent) {
     const inner = response.structuredContent;
-    if (inner && typeof inner === "object" && inner.structuredContent !== undefined) {
+    if (isRecord(inner) && inner.structuredContent !== undefined) {
       return data(inner);
     }
     return inner;
   }
 
-  if (Array.isArray(response.content) && response.content[0]?.text) {
+  const first = Array.isArray(response.content) ? response.content[0] : undefined;
+  if (isRecord(first) && typeof first.text === "string" && first.text) {
     try {
-      const parsed = JSON.parse(response.content[0].text);
-      return data(parsed);
+      return data(JSON.parse(first.text));
     } catch {
-      return response.content[0].text;
+      return first.text;
     }
   }
 
   return response;
+}
+
+/** Narrow a payload field to a string or fail naming the field. */
+function str(value: unknown, what: string): string {
+  if (typeof value !== "string") {
+    throw new Error(`Expected ${what} to be a string, got ${JSON.stringify(value)}`);
+  }
+  return value;
+}
+
+/** Narrow a payload field to a number or fail naming the field. */
+function num(value: unknown, what: string): number {
+  if (typeof value !== "number") {
+    throw new Error(`Expected ${what} to be a number, got ${JSON.stringify(value)}`);
+  }
+  return value;
+}
+
+/** Unwrap a tool response whose payload must be a JSON object. */
+function record(response: unknown): JsonObject {
+  return asRecord(data(response), "tool payload");
+}
+
+/** Unwrap a tool response whose payload must be a JSON array. */
+function list(response: unknown): unknown[] {
+  return asArray(data(response), "tool payload");
 }
 
 /**
@@ -163,7 +189,7 @@ describe("Platform Validation E2E", () => {
       }
 
       const result = await utils.callTool("discover_tools", {});
-      const catalog = data(result);
+      const catalog = record(result);
 
       // discover_tools returns the tool catalog - object with domain keys
       expect(catalog).toBeDefined();
@@ -186,7 +212,7 @@ describe("Platform Validation E2E", () => {
       const result = await utils.callTool("discover_tools", {
         domain: "issues",
       });
-      const schema = data(result);
+      const schema = record(result);
 
       expect(schema).toBeDefined();
       expect(schema.tool).toBe("manage_issues");
@@ -206,7 +232,7 @@ describe("Platform Validation E2E", () => {
         return;
       }
 
-      const project = data(
+      const project = record(
         await utils.callTool("manage_project", {
           action: "create",
           title: `Platform Test Project ${runId}`,
@@ -217,7 +243,7 @@ describe("Platform Validation E2E", () => {
 
       expect(project.id).toBeDefined();
       expect(project.title).toContain("Platform Test Project");
-      projectId = project.id;
+      projectId = str(project.id, "project.id");
     });
 
     it("should create a milestone with deadline tracking", async () => {
@@ -230,7 +256,7 @@ describe("Platform Validation E2E", () => {
         return;
       }
 
-      const milestone = data(
+      const milestone = record(
         await utils.callTool("manage_milestones", {
           action: "create",
           title: `v1.0 Release ${runId}`,
@@ -241,7 +267,7 @@ describe("Platform Validation E2E", () => {
 
       expect(milestone.id).toBeDefined();
       expect(milestone.title).toContain("v1.0 Release");
-      milestoneId = milestone.id;
+      milestoneId = str(milestone.id, "milestone.id");
     });
 
     it("should create issues with labels and priorities", async () => {
@@ -250,7 +276,7 @@ describe("Platform Validation E2E", () => {
         return;
       }
 
-      const issue = data(
+      const issue = record(
         await utils.callTool("manage_issues", {
           action: "create",
           title: `Platform Test Issue ${runId}`,
@@ -261,9 +287,9 @@ describe("Platform Validation E2E", () => {
       );
 
       expect(issue.id).toBeDefined();
-      expect(issue.number).toBeGreaterThan(0);
-      issueId = issue.id;
-      issueNumber = issue.number;
+      expect(num(issue.number, "issue.number")).toBeGreaterThan(0);
+      issueId = str(issue.id, "issue.id");
+      issueNumber = num(issue.number, "issue.number");
 
       // Add to project
       await utils.callTool("manage_project", {
@@ -280,7 +306,7 @@ describe("Platform Validation E2E", () => {
         return;
       }
 
-      const issues = data(
+      const issues = list(
         await utils.callTool("manage_issues", {
           action: "list",
           status: "all",
@@ -302,7 +328,7 @@ describe("Platform Validation E2E", () => {
         return;
       }
 
-      const updated = data(
+      const updated = record(
         await utils.callTool("manage_issues", {
           action: "update",
           issueId,
@@ -325,7 +351,7 @@ describe("Platform Validation E2E", () => {
         return;
       }
 
-      const agent = data(
+      const agent = record(
         await utils.callTool("agent_work", {
           action: "register",
           name: `platform-engineer-${runId}`,
@@ -338,7 +364,7 @@ describe("Platform Validation E2E", () => {
       expect(agent.id).toBeDefined();
       expect(agent.name).toContain("platform-engineer");
       expect(agent.status).toBe("idle");
-      agentId = agent.id;
+      agentId = str(agent.id, "agent.id");
       registeredAgentIds.push(agentId);
     });
 
@@ -352,7 +378,7 @@ describe("Platform Validation E2E", () => {
         return;
       }
 
-      const checkout = data(
+      const checkout = record(
         await utils.callTool("agent_work", {
           action: "checkout_task",
           agentId,
@@ -382,7 +408,7 @@ describe("Platform Validation E2E", () => {
         return;
       }
 
-      const heartbeat = data(
+      const heartbeat = record(
         await utils.callTool("agent_work", {
           action: "heartbeat",
           agentId,
@@ -406,7 +432,7 @@ describe("Platform Validation E2E", () => {
         return;
       }
 
-      const product = data(
+      const product = record(
         await utils.callTool("agent_manage", {
           action: "submit_work_product",
           agentId,
@@ -435,7 +461,7 @@ describe("Platform Validation E2E", () => {
         return;
       }
 
-      const complete = data(
+      const complete = record(
         await utils.callTool("agent_work", {
           action: "complete_task",
           agentId,
@@ -468,7 +494,7 @@ describe("Platform Validation E2E", () => {
         return;
       }
 
-      const budget = data(
+      const budget = record(
         await utils.callTool("agent_manage", {
           action: "set_budget",
           agentId,
@@ -480,7 +506,7 @@ describe("Platform Validation E2E", () => {
 
       expect(budget.totalTokens).toBe(500000);
 
-      const status = data(
+      const status = record(
         await utils.callTool("agent_manage", {
           action: "get_budget",
           agentId,
@@ -500,7 +526,7 @@ describe("Platform Validation E2E", () => {
         return;
       }
 
-      const usage = data(
+      const usage = record(
         await utils.callTool("agent_manage", {
           action: "record_usage",
           agentId,
@@ -523,7 +549,7 @@ describe("Platform Validation E2E", () => {
         return;
       }
 
-      const activity = data(
+      const activity = record(
         await utils.callTool("agent_manage", {
           action: "get_activity",
           includeOffline: true,
@@ -532,7 +558,7 @@ describe("Platform Validation E2E", () => {
 
       expect(activity.agents).toBeDefined();
       expect(Array.isArray(activity.agents)).toBe(true);
-      expect(activity.agents.length).toBeGreaterThan(0);
+      expect(asArray(activity.agents, "activity.agents").length).toBeGreaterThan(0);
     });
 
     it("should return aggregate metrics", async () => {
@@ -541,7 +567,7 @@ describe("Platform Validation E2E", () => {
         return;
       }
 
-      const metrics = data(
+      const metrics = record(
         await utils.callTool("agent_manage", {
           action: "get_metrics",
         })
@@ -569,7 +595,7 @@ describe("Platform Validation E2E", () => {
       }
 
       // Create a reviewer agent
-      const reviewer = data(
+      const reviewer = record(
         await utils.callTool("agent_work", {
           action: "register",
           name: `platform-reviewer-${runId}`,
@@ -577,10 +603,10 @@ describe("Platform Validation E2E", () => {
           runtime: "claude-code",
         })
       );
-      registeredAgentIds.push(reviewer.id);
+      registeredAgentIds.push(str(reviewer.id, "reviewer.id"));
 
       // Create a task for review
-      const issue = data(
+      const issue = record(
         await utils.callTool("manage_issues", {
           action: "create",
           title: `Review Test Issue ${runId}`,
@@ -597,7 +623,7 @@ describe("Platform Validation E2E", () => {
       });
 
       // Engineer checks out and works on it
-      const checkout = data(
+      const checkout = record(
         await utils.callTool("agent_work", {
           action: "checkout_task",
           agentId,
@@ -608,7 +634,7 @@ describe("Platform Validation E2E", () => {
 
       if (checkout?.success && checkout?.issueNumber) {
         // Submit for review
-        const submitted = data(
+        const submitted = record(
           await utils.callTool("agent_work", {
             action: "submit_for_review",
             agentId,
@@ -621,7 +647,7 @@ describe("Platform Validation E2E", () => {
 
         if (submitted.success) {
           // Reviewer approves
-          const approved = data(
+          const approved = record(
             await utils.callTool("agent_work", {
               action: "approve_task",
               reviewerId: reviewer.id,
@@ -647,7 +673,7 @@ describe("Platform Validation E2E", () => {
         return;
       }
 
-      const sprint = data(
+      const sprint = record(
         await utils.callTool("manage_sprints", {
           action: "create",
           title: `Platform Sprint ${runId}`,
@@ -661,7 +687,7 @@ describe("Platform Validation E2E", () => {
       expect(sprint.id).toBeDefined();
       expect(sprint.title).toContain("Platform Sprint");
 
-      const sprints = data(
+      const sprints = list(
         await utils.callTool("manage_sprints", {
           action: "list",
         })

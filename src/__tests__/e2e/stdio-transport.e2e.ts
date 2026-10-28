@@ -2,6 +2,7 @@ import { type ChildProcess, spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import type { WireMessage } from "./utils/payload";
 
 const projectRoot = process.cwd();
 
@@ -32,7 +33,6 @@ describe("Stdio Transport Layer Tests", () => {
   afterEach(() => {
     if (serverProcess) {
       serverProcess.kill("SIGTERM");
-      serverProcess = null as any;
     }
   });
 
@@ -166,7 +166,7 @@ describe("Stdio Transport Layer Tests", () => {
     it(
       "should handle rapid message exchange without stdout corruption",
       async () => {
-        const jsonMessages: any[] = [];
+        const jsonMessages: WireMessage[] = [];
         const parseErrors: string[] = [];
         let stdoutBuffer = "";
 
@@ -475,7 +475,6 @@ function waitForContent(
   timeoutMs = 8000,
   intervalMs = 200
 ): Promise<void> {
-  // eslint-disable-next-line no-restricted-syntax -- Promise.withResolvers unavailable (lib < es2024)
   return new Promise<void>((resolve, reject) => {
     const deadline = Date.now() + timeoutMs;
     const check = () => {

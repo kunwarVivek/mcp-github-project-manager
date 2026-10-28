@@ -1,5 +1,6 @@
 import { vi } from "vitest";
 import { MCPToolTestUtils } from "../utils/MCPToolTestUtils";
+import { isRecord, type JsonObject } from "../utils/payload";
 
 /**
  * End-to-end tests for the Agent Orchestration tools.
@@ -63,27 +64,105 @@ const hasRealCredentials = (): boolean => {
  * `structuredContent`. This helper unwraps recursively until it finds the
  * actual payload in either shape.
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function data(response: any): any {
-  if (!response || typeof response !== "object") return response;
+function data<T extends object = JsonObject>(response: unknown): T {
+  const payload = unwrapPayload(response);
+  if (typeof payload !== "object" || payload === null) {
+    throw new Error(`Expected the tool payload to be JSON, got ${JSON.stringify(payload)}`);
+  }
+  return payload as T;
+}
+
+// The shapes of the tool payloads this suite reads. They describe only the
+// members the assertions touch; `data<T>` checks the payload is a JSON
+// object or array and the assertions check the members.
+interface IssueRef {
+  id: string;
+  number: number;
+}
+interface ProjectRef {
+  id: string;
+  title?: string;
+}
+interface FieldSetup {
+  created?: string[];
+  existing?: string[];
+}
+interface AgentRecord {
+  id: string;
+  name?: string;
+  role?: string;
+  status?: string;
+  currentTaskId?: string;
+  metadata?: { heartbeatHistory?: unknown; progress?: unknown };
+}
+interface AgentList {
+  agents: AgentRecord[];
+  total: number;
+}
+interface ActivityEntry {
+  agent?: { id: string; status?: string };
+  currentTask?: { progress?: number; branch?: string };
+  heartbeatSource?: string;
+  lastHeartbeat?: string;
+  heartbeatHistory?: unknown;
+}
+interface Activity {
+  agents: ActivityEntry[];
+}
+interface TaskContext {
+  issue: { number?: number; id?: string; title?: string };
+  acceptanceCriteria?: string[];
+  branchSuggestion?: string;
+}
+interface StaleDetail {
+  agentId: string;
+  taskId: string;
+}
+interface Reclaimed {
+  reclaimed: number;
+  details?: StaleDetail[];
+}
+interface ConvergeReport {
+  approved: Array<{ issue: number }>;
+  rejected: Array<{ issue: number; findings: string[] }>;
+  decomposed?: Array<{ subtasks: Array<string | number> }>;
+  [member: string]: unknown;
+}
+interface CheckoutResult {
+  success: boolean;
+  issueNumber?: number;
+  issueTitle?: string;
+  [member: string]: unknown;
+}
+interface Dependency {
+  blockingIssueNumber: number;
+  state: string;
+}
+interface ProjectView {
+  id: string;
+  sortBy?: unknown[];
+}
+
+function unwrapPayload(response: unknown): unknown {
+  if (!isRecord(response)) return response;
 
   // Unwrap executor double-wrap: structuredContent: { content, structuredContent }
   if (response.structuredContent) {
     const inner = response.structuredContent;
-    if (inner && typeof inner === "object" && inner.structuredContent !== undefined) {
-      return data(inner);
+    if (isRecord(inner) && inner.structuredContent !== undefined) {
+      return unwrapPayload(inner);
     }
     return inner;
   }
 
   // Fall back to parsing the text blob if structuredContent is absent
-  if (Array.isArray(response.content) && response.content[0]?.text) {
+  const first = Array.isArray(response.content) ? response.content[0] : undefined;
+  if (isRecord(first) && typeof first.text === "string" && first.text) {
     try {
-      const parsed = JSON.parse(response.content[0].text);
-      return data(parsed);
+      return unwrapPayload(JSON.parse(first.text));
     } catch {
       // not JSON — return raw text
-      return response.content[0].text;
+      return first.text;
     }
   }
 
@@ -102,7 +181,7 @@ async function createIssueInProject(
   title: string,
   description: string
 ): Promise<{ id: string; number: number }> {
-  const issue = data(
+  const issue = data<IssueRef>(
     await client.callTool("manage_issues", {
       action: "create",
       title,
@@ -149,7 +228,7 @@ async function registerAgent(
   role: "engineer" | "reviewer" | "pm" | "qa" | "designer" | "devops" | "general",
   capabilities: string[] = []
 ): Promise<string> {
-  const agent = data(
+  const agent = data<AgentRecord>(
     await client.callTool("agent_work", {
       action: "register",
       name,
@@ -170,7 +249,7 @@ async function registerAgent(
  * the repository.
  */
 async function createScenarioProject(client: MCPToolTestUtils, title: string): Promise<string> {
-  const project = data(
+  const project = data<ProjectRef>(
     await client.callTool("manage_project", {
       action: "create",
       title,
@@ -181,7 +260,7 @@ async function createScenarioProject(client: MCPToolTestUtils, title: string): P
   );
   expect(project.id).toBeDefined();
 
-  const fields = data(
+  const fields = data<FieldSetup>(
     await client.callTool("agent_manage", { action: "setup_fields", projectId: project.id })
   );
   const present = new Set([...(fields.created ?? []), ...(fields.existing ?? [])]);
@@ -197,13 +276,13 @@ async function closeIssue(client: MCPToolTestUtils, issueId: string): Promise<vo
 }
 
 /** Checkout through the MCP surface; returns the structured result. */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function checkoutTask(client: MCPToolTestUtils, args: Record<string, unknown>): Promise<any> {
-  const result = data(await client.callTool("agent_work", { action: "checkout_task", ...args }));
-  if (!result || typeof result !== "object") {
-    throw new Error(`checkout_task returned a non-structured result: ${String(result)}`);
-  }
-  return result;
+async function checkoutTask(
+  client: MCPToolTestUtils,
+  args: Record<string, unknown>
+): Promise<CheckoutResult> {
+  return data<CheckoutResult>(
+    await client.callTool("agent_work", { action: "checkout_task", ...args })
+  );
 }
 
 /** Submit a work product (and nothing else) for a task the agent holds. */
@@ -230,9 +309,11 @@ async function submitWorkProduct(
 }
 
 /** The registry record of an agent, read through agent_manage list. */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function registryEntry(client: MCPToolTestUtils, agentId: string): Promise<any> {
-  const agents = data(await client.callTool("agent_manage", { action: "list" }));
+async function registryEntry(
+  client: MCPToolTestUtils,
+  agentId: string
+): Promise<AgentRecord | undefined> {
+  const agents = data<AgentList>(await client.callTool("agent_manage", { action: "list" }));
   return agents.agents.find((a: { id: string }) => a.id === agentId);
 }
 
@@ -242,6 +323,8 @@ const AGENT_FIELD_NAMES = [
   "agent_status",
   "agent_work_branch",
   "agent_pr_number",
+  "agent_heartbeat_at",
+  "agent_progress",
 ];
 
 // The MCP server exposes compound tools (progressive disclosure); the agent
@@ -289,6 +372,25 @@ const AGENT_COMPOUND_ACTIONS: Record<string, string[]> = {
  */
 vi.setConfig({ testTimeout: 120000 });
 
+/**
+ * Test tiers. A full live run costs ~4,500 of the 5,000 GraphQL points/hour,
+ * so the suite is tiered on E2E_TIER:
+ *
+ *   smoke  the product spine only (surface, setup_fields, register, checkout,
+ *          heartbeat, submit_for_review, review-queue checkout, approve,
+ *          closed issue + cleared claim, deregister).
+ *   full   (default) everything.
+ *
+ * The smoke tests are self-sufficient: every `fullIt` test is skipped in the
+ * smoke tier and no smoke test reads state that a `fullIt` test produces.
+ */
+const E2E_TIER = process.env.E2E_TIER ?? "full";
+if (E2E_TIER !== "smoke" && E2E_TIER !== "full") {
+  throw new Error(`E2E_TIER must be "smoke" or "full", got "${E2E_TIER}"`);
+}
+const fullIt = it.skipIf(E2E_TIER === "smoke");
+const smokeOnlyIt = it.skipIf(E2E_TIER !== "smoke");
+
 describe("Agent Orchestration Tools E2E", () => {
   let utils: MCPToolTestUtils | undefined;
 
@@ -304,6 +406,7 @@ describe("Agent Orchestration Tools E2E", () => {
   // Happy-path lifecycle state
   let happyTaskId = "";
   let happyIssueNumber = 0;
+  let happyIssueId = "";
 
   // Reclaim lifecycle state
   let reclaimTaskId = "";
@@ -396,7 +499,8 @@ describe("Agent Orchestration Tools E2E", () => {
     });
 
     expect(raw.isError).toBe(true);
-    expect(raw.content?.[0]?.text ?? "").toMatch(/strategy|validation|allowed values/i);
+    const block = raw.content[0];
+    expect(block?.type === "text" ? block.text : "").toMatch(/strategy|validation|allowed values/i);
   });
 
   // ────────────────────────────────────────────────────────────────────────
@@ -417,7 +521,7 @@ describe("Agent Orchestration Tools E2E", () => {
       visibility: "private",
     });
 
-    const result = data(response);
+    const result = data<ProjectRef>(response);
     expect(result.id).toBeDefined();
     expect(result.title).toContain("E2E Agent Project");
     projectId = result.id;
@@ -434,7 +538,7 @@ describe("Agent Orchestration Tools E2E", () => {
     }
 
     const response = await utils.callTool("agent_manage", { action: "setup_fields", projectId });
-    const result = data(response);
+    const result = data<FieldSetup>(response);
 
     const present = new Set([...(result.created ?? []), ...(result.existing ?? [])]);
     for (const fieldName of AGENT_FIELD_NAMES) {
@@ -465,7 +569,7 @@ describe("Agent Orchestration Tools E2E", () => {
       budgetTokens: 500000,
     });
 
-    const agent = data(response);
+    const agent = data<AgentRecord>(response);
     expect(agent.id).toBeDefined();
     expect(agent.name).toContain("e2e-engineer");
     expect(agent.status).toBe("idle");
@@ -487,7 +591,7 @@ describe("Agent Orchestration Tools E2E", () => {
       runtime: "claude-code",
     });
 
-    const agent = data(response);
+    const agent = data<AgentRecord>(response);
     expect(agent.id).toBeDefined();
     expect(agent.role).toBe("reviewer");
 
@@ -495,13 +599,13 @@ describe("Agent Orchestration Tools E2E", () => {
     registeredAgentIds.push(reviewerAgentId);
   });
 
-  it("should list agents including the newly registered ones", async () => {
+  fullIt("should list agents including the newly registered ones", async () => {
     if (!utils) {
       console.log("Skipping: utils not initialized (missing credentials)");
       return;
     }
 
-    const result = data(await utils.callTool("agent_manage", { action: "list" }));
+    const result = data<AgentList>(await utils.callTool("agent_manage", { action: "list" }));
     expect(Array.isArray(result.agents)).toBe(true);
     expect(result.total).toBeGreaterThanOrEqual(2);
 
@@ -524,7 +628,7 @@ describe("Agent Orchestration Tools E2E", () => {
       return;
     }
 
-    const issue = data(
+    const issue = data<IssueRef>(
       await utils.callTool("manage_issues", {
         action: "create",
         title: `E2E Agent Task ${runId}`,
@@ -537,6 +641,7 @@ describe("Agent Orchestration Tools E2E", () => {
     expect(issue.id).toBeDefined();
     expect(issue.number).toBeGreaterThan(0);
     happyIssueNumber = issue.number;
+    happyIssueId = issue.id;
 
     const added = data(
       await utils.callTool("manage_project", {
@@ -574,7 +679,7 @@ describe("Agent Orchestration Tools E2E", () => {
     happyTaskId = String(result.issueNumber);
   });
 
-  it("should prevent a second agent from claiming the same task", async () => {
+  fullIt("should prevent a second agent from claiming the same task", async () => {
     if (!utils) {
       console.log("Skipping: utils not initialized (missing credentials)");
       return;
@@ -598,7 +703,7 @@ describe("Agent Orchestration Tools E2E", () => {
     expect(result.success).toBe(false);
   });
 
-  it("should get enriched task context", async () => {
+  fullIt("should get enriched task context", async () => {
     if (!utils) {
       console.log("Skipping: utils not initialized (missing credentials)");
       return;
@@ -608,7 +713,7 @@ describe("Agent Orchestration Tools E2E", () => {
       return;
     }
 
-    const context = data(
+    const context = data<TaskContext>(
       await utils.callTool("agent_work", {
         action: "get_task_context",
         issueNumber: happyIssueNumber,
@@ -619,7 +724,7 @@ describe("Agent Orchestration Tools E2E", () => {
     expect(context.issue.number ?? context.issue.id).toBeDefined();
   });
 
-  it("should process a heartbeat and expose heartbeat history in activity", async () => {
+  it("should process a heartbeat and expose the latest heartbeat", async () => {
     if (!utils) {
       console.log("Skipping: utils not initialized (missing credentials)");
       return;
@@ -637,11 +742,12 @@ describe("Agent Orchestration Tools E2E", () => {
         taskId: happyTaskId,
         progress: 50,
         progressSummary: "Halfway through the E2E task",
+        currentBranch: `agent/${happyIssueNumber}-e2e-task`,
       })
     );
     expect(hb.success).toBe(true);
 
-    const activity = data(
+    const activity = data<Activity>(
       await utils.callTool("agent_manage", { action: "get_activity", includeOffline: true })
     );
     expect(Array.isArray(activity.agents)).toBe(true);
@@ -650,10 +756,24 @@ describe("Agent Orchestration Tools E2E", () => {
       (a: { agent?: { id: string } }) => a.agent?.id === engineerAgentId
     );
     expect(entry).toBeDefined();
-    expect(entry.currentTask).toBeDefined();
+    expect(entry?.currentTask).toBeDefined();
+    expect(entry?.heartbeatSource).toBe("project_item");
+    expect(entry?.lastHeartbeat).toBeDefined();
+    expect(entry?.currentTask?.progress).toBe(50);
+    expect(entry?.currentTask?.branch).toBe(`agent/${happyIssueNumber}-e2e-task`);
+    expect(entry?.heartbeatHistory).toBeUndefined();
+
+    // The heartbeat lives on the claimed project item, not in the registry.
+    const registered = await registryEntry(utils, engineerAgentId);
+    expect(registered?.metadata?.heartbeatHistory).toBeUndefined();
+    expect(registered?.metadata?.progress).toBeUndefined();
+
+    const fields = await utils.getProjectItemFieldValues(projectId, happyIssueId);
+    expect(Number(fields?.agent_progress)).toBe(50);
+    expect(String(fields?.agent_heartbeat_at)).toMatch(/^\d{4}-\d{2}-\d{2}T/);
   });
 
-  it("should submit a work product", async () => {
+  fullIt("should submit a work product", async () => {
     if (!utils) {
       console.log("Skipping: utils not initialized (missing credentials)");
       return;
@@ -736,21 +856,61 @@ describe("Agent Orchestration Tools E2E", () => {
       return;
     }
 
-    const activity = data(
+    const activity = data<Activity>(
       await utils.callTool("agent_manage", { action: "get_activity", includeOffline: true })
     );
     const entry = activity.agents.find(
       (a: { agent?: { id: string } }) => a.agent?.id === engineerAgentId
     );
     expect(entry).toBeDefined();
-    expect(entry.currentTask).toBeUndefined();
+    expect(entry?.currentTask).toBeUndefined();
+  });
+
+  it("should leave the issue closed with the claim cleared in GitHub", async () => {
+    if (!utils) {
+      console.log("Skipping: utils not initialized (missing credentials)");
+      return;
+    }
+    if (!happyIssueId || !projectId) {
+      console.log("Skipping: missing setup state");
+      return;
+    }
+
+    expect((await utils.getIssue(happyIssueId))?.status).toBe("closed");
+    const fields = await utils.getProjectItemFieldValues(projectId, happyIssueId);
+    expect(fields).not.toBeNull();
+    expect(fields?.agent_status).toBe("completed");
+    expect(fields?.agent_claimed_by).toBeUndefined();
+  });
+
+  // Smoke tier only: the full tier keeps these agents for the later scenarios
+  // and deregisters them in afterAll.
+  smokeOnlyIt("should deregister the worker and the reviewer", async () => {
+    if (!utils) {
+      console.log("Skipping: utils not initialized (missing credentials)");
+      return;
+    }
+    if (!engineerAgentId || !reviewerAgentId) {
+      console.log("Skipping: no agents registered");
+      return;
+    }
+
+    for (const agentId of [engineerAgentId, reviewerAgentId]) {
+      const result = data(await utils.callTool("agent_manage", { action: "deregister", agentId }));
+      expect(result.success).toBe(true);
+    }
+    const remaining = data<AgentList>(await utils.callTool("agent_manage", { action: "list" }));
+    const ids = new Set(remaining.agents.map((a: { id: string }) => a.id));
+    expect(ids.has(engineerAgentId)).toBe(false);
+    expect(ids.has(reviewerAgentId)).toBe(false);
+    registeredAgentIds.splice(0, registeredAgentIds.length);
   });
 
   // ────────────────────────────────────────────────────────────────────────
   // 5. Budgets
   // ────────────────────────────────────────────────────────────────────────
 
-  it("should set, read, and record against an agent budget", async () => {
+  fullIt("should set, read, and record against an agent budget", async () => {
     if (!utils) {
       console.log("Skipping: utils not initialized (missing credentials)");
       return;
@@ -787,7 +947,7 @@ describe("Agent Orchestration Tools E2E", () => {
     expect(recorded.remainingTokens).toBeLessThanOrEqual(75000);
   });
 
-  it("should refuse checkout when a hard-stop budget is exhausted", async () => {
+  fullIt("should refuse checkout when a hard-stop budget is exhausted", async () => {
     if (!utils) {
       console.log("Skipping: utils not initialized (missing credentials)");
       return;
@@ -865,7 +1025,7 @@ describe("Agent Orchestration Tools E2E", () => {
   // 6. Self-healing: auto-reclaim
   // ────────────────────────────────────────────────────────────────────────
 
-  it("should register a reclaim-test agent and claim a second task", async () => {
+  fullIt("should register a reclaim-test agent and claim a second task", async () => {
     if (!utils) {
       console.log("Skipping: utils not initialized (missing credentials)");
       return;
@@ -875,7 +1035,7 @@ describe("Agent Orchestration Tools E2E", () => {
       return;
     }
 
-    const agent = data(
+    const agent = data<AgentRecord>(
       await utils.callTool("agent_work", {
         action: "register",
         name: `e2e-reclaim-${runId}`,
@@ -914,7 +1074,7 @@ describe("Agent Orchestration Tools E2E", () => {
     reclaimTaskId = String(checkout.issueNumber);
   });
 
-  it("should reclaim the crashed agent task and mark the agent offline", async () => {
+  fullIt("should reclaim the crashed agent task and mark the agent offline", async () => {
     if (!utils) {
       console.log("Skipping: utils not initialized (missing credentials)");
       return;
@@ -932,7 +1092,7 @@ describe("Agent Orchestration Tools E2E", () => {
     await new Promise((resolve) => setTimeout(resolve, 2500));
     vi.useFakeTimers();
 
-    const reclaimed = data(
+    const reclaimed = data<Reclaimed>(
       await utils.callTool("agent_manage", { action: "reclaim_stale", timeoutMinutes: 0.01 })
     );
     expect(reclaimed.reclaimed).toBeGreaterThanOrEqual(1);
@@ -941,24 +1101,24 @@ describe("Agent Orchestration Tools E2E", () => {
       (d: { agentId: string; taskId: string }) => d.agentId === reclaimAgentId
     );
     expect(hit).toBeDefined();
-    expect(hit.taskId).toBe(reclaimTaskId);
+    expect(hit?.taskId).toBe(reclaimTaskId);
 
     // Agent must now be offline in the registry
-    const activity = data(
+    const activity = data<Activity>(
       await utils.callTool("agent_manage", { action: "get_activity", includeOffline: true })
     );
     const entry = activity.agents.find(
       (a: { agent?: { id: string } }) => a.agent?.id === reclaimAgentId
     );
     expect(entry).toBeDefined();
-    expect(entry.agent.status).toBe("offline");
+    expect(entry?.agent?.status).toBe("offline");
   });
 
   // ────────────────────────────────────────────────────────────────────────
   // 7. Metrics
   // ────────────────────────────────────────────────────────────────────────
 
-  it("should return aggregate agent metrics", async () => {
+  fullIt("should return aggregate agent metrics", async () => {
     if (!utils) {
       console.log("Skipping: utils not initialized (missing credentials)");
       return;
@@ -995,1451 +1155,1561 @@ describe("Agent Orchestration Tools E2E", () => {
   let productPmId = "";
   let productWorkerTaskNumber = 0;
 
-  it("should create a dedicated project for the product-level scenarios", async () => {
-    if (!utils) {
-      console.log("Skipping: utils not initialized (missing credentials)");
-      return;
-    }
+  fullIt(
+    "should create a dedicated project for the product-level scenarios",
+    async () => {
+      if (!utils) {
+        console.log("Skipping: utils not initialized (missing credentials)");
+        return;
+      }
 
-    const result = data(
-      await utils.callTool("manage_project", {
-        action: "create",
-        title: `E2E Product Project ${runId}`,
-        shortDescription: "E2E product-level agent lifecycle scenarios",
-        owner: process.env.GITHUB_OWNER || "test-owner",
-        visibility: "private",
-      })
-    );
+      const result = data<ProjectRef>(
+        await utils.callTool("manage_project", {
+          action: "create",
+          title: `E2E Product Project ${runId}`,
+          shortDescription: "E2E product-level agent lifecycle scenarios",
+          owner: process.env.GITHUB_OWNER || "test-owner",
+          visibility: "private",
+        })
+      );
 
-    expect(result.id).toBeDefined();
-    productProjectId = result.id;
-  }, 60000);
+      expect(result.id).toBeDefined();
+      productProjectId = result.id;
+    },
+    60000
+  );
 
-  it("should provision the agent fields on the product project", async () => {
-    if (!utils) {
-      console.log("Skipping: utils not initialized (missing credentials)");
-      return;
-    }
-    if (!productProjectId) {
-      console.log("Skipping: no product project created");
-      return;
-    }
+  fullIt(
+    "should provision the agent fields on the product project",
+    async () => {
+      if (!utils) {
+        console.log("Skipping: utils not initialized (missing credentials)");
+        return;
+      }
+      if (!productProjectId) {
+        console.log("Skipping: no product project created");
+        return;
+      }
 
-    const result = data(
-      await utils.callTool("agent_manage", { action: "setup_fields", projectId: productProjectId })
-    );
+      const result = data<FieldSetup>(
+        await utils.callTool("agent_manage", {
+          action: "setup_fields",
+          projectId: productProjectId,
+        })
+      );
 
-    const present = new Set([...(result.created ?? []), ...(result.existing ?? [])]);
-    for (const fieldName of AGENT_FIELD_NAMES) {
-      expect(present.has(fieldName)).toBe(true);
-    }
-  }, 60000);
+      const present = new Set([...(result.created ?? []), ...(result.existing ?? [])]);
+      for (const fieldName of AGENT_FIELD_NAMES) {
+        expect(present.has(fieldName)).toBe(true);
+      }
+    },
+    60000
+  );
 
-  it("should register the worker, the reviewer and the PM agent for the product scenarios", async () => {
-    if (!utils) {
-      console.log("Skipping: utils not initialized (missing credentials)");
-      return;
-    }
+  fullIt(
+    "should register the worker, the reviewer and the PM agent for the product scenarios",
+    async () => {
+      if (!utils) {
+        console.log("Skipping: utils not initialized (missing credentials)");
+        return;
+      }
 
-    productWorkerId = await registerAgent(utils, `e2e-product-worker-${runId}`, "engineer", [
-      "typescript",
-    ]);
-    productReviewerId = await registerAgent(utils, `e2e-product-reviewer-${runId}`, "reviewer");
-    productPmId = await registerAgent(utils, `e2e-product-pm-${runId}`, "engineer", ["typescript"]);
+      productWorkerId = await registerAgent(utils, `e2e-product-worker-${runId}`, "engineer", [
+        "typescript",
+      ]);
+      productReviewerId = await registerAgent(utils, `e2e-product-reviewer-${runId}`, "reviewer");
+      productPmId = await registerAgent(utils, `e2e-product-pm-${runId}`, "engineer", [
+        "typescript",
+      ]);
 
-    expect(productWorkerId).toBeTruthy();
-    expect(productReviewerId).toBeTruthy();
-    expect(productPmId).toBeTruthy();
+      expect(productWorkerId).toBeTruthy();
+      expect(productReviewerId).toBeTruthy();
+      expect(productPmId).toBeTruthy();
 
-    registeredAgentIds.push(productWorkerId, productReviewerId, productPmId);
-  }, 60000);
+      registeredAgentIds.push(productWorkerId, productReviewerId, productPmId);
+    },
+    60000
+  );
 
   // ── (a) The worker loop ────────────────────────────────────────────
 
-  it("should run the worker loop: checkout, context, heartbeat, work product, review, approve", async () => {
-    if (!utils) {
-      console.log("Skipping: utils not initialized (missing credentials)");
-      return;
-    }
-    if (!productProjectId || !productWorkerId || !productReviewerId) {
-      console.log("Skipping: missing setup state");
-      return;
-    }
+  fullIt(
+    "should run the worker loop: checkout, context, heartbeat, work product, review, approve",
+    async () => {
+      if (!utils) {
+        console.log("Skipping: utils not initialized (missing credentials)");
+        return;
+      }
+      if (!productProjectId || !productWorkerId || !productReviewerId) {
+        console.log("Skipping: missing setup state");
+        return;
+      }
 
-    const task = await createIssueInProject(
-      utils,
-      productProjectId,
-      `E2E Product Worker Task ${runId}`,
-      "Implement the product worker task.\n\n## Acceptance Criteria\n- The worker completes the task\n- The regression suite stays green"
-    );
+      const task = await createIssueInProject(
+        utils,
+        productProjectId,
+        `E2E Product Worker Task ${runId}`,
+        "Implement the product worker task.\n\n## Acceptance Criteria\n- The worker completes the task\n- The regression suite stays green"
+      );
 
-    // 1. The worker claims the only open task in the project.
-    const checkout = data(
-      await utils.callTool("agent_work", {
-        action: "checkout_task",
-        agentId: productWorkerId,
-        projectId: productProjectId,
-        strategy: "highest_priority",
-      })
-    );
-    expect(checkout.success).toBe(true);
-    expect(checkout.issueNumber).toBe(task.number);
-    productWorkerTaskNumber = task.number;
+      // 1. The worker claims the only open task in the project.
+      const checkout = data(
+        await utils.callTool("agent_work", {
+          action: "checkout_task",
+          agentId: productWorkerId,
+          projectId: productProjectId,
+          strategy: "highest_priority",
+        })
+      );
+      expect(checkout.success).toBe(true);
+      expect(checkout.issueNumber).toBe(task.number);
+      productWorkerTaskNumber = task.number;
 
-    // 2. The worker gets the enriched context of the task it claimed.
-    const context = data(
-      await utils.callTool("agent_work", { action: "get_task_context", issueNumber: task.number })
-    );
-    expect(context.issue.number).toBe(task.number);
-    expect(context.issue.title).toContain("E2E Product Worker Task");
-    expect(context.acceptanceCriteria).toContain("The worker completes the task");
-    expect(context.branchSuggestion).toBeTruthy();
+      // 2. The worker gets the enriched context of the task it claimed.
+      const context = data<TaskContext>(
+        await utils.callTool("agent_work", { action: "get_task_context", issueNumber: task.number })
+      );
+      expect(context.issue.number).toBe(task.number);
+      expect(context.issue.title).toContain("E2E Product Worker Task");
+      expect(context.acceptanceCriteria).toContain("The worker completes the task");
+      expect(context.branchSuggestion).toBeTruthy();
 
-    // 3. The worker reports liveness while it works.
-    const heartbeat = data(
-      await utils.callTool("agent_work", {
-        action: "heartbeat",
-        agentId: productWorkerId,
-        status: "working",
-        taskId: String(task.number),
-        progress: 50,
-        progressSummary: "Halfway through the product worker task",
-      })
-    );
-    expect(heartbeat.success).toBe(true);
+      // 3. The worker reports liveness while it works.
+      const heartbeat = data(
+        await utils.callTool("agent_work", {
+          action: "heartbeat",
+          agentId: productWorkerId,
+          status: "working",
+          taskId: String(task.number),
+          progress: 50,
+          progressSummary: "Halfway through the product worker task",
+        })
+      );
+      expect(heartbeat.success).toBe(true);
 
-    // 4. The worker submits the work product.
-    const product = data(
+      // 4. The worker submits the work product.
+      const product = data(
+        await utils.callTool("agent_manage", {
+          action: "submit_work_product",
+          agentId: productWorkerId,
+          taskId: String(task.number),
+          issueNumber: task.number,
+          branch: `agent/${task.number}-product-worker`,
+          commitShas: [],
+          filesChanged: ["src/product-worker.ts"],
+          testsPassed: 3,
+          testsFailed: 0,
+          testsTotal: 3,
+          summary: "Implemented the product worker task end to end",
+        })
+      );
+      expect(product.id).toBeDefined();
+      expect(product.agentId).toBe(productWorkerId);
+      expect(product.taskId).toBe(String(task.number));
+
+      // 5. The worker hands the task over for review.
+      const submitted = data(
+        await utils.callTool("agent_work", {
+          action: "submit_for_review",
+          agentId: productWorkerId,
+          taskId: String(task.number),
+          summary: "Ready for review",
+        })
+      );
+      expect(submitted.success).toBe(true);
+
+      // 6. The reviewer claims it from the REVIEW QUEUE — not from the open pool.
+      const reviewCheckout = data(
+        await utils.callTool("agent_work", {
+          action: "checkout_task",
+          agentId: productReviewerId,
+          projectId: productProjectId,
+          reviewQueue: true,
+        })
+      );
+      expect(reviewCheckout.success).toBe(true);
+      expect(reviewCheckout.issueNumber).toBe(task.number);
+
+      // 7. The reviewer approves it.
+      const approved = data(
+        await utils.callTool("agent_work", {
+          action: "approve_task",
+          reviewerId: productReviewerId,
+          taskId: String(task.number),
+          summary: "LGTM — product lifecycle verified",
+        })
+      );
+      expect(approved.success).toBe(true);
+
+      // ── The end state in GitHub ──────────────────────────────────────
+
+      // The issue is closed.
+      const issue = await utils.getIssue(task.id);
+      expect(issue?.status).toBe("closed");
+
+      // The claim is released and the task is marked completed in the project.
+      const fields = await utils.getProjectItemFieldValues(productProjectId, task.id);
+      expect(fields).not.toBeNull();
+      expect(fields?.agent_status).toBe("completed");
+      expect(fields?.agent_claimed_by).toBeUndefined();
+
+      // Both agents are idle and hold no task.
+      const agents = data<AgentList>(await utils.callTool("agent_manage", { action: "list" }));
+      const worker = agents.agents.find((a: { id: string }) => a.id === productWorkerId);
+      const reviewer = agents.agents.find((a: { id: string }) => a.id === productReviewerId);
+      expect(worker).toBeDefined();
+      expect(worker?.status).toBe("idle");
+      expect(worker?.currentTaskId).toBeUndefined();
+      expect(reviewer).toBeDefined();
+      expect(reviewer?.status).toBe("idle");
+      expect(reviewer?.currentTaskId).toBeUndefined();
+
+      // The work product and the review trail are recorded as comments.
+      const comments = await utils.listIssueComments(task.number);
+      expect(comments.some((c) => c.body.includes("## Agent Work Product"))).toBe(true);
+      expect(comments.some((c) => c.body.includes("agent-work-product"))).toBe(true);
+      expect(comments.some((c) => c.body.includes("## Agent Work Submitted for Review"))).toBe(
+        true
+      );
+      expect(comments.some((c) => c.body.includes("## Agent Work Approved"))).toBe(true);
+    },
+    120000
+  );
+
+  // ── (h) Work products ─────────────────────────────────────────────
+
+  fullIt(
+    "should ignore a malformed work-product comment and return the valid one",
+    async () => {
+      if (!utils) {
+        console.log("Skipping: utils not initialized (missing credentials)");
+        return;
+      }
+      if (!productWorkerId || !productWorkerTaskNumber) {
+        console.log("Skipping: missing setup state");
+        return;
+      }
+
+      // A comment that carries the work-product marker but is not valid JSON.
+      // It is posted AFTER the real work product, so a parser that does not
+      // skip it would return it as the latest product.
+      await utils.callTool("manage_issues", {
+        action: "create_comment",
+        issueNumber: productWorkerTaskNumber,
+        body: "<!-- agent-work-product: {this is not valid json -->",
+      });
+
+      const validation = data<{
+        valid: boolean;
+        findings: string[];
+        recommendation: string;
+        workProduct: { agentId: string; files: string[] };
+      }>(
+        await utils.callTool("agent_work", {
+          action: "validate_work_product",
+          agentId: productWorkerId,
+          taskId: String(productWorkerTaskNumber),
+        })
+      );
+
+      expect(validation.valid).toBe(true);
+      expect(validation.findings).toEqual([]);
+      expect(validation.workProduct.agentId).toBe(productWorkerId);
+      expect(validation.workProduct.files).toContain("src/product-worker.ts");
+      expect(validation.recommendation).toBe("approve");
+    },
+    60000
+  );
+
+  // ── (b) The rejection path ─────────────────────────────────────────
+
+  fullIt(
+    "should return a rejected task to the pool with feedback, and make it claimable again",
+    async () => {
+      if (!utils) {
+        console.log("Skipping: utils not initialized (missing credentials)");
+        return;
+      }
+      if (!productProjectId || !productWorkerId || !productReviewerId || !productPmId) {
+        console.log("Skipping: missing setup state");
+        return;
+      }
+
+      const task = await createIssueInProject(
+        utils,
+        productProjectId,
+        `E2E Product Rejected Task ${runId}`,
+        "Task that will be rejected during review.\n\n## Acceptance Criteria\n- The edge case is covered"
+      );
+
+      const checkout = data(
+        await utils.callTool("agent_work", {
+          action: "checkout_task",
+          agentId: productWorkerId,
+          projectId: productProjectId,
+          strategy: "highest_priority",
+        })
+      );
+      expect(checkout.success).toBe(true);
+      expect(checkout.issueNumber).toBe(task.number);
+
       await utils.callTool("agent_manage", {
         action: "submit_work_product",
         agentId: productWorkerId,
         taskId: String(task.number),
         issueNumber: task.number,
-        branch: `agent/${task.number}-product-worker`,
-        commitShas: [],
-        filesChanged: ["src/product-worker.ts"],
-        testsPassed: 3,
+        filesChanged: ["src/rejected.ts"],
+        testsPassed: 1,
         testsFailed: 0,
-        testsTotal: 3,
-        summary: "Implemented the product worker task end to end",
-      })
-    );
-    expect(product.id).toBeDefined();
-    expect(product.agentId).toBe(productWorkerId);
-    expect(product.taskId).toBe(String(task.number));
+        testsTotal: 1,
+        summary: "First attempt at the rejected task",
+      });
 
-    // 5. The worker hands the task over for review.
-    const submitted = data(
-      await utils.callTool("agent_work", {
-        action: "submit_for_review",
-        agentId: productWorkerId,
-        taskId: String(task.number),
-        summary: "Ready for review",
-      })
-    );
-    expect(submitted.success).toBe(true);
+      const submitted = data(
+        await utils.callTool("agent_work", {
+          action: "submit_for_review",
+          agentId: productWorkerId,
+          taskId: String(task.number),
+          summary: "Please review",
+        })
+      );
+      expect(submitted.success).toBe(true);
 
-    // 6. The reviewer claims it from the REVIEW QUEUE — not from the open pool.
-    const reviewCheckout = data(
-      await utils.callTool("agent_work", {
-        action: "checkout_task",
-        agentId: productReviewerId,
-        projectId: productProjectId,
-        reviewQueue: true,
-      })
-    );
-    expect(reviewCheckout.success).toBe(true);
-    expect(reviewCheckout.issueNumber).toBe(task.number);
+      const reviewCheckout = data(
+        await utils.callTool("agent_work", {
+          action: "checkout_task",
+          agentId: productReviewerId,
+          projectId: productProjectId,
+          reviewQueue: true,
+        })
+      );
+      expect(reviewCheckout.success).toBe(true);
+      expect(reviewCheckout.issueNumber).toBe(task.number);
 
-    // 7. The reviewer approves it.
-    const approved = data(
-      await utils.callTool("agent_work", {
-        action: "approve_task",
-        reviewerId: productReviewerId,
-        taskId: String(task.number),
-        summary: "LGTM — product lifecycle verified",
-      })
-    );
-    expect(approved.success).toBe(true);
+      const rejected = data(
+        await utils.callTool("agent_work", {
+          action: "reject_task",
+          reviewerId: productReviewerId,
+          taskId: String(task.number),
+          feedback: "Please add a regression test for the empty-input edge case",
+        })
+      );
+      expect(rejected.success).toBe(true);
 
-    // ── The end state in GitHub ──────────────────────────────────────
+      // The issue is NOT closed — the work is still owed.
+      const issue = await utils.getIssue(task.id);
+      expect(issue?.status).toBe("active");
 
-    // The issue is closed.
-    const issue = await utils.getIssue(task.id);
-    expect(issue?.status).toBe("closed");
+      // The claim is cleared and the task is back in the unclaimed pool.
+      const fields = await utils.getProjectItemFieldValues(productProjectId, task.id);
+      expect(fields?.agent_status).toBe("unclaimed");
+      expect(fields?.agent_claimed_by).toBeUndefined();
 
-    // The claim is released and the task is marked completed in the project.
-    const fields = await utils.getProjectItemFieldValues(productProjectId, task.id);
-    expect(fields).not.toBeNull();
-    expect(fields?.agent_status).toBe("completed");
-    expect(fields?.agent_claimed_by).toBeUndefined();
+      // The feedback is on the issue for the next agent to read.
+      const comments = await utils.listIssueComments(task.number);
+      const rejection = comments.find((c) => c.body.includes("## Agent Work Rejected"));
+      expect(rejection).toBeDefined();
+      expect(rejection?.body).toContain(
+        "Please add a regression test for the empty-input edge case"
+      );
 
-    // Both agents are idle and hold no task.
-    const agents = data(await utils.callTool("agent_manage", { action: "list" }));
-    const worker = agents.agents.find((a: { id: string }) => a.id === productWorkerId);
-    const reviewer = agents.agents.find((a: { id: string }) => a.id === productReviewerId);
-    expect(worker).toBeDefined();
-    expect(worker.status).toBe("idle");
-    expect(worker.currentTaskId).toBeUndefined();
-    expect(reviewer).toBeDefined();
-    expect(reviewer.status).toBe("idle");
-    expect(reviewer.currentTaskId).toBeUndefined();
+      // Both agents were released.
+      const agents = data<AgentList>(await utils.callTool("agent_manage", { action: "list" }));
+      const worker = agents.agents.find((a: { id: string }) => a.id === productWorkerId);
+      const reviewer = agents.agents.find((a: { id: string }) => a.id === productReviewerId);
+      expect(worker?.currentTaskId).toBeUndefined();
+      expect(reviewer?.currentTaskId).toBeUndefined();
 
-    // The work product and the review trail are recorded as comments.
-    const comments = await utils.listIssueComments(task.number);
-    expect(comments.some((c) => c.body.includes("## Agent Work Product"))).toBe(true);
-    expect(comments.some((c) => c.body.includes("agent-work-product"))).toBe(true);
-    expect(comments.some((c) => c.body.includes("## Agent Work Submitted for Review"))).toBe(true);
-    expect(comments.some((c) => c.body.includes("## Agent Work Approved"))).toBe(true);
-  }, 120000);
+      // And the task is claimable again — by a different agent.
+      const reClaim = data(
+        await utils.callTool("agent_work", {
+          action: "checkout_task",
+          agentId: productPmId,
+          projectId: productProjectId,
+          strategy: "highest_priority",
+        })
+      );
+      expect(reClaim.success).toBe(true);
+      expect(reClaim.issueNumber).toBe(task.number);
 
-  // ── (h) Work products ─────────────────────────────────────────────
-
-  it("should ignore a malformed work-product comment and return the valid one", async () => {
-    if (!utils) {
-      console.log("Skipping: utils not initialized (missing credentials)");
-      return;
-    }
-    if (!productWorkerId || !productWorkerTaskNumber) {
-      console.log("Skipping: missing setup state");
-      return;
-    }
-
-    // A comment that carries the work-product marker but is not valid JSON.
-    // It is posted AFTER the real work product, so a parser that does not
-    // skip it would return it as the latest product.
-    await utils.callTool("manage_issues", {
-      action: "create_comment",
-      issueNumber: productWorkerTaskNumber,
-      body: "<!-- agent-work-product: {this is not valid json -->",
-    });
-
-    const validation = data(
-      await utils.callTool("agent_work", {
-        action: "validate_work_product",
-        agentId: productWorkerId,
-        taskId: String(productWorkerTaskNumber),
-      })
-    );
-
-    expect(validation.valid).toBe(true);
-    expect(validation.findings).toEqual([]);
-    expect(validation.workProduct.agentId).toBe(productWorkerId);
-    expect(validation.workProduct.files).toContain("src/product-worker.ts");
-    expect(validation.recommendation).toBe("approve");
-  }, 60000);
-
-  // ── (b) The rejection path ─────────────────────────────────────────
-
-  it("should return a rejected task to the pool with feedback, and make it claimable again", async () => {
-    if (!utils) {
-      console.log("Skipping: utils not initialized (missing credentials)");
-      return;
-    }
-    if (!productProjectId || !productWorkerId || !productReviewerId || !productPmId) {
-      console.log("Skipping: missing setup state");
-      return;
-    }
-
-    const task = await createIssueInProject(
-      utils,
-      productProjectId,
-      `E2E Product Rejected Task ${runId}`,
-      "Task that will be rejected during review.\n\n## Acceptance Criteria\n- The edge case is covered"
-    );
-
-    const checkout = data(
-      await utils.callTool("agent_work", {
-        action: "checkout_task",
-        agentId: productWorkerId,
-        projectId: productProjectId,
-        strategy: "highest_priority",
-      })
-    );
-    expect(checkout.success).toBe(true);
-    expect(checkout.issueNumber).toBe(task.number);
-
-    await utils.callTool("agent_manage", {
-      action: "submit_work_product",
-      agentId: productWorkerId,
-      taskId: String(task.number),
-      issueNumber: task.number,
-      filesChanged: ["src/rejected.ts"],
-      testsPassed: 1,
-      testsFailed: 0,
-      testsTotal: 1,
-      summary: "First attempt at the rejected task",
-    });
-
-    const submitted = data(
-      await utils.callTool("agent_work", {
-        action: "submit_for_review",
-        agentId: productWorkerId,
-        taskId: String(task.number),
-        summary: "Please review",
-      })
-    );
-    expect(submitted.success).toBe(true);
-
-    const reviewCheckout = data(
-      await utils.callTool("agent_work", {
-        action: "checkout_task",
-        agentId: productReviewerId,
-        projectId: productProjectId,
-        reviewQueue: true,
-      })
-    );
-    expect(reviewCheckout.success).toBe(true);
-    expect(reviewCheckout.issueNumber).toBe(task.number);
-
-    const rejected = data(
-      await utils.callTool("agent_work", {
-        action: "reject_task",
-        reviewerId: productReviewerId,
-        taskId: String(task.number),
-        feedback: "Please add a regression test for the empty-input edge case",
-      })
-    );
-    expect(rejected.success).toBe(true);
-
-    // The issue is NOT closed — the work is still owed.
-    const issue = await utils.getIssue(task.id);
-    expect(issue?.status).toBe("active");
-
-    // The claim is cleared and the task is back in the unclaimed pool.
-    const fields = await utils.getProjectItemFieldValues(productProjectId, task.id);
-    expect(fields?.agent_status).toBe("unclaimed");
-    expect(fields?.agent_claimed_by).toBeUndefined();
-
-    // The feedback is on the issue for the next agent to read.
-    const comments = await utils.listIssueComments(task.number);
-    const rejection = comments.find((c) => c.body.includes("## Agent Work Rejected"));
-    expect(rejection).toBeDefined();
-    expect(rejection?.body).toContain("Please add a regression test for the empty-input edge case");
-
-    // Both agents were released.
-    const agents = data(await utils.callTool("agent_manage", { action: "list" }));
-    const worker = agents.agents.find((a: { id: string }) => a.id === productWorkerId);
-    const reviewer = agents.agents.find((a: { id: string }) => a.id === productReviewerId);
-    expect(worker.currentTaskId).toBeUndefined();
-    expect(reviewer.currentTaskId).toBeUndefined();
-
-    // And the task is claimable again — by a different agent.
-    const reClaim = data(
-      await utils.callTool("agent_work", {
-        action: "checkout_task",
-        agentId: productPmId,
-        projectId: productProjectId,
-        strategy: "highest_priority",
-      })
-    );
-    expect(reClaim.success).toBe(true);
-    expect(reClaim.issueNumber).toBe(task.number);
-
-    // Close the task so the next scenario starts from a clean pool.
-    const completed = data(
-      await utils.callTool("agent_work", {
-        action: "complete_task",
-        agentId: productPmId,
-        taskId: String(task.number),
-        summary: "Re-did the task with the requested regression test",
-        closeIssue: true,
-        autoCheckoutNext: false,
-      })
-    );
-    expect(completed.success).toBe(true);
-  }, 120000);
+      // Close the task so the next scenario starts from a clean pool.
+      const completed = data(
+        await utils.callTool("agent_work", {
+          action: "complete_task",
+          agentId: productPmId,
+          taskId: String(task.number),
+          summary: "Re-did the task with the requested regression test",
+          closeIssue: true,
+          autoCheckoutNext: false,
+        })
+      );
+      expect(completed.success).toBe(true);
+    },
+    120000
+  );
 
   // ── (c) Crash recovery ─────────────────────────────────────────────
 
-  it("should reclaim the task of an agent that stopped heart-beating and let another agent claim it", async () => {
-    if (!utils) {
-      console.log("Skipping: utils not initialized (missing credentials)");
-      return;
-    }
-    if (!productProjectId) {
-      console.log("Skipping: no product project created");
-      return;
-    }
+  fullIt(
+    "should reclaim the task of an agent that stopped heart-beating and let another agent claim it",
+    async () => {
+      if (!utils) {
+        console.log("Skipping: utils not initialized (missing credentials)");
+        return;
+      }
+      if (!productProjectId) {
+        console.log("Skipping: no product project created");
+        return;
+      }
 
-    const crashAgentId = await registerAgent(utils, `e2e-product-crash-${runId}`, "engineer", [
-      "typescript",
-    ]);
-    const rescueAgentId = await registerAgent(utils, `e2e-product-rescue-${runId}`, "engineer", [
-      "typescript",
-    ]);
-    registeredAgentIds.push(crashAgentId, rescueAgentId);
+      const crashAgentId = await registerAgent(utils, `e2e-product-crash-${runId}`, "engineer", [
+        "typescript",
+      ]);
+      const rescueAgentId = await registerAgent(utils, `e2e-product-rescue-${runId}`, "engineer", [
+        "typescript",
+      ]);
+      registeredAgentIds.push(crashAgentId, rescueAgentId);
 
-    const task = await createIssueInProject(
-      utils,
-      productProjectId,
-      `E2E Product Crash Task ${runId}`,
-      "Task whose owner crashes mid-flight."
-    );
+      const task = await createIssueInProject(
+        utils,
+        productProjectId,
+        `E2E Product Crash Task ${runId}`,
+        "Task whose owner crashes mid-flight."
+      );
 
-    const checkout = data(
-      await utils.callTool("agent_work", {
-        action: "checkout_task",
-        agentId: crashAgentId,
-        projectId: productProjectId,
-        strategy: "highest_priority",
-      })
-    );
-    expect(checkout.success).toBe(true);
-    expect(checkout.issueNumber).toBe(task.number);
+      const checkout = data(
+        await utils.callTool("agent_work", {
+          action: "checkout_task",
+          agentId: crashAgentId,
+          projectId: productProjectId,
+          strategy: "highest_priority",
+        })
+      );
+      expect(checkout.success).toBe(true);
+      expect(checkout.issueNumber).toBe(task.number);
 
-    // The agent now "crashes": it never heart-beats again.
-    vi.useRealTimers();
-    await new Promise((resolve) => setTimeout(resolve, 2500));
-    vi.useFakeTimers();
+      // The agent now "crashes": it never heart-beats again.
+      vi.useRealTimers();
+      await new Promise((resolve) => setTimeout(resolve, 2500));
+      vi.useFakeTimers();
 
-    const reclaimed = data(
-      await utils.callTool("agent_manage", { action: "reclaim_stale", timeoutMinutes: 0.01 })
-    );
-    expect(reclaimed.reclaimed).toBeGreaterThanOrEqual(1);
+      const reclaimed = data<Reclaimed>(
+        await utils.callTool("agent_manage", { action: "reclaim_stale", timeoutMinutes: 0.01 })
+      );
+      expect(reclaimed.reclaimed).toBeGreaterThanOrEqual(1);
 
-    const hit = (reclaimed.details ?? []).find(
-      (d: { agentId: string; taskId: string }) =>
-        d.agentId === crashAgentId && d.taskId === String(task.number)
-    );
-    expect(hit).toBeDefined();
+      const hit = (reclaimed.details ?? []).find(
+        (d: { agentId: string; taskId: string }) =>
+          d.agentId === crashAgentId && d.taskId === String(task.number)
+      );
+      expect(hit).toBeDefined();
 
-    // The crashed agent is offline and no longer holds the task.
-    const agents = data(await utils.callTool("agent_manage", { action: "list" }));
-    const crashed = agents.agents.find((a: { id: string }) => a.id === crashAgentId);
-    expect(crashed).toBeDefined();
-    expect(crashed.status).toBe("offline");
-    expect(crashed.currentTaskId).toBeUndefined();
+      // The crashed agent is offline and no longer holds the task.
+      const agents = data<AgentList>(await utils.callTool("agent_manage", { action: "list" }));
+      const crashed = agents.agents.find((a: { id: string }) => a.id === crashAgentId);
+      expect(crashed).toBeDefined();
+      expect(crashed?.status).toBe("offline");
+      expect(crashed?.currentTaskId).toBeUndefined();
 
-    // The task is back in the unclaimed pool.
-    const fields = await utils.getProjectItemFieldValues(productProjectId, task.id);
-    expect(fields?.agent_status).toBe("unclaimed");
-    expect(fields?.agent_claimed_by).toBeUndefined();
+      // The task is back in the unclaimed pool.
+      const fields = await utils.getProjectItemFieldValues(productProjectId, task.id);
+      expect(fields?.agent_status).toBe("unclaimed");
+      expect(fields?.agent_claimed_by).toBeUndefined();
 
-    // Another agent can pick it up.
-    const rescue = data(
-      await utils.callTool("agent_work", {
-        action: "checkout_task",
-        agentId: rescueAgentId,
-        projectId: productProjectId,
-        strategy: "highest_priority",
-      })
-    );
-    expect(rescue.success).toBe(true);
-    expect(rescue.issueNumber).toBe(task.number);
+      // Another agent can pick it up.
+      const rescue = data(
+        await utils.callTool("agent_work", {
+          action: "checkout_task",
+          agentId: rescueAgentId,
+          projectId: productProjectId,
+          strategy: "highest_priority",
+        })
+      );
+      expect(rescue.success).toBe(true);
+      expect(rescue.issueNumber).toBe(task.number);
 
-    const completed = data(
-      await utils.callTool("agent_work", {
-        action: "complete_task",
-        agentId: rescueAgentId,
-        taskId: String(task.number),
-        summary: "Finished the task the crashed agent abandoned",
-        closeIssue: true,
-        autoCheckoutNext: false,
-      })
-    );
-    expect(completed.success).toBe(true);
-  }, 120000);
+      const completed = data(
+        await utils.callTool("agent_work", {
+          action: "complete_task",
+          agentId: rescueAgentId,
+          taskId: String(task.number),
+          summary: "Finished the task the crashed agent abandoned",
+          closeIssue: true,
+          autoCheckoutNext: false,
+        })
+      );
+      expect(completed.success).toBe(true);
+    },
+    120000
+  );
 
   // ── (e) PM flow ────────────────────────────────────────────────────
 
-  it("should let the PM assign a specific issue to a specific agent", async () => {
-    if (!utils) {
-      console.log("Skipping: utils not initialized (missing credentials)");
-      return;
-    }
-    if (!productProjectId || !productPmId) {
-      console.log("Skipping: missing setup state");
-      return;
-    }
+  fullIt(
+    "should let the PM assign a specific issue to a specific agent",
+    async () => {
+      if (!utils) {
+        console.log("Skipping: utils not initialized (missing credentials)");
+        return;
+      }
+      if (!productProjectId || !productPmId) {
+        console.log("Skipping: missing setup state");
+        return;
+      }
 
-    const task = await createIssueInProject(
-      utils,
-      productProjectId,
-      `E2E Product PM Assigned Task ${runId}`,
-      "Task the PM hands to a named agent."
-    );
+      const task = await createIssueInProject(
+        utils,
+        productProjectId,
+        `E2E Product PM Assigned Task ${runId}`,
+        "Task the PM hands to a named agent."
+      );
 
-    const assigned = data(
-      await utils.callTool("agent_manage", {
-        action: "assign_task",
-        agentId: productPmId,
-        projectId: productProjectId,
-        issueNumber: task.number,
-      })
-    );
-    expect(assigned.success).toBe(true);
-    expect(assigned.issueNumber).toBe(task.number);
+      const assigned = data(
+        await utils.callTool("agent_manage", {
+          action: "assign_task",
+          agentId: productPmId,
+          projectId: productProjectId,
+          issueNumber: task.number,
+        })
+      );
+      expect(assigned.success).toBe(true);
+      expect(assigned.issueNumber).toBe(task.number);
 
-    // The durable claim names the agent the PM picked.
-    const fields = await utils.getProjectItemFieldValues(productProjectId, task.id);
-    expect(fields?.agent_claimed_by).toBe(productPmId);
-    expect(fields?.agent_status).toBe("in_progress");
+      // The durable claim names the agent the PM picked.
+      const fields = await utils.getProjectItemFieldValues(productProjectId, task.id);
+      expect(fields?.agent_claimed_by).toBe(productPmId);
+      expect(fields?.agent_status).toBe("in_progress");
 
-    // The registry agrees.
-    const agents = data(await utils.callTool("agent_manage", { action: "list" }));
-    const pm = agents.agents.find((a: { id: string }) => a.id === productPmId);
-    expect(pm.currentTaskId).toBe(String(task.number));
-    expect(pm.status).toBe("working");
+      // The registry agrees.
+      const agents = data<AgentList>(await utils.callTool("agent_manage", { action: "list" }));
+      const pm = agents.agents.find((a: { id: string }) => a.id === productPmId);
+      expect(pm?.currentTaskId).toBe(String(task.number));
+      expect(pm?.status).toBe("working");
 
-    // Hand the task back so the next scenario starts from a clean pool.
-    const completed = data(
-      await utils.callTool("agent_work", {
-        action: "complete_task",
-        agentId: productPmId,
-        taskId: String(task.number),
-        summary: "PM-assigned task delivered",
-        closeIssue: true,
-        autoCheckoutNext: false,
-      })
-    );
-    expect(completed.success).toBe(true);
-  }, 90000);
+      // Hand the task back so the next scenario starts from a clean pool.
+      const completed = data(
+        await utils.callTool("agent_work", {
+          action: "complete_task",
+          agentId: productPmId,
+          taskId: String(task.number),
+          summary: "PM-assigned task delivered",
+          closeIssue: true,
+          autoCheckoutNext: false,
+        })
+      );
+      expect(completed.success).toBe(true);
+    },
+    90000
+  );
 
-  it("should let smart_assign distribute open work to an idle capable agent", async () => {
-    if (!utils) {
-      console.log("Skipping: utils not initialized (missing credentials)");
-      return;
-    }
-    if (!productProjectId || !productPmId) {
-      console.log("Skipping: missing setup state");
-      return;
-    }
+  fullIt(
+    "should let smart_assign distribute open work to an idle capable agent",
+    async () => {
+      if (!utils) {
+        console.log("Skipping: utils not initialized (missing credentials)");
+        return;
+      }
+      if (!productProjectId || !productPmId) {
+        console.log("Skipping: missing setup state");
+        return;
+      }
 
-    const task = await createIssueInProject(
-      utils,
-      productProjectId,
-      `E2E Product Smart Assign typescript Task ${runId}`,
-      "Open work for the capability-aware assignment."
-    );
+      const task = await createIssueInProject(
+        utils,
+        productProjectId,
+        `E2E Product Smart Assign typescript Task ${runId}`,
+        "Open work for the capability-aware assignment."
+      );
 
-    const smart = data(
-      await utils.callTool("agent_manage", {
-        action: "smart_assign",
-        projectId: productProjectId,
-        agentIds: [productPmId],
-      })
-    );
+      const smart = data<{
+        success: boolean;
+        totalAssigned: number;
+        assignments?: Array<{ issueNumber: number; agentId: string }>;
+      }>(
+        await utils.callTool("agent_manage", {
+          action: "smart_assign",
+          projectId: productProjectId,
+          agentIds: [productPmId],
+        })
+      );
 
-    expect(smart.success).toBe(true);
-    expect(smart.totalAssigned).toBeGreaterThanOrEqual(1);
+      expect(smart.success).toBe(true);
+      expect(smart.totalAssigned).toBeGreaterThanOrEqual(1);
 
-    const assignment = (smart.assignments ?? []).find(
-      (a: { issueNumber: number }) => a.issueNumber === task.number
-    );
-    expect(assignment).toBeDefined();
-    expect(assignment.agentId).toBe(productPmId);
+      const assignment = (smart.assignments ?? []).find(
+        (a: { issueNumber: number }) => a.issueNumber === task.number
+      );
+      expect(assignment).toBeDefined();
+      expect(assignment?.agentId).toBe(productPmId);
 
-    // The assignment is durable in the project, not just in the response.
-    const fields = await utils.getProjectItemFieldValues(productProjectId, task.id);
-    expect(fields?.agent_claimed_by).toBe(productPmId);
-    expect(fields?.agent_status).toBe("in_progress");
+      // The assignment is durable in the project, not just in the response.
+      const fields = await utils.getProjectItemFieldValues(productProjectId, task.id);
+      expect(fields?.agent_claimed_by).toBe(productPmId);
+      expect(fields?.agent_status).toBe("in_progress");
 
-    // And the swarm dashboard reports the ownership.
-    const swarm = data(await utils.callTool("agent_manage", { action: "get_swarm_status" }));
-    const entry = swarm.agents.find((a: { id: string }) => a.id === productPmId);
-    expect(entry).toBeDefined();
-    expect(entry.status).toBe("working");
-    expect(entry.currentTask).not.toBeNull();
-    expect(entry.currentTask.id).toBe(String(task.number));
-    expect(entry.currentTask.title).toContain("E2E Product Smart Assign typescript Task");
+      // And the swarm dashboard reports the ownership.
+      const swarm = data<{
+        agents: Array<AgentRecord & { currentTask?: { id?: string; title?: string } | null }>;
+      }>(await utils.callTool("agent_manage", { action: "get_swarm_status" }));
+      const entry = swarm.agents.find((a: { id: string }) => a.id === productPmId);
+      expect(entry).toBeDefined();
+      expect(entry?.status).toBe("working");
+      expect(entry?.currentTask).not.toBeNull();
+      expect(entry?.currentTask?.id).toBe(String(task.number));
+      expect(entry?.currentTask?.title).toContain("E2E Product Smart Assign typescript Task");
 
-    const completed = data(
-      await utils.callTool("agent_work", {
-        action: "complete_task",
-        agentId: productPmId,
-        taskId: String(task.number),
-        summary: "Smart-assigned task delivered",
-        closeIssue: true,
-        autoCheckoutNext: false,
-      })
-    );
-    expect(completed.success).toBe(true);
-  }, 90000);
+      const completed = data(
+        await utils.callTool("agent_work", {
+          action: "complete_task",
+          agentId: productPmId,
+          taskId: String(task.number),
+          summary: "Smart-assigned task delivered",
+          closeIssue: true,
+          autoCheckoutNext: false,
+        })
+      );
+      expect(completed.success).toBe(true);
+    },
+    90000
+  );
 
   // ── (f) Concurrency ────────────────────────────────────────────────
 
-  it("should never let two agents own the same task when they check out at the same time", async () => {
-    if (!utils) {
-      console.log("Skipping: utils not initialized (missing credentials)");
-      return;
-    }
-    if (!productProjectId) {
-      console.log("Skipping: no product project created");
-      return;
-    }
+  fullIt(
+    "should never let two agents own the same task when they check out at the same time",
+    async () => {
+      if (!utils) {
+        console.log("Skipping: utils not initialized (missing credentials)");
+        return;
+      }
+      if (!productProjectId) {
+        console.log("Skipping: no product project created");
+        return;
+      }
 
-    const racerA = await registerAgent(utils, `e2e-product-race-a-${runId}`, "engineer", [
-      "typescript",
-    ]);
-    const racerB = await registerAgent(utils, `e2e-product-race-b-${runId}`, "engineer", [
-      "typescript",
-    ]);
-    const bystander = await registerAgent(utils, `e2e-product-race-c-${runId}`, "engineer", [
-      "typescript",
-    ]);
-    registeredAgentIds.push(racerA, racerB, bystander);
+      const racerA = await registerAgent(utils, `e2e-product-race-a-${runId}`, "engineer", [
+        "typescript",
+      ]);
+      const racerB = await registerAgent(utils, `e2e-product-race-b-${runId}`, "engineer", [
+        "typescript",
+      ]);
+      const bystander = await registerAgent(utils, `e2e-product-race-c-${runId}`, "engineer", [
+        "typescript",
+      ]);
+      registeredAgentIds.push(racerA, racerB, bystander);
 
-    const task = await createIssueInProject(
-      utils,
-      productProjectId,
-      `E2E Product Race Task ${runId}`,
-      "Task two agents race for."
-    );
+      const task = await createIssueInProject(
+        utils,
+        productProjectId,
+        `E2E Product Race Task ${runId}`,
+        "Task two agents race for."
+      );
 
-    // Two agents claim the same task at the same time.
-    const [resultA, resultB] = await Promise.all([
-      utils.callTool("agent_work", {
-        action: "checkout_task",
-        agentId: racerA,
-        projectId: productProjectId,
-        strategy: "highest_priority",
-      }),
-      utils.callTool("agent_work", {
-        action: "checkout_task",
-        agentId: racerB,
-        projectId: productProjectId,
-        strategy: "highest_priority",
-      }),
-    ]);
+      // Two agents claim the same task at the same time.
+      const [resultA, resultB] = await Promise.all([
+        utils.callTool("agent_work", {
+          action: "checkout_task",
+          agentId: racerA,
+          projectId: productProjectId,
+          strategy: "highest_priority",
+        }),
+        utils.callTool("agent_work", {
+          action: "checkout_task",
+          agentId: racerB,
+          projectId: productProjectId,
+          strategy: "highest_priority",
+        }),
+      ]);
 
-    const outcomes = [data(resultA), data(resultB)];
-    const winners = outcomes.filter((o) => o.success === true);
+      const outcomes = [data(resultA), data(resultB)];
+      const winners = outcomes.filter((o) => o.success === true);
 
-    // At least one of them must have won the task.
-    expect(winners.length).toBeGreaterThanOrEqual(1);
+      // At least one of them must have won the task.
+      expect(winners.length).toBeGreaterThanOrEqual(1);
 
-    // The task has exactly ONE durable owner: `agent_claimed_by` is a
-    // single-value field, so the project can never record two owners.
-    const fields = await utils.getProjectItemFieldValues(productProjectId, task.id);
-    const owner = fields?.agent_claimed_by;
-    expect(typeof owner).toBe("string");
-    expect([racerA, racerB]).toContain(owner);
+      // The task has exactly ONE durable owner: `agent_claimed_by` is a
+      // single-value field, so the project can never record two owners.
+      const fields = await utils.getProjectItemFieldValues(productProjectId, task.id);
+      const owner = fields?.agent_claimed_by;
+      expect(typeof owner).toBe("string");
+      expect([racerA, racerB]).toContain(owner);
 
-    // The recorded owner is the racer that won the claim.
-    const ownerOutcome = owner === racerA ? outcomes[0] : outcomes[1];
-    expect(ownerOutcome.success).toBe(true);
+      // The recorded owner is the racer that won the claim.
+      const ownerOutcome = owner === racerA ? outcomes[0] : outcomes[1];
+      expect(ownerOutcome.success).toBe(true);
 
-    // And the pool agrees: a third agent cannot take the same task.
-    const third = data(
-      await utils.callTool("agent_work", {
-        action: "checkout_task",
-        agentId: bystander,
-        projectId: productProjectId,
-        strategy: "highest_priority",
-      })
-    );
-    expect(third.success).toBe(false);
+      // And the pool agrees: a third agent cannot take the same task.
+      const third = data(
+        await utils.callTool("agent_work", {
+          action: "checkout_task",
+          agentId: bystander,
+          projectId: productProjectId,
+          strategy: "highest_priority",
+        })
+      );
+      expect(third.success).toBe(false);
 
-    // Whichever racer won, the task is registered against the agent that
-    // owns the durable claim. (The project claim is a non-atomic
-    // read-modify-write on GitHub, so in the rare interleaving where both
-    // checkouts verify their own write, the registry — whose own writes are
-    // sha-CAS guarded — can briefly list two holders; the PROJECT always
-    // holds exactly one.)
-    const agents = data(await utils.callTool("agent_manage", { action: "list" }));
-    const holders = agents.agents.filter(
-      (a: { currentTaskId?: string }) => a.currentTaskId === String(task.number)
-    );
-    expect(holders.length).toBeGreaterThanOrEqual(1);
-    expect(holders.map((a: { id: string }) => a.id)).toContain(owner);
+      // Whichever racer won, the task is registered against the agent that
+      // owns the durable claim. (The project claim is a non-atomic
+      // read-modify-write on GitHub, so in the rare interleaving where both
+      // checkouts verify their own write, the registry — whose own writes are
+      // sha-CAS guarded — can briefly list two holders; the PROJECT always
+      // holds exactly one.)
+      const agents = data<AgentList>(await utils.callTool("agent_manage", { action: "list" }));
+      const holders = agents.agents.filter(
+        (a: { currentTaskId?: string }) => a.currentTaskId === String(task.number)
+      );
+      expect(holders.length).toBeGreaterThanOrEqual(1);
+      expect(holders.map((a: { id: string }) => a.id)).toContain(owner);
 
-    // Release the task again so the next scenario starts from a clean pool.
-    for (const holder of holders) {
-      await utils.callTool("agent_work", {
-        action: "release_task",
-        agentId: holder.id,
-        taskId: String(task.number),
+      // Release the task again so the next scenario starts from a clean pool.
+      for (const holder of holders) {
+        await utils.callTool("agent_work", {
+          action: "release_task",
+          agentId: holder.id,
+          taskId: String(task.number),
+        });
+      }
+      await utils.callTool("manage_issues", {
+        action: "update",
+        issueId: task.id,
+        status: "closed",
       });
-    }
-    await utils.callTool("manage_issues", {
-      action: "update",
-      issueId: task.id,
-      status: "closed",
-    });
-  }, 90000);
+    },
+    90000
+  );
 
   // ── (d) Budget hard stop ───────────────────────────────────────────
 
-  it("should refuse to check out more work once the hard-stop budget is exhausted", async () => {
-    if (!utils) {
-      console.log("Skipping: utils not initialized (missing credentials)");
-      return;
-    }
-    if (!productProjectId) {
-      console.log("Skipping: no product project created");
-      return;
-    }
+  fullIt(
+    "should refuse to check out more work once the hard-stop budget is exhausted",
+    async () => {
+      if (!utils) {
+        console.log("Skipping: utils not initialized (missing credentials)");
+        return;
+      }
+      if (!productProjectId) {
+        console.log("Skipping: no product project created");
+        return;
+      }
 
-    const budgetAgentId = await registerAgent(utils, `e2e-product-budget-${runId}`, "engineer", [
-      "typescript",
-    ]);
-    registeredAgentIds.push(budgetAgentId);
+      const budgetAgentId = await registerAgent(utils, `e2e-product-budget-${runId}`, "engineer", [
+        "typescript",
+      ]);
+      registeredAgentIds.push(budgetAgentId);
 
-    const task = await createIssueInProject(
-      utils,
-      productProjectId,
-      `E2E Product Budget Task ${runId}`,
-      "Task an agent with an exhausted budget must not get."
-    );
+      const task = await createIssueInProject(
+        utils,
+        productProjectId,
+        `E2E Product Budget Task ${runId}`,
+        "Task an agent with an exhausted budget must not get."
+      );
 
-    const budget = data(
-      await utils.callTool("agent_manage", {
-        action: "set_budget",
-        agentId: budgetAgentId,
-        totalTokens: 1000,
-        warningFraction: 0.8,
-        hardStop: true,
-      })
-    );
-    expect(budget.totalTokens).toBe(1000);
+      const budget = data(
+        await utils.callTool("agent_manage", {
+          action: "set_budget",
+          agentId: budgetAgentId,
+          totalTokens: 1000,
+          warningFraction: 0.8,
+          hardStop: true,
+        })
+      );
+      expect(budget.totalTokens).toBe(1000);
 
-    const exhausted = data(
-      await utils.callTool("agent_manage", {
-        action: "record_usage",
-        agentId: budgetAgentId,
-        tokensUsed: 1200,
-      })
-    );
-    expect(exhausted.isExhausted).toBe(true);
+      const exhausted = data(
+        await utils.callTool("agent_manage", {
+          action: "record_usage",
+          agentId: budgetAgentId,
+          tokensUsed: 1200,
+        })
+      );
+      expect(exhausted.isExhausted).toBe(true);
 
-    const checkout = data(
-      await utils.callTool("agent_work", {
-        action: "checkout_task",
-        agentId: budgetAgentId,
-        projectId: productProjectId,
-        strategy: "highest_priority",
-      })
-    );
-    expect(checkout.success).toBe(false);
-    expect(checkout.message ?? "").toMatch(/budget|exhaust/i);
+      const checkout = data(
+        await utils.callTool("agent_work", {
+          action: "checkout_task",
+          agentId: budgetAgentId,
+          projectId: productProjectId,
+          strategy: "highest_priority",
+        })
+      );
+      expect(checkout.success).toBe(false);
+      expect(checkout.message ?? "").toMatch(/budget|exhaust/i);
 
-    // No claim was written for the refused checkout.
-    const fields = await utils.getProjectItemFieldValues(productProjectId, task.id);
-    expect(fields?.agent_claimed_by).toBeUndefined();
-    expect(fields?.agent_status).not.toBe("in_progress");
+      // No claim was written for the refused checkout.
+      const fields = await utils.getProjectItemFieldValues(productProjectId, task.id);
+      expect(fields?.agent_claimed_by).toBeUndefined();
+      expect(fields?.agent_status).not.toBe("in_progress");
 
-    // Close the task so the repository is left tidy.
-    await utils.callTool("manage_issues", {
-      action: "update",
-      issueId: task.id,
-      status: "closed",
-    });
-  }, 90000);
+      // Close the task so the repository is left tidy.
+      await utils.callTool("manage_issues", {
+        action: "update",
+        issueId: task.id,
+        status: "closed",
+      });
+    },
+    90000
+  );
 
   // ────────────────────────────────────────────────────────────────────────
   // PM convergence + workload scenarios (each in its own project)
   // ────────────────────────────────────────────────────────────────────────
 
-  it("should rebalance_workload: reclaim the stale owner's task and hand it to an idle capable agent", async () => {
-    if (!utils) {
-      console.log("Skipping: utils not initialized (missing credentials)");
-      return;
-    }
+  fullIt(
+    "should rebalance_workload: reclaim the stale owner's task and hand it to an idle capable agent",
+    async () => {
+      if (!utils) {
+        console.log("Skipping: utils not initialized (missing credentials)");
+        return;
+      }
 
-    // Contract (executor): rebalance_workload = reclaim every task whose
-    // owner stopped heart-beating for `staleAfterMinutes`, then redistribute
-    // open project work to idle, capable agents through smart_assign.
-    const rebalanceProjectId = await createScenarioProject(utils, `E2E Rebalance Project ${runId}`);
-    const staleOwnerId = await registerAgent(utils, `e2e-rebalance-stale-${runId}`, "engineer", [
-      "typescript",
-    ]);
-    const idleAgentId = await registerAgent(utils, `e2e-rebalance-idle-${runId}`, "engineer", [
-      "typescript",
-    ]);
-    registeredAgentIds.push(staleOwnerId, idleAgentId);
+      // Contract (executor): rebalance_workload = reclaim every task whose
+      // owner stopped heart-beating for `staleAfterMinutes`, then redistribute
+      // open project work to idle, capable agents through smart_assign.
+      const rebalanceProjectId = await createScenarioProject(
+        utils,
+        `E2E Rebalance Project ${runId}`
+      );
+      const staleOwnerId = await registerAgent(utils, `e2e-rebalance-stale-${runId}`, "engineer", [
+        "typescript",
+      ]);
+      const idleAgentId = await registerAgent(utils, `e2e-rebalance-idle-${runId}`, "engineer", [
+        "typescript",
+      ]);
+      registeredAgentIds.push(staleOwnerId, idleAgentId);
 
-    const task = await createIssueInProject(
-      utils,
-      rebalanceProjectId,
-      `E2E Rebalance typescript Task ${runId}`,
-      "Task whose owner stops heart-beating."
-    );
+      const task = await createIssueInProject(
+        utils,
+        rebalanceProjectId,
+        `E2E Rebalance typescript Task ${runId}`,
+        "Task whose owner stops heart-beating."
+      );
 
-    const claim = await checkoutTask(utils, {
-      agentId: staleOwnerId,
-      projectId: rebalanceProjectId,
-      strategy: "oldest_first",
-    });
-    expect(claim.success).toBe(true);
-    expect(claim.issueNumber).toBe(task.number);
-
-    let fields = await utils.getProjectItemFieldValues(rebalanceProjectId, task.id);
-    expect(fields?.agent_claimed_by).toBe(staleOwnerId);
-
-    // The owner goes silent.
-    vi.useRealTimers();
-    await new Promise((resolve) => setTimeout(resolve, 2500));
-    vi.useFakeTimers();
-
-    const rebalanced = data(
-      await utils.callTool("agent_manage", {
-        action: "rebalance_workload",
+      const claim = await checkoutTask(utils, {
+        agentId: staleOwnerId,
         projectId: rebalanceProjectId,
-        staleAfterMinutes: 0.01,
-        agentIds: [idleAgentId],
-      })
-    );
-    expect(rebalanced.reclaimed).toBeGreaterThanOrEqual(1);
-    expect(
-      (rebalanced.reclaimedTasks ?? []).some(
-        (d: { agentId: string; taskId: string }) =>
-          d.agentId === staleOwnerId && d.taskId === String(task.number)
-      )
-    ).toBe(true);
-    expect(rebalanced.assigned).toBe(1);
-    expect(rebalanced.assignments[0].agentId).toBe(idleAgentId);
-    expect(rebalanced.assignments[0].issueNumber).toBe(task.number);
+        strategy: "oldest_first",
+      });
+      expect(claim.success).toBe(true);
+      expect(claim.issueNumber).toBe(task.number);
 
-    // GitHub: the claim names the new owner; the issue is still open.
-    fields = await utils.getProjectItemFieldValues(rebalanceProjectId, task.id);
-    expect(fields?.agent_claimed_by).toBe(idleAgentId);
-    expect(fields?.agent_status).toBe("in_progress");
-    expect((await utils.getIssue(task.id))?.status).toBe("active");
+      let fields = await utils.getProjectItemFieldValues(rebalanceProjectId, task.id);
+      expect(fields?.agent_claimed_by).toBe(staleOwnerId);
 
-    // Registry: both records agree with the claim.
-    const previousOwner = await registryEntry(utils, staleOwnerId);
-    expect(previousOwner.status).toBe("offline");
-    expect(previousOwner.currentTaskId).toBeUndefined();
-    const newOwner = await registryEntry(utils, idleAgentId);
-    expect(newOwner.status).toBe("working");
-    expect(newOwner.currentTaskId).toBe(String(task.number));
+      // The owner goes silent.
+      vi.useRealTimers();
+      await new Promise((resolve) => setTimeout(resolve, 2500));
+      vi.useFakeTimers();
 
-    // The reclaim is audited on the issue.
-    const comments = await utils.listIssueComments(task.number);
-    expect(comments.some((c) => c.body.includes("## Agent Task Auto-Reclaimed"))).toBe(true);
-
-    const completed = data(
-      await utils.callTool("agent_work", {
-        action: "complete_task",
-        agentId: idleAgentId,
-        taskId: String(task.number),
-        summary: "Finished the rebalanced task",
-        closeIssue: true,
-        autoCheckoutNext: false,
-      })
-    );
-    expect(completed.success).toBe(true);
-  }, 240000);
-
-  it("should converge_project with a reviewer: approve a passing submission and reject a failing one through the review lifecycle", async () => {
-    if (!utils) {
-      console.log("Skipping: utils not initialized (missing credentials)");
-      return;
-    }
-
-    const convergeProjectId = await createScenarioProject(
-      utils,
-      `E2E Converge Reviewer Project ${runId}`
-    );
-    const passingWorkerId = await registerAgent(utils, `e2e-converge-pass-${runId}`, "engineer");
-    const failingWorkerId = await registerAgent(utils, `e2e-converge-fail-${runId}`, "engineer");
-    const reviewerId = await registerAgent(utils, `e2e-converge-reviewer-${runId}`, "reviewer");
-    registeredAgentIds.push(passingWorkerId, failingWorkerId, reviewerId);
-
-    const passing = await createIssueInProject(
-      utils,
-      convergeProjectId,
-      `E2E Converge Passing Task ${runId}`,
-      "Task whose submission passes validation."
-    );
-    const failing = await createIssueInProject(
-      utils,
-      convergeProjectId,
-      `E2E Converge Failing Task ${runId}`,
-      "Task whose submission has a failing test."
-    );
-
-    // Each worker claims one task, submits a work product and hands it over
-    // for review.
-    const firstClaim = await checkoutTask(utils, {
-      agentId: passingWorkerId,
-      projectId: convergeProjectId,
-      strategy: "oldest_first",
-    });
-    expect(firstClaim.issueNumber).toBe(passing.number);
-    const secondClaim = await checkoutTask(utils, {
-      agentId: failingWorkerId,
-      projectId: convergeProjectId,
-      strategy: "oldest_first",
-    });
-    expect(secondClaim.issueNumber).toBe(failing.number);
-
-    await submitWorkProduct(utils, passingWorkerId, passing.number, 0);
-    await submitWorkProduct(utils, failingWorkerId, failing.number, 1);
-    for (const [agentId, issueNumber] of [
-      [passingWorkerId, passing.number],
-      [failingWorkerId, failing.number],
-    ] as const) {
-      const submitted = data(
-        await utils.callTool("agent_work", {
-          action: "submit_for_review",
-          agentId,
-          taskId: String(issueNumber),
-          summary: "Ready for review",
+      const rebalanced = data<{
+        reclaimed: number;
+        reclaimedTasks?: StaleDetail[];
+        assigned: number;
+        assignments: Array<{ agentId: string; issueNumber: number }>;
+      }>(
+        await utils.callTool("agent_manage", {
+          action: "rebalance_workload",
+          projectId: rebalanceProjectId,
+          staleAfterMinutes: 0.01,
+          agentIds: [idleAgentId],
         })
       );
-      expect(submitted.success).toBe(true);
-    }
+      expect(rebalanced.reclaimed).toBeGreaterThanOrEqual(1);
+      expect(
+        (rebalanced.reclaimedTasks ?? []).some(
+          (d: { agentId: string; taskId: string }) =>
+            d.agentId === staleOwnerId && d.taskId === String(task.number)
+        )
+      ).toBe(true);
+      expect(rebalanced.assigned).toBe(1);
+      expect(rebalanced.assignments[0].agentId).toBe(idleAgentId);
+      expect(rebalanced.assignments[0].issueNumber).toBe(task.number);
 
-    const report = data(
-      await utils.callTool("agent_manage", {
-        action: "converge_project",
+      // GitHub: the claim names the new owner; the issue is still open.
+      fields = await utils.getProjectItemFieldValues(rebalanceProjectId, task.id);
+      expect(fields?.agent_claimed_by).toBe(idleAgentId);
+      expect(fields?.agent_status).toBe("in_progress");
+      expect((await utils.getIssue(task.id))?.status).toBe("active");
+
+      // Registry: both records agree with the claim.
+      const previousOwner = await registryEntry(utils, staleOwnerId);
+      expect(previousOwner?.status).toBe("offline");
+      expect(previousOwner?.currentTaskId).toBeUndefined();
+      const newOwner = await registryEntry(utils, idleAgentId);
+      expect(newOwner?.status).toBe("working");
+      expect(newOwner?.currentTaskId).toBe(String(task.number));
+
+      // The reclaim is audited on the issue.
+      const comments = await utils.listIssueComments(task.number);
+      expect(comments.some((c) => c.body.includes("## Agent Task Auto-Reclaimed"))).toBe(true);
+
+      const completed = data(
+        await utils.callTool("agent_work", {
+          action: "complete_task",
+          agentId: idleAgentId,
+          taskId: String(task.number),
+          summary: "Finished the rebalanced task",
+          closeIssue: true,
+          autoCheckoutNext: false,
+        })
+      );
+      expect(completed.success).toBe(true);
+    },
+    240000
+  );
+
+  fullIt(
+    "should converge_project with a reviewer: approve a passing submission and reject a failing one through the review lifecycle",
+    async () => {
+      if (!utils) {
+        console.log("Skipping: utils not initialized (missing credentials)");
+        return;
+      }
+
+      const convergeProjectId = await createScenarioProject(
+        utils,
+        `E2E Converge Reviewer Project ${runId}`
+      );
+      const passingWorkerId = await registerAgent(utils, `e2e-converge-pass-${runId}`, "engineer");
+      const failingWorkerId = await registerAgent(utils, `e2e-converge-fail-${runId}`, "engineer");
+      const reviewerId = await registerAgent(utils, `e2e-converge-reviewer-${runId}`, "reviewer");
+      registeredAgentIds.push(passingWorkerId, failingWorkerId, reviewerId);
+
+      const passing = await createIssueInProject(
+        utils,
+        convergeProjectId,
+        `E2E Converge Passing Task ${runId}`,
+        "Task whose submission passes validation."
+      );
+      const failing = await createIssueInProject(
+        utils,
+        convergeProjectId,
+        `E2E Converge Failing Task ${runId}`,
+        "Task whose submission has a failing test."
+      );
+
+      // Each worker claims one task, submits a work product and hands it over
+      // for review.
+      const firstClaim = await checkoutTask(utils, {
+        agentId: passingWorkerId,
         projectId: convergeProjectId,
-        reviewerId,
-      })
-    );
-    expect(report.approved.map((a: { issue: number }) => a.issue)).toEqual([passing.number]);
-    expect(report.rejected.map((r: { issue: number }) => r.issue)).toEqual([failing.number]);
-    expect(report.rejected[0].findings).toContain("1 test(s) failing");
+        strategy: "oldest_first",
+      });
+      expect(firstClaim.issueNumber).toBe(passing.number);
+      const secondClaim = await checkoutTask(utils, {
+        agentId: failingWorkerId,
+        projectId: convergeProjectId,
+        strategy: "oldest_first",
+      });
+      expect(secondClaim.issueNumber).toBe(failing.number);
 
-    // ── approve path: closed, claim cleared, owner released ──
-    expect((await utils.getIssue(passing.id))?.status).toBe("closed");
-    const approvedFields = await utils.getProjectItemFieldValues(convergeProjectId, passing.id);
-    expect(approvedFields?.agent_status).toBe("completed");
-    expect(approvedFields?.agent_claimed_by).toBeUndefined();
-    expect(approvedFields?.agent_claimed_at).toBeUndefined();
-    const passingWorker = await registryEntry(utils, passingWorkerId);
-    expect(passingWorker.status).toBe("idle");
-    expect(passingWorker.currentTaskId).toBeUndefined();
-    const approvedComments = await utils.listIssueComments(passing.number);
-    const approval = approvedComments.find((c) => c.body.includes("## Agent Work Approved"));
-    expect(approval).toBeDefined();
-    expect(approval?.body).toContain(reviewerId);
-    expect(approvedComments.some((c) => c.body.includes("Auto-Approved by Convergence"))).toBe(
-      false
-    );
-
-    // ── reject path: stays open, claim cleared, feedback on the issue ──
-    expect((await utils.getIssue(failing.id))?.status).toBe("active");
-    const rejectedFields = await utils.getProjectItemFieldValues(convergeProjectId, failing.id);
-    expect(rejectedFields?.agent_status).toBe("unclaimed");
-    expect(rejectedFields?.agent_claimed_by).toBeUndefined();
-    const failingWorker = await registryEntry(utils, failingWorkerId);
-    expect(failingWorker.status).toBe("idle");
-    expect(failingWorker.currentTaskId).toBeUndefined();
-    const rejectedComments = await utils.listIssueComments(failing.number);
-    const rejection = rejectedComments.find((c) => c.body.includes("## Agent Work Rejected"));
-    expect(rejection).toBeDefined();
-    expect(rejection?.body).toContain("1 test(s) failing");
-    expect(rejectedComments.some((c) => c.body.includes("Auto-Rejected by Convergence"))).toBe(
-      false
-    );
-
-    // The reviewer holds nothing afterwards.
-    const reviewer = await registryEntry(utils, reviewerId);
-    expect(reviewer.currentTaskId).toBeUndefined();
-
-    // Tidy up: the rejected task and the fix subtask convergence created.
-    await closeIssue(utils, failing.id);
-    for (const decomposed of report.decomposed ?? []) {
-      for (const subtask of decomposed.subtasks) {
-        await closeIssue(utils, String(subtask));
+      await submitWorkProduct(utils, passingWorkerId, passing.number, 0);
+      await submitWorkProduct(utils, failingWorkerId, failing.number, 1);
+      for (const [agentId, issueNumber] of [
+        [passingWorkerId, passing.number],
+        [failingWorkerId, failing.number],
+      ] as const) {
+        const submitted = data(
+          await utils.callTool("agent_work", {
+            action: "submit_for_review",
+            agentId,
+            taskId: String(issueNumber),
+            summary: "Ready for review",
+          })
+        );
+        expect(submitted.success).toBe(true);
       }
-    }
-  }, 300000);
 
-  it("should converge_project without a reviewer: release the owner, clear the claim, comment and settle the issue", async () => {
-    if (!utils) {
-      console.log("Skipping: utils not initialized (missing credentials)");
-      return;
-    }
-
-    // Contract (executor): without reviewerId there is no lifecycle call.
-    // The owner is released, the claim fields are cleared and agent_status
-    // becomes completed (approve) / unclaimed (reject), and the fallback
-    // writes an "Auto-Approved/Auto-Rejected by Convergence Loop" comment;
-    // an approved issue is closed, a rejected one stays open.
-    const fallbackProjectId = await createScenarioProject(
-      utils,
-      `E2E Converge Fallback Project ${runId}`
-    );
-    const passingWorkerId = await registerAgent(utils, `e2e-fallback-pass-${runId}`, "engineer");
-    const failingWorkerId = await registerAgent(utils, `e2e-fallback-fail-${runId}`, "engineer");
-    registeredAgentIds.push(passingWorkerId, failingWorkerId);
-
-    const passing = await createIssueInProject(
-      utils,
-      fallbackProjectId,
-      `E2E Fallback Passing Task ${runId}`,
-      "Task whose submission passes validation."
-    );
-    const failing = await createIssueInProject(
-      utils,
-      fallbackProjectId,
-      `E2E Fallback Failing Task ${runId}`,
-      "Task whose submission has a failing test."
-    );
-
-    expect(
-      (
-        await checkoutTask(utils, {
-          agentId: passingWorkerId,
-          projectId: fallbackProjectId,
-          strategy: "oldest_first",
+      const report = data<ConvergeReport>(
+        await utils.callTool("agent_manage", {
+          action: "converge_project",
+          projectId: convergeProjectId,
+          reviewerId,
         })
-      ).issueNumber
-    ).toBe(passing.number);
-    expect(
-      (
-        await checkoutTask(utils, {
-          agentId: failingWorkerId,
-          projectId: fallbackProjectId,
-          strategy: "oldest_first",
-        })
-      ).issueNumber
-    ).toBe(failing.number);
+      );
+      expect(report.approved.map((a: { issue: number }) => a.issue)).toEqual([passing.number]);
+      expect(report.rejected.map((r: { issue: number }) => r.issue)).toEqual([failing.number]);
+      expect(report.rejected[0].findings).toContain("1 test(s) failing");
 
-    await submitWorkProduct(utils, passingWorkerId, passing.number, 0);
-    await submitWorkProduct(utils, failingWorkerId, failing.number, 1);
+      // ── approve path: closed, claim cleared, owner released ──
+      expect((await utils.getIssue(passing.id))?.status).toBe("closed");
+      const approvedFields = await utils.getProjectItemFieldValues(convergeProjectId, passing.id);
+      expect(approvedFields?.agent_status).toBe("completed");
+      expect(approvedFields?.agent_claimed_by).toBeUndefined();
+      expect(approvedFields?.agent_claimed_at).toBeUndefined();
+      const passingWorker = await registryEntry(utils, passingWorkerId);
+      expect(passingWorker?.status).toBe("idle");
+      expect(passingWorker?.currentTaskId).toBeUndefined();
+      const approvedComments = await utils.listIssueComments(passing.number);
+      const approval = approvedComments.find((c) => c.body.includes("## Agent Work Approved"));
+      expect(approval).toBeDefined();
+      expect(approval?.body).toContain(reviewerId);
+      expect(approvedComments.some((c) => c.body.includes("Auto-Approved by Convergence"))).toBe(
+        false
+      );
 
-    const report = data(
-      await utils.callTool("agent_manage", {
-        action: "converge_project",
-        projectId: fallbackProjectId,
-      })
-    );
-    expect(report.approved.map((a: { issue: number }) => a.issue)).toEqual([passing.number]);
-    expect(report.rejected.map((r: { issue: number }) => r.issue)).toEqual([failing.number]);
+      // ── reject path: stays open, claim cleared, feedback on the issue ──
+      expect((await utils.getIssue(failing.id))?.status).toBe("active");
+      const rejectedFields = await utils.getProjectItemFieldValues(convergeProjectId, failing.id);
+      expect(rejectedFields?.agent_status).toBe("unclaimed");
+      expect(rejectedFields?.agent_claimed_by).toBeUndefined();
+      const failingWorker = await registryEntry(utils, failingWorkerId);
+      expect(failingWorker?.status).toBe("idle");
+      expect(failingWorker?.currentTaskId).toBeUndefined();
+      const rejectedComments = await utils.listIssueComments(failing.number);
+      const rejection = rejectedComments.find((c) => c.body.includes("## Agent Work Rejected"));
+      expect(rejection).toBeDefined();
+      expect(rejection?.body).toContain("1 test(s) failing");
+      expect(rejectedComments.some((c) => c.body.includes("Auto-Rejected by Convergence"))).toBe(
+        false
+      );
 
-    // Approved: closed, claim + status fields cleared, owner released.
-    expect((await utils.getIssue(passing.id))?.status).toBe("closed");
-    const approvedFields = await utils.getProjectItemFieldValues(fallbackProjectId, passing.id);
-    expect(approvedFields?.agent_status).toBe("completed");
-    expect(approvedFields?.agent_claimed_by).toBeUndefined();
-    expect(approvedFields?.agent_claimed_at).toBeUndefined();
-    const passingWorker = await registryEntry(utils, passingWorkerId);
-    expect(passingWorker.status).toBe("idle");
-    expect(passingWorker.currentTaskId).toBeUndefined();
-    const approvedComments = await utils.listIssueComments(passing.number);
-    expect(
-      approvedComments.some((c) => c.body.includes("## Auto-Approved by Convergence Loop"))
-    ).toBe(true);
-    expect(approvedComments.some((c) => c.body.includes("## Agent Work Approved"))).toBe(false);
+      // The reviewer holds nothing afterwards.
+      const reviewer = await registryEntry(utils, reviewerId);
+      expect(reviewer?.currentTaskId).toBeUndefined();
 
-    // Rejected: stays open, claim cleared back to the pool, findings recorded.
-    expect((await utils.getIssue(failing.id))?.status).toBe("active");
-    const rejectedFields = await utils.getProjectItemFieldValues(fallbackProjectId, failing.id);
-    expect(rejectedFields?.agent_status).toBe("unclaimed");
-    expect(rejectedFields?.agent_claimed_by).toBeUndefined();
-    expect(rejectedFields?.agent_claimed_at).toBeUndefined();
-    const failingWorker = await registryEntry(utils, failingWorkerId);
-    expect(failingWorker.status).toBe("idle");
-    expect(failingWorker.currentTaskId).toBeUndefined();
-    const rejectedComments = await utils.listIssueComments(failing.number);
-    const autoRejection = rejectedComments.find((c) =>
-      c.body.includes("## Auto-Rejected by Convergence Loop")
-    );
-    expect(autoRejection).toBeDefined();
-    expect(autoRejection?.body).toContain("1 test(s) failing");
-
-    await closeIssue(utils, failing.id);
-    for (const decomposed of report.decomposed ?? []) {
-      for (const subtask of decomposed.subtasks) {
-        await closeIssue(utils, String(subtask));
+      // Tidy up: the rejected task and the fix subtask convergence created.
+      await closeIssue(utils, failing.id);
+      for (const decomposed of report.decomposed ?? []) {
+        for (const subtask of decomposed.subtasks) {
+          await closeIssue(utils, String(subtask));
+        }
       }
-    }
-  }, 300000);
+    },
+    300000
+  );
 
-  it("should converge_until_done: report progress per iteration and terminate on a converged project", async () => {
-    if (!utils) {
-      console.log("Skipping: utils not initialized (missing credentials)");
-      return;
-    }
+  fullIt(
+    "should converge_project without a reviewer: release the owner, clear the claim, comment and settle the issue",
+    async () => {
+      if (!utils) {
+        console.log("Skipping: utils not initialized (missing credentials)");
+        return;
+      }
 
-    const doneProjectId = await createScenarioProject(utils, `E2E Converge Done Project ${runId}`);
-    const workerId = await registerAgent(utils, `e2e-done-worker-${runId}`, "engineer");
-    const reviewerId = await registerAgent(utils, `e2e-done-reviewer-${runId}`, "reviewer");
-    registeredAgentIds.push(workerId, reviewerId);
+      // Contract (executor): without reviewerId there is no lifecycle call.
+      // The owner is released, the claim fields are cleared and agent_status
+      // becomes completed (approve) / unclaimed (reject), and the fallback
+      // writes an "Auto-Approved/Auto-Rejected by Convergence Loop" comment;
+      // an approved issue is closed, a rejected one stays open.
+      const fallbackProjectId = await createScenarioProject(
+        utils,
+        `E2E Converge Fallback Project ${runId}`
+      );
+      const passingWorkerId = await registerAgent(utils, `e2e-fallback-pass-${runId}`, "engineer");
+      const failingWorkerId = await registerAgent(utils, `e2e-fallback-fail-${runId}`, "engineer");
+      registeredAgentIds.push(passingWorkerId, failingWorkerId);
 
-    const delivered = await createIssueInProject(
-      utils,
-      doneProjectId,
-      `E2E Done Delivered Task ${runId}`,
-      "Task with a passing work product."
-    );
-    const pending = await createIssueInProject(
-      utils,
-      doneProjectId,
-      `E2E Done Pending Task ${runId}`,
-      "Task nobody has worked on yet."
-    );
+      const passing = await createIssueInProject(
+        utils,
+        fallbackProjectId,
+        `E2E Fallback Passing Task ${runId}`,
+        "Task whose submission passes validation."
+      );
+      const failing = await createIssueInProject(
+        utils,
+        fallbackProjectId,
+        `E2E Fallback Failing Task ${runId}`,
+        "Task whose submission has a failing test."
+      );
 
-    expect(
-      (
-        await checkoutTask(utils, {
-          agentId: workerId,
+      expect(
+        (
+          await checkoutTask(utils, {
+            agentId: passingWorkerId,
+            projectId: fallbackProjectId,
+            strategy: "oldest_first",
+          })
+        ).issueNumber
+      ).toBe(passing.number);
+      expect(
+        (
+          await checkoutTask(utils, {
+            agentId: failingWorkerId,
+            projectId: fallbackProjectId,
+            strategy: "oldest_first",
+          })
+        ).issueNumber
+      ).toBe(failing.number);
+
+      await submitWorkProduct(utils, passingWorkerId, passing.number, 0);
+      await submitWorkProduct(utils, failingWorkerId, failing.number, 1);
+
+      const report = data<ConvergeReport>(
+        await utils.callTool("agent_manage", {
+          action: "converge_project",
+          projectId: fallbackProjectId,
+        })
+      );
+      expect(report.approved.map((a: { issue: number }) => a.issue)).toEqual([passing.number]);
+      expect(report.rejected.map((r: { issue: number }) => r.issue)).toEqual([failing.number]);
+
+      // Approved: closed, claim + status fields cleared, owner released.
+      expect((await utils.getIssue(passing.id))?.status).toBe("closed");
+      const approvedFields = await utils.getProjectItemFieldValues(fallbackProjectId, passing.id);
+      expect(approvedFields?.agent_status).toBe("completed");
+      expect(approvedFields?.agent_claimed_by).toBeUndefined();
+      expect(approvedFields?.agent_claimed_at).toBeUndefined();
+      const passingWorker = await registryEntry(utils, passingWorkerId);
+      expect(passingWorker?.status).toBe("idle");
+      expect(passingWorker?.currentTaskId).toBeUndefined();
+      const approvedComments = await utils.listIssueComments(passing.number);
+      expect(
+        approvedComments.some((c) => c.body.includes("## Auto-Approved by Convergence Loop"))
+      ).toBe(true);
+      expect(approvedComments.some((c) => c.body.includes("## Agent Work Approved"))).toBe(false);
+
+      // Rejected: stays open, claim cleared back to the pool, findings recorded.
+      expect((await utils.getIssue(failing.id))?.status).toBe("active");
+      const rejectedFields = await utils.getProjectItemFieldValues(fallbackProjectId, failing.id);
+      expect(rejectedFields?.agent_status).toBe("unclaimed");
+      expect(rejectedFields?.agent_claimed_by).toBeUndefined();
+      expect(rejectedFields?.agent_claimed_at).toBeUndefined();
+      const failingWorker = await registryEntry(utils, failingWorkerId);
+      expect(failingWorker?.status).toBe("idle");
+      expect(failingWorker?.currentTaskId).toBeUndefined();
+      const rejectedComments = await utils.listIssueComments(failing.number);
+      const autoRejection = rejectedComments.find((c) =>
+        c.body.includes("## Auto-Rejected by Convergence Loop")
+      );
+      expect(autoRejection).toBeDefined();
+      expect(autoRejection?.body).toContain("1 test(s) failing");
+
+      await closeIssue(utils, failing.id);
+      for (const decomposed of report.decomposed ?? []) {
+        for (const subtask of decomposed.subtasks) {
+          await closeIssue(utils, String(subtask));
+        }
+      }
+    },
+    300000
+  );
+
+  fullIt(
+    "should converge_until_done: report progress per iteration and terminate on a converged project",
+    async () => {
+      if (!utils) {
+        console.log("Skipping: utils not initialized (missing credentials)");
+        return;
+      }
+
+      const doneProjectId = await createScenarioProject(
+        utils,
+        `E2E Converge Done Project ${runId}`
+      );
+      const workerId = await registerAgent(utils, `e2e-done-worker-${runId}`, "engineer");
+      const reviewerId = await registerAgent(utils, `e2e-done-reviewer-${runId}`, "reviewer");
+      registeredAgentIds.push(workerId, reviewerId);
+
+      const delivered = await createIssueInProject(
+        utils,
+        doneProjectId,
+        `E2E Done Delivered Task ${runId}`,
+        "Task with a passing work product."
+      );
+      const pending = await createIssueInProject(
+        utils,
+        doneProjectId,
+        `E2E Done Pending Task ${runId}`,
+        "Task nobody has worked on yet."
+      );
+
+      expect(
+        (
+          await checkoutTask(utils, {
+            agentId: workerId,
+            projectId: doneProjectId,
+            strategy: "oldest_first",
+          })
+        ).issueNumber
+      ).toBe(delivered.number);
+      await submitWorkProduct(utils, workerId, delivered.number, 0);
+
+      // Iteration 1: not done; one passing task to settle, one to assign.
+      const first = data<{ done: boolean; progress: unknown; nextActions: string[] }>(
+        await utils.callTool("agent_manage", {
+          action: "converge_until_done",
           projectId: doneProjectId,
-          strategy: "oldest_first",
+          iteration: 1,
+          maxIterations: 5,
         })
-      ).issueNumber
-    ).toBe(delivered.number);
-    await submitWorkProduct(utils, workerId, delivered.number, 0);
+      );
+      expect(first.done).toBe(false);
+      expect(first.progress).toMatchObject({
+        total: 2,
+        closed: 0,
+        open: 2,
+        withWorkProduct: 1,
+        withoutWorkProduct: 1,
+        passing: 1,
+        failing: 0,
+      });
+      expect(first.nextActions.join("\n")).toMatch(/converge_project/);
+      expect(first.nextActions.join("\n")).toMatch(/smart_assign/);
 
-    // Iteration 1: not done; one passing task to settle, one to assign.
-    const first = data(
-      await utils.callTool("agent_manage", {
-        action: "converge_until_done",
-        projectId: doneProjectId,
-        iteration: 1,
-        maxIterations: 5,
-      })
-    );
-    expect(first.done).toBe(false);
-    expect(first.progress).toMatchObject({
-      total: 2,
-      closed: 0,
-      open: 2,
-      withWorkProduct: 1,
-      withoutWorkProduct: 1,
-      passing: 1,
-      failing: 0,
-    });
-    expect(first.nextActions.join("\n")).toMatch(/converge_project/);
-    expect(first.nextActions.join("\n")).toMatch(/smart_assign/);
+      // Execute the suggested action: settle the passing task.
+      const report = data<ConvergeReport>(
+        await utils.callTool("agent_manage", {
+          action: "converge_project",
+          projectId: doneProjectId,
+          reviewerId,
+        })
+      );
+      expect(report.approved.map((a: { issue: number }) => a.issue)).toEqual([delivered.number]);
+      expect((await utils.getIssue(delivered.id))?.status).toBe("closed");
 
-    // Execute the suggested action: settle the passing task.
-    const report = data(
-      await utils.callTool("agent_manage", {
-        action: "converge_project",
-        projectId: doneProjectId,
-        reviewerId,
-      })
-    );
-    expect(report.approved.map((a: { issue: number }) => a.issue)).toEqual([delivered.number]);
-    expect((await utils.getIssue(delivered.id))?.status).toBe("closed");
+      // Iteration 2: one task left, nobody started it.
+      const second = data(
+        await utils.callTool("agent_manage", {
+          action: "converge_until_done",
+          projectId: doneProjectId,
+          iteration: 2,
+          maxIterations: 5,
+        })
+      );
+      expect(second.done).toBe(false);
+      expect(second.progress).toMatchObject({
+        total: 2,
+        closed: 1,
+        open: 1,
+        withoutWorkProduct: 1,
+      });
 
-    // Iteration 2: one task left, nobody started it.
-    const second = data(
-      await utils.callTool("agent_manage", {
-        action: "converge_until_done",
-        projectId: doneProjectId,
-        iteration: 2,
-        maxIterations: 5,
-      })
-    );
-    expect(second.done).toBe(false);
-    expect(second.progress).toMatchObject({ total: 2, closed: 1, open: 1, withoutWorkProduct: 1 });
-
-    // The remaining task is worked and closed by the (now idle) worker.
-    const claim = await checkoutTask(utils, {
-      agentId: workerId,
-      projectId: doneProjectId,
-      strategy: "oldest_first",
-    });
-    expect(claim.issueNumber).toBe(pending.number);
-    const completed = data(
-      await utils.callTool("agent_work", {
-        action: "complete_task",
+      // The remaining task is worked and closed by the (now idle) worker.
+      const claim = await checkoutTask(utils, {
         agentId: workerId,
-        taskId: String(pending.number),
-        summary: "Finished the last task",
-        closeIssue: true,
-        autoCheckoutNext: false,
-      })
-    );
-    expect(completed.success).toBe(true);
-
-    // Iteration 3: converged.
-    const third = data(
-      await utils.callTool("agent_manage", {
-        action: "converge_until_done",
         projectId: doneProjectId,
-        iteration: 3,
-        maxIterations: 5,
-      })
-    );
-    expect(third.done).toBe(true);
-    expect(third.reason).toBe("All issues closed");
-    expect(third.closedCount).toBe(2);
+        strategy: "oldest_first",
+      });
+      expect(claim.issueNumber).toBe(pending.number);
+      const completed = data(
+        await utils.callTool("agent_work", {
+          action: "complete_task",
+          agentId: workerId,
+          taskId: String(pending.number),
+          summary: "Finished the last task",
+          closeIssue: true,
+          autoCheckoutNext: false,
+        })
+      );
+      expect(completed.success).toBe(true);
 
-    // A runaway loop is cut off by maxIterations.
-    const capped = data(
-      await utils.callTool("agent_manage", {
-        action: "converge_until_done",
-        projectId: doneProjectId,
-        iteration: 3,
-        maxIterations: 2,
-      })
-    );
-    expect(capped.done).toBe(true);
-    expect(capped.reason).toBe("Max iterations reached");
-  }, 300000);
+      // Iteration 3: converged.
+      const third = data(
+        await utils.callTool("agent_manage", {
+          action: "converge_until_done",
+          projectId: doneProjectId,
+          iteration: 3,
+          maxIterations: 5,
+        })
+      );
+      expect(third.done).toBe(true);
+      expect(third.reason).toBe("All issues closed");
+      expect(third.closedCount).toBe(2);
+
+      // A runaway loop is cut off by maxIterations.
+      const capped = data(
+        await utils.callTool("agent_manage", {
+          action: "converge_until_done",
+          projectId: doneProjectId,
+          iteration: 3,
+          maxIterations: 2,
+        })
+      );
+      expect(capped.done).toBe(true);
+      expect(capped.reason).toBe("Max iterations reached");
+    },
+    300000
+  );
 
   // ────────────────────────────────────────────────────────────────────────
   // Native blockers + view pools
   // ────────────────────────────────────────────────────────────────────────
 
-  it("should honour native blockers in checkout_task {skipBlocked} and round-trip add/list/remove_blocker", async () => {
-    if (!utils) {
-      console.log("Skipping: utils not initialized (missing credentials)");
-      return;
-    }
+  fullIt(
+    "should honour native blockers in checkout_task {skipBlocked} and round-trip add/list/remove_blocker",
+    async () => {
+      if (!utils) {
+        console.log("Skipping: utils not initialized (missing credentials)");
+        return;
+      }
 
-    const blockerProjectId = await createScenarioProject(utils, `E2E Blocker Project ${runId}`);
-    const firstAgentId = await registerAgent(utils, `e2e-blocker-first-${runId}`, "engineer");
-    const secondAgentId = await registerAgent(utils, `e2e-blocker-second-${runId}`, "engineer");
-    registeredAgentIds.push(firstAgentId, secondAgentId);
+      const blockerProjectId = await createScenarioProject(utils, `E2E Blocker Project ${runId}`);
+      const firstAgentId = await registerAgent(utils, `e2e-blocker-first-${runId}`, "engineer");
+      const secondAgentId = await registerAgent(utils, `e2e-blocker-second-${runId}`, "engineer");
+      registeredAgentIds.push(firstAgentId, secondAgentId);
 
-    // B is created BEFORE A, so oldest_first would hand B out first if the
-    // blocker were ignored.
-    const blocked = await createIssueInProject(
-      utils,
-      blockerProjectId,
-      `E2E Blocker Blocked Task B ${runId}`,
-      "Blocked by A."
-    );
-    const blocker = await createIssueInProject(
-      utils,
-      blockerProjectId,
-      `E2E Blocker Blocking Task A ${runId}`,
-      "Blocks B."
-    );
+      // B is created BEFORE A, so oldest_first would hand B out first if the
+      // blocker were ignored.
+      const blocked = await createIssueInProject(
+        utils,
+        blockerProjectId,
+        `E2E Blocker Blocked Task B ${runId}`,
+        "Blocked by A."
+      );
+      const blocker = await createIssueInProject(
+        utils,
+        blockerProjectId,
+        `E2E Blocker Blocking Task A ${runId}`,
+        "Blocks B."
+      );
 
-    const edge = data(
+      const edge = data(
+        await utils.callTool("manage_issues", {
+          action: "add_blocker",
+          issueId: blocked.id,
+          blockingIssueId: blocker.id,
+        })
+      );
+      expect(edge.blockingIssueNumber).toBe(blocker.number);
+
+      const blockedBy = data<Dependency[]>(
+        await utils.callTool("manage_issues", {
+          action: "list_dependencies",
+          issueId: blocked.id,
+        })
+      );
+      expect(blockedBy).toHaveLength(1);
+      expect(blockedBy[0].blockingIssueNumber).toBe(blocker.number);
+      expect(blockedBy[0].state).toMatch(/open/i);
+
+      // While A is open, B is never handed out: the first agent gets A.
+      const first = await checkoutTask(utils, {
+        agentId: firstAgentId,
+        projectId: blockerProjectId,
+        strategy: "oldest_first",
+        skipBlocked: true,
+      });
+      expect(first.success).toBe(true);
+      expect(first.issueNumber).toBe(blocker.number);
+
+      // A is claimed, B is blocked: nothing is left for the second agent.
+      const none = await checkoutTask(utils, {
+        agentId: secondAgentId,
+        projectId: blockerProjectId,
+        strategy: "oldest_first",
+        skipBlocked: true,
+      });
+      expect(none.success).toBe(false);
+      const untouched = await utils.getProjectItemFieldValues(blockerProjectId, blocked.id);
+      expect(untouched?.agent_claimed_by).toBeUndefined();
+      expect(untouched?.agent_status).not.toBe("in_progress");
+
+      // Closing A releases B.
+      const completed = data(
+        await utils.callTool("agent_work", {
+          action: "complete_task",
+          agentId: firstAgentId,
+          taskId: String(blocker.number),
+          summary: "Finished the blocking task",
+          closeIssue: true,
+          autoCheckoutNext: false,
+        })
+      );
+      expect(completed.success).toBe(true);
+      expect((await utils.getIssue(blocker.id))?.status).toBe("closed");
+
+      const released = await checkoutTask(utils, {
+        agentId: secondAgentId,
+        projectId: blockerProjectId,
+        strategy: "oldest_first",
+        skipBlocked: true,
+      });
+      expect(released.success).toBe(true);
+      expect(released.issueNumber).toBe(blocked.number);
+      const claimed = await utils.getProjectItemFieldValues(blockerProjectId, blocked.id);
+      expect(claimed?.agent_claimed_by).toBe(secondAgentId);
+
+      const finished = data(
+        await utils.callTool("agent_work", {
+          action: "complete_task",
+          agentId: secondAgentId,
+          taskId: String(blocked.number),
+          summary: "Finished the formerly blocked task",
+          closeIssue: true,
+          autoCheckoutNext: false,
+        })
+      );
+      expect(finished.success).toBe(true);
+
+      // ── remove_blocker round trip ──
+      // D blocks C and C is older: with the edge, skipBlocked skips C; after
+      // remove_blocker, C is claimable again.
+      const unblocked = await createIssueInProject(
+        utils,
+        blockerProjectId,
+        `E2E Blocker Round Trip Task C ${runId}`,
+        "Blocked by D until the edge is removed."
+      );
+      const roundTripBlocker = await createIssueInProject(
+        utils,
+        blockerProjectId,
+        `E2E Blocker Round Trip Task D ${runId}`,
+        "Blocks C until the edge is removed."
+      );
       await utils.callTool("manage_issues", {
         action: "add_blocker",
-        issueId: blocked.id,
-        blockingIssueId: blocker.id,
-      })
-    );
-    expect(edge.blockingIssueNumber).toBe(blocker.number);
+        issueId: unblocked.id,
+        blockingIssueId: roundTripBlocker.id,
+      });
+      const listed = data<Dependency[]>(
+        await utils.callTool("manage_issues", {
+          action: "list_dependencies",
+          issueId: unblocked.id,
+        })
+      );
+      expect(listed.map((d: { blockingIssueNumber: number }) => d.blockingIssueNumber)).toEqual([
+        roundTripBlocker.number,
+      ]);
 
-    const blockedBy = data(
-      await utils.callTool("manage_issues", {
-        action: "list_dependencies",
-        issueId: blocked.id,
-      })
-    );
-    expect(blockedBy).toHaveLength(1);
-    expect(blockedBy[0].blockingIssueNumber).toBe(blocker.number);
-    expect(blockedBy[0].state).toMatch(/open/i);
-
-    // While A is open, B is never handed out: the first agent gets A.
-    const first = await checkoutTask(utils, {
-      agentId: firstAgentId,
-      projectId: blockerProjectId,
-      strategy: "oldest_first",
-      skipBlocked: true,
-    });
-    expect(first.success).toBe(true);
-    expect(first.issueNumber).toBe(blocker.number);
-
-    // A is claimed, B is blocked: nothing is left for the second agent.
-    const none = await checkoutTask(utils, {
-      agentId: secondAgentId,
-      projectId: blockerProjectId,
-      strategy: "oldest_first",
-      skipBlocked: true,
-    });
-    expect(none.success).toBe(false);
-    const untouched = await utils.getProjectItemFieldValues(blockerProjectId, blocked.id);
-    expect(untouched?.agent_claimed_by).toBeUndefined();
-    expect(untouched?.agent_status).not.toBe("in_progress");
-
-    // Closing A releases B.
-    const completed = data(
-      await utils.callTool("agent_work", {
-        action: "complete_task",
+      const viaEdge = await checkoutTask(utils, {
         agentId: firstAgentId,
-        taskId: String(blocker.number),
-        summary: "Finished the blocking task",
-        closeIssue: true,
-        autoCheckoutNext: false,
-      })
-    );
-    expect(completed.success).toBe(true);
-    expect((await utils.getIssue(blocker.id))?.status).toBe("closed");
+        projectId: blockerProjectId,
+        strategy: "oldest_first",
+        skipBlocked: true,
+      });
+      expect(viaEdge.issueNumber).toBe(roundTripBlocker.number);
 
-    const released = await checkoutTask(utils, {
-      agentId: secondAgentId,
-      projectId: blockerProjectId,
-      strategy: "oldest_first",
-      skipBlocked: true,
-    });
-    expect(released.success).toBe(true);
-    expect(released.issueNumber).toBe(blocked.number);
-    const claimed = await utils.getProjectItemFieldValues(blockerProjectId, blocked.id);
-    expect(claimed?.agent_claimed_by).toBe(secondAgentId);
+      await utils.callTool("manage_issues", {
+        action: "remove_blocker",
+        issueId: unblocked.id,
+        blockingIssueId: roundTripBlocker.id,
+      });
+      const afterRemoval = data(
+        await utils.callTool("manage_issues", {
+          action: "list_dependencies",
+          issueId: unblocked.id,
+        })
+      );
+      expect(afterRemoval).toHaveLength(0);
 
-    const finished = data(
-      await utils.callTool("agent_work", {
-        action: "complete_task",
+      const afterRemove = await checkoutTask(utils, {
         agentId: secondAgentId,
-        taskId: String(blocked.number),
-        summary: "Finished the formerly blocked task",
-        closeIssue: true,
-        autoCheckoutNext: false,
-      })
-    );
-    expect(finished.success).toBe(true);
+        projectId: blockerProjectId,
+        strategy: "oldest_first",
+        skipBlocked: true,
+      });
+      expect(afterRemove.success).toBe(true);
+      expect(afterRemove.issueNumber).toBe(unblocked.number);
 
-    // ── remove_blocker round trip ──
-    // D blocks C and C is older: with the edge, skipBlocked skips C; after
-    // remove_blocker, C is claimable again.
-    const unblocked = await createIssueInProject(
-      utils,
-      blockerProjectId,
-      `E2E Blocker Round Trip Task C ${runId}`,
-      "Blocked by D until the edge is removed."
-    );
-    const roundTripBlocker = await createIssueInProject(
-      utils,
-      blockerProjectId,
-      `E2E Blocker Round Trip Task D ${runId}`,
-      "Blocks C until the edge is removed."
-    );
-    await utils.callTool("manage_issues", {
-      action: "add_blocker",
-      issueId: unblocked.id,
-      blockingIssueId: roundTripBlocker.id,
-    });
-    const listed = data(
-      await utils.callTool("manage_issues", { action: "list_dependencies", issueId: unblocked.id })
-    );
-    expect(listed.map((d: { blockingIssueNumber: number }) => d.blockingIssueNumber)).toEqual([
-      roundTripBlocker.number,
-    ]);
+      for (const [agentId, issueNumber] of [
+        [firstAgentId, roundTripBlocker.number],
+        [secondAgentId, unblocked.number],
+      ] as const) {
+        const done = data(
+          await utils.callTool("agent_work", {
+            action: "complete_task",
+            agentId,
+            taskId: String(issueNumber),
+            summary: "Round trip task delivered",
+            closeIssue: true,
+            autoCheckoutNext: false,
+          })
+        );
+        expect(done.success).toBe(true);
+      }
+    },
+    360000
+  );
 
-    const viaEdge = await checkoutTask(utils, {
-      agentId: firstAgentId,
-      projectId: blockerProjectId,
-      strategy: "oldest_first",
-      skipBlocked: true,
-    });
-    expect(viaEdge.issueNumber).toBe(roundTripBlocker.number);
+  fullIt(
+    "should claim through checkout_task {view}: a created view is the pool, and a view without a sort order falls back to the strategy",
+    async () => {
+      if (!utils) {
+        console.log("Skipping: utils not initialized (missing credentials)");
+        return;
+      }
 
-    await utils.callTool("manage_issues", {
-      action: "remove_blocker",
-      issueId: unblocked.id,
-      blockingIssueId: roundTripBlocker.id,
-    });
-    const afterRemoval = data(
-      await utils.callTool("manage_issues", { action: "list_dependencies", issueId: unblocked.id })
-    );
-    expect(afterRemoval).toHaveLength(0);
+      // manage_project exposes create_view / list_views. GitHub's
+      // UpdateProjectV2ViewInput / CreateProjectV2ViewInput carry no sort
+      // field (only name, layout, filter and visibleFieldIds), so a view
+      // created through the API has an empty sort order. The claim path
+      // honours a view's sort order when GitHub stores one (covered in
+      // TaskCheckoutService unit tests); a view with no sort order must fall
+      // back to the strategy rather than break or reorder the pool.
+      const viewProjectId = await createScenarioProject(utils, `E2E View Project ${runId}`);
+      const viewAgentId = await registerAgent(utils, `e2e-view-agent-${runId}`, "engineer");
+      const otherAgentId = await registerAgent(utils, `e2e-view-other-${runId}`, "engineer");
+      registeredAgentIds.push(viewAgentId, otherAgentId);
 
-    const afterRemove = await checkoutTask(utils, {
-      agentId: secondAgentId,
-      projectId: blockerProjectId,
-      strategy: "oldest_first",
-      skipBlocked: true,
-    });
-    expect(afterRemove.success).toBe(true);
-    expect(afterRemove.issueNumber).toBe(unblocked.number);
-
-    for (const [agentId, issueNumber] of [
-      [firstAgentId, roundTripBlocker.number],
-      [secondAgentId, unblocked.number],
-    ] as const) {
-      const done = data(
-        await utils.callTool("agent_work", {
-          action: "complete_task",
-          agentId,
-          taskId: String(issueNumber),
-          summary: "Round trip task delivered",
-          closeIssue: true,
-          autoCheckoutNext: false,
+      const viewName = `E2E Pool View ${runId}`;
+      const created = data(
+        await utils.callTool("manage_project", {
+          action: "create_view",
+          projectId: viewProjectId,
+          name: viewName,
+          layout: "table",
         })
       );
-      expect(done.success).toBe(true);
-    }
-  }, 360000);
+      expect(created.id).toBeDefined();
+      expect(created.name).toBe(viewName);
 
-  it("should claim through checkout_task {view}: a created view is the pool, and a view without a sort order falls back to the strategy", async () => {
-    if (!utils) {
-      console.log("Skipping: utils not initialized (missing credentials)");
-      return;
-    }
-
-    // manage_project exposes create_view / list_views. GitHub's
-    // UpdateProjectV2ViewInput / CreateProjectV2ViewInput carry no sort
-    // field (only name, layout, filter and visibleFieldIds), so a view
-    // created through the API has an empty sort order. The claim path
-    // honours a view's sort order when GitHub stores one (covered in
-    // TaskCheckoutService unit tests); a view with no sort order must fall
-    // back to the strategy rather than break or reorder the pool.
-    const viewProjectId = await createScenarioProject(utils, `E2E View Project ${runId}`);
-    const viewAgentId = await registerAgent(utils, `e2e-view-agent-${runId}`, "engineer");
-    const otherAgentId = await registerAgent(utils, `e2e-view-other-${runId}`, "engineer");
-    registeredAgentIds.push(viewAgentId, otherAgentId);
-
-    const viewName = `E2E Pool View ${runId}`;
-    const created = data(
-      await utils.callTool("manage_project", {
-        action: "create_view",
-        projectId: viewProjectId,
-        name: viewName,
-        layout: "table",
-      })
-    );
-    expect(created.id).toBeDefined();
-    expect(created.name).toBe(viewName);
-
-    const views = data(
-      await utils.callTool("manage_project", {
-        action: "list_views",
-        projectId: viewProjectId,
-        name: viewName,
-      })
-    );
-    expect(views).toHaveLength(1);
-    expect(views[0].id).toBe(created.id);
-    expect(views[0].sortBy ?? []).toHaveLength(0);
-
-    const older = await createIssueInProject(
-      utils,
-      viewProjectId,
-      `E2E View Older Task ${runId}`,
-      "Created first."
-    );
-    const newer = await createIssueInProject(
-      utils,
-      viewProjectId,
-      `E2E View Newer Task ${runId}`,
-      "Created second."
-    );
-
-    const viaView = await checkoutTask(utils, {
-      agentId: viewAgentId,
-      projectId: viewProjectId,
-      strategy: "oldest_first",
-      view: viewName,
-    });
-    expect(viaView.success).toBe(true);
-    expect(viaView.issueNumber).toBe(older.number);
-
-    // A view that does not exist behaves the same way.
-    const viaUnknownView = await checkoutTask(utils, {
-      agentId: otherAgentId,
-      projectId: viewProjectId,
-      strategy: "oldest_first",
-      view: `no-such-view-${runId}`,
-    });
-    expect(viaUnknownView.success).toBe(true);
-    expect(viaUnknownView.issueNumber).toBe(newer.number);
-
-    for (const [agentId, issueNumber] of [
-      [viewAgentId, older.number],
-      [otherAgentId, newer.number],
-    ] as const) {
-      const done = data(
-        await utils.callTool("agent_work", {
-          action: "complete_task",
-          agentId,
-          taskId: String(issueNumber),
-          summary: "View pool task delivered",
-          closeIssue: true,
-          autoCheckoutNext: false,
+      const views = data<ProjectView[]>(
+        await utils.callTool("manage_project", {
+          action: "list_views",
+          projectId: viewProjectId,
+          name: viewName,
         })
       );
-      expect(done.success).toBe(true);
-    }
+      expect(views).toHaveLength(1);
+      expect(views[0].id).toBe(created.id);
+      expect(views[0].sortBy ?? []).toHaveLength(0);
 
-    await utils.callTool("manage_project", {
-      action: "delete_view",
-      projectId: viewProjectId,
-      viewId: created.id,
-    });
-  }, 300000);
+      const older = await createIssueInProject(
+        utils,
+        viewProjectId,
+        `E2E View Older Task ${runId}`,
+        "Created first."
+      );
+      const newer = await createIssueInProject(
+        utils,
+        viewProjectId,
+        `E2E View Newer Task ${runId}`,
+        "Created second."
+      );
+
+      const viaView = await checkoutTask(utils, {
+        agentId: viewAgentId,
+        projectId: viewProjectId,
+        strategy: "oldest_first",
+        view: viewName,
+      });
+      expect(viaView.success).toBe(true);
+      expect(viaView.issueNumber).toBe(older.number);
+
+      // A view that does not exist behaves the same way.
+      const viaUnknownView = await checkoutTask(utils, {
+        agentId: otherAgentId,
+        projectId: viewProjectId,
+        strategy: "oldest_first",
+        view: `no-such-view-${runId}`,
+      });
+      expect(viaUnknownView.success).toBe(true);
+      expect(viaUnknownView.issueNumber).toBe(newer.number);
+
+      for (const [agentId, issueNumber] of [
+        [viewAgentId, older.number],
+        [otherAgentId, newer.number],
+      ] as const) {
+        const done = data(
+          await utils.callTool("agent_work", {
+            action: "complete_task",
+            agentId,
+            taskId: String(issueNumber),
+            summary: "View pool task delivered",
+            closeIssue: true,
+            autoCheckoutNext: false,
+          })
+        );
+        expect(done.success).toBe(true);
+      }
+
+      await utils.callTool("manage_project", {
+        action: "delete_view",
+        projectId: viewProjectId,
+        viewId: created.id,
+      });
+    },
+    300000
+  );
 });

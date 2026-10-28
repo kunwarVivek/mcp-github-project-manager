@@ -1,7 +1,7 @@
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 import nock from "nock";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, describe, expect, it } from "vitest";
 import { registerCompoundExecutors } from "../../../infrastructure/tools/compound/register-executors";
 import { ToolRegistry } from "../../../infrastructure/tools/ToolRegistry";
 import { getActionCatalog, getToolCatalog, PUBLISHED_SURFACE } from "../utils/action-catalog";

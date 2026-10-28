@@ -1,6 +1,14 @@
 import { type ChildProcess, spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
+import type {
+  CallToolResult,
+  JSONRPCRequest,
+  JSONRPCResponse,
+  ListToolsResult,
+  Tool,
+} from "@modelcontextprotocol/client";
+import { asRecord, isRecord } from "./payload";
 
 /**
  * The subset of an issue the e2e suites assert on when reading an issue back
@@ -50,10 +58,11 @@ export class MCPToolTestUtils {
       SSE_ENABLED: "false",
     };
 
-    this.serverProcess = spawn("node", [MCPToolTestUtils.serverPath], {
+    const proc = spawn("node", [MCPToolTestUtils.serverPath], {
       env,
       stdio: ["pipe", "pipe", "pipe"],
     });
+    this.serverProcess = proc;
 
     // Wait for server to start
     await new Promise((resolve, reject) => {
@@ -61,12 +70,12 @@ export class MCPToolTestUtils {
         reject(new Error("Server startup timeout"));
       }, 10000);
 
-      this.serverProcess!.on("spawn", () => {
+      proc.on("spawn", () => {
         clearTimeout(timeout);
         resolve(void 0);
       });
 
-      this.serverProcess!.on("error", (error) => {
+      proc.on("error", (error) => {
         clearTimeout(timeout);
         reject(error);
       });
@@ -80,19 +89,20 @@ export class MCPToolTestUtils {
    * Stop the MCP server process
    */
   async stopServer(): Promise<void> {
-    if (this.serverProcess) {
-      this.serverProcess.kill("SIGTERM");
+    const proc = this.serverProcess;
+    if (proc) {
+      proc.kill("SIGTERM");
 
       // Wait for process to exit
       await new Promise<void>((resolve) => {
         const timeout = setTimeout(() => {
-          if (this.serverProcess && !this.serverProcess.killed) {
-            this.serverProcess.kill("SIGKILL");
+          if (!proc.killed) {
+            proc.kill("SIGKILL");
           }
           resolve();
         }, 5000);
 
-        this.serverProcess!.on("exit", () => {
+        proc.on("exit", () => {
           clearTimeout(timeout);
           resolve();
         });
@@ -106,7 +116,7 @@ export class MCPToolTestUtils {
    * Initialize MCP connection
    */
   private async initializeConnection(): Promise<void> {
-    const initRequest = {
+    const initRequest: JSONRPCRequest = {
       jsonrpc: "2.0",
       id: this.messageId++,
       method: "initialize",
@@ -123,9 +133,14 @@ export class MCPToolTestUtils {
   /**
    * Send a message to the MCP server and wait for response
    */
-  private async sendMessage(message: any): Promise<any> {
-    if (!this.serverProcess) {
+  private async sendMessage(message: JSONRPCRequest): Promise<JSONRPCResponse> {
+    const proc = this.serverProcess;
+    if (!proc) {
       throw new Error("Server is not running");
+    }
+    const { stdin, stdout, stderr } = proc;
+    if (!stdin || !stdout || !stderr) {
+      throw new Error("Server stdio pipes are not available");
     }
 
     return new Promise((resolve, reject) => {
@@ -142,12 +157,12 @@ export class MCPToolTestUtils {
         const lines = responseData.split("\n").filter((line) => line.trim());
         for (const line of lines) {
           try {
-            const response = JSON.parse(line);
-            if (response.id === message.id) {
+            const response: unknown = JSON.parse(line);
+            if (isRecord(response) && response.id === message.id) {
               clearTimeout(timeout);
-              this.serverProcess!.stdout!.off("data", onData);
-              this.serverProcess!.stderr!.off("data", onError);
-              resolve(response);
+              stdout.off("data", onData);
+              stderr.off("data", onError);
+              resolve(response as JSONRPCResponse);
               return;
             }
           } catch {
@@ -160,19 +175,19 @@ export class MCPToolTestUtils {
         // Drain stderr so the child process does not block on a full pipe.
       };
 
-      this.serverProcess!.stdout!.on("data", onData);
-      this.serverProcess!.stderr!.on("data", onError);
+      stdout.on("data", onData);
+      stderr.on("data", onError);
 
       // Send the message
-      this.serverProcess!.stdin!.write(`${JSON.stringify(message)}\n`);
+      stdin.write(`${JSON.stringify(message)}\n`);
     });
   }
 
   /**
    * List all available tools
    */
-  async listTools(): Promise<any[]> {
-    const request = {
+  async listTools(): Promise<Tool[]> {
+    const request: JSONRPCRequest = {
       jsonrpc: "2.0",
       id: this.messageId++,
       method: "tools/list",
@@ -181,18 +196,22 @@ export class MCPToolTestUtils {
 
     const response = await this.sendMessage(request);
 
-    if (response.error) {
+    if ("error" in response) {
       throw new Error(`Failed to list tools: ${response.error.message}`);
     }
 
-    return response.result?.tools || [];
+    return (response.result as ListToolsResult).tools ?? [];
   }
 
   /**
    * Call a specific tool with arguments
    */
-  async callTool(toolName: string, args: any): Promise<any> {
-    const request = {
+  async callTool(toolName: string, args: Record<string, unknown>): Promise<unknown> {
+    return MCPToolTestUtils.extractData(await this.callToolRaw(toolName, args));
+  }
+
+  private toolCallRequest(toolName: string, args: Record<string, unknown>): JSONRPCRequest {
+    return {
       jsonrpc: "2.0",
       id: this.messageId++,
       method: "tools/call",
@@ -201,37 +220,20 @@ export class MCPToolTestUtils {
         arguments: args,
       },
     };
-
-    const response = await this.sendMessage(request);
-
-    if (response.error) {
-      throw new Error(`Tool ${toolName} failed: ${response.error.message}`);
-    }
-
-    return MCPToolTestUtils.extractData(response.result);
   }
 
   /**
    * Call a specific tool and return raw MCP result (no extraction)
    */
-  async callToolRaw(toolName: string, args: any): Promise<any> {
-    const request = {
-      jsonrpc: "2.0",
-      id: this.messageId++,
-      method: "tools/call",
-      params: {
-        name: toolName,
-        arguments: args,
-      },
-    };
+  async callToolRaw(toolName: string, args: Record<string, unknown>): Promise<CallToolResult> {
+    const response = await this.sendMessage(this.toolCallRequest(toolName, args));
 
-    const response = await this.sendMessage(request);
-
-    if (response.error) {
+    if ("error" in response) {
       throw new Error(`Tool ${toolName} failed: ${response.error.message}`);
     }
 
-    return response.result;
+    // The server's tools/call result is a CallToolResult.
+    return response.result as CallToolResult;
   }
 
   /**
@@ -260,19 +262,33 @@ export class MCPToolTestUtils {
 
     // The compound surface answers with the action's payload; the granular
     // executor envelope is unwrapped if it is still there.
-    const payload = (result?.structuredContent ?? result) as {
-      items?: Array<{ contentId?: string; fieldValues?: Record<string, unknown> }>;
-    };
-    const items = payload?.items ?? [];
-    const item = items.find((i) => i.contentId === contentId);
-    return item ? (item.fieldValues ?? {}) : null;
+    const payload =
+      isRecord(result) && result.structuredContent ? result.structuredContent : result;
+    const items = isRecord(payload) && Array.isArray(payload.items) ? payload.items : [];
+    for (const item of items) {
+      if (isRecord(item) && item.contentId === contentId) {
+        return isRecord(item.fieldValues) ? item.fieldValues : {};
+      }
+    }
+    return null;
   }
 
   /**
    * Fetch a single issue by node id (or by issue number).
    */
   async getIssue(issueId: string | number): Promise<McpIssueState | null> {
-    return this.callTool("manage_issues", { action: "get", issueId: String(issueId) });
+    const issue = await this.callTool("manage_issues", { action: "get", issueId: String(issueId) });
+    if (!isRecord(issue)) return null;
+    const { id, number, title, status } = issue;
+    if (
+      typeof id !== "string" ||
+      typeof number !== "number" ||
+      typeof title !== "string" ||
+      typeof status !== "string"
+    ) {
+      return null;
+    }
+    return { id, number, title, status };
   }
 
   /**
@@ -282,24 +298,37 @@ export class MCPToolTestUtils {
     issueNumber: number
   ): Promise<Array<{ id: number; body: string; user: string; createdAt: string }>> {
     const comments = await this.callTool("manage_issues", { action: "list_comments", issueNumber });
-    return Array.isArray(comments) ? comments : [];
+    if (!Array.isArray(comments)) return [];
+    return comments.map((comment: unknown) => {
+      const c = asRecord(comment, "issue comment");
+      const { id, body, user, createdAt } = c;
+      if (
+        typeof id !== "number" ||
+        typeof body !== "string" ||
+        typeof user !== "string" ||
+        typeof createdAt !== "string"
+      ) {
+        throw new Error(`Malformed issue comment: ${JSON.stringify(c)}`);
+      }
+      return { id, body, user, createdAt };
+    });
   }
 
   /**
    * Extract domain data from MCP v2 tool response
    */
-  static extractData(result: any): any {
-    if (!result || typeof result !== "object") return result;
+  static extractData(result: unknown): unknown {
+    if (!isRecord(result)) return result;
     // Check for structuredContent first (MCP v2 with outputSchema)
     if (result.structuredContent) return result.structuredContent;
     // Extract from content[0].text
-    if (Array.isArray(result.content) && result.content[0]?.text) {
+    const first = Array.isArray(result.content) ? result.content[0] : undefined;
+    if (isRecord(first) && typeof first.text === "string" && first.text) {
       try {
-        const parsed = JSON.parse(result.content[0].text);
         // Recursively unwrap if needed
-        return MCPToolTestUtils.extractData(parsed);
+        return MCPToolTestUtils.extractData(JSON.parse(first.text));
       } catch {
-        return result.content[0].text;
+        return first.text;
       }
     }
     return result;
@@ -325,7 +354,7 @@ export class MCPToolTestUtils {
    */
   async testToolValidation(
     toolName: string,
-    invalidArgs: any
+    invalidArgs: Record<string, unknown>
   ): Promise<{ hasValidation: boolean; errorMessage?: string }> {
     try {
       await this.callTool(toolName, invalidArgs);
@@ -341,23 +370,26 @@ export class MCPToolTestUtils {
   /**
    * Extract content from MCP response
    */
-  static extractContent(response: any): string {
+  static extractContent(response: unknown): string {
     // Handle different response formats
     if (typeof response === "string") {
       try {
-        const parsed = JSON.parse(response);
-        return MCPToolTestUtils.extractContent(parsed);
+        return MCPToolTestUtils.extractContent(JSON.parse(response));
       } catch {
         return response;
       }
+    }
+
+    if (!isRecord(response)) {
+      return JSON.stringify(response);
     }
 
     // Handle MCP tool response format
     if (response.output) {
       if (typeof response.output === "string") {
         try {
-          const parsed = JSON.parse(response.output);
-          if (parsed.content) {
+          const parsed: unknown = JSON.parse(response.output);
+          if (isRecord(parsed) && parsed.content) {
             return typeof parsed.content === "string"
               ? parsed.content
               : JSON.stringify(parsed.content);
@@ -473,14 +505,14 @@ export const MCPTestHelpers = {
   /**
    * Validate that a tool response has the expected structure
    */
-  validateToolResponse(response: any, expectedFields: string[] = []): void {
+  validateToolResponse(response: unknown, expectedFields: string[] = []): void {
     expect(response).toBeDefined();
 
     // Handle different response formats
-    let actualResponse = response;
+    let actualResponse: unknown = response;
 
     // If response has output property, extract it
-    if (response.output && typeof response.output === "string") {
+    if (isRecord(response) && typeof response.output === "string") {
       try {
         actualResponse = JSON.parse(response.output);
       } catch {
@@ -499,7 +531,7 @@ export const MCPTestHelpers = {
    * Create test data for GitHub resources
    */
   createTestData: {
-    project: (overrides: any = {}) => ({
+    project: (overrides: Record<string, unknown> = {}) => ({
       title: `Test Project ${Date.now()}`,
       shortDescription: "E2E test project",
       owner: process.env.GITHUB_OWNER || "test-owner",
@@ -507,14 +539,14 @@ export const MCPTestHelpers = {
       ...overrides,
     }),
 
-    milestone: (overrides: any = {}) => ({
+    milestone: (overrides: Record<string, unknown> = {}) => ({
       title: `Test Milestone ${Date.now()}`,
       description: "E2E test milestone",
       dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
       ...overrides,
     }),
 
-    issue: (overrides: any = {}) => ({
+    issue: (overrides: Record<string, unknown> = {}) => ({
       title: `Test Issue ${Date.now()}`,
       description: "E2E test issue",
       assignees: [],
@@ -522,7 +554,7 @@ export const MCPTestHelpers = {
       ...overrides,
     }),
 
-    sprint: (overrides: any = {}) => ({
+    sprint: (overrides: Record<string, unknown> = {}) => ({
       title: `Test Sprint ${Date.now()}`,
       description: "E2E test sprint",
       startDate: new Date().toISOString(),

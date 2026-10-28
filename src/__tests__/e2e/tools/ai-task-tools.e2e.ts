@@ -39,12 +39,17 @@ const AI_GENERATE_ACTIONS = [
   "create_traceability_matrix",
 ];
 
+interface ParsedTask {
+  title?: string;
+  description?: string;
+}
+
 MCPToolTestUtils.createTestSuite(
   "AI Task Management Tools E2E",
   "both"
 )((utils: MCPToolTestUtils | undefined) => {
   let generatedPRDContent: string;
-  let parsedTasks: any[];
+  let parsedTasks: ParsedTask[];
   let projectId: string;
 
   describe("AI Tool Registration", () => {
@@ -55,11 +60,11 @@ MCPToolTestUtils.createTestSuite(
       }
       const tools = await utils.listTools();
 
-      const tool = tools.find((t: any) => t.name === AI_COMPOUND_TOOL);
+      const tool = tools.find((t) => t.name === AI_COMPOUND_TOOL);
       expect(tool).toBeDefined();
-      expect(tool.name).toBe(AI_COMPOUND_TOOL);
-      expect(tool.description).toBeDefined();
-      expect(tool.inputSchema).toBeDefined();
+      expect(tool?.name).toBe(AI_COMPOUND_TOOL);
+      expect(tool?.description).toBeDefined();
+      expect(tool?.inputSchema).toBeDefined();
     });
 
     it("should NOT list granular AI tool names", async () => {
@@ -68,7 +73,7 @@ MCPToolTestUtils.createTestSuite(
         return;
       }
       const tools = await utils.listTools();
-      const names = tools.map((t: any) => t.name);
+      const names = tools.map((t) => t.name);
 
       for (const granular of [
         "generate_prd",
@@ -195,7 +200,7 @@ MCPToolTestUtils.createTestSuite(
       const content = MCPToolTestUtils.extractContent(response);
 
       // Parse the response to get tasks
-      let responseData: { tasks?: unknown[] };
+      let responseData: { tasks?: ParsedTask[] };
       try {
         responseData = JSON.parse(content);
       } catch {
@@ -388,9 +393,11 @@ MCPToolTestUtils.createTestSuite(
 
         // Should either work with fallback or provide meaningful error
         expect(response).toBeDefined();
-      } catch (error: any) {
+      } catch (error) {
         // Should provide meaningful error message about missing credentials
-        expect(error.message).toMatch(/AI|credential|key|service/i);
+        expect(error instanceof Error ? error.message : String(error)).toMatch(
+          /AI|credential|key|service/i
+        );
       } finally {
         // Restore original key
         if (originalKey) {

@@ -148,8 +148,12 @@ describe("Resource System", () => {
 
   describe("Resource Events", () => {
     it("should emit events for resource operations", async () => {
-      const events: any[] = [];
-      manager.on("resource", (event: any) => events.push(event));
+      const events: Array<{
+        type: ResourceEventType;
+        resourceId: string;
+        resourceType: ResourceType;
+      }> = [];
+      manager.on("resource", (event) => events.push(event));
 
       const project = await manager.create<BaseProjectResource>(ResourceType.PROJECT, {
         title: "Test Project",

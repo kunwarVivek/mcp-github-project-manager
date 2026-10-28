@@ -74,17 +74,14 @@ describe("E2E Test Infrastructure Validation", () => {
     const result = await utils.callToolRaw("manage_project", {});
 
     expect(result.isError).toBe(true);
-    const message = result.content[0].text;
+    const first = result.content[0];
+    expect(first.type).toBe("text");
+    const message = first.type === "text" ? first.text : "";
     expect(message).toContain("validation error");
     expect(message).toContain("action");
   });
 
   it("should handle unknown tools gracefully", async () => {
-    try {
-      await utils.callTool("nonexistent_tool", {});
-      throw new Error("Should have thrown error for unknown tool");
-    } catch (error: any) {
-      expect(error.message).toContain("nonexistent_tool");
-    }
+    await expect(utils.callTool("nonexistent_tool", {})).rejects.toThrow("nonexistent_tool");
   });
 });

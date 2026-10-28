@@ -74,7 +74,7 @@ function printUsage() {
   console.log("  --platform-only          Platform validation");
   console.log("  --all                     Every e2e suite (default)");
   console.log("  --suite <name>            One suite by name (repeatable)");
-  console.log("                             names: " + Object.keys(SUITES).join(", "));
+  console.log(`                             names: ${Object.keys(SUITES).join(", ")}`);
 
   console.log(colorize("\nOptions:", "bright"));
   console.log("  --help, -h                Show this help message");
@@ -83,6 +83,13 @@ function printUsage() {
   console.log("  --verbose                 Enable verbose output");
   console.log("  --timeout <seconds>       Per-test timeout (default: 120 - the live API is slow)");
   console.log("  --json <path>             Also write a machine-readable summary");
+  console.log(
+    "  --tier <smoke|full>       Agent-orchestration live tier (E2E_TIER). smoke = product"
+  );
+  console.log(
+    "                             spine, ~600 GraphQL points; full (default) ~4,500. Without"
+  );
+  console.log("                             --suite/scope it selects the agents suite");
 
   console.log(colorize("\nExamples:", "bright"));
   console.log("  node scripts/run-e2e-tests.js");
@@ -90,6 +97,7 @@ function printUsage() {
   console.log("  node scripts/run-e2e-tests.js --build --verbose");
   console.log("  node scripts/run-e2e-tests.js --suite agents --suite workflows");
   console.log("  node scripts/run-e2e-tests.js --json /tmp/e2e-summary.json");
+  console.log("  node scripts/run-e2e-tests.js --real-api --tier smoke");
 }
 
 function checkEnvironment() {
@@ -174,6 +182,7 @@ function parseArgs() {
     verbose: false,
     timeout: 120,
     json: null,
+    tier: null,
   };
 
   const scopeFlags = {
@@ -232,6 +241,17 @@ function parseArgs() {
           i++; // Skip next argument
         }
         break;
+      case "--tier":
+        if (i + 1 < args.length) {
+          const tier = args[i + 1];
+          if (tier !== "smoke" && tier !== "full") {
+            console.log(colorize(`⚠️  Unknown tier "${tier}". Known: smoke, full`, "yellow"));
+          } else {
+            options.tier = tier;
+          }
+          i++; // Skip next argument
+        }
+        break;
       case "--json":
         if (i + 1 < args.length) {
           options.json = args[i + 1];
@@ -261,6 +281,9 @@ function buildTestCommand(options) {
     }
   } else if (options.scope) {
     filters.push(SUITES[options.scope]);
+  } else if (options.tier) {
+    // The tier only exists in the agent-orchestration suite.
+    filters.push(SUITES.agents);
   } else {
     filters.push("src/__tests__/e2e");
   }
@@ -278,6 +301,9 @@ function buildTestCommand(options) {
   const env = { ...process.env };
   if (options.realApi) {
     env.E2E_REAL_API = "true";
+  }
+  if (options.tier) {
+    env.E2E_TIER = options.tier;
   }
 
   return { command, args: commandArgs, env, filters };
@@ -329,6 +355,7 @@ async function runTests(options) {
   console.log(`  Package manager: ${PM}`);
   console.log(`  Filters: ${filters.join(", ")}`);
   console.log(`  Timeout: ${options.timeout}s`);
+  console.log(`  Tier: ${options.tier ?? "full"}`);
   console.log(`  Verbose: ${options.verbose ? "Yes" : "No"}`);
 
   // Capture the output so the summary can be parsed, and still stream it.
@@ -364,6 +391,7 @@ async function runTests(options) {
       mode: options.realApi ? "real-api" : "mock",
       packageManager: PM,
       filters,
+      tier: options.tier ?? "full",
       timeoutSeconds: options.timeout,
       exitCode: code,
       ...summary,

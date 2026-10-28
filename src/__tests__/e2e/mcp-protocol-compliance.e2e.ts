@@ -2,6 +2,7 @@ import { type ChildProcess, spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import type { WireMessage } from "./utils/payload";
 
 const projectRoot = process.cwd();
 
@@ -33,7 +34,6 @@ describe("MCP Protocol Compliance E2E Tests", () => {
   afterEach(() => {
     if (serverProcess) {
       serverProcess.kill("SIGTERM");
-      serverProcess = null as any;
     }
   });
 
@@ -42,7 +42,7 @@ describe("MCP Protocol Compliance E2E Tests", () => {
       "should only output JSON messages to stdout, logs to stderr",
       async () => {
         let stderrData = "";
-        const stdoutMessages: any[] = [];
+        const stdoutMessages: WireMessage[] = [];
         const jsonParseErrors: string[] = [];
         let receivedInitResponse = false;
 
@@ -310,7 +310,7 @@ describe("MCP Protocol Compliance E2E Tests", () => {
     it(
       "should handle tool execution without stderr pollution in JSON responses",
       async () => {
-        const responseMessages: any[] = [];
+        const responseMessages: WireMessage[] = [];
         let stderrData = "";
 
         serverProcess = spawn("node", [serverPath], {
@@ -414,7 +414,7 @@ describe("MCP Protocol Compliance E2E Tests", () => {
     it(
       "should return proper MCP error responses for invalid requests",
       async () => {
-        const responseMessages: any[] = [];
+        const responseMessages: WireMessage[] = [];
 
         serverProcess = spawn("node", [serverPath], {
           env: {
@@ -487,10 +487,10 @@ describe("MCP Protocol Compliance E2E Tests", () => {
         const errorResponse = responseMessages.find((msg) => msg.id === 1 && msg.error);
 
         expect(errorResponse).toBeDefined();
-        expect(errorResponse.jsonrpc).toBe("2.0");
-        expect(errorResponse.error).toBeDefined();
-        expect(errorResponse.error.code).toBeDefined();
-        expect(errorResponse.error.message).toBeDefined();
+        expect(errorResponse?.jsonrpc).toBe("2.0");
+        expect(errorResponse?.error).toBeDefined();
+        expect(errorResponse?.error?.code).toBeDefined();
+        expect(errorResponse?.error?.message).toBeDefined();
       },
       testTimeout
     );
@@ -498,8 +498,7 @@ describe("MCP Protocol Compliance E2E Tests", () => {
 
   describe("MCP Inspector Compatibility", () => {
     it("should be compatible with MCP Inspector connection flow", async () => {
-      let initializeResponse: any = null;
-      let toolsListResponse: any = null;
+      const responses: { initialize?: WireMessage; toolsList?: WireMessage } = {};
 
       serverProcess = spawn("node", [serverPath], {
         env: {
@@ -528,9 +527,9 @@ describe("MCP Protocol Compliance E2E Tests", () => {
             try {
               const parsed = JSON.parse(trimmed);
               if (parsed.id === 1 && parsed.result) {
-                initializeResponse = parsed;
+                responses.initialize = parsed;
               } else if (parsed.id === 2 && parsed.result) {
-                toolsListResponse = parsed;
+                responses.toolsList = parsed;
               }
             } catch {
               // For debugging: log parse errors for potential responses
@@ -574,7 +573,7 @@ describe("MCP Protocol Compliance E2E Tests", () => {
       await new Promise((resolve, reject) => {
         const startTime = Date.now();
         const checkResponse = () => {
-          if (initializeResponse) {
+          if (responses.initialize) {
             resolve(undefined);
           } else if (Date.now() - startTime > 10000) {
             reject(new Error("Timeout waiting for initialize response"));
@@ -586,10 +585,10 @@ describe("MCP Protocol Compliance E2E Tests", () => {
       });
 
       // Verify initialize response
-      expect(initializeResponse).toBeDefined();
-      expect(initializeResponse.jsonrpc).toBe("2.0");
-      expect(initializeResponse.result).toBeDefined();
-      expect(initializeResponse.result.capabilities).toBeDefined();
+      expect(responses.initialize).toBeDefined();
+      expect(responses.initialize?.jsonrpc).toBe("2.0");
+      expect(responses.initialize?.result).toBeDefined();
+      expect(responses.initialize?.result?.capabilities).toBeDefined();
 
       // Step 2: Send initialized notification
       serverProcess.stdin?.write(
@@ -615,7 +614,7 @@ describe("MCP Protocol Compliance E2E Tests", () => {
       await new Promise((resolve, reject) => {
         const startTime = Date.now();
         const checkResponse = () => {
-          if (toolsListResponse) {
+          if (responses.toolsList) {
             resolve(undefined);
           } else if (Date.now() - startTime > 10000) {
             // Before timing out, try to process any remaining buffer content
@@ -623,7 +622,7 @@ describe("MCP Protocol Compliance E2E Tests", () => {
               try {
                 const parsed = JSON.parse(stdoutBuffer.trim());
                 if (parsed.id === 2 && parsed.result) {
-                  toolsListResponse = parsed;
+                  responses.toolsList = parsed;
                   resolve(undefined);
                   return;
                 }
@@ -643,17 +642,17 @@ describe("MCP Protocol Compliance E2E Tests", () => {
       });
 
       // Verify tools list response
-      expect(toolsListResponse).toBeDefined();
-      expect(toolsListResponse.result).toBeDefined();
-      expect(toolsListResponse.result.tools).toBeDefined();
-      expect(Array.isArray(toolsListResponse.result.tools)).toBe(true);
-      expect(toolsListResponse.result.tools.length).toBeGreaterThan(0);
+      expect(responses.toolsList).toBeDefined();
+      expect(responses.toolsList?.result).toBeDefined();
+      expect(responses.toolsList?.result?.tools).toBeDefined();
+      expect(Array.isArray(responses.toolsList?.result?.tools)).toBe(true);
+      expect(responses.toolsList?.result?.tools?.length).toBeGreaterThan(0);
 
       // Verify tool structure matches MCP specification
-      const firstTool = toolsListResponse.result.tools[0];
-      expect(firstTool.name).toBeDefined();
-      expect(firstTool.description).toBeDefined();
-      expect(firstTool.inputSchema).toBeDefined();
+      const firstTool = responses.toolsList?.result?.tools?.[0];
+      expect(firstTool?.name).toBeDefined();
+      expect(firstTool?.description).toBeDefined();
+      expect(firstTool?.inputSchema).toBeDefined();
     }, 30000); // Increase timeout for MCP Inspector test
   });
 });

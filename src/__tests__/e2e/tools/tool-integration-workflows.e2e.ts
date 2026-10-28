@@ -1,5 +1,23 @@
 import { vi } from "vitest";
 import { MCPToolTestUtils } from "../utils/MCPToolTestUtils";
+import { asRecord, type JsonObject } from "../utils/payload";
+
+/** Call a tool whose result must be a JSON object. */
+async function callRecord(
+  utils: MCPToolTestUtils,
+  name: string,
+  args: Record<string, unknown>
+): Promise<JsonObject> {
+  return asRecord(await utils.callTool(name, args), `${name} result`);
+}
+
+/** Narrow a payload field to a string or fail naming the field. */
+function str(value: unknown, what: string): string {
+  if (typeof value !== "string") {
+    throw new Error(`Expected ${what} to be a string, got ${JSON.stringify(value)}`);
+  }
+  return value;
+}
 
 /**
  * Comprehensive E2E tests for Tool Integration and Workflows
@@ -75,7 +93,7 @@ describe("Tool Integration Workflows E2E", () => {
       expect(workflowPRDContent).toContain("ProjectHub Pro");
 
       // Step 2: Create GitHub Project
-      const projectResponse = await utils.callTool("manage_project", {
+      const projectResponse = await callRecord(utils, "manage_project", {
         action: "create",
         title: "ProjectHub Pro Development",
         shortDescription: "Development project for ProjectHub Pro dashboard",
@@ -83,7 +101,7 @@ describe("Tool Integration Workflows E2E", () => {
         visibility: "private",
       });
 
-      workflowProjectId = projectResponse.id;
+      workflowProjectId = str(projectResponse.id, "project id");
       expect(workflowProjectId).toBeDefined();
 
       // Step 3: Parse PRD to generate tasks
@@ -105,14 +123,14 @@ describe("Tool Integration Workflows E2E", () => {
       expect(parseResponse).toBeDefined();
 
       // Step 4: Create milestone for first phase
-      const milestoneResponse = await utils.callTool("manage_milestones", {
+      const milestoneResponse = await callRecord(utils, "manage_milestones", {
         action: "create",
         title: "Phase 1: Core Infrastructure",
         description: "Establish core infrastructure and basic functionality",
         dueDate: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString(), // 60 days
       });
 
-      workflowMilestoneId = milestoneResponse.id;
+      workflowMilestoneId = str(milestoneResponse.id, "milestone id");
       expect(workflowMilestoneId).toBeDefined();
 
       console.log("✅ Complete project setup workflow executed successfully");
@@ -132,7 +150,7 @@ describe("Tool Integration Workflows E2E", () => {
       const owner = process.env.GITHUB_OWNER || "test-owner";
 
       // Create project
-      const project = await utils.callTool("manage_project", {
+      const project = await callRecord(utils, "manage_project", {
         action: "create",
         title: "ProjectHub Pro Roadmap",
         shortDescription: "Complete development roadmap for ProjectHub Pro",
@@ -142,14 +160,14 @@ describe("Tool Integration Workflows E2E", () => {
       expect(project.id).toBeDefined();
 
       // Phase 1 milestone + issues
-      const milestone1 = await utils.callTool("manage_milestones", {
+      const milestone1 = await callRecord(utils, "manage_milestones", {
         action: "create",
         title: "Phase 1: Foundation",
         description: "Core infrastructure and authentication",
         dueDate: new Date(Date.now() + 45 * 24 * 60 * 60 * 1000).toISOString(),
       });
 
-      const issue1 = await utils.callTool("manage_issues", {
+      const issue1 = await callRecord(utils, "manage_issues", {
         action: "create",
         title: "Set up project infrastructure",
         description: "Initialize project structure, CI/CD, and development environment",
@@ -159,7 +177,7 @@ describe("Tool Integration Workflows E2E", () => {
         labels: ["infrastructure", "setup"],
       });
 
-      const issue2 = await utils.callTool("manage_issues", {
+      const issue2 = await callRecord(utils, "manage_issues", {
         action: "create",
         title: "Implement user authentication",
         description: "Create secure authentication system with OAuth integration",
@@ -170,14 +188,14 @@ describe("Tool Integration Workflows E2E", () => {
       });
 
       // Phase 2 milestone + issues
-      const milestone2 = await utils.callTool("manage_milestones", {
+      const milestone2 = await callRecord(utils, "manage_milestones", {
         action: "create",
         title: "Phase 2: Core Features",
         description: "Dashboard and project management features",
         dueDate: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString(),
       });
 
-      const issue3 = await utils.callTool("manage_issues", {
+      const issue3 = await callRecord(utils, "manage_issues", {
         action: "create",
         title: "Build main dashboard",
         description: "Create responsive dashboard with real-time analytics",
@@ -187,7 +205,7 @@ describe("Tool Integration Workflows E2E", () => {
         labels: ["dashboard", "analytics"],
       });
 
-      const issue4 = await utils.callTool("manage_issues", {
+      const issue4 = await callRecord(utils, "manage_issues", {
         action: "create",
         title: "Implement project management features",
         description: "Add project creation, task management, and team collaboration",
@@ -206,7 +224,12 @@ describe("Tool Integration Workflows E2E", () => {
       expect(issue4.id).toBeDefined();
 
       // Store created issue IDs for later use
-      workflowIssueIds.push(issue1.id, issue2.id, issue3.id, issue4.id);
+      workflowIssueIds.push(
+        str(issue1.id, "issue1 id"),
+        str(issue2.id, "issue2 id"),
+        str(issue3.id, "issue3 id"),
+        str(issue4.id, "issue4 id")
+      );
 
       console.log("✅ Comprehensive roadmap created with multiple milestones");
     });
@@ -221,7 +244,7 @@ describe("Tool Integration Workflows E2E", () => {
         return;
       }
 
-      const sprintResponse = await utils.callTool("manage_sprints", {
+      const sprintResponse = await callRecord(utils, "manage_sprints", {
         action: "plan",
         sprint: {
           title: "Sprint 1: Foundation Setup",
@@ -241,7 +264,7 @@ describe("Tool Integration Workflows E2E", () => {
       expect(sprintResponse.title).toBe("Sprint 1: Foundation Setup");
       expect(sprintResponse.issues).toHaveLength(2);
 
-      workflowSprintId = sprintResponse.id;
+      workflowSprintId = str(sprintResponse.id, "sprint id");
       console.log("✅ Sprint planned with selected issues");
     });
   });
@@ -371,7 +394,7 @@ describe("Tool Integration Workflows E2E", () => {
         return;
       }
 
-      const metricsResponse = await utils.callTool("manage_milestones", {
+      const metricsResponse = await callRecord(utils, "manage_milestones", {
         action: "get_metrics",
         milestoneId: workflowMilestoneId,
         includeIssues: true,
@@ -395,7 +418,7 @@ describe("Tool Integration Workflows E2E", () => {
         return;
       }
 
-      const sprintMetricsResponse = await utils.callTool("manage_sprints", {
+      const sprintMetricsResponse = await callRecord(utils, "manage_sprints", {
         action: "get_metrics",
         sprintId: workflowSprintId,
         includeIssues: true,
@@ -530,7 +553,7 @@ describe("Tool Integration Workflows E2E", () => {
 
       // Verify all created resources exist and are properly linked
       if (workflowProjectId) {
-        const project = await utils.callTool("manage_project", {
+        const project = await callRecord(utils, "manage_project", {
           action: "get",
           projectId: workflowProjectId,
         });
@@ -538,7 +561,7 @@ describe("Tool Integration Workflows E2E", () => {
       }
 
       if (workflowMilestoneId) {
-        const milestoneMetrics = await utils.callTool("manage_milestones", {
+        const milestoneMetrics = await callRecord(utils, "manage_milestones", {
           action: "get_metrics",
           milestoneId: workflowMilestoneId,
           includeIssues: false,
@@ -547,7 +570,7 @@ describe("Tool Integration Workflows E2E", () => {
       }
 
       if (workflowSprintId) {
-        const sprintMetrics = await utils.callTool("manage_sprints", {
+        const sprintMetrics = await callRecord(utils, "manage_sprints", {
           action: "get_metrics",
           sprintId: workflowSprintId,
           includeIssues: false,
@@ -568,9 +591,9 @@ describe("Tool Integration Workflows E2E", () => {
       const tools = await utils.listTools();
 
       // Verify compound tool categories are present
-      const coreTools = tools.filter((t: any) => t.name.startsWith("manage_"));
+      const coreTools = tools.filter((t) => t.name.startsWith("manage_"));
 
-      const aiTools = tools.filter((t: any) => t.name.startsWith("ai_"));
+      const aiTools = tools.filter((t) => t.name.startsWith("ai_"));
 
       // Compound tools: manage_project, manage_issues, manage_milestones,
       // manage_sprints, manage_prs, manage_labels, manage_automation,
