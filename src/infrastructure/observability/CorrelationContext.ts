@@ -48,9 +48,9 @@ export interface TraceContext {
    *
    * Mutable on purpose: AI middleware increments it in-process as calls happen,
    * and the tool dispatcher debits the agent's budget ONCE at the end. Debiting
-   * per AI call would mean a GitHub read-modify-write round trip per LLM call
-   * (AgentStore is GitHub-backed and does not lock), which is both slow and
-   * prone to lost updates under concurrency.
+   * per AI call would mean a GitHub round trip per LLM call (AgentStore is
+   * GitHub-backed: each registry write is a read plus a compare-and-swap
+   * commit), which is both slow and a needless source of write contention.
    */
   usage?: { tokens: number };
 }

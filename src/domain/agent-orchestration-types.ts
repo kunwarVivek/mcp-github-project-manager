@@ -499,8 +499,21 @@ export const MAX_AGENT_HIERARCHY_DEPTH = 5;
  */
 export const MAX_AGENT_CHILDREN = 20;
 
-/** Label used to identify the agent registry issue. */
+/**
+ * Label of the LEGACY agent registry issue. The registry no longer lives in an
+ * issue; this is only used to find an old registry issue to migrate.
+ */
 export const AGENT_REGISTRY_LABEL = "agent-registry";
+
+/**
+ * Orphan branch that holds the agent registry file. The registry is stored
+ * through the GitHub Contents API with sha compare-and-swap, which an issue
+ * body cannot offer.
+ */
+export const AGENT_REGISTRY_BRANCH = "agent-registry";
+
+/** Path of the registry file on {@link AGENT_REGISTRY_BRANCH}. */
+export const AGENT_REGISTRY_FILE = "registry.json";
 
 /** Comment marker for structured work product data. */
 export const WORK_PRODUCT_MARKER = "<!-- agent-work-product:";

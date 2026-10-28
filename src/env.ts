@@ -239,8 +239,9 @@ export const SYNC_RESOURCES = getOptionalConfigValue(
 // makes the swarm self-healing: one crash no longer blocks a task forever.
 //
 // Note: the sweep never bootstraps the registry — it probes with
-// AgentStore.registryExists() and returns early when no registry issue exists,
-// so a repo that never opted into the agent layer is not mutated. Disable
+// AgentStore.registryExists() and returns early when neither the registry branch
+// nor a legacy registry issue exists, so a repo that never opted into the agent
+// layer is not mutated. Disable
 // entirely with AGENT_RECLAIM_ENABLED=false or AGENT_RECLAIM_INTERVAL_MS=0.
 export const AGENT_RECLAIM_ENABLED = getBooleanConfigValue("AGENT_RECLAIM_ENABLED", true);
 export const AGENT_RECLAIM_INTERVAL_MS = getNumericConfigValue("AGENT_RECLAIM_INTERVAL_MS", 300000); // 5 min; 0 = disabled
