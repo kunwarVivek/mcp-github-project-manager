@@ -10,6 +10,7 @@
  * does not support server-side filtering for project items.
  */
 
+import { projectFieldUnionSelection } from "../github/project-field-fragments";
 import { ANNOTATION_PATTERNS } from "./annotations/tool-annotations";
 import {
   type FilterProjectItemsInput,
@@ -77,6 +78,24 @@ const SEARCH_ISSUES_ADVANCED_QUERY = `
   }
 `;
 
+/**
+ * The selection of the `ProjectV2FieldConfiguration` union.
+ *
+ * The union has four members (text/number/date/..., single select, multi
+ * select, iteration) and a selection that omits one of them makes GitHub
+ * reject the whole query with "Could not resolve to a
+ * Unions::ProjectV2FieldConfiguration". Every field value therefore selects
+ * the union in full - see `projectFieldUnionSelection`.
+ */
+const PROJECT_FIELD_SELECTION = projectFieldUnionSelection();
+
+/**
+ * Reads the field values of a project item.
+ *
+ * `ProjectV2ItemFieldValue` is a union of thirteen members; the reader selects
+ * all of them, so every value kind a project item can carry - not just the
+ * single-select and text ones - is visible to a client.
+ */
 const LIST_PROJECT_ITEMS_QUERY = `
   query ListProjectItems($projectId: ID!, $first: Int!, $after: String) {
     node(id: $projectId) {
@@ -106,13 +125,78 @@ const LIST_PROJECT_ITEMS_QUERY = `
             }
             fieldValues(first: 20) {
               nodes {
+                __typename
+                ... on ProjectV2ItemFieldDateValue {
+                  date
+                  field { ${PROJECT_FIELD_SELECTION} }
+                }
+                ... on ProjectV2ItemFieldIterationValue {
+                  title
+                  iterationId
+                  startDate
+                  duration
+                  field { ${PROJECT_FIELD_SELECTION} }
+                }
+                ... on ProjectV2ItemFieldLabelValue {
+                  labels(first: 20) { nodes { name } }
+                  field { ${PROJECT_FIELD_SELECTION} }
+                }
+                ... on ProjectV2ItemFieldMilestoneValue {
+                  milestone { title }
+                  field { ${PROJECT_FIELD_SELECTION} }
+                }
+                ... on ProjectV2ItemFieldMultiSelectValue {
+                  options { name }
+                  value
+                  field { ${PROJECT_FIELD_SELECTION} }
+                }
+                ... on ProjectV2ItemFieldNumberValue {
+                  number
+                  field { ${PROJECT_FIELD_SELECTION} }
+                }
+                ... on ProjectV2ItemFieldPullRequestValue {
+                  pullRequests(first: 20) { nodes { number } }
+                  field { ${PROJECT_FIELD_SELECTION} }
+                }
+                ... on ProjectV2ItemFieldRepositoryValue {
+                  repository { nameWithOwner }
+                  field { ${PROJECT_FIELD_SELECTION} }
+                }
+                ... on ProjectV2ItemFieldReviewerValue {
+                  reviewers(first: 20) {
+                    nodes {
+                      ... on Bot { login }
+                      ... on EnterpriseTeam { name }
+                      ... on Mannequin { login }
+                      ... on Team { name }
+                      ... on User { login }
+                    }
+                  }
+                  field { ${PROJECT_FIELD_SELECTION} }
+                }
                 ... on ProjectV2ItemFieldSingleSelectValue {
                   name
-                  field { ... on ProjectV2SingleSelectField { name } }
+                  optionId
+                  field { ${PROJECT_FIELD_SELECTION} }
                 }
                 ... on ProjectV2ItemFieldTextValue {
                   text
-                  field { ... on ProjectV2Field { name } }
+                  field { ${PROJECT_FIELD_SELECTION} }
+                }
+                ... on ProjectV2ItemFieldUserValue {
+                  users(first: 20) { nodes { login } }
+                  field { ${PROJECT_FIELD_SELECTION} }
+                }
+                ... on ProjectV2ItemIssueFieldValue {
+                  issueFieldValue {
+                    __typename
+                    ... on IssueFieldDateValue { value }
+                    ... on IssueFieldMultiSelectValue { value options { name } }
+                    ... on IssueFieldNumberValue { value }
+                    ... on IssueFieldSingleSelectValue { value name }
+                    ... on IssueFieldTextValue { value }
+                  }
+                  field { ${PROJECT_FIELD_SELECTION} }
                 }
               }
             }
@@ -181,12 +265,52 @@ interface SearchIssuesResponse {
   };
 }
 
+/**
+ * The value of an issue field (the `issueFieldValue` of an item field value).
+ *
+ * `ProjectV2IssueFieldValues` is a union of five members whose `value` has a
+ * different type each (float for the number one, string for the rest), so the
+ * reader selects them member by member and discriminates on `__typename`.
+ */
+interface IssueFieldValueNode {
+  __typename?: string;
+  value?: string | number | null;
+  name?: string | null;
+  options?: Array<{ name: string }> | null;
+}
+
+/**
+ * A field value of a project item.
+ *
+ * `ProjectV2ItemFieldValue` is a union of thirteen members; the reader selects
+ * all of them and discriminates on `__typename`.
+ */
 interface FieldValueNode {
-  name?: string;
-  text?: string;
+  __typename?: string;
+  /** The name of the selected option (single select). */
+  name?: string | null;
+  optionId?: string | null;
+  /** The text of a text field. */
+  text?: string | null;
+  /** The date of a date field, e.g. "2024-01-01". */
+  date?: string | null;
+  /** The number of a number field. */
+  number?: number | null;
+  /** The title of an iteration field. */
+  title?: string | null;
+  iterationId?: string | null;
+  milestone?: { title?: string | null } | null;
+  repository?: { nameWithOwner?: string | null } | null;
+  labels?: { nodes: Array<{ name: string }> } | null;
+  users?: { nodes: Array<{ login: string }> } | null;
+  pullRequests?: { nodes: Array<{ number: number }> } | null;
+  reviewers?: { nodes: Array<{ login?: string | null; name?: string | null }> } | null;
+  /** The selected options of a multi select field. */
+  options?: Array<{ name: string }> | null;
+  issueFieldValue?: IssueFieldValueNode | null;
   field?: {
-    name: string;
-  };
+    name?: string | null;
+  } | null;
 }
 
 interface ProjectItemContentNode {
@@ -221,6 +345,103 @@ interface ListProjectItemsResponse {
       };
     };
   } | null;
+}
+
+/** Separator between the names of a field value that holds several of them. */
+const MULTI_VALUE_SEPARATOR = ", ";
+
+/**
+ * Join the names of a multi-valued field into one string.
+ *
+ * @returns the joined names, or null when there is none.
+ */
+function joinNames(names: string[]): string | null {
+  const parts = names.filter((name) => name.length > 0);
+  return parts.length > 0 ? parts.join(MULTI_VALUE_SEPARATOR) : null;
+}
+
+/**
+ * Render the value of an issue field (e.g. "Parent issue") as a string.
+ */
+function issueFieldValueToString(node: IssueFieldValueNode | null | undefined): string | null {
+  if (!node) return null;
+
+  switch (node.__typename) {
+    case "IssueFieldSingleSelectValue":
+      return node.name ?? (node.value != null ? String(node.value) : null);
+    case "IssueFieldMultiSelectValue":
+      return (
+        joinNames(node.options?.map((option) => option.name) ?? []) ??
+        (node.value != null ? String(node.value) : null)
+      );
+    default:
+      return node.value != null ? String(node.value) : null;
+  }
+}
+
+/**
+ * Render one field value of a project item as the flat string the tool
+ * advertises.
+ *
+ * `filter_project_items` returns the field values as a
+ * `Record<string, string | null>` keyed by field name, so every value kind is
+ * rendered as a deterministic string:
+ *
+ * | kind                 | rendering                                    |
+ * | -------------------- | -------------------------------------------- |
+ * | text                 | the text                                     |
+ * | number               | the number, e.g. "42"                        |
+ * | date                 | the date, e.g. "2024-01-01"                  |
+ * | single select        | the name of the selected option              |
+ * | multi select         | the names of the selected options            |
+ * | iteration            | the title of the iteration                   |
+ * | label                | the names of the labels                      |
+ * | milestone            | the title of the milestone                   |
+ * | repository           | "owner/repo"                                 |
+ * | reviewers            | the logins (users) or names (teams)          |
+ * | users                | the logins                                   |
+ * | linked pull requests | the PR numbers, e.g. "#123"                  |
+ * | issue field          | the value of the underlying issue field      |
+ *
+ * Multi-valued kinds join their names with ", ".
+ */
+function fieldValueToString(node: FieldValueNode): string | null {
+  switch (node.__typename) {
+    case "ProjectV2ItemFieldTextValue":
+      return node.text ?? null;
+    case "ProjectV2ItemFieldNumberValue":
+      return node.number != null ? String(node.number) : null;
+    case "ProjectV2ItemFieldDateValue":
+      return node.date ?? null;
+    case "ProjectV2ItemFieldSingleSelectValue":
+      return node.name ?? null;
+    case "ProjectV2ItemFieldMultiSelectValue":
+      return joinNames(node.options?.map((option) => option.name) ?? []);
+    case "ProjectV2ItemFieldIterationValue":
+      return node.title ?? node.iterationId ?? null;
+    case "ProjectV2ItemFieldLabelValue":
+      return joinNames(node.labels?.nodes.map((label) => label.name) ?? []);
+    case "ProjectV2ItemFieldMilestoneValue":
+      return node.milestone?.title ?? null;
+    case "ProjectV2ItemFieldRepositoryValue":
+      return node.repository?.nameWithOwner ?? null;
+    case "ProjectV2ItemFieldReviewerValue":
+      return joinNames(
+        node.reviewers?.nodes.map((reviewer) => reviewer.login ?? reviewer.name ?? "") ?? []
+      );
+    case "ProjectV2ItemFieldUserValue":
+      return joinNames(node.users?.nodes.map((user) => user.login) ?? []);
+    case "ProjectV2ItemFieldPullRequestValue":
+      return joinNames(
+        node.pullRequests?.nodes.map((pullRequest) => `#${pullRequest.number}`) ?? []
+      );
+    case "ProjectV2ItemIssueFieldValue":
+      return issueFieldValueToString(node.issueFieldValue);
+    default:
+      // A value without a type discriminator (a legacy fixture): fall back to
+      // the option name or the text it carries.
+      return node.name ?? node.text ?? null;
+  }
 }
 
 /**
@@ -559,8 +780,9 @@ export async function executeFilterProjectItems(args: FilterProjectItemsInput): 
     // Build field values map
     const fieldValues: Record<string, string | null> = {};
     for (const fv of node.fieldValues.nodes) {
-      if (fv.field?.name) {
-        fieldValues[fv.field.name] = fv.name ?? fv.text ?? null;
+      const fieldName = fv.field?.name;
+      if (fieldName) {
+        fieldValues[fieldName] = fieldValueToString(fv);
       }
     }
 

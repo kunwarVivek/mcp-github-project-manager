@@ -10,6 +10,7 @@ export enum ResourceType {
   VIEW = "view",
   FIELD = "field",
   COMMENT = "comment",
+  WORKFLOW = "workflow",
   // AI-related resource types
   PRD = "prd",
   AI_TASK = "ai_task",

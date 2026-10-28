@@ -6,7 +6,6 @@ import {
   AIRoadmapOutputSchema,
   AITriageOutputSchema,
   BulkOperationResultSchema,
-  SuccessOutputSchema,
 } from "./project-schemas";
 
 // ============================================================================
@@ -65,14 +64,6 @@ export const triageAllIssuesSchema = z.object({
 });
 
 export type TriageAllIssuesArgs = z.infer<typeof triageAllIssuesSchema>;
-
-export const scheduleTriagingSchema = z.object({
-  projectId: z.string().min(1, "Project ID is required"),
-  schedule: z.enum(["hourly", "daily", "weekly"]),
-  autoApply: z.boolean().default(false),
-});
-
-export type ScheduleTriagingArgs = z.infer<typeof scheduleTriagingSchema>;
 
 // ============================================================================
 // AI-Powered Automation Tool Definitions
@@ -201,29 +192,6 @@ export const triageAllIssuesTool: ToolDefinition<
         onlyUntriaged: true,
         autoApply: false,
         projectContext: "Mobile app for task management",
-      },
-    },
-  ],
-};
-
-export const scheduleTriagingTool: ToolDefinition<
-  ScheduleTriagingArgs,
-  z.infer<typeof SuccessOutputSchema>
-> = {
-  name: "schedule_triaging",
-  title: "Schedule Triaging",
-  description: "Schedule automated issue triaging to run periodically.",
-  schema: scheduleTriagingSchema as unknown as ToolSchema<ScheduleTriagingArgs>,
-  outputSchema: SuccessOutputSchema,
-  annotations: ANNOTATION_PATTERNS.create,
-  examples: [
-    {
-      name: "Daily triage",
-      description: "Set up daily automated triaging",
-      args: {
-        projectId: "PVT_kwDOLhQ7gc4AOEbH",
-        schedule: "daily",
-        autoApply: true,
       },
     },
   ],

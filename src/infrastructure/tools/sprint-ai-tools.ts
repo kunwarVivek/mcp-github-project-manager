@@ -16,6 +16,7 @@ import { SprintCapacityAnalyzer } from "../../services/ai/SprintCapacityAnalyzer
 import { SprintRiskAssessor } from "../../services/ai/SprintRiskAssessor";
 import { SprintSuggestionService } from "../../services/ai/SprintSuggestionService";
 import { ANNOTATION_PATTERNS } from "./annotations/tool-annotations";
+import { requireArray } from "./input-validation";
 import {
   type BacklogPrioritizationInput,
   BacklogPrioritizationInputSchema,
@@ -35,6 +36,19 @@ import {
   SprintSuggestionOutputSchema,
 } from "./schemas/sprint-roadmap-schemas";
 import type { ToolDefinition, ToolSchema } from "./ToolValidator";
+
+/**
+ * Days between two ISO dates, used when the caller sent the compound
+ * schema's sprint metrics (which carry start/end dates but no duration).
+ */
+function durationInDays(startDate: string, endDate: string): number {
+  const start = Date.parse(startDate);
+  const end = Date.parse(endDate);
+  if (Number.isNaN(start) || Number.isNaN(end)) {
+    return 0;
+  }
+  return Math.max(0, Math.round((end - start) / 86_400_000));
+}
 
 // ============================================================================
 // Tool Definitions
@@ -134,26 +148,50 @@ export const suggestSprintCompositionTool: ToolDefinition<
 export async function executeCalculateSprintCapacity(
   args: SprintCapacityInput
 ): Promise<SprintCapacityOutput> {
+  const action = "calculate_capacity";
+
+  // The compound schema is flat (one object holds the parameters of every
+  // action), so an action's own parameters arrive undefined unless the
+  // caller sends them - and `args.teamMembers.map` used to throw
+  // "Cannot read properties of undefined". Guard the argument and name it.
+  const teamMembers = requireArray(args.teamMembers, "teamMembers", action);
+
   const analyzer = new SprintCapacityAnalyzer();
 
   const result = await analyzer.calculateCapacity({
     velocity: args.velocity,
     sprintDurationDays: args.sprintDurationDays,
-    teamMembers: args.teamMembers.map((m) => ({
-      id: m.id,
-      name: m.name,
-      availability: m.availability,
-      skills: m.skills,
-    })),
-    historicalSprints: args.historicalSprints?.map((s) => ({
-      sprintId: s.sprintId,
-      sprintName: s.sprintName,
-      plannedPoints: s.plannedPoints,
-      completedPoints: s.completedPoints,
-      durationDays: s.durationDays,
-      startDate: s.startDate,
-      endDate: s.endDate,
-    })),
+    teamMembers: teamMembers.map((m) => {
+      // The compound schema speaks in `availabilityPercent`, the analyzer in
+      // an `availability` fraction (0-1). Accept both.
+      const member = m as SprintCapacityInput["teamMembers"][number] & {
+        availabilityPercent?: number;
+      };
+      return {
+        id: member.id ?? member.name,
+        name: member.name,
+        availability:
+          member.availability ??
+          (member.availabilityPercent !== undefined ? member.availabilityPercent / 100 : 1),
+        skills: member.skills,
+      };
+    }),
+    historicalSprints: args.historicalSprints?.map((s) => {
+      // Same story for sprint metrics: the compound schema offers `name`,
+      // the analyzer wants `sprintName` and a `durationDays`.
+      const sprint = s as NonNullable<SprintCapacityInput["historicalSprints"]>[number] & {
+        name?: string;
+      };
+      return {
+        sprintId: sprint.sprintId,
+        sprintName: sprint.sprintName ?? sprint.name ?? sprint.sprintId,
+        plannedPoints: sprint.plannedPoints,
+        completedPoints: sprint.completedPoints,
+        durationDays: sprint.durationDays ?? durationInDays(sprint.startDate, sprint.endDate),
+        startDate: sprint.startDate,
+        endDate: sprint.endDate,
+      };
+    }),
   });
 
   return result;
@@ -171,15 +209,17 @@ export async function executePrioritizeBacklog(
   const prioritizer = new BacklogPrioritizer();
 
   const result = await prioritizer.prioritize({
-    backlogItems: args.backlogItems.map((item) => ({
-      id: item.id,
-      title: item.title,
-      description: item.description,
-      points: item.points,
-      priority: item.priority,
-      labels: item.labels,
-      dependencies: item.dependencies,
-    })),
+    backlogItems: requireArray(args.backlogItems, "backlogItems", "prioritize_backlog").map(
+      (item) => ({
+        id: item.id,
+        title: item.title,
+        description: item.description,
+        points: item.points,
+        priority: item.priority,
+        labels: item.labels,
+        dependencies: item.dependencies,
+      })
+    ),
     sprintCapacity: args.sprintCapacity,
     businessGoals: args.businessGoals,
     riskTolerance: args.riskTolerance,
@@ -198,7 +238,7 @@ export async function executeAssessSprintRisk(args: SprintRiskInput): Promise<Sp
   const assessor = new SprintRiskAssessor();
 
   const result = await assessor.assessRisks({
-    sprintItems: args.sprintItems.map((item) => ({
+    sprintItems: requireArray(args.sprintItems, "sprintItems", "assess_risk").map((item) => ({
       id: item.id,
       title: item.title,
       description: item.description,
@@ -233,15 +273,17 @@ export async function executeSuggestSprintComposition(
   const service = new SprintSuggestionService();
 
   const result = await service.suggestSprintComposition({
-    backlogItems: args.backlogItems.map((item) => ({
-      id: item.id,
-      title: item.title,
-      description: item.description,
-      points: item.points,
-      priority: item.priority,
-      labels: item.labels,
-      dependencies: item.dependencies,
-    })),
+    backlogItems: requireArray(args.backlogItems, "backlogItems", "suggest_composition").map(
+      (item) => ({
+        id: item.id,
+        title: item.title,
+        description: item.description,
+        points: item.points,
+        priority: item.priority,
+        labels: item.labels,
+        dependencies: item.dependencies,
+      })
+    ),
     velocity: args.velocity,
     sprintDurationDays: args.sprintDurationDays,
     teamMembers: args.teamMembers?.map((m) => ({

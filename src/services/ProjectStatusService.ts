@@ -1,6 +1,11 @@
 import { inject, injectable } from "tsyringe";
 import type { ResourceStatus } from "../domain/resource-types";
-import type { CreateProject, Project } from "../domain/types";
+import type {
+  CreateProject,
+  Project,
+  ProjectCollaborator,
+  ProjectCollaboratorGrant,
+} from "../domain/types";
 import { filterByStatus, parseResourceStatus } from "../domain/utils/StatusParser";
 import type { GitHubRepositoryFactory } from "../infrastructure/github/GitHubRepositoryFactory";
 import type { GitHubProjectRepository } from "../infrastructure/github/repositories/GitHubProjectRepository";
@@ -139,6 +144,26 @@ export class ProjectStatusService {
         success: true,
         message: `Project ${data.projectId} has been deleted`,
       };
+    });
+  }
+
+  /**
+   * Sets the roles of a project's collaborators.
+   *
+   * GitHub has no read path for collaborator roles, so this is a write-only
+   * capability: the roles that were granted are the ones that come back.
+   *
+   * @param data - The project, the roles to grant and the organization that
+   *   owns the teams
+   * @returns The collaborators of the project, with the roles that were granted
+   */
+  async setProjectCollaborators(data: {
+    projectId: string;
+    org?: string;
+    collaborators: ProjectCollaboratorGrant[];
+  }): Promise<ProjectCollaborator[]> {
+    return safeCall(async () => {
+      return this.projectRepo.updateCollaborators(data.projectId, data.collaborators, data.org);
     });
   }
 }

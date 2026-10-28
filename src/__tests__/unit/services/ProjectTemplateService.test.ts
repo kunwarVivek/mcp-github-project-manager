@@ -16,6 +16,8 @@ describe("ProjectTemplateService", () => {
     mockProjectRepo = {
       findById: vi.fn(),
       createView: vi.fn(),
+      listViews: vi.fn(async () => []),
+      updateView: vi.fn(async () => ({ id: "VIEW_1", name: "Board", layout: "board" })),
       updateField: vi.fn(),
       deleteView: vi.fn(),
     };
@@ -241,43 +243,40 @@ describe("ProjectTemplateService", () => {
   });
 
   describe("listProjectViews", () => {
-    it("should list project views successfully", async () => {
-      mockGraphql.mockResolvedValueOnce({
-        node: {
-          views: {
-            nodes: [
-              { id: "VIEW_1", name: "Board", layout: "BOARD" },
-              { id: "VIEW_2", name: "Table", layout: "TABLE" },
-            ],
-          },
-        },
-      });
+    it("should list project views through the repository", async () => {
+      const views = [
+        { id: "VIEW_1", name: "Board", layout: "board" },
+        { id: "VIEW_2", name: "Table", layout: "table" },
+      ];
+      mockProjectRepo.listViews.mockResolvedValueOnce(views);
 
       const result = await service.listProjectViews({ projectId: "PROJECT_123" });
 
-      expect(result).toHaveLength(2);
-      expect(result[0]).toEqual(
-        expect.objectContaining({
-          id: "VIEW_1",
-          name: "Board",
-          layout: "board",
-        })
-      );
-      expect(result[1]).toEqual(
-        expect.objectContaining({
-          id: "VIEW_2",
-          name: "Table",
-          layout: "table",
-        })
-      );
+      expect(mockProjectRepo.listViews).toHaveBeenCalledWith("PROJECT_123", {
+        name: undefined,
+        viewId: undefined,
+      });
+      expect(result).toEqual(views);
+    });
+
+    it("should pass a view selection through to the repository", async () => {
+      const views = [{ id: "VIEW_2", name: "Claiming pool", layout: "table" }];
+      mockProjectRepo.listViews.mockResolvedValueOnce(views);
+
+      const result = await service.listProjectViews({
+        projectId: "PROJECT_123",
+        name: "Claiming pool",
+      });
+
+      expect(mockProjectRepo.listViews).toHaveBeenCalledWith("PROJECT_123", {
+        name: "Claiming pool",
+        viewId: undefined,
+      });
+      expect(result).toEqual(views);
     });
 
     it("should return empty array when project has no views", async () => {
-      mockGraphql.mockResolvedValueOnce({
-        node: {
-          views: null,
-        },
-      });
+      mockProjectRepo.listViews.mockResolvedValueOnce([]);
 
       const result = await service.listProjectViews({ projectId: "PROJECT_123" });
 
@@ -286,15 +285,11 @@ describe("ProjectTemplateService", () => {
   });
 
   describe("updateProjectView", () => {
-    it("should update view name successfully", async () => {
-      mockGraphql.mockResolvedValueOnce({
-        updateProjectV2View: {
-          projectV2View: {
-            id: "VIEW_1",
-            name: "Updated Board",
-            layout: "BOARD",
-          },
-        },
+    it("should update view name through the repository", async () => {
+      mockProjectRepo.updateView.mockResolvedValueOnce({
+        id: "VIEW_1",
+        name: "Updated Board",
+        layout: "board",
       });
 
       const result = await service.updateProjectView({
@@ -303,6 +298,9 @@ describe("ProjectTemplateService", () => {
         name: "Updated Board",
       });
 
+      expect(mockProjectRepo.updateView).toHaveBeenCalledWith("PROJECT_123", "VIEW_1", {
+        name: "Updated Board",
+      });
       expect(result).toEqual(
         expect.objectContaining({
           id: "VIEW_1",
@@ -312,15 +310,11 @@ describe("ProjectTemplateService", () => {
       );
     });
 
-    it("should update view layout successfully", async () => {
-      mockGraphql.mockResolvedValueOnce({
-        updateProjectV2View: {
-          projectV2View: {
-            id: "VIEW_1",
-            name: "Sprint View",
-            layout: "TABLE",
-          },
-        },
+    it("should update view layout through the repository", async () => {
+      mockProjectRepo.updateView.mockResolvedValueOnce({
+        id: "VIEW_1",
+        name: "Sprint View",
+        layout: "table",
       });
 
       const result = await service.updateProjectView({
@@ -329,15 +323,10 @@ describe("ProjectTemplateService", () => {
         layout: "table",
       });
 
+      expect(mockProjectRepo.updateView).toHaveBeenCalledWith("PROJECT_123", "VIEW_1", {
+        layout: "table",
+      });
       expect(result.layout).toBe("table");
-      expect(mockGraphql).toHaveBeenCalledWith(
-        expect.stringContaining("mutation($input: UpdateProjectV2ViewInput!)"),
-        expect.objectContaining({
-          input: expect.objectContaining({
-            layout: "TABLE",
-          }),
-        })
-      );
     });
   });
 

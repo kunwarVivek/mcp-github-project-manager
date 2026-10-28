@@ -4,10 +4,10 @@ import { GitHubConfig } from "./GitHubConfig";
 import { GitHubErrorHandler } from "./GitHubErrorHandler";
 import { RateLimitManager } from "./RateLimitManager";
 import type { IGitHubRepository } from "./repositories/BaseRepository";
-import { GitHubAutomationRuleRepository } from "./repositories/GitHubAutomationRuleRepository";
 import { GitHubIssueRepository } from "./repositories/GitHubIssueRepository";
 import { GitHubMilestoneRepository } from "./repositories/GitHubMilestoneRepository";
 import { GitHubProjectRepository } from "./repositories/GitHubProjectRepository";
+import { GitHubProjectWorkflowRepository } from "./repositories/GitHubProjectWorkflowRepository";
 import { GitHubSprintRepository } from "./repositories/GitHubSprintRepository";
 import { GitHubStatusUpdateRepository } from "./repositories/GitHubStatusUpdateRepository";
 import { GitHubSubIssueRepository } from "./repositories/GitHubSubIssueRepository";
@@ -133,10 +133,10 @@ export class GitHubRepositoryFactory {
   }
 
   /**
-   * Creates an instance of an Automation Rule Repository
+   * Creates an instance of a Project Workflow Repository
    */
-  createAutomationRuleRepository(): GitHubAutomationRuleRepository {
-    return new GitHubAutomationRuleRepository(this.octokit, this.config);
+  createProjectWorkflowRepository(): GitHubProjectWorkflowRepository {
+    return new GitHubProjectWorkflowRepository(this.octokit, this.config);
   }
 
   /**

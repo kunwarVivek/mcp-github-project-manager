@@ -1,4 +1,4 @@
-import type { FieldType, ViewLayout } from "../../domain/types";
+import type { ViewLayout } from "../../domain/types";
 
 export interface GraphQLResponse<T> {
   data?: T;
@@ -26,17 +26,74 @@ export interface ProjectV2Node {
   };
 }
 
+/**
+ * A project field as the view configuration reports it.
+ *
+ * `groupByFields`, `sortByFields.field` and `configuration.visibleFields`
+ * all point at the `ProjectV2FieldConfiguration` union, so a selection of
+ * them has to cover all four members (see `projectFieldUnionSelection`).
+ */
+export interface ProjectV2ViewFieldNode {
+  id: string;
+  name: string;
+}
+
 export interface ProjectV2ViewNode {
   id: string;
   name: string;
   layout: string;
-  groupByField?: {
-    field: { name: string };
+  /** The view's server-side filter expression; `null` when it has none. */
+  filter?: string | null;
+  /** The fields the view groups by, in order. */
+  groupByFields?: {
+    nodes?: ProjectV2ViewFieldNode[];
   };
-  sortByFields?: Array<{
-    field: { name: string };
-    direction: string;
-  }>;
+  /** The fields the view sorts by, with the direction of each. */
+  sortByFields?: {
+    nodes?: Array<{
+      direction: string;
+      field: ProjectV2ViewFieldNode;
+    }>;
+  };
+  /** The view's own configuration - which fields it shows. */
+  configuration?: {
+    visibleFields?: {
+      nodes?: ProjectV2ViewFieldNode[];
+    };
+  };
+}
+
+/**
+ * A user or a team - the members of the `ProjectV2Actor` union the
+ * collaborators payload returns.
+ */
+export interface ProjectV2ActorNode {
+  id: string;
+  /** Set for a user. */
+  login?: string;
+  /** Set for a team. */
+  slug?: string;
+  /** Set for a team. */
+  name?: string;
+  /** `User` or `Team`. */
+  __typename?: string;
+}
+
+/**
+ * The response of `updateProjectV2Collaborators`.
+ *
+ * The payload reports the project's collaborators - the actors that have
+ * access - but NOT their roles: `ProjectV2` has no `collaborators` field
+ * and `ProjectV2Actor` carries no role, so a role can never be read back
+ * from GitHub.
+ */
+export interface UpdateProjectV2CollaboratorsResponse {
+  updateProjectV2Collaborators: {
+    collaborators?: {
+      totalCount?: number;
+      nodes?: ProjectV2ActorNode[];
+    } | null;
+  } | null;
 }
 
 export interface ProjectV2FieldNode {
@@ -96,73 +153,76 @@ export interface UpdateProjectV2FieldResponse {
   };
 }
 
-export type GraphQLViewLayout =
-  | "BOARD_LAYOUT"
-  | "TABLE_LAYOUT"
-  | "TIMELINE_LAYOUT"
-  | "ROADMAP_LAYOUT";
+/**
+ * The layouts GitHub's GraphQL API accepts.
+ *
+ * `ProjectV2ViewLayout` has exactly three members — there is no timeline
+ * layout, so sending one is a schema error ("Expected type
+ * ProjectV2ViewLayout, found TIMELINE_LAYOUT").
+ */
+export type GraphQLViewLayout = "BOARD_LAYOUT" | "TABLE_LAYOUT" | "ROADMAP_LAYOUT";
+
+/**
+ * The field data types GitHub's GraphQL API can create.
+ *
+ * `ProjectV2CustomFieldType` has exactly six members. The other project
+ * fields (Assignees, Labels, Milestone, Repository, Tracked by, Tracks, …) are
+ * built-in fields GitHub adds to every project; the API cannot create them.
+ */
 export type GraphQLFieldType =
   | "TEXT"
   | "NUMBER"
   | "DATE"
   | "SINGLE_SELECT"
-  | "ITERATION"
-  | "MILESTONE"
-  | "ASSIGNEES"
-  | "LABELS"
-  | "REPOSITORY"
-  | "TRACKED_BY" // Fixed name to match mapToGraphQLFieldType
-  | "TRACKS"; // Fixed name to match mapToGraphQLFieldType
+  | "MULTI_SELECT"
+  | "ITERATION";
 
 /**
  * Maps domain view layout to GitHub GraphQL layout
+ *
+ * A layout GitHub does not have is rejected here with a readable message
+ * instead of failing later as a GraphQL schema error.
  */
 export function mapToGraphQLViewLayout(layout: ViewLayout): GraphQLViewLayout {
-  const mappings: Record<ViewLayout, GraphQLViewLayout> = {
+  const mappings: Partial<Record<ViewLayout, GraphQLViewLayout>> = {
     board: "BOARD_LAYOUT",
     table: "TABLE_LAYOUT",
-    timeline: "TIMELINE_LAYOUT",
     roadmap: "ROADMAP_LAYOUT",
   };
-  return mappings[layout];
+  const mapped = mappings[layout];
+  if (!mapped) {
+    throw new Error(
+      `GitHub Projects has no "${layout}" view layout — use board, table or roadmap.`
+    );
+  }
+  return mapped;
 }
 
 /**
- * Maps domain field type to GitHub GraphQL field type
+ * Maps a GitHub GraphQL layout back to the domain layout.
  */
-export function mapToGraphQLFieldType(type: FieldType): GraphQLFieldType {
-  const mappings: Partial<Record<string, GraphQLFieldType>> = {
-    text: "TEXT",
-    number: "NUMBER",
-    date: "DATE",
-    single_select: "SINGLE_SELECT",
-    iteration: "ITERATION",
-    milestone: "MILESTONE",
-    assignees: "ASSIGNEES",
-    labels: "LABELS",
-    repository: "REPOSITORY",
-    tracked_by: "TRACKED_BY",
-    tracks: "TRACKS",
-  };
-  return mappings[type] || "TEXT";
+export function fromGraphQLViewLayout(layout: string): ViewLayout {
+  switch (layout) {
+    case "TABLE_LAYOUT":
+      return "table";
+    case "ROADMAP_LAYOUT":
+      return "roadmap";
+    default:
+      return "board";
+  }
 }
 
 /**
- * Maps GitHub GraphQL field type to domain field type
+ * The sort direction GitHub's `OrderDirection` enum reports.
+ *
+ * The enum has exactly two members - ASC and DESC.
  */
-export function mapFromGraphQLFieldType(type: GraphQLFieldType): FieldType {
-  const mappings: Partial<Record<GraphQLFieldType, FieldType>> = {
-    TEXT: "text",
-    NUMBER: "number",
-    DATE: "date",
-    SINGLE_SELECT: "single_select",
-    ITERATION: "iteration",
-    MILESTONE: "milestone",
-    ASSIGNEES: "assignees",
-    LABELS: "labels",
-    REPOSITORY: "repository",
-    TRACKED_BY: "tracked_by",
-    // Remove the 'TRACKS' mapping as it doesn't have a corresponding FieldType
-  };
-  return mappings[type] || "text";
+export type GraphQLOrderDirection = "ASC" | "DESC";
+
+/**
+ * Maps the sort direction of a view's sort-by field to the domain
+ * direction. Anything GitHub reports that is not `DESC` sorts ascending.
+ */
+export function fromGraphQLOrderDirection(direction: string): GraphQLOrderDirection {
+  return direction === "DESC" ? "DESC" : "ASC";
 }

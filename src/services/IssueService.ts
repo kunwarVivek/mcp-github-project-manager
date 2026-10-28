@@ -1,4 +1,10 @@
-import type { CreateIssue, Issue } from "../domain/types";
+import type {
+  CreateIssue,
+  Issue,
+  IssueDependency,
+  IssueProjectMembership,
+  IssueTypeDefinition,
+} from "../domain/types";
 import { filterByStatus, parseResourceStatus } from "../domain/utils/StatusParser";
 import type { GitHubRepositoryFactory } from "../infrastructure/github/GitHubRepositoryFactory";
 import type { GitHubIssueRepository } from "../infrastructure/github/repositories/GitHubIssueRepository";
@@ -146,6 +152,7 @@ export class IssueService {
       milestoneId?: string | null;
       assignees?: string[];
       labels?: string[];
+      type?: string;
     }
   ): Promise<Issue> {
     return safeCall(async () => {
@@ -164,9 +171,64 @@ export class IssueService {
       }
 
       const issue = await this.issueRepo.update(issueId, data);
+      // The issue type is a separate write: the native organization issue
+      // type is not part of the issue update input.
+      if (updates.type) {
+        await this.issueRepo.setIssueType(issueId, updates.type);
+      }
       // Return plain object for MCP compatibility
       return issue;
     });
+  }
+
+  /**
+   * The native "blocked by" edges of an issue.
+   *
+   * `direction` selects which side of the edge is read: `blocked_by` are the
+   * issues that block this one, `blocking` are the issues this one blocks.
+   * The edges that predate the native API (`blocked-by:#123` labels) are
+   * merged into the answer, so a board wired up before the native edge
+   * exists keeps working.
+   */
+  async listIssueBlockers(
+    issueId: string,
+    direction: "blocked_by" | "blocking" = "blocked_by"
+  ): Promise<IssueDependency[]> {
+    return safeCall(async () => {
+      return direction === "blocking"
+        ? await this.issueRepo.listBlocking(issueId)
+        : await this.issueRepo.listBlockers(issueId);
+    });
+  }
+
+  /** Makes an issue blocked by another one (native edge). */
+  async addIssueBlocker(issueId: string, blockingIssueId: string): Promise<IssueDependency> {
+    return safeCall(async () => this.issueRepo.addBlocker(issueId, blockingIssueId));
+  }
+
+  /** Removes a native "blocked by" edge. */
+  async removeIssueBlocker(issueId: string, blockingIssueId: string): Promise<void> {
+    return safeCall(async () => this.issueRepo.removeBlocker(issueId, blockingIssueId));
+  }
+
+  /** The issue types the organization defines. */
+  async listIssueTypes(): Promise<IssueTypeDefinition[]> {
+    return safeCall(async () => this.issueRepo.listIssueTypes());
+  }
+
+  /**
+   * Sets the issue type.
+   *
+   * The native organization issue type is written when the deployment knows
+   * it; otherwise the `type:<name>` label emulation is used.
+   */
+  async setIssueType(issueId: string, issueType: string): Promise<IssueTypeDefinition | null> {
+    return safeCall(async () => this.issueRepo.setIssueType(issueId, issueType));
+  }
+
+  /** The projects an issue is tracked on (native reverse membership). */
+  async getIssueProjectMembership(issueId: string): Promise<IssueProjectMembership> {
+    return safeCall(async () => this.issueRepo.getProjectMembership(issueId));
   }
 
   async createIssueComment(data: { issueNumber: number; body: string }): Promise<IssueComment> {

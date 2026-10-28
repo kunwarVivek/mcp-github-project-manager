@@ -1,6 +1,6 @@
 import { ResourceNotFoundError } from "../domain/errors";
 import { ResourceType } from "../domain/resource-types";
-import type { CustomField, ProjectView } from "../domain/types";
+import type { CustomField, FieldType, ProjectView, ViewLayout } from "../domain/types";
 import type { GitHubRepositoryFactory } from "../infrastructure/github/GitHubRepositoryFactory";
 import type { GitHubProjectRepository } from "../infrastructure/github/repositories/GitHubProjectRepository";
 import { safeCall } from "./utils/safeCall";
@@ -105,7 +105,7 @@ export class ProjectTemplateService {
   async createProjectField(data: {
     projectId: string;
     name: string;
-    type: string;
+    type: FieldType;
     options?: Array<{
       name: string;
       color?: string;
@@ -115,7 +115,7 @@ export class ProjectTemplateService {
     return safeCall(async () => {
       return await this.projectRepo.createField(data.projectId, {
         name: data.name,
-        type: data.type as CustomField["type"],
+        type: data.type,
         options: data.options?.map((opt) => ({
           id: "", // Will be assigned by GitHub
           name: opt.name,
@@ -158,60 +158,29 @@ export class ProjectTemplateService {
   async createProjectView(data: {
     projectId: string;
     name: string;
-    layout: "board" | "table" | "timeline" | "roadmap";
+    layout: ViewLayout;
   }): Promise<ProjectView> {
     return safeCall(async () => {
       return await this.projectRepo.createView(data.projectId, data.name, data.layout);
     });
   }
 
-  async listProjectViews(data: { projectId: string }): Promise<ProjectView[]> {
+  /**
+   * The views of a project, with the configuration GitHub stores for them.
+   *
+   * `name` / `viewId` narrow the result down to a single view, so a caller
+   * can pick the view it wants to use as a pool.
+   */
+  async listProjectViews(data: {
+    projectId: string;
+    name?: string;
+    viewId?: string;
+  }): Promise<ProjectView[]> {
     return safeCall(async () => {
-      const query = `
-        query($projectId: ID!) {
-          node(id: $projectId) {
-            ... on ProjectV2 {
-              views(first: 20) {
-                nodes {
-                  id
-                  name
-                  layout
-                }
-              }
-            }
-          }
-        }
-      `;
-
-      interface ListViewsResponse {
-        node: {
-          views: {
-            nodes: Array<{
-              id: string;
-              name: string;
-              layout: string;
-            }>;
-          };
-        };
-      }
-
-      const response = await this.factory.graphql<ListViewsResponse>(query, {
-        projectId: data.projectId,
+      return this.projectRepo.listViews(data.projectId, {
+        name: data.name,
+        viewId: data.viewId,
       });
-
-      if (!response.node?.views?.nodes) {
-        return [];
-      }
-
-      return response.node.views.nodes.map((view) => ({
-        id: view.id,
-        name: view.name,
-        layout: view.layout.toLowerCase() as "board" | "table" | "timeline" | "roadmap",
-        fields: [], // These would need to be fetched separately if needed
-        sortBy: [],
-        groupBy: undefined,
-        filters: [],
-      }));
     });
   }
 
@@ -219,59 +188,18 @@ export class ProjectTemplateService {
     projectId: string;
     viewId: string;
     name?: string;
-    layout?: "board" | "table" | "timeline" | "roadmap";
+    layout?: ViewLayout;
   }): Promise<ProjectView> {
     return safeCall(async () => {
-      const mutation = `
-        mutation($input: UpdateProjectV2ViewInput!) {
-          updateProjectV2View(input: $input) {
-            projectV2View {
-              id
-              name
-              layout
-            }
-          }
-        }
-      `;
-
-      interface UpdateViewResponse {
-        updateProjectV2View: {
-          projectV2View: {
-            id: string;
-            name: string;
-            layout: string;
-          };
-        };
-      }
-
-      const input: Record<string, any> = {
-        projectId: data.projectId,
-        id: data.viewId,
-      };
-
-      if (data.name) {
-        input.name = data.name;
-      }
-
-      if (data.layout) {
-        input.layout = data.layout.toUpperCase();
-      }
-
-      const response = await this.factory.graphql<UpdateViewResponse>(mutation, {
-        input,
+      // The repository owns this mutation: `UpdateProjectV2ViewInput` carries
+      // the view id only (the project is implied by the view) and the layout
+      // enum is BOARD_LAYOUT / TABLE_LAYOUT / ROADMAP_LAYOUT. This service
+      // used to send `projectId` + `id` + a layout like "BOARD", which
+      // GitHub rejects on every call.
+      return this.projectRepo.updateView(data.projectId, data.viewId, {
+        ...(data.name !== undefined ? { name: data.name } : {}),
+        ...(data.layout !== undefined ? { layout: data.layout } : {}),
       });
-
-      const view = response.updateProjectV2View.projectV2View;
-
-      return {
-        id: view.id,
-        name: view.name,
-        layout: view.layout.toLowerCase() as "board" | "table" | "timeline" | "roadmap",
-        fields: [],
-        sortBy: [],
-        groupBy: undefined,
-        filters: [],
-      };
     });
   }
 

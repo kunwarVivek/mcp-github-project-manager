@@ -69,6 +69,23 @@ function makeStrategy(
           return { ...base, value: iterationValue.iterationId || String(raw) };
         },
       };
+    case "MULTI_SELECT":
+      return {
+        buildMutation: () =>
+          `mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $value: [String!]!) {
+            updateProjectV2ItemFieldValue(input: { projectId: $projectId, itemId: $itemId, fieldId: $fieldId, value: { multiSelectOptionIds: $value } }) { ${ITEM_FRAGMENT} }
+          }`,
+        buildVariables: (base, raw) => {
+          // The value is a list of option ids; a caller may name the options
+          // instead, so a name is resolved to its id.
+          const requested = (Array.isArray(raw) ? raw : [raw]).map((entry) => String(entry));
+          const ids = requested.map((entry) => {
+            const match = options?.find((option) => option.name === entry || option.id === entry);
+            return match?.id ?? entry;
+          });
+          return { ...base, value: ids };
+        },
+      };
     default:
       throw new ValidationError(`Unsupported field type: ${dataType}`);
   }
@@ -78,12 +95,12 @@ function makeStrategy(
  * Service for managing GitHub Projects v2 custom field values.
  *
  * Handles:
- * - Setting field values (text, number, date, single select, iteration)
+ * - Setting field values (text, number, date, single select, multi select, iteration)
  * - Getting field values for project items
  * - Clearing field values
  *
  * Uses GraphQL mutations to interact with the GitHub Projects v2 API.
- * Supports field types: TEXT, NUMBER, DATE, SINGLE_SELECT, ITERATION.
+ * Supports field types: TEXT, NUMBER, DATE, SINGLE_SELECT, MULTI_SELECT, ITERATION.
  *
  * Can be instantiated directly with a GitHubRepositoryFactory or via dependency injection.
  */
@@ -102,12 +119,15 @@ export class FieldValueService {
   }): Promise<{ success: boolean; message: string }> {
     return safeCall(async () => {
       // ProjectV2.field() only accepts `name`, so the field is looked up by its node ID.
+      // Every member of the `ProjectV2FieldConfiguration` union needs a
+      // fragment: a node that matches none of them comes back empty.
       const fieldQuery = `
         query($fieldId: ID!) {
           node(id: $fieldId) {
             ... on ProjectV2Field { id name dataType }
             ... on ProjectV2IterationField { id name dataType }
             ... on ProjectV2SingleSelectField { id name dataType options { id name } }
+            ... on ProjectV2MultiSelectField { id name dataType multiSelectOptions { id name } }
           }
         }
       `;
@@ -118,6 +138,7 @@ export class FieldValueService {
           name: string;
           dataType: string;
           options?: Array<{ id: string; name: string }>;
+          multiSelectOptions?: Array<{ id: string; name: string }>;
         } | null;
       }
 
@@ -131,7 +152,10 @@ export class FieldValueService {
       }
 
       const field = fieldResponse.node;
-      const strategy = makeStrategy(field.dataType, field.options);
+      const strategy = makeStrategy(
+        field.dataType,
+        field.dataType === "MULTI_SELECT" ? field.multiSelectOptions : field.options
+      );
       const mutation = strategy.buildMutation();
       const variables = strategy.buildVariables(
         { projectId: data.projectId, itemId: data.itemId, fieldId: data.fieldId },
@@ -159,6 +183,7 @@ export class FieldValueService {
                   ... on ProjectV2ItemFieldNumberValue { number field { ... on ProjectV2Field { id name } } }
                   ... on ProjectV2ItemFieldDateValue { date field { ... on ProjectV2Field { id name } } }
                   ... on ProjectV2ItemFieldSingleSelectValue { name optionId field { ... on ProjectV2SingleSelectField { id name } } }
+                  ... on ProjectV2ItemFieldMultiSelectValue { options { id name } field { ... on ProjectV2MultiSelectField { id name } } }
                   ... on ProjectV2ItemFieldIterationValue { title iterationId field { ... on ProjectV2IterationField { id name } } }
                 }
               }
@@ -177,6 +202,7 @@ export class FieldValueService {
               date?: string;
               name?: string;
               optionId?: string;
+              options?: Array<{ id: string; name: string }>;
               title?: string;
               iterationId?: string;
             }>;
@@ -214,6 +240,9 @@ export class FieldValueService {
       } else if ("optionId" in fieldValue) {
         value = { optionId: fieldValue.optionId, name: fieldValue.name };
         type = "SINGLE_SELECT";
+      } else if ("options" in fieldValue && fieldValue.options) {
+        value = { options: fieldValue.options };
+        type = "MULTI_SELECT";
       } else if ("iterationId" in fieldValue) {
         value = { iterationId: fieldValue.iterationId, title: fieldValue.title };
         type = "ITERATION";

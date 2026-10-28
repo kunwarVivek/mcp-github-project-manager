@@ -19,6 +19,7 @@
 
 import { RoadmapAIService } from "../../services/ai/RoadmapAIService";
 import { ANNOTATION_PATTERNS } from "./annotations/tool-annotations";
+import { requireValue } from "./input-validation";
 import {
   type RoadmapGenerationInput,
   RoadmapGenerationInputSchema,
@@ -87,10 +88,14 @@ export const generateRoadmapVisualizationTool: ToolDefinition<
  * @returns Generated roadmap with phases and milestones
  */
 export async function executeGenerateRoadmap(args: RoadmapGenerationInput): Promise<RoadmapOutput> {
+  // `requirements` is what the planner iterates over; without it the service
+  // died on `requirements.map` with an unreadable TypeError.
+  const requirements = requireValue(args.requirements, "requirements", "generate_roadmap");
+
   const service = new RoadmapAIService();
 
   const result = await service.generateRoadmap({
-    requirements: args.requirements,
+    requirements,
     constraints: args.constraints,
     businessContext: args.businessContext,
   });
@@ -107,9 +112,16 @@ export async function executeGenerateRoadmap(args: RoadmapGenerationInput): Prom
 export async function executeGenerateRoadmapVisualization(
   args: RoadmapOutput
 ): Promise<RoadmapVisualizationOutput> {
+  // The visualizer maps over `roadmap.phases`; an empty call used to crash
+  // on `roadmap.phases` being undefined.
+  const roadmap = requireValue(args, "roadmap", "generate_visualization");
+  if (!Array.isArray((roadmap as { phases?: unknown }).phases)) {
+    throw new Error("roadmap.phases is required for generate_visualization");
+  }
+
   const service = new RoadmapAIService();
 
-  const result = service.generateVisualizationData(args);
+  const result = service.generateVisualizationData(roadmap);
 
   return result;
 }
@@ -125,13 +137,3 @@ export const roadmapAITools: ToolDefinition<unknown>[] = [
   generateRoadmapTool as ToolDefinition<unknown>,
   generateRoadmapVisualizationTool as ToolDefinition<unknown>,
 ];
-
-/**
- * Map of tool names to executor functions.
- */
-export const roadmapAIExecutors: Record<string, (args: unknown) => Promise<unknown>> = {
-  generate_roadmap_requirements: executeGenerateRoadmap as (args: unknown) => Promise<unknown>,
-  generate_roadmap_visualization: executeGenerateRoadmapVisualization as (
-    args: unknown
-  ) => Promise<unknown>,
-};

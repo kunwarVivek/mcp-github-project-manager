@@ -1,143 +1,66 @@
-import { AutomationActionType, AutomationTriggerType } from "../../domain/automation-types";
+import type { ProjectWorkflow } from "../../domain/automation-types";
 
-// GitHub GraphQL automation types
-export type GitHubProjectRuleTriggerType =
-  | "ISSUE_ADDED"
-  | "ISSUE_EDITED"
-  | "PULL_REQUEST_OPENED"
-  | "PULL_REQUEST_MERGED"
-  | "PULL_REQUEST_APPROVED"
-  | "FIELD_VALUE_CHANGED";
+// GitHub GraphQL types for project automation workflows.
+//
+// The only workflow-related operations the API exposes are:
+//   - query  ProjectV2.workflows / ProjectV2.workflow(number)
+//   - query  node(id:) { ... on ProjectV2Workflow }
+//   - mutate deleteProjectV2Workflow(input: DeleteProjectV2WorkflowInput)
+//
+// There is no create/update mutation and the `ProjectV2Workflow` type carries
+// no trigger/action payload, so none is modelled here.
 
-export type GitHubProjectRuleActionType =
-  | "SET_FIELD_VALUE"
-  | "ADD_TO_PROJECT"
-  | "REMOVE_FROM_PROJECT"
-  | "COPY_FIELD_VALUE"
-  | "ADD_LABEL"
-  | "REMOVE_LABEL"
-  | "SET_MILESTONE";
-
-export interface GitHubProjectRuleNode {
+/** A project automation workflow as returned by the GraphQL API. */
+export interface GitHubProjectWorkflowNode {
   id: string;
-  databaseId: number;
+  name: string;
+  number: number;
+  enabled: boolean;
   createdAt: string;
   updatedAt: string;
-  isActive: boolean;
-  name: string;
-  ruleTrigger: {
-    type: GitHubProjectRuleTriggerType;
-    whenStateEquals?: string;
-    whenStateWas?: string;
-    whenFieldValueEquals?: string;
-    whenFieldId?: string;
-  };
-  ruleActions: Array<{
-    type: GitHubProjectRuleActionType;
-    fieldId?: string;
-    value?: string;
-    projectItemId?: string;
-    sourceFieldId?: string;
-    targetFieldId?: string;
-    labelName?: string;
-    milestoneId?: string;
-  }>;
+  project: { id: string } | null;
 }
 
-export interface CreateProjectRuleResponse {
-  createProjectV2Rule: {
-    projectRule: GitHubProjectRuleNode;
-  };
-}
-
-export interface UpdateProjectRuleResponse {
-  updateProjectV2Rule: {
-    projectRule: GitHubProjectRuleNode;
-  };
-}
-
-export interface DeleteProjectRuleResponse {
-  deleteProjectV2Rule: {
-    projectRule: {
-      id: string;
-    };
-  };
-}
-
-export interface GetProjectRuleResponse {
-  node: GitHubProjectRuleNode;
-}
-
-export interface ListProjectRulesResponse {
+/** Response of the `ProjectV2.workflows` connection query. */
+export interface ListProjectWorkflowsResponse {
   node: {
-    projectRules: {
-      nodes: GitHubProjectRuleNode[];
-    };
-  };
+    workflows: {
+      totalCount: number;
+      nodes: GitHubProjectWorkflowNode[];
+    } | null;
+  } | null;
+}
+
+/** Response of the `node(id:)` workflow lookup. */
+export interface GetProjectWorkflowResponse {
+  node: GitHubProjectWorkflowNode | null;
+}
+
+/** Response of the `deleteProjectV2Workflow` mutation. */
+export interface DeleteProjectWorkflowResponse {
+  deleteProjectV2Workflow: {
+    deletedWorkflowId: string | null;
+    projectV2: { id: string } | null;
+  } | null;
 }
 
 /**
- * Maps between domain and GitHub GraphQL automation types
+ * Maps a GraphQL workflow node onto the domain workflow.
+ *
+ * `fallbackProjectId` is used when the node carries no project link, which
+ * happens for the workflow connection query where the project is already known.
  */
-
-export function mapToGitHubTriggerType(
-  type: AutomationTriggerType
-): GitHubProjectRuleTriggerType | undefined {
-  const mappings: Partial<Record<AutomationTriggerType, GitHubProjectRuleTriggerType>> = {
-    // Use the actual enum values from AutomationTriggerType
-    [AutomationTriggerType.ISSUE_OPENED]: "ISSUE_ADDED",
-    [AutomationTriggerType.ISSUE_CLOSED]: "ISSUE_EDITED",
-    [AutomationTriggerType.ISSUE_LABELED]: "ISSUE_EDITED",
-    [AutomationTriggerType.ISSUE_ASSIGNED]: "ISSUE_EDITED",
-    [AutomationTriggerType.PR_OPENED]: "PULL_REQUEST_OPENED",
-    [AutomationTriggerType.PR_CLOSED]: "PULL_REQUEST_OPENED",
-    [AutomationTriggerType.PR_MERGED]: "PULL_REQUEST_MERGED",
-    [AutomationTriggerType.PR_APPROVED]: "PULL_REQUEST_APPROVED",
-    [AutomationTriggerType.RESOURCE_UPDATED]: "FIELD_VALUE_CHANGED",
+export function mapWorkflowNodeToProjectWorkflow(
+  node: GitHubProjectWorkflowNode,
+  fallbackProjectId = ""
+): ProjectWorkflow {
+  return {
+    id: node.id,
+    name: node.name,
+    number: node.number,
+    enabled: node.enabled,
+    projectId: node.project?.id ?? fallbackProjectId,
+    createdAt: new Date(node.createdAt),
+    updatedAt: new Date(node.updatedAt),
   };
-  return mappings[type];
-}
-
-export function mapFromGitHubTriggerType(
-  type: GitHubProjectRuleTriggerType
-): AutomationTriggerType {
-  const mappings: Record<GitHubProjectRuleTriggerType, AutomationTriggerType> = {
-    // Map from GitHub trigger types to actual domain enum values
-    ISSUE_ADDED: AutomationTriggerType.ISSUE_OPENED,
-    ISSUE_EDITED: AutomationTriggerType.RESOURCE_UPDATED, // Changed from non-existent ISSUE_UPDATED
-    PULL_REQUEST_OPENED: AutomationTriggerType.PR_OPENED,
-    PULL_REQUEST_MERGED: AutomationTriggerType.PR_MERGED,
-    PULL_REQUEST_APPROVED: AutomationTriggerType.PR_APPROVED,
-    FIELD_VALUE_CHANGED: AutomationTriggerType.RESOURCE_UPDATED,
-  };
-  return mappings[type];
-}
-
-export function mapToGitHubActionType(
-  type: AutomationActionType
-): GitHubProjectRuleActionType | undefined {
-  const mappings: Partial<Record<AutomationActionType, GitHubProjectRuleActionType>> = {
-    // Map using the correct enum values
-    [AutomationActionType.UPDATE_RESOURCE]: "SET_FIELD_VALUE",
-    [AutomationActionType.CREATE_RESOURCE]: "ADD_TO_PROJECT",
-    [AutomationActionType.DELETE_RESOURCE]: "REMOVE_FROM_PROJECT",
-    [AutomationActionType.ADD_LABEL]: "ADD_LABEL",
-    [AutomationActionType.REMOVE_LABEL]: "REMOVE_LABEL",
-    [AutomationActionType.CUSTOM_SCRIPT]: "COPY_FIELD_VALUE", // Best match
-  };
-  return mappings[type];
-}
-
-export function mapFromGitHubActionType(type: GitHubProjectRuleActionType): AutomationActionType {
-  const mappings: Record<GitHubProjectRuleActionType, AutomationActionType> = {
-    // Map from GitHub action types to actual domain enum values
-    SET_FIELD_VALUE: AutomationActionType.UPDATE_RESOURCE,
-    ADD_TO_PROJECT: AutomationActionType.CREATE_RESOURCE,
-    REMOVE_FROM_PROJECT: AutomationActionType.DELETE_RESOURCE,
-    COPY_FIELD_VALUE: AutomationActionType.CUSTOM_SCRIPT,
-    ADD_LABEL: AutomationActionType.ADD_LABEL,
-    REMOVE_LABEL: AutomationActionType.REMOVE_LABEL,
-    SET_MILESTONE: AutomationActionType.UPDATE_RESOURCE,
-  };
-  return mappings[type];
 }

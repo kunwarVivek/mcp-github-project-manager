@@ -21,7 +21,7 @@
  * | PRs | createPullRequest, listPullRequests, mergePullRequest, … | PullRequestService |
  * | Fields | setFieldValue, getFieldValue, clearFieldValue | FieldValueService |
  * | Labels | createLabel, listLabels | LabelService |
- * | Automation | createAutomationRule, listAutomationRules, … | ProjectAutomationService |
+ * | Automation | listProjectWorkflows, getProjectWorkflow, deleteProjectWorkflow | ProjectAutomationService |
  * | Iterations | getIterationConfiguration, getCurrentIteration, … | IterationService |
  */
 
@@ -32,12 +32,19 @@ import type {
   CreateProject,
   CreateSprint,
   CustomField,
+  FieldType,
   Issue,
+  IssueProjectMembership,
+  IssueTypeDefinition,
   Milestone,
+  IssueDependency as NativeIssueDependency,
   Project,
+  ProjectCollaborator,
+  ProjectCollaboratorGrant,
   ProjectItem,
   ProjectView,
   Sprint,
+  ViewLayout,
 } from "../domain/types";
 import type { GitHubRepositoryFactory } from "../infrastructure/github/GitHubRepositoryFactory";
 import type { FieldValueService } from "./FieldValueService";
@@ -46,13 +53,7 @@ import type { IterationService } from "./IterationService";
 import type { LabelService } from "./LabelService";
 import type { MilestoneMetrics } from "./MilestoneService";
 import { MilestoneService } from "./MilestoneService";
-import type {
-  AutomationRuleDTO,
-  AutomationRuleSummary,
-  CreateAutomationRuleInput,
-  ProjectAutomationService,
-  UpdateAutomationRuleInput,
-} from "./ProjectAutomationService";
+import type { ProjectAutomationService, ProjectWorkflowDTO } from "./ProjectAutomationService";
 import { ProjectLinkingService } from "./ProjectLinkingService";
 import { ProjectStatusService } from "./ProjectStatusService";
 import { ProjectTemplateService } from "./ProjectTemplateService";
@@ -291,7 +292,7 @@ export class ProjectManagementService {
   async createProjectField(data: {
     projectId: string;
     name: string;
-    type: string;
+    type: FieldType;
     options?: Array<{ name: string; color?: string; description?: string }>;
   }): Promise<CustomField> {
     return this.templateService.createProjectField(data);
@@ -307,7 +308,7 @@ export class ProjectManagementService {
   async createProjectView(data: {
     projectId: string;
     name: string;
-    layout?: "table" | "board" | "roadmap";
+    layout?: ViewLayout;
   }): Promise<ProjectView> {
     return this.templateService.createProjectView({
       projectId: data.projectId,
@@ -315,14 +316,18 @@ export class ProjectManagementService {
       layout: data.layout || "table",
     });
   }
-  async listProjectViews(data: { projectId: string }): Promise<ProjectView[]> {
+  async listProjectViews(data: {
+    projectId: string;
+    name?: string;
+    viewId?: string;
+  }): Promise<ProjectView[]> {
     return this.templateService.listProjectViews(data);
   }
   async updateProjectView(data: {
     projectId: string;
     viewId: string;
     name?: string;
-    layout?: "table" | "board" | "roadmap";
+    layout?: ViewLayout;
     filter?: string;
     sortBy?: Array<{ field: string; direction: "asc" | "desc" }>;
   }): Promise<ProjectView> {
@@ -333,6 +338,20 @@ export class ProjectManagementService {
     viewId: string;
   }): Promise<{ success: boolean; message: string }> {
     return this.templateService.deleteProjectView(data);
+  }
+
+  /**
+   * Sets the roles of a project's collaborators.
+   *
+   * GitHub has no read path for collaborator roles, so this is a write-only
+   * capability: the roles that were granted are the ones that come back.
+   */
+  async setProjectCollaborators(data: {
+    projectId: string;
+    org?: string;
+    collaborators: ProjectCollaboratorGrant[];
+  }): Promise<ProjectCollaborator[]> {
+    return this.projectStatusService.setProjectCollaborators(data);
   }
 
   // -- ProjectLinkingService --------------------------------------------------
@@ -413,9 +432,37 @@ export class ProjectManagementService {
       milestoneId?: string | null;
       assignees?: string[];
       labels?: string[];
+      type?: string;
     }
   ): Promise<Issue> {
     return this.issueService.updateIssue(issueId, updates);
+  }
+
+  // -- Native issue capabilities ---------------------------------------------
+  // The native "blocked by" edges, the native issue types and the reverse
+  // issue→project membership. The sub-issue relations above are a different
+  // concept (parent/child), hence the distinct names.
+
+  async listIssueBlockers(
+    issueId: string,
+    direction: "blocked_by" | "blocking" = "blocked_by"
+  ): Promise<NativeIssueDependency[]> {
+    return this.issueService.listIssueBlockers(issueId, direction);
+  }
+  async addIssueBlocker(issueId: string, blockingIssueId: string): Promise<NativeIssueDependency> {
+    return this.issueService.addIssueBlocker(issueId, blockingIssueId);
+  }
+  async removeIssueBlocker(issueId: string, blockingIssueId: string): Promise<void> {
+    return this.issueService.removeIssueBlocker(issueId, blockingIssueId);
+  }
+  async listIssueTypes(): Promise<IssueTypeDefinition[]> {
+    return this.issueService.listIssueTypes();
+  }
+  async setIssueType(issueId: string, issueType: string): Promise<IssueTypeDefinition | null> {
+    return this.issueService.setIssueType(issueId, issueType);
+  }
+  async getIssueProjectMembership(issueId: string): Promise<IssueProjectMembership> {
+    return this.issueService.getIssueProjectMembership(issueId);
   }
   async createIssueComment(data: {
     issueNumber: number;
@@ -566,44 +613,20 @@ export class ProjectManagementService {
 
   // -- ProjectAutomationService -----------------------------------------------
 
-  async createAutomationRule(data: CreateAutomationRuleInput): Promise<AutomationRuleDTO> {
-    return safeCall(() => this.automationService.createRuleFromInput(data));
-  }
-  async updateAutomationRule(
-    data: UpdateAutomationRuleInput
-  ): Promise<Omit<AutomationRuleDTO, "projectId">> {
-    return safeCall(() => this.automationService.updateRuleFromInput(data));
-  }
-  async deleteAutomationRule(data: { ruleId: string }): Promise<{ success: boolean }> {
-    return safeCall(async () => {
-      await this.automationService.deleteRule(data.ruleId);
-      return { success: true };
-    });
-  }
-  async getAutomationRule(data: { ruleId: string }): Promise<AutomationRuleDTO> {
-    return safeCall(() => this.automationService.getRuleDTO(data.ruleId));
-  }
-  async listAutomationRules(data: {
+  async listProjectWorkflows(data: {
     projectId: string;
-  }): Promise<{ rules: AutomationRuleSummary[] }> {
+  }): Promise<{ workflows: ProjectWorkflowDTO[] }> {
     return safeCall(async () => ({
-      rules: await this.automationService.listRuleSummaries(data.projectId),
+      workflows: await this.automationService.listWorkflowDTOs(data.projectId),
     }));
   }
-  async enableAutomationRule(data: {
-    ruleId: string;
-  }): Promise<{ id: string; name: string; enabled: boolean }> {
-    return safeCall(async () => {
-      const updated = await this.automationService.enableRule(data.ruleId);
-      return { id: updated.id, name: updated.name, enabled: updated.enabled };
-    });
+  async getProjectWorkflow(data: { workflowId: string }): Promise<ProjectWorkflowDTO> {
+    return safeCall(() => this.automationService.getWorkflowDTO(data.workflowId));
   }
-  async disableAutomationRule(data: {
-    ruleId: string;
-  }): Promise<{ id: string; name: string; enabled: boolean }> {
+  async deleteProjectWorkflow(data: { workflowId: string }): Promise<{ success: boolean }> {
     return safeCall(async () => {
-      const updated = await this.automationService.disableRule(data.ruleId);
-      return { id: updated.id, name: updated.name, enabled: updated.enabled };
+      await this.automationService.deleteWorkflow(data.workflowId);
+      return { success: true };
     });
   }
 

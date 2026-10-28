@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { executeDiscoverTools } from "../../../../infrastructure/tools/compound/compound-executors";
+import { registerCompoundExecutors } from "../../../../infrastructure/tools/compound/register-executors";
 import { ToolRegistry } from "../../../../infrastructure/tools/ToolRegistry";
 
 /**
@@ -129,5 +130,30 @@ describe("tool registration surface", () => {
       actions: string[];
     };
     expect(catalog.actions).toContain("enrich_issue_sections");
+  });
+
+  it("registers an executor only for a public tool", () => {
+    // The 82 granular executors that used to be registered here were
+    // unreachable: `dispatchTool` looks an executor up by the name the MCP
+    // client called, and a client can only call a compound tool. The
+    // granular tools remain DEFINED in the registry (they are the compound
+    // layer's implementation contract), but a granular EXECUTOR could never
+    // run. This test keeps that from silently growing back.
+    const registry = ToolRegistry.getInstance();
+    registerCompoundExecutors(registry);
+
+    const publicNames = new Set(registry.getToolsForMCP().map((t) => t.name));
+    const executorNames = registry.getExecutorNames();
+
+    const unreachable = executorNames.filter((name) => !publicNames.has(name));
+    expect(
+      unreachable,
+      `executors registered under a name no client can call: ${unreachable.join(", ")}`
+    ).toEqual([]);
+
+    // ...and the other direction: a public tool without an executor would
+    // answer every call with "Tool handler not implemented".
+    const missing = [...publicNames].filter((name) => !executorNames.includes(name));
+    expect(missing, `public tools without an executor: ${missing.join(", ")}`).toEqual([]);
   });
 });

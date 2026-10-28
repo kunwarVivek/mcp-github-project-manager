@@ -3,24 +3,59 @@ import type {
   CreateProject,
   CustomField,
   Project,
+  ProjectCollaborator,
+  ProjectCollaboratorGrant,
   ProjectId,
   ProjectRepository,
+  ProjectRole,
   ProjectView,
-  ViewLayout,
 } from "../../../domain/types";
 import {
   type CreateProjectV2ViewResponse,
-  type GraphQLFieldType,
+  fromGraphQLOrderDirection,
+  fromGraphQLViewLayout,
   mapToGraphQLViewLayout,
+  type ProjectV2ViewNode,
+  type UpdateProjectV2CollaboratorsResponse,
   type UpdateProjectV2ViewResponse,
 } from "../graphql-types";
+import { projectFieldUnionSelection } from "../project-field-fragments";
 import {
+  buildFieldOptions,
   type CreateProjectV2FieldResponse,
+  type FieldOptionInput,
   mapFromGraphQLFieldType,
   mapToGraphQLFieldType,
+  toGraphQLDate,
   type UpdateProjectV2FieldResponse,
 } from "../util/graphql-helpers";
 import { BaseGitHubRepository } from "./BaseRepository";
+
+/** The `CreateProjectV2FieldInput` payload the API accepts. */
+type CreateProjectV2FieldVariables = {
+  input: {
+    projectId: string;
+    dataType: string;
+    name: string;
+    singleSelectOptions?: FieldOptionInput[];
+    multiSelectOptions?: FieldOptionInput[];
+    iterationConfiguration?: {
+      startDate: string;
+      duration: number;
+      iterations: Array<{ title: string; startDate: string; duration: number }>;
+    };
+  };
+};
+
+/** The `UpdateProjectV2FieldInput` payload the API accepts. */
+type UpdateProjectV2FieldVariables = {
+  input: {
+    fieldId: string;
+    name?: string;
+    singleSelectOptions?: FieldOptionInput[];
+    multiSelectOptions?: FieldOptionInput[];
+  };
+};
 
 interface GitHubProject {
   id: string;
@@ -57,6 +92,20 @@ interface ListProjectsResponse {
 }
 
 /** ProjectV2.fields is a ProjectV2FieldConfiguration UNION — use fragments. */
+/**
+ * Does this look like a Project v2 field NODE ID rather than a field name?
+ *
+ * The ids differ per field type: "PVTF_" (text, number, date, ...),
+ * "PVTSSF_" (single select), "PVTMSF_" (multi select), "PVTIF_" (iteration).
+ * Only the first one used to be recognised, so a single-select id was passed
+ * to `field(name:)` as if it were a name and GitHub answered
+ * "Could not resolve to a Unions::ProjectV2FieldConfiguration with the name
+ * PVTSSF_...".
+ */
+function looksLikeFieldNodeId(value: string): boolean {
+  return /^PVT[A-Z]*_/.test(value);
+}
+
 const LIST_PROJECT_FIELDS_QUERY = `
   query($projectId: ID!) {
     node(id: $projectId) {
@@ -64,15 +113,52 @@ const LIST_PROJECT_FIELDS_QUERY = `
         fields(first: 100) {
           nodes {
             __typename
-            ... on ProjectV2Field { id name dataType }
-            ... on ProjectV2SingleSelectField { id name dataType }
-            ... on ProjectV2IterationField { id name dataType }
+            ${projectFieldUnionSelection()}
           }
         }
       }
     }
   }
 `;
+
+/** One option of a single-select or multi-select field. */
+interface ListedFieldOption {
+  id: string;
+  name: string;
+  description?: string;
+  color?: string;
+}
+
+/** A project field as the API reports it. */
+interface ListedProjectField {
+  id: string;
+  name: string;
+  /** The field data type, e.g. `TEXT` or `SINGLE_SELECT`. */
+  dataType: string;
+  options?: ListedFieldOption[];
+  multiSelectOptions?: ListedFieldOption[];
+  configuration?: {
+    duration: number;
+    startDay: string;
+    iterations: Array<{ id: string; title: string; startDate: string; duration: number }>;
+  };
+}
+
+/** The response of the project field list query. */
+interface ProjectFieldListResponse {
+  node?: {
+    fields?: {
+      nodes?: Array<{ id: string; name: string }>;
+    };
+  } | null;
+}
+
+/** The response of the single project field query. */
+interface ProjectFieldResponse {
+  node?: {
+    field?: ListedProjectField | null;
+  } | null;
+}
 
 export class GitHubProjectRepository extends BaseGitHubRepository implements ProjectRepository {
   async create(data: CreateProject): Promise<Project> {
@@ -399,14 +485,102 @@ export class GitHubProjectRepository extends BaseGitHubRepository implements Pro
       return {
         id: view.id,
         name: view.name,
-        layout: view.layout.toLowerCase() as ViewLayout,
+        layout: fromGraphQLViewLayout(view.layout),
         fields: [],
         sortBy: [],
-        groupBy: undefined,
         filters: [],
       };
     } catch (error) {
       this.logger.error(`Failed to create project view for project ${projectId}`, error);
+      throw this.handleGraphQLError(error);
+    }
+  }
+
+  /**
+   * The views of a project, with the configuration GitHub stores for them.
+   *
+   * The configuration is what makes a view usable as a server-side pool:
+   * `filter` is the predicate the view selects its items with, `groupByFields`
+   * and `sortByFields` are the field configurations the view groups and
+   * sorts by, and `configuration.visibleFields` are the fields it shows.
+   *
+   * @param projectId - The project to read the views of
+   * @param options - Narrow the result down to a single view, by name or id
+   */
+  async listViews(
+    projectId: ProjectId,
+    options: { name?: string; viewId?: string } = {}
+  ): Promise<ProjectView[]> {
+    const query = `
+      query($projectId: ID!) {
+        node(id: $projectId) {
+          ... on ProjectV2 {
+            views(first: 50) {
+              nodes {
+                id
+                name
+                layout
+                filter
+                groupByFields(first: 10) {
+                  nodes {
+                    ${projectFieldUnionSelection()}
+                  }
+                }
+                sortByFields(first: 10) {
+                  nodes {
+                    direction
+                    field {
+                      ${projectFieldUnionSelection()}
+                    }
+                  }
+                }
+                configuration {
+                  visibleFields(first: 50) {
+                    nodes {
+                      ${projectFieldUnionSelection()}
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    `;
+
+    interface ListViewsResponse {
+      node: {
+        views: {
+          nodes: ProjectV2ViewNode[];
+        };
+      } | null;
+    }
+
+    try {
+      const response = await this.graphql<ListViewsResponse>(query, { projectId });
+      const views = response.node?.views?.nodes ?? [];
+      const selected = views.filter(
+        (view) =>
+          (options.name === undefined || view.name === options.name) &&
+          (options.viewId === undefined || view.id === options.viewId)
+      );
+
+      return selected.map((view) => ({
+        id: view.id,
+        name: view.name,
+        layout: fromGraphQLViewLayout(view.layout),
+        fields: [],
+        sortBy: (view.sortByFields?.nodes ?? []).map((sort) => ({
+          field: sort.field.name,
+          direction: fromGraphQLOrderDirection(sort.direction),
+        })),
+        groupByFields: (view.groupByFields?.nodes ?? []).map((field) => field.name),
+        filter: view.filter ?? null,
+        visibleFields: (view.configuration?.visibleFields?.nodes ?? []).map((field) => field.name),
+        filters: [],
+      }));
+    } catch (error) {
+      this.logger.error(`Failed to list views for project ${projectId}`, error);
       throw this.handleGraphQLError(error);
     }
   }
@@ -429,8 +603,10 @@ export class GitHubProjectRepository extends BaseGitHubRepository implements Pro
     `;
 
     try {
+      // UpdateProjectV2ViewInput carries the view id only — the project is
+      // implied by the view. Sending `projectId` is a schema error
+      // ("Field 'projectId' is not defined by type 'UpdateProjectV2ViewInput'").
       const input: Record<string, any> = {
-        projectId,
         viewId,
       };
 
@@ -455,10 +631,9 @@ export class GitHubProjectRepository extends BaseGitHubRepository implements Pro
       return {
         id: view.id,
         name: view.name,
-        layout: view.layout.toLowerCase() as ViewLayout,
+        layout: fromGraphQLViewLayout(view.layout),
         fields: [],
         sortBy: [],
-        groupBy: undefined,
         filters: [],
       };
     } catch (error) {
@@ -481,7 +656,7 @@ export class GitHubProjectRepository extends BaseGitHubRepository implements Pro
     try {
       await this.graphql(mutation, {
         input: {
-          projectId,
+          // DeleteProjectV2ViewInput carries the view id only.
           viewId,
         },
       });
@@ -493,6 +668,135 @@ export class GitHubProjectRepository extends BaseGitHubRepository implements Pro
     }
   }
 
+  /**
+   * Sets the roles of a project's collaborators.
+   *
+   * GitHub's `updateProjectV2Collaborators` takes the collaborators to
+   * update - each with a `userId` or a `teamId` and one of the four
+   * `ProjectV2Roles` roles - and answers with the project's collaborators.
+   *
+   * The payload reports the actors that have access but NOT their roles:
+   * `ProjectV2` has no `collaborators` field and `ProjectV2Actor` carries
+   * no role, so a role can never be read back from GitHub. The roles this
+   * method returns are the ones it just granted; a collaborator that was
+   * already on the project comes back without a role.
+   *
+   * @param projectId - The project to set the roles on
+   * @param grants - The roles to grant, one entry per user or team
+   * @param org - The organization that owns the teams. Defaults to the
+   *   configured owner.
+   */
+  async updateCollaborators(
+    projectId: ProjectId,
+    grants: ProjectCollaboratorGrant[],
+    org?: string
+  ): Promise<ProjectCollaborator[]> {
+    const collaborators: Array<{ userId?: string; teamId?: string; role: ProjectRole }> = [];
+    // The roles this call granted, keyed by the node id they were granted to.
+    const grantedRoles = new Map<string, ProjectRole>();
+
+    for (const grant of grants) {
+      if (grant.userLogin) {
+        const userId = await this.resolveUserNodeId(grant.userLogin);
+        collaborators.push({ userId, role: grant.role });
+        grantedRoles.set(userId, grant.role);
+      } else if (grant.teamSlug) {
+        const teamId = await this.resolveTeamNodeId(org ?? this.owner, grant.teamSlug);
+        collaborators.push({ teamId, role: grant.role });
+        grantedRoles.set(teamId, grant.role);
+      } else {
+        throw new Error(
+          `A collaborator needs a userLogin or a teamSlug to grant the role ${grant.role} to.`
+        );
+      }
+    }
+
+    const mutation = `
+      mutation($input: UpdateProjectV2CollaboratorsInput!) {
+        updateProjectV2Collaborators(input: $input) {
+          collaborators(first: 100) {
+            totalCount
+            nodes {
+              ... on User {
+                id
+                login
+              }
+              ... on Team {
+                id
+                slug
+                name
+              }
+            }
+          }
+        }
+      }
+    `;
+
+    try {
+      const response = await this.graphql<UpdateProjectV2CollaboratorsResponse>(mutation, {
+        input: { projectId, collaborators },
+      });
+
+      const actors = response.updateProjectV2Collaborators?.collaborators?.nodes ?? [];
+
+      return actors.map((actor) => {
+        const isTeam = actor.__typename === "Team";
+        return {
+          id: actor.id,
+          login: isTeam ? (actor.slug ?? "") : (actor.login ?? ""),
+          type: isTeam ? "team" : "user",
+          role: grantedRoles.get(actor.id),
+        };
+      });
+    } catch (error) {
+      this.logger.error(`Failed to update collaborators of project ${projectId}`, error);
+      throw this.handleGraphQLError(error);
+    }
+  }
+
+  /**
+   * Resolves a user login to the node id the API wants.
+   */
+  private async resolveUserNodeId(login: string): Promise<string> {
+    const query = `
+      query GetCollaboratorUserNodeId($login: String!) {
+        user(login: $login) {
+          id
+        }
+      }
+    `;
+
+    const response = await this.graphql<{ user?: { id: string } | null }>(query, { login });
+    if (!response.user?.id) {
+      throw new Error(`User ${login} not found.`);
+    }
+    return response.user.id;
+  }
+
+  /**
+   * Resolves a team slug to the node id the API wants.
+   */
+  private async resolveTeamNodeId(org: string, slug: string): Promise<string> {
+    const query = `
+      query GetCollaboratorTeamNodeId($org: String!, $slug: String!) {
+        organization(login: $org) {
+          team(slug: $slug) {
+            id
+          }
+        }
+      }
+    `;
+
+    const response = await this.graphql<{
+      organization?: { team?: { id: string } | null } | null;
+    }>(query, { org, slug });
+    const teamId = response.organization?.team?.id;
+    if (!teamId) {
+      throw new Error(`Team ${slug} not found in ${org}.`);
+    }
+    return teamId;
+  }
+
   async createField(projectId: ProjectId, field: Omit<CustomField, "id">): Promise<CustomField> {
     // createProjectV2Field.projectV2Field returns the ProjectV2FieldConfiguration
     // UNION — selections must use concrete-type fragments, never direct fields.
@@ -501,9 +805,7 @@ export class GitHubProjectRepository extends BaseGitHubRepository implements Pro
         createProjectV2Field(input: $input) {
           projectV2Field {
             __typename
-            ... on ProjectV2Field { id name dataType }
-            ... on ProjectV2SingleSelectField { id name dataType }
-            ... on ProjectV2IterationField { id name dataType }
+            ${projectFieldUnionSelection()}
           }
         }
       }
@@ -512,7 +814,7 @@ export class GitHubProjectRepository extends BaseGitHubRepository implements Pro
     try {
       const githubFieldType = mapToGraphQLFieldType(field.type);
 
-      const variables: any = {
+      const variables: CreateProjectV2FieldVariables = {
         input: {
           projectId,
           dataType: githubFieldType,
@@ -521,20 +823,25 @@ export class GitHubProjectRepository extends BaseGitHubRepository implements Pro
       };
 
       if (field.type === "single_select" && field.options && field.options.length > 0) {
-        variables.input.singleSelectOptions = field.options.map((option) => ({
-          name: option.name,
-          description: option.description || null,
-          color: option.color || null,
-        }));
+        // `ProjectV2SingleSelectFieldOptionInput` requires a description and a
+        // color — sending null for either is a schema error.
+        variables.input.singleSelectOptions = buildFieldOptions([], field.options);
+      }
+
+      if (field.type === "multi_select" && field.options && field.options.length > 0) {
+        // A multi-select field carries its options in `multiSelectOptions`; the
+        // payload shape is the same as the single-select one.
+        variables.input.multiSelectOptions = buildFieldOptions([], field.options);
       }
 
       if (field.type === "iteration" && field.config) {
-        if (field.config.iterationDuration) {
-          variables.input.iterationDuration = field.config.iterationDuration;
-        }
-        if (field.config.iterationStart) {
-          variables.input.iterationStartDate = field.config.iterationStart;
-        }
+        // The iteration setup lives in `iterationConfiguration`; there are no
+        // top-level `iterationDuration` / `iterationStartDate` input fields.
+        variables.input.iterationConfiguration = {
+          startDate: toGraphQLDate(field.config.iterationStart ?? new Date()),
+          duration: field.config.iterationDuration ?? 14,
+          iterations: [],
+        };
       }
 
       const response = await this.graphql<CreateProjectV2FieldResponse>(mutation, variables);
@@ -573,118 +880,47 @@ export class GitHubProjectRepository extends BaseGitHubRepository implements Pro
         updateProjectV2Field(input: $input) {
           projectV2Field {
             __typename
-            ... on ProjectV2Field { id name dataType }
-            ... on ProjectV2SingleSelectField { id name dataType }
-            ... on ProjectV2IterationField { id name dataType }
+            ${projectFieldUnionSelection()}
           }
         }
       }
     `;
 
     try {
-      const variables: any = {
+      const variables: UpdateProjectV2FieldVariables = {
         input: {
-          projectId,
+          // UpdateProjectV2FieldInput carries the field id only — the project
+          // is implied by the field.
           fieldId,
-          name: updates.name,
         },
       };
 
-      // Handle single_select option updates
-      if (updates.type === "single_select" && updates.options && updates.options.length > 0) {
+      if (updates.name !== undefined) {
+        variables.input.name = updates.name;
+      }
+
+      // Select-option changes (single-select and multi-select).
+      //
+      // GitHub has no "add / update / delete option" mutation: the option set
+      // of a select field is REPLACED by the list sent with
+      // `updateProjectV2Field`, and an option sent without its `id` is a new
+      // one while an option sent with its `id` keeps its identity. The whole
+      // list is therefore sent — the existing options with their ids plus the
+      // ones that are missing — which adds what is missing, keeps the identity
+      // (and the item values pointing at it) of what is already there, and
+      // drops what was removed.
+      if (updates.options) {
         const currentField = await this.getField(projectId, fieldId);
-
-        if (currentField && currentField.type === "single_select") {
-          const currentOptions = currentField.options || [];
-          const newOptions = updates.options;
-
-          // Find options to add (in newOptions but not in currentOptions)
-          const optionsToAdd = newOptions.filter(
-            (newOpt) => !currentOptions.some((currOpt) => currOpt.name === newOpt.name)
+        if (currentField?.type === "single_select") {
+          variables.input.singleSelectOptions = buildFieldOptions(
+            currentField.options ?? [],
+            updates.options
           );
-
-          // Find options to delete (in currentOptions but not in newOptions)
-          const optionsToDelete = currentOptions.filter(
-            (currOpt) => !newOptions.some((newOpt) => newOpt.name === currOpt.name)
+        } else if (currentField?.type === "multi_select") {
+          variables.input.multiSelectOptions = buildFieldOptions(
+            currentField.options ?? [],
+            updates.options
           );
-
-          // Find options to update (same name but different color)
-          const optionsToUpdate = newOptions.filter((newOpt) => {
-            const currOpt = currentOptions.find((c) => c.name === newOpt.name);
-            return currOpt && currOpt.color !== newOpt.color;
-          });
-
-          // Add new options
-          for (const option of optionsToAdd) {
-            const addMutation = `
-              mutation($input: AddProjectV2SingleSelectOptionInput!) {
-                addProjectV2SingleSelectOption(input: $input) {
-                  projectV2SingleSelectOption {
-                    id
-                    name
-                  }
-                }
-              }
-            `;
-
-            await this.graphql(addMutation, {
-              input: {
-                projectId,
-                fieldId,
-                name: option.name,
-                color: option.color || "GRAY",
-              },
-            });
-          }
-
-          // Update existing options (color changes)
-          for (const option of optionsToUpdate) {
-            const currOpt = currentOptions.find((c) => c.name === option.name);
-            if (currOpt?.id) {
-              const updateMutation = `
-                mutation($input: UpdateProjectV2SingleSelectOptionInput!) {
-                  updateProjectV2SingleSelectOption(input: $input) {
-                    projectV2SingleSelectOption {
-                      id
-                      name
-                      color
-                    }
-                  }
-                }
-              `;
-
-              await this.graphql(updateMutation, {
-                input: {
-                  projectId,
-                  fieldId,
-                  optionId: currOpt.id,
-                  name: option.name,
-                  color: option.color || "GRAY",
-                },
-              });
-            }
-          }
-
-          // Delete removed options
-          for (const option of optionsToDelete) {
-            if (option.id) {
-              const deleteMutation = `
-                mutation($input: DeleteProjectV2SingleSelectOptionInput!) {
-                  deleteProjectV2SingleSelectOption(input: $input) {
-                    deletedOptionId
-                  }
-                }
-              `;
-
-              await this.graphql(deleteMutation, {
-                input: {
-                  projectId,
-                  fieldId,
-                  optionId: option.id,
-                },
-              });
-            }
-          }
         }
       }
 
@@ -710,7 +946,7 @@ export class GitHubProjectRepository extends BaseGitHubRepository implements Pro
     try {
       await this.graphql(mutation, {
         input: {
-          projectId,
+          // DeleteProjectV2FieldInput carries the field id only.
           fieldId,
         },
       });
@@ -731,8 +967,10 @@ export class GitHubProjectRepository extends BaseGitHubRepository implements Pro
   private async getField(projectId: ProjectId, fieldIdOrName: string): Promise<CustomField | null> {
     // Resolve name from id if needed (ProjectV2.field takes name, not id)
     let fieldName = fieldIdOrName;
-    if (fieldIdOrName.startsWith("PVTF_")) {
-      const listResp = await this.graphql<any>(LIST_PROJECT_FIELDS_QUERY, { projectId });
+    if (looksLikeFieldNodeId(fieldIdOrName)) {
+      const listResp = await this.graphql<ProjectFieldListResponse>(LIST_PROJECT_FIELDS_QUERY, {
+        projectId,
+      });
       const match = (listResp.node?.fields?.nodes ?? []).find(
         (f: { id: string }) => f.id === fieldIdOrName
       );
@@ -746,27 +984,20 @@ export class GitHubProjectRepository extends BaseGitHubRepository implements Pro
           ... on ProjectV2 {
             field(name: $fieldName) {
               __typename
-              ... on ProjectV2Field {
-                id
-                name
-                dataType
-              }
-              ... on ProjectV2SingleSelectField {
-                id
-                name
-                dataType
-                options {
+              ${projectFieldUnionSelection({
+                singleSelect: `options {
                   id
                   name
                   description
                   color
-                }
-              }
-              ... on ProjectV2IterationField {
-                id
-                name
-                dataType
-                configuration {
+                }`,
+                multiSelect: `multiSelectOptions {
+                  id
+                  name
+                  description
+                  color
+                }`,
+                iteration: `configuration {
                   duration
                   startDay
                   iterations {
@@ -775,8 +1006,8 @@ export class GitHubProjectRepository extends BaseGitHubRepository implements Pro
                     startDate
                     duration
                   }
-                }
-              }
+                }`,
+              })}
             }
           }
         }
@@ -784,7 +1015,7 @@ export class GitHubProjectRepository extends BaseGitHubRepository implements Pro
     `;
 
     try {
-      const response = await this.graphql<any>(query, { projectId, fieldName });
+      const response = await this.graphql<ProjectFieldResponse>(query, { projectId, fieldName });
       const fieldData = response.node?.field;
 
       if (!fieldData) return null;
@@ -792,12 +1023,24 @@ export class GitHubProjectRepository extends BaseGitHubRepository implements Pro
       const customField: CustomField = {
         id: fieldData.id,
         name: fieldData.name,
-        type: mapFromGraphQLFieldType(fieldData.dataType as GraphQLFieldType),
+        // A built-in project field (Assignees, Labels, Milestone, …) has no
+        // domain field type — the mapping refuses it with a message that says
+        // so instead of reporting it as some other kind of field.
+        type: mapFromGraphQLFieldType(fieldData.dataType),
         description: "",
       };
 
       if (fieldData.dataType === "SINGLE_SELECT" && fieldData.options) {
-        customField.options = fieldData.options.map((opt: any) => ({
+        customField.options = fieldData.options.map((opt) => ({
+          id: opt.id,
+          name: opt.name,
+          description: opt.description,
+          color: opt.color,
+        }));
+      }
+
+      if (fieldData.dataType === "MULTI_SELECT" && fieldData.multiSelectOptions) {
+        customField.options = fieldData.multiSelectOptions.map((opt) => ({
           id: opt.id,
           name: opt.name,
           description: opt.description,

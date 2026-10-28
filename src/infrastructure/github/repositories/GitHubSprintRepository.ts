@@ -2,6 +2,7 @@ import { ResourceStatus } from "../../../domain/resource-types";
 import type { Issue, IssueId, Sprint, SprintId, SprintRepository } from "../../../domain/types";
 import { logger } from "../../logger";
 import type { GitHubConfig } from "../GitHubConfig"; // Import the class, not the interface
+import { projectFieldUnionSelection } from "../project-field-fragments";
 import { BaseGitHubRepository } from "./BaseRepository";
 import { GitHubIssueRepository } from "./GitHubIssueRepository";
 
@@ -32,6 +33,52 @@ interface ListIterationFieldsResponse {
 // Note: GitHub Projects V2 API doesn't support creating individual iterations
 // Iterations are managed through the project's iteration field configuration
 
+const DAY_MS = 1000 * 60 * 60 * 24;
+
+/** Midnight UTC of the given date - GitHub stores iteration dates as plain days. */
+function startOfDayUtc(value: string | Date): Date {
+  const date = typeof value === "string" ? new Date(value) : value;
+  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+}
+
+/** `days` days after `start` (UTC days). */
+function addDaysUtc(start: Date, days: number): Date {
+  return new Date(start.getTime() + days * DAY_MS);
+}
+
+/**
+ * Where a new iteration may start.
+ *
+ * GitHub drops iterations it does not accept, and it does so SILENTLY: the
+ * mutation succeeds, the response simply does not contain the new iteration,
+ * and the caller sees "Iteration X was not found after creation". Verified
+ * against the live API, two things make GitHub drop an iteration:
+ *
+ *  1. It overlaps an existing one - GitHub keeps ONE iteration per start
+ *     date, so a new sprint that starts on a day already taken is ignored.
+ *  2. It starts in the PAST - an iteration with a start date before today
+ *     comes back as an empty list.
+ *
+ * So the effective start is the latest of: the requested start, today, and
+ * the end of the last existing iteration. Sprints are sequential, so a new
+ * sprint starts when the last one ends. The caller sees the effective start
+ * in the result, so a clamped date is visible rather than silent.
+ */
+export function nextIterationStart(
+  requestedStart: string | Date,
+  existingIterations: Array<{ startDate: string; duration: number }>
+): Date {
+  const wanted = startOfDayUtc(requestedStart);
+  const today = startOfDayUtc(new Date());
+  const lastEnd = existingIterations.reduce<Date>((latest, iteration) => {
+    const iterationEnd = addDaysUtc(startOfDayUtc(iteration.startDate), iteration.duration);
+    return iterationEnd.getTime() > latest.getTime() ? iterationEnd : latest;
+  }, new Date(0));
+
+  const start = wanted.getTime() > today.getTime() ? wanted : today;
+  return lastEnd.getTime() > start.getTime() ? lastEnd : start;
+}
+
 export class GitHubSprintRepository extends BaseGitHubRepository implements SprintRepository {
   private readonly factory: any;
 
@@ -53,20 +100,32 @@ export class GitHubSprintRepository extends BaseGitHubRepository implements Spri
       data.projectId
     );
 
-    // Calculate duration in days (GitHub stores as weeks but the input is days)
-    const startDate = new Date(data.startDate);
-    const endDate = new Date(data.endDate);
+    // Where the new iteration may start.
+    //
+    // GitHub keeps ONE iteration per start date: an iteration that overlaps
+    // an existing one is silently dropped by the API, and the only symptom is
+    // "Iteration X was not found after creation" (verified against the live
+    // API - the mutation succeeds and the response simply does not contain the
+    // new iteration). Sprints are sequential, so a new sprint starts when the
+    // last one ends, unless the caller asked for a later start anyway.
+    const startDate = nextIterationStart(data.startDate, existingIterations);
+
+    // Duration in days. Round rather than ceil: a 14-day range that carries a
+    // few milliseconds of clock skew used to become a 15-day iteration.
+    const endDate = startOfDayUtc(data.endDate);
     const durationDays = Math.max(
       7,
-      Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24))
+      Math.round((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24))
     );
     // GitHub iteration duration is in DAYS (despite what docs sometimes suggest)
     const durationValue = durationDays;
 
     // Append new iteration to existing ones via updateProjectV2Field
-    // The API replaces all iterations, so we must include existing ones
+    // The API replaces all iterations, so we must include existing ones -
+    // WITH their ids, so GitHub keeps them instead of recreating them.
     const allIterations = [
       ...existingIterations.map((iter) => ({
+        id: iter.id,
         title: iter.title,
         startDate: iter.startDate,
         duration: iter.duration,
@@ -162,15 +221,13 @@ export class GitHubSprintRepository extends BaseGitHubRepository implements Spri
               id
               fields(first: 100) {
                 nodes {
-                  ... on ProjectV2IterationField {
-                    id
-                    name
-                    configuration {
+                  ${projectFieldUnionSelection({
+                    iteration: `configuration {
                       ... on ProjectV2IterationFieldConfiguration {
                         iterations { id title startDate duration }
                       }
-                    }
-                  }
+                    }`,
+                  })}
                 }
               }
             }
@@ -192,15 +249,13 @@ export class GitHubSprintRepository extends BaseGitHubRepository implements Spri
                 id
                 fields(first: 100) {
                   nodes {
-                    ... on ProjectV2IterationField {
-                      id
-                      name
-                      configuration {
+                    ${projectFieldUnionSelection({
+                      iteration: `configuration {
                         ... on ProjectV2IterationFieldConfiguration {
                           iterations { id title startDate duration }
                         }
-                      }
-                    }
+                      }`,
+                    })}
                   }
                 }
               }
@@ -331,10 +386,8 @@ export class GitHubSprintRepository extends BaseGitHubRepository implements Spri
             nodes {
               fields(first: 100) {
                 nodes {
-                  ... on ProjectV2IterationField {
-                    id
-                    name
-                    configuration {
+                  ${projectFieldUnionSelection({
+                    iteration: `configuration {
                       ... on ProjectV2IterationFieldConfiguration {
                         iterations {
                           id
@@ -343,8 +396,8 @@ export class GitHubSprintRepository extends BaseGitHubRepository implements Spri
                           duration
                         }
                       }
-                    }
-                  }
+                    }`,
+                  })}
                 }
               }
             }

@@ -1,4 +1,8 @@
 import { describe, expect, it } from "vitest";
+import {
+  agentManageSchema,
+  agentWorkSchema,
+} from "../../../../infrastructure/tools/compound/compound-schemas";
 import { ToolRegistry } from "../../../../infrastructure/tools/ToolRegistry";
 
 /**
@@ -67,6 +71,52 @@ describe("MCP tool schema generation", () => {
         .map(([k]) => k);
       const wrong = defaulted.filter((k) => (schema.required ?? []).includes(k));
       expect(wrong, `${tool.name}: defaulted-but-required`).toEqual([]);
+    }
+  });
+});
+
+describe("agent compound schemas", () => {
+  it("requires action-specific agent_work arguments before execution", () => {
+    expect(() => agentWorkSchema.parse({ action: "complete_task", agentId: "agent-1" })).toThrow();
+
+    expect(agentWorkSchema.parse({ action: "checkout_task", agentId: "agent-1" })).toMatchObject({
+      action: "checkout_task",
+      agentId: "agent-1",
+      strategy: "highest_priority",
+    });
+  });
+
+  it("requires action-specific agent_manage arguments and preserves budget aliases", () => {
+    expect(() => agentManageSchema.parse({ action: "smart_assign" })).toThrow();
+
+    expect(
+      agentManageSchema.parse({
+        action: "set_budget",
+        agentId: "agent-1",
+        totalTokens: 1000,
+        warningThreshold: 0.75,
+      })
+    ).toMatchObject({
+      action: "set_budget",
+      agentId: "agent-1",
+      totalTokens: 1000,
+      warningThreshold: 0.75,
+      hardStop: true,
+    });
+  });
+
+  it("advertises action-specific MCP validation for agent compound tools", () => {
+    const tools = ToolRegistry.getInstance().getToolsForMCP();
+    for (const name of ["agent_work", "agent_manage"]) {
+      const schema = tools.find((tool) => tool.name === name)?.inputSchema as {
+        type?: string;
+        oneOf?: Array<{ required?: string[] }>;
+        properties?: Record<string, { enum?: string[] }>;
+      };
+
+      expect(schema.type).toBe("object");
+      expect(schema.properties?.action.enum?.length).toBeGreaterThan(1);
+      expect(schema.oneOf?.some((variant) => variant.required?.includes("agentId"))).toBe(true);
     }
   });
 });

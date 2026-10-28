@@ -48,7 +48,7 @@ describe("ProjectManagementService", () => {
       createMilestoneRepository: vi.fn(),
       createIssueRepository: vi.fn(),
       createSprintRepository: vi.fn(),
-      createAutomationRuleRepository: vi.fn(),
+      createProjectWorkflowRepository: vi.fn(),
     } as unknown as GitHubRepositoryFactory;
 
     // Create stub services (not used by setFieldValue/getFieldValue tests)

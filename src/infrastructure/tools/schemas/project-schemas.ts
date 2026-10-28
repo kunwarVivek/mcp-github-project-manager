@@ -19,16 +19,44 @@ export const ProjectFieldSchema = z.object({
 export const ProjectViewSchema = z.object({
   id: z.string(),
   name: z.string(),
-  layout: z.string(),
-  filter: z.string().optional(),
+  // Exactly the layouts GitHub's `ProjectV2ViewLayout` has — there is no
+  // timeline layout.
+  layout: z.enum(["board", "table", "roadmap"]),
+  // The view's server-side filter expression, exactly as GitHub stores it.
+  // `null` when the view has no filter.
+  filter: z.string().nullable().optional(),
   sortBy: z
     .array(
       z.object({
         field: z.string(),
-        direction: z.enum(["asc", "desc"]),
+        // The directions of GitHub's `OrderDirection` enum.
+        direction: z.enum(["ASC", "DESC"]),
       })
     )
     .optional(),
+  // The names of the fields the view groups by, in order.
+  groupByFields: z.array(z.string()).optional(),
+  // The names of the fields the view shows, in configured order.
+  visibleFields: z.array(z.string()).optional(),
+});
+
+/**
+ * A collaborator of a project.
+ *
+ * `role` is only set for the collaborators whose role was just granted:
+ * GitHub has no read path for collaborator roles, so a role can never be
+ * read back.
+ */
+export const ProjectCollaboratorSchema = z.object({
+  id: z.string(),
+  login: z.string(),
+  type: z.enum(["user", "team"]),
+  role: z.enum(["ADMIN", "WRITER", "READER", "NONE"]).optional(),
+});
+
+export const ProjectCollaboratorsOutputSchema = z.object({
+  projectId: z.string(),
+  collaborators: z.array(ProjectCollaboratorSchema),
 });
 
 export const ProjectItemSchema = z.object({
@@ -242,39 +270,18 @@ export const IterationItemsOutputSchema = z.object({
 
 // ===== Automation Schemas =====
 
-export const AutomationRuleOutputSchema = z.object({
+export const ProjectWorkflowOutputSchema = z.object({
   id: z.string(),
   name: z.string(),
-  description: z.string().optional(),
-  projectId: z.string(),
+  number: z.number(),
   enabled: z.boolean(),
-  triggers: z.array(
-    z.object({
-      type: z.string(),
-      resourceType: z.string().optional(),
-      conditions: z
-        .array(
-          z.object({
-            field: z.string(),
-            operator: z.string(),
-            value: z.unknown(),
-          })
-        )
-        .optional(),
-    })
-  ),
-  actions: z.array(
-    z.object({
-      type: z.string(),
-      parameters: z.record(z.string(), z.unknown()),
-    })
-  ),
+  projectId: z.string(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
 
-export const AutomationRuleListOutputSchema = z.object({
-  rules: z.array(AutomationRuleOutputSchema),
+export const ProjectWorkflowListOutputSchema = z.object({
+  workflows: z.array(ProjectWorkflowOutputSchema),
   totalCount: z.number(),
 });
 

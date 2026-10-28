@@ -82,16 +82,10 @@ export type UpdateProjectReadmeArgs = z.infer<typeof updateProjectReadmeSchema>;
 export const createProjectFieldSchema = z.object({
   projectId: z.string().min(1, "Project ID is required"),
   name: z.string().min(1, "Field name is required"),
-  type: z.enum([
-    "text",
-    "number",
-    "date",
-    "single_select",
-    "iteration",
-    "milestone",
-    "assignees",
-    "labels",
-  ]),
+  // Exactly the field types GitHub's `ProjectV2CustomFieldType` can create.
+  // The other project fields (Assignees, Labels, Milestone, Repository, …)
+  // are built-in fields GitHub adds itself; the API cannot create them.
+  type: z.enum(["text", "number", "date", "single_select", "multi_select", "iteration"]),
   options: z
     .array(
       z.object({
@@ -140,7 +134,9 @@ export type UpdateProjectFieldArgs = z.infer<typeof updateProjectFieldSchema>;
 export const createProjectViewSchema = z.object({
   projectId: z.string().min(1, "Project ID is required"),
   name: z.string().min(1, "View name is required"),
-  layout: z.enum(["board", "table", "timeline", "roadmap"]),
+  // Exactly the layouts GitHub's `ProjectV2ViewLayout` accepts — there is no
+  // timeline layout.
+  layout: z.enum(["board", "table", "roadmap"]),
 });
 
 export type CreateProjectViewArgs = z.infer<typeof createProjectViewSchema>;
@@ -155,7 +151,7 @@ export const updateProjectViewSchema = z.object({
   projectId: z.string().min(1, "Project ID is required"),
   viewId: z.string().min(1, "View ID is required"),
   name: z.string().optional(),
-  layout: z.enum(["board", "table", "timeline", "roadmap"]).optional(),
+  layout: z.enum(["board", "table", "roadmap"]).optional(),
 });
 
 export type UpdateProjectViewArgs = z.infer<typeof updateProjectViewSchema>;
@@ -547,13 +543,13 @@ export const updateProjectViewTool: ToolDefinition<
   annotations: ANNOTATION_PATTERNS.updateIdempotent,
   examples: [
     {
-      name: "Update view to timeline",
-      description: "Change a view's name and layout to timeline",
+      name: "Update view to roadmap",
+      description: "Change a view's name and layout to roadmap",
       args: {
         projectId: "PVT_kwDOLhQ7gc4AOEbH",
         viewId: "PVV_lADOLhQ7gc4AOEbHzM4AOAL9",
-        name: "Development Timeline",
-        layout: "timeline",
+        name: "Development Roadmap",
+        layout: "roadmap",
       },
     },
   ],

@@ -183,27 +183,4 @@ export class IssueTriagingService {
 
     return { triaged: results.length, results };
   }
-
-  async scheduleTriaging(params: {
-    projectId: string;
-    schedule: "hourly" | "daily" | "weekly";
-    autoApply: boolean;
-  }): Promise<{ ruleId: string }> {
-    const rule = await this.projectService.createAutomationRule({
-      name: `Automated Triage (${params.schedule})`,
-      description: `Auto-triage issues ${params.schedule}`,
-      projectId: params.projectId,
-      enabled: true,
-      triggers: [{ type: "schedule" }],
-      actions: [{ type: "custom_script", parameters: { script: "triage" } }],
-    });
-
-    this.logger.info(`Scheduled ${params.schedule} triage for project ${params.projectId}`, {
-      ruleId: rule.id,
-      schedule: params.schedule,
-      autoApply: params.autoApply,
-    });
-
-    return { ruleId: rule.id };
-  }
 }

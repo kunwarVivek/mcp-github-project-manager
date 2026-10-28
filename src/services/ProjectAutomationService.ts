@@ -1,201 +1,64 @@
 import { inject, injectable } from "tsyringe";
-import type {
-  AutomationAction,
-  AutomationActionType,
-  AutomationRule,
-  AutomationTrigger,
-  AutomationTriggerType,
-  CreateAutomationRule,
-} from "../domain/automation-types";
-
-/** Tool-shaped input for creating an automation rule (string-typed enums). */
-export interface CreateAutomationRuleInput {
-  name: string;
-  description?: string;
-  projectId: string;
-  enabled?: boolean;
-  triggers: Array<{
-    type: string;
-    resourceType?: string;
-    conditions?: Array<{ field: string; operator: string; value: unknown }>;
-  }>;
-  actions: Array<{ type: string; parameters: Record<string, unknown> }>;
-}
-
-/** Tool-shaped input for updating an automation rule. */
-export interface UpdateAutomationRuleInput {
-  ruleId: string;
-  name?: string;
-  description?: string;
-  enabled?: boolean;
-  triggers?: Array<{
-    type: string;
-    resourceType?: string;
-    conditions?: Array<{ field: string; operator: string; value: unknown }>;
-  }>;
-  actions?: Array<{ type: string; parameters: Record<string, unknown> }>;
-}
-
-/** Serializable rule shape returned to tool callers (no Date fields). */
-export interface AutomationRuleDTO {
-  id: string;
-  name: string;
-  description?: string;
-  projectId: string;
-  enabled: boolean;
-  triggers: unknown[];
-  actions: unknown[];
-}
-
-/** Compact summary for list operations. */
-export interface AutomationRuleSummary {
-  id: string;
-  name: string;
-  description?: string;
-  enabled: boolean;
-  triggersCount: number;
-  actionsCount: number;
-}
-
-function ruleToDTO(rule: AutomationRule): AutomationRuleDTO {
-  return {
-    id: rule.id,
-    name: rule.name,
-    description: rule.description,
-    projectId: rule.projectId,
-    enabled: rule.enabled,
-    triggers: rule.triggers,
-    actions: rule.actions,
-  };
-}
-
-function mapTriggersForCreate(
-  triggers: CreateAutomationRuleInput["triggers"]
-): Omit<AutomationTrigger, "id">[] {
-  return triggers.map((t) => ({
-    type: t.type as AutomationTriggerType,
-    resourceType: t.resourceType as ResourceType | undefined,
-    conditions: t.conditions?.map((c) => ({
-      id: "",
-      field: c.field,
-      operator: c.operator,
-      value: c.value,
-    })),
-  }));
-}
-
-function mapTriggersForUpdate(
-  triggers?: UpdateAutomationRuleInput["triggers"]
-): AutomationTrigger[] | undefined {
-  return triggers?.map((t) => ({
-    id: "",
-    type: t.type as AutomationTriggerType,
-    resourceType: t.resourceType as ResourceType | undefined,
-    conditions: t.conditions?.map((c) => ({
-      id: "",
-      field: c.field,
-      operator: c.operator,
-      value: c.value,
-    })),
-  }));
-}
-
-function mapActions(
-  actions: Array<{ type: string; parameters: Record<string, unknown> }>
-): Omit<AutomationAction, "id">[] {
-  return actions.map((a) => ({ type: a.type as AutomationActionType, parameters: a.parameters }));
-}
-
-function mapActionsForUpdate(
-  actions?: Array<{ type: string; parameters: Record<string, unknown> }>
-): AutomationAction[] | undefined {
-  return actions?.map((a) => ({
-    id: "",
-    type: a.type as AutomationActionType,
-    parameters: a.parameters,
-  }));
-}
-
-// Decorated constructor params: `emitDecoratorMetadata` references these types
-// at runtime, so `isolatedModules` requires an explicit type-only import.
-import type { AutomationRuleRepository } from "../domain/automation-types";
-import { ResourceNotFoundError } from "../domain/errors";
+import type { ProjectWorkflow, ProjectWorkflowRepository } from "../domain/automation-types";
+import { ResourceNotFoundError, ValidationError } from "../domain/errors";
 import { ResourceType } from "../domain/resource-types";
 import type { CustomField, FieldId, ProjectId, ProjectRepository } from "../domain/types";
 import type { ILogger } from "../infrastructure/logger";
 import { safeCall } from "./utils/safeCall";
 
+/** Serializable workflow shape returned to tool callers (no Date fields). */
+export interface ProjectWorkflowDTO {
+  id: string;
+  name: string;
+  number: number;
+  enabled: boolean;
+  projectId: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** Maps a domain workflow onto its tool-facing DTO. */
+function workflowToDTO(workflow: ProjectWorkflow): ProjectWorkflowDTO {
+  return {
+    id: workflow.id,
+    name: workflow.name,
+    number: workflow.number,
+    enabled: workflow.enabled,
+    projectId: workflow.projectId,
+    createdAt: workflow.createdAt.toISOString(),
+    updatedAt: workflow.updatedAt.toISOString(),
+  };
+}
+
 /**
- * Service for managing project automation rules.
+ * Service for managing project automations.
  *
  * Handles:
- * - Creating, updating, and deleting automation rules
- * - Enabling and disabling rules
+ * - Reading the automation workflows attached to a project
+ * - Deleting an automation workflow
  * - Managing custom fields for projects
  * - Tool-facing adapters with string-typed input and DTO output
  *
- * Automation rules define triggers (e.g., issue created, label added) and
- * actions (e.g., add to project, assign label) that execute automatically.
- *
- * Can be instantiated via dependency injection with tsyringe.
+ * Project automations are GitHub `ProjectV2Workflow` objects. The API exposes
+ * them read-only apart from deletion - they are authored in the GitHub UI - so
+ * this service deliberately offers no create/update/enable/disable operation.
  */
 @injectable()
 export class ProjectAutomationService {
   constructor(
-    @inject("AutomationRuleRepository") private automationRepo: AutomationRuleRepository,
+    @inject("ProjectWorkflowRepository") private workflowRepo: ProjectWorkflowRepository,
     @inject("ProjectRepository") private projectRepo: ProjectRepository,
     @inject("ILogger") private logger: ILogger
   ) {}
 
   /**
-   * Creates a new automation rule for a project
+   * Gets all automation workflows for a project
    */
-  async createRule(data: CreateAutomationRule): Promise<AutomationRule> {
-    return safeCall(async () => {
-      // Verify project exists
-      const project = await this.projectRepo.findById(data.projectId);
-      if (!project) {
-        throw new ResourceNotFoundError(ResourceType.PROJECT, data.projectId);
-      }
+  async listWorkflows(projectId: ProjectId): Promise<ProjectWorkflow[]> {
+    if (!projectId) {
+      throw new ValidationError("Project ID is required");
+    }
 
-      return await this.automationRepo.create(data);
-    });
-  }
-
-  /**
-   * Updates an existing automation rule
-   */
-  async updateRule(id: string, data: Partial<AutomationRule>): Promise<AutomationRule> {
-    return safeCall(async () => {
-      // Verify rule exists
-      const rule = await this.automationRepo.findById(id);
-      if (!rule) {
-        throw new ResourceNotFoundError(ResourceType.RELATIONSHIP, id);
-      }
-
-      return await this.automationRepo.update(id, data);
-    });
-  }
-
-  /**
-   * Deletes an automation rule
-   */
-  async deleteRule(id: string): Promise<void> {
-    return safeCall(async () => {
-      // Verify rule exists
-      const rule = await this.automationRepo.findById(id);
-      if (!rule) {
-        throw new ResourceNotFoundError(ResourceType.RELATIONSHIP, id);
-      }
-
-      await this.automationRepo.delete(id);
-    });
-  }
-
-  /**
-   * Gets all automation rules for a project
-   */
-  async getRulesByProject(projectId: ProjectId): Promise<AutomationRule[]> {
     return safeCall(async () => {
       // Verify project exists
       const project = await this.projectRepo.findById(projectId);
@@ -203,44 +66,38 @@ export class ProjectAutomationService {
         throw new ResourceNotFoundError(ResourceType.PROJECT, projectId);
       }
 
-      return await this.automationRepo.findByProject(projectId);
+      return await this.workflowRepo.findByProject(projectId);
     });
   }
 
   /**
-   * Gets a specific automation rule by ID
+   * Gets a specific automation workflow by ID
    */
-  async getRuleById(id: string): Promise<AutomationRule> {
-    const rule = await this.automationRepo.findById(id);
-    if (!rule) {
-      throw new ResourceNotFoundError(ResourceType.RELATIONSHIP, id);
+  async getWorkflowById(id: string): Promise<ProjectWorkflow> {
+    if (!id) {
+      throw new ValidationError("Workflow ID is required");
     }
 
-    return rule;
+    const workflow = await this.workflowRepo.findById(id);
+    if (!workflow) {
+      throw new ResourceNotFoundError(ResourceType.WORKFLOW, id);
+    }
+
+    return workflow;
   }
 
   /**
-   * Enables an automation rule
+   * Deletes an automation workflow
    */
-  async enableRule(id: string): Promise<AutomationRule> {
-    const rule = await this.automationRepo.findById(id);
-    if (!rule) {
-      throw new ResourceNotFoundError(ResourceType.RELATIONSHIP, id);
+  async deleteWorkflow(id: string): Promise<void> {
+    if (!id) {
+      throw new ValidationError("Workflow ID is required");
     }
 
-    return await this.automationRepo.enable(id);
-  }
-
-  /**
-   * Disables an automation rule
-   */
-  async disableRule(id: string): Promise<AutomationRule> {
-    const rule = await this.automationRepo.findById(id);
-    if (!rule) {
-      throw new ResourceNotFoundError(ResourceType.RELATIONSHIP, id);
-    }
-
-    return await this.automationRepo.disable(id);
+    return safeCall(async () => {
+      await this.workflowRepo.delete(id);
+      this.logger.info(`Deleted project workflow ${id}`);
+    });
   }
 
   /**
@@ -310,42 +167,12 @@ export class ProjectAutomationService {
   // Tool-facing adapter methods (string-typed input, DTO output)
   // ========================================================================
 
-  async createRuleFromInput(data: CreateAutomationRuleInput): Promise<AutomationRuleDTO> {
-    const rule = await this.createRule({
-      name: data.name,
-      description: data.description,
-      projectId: data.projectId,
-      enabled: data.enabled !== false,
-      triggers: mapTriggersForCreate(data.triggers),
-      actions: mapActions(data.actions),
-    } as CreateAutomationRule);
-    return ruleToDTO(rule);
+  async getWorkflowDTO(workflowId: string): Promise<ProjectWorkflowDTO> {
+    return workflowToDTO(await this.getWorkflowById(workflowId));
   }
 
-  async updateRuleFromInput(data: UpdateAutomationRuleInput): Promise<AutomationRuleDTO> {
-    const updated = await this.updateRule(data.ruleId, {
-      name: data.name,
-      description: data.description,
-      enabled: data.enabled,
-      triggers: mapTriggersForUpdate(data.triggers),
-      actions: mapActionsForUpdate(data.actions),
-    });
-    return ruleToDTO(updated);
-  }
-
-  async getRuleDTO(ruleId: string): Promise<AutomationRuleDTO> {
-    return ruleToDTO(await this.getRuleById(ruleId));
-  }
-
-  async listRuleSummaries(projectId: string): Promise<AutomationRuleSummary[]> {
-    const rules = await this.getRulesByProject(projectId);
-    return rules.map((rule) => ({
-      id: rule.id,
-      name: rule.name,
-      description: rule.description,
-      enabled: rule.enabled,
-      triggersCount: rule.triggers.length,
-      actionsCount: rule.actions.length,
-    }));
+  async listWorkflowDTOs(projectId: string): Promise<ProjectWorkflowDTO[]> {
+    const workflows = await this.listWorkflows(projectId);
+    return workflows.map(workflowToDTO);
   }
 }

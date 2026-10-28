@@ -66,6 +66,51 @@ const DEFAULT_CONFIG: IssueEntityConfig = {
   allowedLabelPrefixes: [],
 };
 
+/** The label prefix that emulates a native "blocked by" edge. */
+export const BLOCKED_BY_LABEL_PREFIX = "blocked-by:";
+
+/** The label prefix that emulates a native issue type. */
+export const ISSUE_TYPE_LABEL_PREFIX = "type:";
+
+/**
+ * The label name that emulates "this issue is blocked by #<number>".
+ */
+export function blockerLabelName(issueNumber: number): string {
+  return `${BLOCKED_BY_LABEL_PREFIX}#${issueNumber}`;
+}
+
+/**
+ * The issue numbers a set of labels declares as blockers.
+ *
+ * This is the platform's emulation of GitHub's native `blockedBy` issue
+ * edges; it is used as a fallback when the deployment does not expose the
+ * native field.
+ */
+export function parseBlockerLabelNumbers(labels: string[]): number[] {
+  return labels
+    .filter((label) => label.startsWith(BLOCKED_BY_LABEL_PREFIX))
+    .map((label) => {
+      const afterPrefix = label.slice(BLOCKED_BY_LABEL_PREFIX.length);
+      // Handle both '#123' and '123' formats
+      const numStr = afterPrefix.startsWith("#") ? afterPrefix.slice(1) : afterPrefix;
+      return parseInt(numStr, 10);
+    })
+    .filter((n) => !isNaN(n));
+}
+
+/**
+ * The issue type a set of labels declares, e.g. "type:bug" → "bug".
+ *
+ * This is the platform's emulation of GitHub's native issue types; it is used
+ * as a fallback when the deployment does not expose the native field.
+ */
+export function parseIssueTypeLabel(labels: string[]): string | null {
+  const typeLabel = labels.find((label) => label.startsWith(ISSUE_TYPE_LABEL_PREFIX));
+  if (!typeLabel) return null;
+  const type = typeLabel.slice(ISSUE_TYPE_LABEL_PREFIX.length).trim();
+  return type.length > 0 ? type : null;
+}
+
 /**
  * Rich domain entity for GitHub Issues
  */
@@ -83,6 +128,17 @@ export class IssueEntity implements Issue {
   public updatedAt: string;
   public readonly url: string;
 
+  /** The native GitHub issue type name, when the issue has one. */
+  public readonly issueTypeName?: string;
+  /** The native GitHub issue type node id, when the issue has one. */
+  public readonly issueTypeId?: string;
+  /** Node ids of the projects the issue is a member of. */
+  public projectIds?: string[];
+
+  // Native issue edges read from GitHub (`Issue.blockedBy` / `Issue.blocking`).
+  private readonly nativeBlockedBy: number[];
+  private readonly nativeBlocking: number[];
+
   // Internal config
   private readonly config: IssueEntityConfig;
 
@@ -98,6 +154,11 @@ export class IssueEntity implements Issue {
     this.createdAt = data.createdAt;
     this.updatedAt = data.updatedAt;
     this.url = data.url;
+    this.issueTypeName = data.issueTypeName;
+    this.issueTypeId = data.issueTypeId;
+    this.projectIds = data.projectIds ? [...data.projectIds] : undefined;
+    this.nativeBlockedBy = [...(data.blockedBy ?? [])];
+    this.nativeBlocking = [...(data.blocking ?? [])];
     this.config = config;
 
     // Normalize labels on creation
@@ -205,15 +266,35 @@ export class IssueEntity implements Issue {
   }
 
   /**
-   * Get the issue type from labels (e.g., "type:bug" → "bug")
+   * Get the issue type.
+   *
+   * The native GitHub issue type wins when the issue has one; the `type:`
+   * label is the fallback for issues that were typed before the native type
+   * existed (or on deployments that do not expose it).
    */
   get issueType(): IssueType | null {
-    const typeLabel = this.labels.find((l) => l.startsWith("type:"));
+    const native = this.nativeIssueType;
+    if (native) {
+      const match = Object.values(IssueType).find((type) => type === native.toLowerCase());
+      if (match) return match;
+    }
+
+    const typeLabel = this.labels.find((l) => l.startsWith(ISSUE_TYPE_LABEL_PREFIX));
     if (typeLabel) {
-      const type = typeLabel.replace("type:", "") as IssueType;
+      const type = typeLabel.replace(ISSUE_TYPE_LABEL_PREFIX, "") as IssueType;
       return Object.values(IssueType).includes(type) ? type : null;
     }
     return null;
+  }
+
+  /**
+   * The native GitHub issue type name, e.g. "Bug".
+   *
+   * `null` when the issue has no native type (the `type:` label emulation is
+   * then still readable through {@link issueType}).
+   */
+  get nativeIssueType(): string | null {
+    return this.issueTypeName ?? null;
   }
 
   /**
@@ -396,40 +477,56 @@ export class IssueEntity implements Issue {
   }
 
   /**
-   * Check if the issue is blocked by another issue
-   * Looks for "blocked" label or "blocked-by:#123" pattern
+   * Check if the issue is blocked by another issue.
+   *
+   * True when GitHub's native `blockedBy` edge exists, when the "blocked"
+   * label is present, or when a `blocked-by:#123` label is present.
    */
   get isBlocked(): boolean {
-    return this.hasLabel("blocked") || this.labels.some((l) => l.startsWith("blocked-by:"));
+    return (
+      this.nativeBlockedBy.length > 0 ||
+      this.hasLabel("blocked") ||
+      this.labels.some((l) => l.startsWith(BLOCKED_BY_LABEL_PREFIX))
+    );
   }
 
   /**
-   * Get the issue numbers that block this issue
+   * Get the issue numbers that block this issue.
+   *
+   * GitHub's native `blockedBy` edges come first; the `blocked-by:#123`
+   * labels are the fallback and are still reported for issues that were
+   * wired up before the native edges existed.
    */
   get blockedBy(): number[] {
-    const blockingLabels = this.labels.filter((l) => l.startsWith("blocked-by:"));
-    return blockingLabels
-      .map((l) => {
-        const afterPrefix = l.replace("blocked-by:", "");
-        // Handle both '#123' and '123' formats
-        const numStr = afterPrefix.startsWith("#") ? afterPrefix.slice(1) : afterPrefix;
-        return parseInt(numStr, 10);
-      })
-      .filter((n) => !isNaN(n));
+    const blockers = [...this.nativeBlockedBy];
+    for (const number of parseBlockerLabelNumbers(this.labels)) {
+      if (!blockers.includes(number)) blockers.push(number);
+    }
+    return blockers;
+  }
+
+  /**
+   * Get the issue numbers that this issue blocks.
+   *
+   * Only GitHub's native `blocking` edges can express this direction — the
+   * label emulation lives on the blocked issue, not on the blocker.
+   */
+  get blocking(): number[] {
+    return [...this.nativeBlocking];
   }
 
   /**
    * Mark the issue as blocked by another issue
    */
   blockBy(issueNumber: number): void {
-    this.addLabel(`blocked-by:#${issueNumber}`);
+    this.addLabel(blockerLabelName(issueNumber));
   }
 
   /**
    * Remove blocking label for a specific issue
    */
   unblockBy(issueNumber: number): void {
-    this.removeLabel(`blocked-by:#${issueNumber}`);
+    this.removeLabel(blockerLabelName(issueNumber));
   }
 
   /**
@@ -448,6 +545,11 @@ export class IssueEntity implements Issue {
       createdAt: this.createdAt,
       updatedAt: this.updatedAt,
       url: this.url,
+      issueTypeName: this.issueTypeName,
+      issueTypeId: this.issueTypeId,
+      blockedBy: this.nativeBlockedBy.length > 0 ? [...this.nativeBlockedBy] : undefined,
+      blocking: this.nativeBlocking.length > 0 ? [...this.nativeBlocking] : undefined,
+      projectIds: this.projectIds ? [...this.projectIds] : undefined,
     };
   }
 

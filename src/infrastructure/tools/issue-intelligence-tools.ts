@@ -23,6 +23,7 @@ import { IssueEnrichmentAIService } from "../../services/ai/IssueEnrichmentAISer
 import { LabelSuggestionService } from "../../services/ai/LabelSuggestionService";
 import { RelatedIssueLinkingService } from "../../services/ai/RelatedIssueLinkingService";
 import { ANNOTATION_PATTERNS } from "./annotations/tool-annotations";
+import { requireArray } from "./input-validation";
 import {
   type DetectDuplicatesInput,
   DetectDuplicatesInputSchema,
@@ -165,11 +166,13 @@ export async function executeSuggestLabels(args: SuggestLabelsInput): Promise<Su
   const result = await service.suggestLabels({
     issueTitle: args.issueTitle,
     issueDescription: args.issueDescription,
-    existingLabels: args.existingLabels.map((l) => ({
-      name: l.name,
-      description: l.description,
-      color: l.color,
-    })),
+    existingLabels: requireArray(args.existingLabels, "existingLabels", "suggest_labels").map(
+      (l) => ({
+        name: l.name,
+        description: l.description,
+        color: l.color,
+      })
+    ),
     issueHistory: args.issueHistory?.map((h) => ({
       labels: h.labels,
       title: h.title,
@@ -200,15 +203,17 @@ export async function executeDetectDuplicates(
   const result = await service.detectDuplicates({
     issueTitle: args.issueTitle,
     issueDescription: args.issueDescription,
-    existingIssues: args.existingIssues.map((issue) => ({
-      id: issue.id,
-      number: issue.number,
-      title: issue.title,
-      body: issue.body,
-      labels: [],
-      state: issue.state,
-      createdAt: new Date().toISOString(),
-    })),
+    existingIssues: requireArray(args.existingIssues, "existingIssues", "detect_duplicates").map(
+      (issue) => ({
+        id: issue.id,
+        number: issue.number,
+        title: issue.title,
+        body: issue.body,
+        labels: [],
+        state: issue.state,
+        createdAt: new Date().toISOString(),
+      })
+    ),
     maxResults: args.maxResults,
   });
 
@@ -224,11 +229,16 @@ export async function executeDetectDuplicates(
 export async function executeFindRelatedIssues(
   args: FindRelatedIssuesInput
 ): Promise<FindRelatedIssuesOutput> {
-  const config = args.config
+  // The compound schema names this field `relationConfig`; the granular one
+  // calls it `config`. Accept both, or the relation settings are silently
+  // dropped.
+  const relationConfig =
+    (args as { relationConfig?: typeof args.config }).relationConfig ?? args.config;
+  const config = relationConfig
     ? {
-        includeSemanticSimilarity: args.config.includeSemanticSimilarity,
-        includeDependencies: args.config.includeDependencies,
-        includeComponentGrouping: args.config.includeComponentGrouping,
+        includeSemanticSimilarity: relationConfig.includeSemanticSimilarity,
+        includeDependencies: relationConfig.includeDependencies,
+        includeComponentGrouping: relationConfig.includeComponentGrouping,
       }
     : undefined;
 
@@ -239,15 +249,17 @@ export async function executeFindRelatedIssues(
     issueTitle: args.issueTitle,
     issueDescription: args.issueDescription,
     issueLabels: args.issueLabels,
-    repositoryIssues: args.repositoryIssues.map((issue) => ({
-      id: issue.id,
-      number: issue.number,
-      title: issue.title,
-      body: issue.body,
-      labels: issue.labels,
-      state: issue.state,
-      createdAt: new Date().toISOString(),
-    })),
+    repositoryIssues: requireArray(args.repositoryIssues, "repositoryIssues", "find_related").map(
+      (issue) => ({
+        id: issue.id,
+        number: issue.number,
+        title: issue.title,
+        body: issue.body,
+        labels: issue.labels,
+        state: issue.state,
+        createdAt: new Date().toISOString(),
+      })
+    ),
   });
 
   return result;
@@ -266,13 +278,3 @@ export const issueIntelligenceTools: ToolDefinition<unknown>[] = [
   detectDuplicatesTool as ToolDefinition<unknown>,
   findRelatedIssuesTool as ToolDefinition<unknown>,
 ];
-
-/**
- * Map of tool names to executor functions.
- */
-export const issueIntelligenceExecutors: Record<string, (args: unknown) => Promise<unknown>> = {
-  enrich_issue_sections: executeEnrichIssue as (args: unknown) => Promise<unknown>,
-  suggest_labels: executeSuggestLabels as (args: unknown) => Promise<unknown>,
-  detect_duplicates: executeDetectDuplicates as (args: unknown) => Promise<unknown>,
-  find_related_issues: executeFindRelatedIssues as (args: unknown) => Promise<unknown>,
-};

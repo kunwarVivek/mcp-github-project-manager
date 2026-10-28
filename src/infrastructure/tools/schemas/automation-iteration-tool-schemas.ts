@@ -2,170 +2,36 @@ import { z } from "zod";
 import { ANNOTATION_PATTERNS } from "../annotations/tool-annotations";
 import type { ToolDefinition, ToolSchema } from "../ToolValidator";
 import {
-  AutomationRuleListOutputSchema,
-  AutomationRuleOutputSchema,
   BulkOperationResultSchema,
   DeleteOutputSchema,
   IterationConfigOutputSchema,
   IterationItemsOutputSchema,
   IterationOutputSchema,
+  ProjectWorkflowListOutputSchema,
+  ProjectWorkflowOutputSchema,
 } from "./project-schemas";
 
 // ============================================================================
-// Automation Rule Schemas
+// Project Automation Workflow Schemas
 // ============================================================================
 
-export const createAutomationRuleSchema = z.object({
-  name: z.string().min(1, "Rule name is required"),
-  description: z.string().optional(),
-  projectId: z.string().min(1, "Project ID is required"),
-  enabled: z.boolean().optional().default(true),
-  triggers: z.array(
-    z.object({
-      type: z.enum([
-        "resource_created",
-        "resource_updated",
-        "resource_deleted",
-        "issue_opened",
-        "issue_closed",
-        "issue_labeled",
-        "issue_assigned",
-        "pr_opened",
-        "pr_closed",
-        "pr_merged",
-        "pr_approved",
-        "sprint_started",
-        "sprint_ended",
-        "milestone_reached",
-        "schedule",
-      ]),
-      resourceType: z.string().optional(),
-      conditions: z
-        .array(
-          z.object({
-            field: z.string(),
-            operator: z.string(),
-            value: z.any(),
-          })
-        )
-        .optional(),
-    })
-  ),
-  actions: z.array(
-    z.object({
-      type: z.enum([
-        "update_resource",
-        "create_resource",
-        "delete_resource",
-        "add_label",
-        "remove_label",
-        "assign_user",
-        "unassign_user",
-        "create_relationship",
-        "delete_relationship",
-        "notify",
-        "webhook",
-        "custom_script",
-      ]),
-      parameters: z.record(z.string(), z.any()),
-    })
-  ),
-});
-
-export type CreateAutomationRuleArgs = z.infer<typeof createAutomationRuleSchema>;
-
-export const updateAutomationRuleSchema = z.object({
-  ruleId: z.string().min(1, "Rule ID is required"),
-  name: z.string().optional(),
-  description: z.string().optional(),
-  enabled: z.boolean().optional(),
-  triggers: z
-    .array(
-      z.object({
-        type: z.enum([
-          "resource_created",
-          "resource_updated",
-          "resource_deleted",
-          "issue_opened",
-          "issue_closed",
-          "issue_labeled",
-          "issue_assigned",
-          "pr_opened",
-          "pr_closed",
-          "pr_merged",
-          "pr_approved",
-          "sprint_started",
-          "sprint_ended",
-          "milestone_reached",
-          "schedule",
-        ]),
-        resourceType: z.string().optional(),
-        conditions: z
-          .array(
-            z.object({
-              field: z.string(),
-              operator: z.string(),
-              value: z.any(),
-            })
-          )
-          .optional(),
-      })
-    )
-    .optional(),
-  actions: z
-    .array(
-      z.object({
-        type: z.enum([
-          "update_resource",
-          "create_resource",
-          "delete_resource",
-          "add_label",
-          "remove_label",
-          "assign_user",
-          "unassign_user",
-          "create_relationship",
-          "delete_relationship",
-          "notify",
-          "webhook",
-          "custom_script",
-        ]),
-        parameters: z.record(z.string(), z.any()),
-      })
-    )
-    .optional(),
-});
-
-export type UpdateAutomationRuleArgs = z.infer<typeof updateAutomationRuleSchema>;
-
-export const deleteAutomationRuleSchema = z.object({
-  ruleId: z.string().min(1, "Rule ID is required"),
-});
-
-export type DeleteAutomationRuleArgs = z.infer<typeof deleteAutomationRuleSchema>;
-
-export const getAutomationRuleSchema = z.object({
-  ruleId: z.string().min(1, "Rule ID is required"),
-});
-
-export type GetAutomationRuleArgs = z.infer<typeof getAutomationRuleSchema>;
-
-export const listAutomationRulesSchema = z.object({
+export const listProjectWorkflowsSchema = z.object({
   projectId: z.string().min(1, "Project ID is required"),
 });
 
-export type ListAutomationRulesArgs = z.infer<typeof listAutomationRulesSchema>;
+export type ListProjectWorkflowsArgs = z.infer<typeof listProjectWorkflowsSchema>;
 
-export const enableAutomationRuleSchema = z.object({
-  ruleId: z.string().min(1, "Rule ID is required"),
+export const getProjectWorkflowSchema = z.object({
+  workflowId: z.string().min(1, "Workflow ID is required"),
 });
 
-export type EnableAutomationRuleArgs = z.infer<typeof enableAutomationRuleSchema>;
+export type GetProjectWorkflowArgs = z.infer<typeof getProjectWorkflowSchema>;
 
-export const disableAutomationRuleSchema = z.object({
-  ruleId: z.string().min(1, "Rule ID is required"),
+export const deleteProjectWorkflowSchema = z.object({
+  workflowId: z.string().min(1, "Workflow ID is required"),
 });
 
-export type DisableAutomationRuleArgs = z.infer<typeof disableAutomationRuleSchema>;
+export type DeleteProjectWorkflowArgs = z.infer<typeof deleteProjectWorkflowSchema>;
 
 // ============================================================================
 // Iteration Management Schemas
@@ -211,200 +77,67 @@ export const assignItemsToIterationSchema = z.object({
 export type AssignItemsToIterationArgs = z.infer<typeof assignItemsToIterationSchema>;
 
 // ============================================================================
-// Automation Rule Tool Definitions
+// Project Automation Workflow Tool Definitions
 // ============================================================================
 
-export const createAutomationRuleTool: ToolDefinition<
-  CreateAutomationRuleArgs,
-  z.infer<typeof AutomationRuleOutputSchema>
+export const listProjectWorkflowsTool: ToolDefinition<
+  ListProjectWorkflowsArgs,
+  z.infer<typeof ProjectWorkflowListOutputSchema>
 > = {
-  name: "create_automation_rule",
-  title: "Create Automation Rule",
-  description: "Create a new automation rule for a GitHub project",
-  schema: createAutomationRuleSchema as unknown as ToolSchema<CreateAutomationRuleArgs>,
-  outputSchema: AutomationRuleOutputSchema,
-  annotations: ANNOTATION_PATTERNS.create,
+  name: "list_project_workflows",
+  title: "List Project Workflows",
+  description: "List the automation workflows attached to a GitHub project",
+  schema: listProjectWorkflowsSchema as unknown as ToolSchema<ListProjectWorkflowsArgs>,
+  outputSchema: ProjectWorkflowListOutputSchema,
+  annotations: ANNOTATION_PATTERNS.readOnly,
   examples: [
     {
-      name: "Auto-label PRs",
-      description: "Automatically add 'needs-review' label when PR is opened",
+      name: "List project workflows",
+      description: "Get every automation workflow configured on a project",
       args: {
-        name: "Auto-label new PRs",
         projectId: "PVT_kwDOLhQ7gc4AOEbH",
-        enabled: true,
-        triggers: [
-          {
-            type: "pr_opened",
-          },
-        ],
-        actions: [
-          {
-            type: "add_label",
-            parameters: { labelName: "needs-review" },
-          },
-        ],
-      },
-    },
-    {
-      name: "Auto-assign issues",
-      description: "Automatically assign issues with 'bug' label to maintainer",
-      args: {
-        name: "Auto-assign bugs",
-        projectId: "PVT_kwDOLhQ7gc4AOEbH",
-        enabled: true,
-        triggers: [
-          {
-            type: "issue_labeled",
-            conditions: [
-              {
-                field: "label",
-                operator: "equals",
-                value: "bug",
-              },
-            ],
-          },
-        ],
-        actions: [
-          {
-            type: "assign_user",
-            parameters: { username: "maintainer" },
-          },
-        ],
       },
     },
   ],
 };
 
-export const updateAutomationRuleTool: ToolDefinition<
-  UpdateAutomationRuleArgs,
-  z.infer<typeof AutomationRuleOutputSchema>
+export const getProjectWorkflowTool: ToolDefinition<
+  GetProjectWorkflowArgs,
+  z.infer<typeof ProjectWorkflowOutputSchema>
 > = {
-  name: "update_automation_rule",
-  title: "Update Automation Rule",
-  description: "Update an existing automation rule",
-  schema: updateAutomationRuleSchema as unknown as ToolSchema<UpdateAutomationRuleArgs>,
-  outputSchema: AutomationRuleOutputSchema,
-  annotations: ANNOTATION_PATTERNS.updateIdempotent,
+  name: "get_project_workflow",
+  title: "Get Project Workflow",
+  description: "Get details of a single project automation workflow",
+  schema: getProjectWorkflowSchema as unknown as ToolSchema<GetProjectWorkflowArgs>,
+  outputSchema: ProjectWorkflowOutputSchema,
+  annotations: ANNOTATION_PATTERNS.readOnly,
   examples: [
     {
-      name: "Update rule name",
-      description: "Change the name of an automation rule",
+      name: "Get workflow details",
+      description: "Retrieve the name, number and enabled state of a workflow",
       args: {
-        ruleId: "AR_kwDOLhQ7gc4AOEbH",
-        name: "Updated rule name",
-      },
-    },
-    {
-      name: "Disable rule temporarily",
-      description: "Disable an automation rule without deleting it",
-      args: {
-        ruleId: "AR_kwDOLhQ7gc4AOEbH",
-        enabled: false,
+        workflowId: "PVW_lADOLhQ7gc4AOEbH",
       },
     },
   ],
 };
 
-export const deleteAutomationRuleTool: ToolDefinition<
-  DeleteAutomationRuleArgs,
+export const deleteProjectWorkflowTool: ToolDefinition<
+  DeleteProjectWorkflowArgs,
   z.infer<typeof DeleteOutputSchema>
 > = {
-  name: "delete_automation_rule",
-  title: "Delete Automation Rule",
-  description: "Delete an automation rule from a project",
-  schema: deleteAutomationRuleSchema as unknown as ToolSchema<DeleteAutomationRuleArgs>,
+  name: "delete_project_workflow",
+  title: "Delete Project Workflow",
+  description: "Delete an automation workflow from a project",
+  schema: deleteProjectWorkflowSchema as unknown as ToolSchema<DeleteProjectWorkflowArgs>,
   outputSchema: DeleteOutputSchema,
   annotations: ANNOTATION_PATTERNS.delete,
   examples: [
     {
-      name: "Delete rule",
-      description: "Remove an automation rule from a project",
+      name: "Delete workflow",
+      description: "Remove an automation workflow from a project",
       args: {
-        ruleId: "AR_kwDOLhQ7gc4AOEbH",
-      },
-    },
-  ],
-};
-
-export const getAutomationRuleTool: ToolDefinition<
-  GetAutomationRuleArgs,
-  z.infer<typeof AutomationRuleOutputSchema>
-> = {
-  name: "get_automation_rule",
-  title: "Get Automation Rule",
-  description: "Get details of a specific automation rule",
-  schema: getAutomationRuleSchema as unknown as ToolSchema<GetAutomationRuleArgs>,
-  outputSchema: AutomationRuleOutputSchema,
-  annotations: ANNOTATION_PATTERNS.readOnly,
-  examples: [
-    {
-      name: "Get rule details",
-      description: "Retrieve details of an automation rule",
-      args: {
-        ruleId: "AR_kwDOLhQ7gc4AOEbH",
-      },
-    },
-  ],
-};
-
-export const listAutomationRulesTool: ToolDefinition<
-  ListAutomationRulesArgs,
-  z.infer<typeof AutomationRuleListOutputSchema>
-> = {
-  name: "list_automation_rules",
-  title: "List Automation Rules",
-  description: "List all automation rules for a GitHub project",
-  schema: listAutomationRulesSchema as unknown as ToolSchema<ListAutomationRulesArgs>,
-  outputSchema: AutomationRuleListOutputSchema,
-  annotations: ANNOTATION_PATTERNS.readOnly,
-  examples: [
-    {
-      name: "List project rules",
-      description: "Get all automation rules for a project",
-      args: {
-        projectId: "PVT_kwDOLhQ7gc4AOEbH",
-      },
-    },
-  ],
-};
-
-export const enableAutomationRuleTool: ToolDefinition<
-  EnableAutomationRuleArgs,
-  z.infer<typeof AutomationRuleOutputSchema>
-> = {
-  name: "enable_automation_rule",
-  title: "Enable Automation Rule",
-  description: "Enable a disabled automation rule",
-  schema: enableAutomationRuleSchema as unknown as ToolSchema<EnableAutomationRuleArgs>,
-  outputSchema: AutomationRuleOutputSchema,
-  annotations: ANNOTATION_PATTERNS.updateIdempotent,
-  examples: [
-    {
-      name: "Enable rule",
-      description: "Re-enable a disabled automation rule",
-      args: {
-        ruleId: "AR_kwDOLhQ7gc4AOEbH",
-      },
-    },
-  ],
-};
-
-export const disableAutomationRuleTool: ToolDefinition<
-  DisableAutomationRuleArgs,
-  z.infer<typeof AutomationRuleOutputSchema>
-> = {
-  name: "disable_automation_rule",
-  title: "Disable Automation Rule",
-  description: "Disable an automation rule without deleting it",
-  schema: disableAutomationRuleSchema as unknown as ToolSchema<DisableAutomationRuleArgs>,
-  outputSchema: AutomationRuleOutputSchema,
-  annotations: ANNOTATION_PATTERNS.updateIdempotent,
-  examples: [
-    {
-      name: "Disable rule",
-      description: "Temporarily disable an automation rule",
-      args: {
-        ruleId: "AR_kwDOLhQ7gc4AOEbH",
+        workflowId: "PVW_lADOLhQ7gc4AOEbH",
       },
     },
   ],

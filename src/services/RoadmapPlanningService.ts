@@ -175,40 +175,101 @@ REQUIREMENTS:
   }
 
   /**
-   * Auto-create roadmap in GitHub (creates actual milestones and updates project)
+   * Auto-create roadmap in GitHub: creates the milestones of the plan and
+   * assigns them to the issues of the project the plan was generated from.
+   *
+   * The plan references issues by PROJECT ITEM id (that is what
+   * `generateRoadmap` sees when it reads the project's items), while a
+   * milestone has to be set on the issue itself - so the item id is resolved
+   * to its issue node id first. `projectId` is what makes that resolution
+   * possible; without it the milestones would be created on the repository
+   * but never attached to the issues of the project the plan came from.
+   *
+   * Partial failure is the norm for a multi-item write, so the outcome is
+   * reported rather than swallowed: `failures` lists every item that could
+   * not be created or updated, with the reason.
    */
   async createRoadmapInGitHub(params: { projectId: string; roadmap: any }): Promise<{
     createdMilestones: number;
     updatedIssues: number;
+    failures: Array<{ target: string; error: string }>;
   }> {
-    try {
-      let createdMilestones = 0;
-      const updatedIssues = 0;
+    const failures: Array<{ target: string; error: string }> = [];
+    let createdMilestones = 0;
+    let updatedIssues = 0;
 
-      // Create milestones
-      for (const milestone of params.roadmap.milestones) {
-        try {
-          await this.projectService.createMilestone({
-            title: milestone.title,
-            description: milestone.description,
-            dueDate: milestone.dueDate,
-          });
-          createdMilestones++;
-          this.logger.info(`Created milestone: ${milestone.title}`);
-        } catch (error) {
-          this.logger.error(`Failed to create milestone ${milestone.title}`, error);
+    // project item id -> issue node id
+    const issueNodeIdByItemId = new Map<string, string>();
+    try {
+      const items = await this.projectService.listProjectItems({
+        projectId: params.projectId,
+        limit: 200,
+      });
+      for (const item of items ?? []) {
+        const itemId = item?.id === undefined ? undefined : String(item.id);
+        const contentId = item?.contentId === undefined ? undefined : String(item.contentId);
+        if (itemId && contentId) {
+          issueNodeIdByItemId.set(itemId, contentId);
         }
       }
-
-      this.logger.info(`Roadmap created: ${createdMilestones} milestones`);
-
-      return {
-        createdMilestones,
-        updatedIssues,
-      };
     } catch (error) {
-      this.logger.error("Failed to create roadmap in GitHub", error);
-      throw error;
+      // Without the mapping the milestones can still be created, but no issue
+      // can be attached to them - say so instead of silently doing half the job.
+      failures.push({
+        target: `project:${params.projectId}`,
+        error: error instanceof Error ? error.message : String(error),
+      });
     }
+
+    const milestones = Array.isArray(params.roadmap?.milestones) ? params.roadmap.milestones : [];
+
+    for (const milestone of milestones) {
+      const title = milestone?.title ?? "Untitled milestone";
+      try {
+        const created = await this.projectService.createMilestone({
+          title: milestone.title,
+          description: milestone.description,
+          dueDate: milestone.dueDate,
+        });
+        createdMilestones++;
+        this.logger.info(`Created milestone: ${title}`);
+
+        for (const itemId of milestone.issueIds ?? []) {
+          const issueNodeId = issueNodeIdByItemId.get(String(itemId));
+          if (!issueNodeId) {
+            failures.push({
+              target: `issue:${itemId}`,
+              error: "Issue is not an item of this project",
+            });
+            continue;
+          }
+          try {
+            await this.projectService.updateIssue(issueNodeId, { milestoneId: created.id });
+            updatedIssues++;
+          } catch (error) {
+            failures.push({
+              target: `issue:${itemId}`,
+              error: error instanceof Error ? error.message : String(error),
+            });
+          }
+        }
+      } catch (error) {
+        this.logger.error(`Failed to create milestone ${title}`, error);
+        failures.push({
+          target: title,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+
+    this.logger.info(
+      `Roadmap created: ${createdMilestones} milestones, ${updatedIssues} issues updated, ${failures.length} failures`
+    );
+
+    return {
+      createdMilestones,
+      updatedIssues,
+      failures,
+    };
   }
 }
