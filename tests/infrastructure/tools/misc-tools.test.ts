@@ -9,7 +9,6 @@ import { vi } from "vitest";
  * - Executor functions (with mocked repositories)
  */
 
-import { GitHubRepositoryFactory } from "../../../src/infrastructure/github/GitHubRepositoryFactory.js";
 import {
   HealthStatusOutputSchema,
   healthCheckSchema,
@@ -57,8 +56,6 @@ vi.mock("../../../src/infrastructure/github/GitHubRepositoryFactory.js", () => {
     }),
   };
 });
-
-const MockedFactory = GitHubRepositoryFactory as MockedClass<typeof GitHubRepositoryFactory>;
 
 describe("Misc Tools - Project View Tools", () => {
   describe("Input Schemas", () => {

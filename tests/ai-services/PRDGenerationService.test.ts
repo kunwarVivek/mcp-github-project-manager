@@ -1,4 +1,6 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, type Mock, vi } from "vitest";
+import { TaskPriority } from "../../src/domain/ai-task-types";
+import type { PRDDocument } from "../../src/domain/ai-types";
 import { AITaskProcessor } from "../../src/services/ai/AITaskProcessor";
 import { PRDGenerationService } from "../../src/services/PRDGenerationService";
 
@@ -16,7 +18,12 @@ vi.mock("../../src/services/ai/AITaskProcessor", () => ({
 
 describe("PRDGenerationService", () => {
   let service: PRDGenerationService;
-  let mockAIService: any;
+  let mockAIService: {
+    generatePRDFromIdea: Mock;
+    enhancePRD: Mock;
+    extractFeaturesFromPRD: Mock;
+    testConnection: Mock;
+  };
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -434,7 +441,7 @@ describe("PRDGenerationService", () => {
 
   describe("validatePRDCompleteness", () => {
     it("should validate complete PRD with high score", async () => {
-      const completePRD = {
+      const completePRD: PRDDocument = {
         id: "prd-1",
         title: "Complete PRD",
         overview: "Comprehensive overview of the project",
@@ -452,7 +459,7 @@ describe("PRDGenerationService", () => {
             description: "System administrator",
             goals: ["Manage system"],
             painPoints: ["Complex interfaces"],
-            technicalLevel: "expert" as const,
+            technicalLevel: "advanced" as const,
           },
         ],
         userJourney: "Admin logs in, manages system, monitors performance",
@@ -461,7 +468,7 @@ describe("PRDGenerationService", () => {
             id: "feature-1",
             title: "Feature 1",
             description: "Detailed feature description",
-            priority: "high" as const,
+            priority: TaskPriority.HIGH,
             userStories: ["User story 1"],
             acceptanceCriteria: ["Criteria 1"],
             estimatedComplexity: 5,
@@ -473,7 +480,7 @@ describe("PRDGenerationService", () => {
             id: "req-1",
             category: "performance",
             requirement: "System must be fast",
-            priority: "high" as const,
+            priority: TaskPriority.HIGH,
             rationale: "User experience requirement",
           },
         ],
@@ -489,7 +496,7 @@ describe("PRDGenerationService", () => {
         aiGenerated: false,
       };
 
-      const validation = await service.validatePRDCompleteness(completePRD as any);
+      const validation = await service.validatePRDCompleteness(completePRD);
 
       // The validation service calculates score based on actual content
       expect(validation.score).toBeGreaterThanOrEqual(0);
@@ -499,7 +506,7 @@ describe("PRDGenerationService", () => {
     });
 
     it("should identify missing elements in incomplete PRD", async () => {
-      const incompletePRD = {
+      const incompletePRD: PRDDocument = {
         id: "prd-1",
         title: "Incomplete PRD",
         overview: "Basic overview",
@@ -526,7 +533,7 @@ describe("PRDGenerationService", () => {
         aiGenerated: false,
       };
 
-      const validation = await service.validatePRDCompleteness(incompletePRD as any);
+      const validation = await service.validatePRDCompleteness(incompletePRD);
 
       expect(validation.score).toBeLessThan(100);
       expect(validation.isComplete).toBe(false);

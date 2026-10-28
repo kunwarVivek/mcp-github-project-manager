@@ -212,7 +212,9 @@ describe("EstimationCalibrator", () => {
       });
 
       expect(estimate.reasoning).toBeDefined();
-      expect(estimate.reasoning!.length).toBeGreaterThan(0);
+      expect(
+        defined(estimate.reasoning, "estimate.reasoning should be defined").length
+      ).toBeGreaterThan(0);
     });
 
     it("includes confidence in estimate", () => {
@@ -462,3 +464,10 @@ describe("EstimationCalibrator", () => {
     });
   });
 });
+
+function defined<T>(value: T | undefined | null, message: string): T {
+  if (value === undefined || value === null) {
+    throw new Error(message);
+  }
+  return value;
+}

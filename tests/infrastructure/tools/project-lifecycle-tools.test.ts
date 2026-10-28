@@ -1,4 +1,4 @@
-import { vi } from "vitest";
+import { type Mock, type MockedClass, vi } from "vitest";
 
 /**
  * Unit tests for project lifecycle MCP tools
@@ -9,6 +9,7 @@ import { vi } from "vitest";
  * - Executor functions (with mocked repositories)
  */
 
+import { partialFake } from "../../../src/__tests__/helpers/aiFakes.js";
 import { GitHubRepositoryFactory } from "../../../src/infrastructure/github/GitHubRepositoryFactory.js";
 import {
   closeProjectTool,
@@ -208,7 +209,7 @@ describe("Project Lifecycle Tools", () => {
 
       it("has examples", () => {
         expect(closeProjectTool.examples).toBeDefined();
-        expect(closeProjectTool.examples!.length).toBeGreaterThan(0);
+        expect(closeProjectTool.examples?.length).toBeGreaterThan(0);
       });
     });
 
@@ -236,7 +237,7 @@ describe("Project Lifecycle Tools", () => {
 
       it("has examples", () => {
         expect(reopenProjectTool.examples).toBeDefined();
-        expect(reopenProjectTool.examples!.length).toBeGreaterThan(0);
+        expect(reopenProjectTool.examples?.length).toBeGreaterThan(0);
       });
     });
 
@@ -264,7 +265,7 @@ describe("Project Lifecycle Tools", () => {
 
       it("has examples", () => {
         expect(convertDraftIssueTool.examples).toBeDefined();
-        expect(convertDraftIssueTool.examples!.length).toBeGreaterThan(0);
+        expect(convertDraftIssueTool.examples?.length).toBeGreaterThan(0);
       });
     });
   });
@@ -279,10 +280,10 @@ describe("Project Lifecycle Tools", () => {
       mockGraphql = vi.fn();
 
       MockedFactory.mockImplementation(function () {
-        return {
+        return partialFake<GitHubRepositoryFactory>({
           graphql: mockGraphql,
           getConfig: vi.fn().mockReturnValue({ owner: "placeholder", repo: "placeholder" }),
-        } as unknown as GitHubRepositoryFactory;
+        });
       });
     });
 
@@ -342,7 +343,7 @@ describe("Project Lifecycle Tools", () => {
       });
 
       it("throws error when GITHUB_TOKEN is missing", async () => {
-        vi.stubEnv("GITHUB_TOKEN", undefined as unknown as string);
+        vi.stubEnv("GITHUB_TOKEN", undefined);
 
         const input = CloseProjectInputSchema.parse({
           projectId: "PVT_kwDOTest123",
@@ -414,7 +415,7 @@ describe("Project Lifecycle Tools", () => {
       });
 
       it("throws error when GITHUB_TOKEN is missing", async () => {
-        vi.stubEnv("GITHUB_TOKEN", undefined as unknown as string);
+        vi.stubEnv("GITHUB_TOKEN", undefined);
 
         const input = ReopenProjectInputSchema.parse({
           projectId: "PVT_kwDOTest456",
@@ -533,7 +534,7 @@ describe("Project Lifecycle Tools", () => {
       });
 
       it("throws error when GITHUB_TOKEN is missing", async () => {
-        vi.stubEnv("GITHUB_TOKEN", undefined as unknown as string);
+        vi.stubEnv("GITHUB_TOKEN", undefined);
 
         const input = ConvertDraftIssueInputSchema.parse({
           itemId: "PVTI_lADOTest123",

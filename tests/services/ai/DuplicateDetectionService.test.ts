@@ -1,4 +1,4 @@
-import { vi } from "vitest";
+import { type MockedFunction, vi } from "vitest";
 
 /**
  * Unit tests for DuplicateDetectionService
@@ -8,6 +8,7 @@ import { vi } from "vitest";
  */
 
 import { cosineSimilarity, embed, embedMany } from "ai";
+import { embedManyResult, embedResult } from "../../../src/__tests__/helpers/aiFakes";
 import { DuplicateDetectionService } from "../../../src/services/ai/DuplicateDetectionService";
 
 // Mock dependencies
@@ -68,10 +69,8 @@ describe("DuplicateDetectionService", () => {
     service = new DuplicateDetectionService();
 
     // Default mock for embedding
-    mockEmbed.mockResolvedValue({ embedding: [0.1, 0.2, 0.3] } as any);
-    mockEmbedMany.mockResolvedValue({
-      embeddings: mockExistingIssues.map(() => [0.1, 0.2, 0.3]),
-    } as any);
+    mockEmbed.mockResolvedValue(embedResult([0.1, 0.2, 0.3]));
+    mockEmbedMany.mockResolvedValue(embedManyResult(mockExistingIssues.map(() => [0.1, 0.2, 0.3])));
     mockCosineSimilarity.mockReturnValue(0.5);
   });
 

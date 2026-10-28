@@ -1,16 +1,17 @@
-import { beforeEach, describe, expect, it, type MockedFunction, vi } from "vitest";
+import { beforeEach, describe, expect, it, type Mock, vi } from "vitest";
 import { ResourceType } from "../../../domain/resource-types";
 import { ProjectLinkingService } from "../../../services/ProjectLinkingService";
+import { asFactory, type GraphqlFn } from "../../helpers/mockTypes";
 
 describe("ProjectLinkingService", () => {
   let service: ProjectLinkingService;
-  let mockGraphql: MockedFunction<any>;
+  let mockGraphql: Mock<GraphqlFn>;
 
   beforeEach(() => {
     vi.clearAllMocks();
 
     // Create mock GraphQL function
-    mockGraphql = vi.fn() as MockedFunction<any>;
+    mockGraphql = vi.fn<GraphqlFn>();
 
     // Create mock factory
     const mockFactory = {
@@ -18,7 +19,7 @@ describe("ProjectLinkingService", () => {
     };
 
     // Create service with mock factory
-    service = new ProjectLinkingService(mockFactory as any);
+    service = new ProjectLinkingService(asFactory(mockFactory));
   });
 
   it("should be properly initialized", () => {

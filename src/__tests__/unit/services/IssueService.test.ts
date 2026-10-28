@@ -1,13 +1,17 @@
-import { beforeEach, describe, expect, it, type Mocked, vi } from "vitest";
+import { beforeEach, describe, expect, it, type Mock, type Mocked, vi } from "vitest";
 import { ResourceStatus } from "../../../domain/resource-types";
 import type { Issue } from "../../../domain/types";
 import type { GitHubRepositoryFactory } from "../../../infrastructure/github/GitHubRepositoryFactory";
 import type { GitHubIssueRepository } from "../../../infrastructure/github/repositories/GitHubIssueRepository";
 import { IssueService } from "../../../services/IssueService";
+import type { RestCallFn } from "../../helpers/mockTypes";
 
 // Mock tsyringe decorators
 vi.mock("tsyringe", () => ({
-  injectable: () => (target: any) => target,
+  injectable:
+    () =>
+    <T>(target: T) =>
+      target,
   inject: () => () => undefined,
 }));
 
@@ -15,6 +19,14 @@ describe("IssueService", () => {
   let service: IssueService;
   let mockFactory: Mocked<GitHubRepositoryFactory>;
   let mockIssueRepo: Mocked<GitHubIssueRepository>;
+  let mockOctokit: {
+    rest: {
+      issues: Record<
+        "createComment" | "updateComment" | "deleteComment" | "listComments",
+        Mock<RestCallFn>
+      >;
+    };
+  };
 
   const mockIssue: Issue = {
     id: "issue-1",
@@ -53,13 +65,13 @@ describe("IssueService", () => {
     } as unknown as Mocked<GitHubIssueRepository>;
 
     // Create mock Octokit
-    const mockOctokit = {
+    mockOctokit = {
       rest: {
         issues: {
-          createComment: vi.fn() as any,
-          updateComment: vi.fn() as any,
-          deleteComment: vi.fn() as any,
-          listComments: vi.fn() as any,
+          createComment: vi.fn<RestCallFn>(),
+          updateComment: vi.fn<RestCallFn>(),
+          deleteComment: vi.fn<RestCallFn>(),
+          listComments: vi.fn<RestCallFn>(),
         },
       },
     };
@@ -236,8 +248,7 @@ describe("IssueService", () => {
         updated_at: "2024-01-01T00:00:00Z",
       };
 
-      const octokit = mockFactory.getOctokit() as any;
-      octokit.rest.issues.createComment.mockResolvedValue({ data: mockComment });
+      mockOctokit.rest.issues.createComment.mockResolvedValue({ data: mockComment });
 
       const result = await service.createIssueComment({
         issueNumber: 1,
@@ -273,8 +284,7 @@ describe("IssueService", () => {
         },
       ];
 
-      const octokit = mockFactory.getOctokit() as any;
-      octokit.rest.issues.listComments.mockResolvedValue({ data: mockComments });
+      mockOctokit.rest.issues.listComments.mockResolvedValue({ data: mockComments });
 
       const result = await service.listIssueComments({
         issueNumber: 1,
@@ -302,7 +312,7 @@ describe("IssueService", () => {
         },
       };
 
-      mockFactory.graphql.mockResolvedValue(mockResponse as any);
+      mockFactory.graphql.mockResolvedValue(mockResponse);
 
       const result = await service.createDraftIssue({
         projectId: "project-1",
@@ -328,7 +338,7 @@ describe("IssueService", () => {
         },
       };
 
-      mockFactory.graphql.mockResolvedValue(mockResponse as any);
+      mockFactory.graphql.mockResolvedValue(mockResponse);
 
       const result = await service.updateDraftIssue({
         draftIssueId: "draft-1",
@@ -344,7 +354,7 @@ describe("IssueService", () => {
     });
 
     it("should delete a draft issue", async () => {
-      mockFactory.graphql.mockResolvedValue({} as any);
+      mockFactory.graphql.mockResolvedValue({});
 
       const result = await service.deleteDraftIssue({
         draftIssueId: "draft-1",

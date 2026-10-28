@@ -18,6 +18,7 @@ import {
 } from "../../domain/entities";
 import { ResourceStatus } from "../../domain/resource-types";
 import type { Issue, Milestone, Sprint } from "../../domain/types";
+import { must } from "../helpers/must";
 
 describe("Domain Entities Integration", () => {
   // The global setup file (src/__tests__/e2e/setup.ts) is registered as a vitest
@@ -561,7 +562,7 @@ describe("Domain Entities Integration", () => {
 
       const estimated = entity.estimateCompletion(1);
       expect(estimated).not.toBeNull();
-      expect(estimated!.getTime()).toBeGreaterThan(now.getTime());
+      expect(must(estimated, "estimated completion").getTime()).toBeGreaterThan(now.getTime());
     });
 
     it("should serialize and deserialize correctly", () => {

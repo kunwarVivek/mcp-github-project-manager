@@ -1,4 +1,4 @@
-import { vi } from "vitest";
+import { type MockedFunction, vi } from "vitest";
 
 /**
  * Unit tests for FeatureAnalysisService
@@ -8,7 +8,8 @@ import { vi } from "vitest";
  */
 
 import { generateObject } from "ai";
-import { TaskPriority } from "../../../src/domain/ai-types";
+import { generateObjectResult, partialFake } from "../../../src/__tests__/helpers/aiFakes";
+import { type PRDDocument, TaskPriority } from "../../../src/domain/ai-types";
 import { AIServiceFactory } from "../../../src/services/ai/AIServiceFactory";
 import { FeatureAnalysisService } from "../../../src/services/feature/FeatureAnalysisService";
 
@@ -50,17 +51,15 @@ function aiResponse(
     dependencies: string[];
   }> = {}
 ) {
-  return {
-    object: {
-      analysis: overrides.analysis ?? "Feature analysis text",
-      recommendation: overrides.recommendation ?? "modify",
-      priority: overrides.priority ?? "medium",
-      complexity: overrides.complexity ?? 5,
-      estimatedEffort: overrides.estimatedEffort ?? 40,
-      risks: overrides.risks ?? ["Technical complexity", "Integration challenges"],
-      dependencies: overrides.dependencies ?? [],
-    },
-  } as unknown as ReturnType<typeof generateObject>;
+  return generateObjectResult({
+    analysis: overrides.analysis ?? "Feature analysis text",
+    recommendation: overrides.recommendation ?? "modify",
+    priority: overrides.priority ?? "medium",
+    complexity: overrides.complexity ?? 5,
+    estimatedEffort: overrides.estimatedEffort ?? 40,
+    risks: overrides.risks ?? ["Technical complexity", "Integration challenges"],
+    dependencies: overrides.dependencies ?? [],
+  });
 }
 const mockGetMainModel = vi.fn();
 const mockGetBestAvailableModel = vi.fn();
@@ -70,10 +69,12 @@ describe("FeatureAnalysisService", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    AIServiceFactory.getInstance.mockReturnValue({
-      getMainModel: mockGetMainModel,
-      getBestAvailableModel: mockGetBestAvailableModel,
-    } as any);
+    vi.mocked(AIServiceFactory.getInstance).mockReturnValue(
+      partialFake<AIServiceFactory>({
+        getMainModel: mockGetMainModel,
+        getBestAvailableModel: mockGetBestAvailableModel,
+      })
+    );
     service = new FeatureAnalysisService();
   });
 
@@ -84,10 +85,10 @@ describe("FeatureAnalysisService", () => {
     });
 
     it("should create instance with injected AIServiceFactory", () => {
-      const mockFactory = {
+      const mockFactory = partialFake<AIServiceFactory>({
         getMainModel: vi.fn().mockReturnValue({ id: "mock" }),
         getBestAvailableModel: vi.fn(),
-      } as any;
+      });
       const customService = new FeatureAnalysisService(mockFactory);
       expect(customService).toBeDefined();
     });
@@ -196,7 +197,7 @@ describe("FeatureAnalysisService", () => {
       it("should pass existing PRD to AI when provided", async () => {
         mockGenerateObject.mockResolvedValue(aiResponse({ recommendation: "approve" }));
 
-        const existingPRD = {
+        const existingPRD: PRDDocument = {
           id: "prd-1",
           title: "Existing PRD",
           features: [],
@@ -216,7 +217,7 @@ describe("FeatureAnalysisService", () => {
           author: "test",
           stakeholders: [],
           tags: [],
-        } as any;
+        };
 
         await service.analyzeFeatureRequest({
           ...validParams,

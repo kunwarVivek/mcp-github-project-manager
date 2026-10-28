@@ -1,5 +1,6 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, type Mocked, vi } from "vitest";
 import {
+  type Resource,
   ResourceNotFoundError,
   ResourceStatus,
   ResourceType,
@@ -28,16 +29,23 @@ vi.mock("../../../../infrastructure/cache/ResourceCache", () => {
 
 import { ResourceCache } from "../../../../infrastructure/cache/ResourceCache";
 
+/** Minimal titled resource used to exercise create(). */
+interface TitledResource extends Resource {
+  title: string;
+  description: string;
+  owner: string;
+}
+
 describe("ResourceManager", () => {
   let resourceManager: ResourceManager;
-  let mockCache: any;
+  let mockCache: Mocked<ResourceCache>;
 
   beforeEach(() => {
     // Reset mocks before each test
     vi.clearAllMocks();
 
     // Create a new instance of the mocked ResourceCache
-    mockCache = new ResourceCache();
+    mockCache = vi.mocked(new ResourceCache());
 
     // Create resourceManager with mocked cache
     resourceManager = new ResourceManager(mockCache);
@@ -49,20 +57,23 @@ describe("ResourceManager", () => {
 
   it("should create a resource successfully", async () => {
     // Setup
-    const resourceData: any = {
+    const resourceData: Partial<TitledResource> = {
       title: "Test Resource",
       description: "This is a test resource",
       owner: "test-owner",
       // Add any other required fields for a project resource if needed
     };
     // Execute
-    const resource = await resourceManager.create(ResourceType.PROJECT, resourceData);
+    const resource = await resourceManager.create<TitledResource>(
+      ResourceType.PROJECT,
+      resourceData
+    );
     // Verify
     expect(resource).toBeDefined();
     expect(resource.id).toBeDefined();
     expect(resource.type).toBe(ResourceType.PROJECT);
     expect(resource.status).toBe(ResourceStatus.ACTIVE);
-    expect((resource as any).title).toBe("Test Resource");
+    expect(resource.title).toBe("Test Resource");
     // createdAt and updatedAt should be ISO strings convertible to Date
     expect(typeof resource.createdAt).toBe("string");
     expect(resource.createdAt).toBeTruthy();

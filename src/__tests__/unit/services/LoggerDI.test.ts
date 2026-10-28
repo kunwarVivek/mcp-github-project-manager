@@ -5,8 +5,11 @@
  * and that mocked loggers work correctly for testing.
  */
 import { describe, expect, it, type Mock, vi } from "vitest";
-import { TaskPriority, TaskStatus } from "../../../domain/ai-task-types";
+import { type AITask, TaskPriority, TaskStatus } from "../../../domain/ai-task-types";
 import { type ILogger, NoopLogger } from "../../../infrastructure/logger";
+import type { AIServiceFactory } from "../../../services/ai/AIServiceFactory";
+import { partialFake } from "../../helpers/aiFakes";
+import { must } from "../../helpers/must";
 
 // ---------------------------------------------------------------------------
 // Mock Logger Factory
@@ -73,7 +76,7 @@ describe("Logger DI Injection", () => {
       };
 
       const { AITaskProcessor } = await import("../../../services/ai/AITaskProcessor");
-      const processor = new AITaskProcessor(mockFactory as any, mockLogger);
+      const processor = new AITaskProcessor(partialFake<AIServiceFactory>(mockFactory), mockLogger);
 
       // Verify the logger was injected (check via testConnection which uses logger)
       const result = await processor.testConnection();
@@ -114,7 +117,10 @@ describe("Logger DI Injection", () => {
       const { FeatureAnalysisService } = await import(
         "../../../services/feature/FeatureAnalysisService"
       );
-      const service = new FeatureAnalysisService(mockFactory as any, mockLogger);
+      const service = new FeatureAnalysisService(
+        partialFake<AIServiceFactory>(mockFactory),
+        mockLogger
+      );
 
       // Try to analyze without AI - should use logger for warning
       try {
@@ -143,7 +149,10 @@ describe("Logger DI Injection", () => {
       const { TaskLifecycleService } = await import(
         "../../../services/feature/TaskLifecycleService"
       );
-      const service = new TaskLifecycleService(mockFactory as any, mockLogger);
+      const service = new TaskLifecycleService(
+        partialFake<AIServiceFactory>(mockFactory),
+        mockLogger
+      );
 
       // Create initial state (should work without AI)
       const state = service.createInitialTaskLifecycleState({
@@ -177,7 +186,10 @@ describe("Logger DI Injection", () => {
       const { TaskLifecycleService } = await import(
         "../../../services/feature/TaskLifecycleService"
       );
-      const service = new TaskLifecycleService(mockFactory as any, mockLogger);
+      const service = new TaskLifecycleService(
+        partialFake<AIServiceFactory>(mockFactory),
+        mockLogger
+      );
 
       const state = service.createInitialTaskLifecycleState({
         id: "task-1",
@@ -217,27 +229,33 @@ describe("Logger DI Injection", () => {
       const { ContextualReferenceGenerator } = await import(
         "../../../services/context/ContextualReferenceGenerator"
       );
-      const generator = new ContextualReferenceGenerator(mockFactory as any, mockLogger);
+      const generator = new ContextualReferenceGenerator(
+        partialFake<AIServiceFactory>(mockFactory),
+        mockLogger
+      );
 
       // Generate basic references (no AI)
-      const refs = generator["generateBasicReferences"](
-        {
-          id: "1",
-          title: "Test",
-          description: "Desc",
-          priority: TaskPriority.MEDIUM,
-          complexity: 5 as any,
-          estimatedHours: 8,
-          status: TaskStatus.PENDING,
-          aiGenerated: false,
-          createdAt: "",
-          updatedAt: "",
-          subtasks: [],
-          dependencies: [],
-          acceptanceCriteria: [],
-          tags: [],
-        },
-        "PRD content"
+      const refs = must(
+        await generator.generateReferences(
+          {
+            id: "1",
+            title: "Test",
+            description: "Desc",
+            priority: TaskPriority.MEDIUM,
+            complexity: 5,
+            estimatedHours: 8,
+            status: TaskStatus.PENDING,
+            aiGenerated: false,
+            createdAt: "",
+            updatedAt: "",
+            subtasks: [],
+            dependencies: [],
+            acceptanceCriteria: [],
+            tags: [],
+          },
+          "PRD content"
+        ),
+        "contextual references"
       );
 
       expect(refs).toBeDefined();
@@ -255,15 +273,18 @@ describe("Logger DI Injection", () => {
       const { DependencyContextGenerator } = await import(
         "../../../services/context/DependencyContextGenerator"
       );
-      const generator = new DependencyContextGenerator(mockFactory as any, mockLogger);
+      const generator = new DependencyContextGenerator(
+        partialFake<AIServiceFactory>(mockFactory),
+        mockLogger
+      );
 
       // Generate basic dependency context (no AI)
-      const task = {
+      const task: AITask = {
         id: "1",
         title: "Test Task",
         description: "Description",
         priority: TaskPriority.MEDIUM,
-        complexity: 5 as any,
+        complexity: 5,
         estimatedHours: 8,
         status: TaskStatus.PENDING,
         aiGenerated: false,
@@ -275,7 +296,10 @@ describe("Logger DI Injection", () => {
         tags: [],
       };
 
-      const ctx = generator["generateBasicDependencyContext"](task, [task], []);
+      const ctx = must(
+        await generator.generateDependencyContext(task, [task], []),
+        "dependency context"
+      );
 
       expect(ctx).toBeDefined();
       expect(ctx.dependencies).toBeDefined();

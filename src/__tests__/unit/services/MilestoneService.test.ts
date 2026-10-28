@@ -1,9 +1,10 @@
 import { beforeEach, describe, expect, it, type Mocked, type MockedFunction, vi } from "vitest";
 import { DomainError } from "../../../domain/errors";
 import { ResourceStatus } from "../../../domain/resource-types";
-import type { Issue, Milestone } from "../../../domain/types";
+import type { Issue, IssueRepository, Milestone, MilestoneRepository } from "../../../domain/types";
 import type { GitHubRepositoryFactory } from "../../../infrastructure/github/GitHubRepositoryFactory";
 import { MilestoneService } from "../../../services/MilestoneService";
+import { must } from "../../helpers/must";
 
 // Mock the factory
 vi.mock("../../../infrastructure/github/GitHubRepositoryFactory");
@@ -12,14 +13,14 @@ describe("MilestoneService", () => {
   let service: MilestoneService;
   let mockFactory: Mocked<GitHubRepositoryFactory>;
   let mockMilestoneRepo: {
-    findById: MockedFunction<any>;
-    findAll: MockedFunction<any>;
-    create: MockedFunction<any>;
-    update: MockedFunction<any>;
-    delete: MockedFunction<any>;
+    findById: MockedFunction<MilestoneRepository["findById"]>;
+    findAll: MockedFunction<MilestoneRepository["findAll"]>;
+    create: MockedFunction<MilestoneRepository["create"]>;
+    update: MockedFunction<MilestoneRepository["update"]>;
+    delete: MockedFunction<MilestoneRepository["delete"]>;
   };
   let mockIssueRepo: {
-    findAll: MockedFunction<any>;
+    findAll: MockedFunction<IssueRepository["findAll"]>;
   };
 
   const now = new Date();
@@ -122,7 +123,7 @@ describe("MilestoneService", () => {
       const result = await service.getMilestoneMetrics("milestone-1", true);
 
       expect(result.issues).toHaveLength(1);
-      expect(result.issues![0].id).toBe("issue-1");
+      expect(must(result.issues, "issues")[0].id).toBe("issue-1");
     });
 
     it("should throw error when milestone not found", async () => {

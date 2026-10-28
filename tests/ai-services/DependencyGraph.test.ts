@@ -81,20 +81,20 @@ describe("KeywordExtractor", () => {
       const pattern = findMatchingPattern(["database", "schema", "model"]);
 
       expect(pattern).not.toBeNull();
-      expect(pattern!.keywords).toContain("database");
+      expect(defined(pattern, "pattern should be defined").keywords).toContain("database");
     });
 
     it("matches API-related keywords", () => {
       const pattern = findMatchingPattern(["api", "endpoint", "controller"]);
 
       expect(pattern).not.toBeNull();
-      expect(pattern!.dependsOn.length).toBeGreaterThan(0);
+      expect(defined(pattern, "pattern should be defined").dependsOn.length).toBeGreaterThan(0);
     });
 
     it("matches infrastructure keywords", () => {
       const pattern = findMatchingPattern(["setup", "infrastructure", "init"]);
       expect(pattern).not.toBeNull();
-      expect(pattern!.dependsOn).toEqual([]);
+      expect(defined(pattern, "pattern should be defined").dependsOn).toEqual([]);
     });
 
     it("matches frontend keywords", () => {
@@ -511,3 +511,10 @@ describe("detectImplicitDependencies helper", () => {
     expect(detected).toEqual([]);
   });
 });
+
+function defined<T>(value: T | undefined | null, message: string): T {
+  if (value === undefined || value === null) {
+    throw new Error(message);
+  }
+  return value;
+}

@@ -1,5 +1,6 @@
 import { generateObject } from "ai";
 import { beforeEach, describe, expect, it, type Mock, vi } from "vitest";
+import { partialFake } from "../../src/__tests__/helpers/aiFakes.js";
 import { AIServiceFactory } from "../../src/services/ai/AIServiceFactory";
 import { IssueEnrichmentService } from "../../src/services/IssueEnrichmentService";
 import { ProjectManagementService } from "../../src/services/ProjectManagementService";
@@ -40,8 +41,8 @@ vi.mock("../../src/services/ProjectManagementService", () => ({
 
 describe("IssueEnrichmentService", () => {
   let service: IssueEnrichmentService;
-  let mockAIService: any;
-  let mockProjectService: any;
+  let mockAIService: { modelId: string; provider: string };
+  let mockProjectService: { listProjectItems: Mock; listMilestones: Mock; updateProjectItem: Mock };
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -77,7 +78,7 @@ describe("IssueEnrichmentService", () => {
     // This avoids TypeScript errors from the new 7-argument constructor signature
     service = new IssueEnrichmentService(
       AIServiceFactory.getInstance(),
-      mockProjectService as unknown as ProjectManagementService
+      partialFake<ProjectManagementService>(mockProjectService)
     );
   });
 

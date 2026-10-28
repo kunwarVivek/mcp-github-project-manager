@@ -1,5 +1,6 @@
 import { generateObject } from "ai";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, type Mock, vi } from "vitest";
+import { partialFake } from "../../src/__tests__/helpers/aiFakes.js";
 import { AIServiceFactory } from "../../src/services/ai/AIServiceFactory";
 import { ProjectManagementService } from "../../src/services/ProjectManagementService";
 import { RoadmapPlanningService } from "../../src/services/RoadmapPlanningService";
@@ -40,8 +41,13 @@ vi.mock("../../src/services/ProjectManagementService", () => ({
 
 describe("RoadmapPlanningService", () => {
   let service: RoadmapPlanningService;
-  let mockAIService: any;
-  let mockProjectService: any;
+  let mockAIService: { modelId: string; provider: string };
+  let mockProjectService: {
+    listProjectItems: Mock;
+    createMilestone: Mock;
+    updateProjectItem: Mock;
+    updateIssue: Mock;
+  };
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -78,7 +84,7 @@ describe("RoadmapPlanningService", () => {
     // This avoids TypeScript errors from the new 7-argument constructor signature
     service = new RoadmapPlanningService(
       AIServiceFactory.getInstance(),
-      mockProjectService as unknown as ProjectManagementService
+      partialFake<ProjectManagementService>(mockProjectService)
     );
   });
 
@@ -277,7 +283,7 @@ describe("RoadmapPlanningService", () => {
             title: "MVP Launch",
             description: "Launch minimum viable product",
             dueDate: "2025-06-01",
-            deliverables: ["Auth", "UI"],
+            issueIds: [],
           },
         ],
         sprints: [],
@@ -301,7 +307,7 @@ describe("RoadmapPlanningService", () => {
       const mockRoadmap = {
         roadmap: { phases: [], milestones: [] },
         milestones: [
-          { title: "Test", description: "Test milestone", dueDate: "2025-06-01", deliverables: [] },
+          { title: "Test", description: "Test milestone", dueDate: "2025-06-01", issueIds: [] },
         ],
         sprints: [],
       };

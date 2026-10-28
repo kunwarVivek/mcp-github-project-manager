@@ -1,7 +1,8 @@
-import { beforeEach, describe, expect, it, type Mocked, type MockedFunction, vi } from "vitest";
+import { beforeEach, describe, expect, it, type Mock, type Mocked, vi } from "vitest";
 import { DomainError } from "../../../domain/errors";
 import type { GitHubRepositoryFactory } from "../../../infrastructure/github/GitHubRepositoryFactory";
 import { PullRequestService } from "../../../services/PullRequestService";
+import type { RestCallFn } from "../../helpers/mockTypes";
 
 vi.mock("../../../infrastructure/github/GitHubRepositoryFactory");
 
@@ -11,13 +12,13 @@ describe("PullRequestService", () => {
   let mockOctokit: {
     rest: {
       pulls: {
-        create: MockedFunction<any>;
-        get: MockedFunction<any>;
-        list: MockedFunction<any>;
-        update: MockedFunction<any>;
-        merge: MockedFunction<any>;
-        listReviews: MockedFunction<any>;
-        createReview: MockedFunction<any>;
+        create: Mock<RestCallFn>;
+        get: Mock<RestCallFn>;
+        list: Mock<RestCallFn>;
+        update: Mock<RestCallFn>;
+        merge: Mock<RestCallFn>;
+        listReviews: Mock<RestCallFn>;
+        createReview: Mock<RestCallFn>;
       };
     };
   };
@@ -30,13 +31,13 @@ describe("PullRequestService", () => {
     mockOctokit = {
       rest: {
         pulls: {
-          create: vi.fn(),
-          get: vi.fn(),
-          list: vi.fn(),
-          update: vi.fn(),
-          merge: vi.fn(),
-          listReviews: vi.fn(),
-          createReview: vi.fn(),
+          create: vi.fn<RestCallFn>(),
+          get: vi.fn<RestCallFn>(),
+          list: vi.fn<RestCallFn>(),
+          update: vi.fn<RestCallFn>(),
+          merge: vi.fn<RestCallFn>(),
+          listReviews: vi.fn<RestCallFn>(),
+          createReview: vi.fn<RestCallFn>(),
         },
       },
     };

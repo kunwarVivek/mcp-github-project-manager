@@ -8,7 +8,10 @@ import { SprintPlanningService } from "../../../services/SprintPlanningService";
 
 // Mock tsyringe decorators
 vi.mock("tsyringe", () => ({
-  injectable: () => (target: any) => target,
+  injectable:
+    () =>
+    <T>(target: T) =>
+      target,
   inject: () => () => undefined,
 }));
 
@@ -127,7 +130,7 @@ describe("SprintPlanningService", () => {
         issueIds: [],
       };
 
-      await expect(service.planSprint(invalidData as any)).rejects.toThrow();
+      await expect(service.planSprint(invalidData)).rejects.toThrow();
     });
 
     it("should throw ValidationError for invalid date format", async () => {
@@ -141,7 +144,7 @@ describe("SprintPlanningService", () => {
         issueIds: [],
       };
 
-      await expect(service.planSprint(invalidData as any)).rejects.toThrow();
+      await expect(service.planSprint(invalidData)).rejects.toThrow();
     });
   });
 

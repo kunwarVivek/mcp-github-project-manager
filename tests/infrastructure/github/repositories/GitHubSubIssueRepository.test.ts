@@ -11,17 +11,14 @@ import { vi } from "vitest";
  * - removeSubIssue: Remove sub-issue relationship
  */
 
-import type { Octokit } from "@octokit/rest";
+import { octokitWithGraphql } from "../../../../src/__tests__/helpers/aiFakes.js";
 import { GitHubConfig } from "../../../../src/infrastructure/github/GitHubConfig.js";
 import { GitHubSubIssueRepository } from "../../../../src/infrastructure/github/repositories/GitHubSubIssueRepository.js";
 
 // Mock Octokit graphql method
 const mockGraphql = vi.fn();
 
-const mockOctokit = {
-  graphql: mockGraphql,
-  rest: {},
-} as unknown as Octokit;
+const mockOctokit = octokitWithGraphql(mockGraphql);
 
 // Create a real GitHubConfig instance
 const mockConfig = GitHubConfig.create("test-owner", "test-repo", "test-token");
@@ -270,11 +267,11 @@ describe("GitHubSubIssueRepository", () => {
       const result = await repository.getParentIssue("I_child456");
 
       expect(result).not.toBeNull();
-      expect(result!.id).toBe("I_parent123");
-      expect(result!.number).toBe(100);
-      expect(result!.title).toBe("Parent Issue");
-      expect(result!.state).toBe("OPEN");
-      expect(result!.url).toBe("https://github.com/test-owner/test-repo/issues/100");
+      expect(result?.id).toBe("I_parent123");
+      expect(result?.number).toBe(100);
+      expect(result?.title).toBe("Parent Issue");
+      expect(result?.state).toBe("OPEN");
+      expect(result?.url).toBe("https://github.com/test-owner/test-repo/issues/100");
     });
 
     it("returns null when no parent", async () => {

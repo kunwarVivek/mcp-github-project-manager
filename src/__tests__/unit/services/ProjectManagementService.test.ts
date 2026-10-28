@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, type MockedFunction, vi } from "vitest";
+import { beforeEach, describe, expect, it, type Mock, vi } from "vitest";
 import type { GitHubRepositoryFactory } from "../../../infrastructure/github/GitHubRepositoryFactory";
 import type { FieldValueService } from "../../../services/FieldValueService";
 import type { IssueService } from "../../../services/IssueService";
@@ -14,6 +14,7 @@ import type { PullRequestService } from "../../../services/PullRequestService";
 import type { RoadmapService } from "../../../services/RoadmapService";
 import type { SprintPlanningService } from "../../../services/SprintPlanningService";
 import type { SubIssueService } from "../../../services/SubIssueService";
+import type { AsyncFn, GraphqlFn } from "../../helpers/mockTypes";
 
 /**
  * ProjectManagementService Unit Tests
@@ -31,7 +32,7 @@ import type { SubIssueService } from "../../../services/SubIssueService";
  */
 describe("ProjectManagementService", () => {
   let service: ProjectManagementService;
-  let mockGraphql: MockedFunction<any>;
+  let mockGraphql: Mock<GraphqlFn>;
   let mockFactory: GitHubRepositoryFactory;
 
   beforeEach(() => {
@@ -39,7 +40,7 @@ describe("ProjectManagementService", () => {
     vi.clearAllMocks();
 
     // Create mock graphql function BEFORE service instantiation
-    mockGraphql = vi.fn() as MockedFunction<any>;
+    mockGraphql = vi.fn<GraphqlFn>();
 
     // Create mock factory with graphql method pre-configured
     mockFactory = {
@@ -63,14 +64,18 @@ describe("ProjectManagementService", () => {
     const mockAutomation = {} as ProjectAutomationService;
     const mockPullRequest = {} as PullRequestService;
     const mockFieldValue = {
-      setFieldValue: vi.fn<any>().mockResolvedValue({ success: true, message: "Field updated" }),
-      getFieldValue: vi.fn<any>().mockResolvedValue({
+      setFieldValue: vi
+        .fn<AsyncFn>()
+        .mockResolvedValue({ success: true, message: "Field updated" }),
+      getFieldValue: vi.fn<AsyncFn>().mockResolvedValue({
         fieldId: "field-1",
         fieldName: "Status",
         value: "Done",
         type: "SINGLE_SELECT",
       }),
-      clearFieldValue: vi.fn<any>().mockResolvedValue({ success: true, message: "Field cleared" }),
+      clearFieldValue: vi
+        .fn<AsyncFn>()
+        .mockResolvedValue({ success: true, message: "Field cleared" }),
     } as unknown as FieldValueService;
     const mockLabel = {} as LabelService;
     const mockIteration = {} as IterationService;

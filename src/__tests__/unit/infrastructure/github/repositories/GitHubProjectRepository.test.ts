@@ -27,7 +27,7 @@ describe("GitHubProjectRepository", () => {
     // Create mock Octokit instance
     mockOctokit = {
       graphql: vi.fn(),
-    } as any;
+    } as unknown as Mocked<Octokit>;
 
     (Octokit as MockedClass<typeof Octokit>).mockImplementation(() => mockOctokit);
 

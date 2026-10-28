@@ -393,7 +393,7 @@ describe("PR Tools", () => {
         expect(result.success).toBe(true);
         if (result.success) {
           expect(result.data.comments).toHaveLength(1);
-          expect(result.data.comments![0].path).toBe("src/auth.ts");
+          expect(result.data.comments?.[0]?.path).toBe("src/auth.ts");
         }
       });
 
@@ -432,7 +432,7 @@ describe("PR Tools", () => {
 
       it("has examples", () => {
         expect(createPullRequestTool.examples).toBeDefined();
-        expect(createPullRequestTool.examples!.length).toBeGreaterThan(0);
+        expect(createPullRequestTool.examples?.length).toBeGreaterThan(0);
       });
     });
 
@@ -802,7 +802,7 @@ describe("Label Tools", () => {
 
       it("has examples", () => {
         expect(createLabelTool.examples).toBeDefined();
-        expect(createLabelTool.examples!.length).toBeGreaterThan(0);
+        expect(createLabelTool.examples?.length).toBeGreaterThan(0);
       });
     });
 
@@ -826,7 +826,7 @@ describe("Label Tools", () => {
 
       it("has examples", () => {
         expect(listLabelsTool.examples).toBeDefined();
-        expect(listLabelsTool.examples!.length).toBeGreaterThan(0);
+        expect(listLabelsTool.examples?.length).toBeGreaterThan(0);
       });
     });
   });

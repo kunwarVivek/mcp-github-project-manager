@@ -1,4 +1,4 @@
-import { vi } from "vitest";
+import { type Mock, vi } from "vitest";
 
 /**
  * Unit tests for SprintSuggestionService

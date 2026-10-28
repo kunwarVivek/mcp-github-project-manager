@@ -1,4 +1,4 @@
-import { vi } from "vitest";
+import { type Mock, vi } from "vitest";
 
 /**
  * Unit tests for SprintRiskAssessor
@@ -60,7 +60,9 @@ describe("SprintRiskAssessor", () => {
         );
 
         expect(overcommitRisk).toBeDefined();
-        expect(overcommitRisk!.probability).toMatch(/high|medium/);
+        expect(defined(overcommitRisk, "overcommitRisk should be defined").probability).toMatch(
+          /high|medium/
+        );
       });
 
       it("should identify low buffer risk", async () => {
@@ -106,7 +108,9 @@ describe("SprintRiskAssessor", () => {
         );
 
         expect(complexityRisk).toBeDefined();
-        expect(complexityRisk!.relatedItems).toContain("1");
+        expect(defined(complexityRisk, "complexityRisk should be defined").relatedItems).toContain(
+          "1"
+        );
       });
 
       it("should not flag complexity risk for small items", async () => {
@@ -476,4 +480,11 @@ function createCapacity(overrides: Partial<SprintCapacity> = {}): SprintCapacity
     },
     ...overrides,
   };
+}
+
+function defined<T>(value: T | undefined | null, message: string): T {
+  if (value === undefined || value === null) {
+    throw new Error(message);
+  }
+  return value;
 }

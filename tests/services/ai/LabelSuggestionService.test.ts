@@ -1,4 +1,4 @@
-import { type Mock, vi } from "vitest";
+import { type MockedFunction, vi } from "vitest";
 
 /**
  * Unit tests for LabelSuggestionService
@@ -8,6 +8,7 @@ import { type Mock, vi } from "vitest";
  */
 
 import { generateObject } from "ai";
+import { generateObjectResult, partialFake } from "../../../src/__tests__/helpers/aiFakes";
 import { AIServiceFactory } from "../../../src/services/ai/AIServiceFactory";
 import { LabelSuggestionService } from "../../../src/services/ai/LabelSuggestionService";
 
@@ -47,10 +48,12 @@ describe("LabelSuggestionService", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    (AIServiceFactory.getInstance as Mock).mockReturnValue({
-      getModel: mockGetModel,
-      getBestAvailableModel: mockGetBestAvailableModel,
-    });
+    vi.mocked(AIServiceFactory.getInstance).mockReturnValue(
+      partialFake<AIServiceFactory>({
+        getModel: mockGetModel,
+        getBestAvailableModel: mockGetBestAvailableModel,
+      })
+    );
     service = new LabelSuggestionService();
   });
 
@@ -63,8 +66,8 @@ describe("LabelSuggestionService", () => {
 
     describe("suggestLabels", () => {
       it("should return tiered suggestions (high/medium/low)", async () => {
-        mockGenerateObject.mockResolvedValue({
-          object: {
+        mockGenerateObject.mockResolvedValue(
+          generateObjectResult({
             suggestions: [
               {
                 label: "bug",
@@ -89,8 +92,8 @@ describe("LabelSuggestionService", () => {
               },
             ],
             overallConfidence: 0.8,
-          },
-        } as any);
+          })
+        );
 
         const result = await service.suggestLabels({
           issueTitle: "App crashes on startup",
@@ -104,8 +107,8 @@ describe("LabelSuggestionService", () => {
       });
 
       it("should include rationale for each suggestion", async () => {
-        mockGenerateObject.mockResolvedValue({
-          object: {
+        mockGenerateObject.mockResolvedValue(
+          generateObjectResult({
             suggestions: [
               {
                 label: "bug",
@@ -116,8 +119,8 @@ describe("LabelSuggestionService", () => {
               },
             ],
             overallConfidence: 0.9,
-          },
-        } as any);
+          })
+        );
 
         const result = await service.suggestLabels({
           issueTitle: "Crash on login",
@@ -129,8 +132,8 @@ describe("LabelSuggestionService", () => {
       });
 
       it("should prefer existing labels over new ones", async () => {
-        mockGenerateObject.mockResolvedValue({
-          object: {
+        mockGenerateObject.mockResolvedValue(
+          generateObjectResult({
             suggestions: [
               {
                 label: "bug",
@@ -141,8 +144,8 @@ describe("LabelSuggestionService", () => {
               },
             ],
             overallConfidence: 0.9,
-          },
-        } as any);
+          })
+        );
 
         const result = await service.suggestLabels({
           issueTitle: "Bug report",
@@ -154,8 +157,8 @@ describe("LabelSuggestionService", () => {
       });
 
       it("should include new label proposals when configured", async () => {
-        mockGenerateObject.mockResolvedValue({
-          object: {
+        mockGenerateObject.mockResolvedValue(
+          generateObjectResult({
             suggestions: [],
             newLabelProposals: [
               {
@@ -166,8 +169,8 @@ describe("LabelSuggestionService", () => {
               },
             ],
             overallConfidence: 0.7,
-          },
-        } as any);
+          })
+        );
 
         const result = await service.suggestLabels({
           issueTitle: "Security vulnerability",
@@ -176,12 +179,12 @@ describe("LabelSuggestionService", () => {
         });
 
         expect(result.newLabelProposals).toHaveLength(1);
-        expect(result.newLabelProposals![0].name).toBe("security");
+        expect(result.newLabelProposals?.[0]?.name).toBe("security");
       });
 
       it("should use issue history for learning", async () => {
-        mockGenerateObject.mockResolvedValue({
-          object: {
+        mockGenerateObject.mockResolvedValue(
+          generateObjectResult({
             suggestions: [
               {
                 label: "bug",
@@ -192,8 +195,8 @@ describe("LabelSuggestionService", () => {
               },
             ],
             overallConfidence: 0.9,
-          },
-        } as any);
+          })
+        );
 
         await service.suggestLabels({
           issueTitle: "App crashes",
@@ -209,8 +212,8 @@ describe("LabelSuggestionService", () => {
       });
 
       it("should include matched patterns in suggestions", async () => {
-        mockGenerateObject.mockResolvedValue({
-          object: {
+        mockGenerateObject.mockResolvedValue(
+          generateObjectResult({
             suggestions: [
               {
                 label: "bug",
@@ -221,8 +224,8 @@ describe("LabelSuggestionService", () => {
               },
             ],
             overallConfidence: 0.85,
-          },
-        } as any);
+          })
+        );
 
         const result = await service.suggestLabels({
           issueTitle: "Bug: App crashes with error",
@@ -234,8 +237,8 @@ describe("LabelSuggestionService", () => {
       });
 
       it("should sort each tier by confidence descending", async () => {
-        mockGenerateObject.mockResolvedValue({
-          object: {
+        mockGenerateObject.mockResolvedValue(
+          generateObjectResult({
             suggestions: [
               {
                 label: "bug",
@@ -260,8 +263,8 @@ describe("LabelSuggestionService", () => {
               },
             ],
             overallConfidence: 0.85,
-          },
-        } as any);
+          })
+        );
 
         const result = await service.suggestLabels({
           issueTitle: "Test",
@@ -277,8 +280,8 @@ describe("LabelSuggestionService", () => {
       });
 
       it("should have valid confidence structure", async () => {
-        mockGenerateObject.mockResolvedValue({
-          object: {
+        mockGenerateObject.mockResolvedValue(
+          generateObjectResult({
             suggestions: [
               {
                 label: "bug",
@@ -289,8 +292,8 @@ describe("LabelSuggestionService", () => {
               },
             ],
             overallConfidence: 0.9,
-          },
-        } as any);
+          })
+        );
 
         const result = await service.suggestLabels({
           issueTitle: "Test",
@@ -373,8 +376,8 @@ describe("LabelSuggestionService", () => {
   describe("Configuration", () => {
     it("should respect maxSuggestions limit", async () => {
       mockGetModel.mockReturnValue({ id: "test-model" });
-      mockGenerateObject.mockResolvedValue({
-        object: {
+      mockGenerateObject.mockResolvedValue(
+        generateObjectResult({
           suggestions: Array(20)
             .fill(null)
             .map((_, i) => ({
@@ -385,8 +388,8 @@ describe("LabelSuggestionService", () => {
               matchedPatterns: [],
             })),
           overallConfidence: 0.8,
-        },
-      } as any);
+        })
+      );
 
       const customService = new LabelSuggestionService(undefined, { maxSuggestions: 5 });
       const result = await customService.suggestLabels({
@@ -401,8 +404,8 @@ describe("LabelSuggestionService", () => {
 
     it("should use custom confidence thresholds", async () => {
       mockGetModel.mockReturnValue({ id: "test-model" });
-      mockGenerateObject.mockResolvedValue({
-        object: {
+      mockGenerateObject.mockResolvedValue(
+        generateObjectResult({
           suggestions: [
             {
               label: "bug",
@@ -413,8 +416,8 @@ describe("LabelSuggestionService", () => {
             },
           ],
           overallConfidence: 0.75,
-        },
-      } as any);
+        })
+      );
 
       // Higher threshold means fewer in high tier
       const customService = new LabelSuggestionService(undefined, {
@@ -434,15 +437,15 @@ describe("LabelSuggestionService", () => {
 
     it("should toggle includeNewProposals", async () => {
       mockGetModel.mockReturnValue({ id: "test-model" });
-      mockGenerateObject.mockResolvedValue({
-        object: {
+      mockGenerateObject.mockResolvedValue(
+        generateObjectResult({
           suggestions: [],
           newLabelProposals: [
             { name: "new-label", description: "D", color: "000000", rationale: "R" },
           ],
           overallConfidence: 0.7,
-        },
-      } as any);
+        })
+      );
 
       const customService = new LabelSuggestionService(undefined, { includeNewProposals: false });
       const result = await customService.suggestLabels({

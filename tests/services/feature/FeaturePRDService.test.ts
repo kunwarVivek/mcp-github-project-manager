@@ -1,4 +1,4 @@
-import { vi } from "vitest";
+import { type Mocked, vi } from "vitest";
 
 /**
  * Unit tests for FeaturePRDService
@@ -7,6 +7,7 @@ import { vi } from "vitest";
  * and impact assessment.
  */
 
+import { partialFake } from "../../../src/__tests__/helpers/aiFakes";
 import {
   type FeatureAdditionRequest,
   type PRDDocument,
@@ -67,7 +68,7 @@ describe("FeaturePRDService", () => {
     author: "test-author",
     stakeholders: ["stakeholder-1"],
     tags: ["test"],
-  } as any;
+  };
 
   const mockFeatureRequest: FeatureAdditionRequest = {
     id: "req-1",
@@ -84,9 +85,9 @@ describe("FeaturePRDService", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2024-01-15T12:00:00Z"));
 
-    mockAnalysisService = {
+    mockAnalysisService = partialFake<Mocked<FeatureAnalysisService>>({
       analyzeFeatureRequest: mockAnalyzeFeatureRequest,
-    } as any;
+    });
 
     service = new FeaturePRDService(mockAnalysisService);
   });

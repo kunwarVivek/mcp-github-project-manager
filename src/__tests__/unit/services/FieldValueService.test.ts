@@ -1,14 +1,16 @@
-import { beforeEach, describe, expect, it, type Mocked, type MockedFunction, vi } from "vitest";
+import { beforeEach, describe, expect, it, type Mock, type Mocked, vi } from "vitest";
 import { DomainError } from "../../../domain/errors";
 import type { GitHubRepositoryFactory } from "../../../infrastructure/github/GitHubRepositoryFactory";
 import { FieldValueService } from "../../../services/FieldValueService";
+import type { GraphqlFn } from "../../helpers/mockTypes";
+import { must } from "../../helpers/must";
 
 vi.mock("../../../infrastructure/github/GitHubRepositoryFactory");
 
 describe("FieldValueService", () => {
   let service: FieldValueService;
   let mockFactory: Mocked<GitHubRepositoryFactory>;
-  let mockGraphql: MockedFunction<any>;
+  let mockGraphql: Mock<GraphqlFn>;
 
   const projectId = "PVT_proj1";
   const itemId = "PVTI_item1";
@@ -17,7 +19,7 @@ describe("FieldValueService", () => {
   beforeEach(() => {
     vi.clearAllMocks();
 
-    mockGraphql = vi.fn();
+    mockGraphql = vi.fn<GraphqlFn>();
 
     mockFactory = {
       graphql: mockGraphql,
@@ -41,7 +43,7 @@ describe("FieldValueService", () => {
       expect(result).toEqual({ success: true, message: "Field Description updated successfully" });
       expect(mockGraphql).toHaveBeenCalledTimes(2);
       // Verify mutation variables include stringified value
-      const mutationVars = mockGraphql.mock.calls[1][1];
+      const mutationVars = must(mockGraphql.mock.calls[1][1], "mutation variables");
       expect(mutationVars.value).toBe("hello");
     });
 
@@ -55,7 +57,7 @@ describe("FieldValueService", () => {
       const result = await service.setFieldValue({ projectId, itemId, fieldId, value: 42 });
 
       expect(result.success).toBe(true);
-      const mutationVars = mockGraphql.mock.calls[1][1];
+      const mutationVars = must(mockGraphql.mock.calls[1][1], "mutation variables");
       expect(mutationVars.value).toBe(42);
     });
 
@@ -74,7 +76,7 @@ describe("FieldValueService", () => {
       });
 
       expect(result.success).toBe(true);
-      const mutationVars = mockGraphql.mock.calls[1][1];
+      const mutationVars = must(mockGraphql.mock.calls[1][1], "mutation variables");
       expect(mutationVars.value).toBe("2024-06-01");
     });
 
@@ -96,7 +98,7 @@ describe("FieldValueService", () => {
       const result = await service.setFieldValue({ projectId, itemId, fieldId, value: "Done" });
 
       expect(result.success).toBe(true);
-      const mutationVars = mockGraphql.mock.calls[1][1];
+      const mutationVars = must(mockGraphql.mock.calls[1][1], "mutation variables");
       expect(mutationVars.value).toBe("opt-2");
     });
 
@@ -115,7 +117,7 @@ describe("FieldValueService", () => {
       });
 
       expect(result.success).toBe(true);
-      const mutationVars = mockGraphql.mock.calls[1][1];
+      const mutationVars = must(mockGraphql.mock.calls[1][1], "mutation variables");
       expect(mutationVars.value).toBe("iter-1");
     });
 

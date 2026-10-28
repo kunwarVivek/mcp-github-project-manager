@@ -619,7 +619,7 @@ describe("Sprint Tools", () => {
 
       it("has examples", () => {
         expect(createSprintTool.examples).toBeDefined();
-        expect(createSprintTool.examples!.length).toBeGreaterThan(0);
+        expect(createSprintTool.examples?.length).toBeGreaterThan(0);
       });
     });
 
@@ -647,7 +647,7 @@ describe("Sprint Tools", () => {
 
       it("has examples", () => {
         expect(listSprintsTool.examples).toBeDefined();
-        expect(listSprintsTool.examples!.length).toBeGreaterThan(0);
+        expect(listSprintsTool.examples?.length).toBeGreaterThan(0);
       });
     });
 
@@ -675,7 +675,7 @@ describe("Sprint Tools", () => {
 
       it("has examples", () => {
         expect(getCurrentSprintTool.examples).toBeDefined();
-        expect(getCurrentSprintTool.examples!.length).toBeGreaterThan(0);
+        expect(getCurrentSprintTool.examples?.length).toBeGreaterThan(0);
       });
     });
 
@@ -703,7 +703,7 @@ describe("Sprint Tools", () => {
 
       it("has examples", () => {
         expect(updateSprintTool.examples).toBeDefined();
-        expect(updateSprintTool.examples!.length).toBeGreaterThan(0);
+        expect(updateSprintTool.examples?.length).toBeGreaterThan(0);
       });
     });
 
@@ -731,7 +731,7 @@ describe("Sprint Tools", () => {
 
       it("has examples", () => {
         expect(addIssuesToSprintTool.examples).toBeDefined();
-        expect(addIssuesToSprintTool.examples!.length).toBeGreaterThan(0);
+        expect(addIssuesToSprintTool.examples?.length).toBeGreaterThan(0);
       });
     });
 
@@ -759,7 +759,7 @@ describe("Sprint Tools", () => {
 
       it("has examples", () => {
         expect(removeIssuesFromSprintTool.examples).toBeDefined();
-        expect(removeIssuesFromSprintTool.examples!.length).toBeGreaterThan(0);
+        expect(removeIssuesFromSprintTool.examples?.length).toBeGreaterThan(0);
       });
     });
 
@@ -787,7 +787,7 @@ describe("Sprint Tools", () => {
 
       it("has examples", () => {
         expect(planSprintTool.examples).toBeDefined();
-        expect(planSprintTool.examples!.length).toBeGreaterThan(0);
+        expect(planSprintTool.examples?.length).toBeGreaterThan(0);
       });
     });
 
@@ -815,7 +815,7 @@ describe("Sprint Tools", () => {
 
       it("has examples", () => {
         expect(getMilestoneMetricsTool.examples).toBeDefined();
-        expect(getMilestoneMetricsTool.examples!.length).toBeGreaterThan(0);
+        expect(getMilestoneMetricsTool.examples?.length).toBeGreaterThan(0);
       });
     });
 
@@ -843,7 +843,7 @@ describe("Sprint Tools", () => {
 
       it("has examples", () => {
         expect(getSprintMetricsTool.examples).toBeDefined();
-        expect(getSprintMetricsTool.examples!.length).toBeGreaterThan(0);
+        expect(getSprintMetricsTool.examples?.length).toBeGreaterThan(0);
       });
     });
 
@@ -871,7 +871,7 @@ describe("Sprint Tools", () => {
 
       it("has examples", () => {
         expect(getOverdueMilestonesTool.examples).toBeDefined();
-        expect(getOverdueMilestonesTool.examples!.length).toBeGreaterThan(0);
+        expect(getOverdueMilestonesTool.examples?.length).toBeGreaterThan(0);
       });
     });
 
@@ -899,7 +899,7 @@ describe("Sprint Tools", () => {
 
       it("has examples", () => {
         expect(getUpcomingMilestonesTool.examples).toBeDefined();
-        expect(getUpcomingMilestonesTool.examples!.length).toBeGreaterThan(0);
+        expect(getUpcomingMilestonesTool.examples?.length).toBeGreaterThan(0);
       });
     });
   });
@@ -1222,7 +1222,7 @@ describe("Iteration Tools", () => {
 
       it("has examples", () => {
         expect(getIterationConfigurationTool.examples).toBeDefined();
-        expect(getIterationConfigurationTool.examples!.length).toBeGreaterThan(0);
+        expect(getIterationConfigurationTool.examples?.length).toBeGreaterThan(0);
       });
     });
 
@@ -1250,7 +1250,7 @@ describe("Iteration Tools", () => {
 
       it("has examples", () => {
         expect(getCurrentIterationTool.examples).toBeDefined();
-        expect(getCurrentIterationTool.examples!.length).toBeGreaterThan(0);
+        expect(getCurrentIterationTool.examples?.length).toBeGreaterThan(0);
       });
     });
 
@@ -1278,7 +1278,7 @@ describe("Iteration Tools", () => {
 
       it("has examples", () => {
         expect(getIterationItemsTool.examples).toBeDefined();
-        expect(getIterationItemsTool.examples!.length).toBeGreaterThan(0);
+        expect(getIterationItemsTool.examples?.length).toBeGreaterThan(0);
       });
     });
 
@@ -1306,7 +1306,7 @@ describe("Iteration Tools", () => {
 
       it("has examples", () => {
         expect(getIterationByDateTool.examples).toBeDefined();
-        expect(getIterationByDateTool.examples!.length).toBeGreaterThan(0);
+        expect(getIterationByDateTool.examples?.length).toBeGreaterThan(0);
       });
     });
 
@@ -1334,7 +1334,7 @@ describe("Iteration Tools", () => {
 
       it("has examples", () => {
         expect(assignItemsToIterationTool.examples).toBeDefined();
-        expect(assignItemsToIterationTool.examples!.length).toBeGreaterThan(0);
+        expect(assignItemsToIterationTool.examples?.length).toBeGreaterThan(0);
       });
     });
   });

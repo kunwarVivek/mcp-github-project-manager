@@ -1,16 +1,20 @@
-import { beforeEach, describe, expect, it, type MockedFunction, vi } from "vitest";
+import { beforeEach, describe, expect, it, type Mock, vi } from "vitest";
 import { ProjectTemplateService } from "../../../services/ProjectTemplateService";
+import { type AsyncFn, asFactory, type GraphqlFn } from "../../helpers/mockTypes";
 
 describe("ProjectTemplateService", () => {
   let service: ProjectTemplateService;
-  let mockGraphql: MockedFunction<any>;
-  let mockProjectRepo: any;
+  let mockGraphql: Mock<GraphqlFn>;
+  let mockProjectRepo: Record<
+    "findById" | "createView" | "listViews" | "updateView" | "updateField" | "deleteView",
+    Mock<AsyncFn>
+  >;
 
   beforeEach(() => {
     vi.clearAllMocks();
 
     // Create mock GraphQL function
-    mockGraphql = vi.fn() as MockedFunction<any>;
+    mockGraphql = vi.fn<GraphqlFn>();
 
     // Create mock project repository
     mockProjectRepo = {
@@ -29,7 +33,7 @@ describe("ProjectTemplateService", () => {
     };
 
     // Create service with mock factory
-    service = new ProjectTemplateService(mockFactory as any);
+    service = new ProjectTemplateService(asFactory(mockFactory));
   });
 
   it("should be properly initialized", () => {

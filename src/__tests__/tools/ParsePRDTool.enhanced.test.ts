@@ -26,17 +26,49 @@ vi.mock("ai", () => ({
 import { generateObject, generateText } from "ai";
 import type { MCPResponse, MCPSuccessResponse } from "../../domain/mcp-types";
 import { executeParsePRD, parsePRDTool } from "../../infrastructure/tools/ai-tasks/ParsePRDTool";
+import { generateObjectResult, generateTextResult } from "../helpers/aiFakes";
+import { must } from "../helpers/must";
+
+/** The slice of the parse_prd structured payload these tests read. */
+interface ParsedPRDData {
+  tasks: Array<{
+    id: string;
+    title: string;
+    description: string;
+    status: string;
+    priority: string;
+    acceptanceCriteria: unknown;
+    executionContext?: {
+      businessObjective: string;
+      userImpact: unknown;
+      successMetrics: unknown;
+      parentFeature: unknown;
+      technicalConstraints: unknown;
+      prdContextSummary: unknown;
+    };
+    enhancedAcceptanceCriteria?: unknown[];
+    implementationGuidance?: unknown;
+  }>;
+  traceabilityMatrix?: {
+    id: string;
+    projectId: string;
+    tasks: unknown;
+    coverage: unknown;
+  };
+  metrics: { totalEffort: unknown; avgComplexity: unknown; estimatedDuration: unknown };
+  recommendations: { startWithTasks: unknown; highPriorityTasks: unknown };
+  summary: string;
+}
 
 // Helper function to extract data from MCP response
-function extractDataFromMCPResponse(response: MCPResponse): any {
+function extractDataFromMCPResponse(response: MCPResponse): ParsedPRDData | null {
   if (response.status === "success") {
     const successResponse = response as MCPSuccessResponse;
     if (successResponse.output.content) {
       try {
         return JSON.parse(successResponse.output.content);
       } catch {
-        // If content is not JSON, return as is
-        return { content: successResponse.output.content };
+        throw new Error(`parse_prd returned non-JSON content: ${successResponse.output.content}`);
       }
     }
   }
@@ -103,16 +135,18 @@ describe("ParsePRDTool - Enhanced Context Generation", () => {
     ];
 
     // Mock different responses based on what's being generated
-    generateObject.mockImplementation((params: any) => {
+    vi.mocked(generateObject).mockImplementation((params) => {
+      const prompt =
+        "prompt" in params && typeof params.prompt === "string" ? params.prompt : undefined;
       // Check if this is a task generation call
-      if (params.prompt?.includes("task")) {
-        return Promise.resolve({ object: mockTasks });
+      if (prompt?.includes("task")) {
+        return Promise.resolve(generateObjectResult(mockTasks));
       }
 
       // Mock feature extraction response (expects array of features)
-      if (params.prompt && (params.prompt.includes("PRD") || params.prompt.includes("feature"))) {
-        return Promise.resolve({
-          object: [
+      if (prompt && (prompt.includes("PRD") || prompt.includes("feature"))) {
+        return Promise.resolve(
+          generateObjectResult([
             {
               id: "user-auth",
               title: "User Authentication",
@@ -147,17 +181,19 @@ describe("ParsePRDTool - Enhanced Context Generation", () => {
               estimatedComplexity: 6,
               dependencies: ["user-auth"],
             },
-          ],
-        });
+          ])
+        );
       }
 
       // Default response
-      return Promise.resolve({ object: mockTasks });
+      return Promise.resolve(generateObjectResult(mockTasks));
     });
 
-    generateText.mockResolvedValue({
-      text: "Task generation completed successfully. Generated comprehensive tasks with enhanced context.",
-    });
+    vi.mocked(generateText).mockResolvedValue(
+      generateTextResult(
+        "Task generation completed successfully. Generated comprehensive tasks with enhanced context."
+      )
+    );
   });
 
   const samplePRD = `# E-commerce Platform PRD
@@ -253,7 +289,7 @@ Build a modern e-commerce platform to increase online sales and improve customer
       expect(result).toBeDefined();
       expect(result.status).toBe("success");
 
-      const data = extractDataFromMCPResponse(result);
+      const data = must(extractDataFromMCPResponse(result), "parse_prd payload");
       expect(data).toBeDefined();
       expect(data.tasks).toBeDefined();
       expect(Array.isArray(data.tasks)).toBe(true);
@@ -353,7 +389,7 @@ Build a modern e-commerce platform to increase online sales and improve customer
       expect(result).toBeDefined();
       expect(result.status).toBe("success");
 
-      const data = extractDataFromMCPResponse(result);
+      const data = must(extractDataFromMCPResponse(result), "parse_prd payload");
       expect(data).toBeDefined();
       expect(data.tasks).toBeDefined();
       expect(data.tasks.length).toBeGreaterThan(0);
@@ -393,7 +429,7 @@ Build a modern e-commerce platform to increase online sales and improve customer
       expect(result).toBeDefined();
       expect(result.status).toBe("success");
 
-      const data = extractDataFromMCPResponse(result);
+      const data = must(extractDataFromMCPResponse(result), "parse_prd payload");
       expect(data).toBeDefined();
       expect(data.tasks).toBeDefined();
       expect(data.tasks.length).toBeGreaterThan(0);
@@ -445,7 +481,7 @@ Build a modern e-commerce platform to increase online sales and improve customer
         expect(result).toBeDefined();
         expect(result.status).toBe("success");
 
-        const data = extractDataFromMCPResponse(result);
+        const data = must(extractDataFromMCPResponse(result), "parse_prd payload");
         expect(data).toBeDefined();
         expect(data.tasks).toBeDefined();
         expect(data.tasks.length).toBeGreaterThan(0);

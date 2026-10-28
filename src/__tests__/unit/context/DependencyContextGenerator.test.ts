@@ -1,4 +1,4 @@
-import { generateObject } from "ai";
+import { generateObject, type LanguageModel } from "ai";
 import { beforeEach, describe, expect, it, type Mocked, vi } from "vitest";
 import {
   type AITask,
@@ -8,6 +8,8 @@ import {
 } from "../../../domain/ai-types";
 import { AIServiceFactory } from "../../../services/ai/AIServiceFactory";
 import { DependencyContextGenerator } from "../../../services/context/DependencyContextGenerator";
+import { generateObjectResult } from "../../helpers/aiFakes";
+import { must } from "../../helpers/must";
 
 // Mock the AI modules
 vi.mock("ai", () => ({
@@ -82,14 +84,14 @@ describe("DependencyContextGenerator", () => {
       createLanguageModel: vi.fn(),
     } as unknown as Mocked<AIServiceFactory>;
 
-    (AIServiceFactory.getInstance as Mock).mockReturnValue(mockAIServiceFactory);
+    vi.mocked(AIServiceFactory.getInstance).mockReturnValue(mockAIServiceFactory);
 
     generator = new DependencyContextGenerator();
   });
 
   describe("isAIAvailable", () => {
     it("should return true when AI model is available", () => {
-      mockAIServiceFactory.getBestAvailableModel.mockReturnValue({} as any);
+      mockAIServiceFactory.getBestAvailableModel.mockReturnValue({} as LanguageModel);
 
       expect(generator.isAIAvailable()).toBe(true);
     });
@@ -114,23 +116,29 @@ describe("DependencyContextGenerator", () => {
         const depTask = createDependencyTask("dep-1", "Setup Database Schema");
         const allTasks = [task, depTask];
 
-        const result = await generator.generateDependencyContext(task, allTasks);
+        const result = must(
+          await generator.generateDependencyContext(task, allTasks),
+          "dependency context"
+        );
 
         expect(result).not.toBeNull();
-        expect(result!.dependencies).toBeDefined();
-        expect(result!.dependencies.length).toBeGreaterThan(0);
-        expect(result!.parallelOpportunities).toBeDefined();
-        expect(result!.criticalPath).toBeDefined();
+        expect(result.dependencies).toBeDefined();
+        expect(result.dependencies.length).toBeGreaterThan(0);
+        expect(result.parallelOpportunities).toBeDefined();
+        expect(result.criticalPath).toBeDefined();
       });
 
       it("should handle task with no dependencies", async () => {
         const task = createMockTask({ dependencies: [] });
         const allTasks = [task];
 
-        const result = await generator.generateDependencyContext(task, allTasks);
+        const result = must(
+          await generator.generateDependencyContext(task, allTasks),
+          "dependency context"
+        );
 
         expect(result).not.toBeNull();
-        expect(result!.dependencies).toHaveLength(0);
+        expect(result.dependencies).toHaveLength(0);
       });
 
       it("should handle external dependencies array", async () => {
@@ -141,11 +149,14 @@ describe("DependencyContextGenerator", () => {
           { id: "ext-dep", type: "blocks", description: "External dep" },
         ];
 
-        const result = await generator.generateDependencyContext(task, allTasks, externalDeps);
+        const result = must(
+          await generator.generateDependencyContext(task, allTasks, externalDeps),
+          "dependency context"
+        );
 
         expect(result).not.toBeNull();
-        expect(result!.dependencies.length).toBe(1);
-        expect(result!.dependencies[0].dependencyId).toBe("ext-dep");
+        expect(result.dependencies.length).toBe(1);
+        expect(result.dependencies[0].dependencyId).toBe("ext-dep");
       });
 
       it("should create basic entry for dependency task not found", async () => {
@@ -154,20 +165,23 @@ describe("DependencyContextGenerator", () => {
         });
         const allTasks = [task];
 
-        const result = await generator.generateDependencyContext(task, allTasks);
+        const result = must(
+          await generator.generateDependencyContext(task, allTasks),
+          "dependency context"
+        );
 
         expect(result).not.toBeNull();
-        expect(result!.dependencies).toHaveLength(1);
-        expect(result!.dependencies[0].dependencyId).toBe("missing-task");
-        expect(result!.dependencies[0].dependencyTitle).toBe("missing-task");
-        expect(result!.dependencies[0].dependencyType).toBe("blocks");
+        expect(result.dependencies).toHaveLength(1);
+        expect(result.dependencies[0].dependencyId).toBe("missing-task");
+        expect(result.dependencies[0].dependencyTitle).toBe("missing-task");
+        expect(result.dependencies[0].dependencyType).toBe("blocks");
       });
     });
 
     describe("AI mode", () => {
       it("should use AI to generate enhanced dependency context", async () => {
         const mockModel = { modelId: "test-model" };
-        mockAIServiceFactory.getBestAvailableModel.mockReturnValue(mockModel as any);
+        mockAIServiceFactory.getBestAvailableModel.mockReturnValue(mockModel as LanguageModel);
 
         const task = createMockTask({
           dependencies: [{ id: "dep-1", type: "depends_on" }],
@@ -177,8 +191,8 @@ describe("DependencyContextGenerator", () => {
 
         // Mock generateObject to return valid dependency context
         const mockGenerateObject = vi.mocked(generateObject);
-        mockGenerateObject.mockResolvedValue({
-          object: {
+        mockGenerateObject.mockResolvedValue(
+          generateObjectResult({
             dependencies: [
               {
                 dependencyId: "dep-1",
@@ -194,19 +208,22 @@ describe("DependencyContextGenerator", () => {
             parallelOpportunities: [],
             criticalPath: ["dep-1", "task-1"],
             estimatedUnblockDate: "2024-01-10T00:00:00Z",
-          },
-        });
+          })
+        );
 
-        const result = await generator.generateDependencyContext(task, allTasks);
+        const result = must(
+          await generator.generateDependencyContext(task, allTasks),
+          "dependency context"
+        );
 
         expect(result).not.toBeNull();
         expect(mockGenerateObject).toHaveBeenCalled();
-        expect(result!.dependencies[0].rationale).toContain("Database");
+        expect(result.dependencies[0].rationale).toContain("Database");
       });
 
       it("should fallback to basic analysis on AI error", async () => {
         const mockModel = { modelId: "test-model" };
-        mockAIServiceFactory.getBestAvailableModel.mockReturnValue(mockModel as any);
+        mockAIServiceFactory.getBestAvailableModel.mockReturnValue(mockModel as LanguageModel);
 
         const task = createMockTask({
           dependencies: [{ id: "dep-1", type: "depends_on" }],
@@ -218,11 +235,14 @@ describe("DependencyContextGenerator", () => {
         const mockGenerateObject = vi.mocked(generateObject);
         mockGenerateObject.mockRejectedValue(new Error("AI service unavailable"));
 
-        const result = await generator.generateDependencyContext(task, allTasks);
+        const result = must(
+          await generator.generateDependencyContext(task, allTasks),
+          "dependency context"
+        );
 
         expect(result).not.toBeNull();
         // Should still return valid context via fallback
-        expect(result!.dependencies).toBeDefined();
+        expect(result.dependencies).toBeDefined();
       });
     });
   });
@@ -242,9 +262,12 @@ describe("DependencyContextGenerator", () => {
       depTask.description = "Implement the authentication module";
       const allTasks = [task, depTask];
 
-      const result = await generator.generateDependencyContext(task, allTasks);
+      const result = must(
+        await generator.generateDependencyContext(task, allTasks),
+        "dependency context"
+      );
 
-      expect(result!.dependencies[0].dependencyType).toBe("implements");
+      expect(result.dependencies[0].dependencyType).toBe("implements");
     });
 
     it("should detect blocks type for infrastructure setup", async () => {
@@ -257,9 +280,12 @@ describe("DependencyContextGenerator", () => {
       const depTask = createDependencyTask("dep-1", "Setup Infrastructure");
       const allTasks = [task, depTask];
 
-      const result = await generator.generateDependencyContext(task, allTasks);
+      const result = must(
+        await generator.generateDependencyContext(task, allTasks),
+        "dependency context"
+      );
 
-      expect(result!.dependencies[0].dependencyType).toBe("blocks");
+      expect(result.dependencies[0].dependencyType).toBe("blocks");
     });
 
     it("should detect blocks type for configuration tasks", async () => {
@@ -272,9 +298,12 @@ describe("DependencyContextGenerator", () => {
       const depTask = createDependencyTask("dep-1", "Configure Database Connection");
       const allTasks = [task, depTask];
 
-      const result = await generator.generateDependencyContext(task, allTasks);
+      const result = must(
+        await generator.generateDependencyContext(task, allTasks),
+        "dependency context"
+      );
 
-      expect(result!.dependencies[0].dependencyType).toBe("blocks");
+      expect(result.dependencies[0].dependencyType).toBe("blocks");
     });
   });
 
@@ -290,9 +319,12 @@ describe("DependencyContextGenerator", () => {
       const depTask = createDependencyTask("dep-1", "Setup Infrastructure");
       const allTasks = [task, depTask];
 
-      const result = await generator.generateDependencyContext(task, allTasks);
+      const result = must(
+        await generator.generateDependencyContext(task, allTasks),
+        "dependency context"
+      );
 
-      expect(result!.dependencies[0].rationale).toContain("infrastructure");
+      expect(result.dependencies[0].rationale).toContain("infrastructure");
     });
 
     it("should generate rationale for API dependency", async () => {
@@ -302,9 +334,12 @@ describe("DependencyContextGenerator", () => {
       const depTask = createDependencyTask("dep-1", "Create User API Endpoints");
       const allTasks = [task, depTask];
 
-      const result = await generator.generateDependencyContext(task, allTasks);
+      const result = must(
+        await generator.generateDependencyContext(task, allTasks),
+        "dependency context"
+      );
 
-      expect(result!.dependencies[0].rationale).toContain("API");
+      expect(result.dependencies[0].rationale).toContain("API");
     });
 
     it("should generate rationale for model/schema dependency", async () => {
@@ -314,9 +349,12 @@ describe("DependencyContextGenerator", () => {
       const depTask = createDependencyTask("dep-1", "Define Data Model");
       const allTasks = [task, depTask];
 
-      const result = await generator.generateDependencyContext(task, allTasks);
+      const result = must(
+        await generator.generateDependencyContext(task, allTasks),
+        "dependency context"
+      );
 
-      expect(result!.dependencies[0].rationale).toContain("data model");
+      expect(result.dependencies[0].rationale).toContain("data model");
     });
 
     it("should generate rationale for component/UI dependency", async () => {
@@ -326,9 +364,12 @@ describe("DependencyContextGenerator", () => {
       const depTask = createDependencyTask("dep-1", "Create Login Component");
       const allTasks = [task, depTask];
 
-      const result = await generator.generateDependencyContext(task, allTasks);
+      const result = must(
+        await generator.generateDependencyContext(task, allTasks),
+        "dependency context"
+      );
 
-      expect(result!.dependencies[0].rationale).toContain("UI component");
+      expect(result.dependencies[0].rationale).toContain("UI component");
     });
   });
 
@@ -344,9 +385,12 @@ describe("DependencyContextGenerator", () => {
       const depTask = createDependencyTask("dep-1", "Setup and Configure");
       const allTasks = [task, depTask];
 
-      const result = await generator.generateDependencyContext(task, allTasks);
+      const result = must(
+        await generator.generateDependencyContext(task, allTasks),
+        "dependency context"
+      );
 
-      expect(result!.dependencies[0].providedBy).toContain("environment");
+      expect(result.dependencies[0].providedBy).toContain("environment");
     });
 
     it("should identify what API tasks provide", async () => {
@@ -356,9 +400,12 @@ describe("DependencyContextGenerator", () => {
       const depTask = createDependencyTask("dep-1", "API Endpoint Creation");
       const allTasks = [task, depTask];
 
-      const result = await generator.generateDependencyContext(task, allTasks);
+      const result = must(
+        await generator.generateDependencyContext(task, allTasks),
+        "dependency context"
+      );
 
-      expect(result!.dependencies[0].providedBy).toContain("API");
+      expect(result.dependencies[0].providedBy).toContain("API");
     });
 
     it("should identify what auth tasks provide", async () => {
@@ -368,9 +415,12 @@ describe("DependencyContextGenerator", () => {
       const depTask = createDependencyTask("dep-1", "Authentication Implementation");
       const allTasks = [task, depTask];
 
-      const result = await generator.generateDependencyContext(task, allTasks);
+      const result = must(
+        await generator.generateDependencyContext(task, allTasks),
+        "dependency context"
+      );
 
-      expect(result!.dependencies[0].providedBy).toContain("Authentication");
+      expect(result.dependencies[0].providedBy).toContain("Authentication");
     });
 
     it("should identify what service tasks provide", async () => {
@@ -380,9 +430,12 @@ describe("DependencyContextGenerator", () => {
       const depTask = createDependencyTask("dep-1", "User Service Business Logic");
       const allTasks = [task, depTask];
 
-      const result = await generator.generateDependencyContext(task, allTasks);
+      const result = must(
+        await generator.generateDependencyContext(task, allTasks),
+        "dependency context"
+      );
 
-      expect(result!.dependencies[0].providedBy).toContain("Business logic");
+      expect(result.dependencies[0].providedBy).toContain("Business logic");
     });
   });
 
@@ -398,9 +451,12 @@ describe("DependencyContextGenerator", () => {
       const depTask = createDependencyTask("dep-1", "API Implementation");
       const allTasks = [task, depTask];
 
-      const result = await generator.generateDependencyContext(task, allTasks);
+      const result = must(
+        await generator.generateDependencyContext(task, allTasks),
+        "dependency context"
+      );
 
-      expect(result!.dependencies[0].integrationGuidance).toContain("API");
+      expect(result.dependencies[0].integrationGuidance).toContain("API");
     });
 
     it("should generate component integration guidance", async () => {
@@ -410,9 +466,12 @@ describe("DependencyContextGenerator", () => {
       const depTask = createDependencyTask("dep-1", "Button Component");
       const allTasks = [task, depTask];
 
-      const result = await generator.generateDependencyContext(task, allTasks);
+      const result = must(
+        await generator.generateDependencyContext(task, allTasks),
+        "dependency context"
+      );
 
-      expect(result!.dependencies[0].integrationGuidance).toContain("component");
+      expect(result.dependencies[0].integrationGuidance).toContain("component");
     });
 
     it("should generate service integration guidance", async () => {
@@ -422,9 +481,12 @@ describe("DependencyContextGenerator", () => {
       const depTask = createDependencyTask("dep-1", "Payment Service");
       const allTasks = [task, depTask];
 
-      const result = await generator.generateDependencyContext(task, allTasks);
+      const result = must(
+        await generator.generateDependencyContext(task, allTasks),
+        "dependency context"
+      );
 
-      expect(result!.dependencies[0].integrationGuidance).toContain("service");
+      expect(result.dependencies[0].integrationGuidance).toContain("service");
     });
   });
 
@@ -440,9 +502,12 @@ describe("DependencyContextGenerator", () => {
       const depTask = createDependencyTask("dep-1", "REST API Implementation");
       const allTasks = [task, depTask];
 
-      const result = await generator.generateDependencyContext(task, allTasks);
+      const result = must(
+        await generator.generateDependencyContext(task, allTasks),
+        "dependency context"
+      );
 
-      expect(result!.dependencies[0].interfaces).toContain("REST API endpoints");
+      expect(result.dependencies[0].interfaces).toContain("REST API endpoints");
     });
 
     it("should identify database interfaces", async () => {
@@ -452,9 +517,12 @@ describe("DependencyContextGenerator", () => {
       const depTask = createDependencyTask("dep-1", "Database Repository");
       const allTasks = [task, depTask];
 
-      const result = await generator.generateDependencyContext(task, allTasks);
+      const result = must(
+        await generator.generateDependencyContext(task, allTasks),
+        "dependency context"
+      );
 
-      expect(result!.dependencies[0].interfaces).toContain("Repository interface");
+      expect(result.dependencies[0].interfaces).toContain("Repository interface");
     });
 
     it("should provide default interface for generic tasks", async () => {
@@ -464,9 +532,12 @@ describe("DependencyContextGenerator", () => {
       const depTask = createDependencyTask("dep-1", "Generic Task");
       const allTasks = [task, depTask];
 
-      const result = await generator.generateDependencyContext(task, allTasks);
+      const result = must(
+        await generator.generateDependencyContext(task, allTasks),
+        "dependency context"
+      );
 
-      expect(result!.dependencies[0].interfaces).toContain("Standard integration interface");
+      expect(result.dependencies[0].interfaces).toContain("Standard integration interface");
     });
   });
 
@@ -482,9 +553,12 @@ describe("DependencyContextGenerator", () => {
       const depTask = createDependencyTask("dep-1", "Setup Infrastructure");
       const allTasks = [task, depTask];
 
-      const result = await generator.generateDependencyContext(task, allTasks);
+      const result = must(
+        await generator.generateDependencyContext(task, allTasks),
+        "dependency context"
+      );
 
-      expect(result!.dependencies[0].canRunInParallel).toBe(false);
+      expect(result.dependencies[0].canRunInParallel).toBe(false);
     });
 
     it("should identify parallel opportunities for independent tasks", async () => {
@@ -495,9 +569,12 @@ describe("DependencyContextGenerator", () => {
       indepTask2.dependencies = [];
       const allTasks = [task, indepTask1, indepTask2];
 
-      const result = await generator.generateDependencyContext(task, allTasks);
+      const result = must(
+        await generator.generateDependencyContext(task, allTasks),
+        "dependency context"
+      );
 
-      expect(result!.parallelOpportunities.length).toBeGreaterThanOrEqual(0);
+      expect(result.parallelOpportunities.length).toBeGreaterThanOrEqual(0);
     });
   });
 
@@ -510,9 +587,12 @@ describe("DependencyContextGenerator", () => {
       const task = createMockTask({ id: "task-1" });
       const allTasks = [task];
 
-      const result = await generator.generateDependencyContext(task, allTasks);
+      const result = must(
+        await generator.generateDependencyContext(task, allTasks),
+        "dependency context"
+      );
 
-      expect(result!.criticalPath).toContain("task-1");
+      expect(result.criticalPath).toContain("task-1");
     });
   });
 
@@ -525,9 +605,12 @@ describe("DependencyContextGenerator", () => {
       const task = createMockTask({ dependencies: [] });
       const allTasks = [task];
 
-      const result = await generator.generateDependencyContext(task, allTasks);
+      const result = must(
+        await generator.generateDependencyContext(task, allTasks),
+        "dependency context"
+      );
 
-      expect(result!.estimatedUnblockDate).toBeUndefined();
+      expect(result.estimatedUnblockDate).toBeUndefined();
     });
 
     it("should estimate unblock date for blocking dependencies", async () => {
@@ -547,10 +630,13 @@ describe("DependencyContextGenerator", () => {
       depTask2.description = "Configure the database";
       const allTasks = [task, depTask1, depTask2];
 
-      const result = await generator.generateDependencyContext(task, allTasks);
+      const result = must(
+        await generator.generateDependencyContext(task, allTasks),
+        "dependency context"
+      );
 
       // Should have an estimated date since there are blocking deps
-      expect(result!.estimatedUnblockDate).toBeDefined();
+      expect(result.estimatedUnblockDate).toBeDefined();
     });
   });
 
@@ -562,10 +648,13 @@ describe("DependencyContextGenerator", () => {
     it("should handle empty allTasks array", async () => {
       const task = createMockTask();
 
-      const result = await generator.generateDependencyContext(task, []);
+      const result = must(
+        await generator.generateDependencyContext(task, []),
+        "dependency context"
+      );
 
       expect(result).not.toBeNull();
-      expect(result!.dependencies).toHaveLength(0);
+      expect(result.dependencies).toHaveLength(0);
     });
 
     it("should handle task with circular reference in dependencies", async () => {
@@ -576,7 +665,10 @@ describe("DependencyContextGenerator", () => {
       const allTasks = [task];
 
       // Should not throw
-      const result = await generator.generateDependencyContext(task, allTasks);
+      const result = must(
+        await generator.generateDependencyContext(task, allTasks),
+        "dependency context"
+      );
 
       expect(result).not.toBeNull();
     });
@@ -594,9 +686,12 @@ describe("DependencyContextGenerator", () => {
       const dep3 = createDependencyTask("dep-3", "Logging Service");
       const allTasks = [task, dep1, dep2, dep3];
 
-      const result = await generator.generateDependencyContext(task, allTasks);
+      const result = must(
+        await generator.generateDependencyContext(task, allTasks),
+        "dependency context"
+      );
 
-      expect(result!.dependencies).toHaveLength(3);
+      expect(result.dependencies).toHaveLength(3);
     });
 
     it("should handle tasks found by title match", async () => {
@@ -606,10 +701,13 @@ describe("DependencyContextGenerator", () => {
       const depTask = createDependencyTask("different-id", "Database Setup");
       const allTasks = [task, depTask];
 
-      const result = await generator.generateDependencyContext(task, allTasks);
+      const result = must(
+        await generator.generateDependencyContext(task, allTasks),
+        "dependency context"
+      );
 
-      expect(result!.dependencies).toHaveLength(1);
-      expect(result!.dependencies[0].dependencyId).toBe("different-id");
+      expect(result.dependencies).toHaveLength(1);
+      expect(result.dependencies[0].dependencyId).toBe("different-id");
     });
   });
 
@@ -640,16 +738,19 @@ describe("DependencyContextGenerator", () => {
       });
 
       const allTasks = [taskA, taskB, taskC, taskD];
-      const result = await generator.generateDependencyContext(taskA, allTasks);
+      const result = must(
+        await generator.generateDependencyContext(taskA, allTasks),
+        "dependency context"
+      );
 
       expect(result).not.toBeNull();
       // A's direct dependencies are B and C
-      expect(result!.dependencies).toHaveLength(2);
-      const depIds = result!.dependencies.map((d) => d.dependencyId);
+      expect(result.dependencies).toHaveLength(2);
+      const depIds = result.dependencies.map((d) => d.dependencyId);
       expect(depIds).toContain("b");
       expect(depIds).toContain("c");
       // B and C share the same dependency D, so they should form a parallel group
-      expect(result!.criticalPath).toContain("a");
+      expect(result.criticalPath).toContain("a");
     });
 
     it("should handle circular dependency A→B→C→A without infinite loop", async () => {
@@ -667,14 +768,17 @@ describe("DependencyContextGenerator", () => {
       const allTasks = [taskA, taskB, taskC];
 
       // Must not throw or hang
-      const result = await generator.generateDependencyContext(taskA, allTasks);
+      const result = must(
+        await generator.generateDependencyContext(taskA, allTasks),
+        "dependency context"
+      );
 
       expect(result).not.toBeNull();
-      expect(result!.dependencies).toHaveLength(1);
-      expect(result!.dependencies[0].dependencyId).toBe("b");
+      expect(result.dependencies).toHaveLength(1);
+      expect(result.dependencies[0].dependencyId).toBe("b");
       // Critical path should contain 'a' without duplicates
-      const uniquePath = new Set(result!.criticalPath);
-      expect(uniquePath.size).toBe(result!.criticalPath.length);
+      const uniquePath = new Set(result.criticalPath);
+      expect(uniquePath.size).toBe(result.criticalPath.length);
     });
 
     it("should handle deep dependency chain of 6 levels", async () => {
@@ -703,15 +807,21 @@ describe("DependencyContextGenerator", () => {
         tasks.push(t);
       }
 
-      const rootTask = tasks.find((t) => t.id === "level-0")!;
-      const result = await generator.generateDependencyContext(rootTask, tasks);
+      const rootTask = must(
+        tasks.find((t) => t.id === "level-0"),
+        "level-0 task"
+      );
+      const result = must(
+        await generator.generateDependencyContext(rootTask, tasks),
+        "dependency context"
+      );
 
       expect(result).not.toBeNull();
       // Root has a direct dependency on level-1
-      expect(result!.dependencies).toHaveLength(1);
-      expect(result!.dependencies[0].dependencyId).toBe("level-1");
+      expect(result.dependencies).toHaveLength(1);
+      expect(result.dependencies[0].dependencyId).toBe("level-1");
       // Critical path must include the root
-      expect(result!.criticalPath).toContain("level-0");
+      expect(result.criticalPath).toContain("level-0");
     });
 
     it("should handle multiple missing dependencies gracefully", async () => {
@@ -726,19 +836,25 @@ describe("DependencyContextGenerator", () => {
         ],
       });
 
-      const result = await generator.generateDependencyContext(task, [task]);
+      const result = must(
+        await generator.generateDependencyContext(task, [task]),
+        "dependency context"
+      );
 
       expect(result).not.toBeNull();
-      expect(result!.dependencies).toHaveLength(3);
+      expect(result.dependencies).toHaveLength(3);
 
-      for (const dep of result!.dependencies) {
+      for (const dep of result.dependencies) {
         // Missing deps get basic fallback entries
         expect(dep.dependencyType).toBe("blocks");
         expect(dep.canRunInParallel).toBe(false);
         expect(dep.interfaces).toEqual([]);
       }
       // The one with a description should use it as rationale
-      const ghost3 = result!.dependencies.find((d) => d.dependencyId === "ghost-3")!;
+      const ghost3 = must(
+        result.dependencies.find((d) => d.dependencyId === "ghost-3"),
+        "ghost3 dependency"
+      );
       expect(ghost3.rationale).toBe("Needs external auth provider");
     });
 
@@ -758,18 +874,27 @@ describe("DependencyContextGenerator", () => {
       // 'missing-service' deliberately absent from allTasks
       const allTasks = [task, dbTask, authTask];
 
-      const result = await generator.generateDependencyContext(task, allTasks);
+      const result = must(
+        await generator.generateDependencyContext(task, allTasks),
+        "dependency context"
+      );
 
       expect(result).not.toBeNull();
-      expect(result!.dependencies).toHaveLength(3);
+      expect(result.dependencies).toHaveLength(3);
 
       // Resolved deps have rich metadata
-      const dbDep = result!.dependencies.find((d) => d.dependencyId === "db-setup")!;
+      const dbDep = must(
+        result.dependencies.find((d) => d.dependencyId === "db-setup"),
+        "dbDep dependency"
+      );
       expect(dbDep.dependencyTitle).toBe("Setup Database");
       expect(dbDep.rationale.length).toBeGreaterThan(10);
 
       // Unresolved dep has fallback fields
-      const missingDep = result!.dependencies.find((d) => d.dependencyId === "missing-service")!;
+      const missingDep = must(
+        result.dependencies.find((d) => d.dependencyId === "missing-service"),
+        "missingDep dependency"
+      );
       expect(missingDep.dependencyTitle).toBe("missing-service");
       expect(missingDep.dependencyType).toBe("blocks");
       expect(missingDep.interfaces).toEqual([]);
@@ -793,15 +918,18 @@ describe("DependencyContextGenerator", () => {
       });
 
       const allTasks = [mainTask, taskX, taskY, sharedDep];
-      const result = await generator.generateDependencyContext(mainTask, allTasks);
+      const result = must(
+        await generator.generateDependencyContext(mainTask, allTasks),
+        "dependency context"
+      );
 
       expect(result).not.toBeNull();
       // groupTasksByDependencies should group X and Y (same dep key)
-      const groupOpportunity = result!.parallelOpportunities.find(
+      const groupOpportunity = result.parallelOpportunities.find(
         (op) => op.taskIds.includes("x") && op.taskIds.includes("y")
       );
       expect(groupOpportunity).toBeDefined();
-      expect(groupOpportunity!.reason).toContain("same dependencies");
+      expect(must(groupOpportunity, "group opportunity").reason).toContain("same dependencies");
     });
 
     it("should perform well with a large graph of 50 tasks", async () => {
@@ -830,11 +958,14 @@ describe("DependencyContextGenerator", () => {
       }
 
       const start = Date.now();
-      const result = await generator.generateDependencyContext(tasks[0], tasks);
+      const result = must(
+        await generator.generateDependencyContext(tasks[0], tasks),
+        "dependency context"
+      );
       const elapsed = Date.now() - start;
 
       expect(result).not.toBeNull();
-      expect(result!.dependencies).toHaveLength(1);
+      expect(result.dependencies).toHaveLength(1);
       // Should complete in under 1 second (no exponential blowup)
       expect(elapsed).toBeLessThan(1000);
     });
@@ -853,18 +984,24 @@ describe("DependencyContextGenerator", () => {
         id: "main",
         title: "Build Complete System",
         description: "System requires all setup components",
-        dependencies: setupTasks.map((st) => ({ id: st.id!, type: "depends_on" as const })),
+        dependencies: setupTasks.map((st) => ({
+          id: must(st.id, "setup task id"),
+          type: "depends_on" as const,
+        })),
       });
 
       const allTasks = [mainTask, ...setupTasks];
-      const result = await generator.generateDependencyContext(mainTask, allTasks);
+      const result = must(
+        await generator.generateDependencyContext(mainTask, allTasks),
+        "dependency context"
+      );
 
       // The main task has 8 dependencies; the generator may not produce
       // parallel opportunities from the main task's perspective since it
       // depends on all of them. Just verify the dependency count is correct.
-      expect(result!.dependencies).toHaveLength(8);
+      expect(result.dependencies).toHaveLength(8);
       // Each dependency should have the correct type
-      for (const dep of result!.dependencies) {
+      for (const dep of result.dependencies) {
         expect(dep.dependencyType).toBeDefined();
       }
     });
@@ -882,16 +1019,22 @@ describe("DependencyContextGenerator", () => {
         id: "main",
         title: "Deploy Application",
         description: "Deploy the full application",
-        dependencies: setupTasks.map((st) => ({ id: st.id!, type: "depends_on" as const })),
+        dependencies: setupTasks.map((st) => ({
+          id: must(st.id, "setup task id"),
+          type: "depends_on" as const,
+        })),
       });
 
       const allTasks = [mainTask, ...setupTasks];
-      const result = await generator.generateDependencyContext(mainTask, allTasks);
+      const result = must(
+        await generator.generateDependencyContext(mainTask, allTasks),
+        "dependency context"
+      );
 
       expect(result).not.toBeNull();
-      expect(result!.estimatedUnblockDate).toBeDefined();
+      expect(result.estimatedUnblockDate).toBeDefined();
 
-      const unblockDate = new Date(result!.estimatedUnblockDate!);
+      const unblockDate = new Date(must(result.estimatedUnblockDate, "estimatedUnblockDate"));
       const now = new Date();
       const daysDiff = Math.round((unblockDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
       // 4 blocking deps × 3 days each = ~12 days (allow ±1 for date boundary)
@@ -912,12 +1055,15 @@ describe("DependencyContextGenerator", () => {
       depTask.description = "Monitoring for the Logging Module";
 
       const allTasks = [task, depTask];
-      const result = await generator.generateDependencyContext(task, allTasks);
+      const result = must(
+        await generator.generateDependencyContext(task, allTasks),
+        "dependency context"
+      );
 
       expect(result).not.toBeNull();
-      expect(result!.dependencies).toHaveLength(1);
-      expect(result!.dependencies[0].dependencyType).toBe("relates_to");
-      expect(result!.dependencies[0].canRunInParallel).toBe(true);
+      expect(result.dependencies).toHaveLength(1);
+      expect(result.dependencies[0].dependencyType).toBe("relates_to");
+      expect(result.dependencies[0].canRunInParallel).toBe(true);
     });
   });
 });

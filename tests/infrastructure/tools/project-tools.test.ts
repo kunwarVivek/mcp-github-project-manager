@@ -745,7 +745,7 @@ describe("Project Tools", () => {
 
       it("has examples", () => {
         expect(createProjectTool.examples).toBeDefined();
-        expect(createProjectTool.examples!.length).toBeGreaterThan(0);
+        expect(createProjectTool.examples?.length).toBeGreaterThan(0);
       });
     });
 
@@ -773,7 +773,7 @@ describe("Project Tools", () => {
 
       it("has examples", () => {
         expect(listProjectsTool.examples).toBeDefined();
-        expect(listProjectsTool.examples!.length).toBeGreaterThan(0);
+        expect(listProjectsTool.examples?.length).toBeGreaterThan(0);
       });
     });
 
@@ -801,7 +801,7 @@ describe("Project Tools", () => {
 
       it("has examples", () => {
         expect(getProjectTool.examples).toBeDefined();
-        expect(getProjectTool.examples!.length).toBeGreaterThan(0);
+        expect(getProjectTool.examples?.length).toBeGreaterThan(0);
       });
     });
 
@@ -829,7 +829,7 @@ describe("Project Tools", () => {
 
       it("has examples", () => {
         expect(updateProjectTool.examples).toBeDefined();
-        expect(updateProjectTool.examples!.length).toBeGreaterThan(0);
+        expect(updateProjectTool.examples?.length).toBeGreaterThan(0);
       });
     });
 
@@ -857,7 +857,7 @@ describe("Project Tools", () => {
 
       it("has examples", () => {
         expect(deleteProjectTool.examples).toBeDefined();
-        expect(deleteProjectTool.examples!.length).toBeGreaterThan(0);
+        expect(deleteProjectTool.examples?.length).toBeGreaterThan(0);
       });
     });
 
@@ -885,7 +885,7 @@ describe("Project Tools", () => {
 
       it("has examples", () => {
         expect(createProjectFieldTool.examples).toBeDefined();
-        expect(createProjectFieldTool.examples!.length).toBeGreaterThan(0);
+        expect(createProjectFieldTool.examples?.length).toBeGreaterThan(0);
       });
     });
 
@@ -913,7 +913,7 @@ describe("Project Tools", () => {
 
       it("has examples", () => {
         expect(listProjectFieldsTool.examples).toBeDefined();
-        expect(listProjectFieldsTool.examples!.length).toBeGreaterThan(0);
+        expect(listProjectFieldsTool.examples?.length).toBeGreaterThan(0);
       });
     });
 
@@ -941,7 +941,7 @@ describe("Project Tools", () => {
 
       it("has examples", () => {
         expect(updateProjectFieldTool.examples).toBeDefined();
-        expect(updateProjectFieldTool.examples!.length).toBeGreaterThan(0);
+        expect(updateProjectFieldTool.examples?.length).toBeGreaterThan(0);
       });
     });
 
@@ -969,7 +969,7 @@ describe("Project Tools", () => {
 
       it("has examples", () => {
         expect(addProjectItemTool.examples).toBeDefined();
-        expect(addProjectItemTool.examples!.length).toBeGreaterThan(0);
+        expect(addProjectItemTool.examples?.length).toBeGreaterThan(0);
       });
     });
 
@@ -997,7 +997,7 @@ describe("Project Tools", () => {
 
       it("has examples", () => {
         expect(removeProjectItemTool.examples).toBeDefined();
-        expect(removeProjectItemTool.examples!.length).toBeGreaterThan(0);
+        expect(removeProjectItemTool.examples?.length).toBeGreaterThan(0);
       });
     });
 
@@ -1025,7 +1025,7 @@ describe("Project Tools", () => {
 
       it("has examples", () => {
         expect(listProjectItemsTool.examples).toBeDefined();
-        expect(listProjectItemsTool.examples!.length).toBeGreaterThan(0);
+        expect(listProjectItemsTool.examples?.length).toBeGreaterThan(0);
       });
     });
 
@@ -1053,7 +1053,7 @@ describe("Project Tools", () => {
 
       it("has examples", () => {
         expect(setFieldValueTool.examples).toBeDefined();
-        expect(setFieldValueTool.examples!.length).toBeGreaterThan(0);
+        expect(setFieldValueTool.examples?.length).toBeGreaterThan(0);
       });
     });
 
@@ -1081,7 +1081,7 @@ describe("Project Tools", () => {
 
       it("has examples", () => {
         expect(getFieldValueTool.examples).toBeDefined();
-        expect(getFieldValueTool.examples!.length).toBeGreaterThan(0);
+        expect(getFieldValueTool.examples?.length).toBeGreaterThan(0);
       });
     });
 
@@ -1109,7 +1109,7 @@ describe("Project Tools", () => {
 
       it("has examples", () => {
         expect(clearFieldValueTool.examples).toBeDefined();
-        expect(clearFieldValueTool.examples!.length).toBeGreaterThan(0);
+        expect(clearFieldValueTool.examples?.length).toBeGreaterThan(0);
       });
     });
 
@@ -1137,7 +1137,7 @@ describe("Project Tools", () => {
 
       it("has examples", () => {
         expect(archiveProjectItemTool.examples).toBeDefined();
-        expect(archiveProjectItemTool.examples!.length).toBeGreaterThan(0);
+        expect(archiveProjectItemTool.examples?.length).toBeGreaterThan(0);
       });
     });
 
@@ -1165,7 +1165,7 @@ describe("Project Tools", () => {
 
       it("has examples", () => {
         expect(unarchiveProjectItemTool.examples).toBeDefined();
-        expect(unarchiveProjectItemTool.examples!.length).toBeGreaterThan(0);
+        expect(unarchiveProjectItemTool.examples?.length).toBeGreaterThan(0);
       });
     });
   });

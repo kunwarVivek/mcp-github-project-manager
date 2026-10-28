@@ -1,5 +1,6 @@
-import { generateObject, generateText } from "ai";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { generateObject } from "ai";
+import { beforeEach, describe, expect, it, type Mock, vi } from "vitest";
+import { generateObjectResult } from "../../src/__tests__/helpers/aiFakes.js";
 import { type TaskComplexity, TaskPriority, TaskStatus } from "../../src/domain/ai-types";
 import { AIServiceFactory } from "../../src/services/ai/AIServiceFactory";
 import { TaskGenerationService } from "../../src/services/TaskGenerationService";
@@ -29,7 +30,7 @@ vi.mock("ai", () => ({
 
 describe("TaskGenerationService", () => {
   let service: TaskGenerationService;
-  let mockAIService: any;
+  let mockAIService: { modelId: string; provider: string };
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -93,7 +94,7 @@ describe("TaskGenerationService", () => {
         },
       ];
 
-      generateObject.mockResolvedValue({ object: mockTasks });
+      vi.mocked(generateObject).mockResolvedValue(generateObjectResult(mockTasks));
 
       const input = {
         prd: "Task management application with user authentication and task CRUD operations",
@@ -134,7 +135,7 @@ describe("TaskGenerationService", () => {
         updatedAt: new Date().toISOString(),
       }));
 
-      generateObject.mockResolvedValue({ object: mockManyTasks.slice(0, 5) }); // Respect maxTasks limit
+      vi.mocked(generateObject).mockResolvedValue(generateObjectResult(mockManyTasks.slice(0, 5))); // Respect maxTasks limit
 
       const input = {
         prd: "Complex application with many features",
@@ -186,7 +187,7 @@ describe("TaskGenerationService", () => {
         },
       ];
 
-      generateObject.mockResolvedValue({ object: mockTasksWithSubtasks });
+      vi.mocked(generateObject).mockResolvedValue(generateObjectResult(mockTasksWithSubtasks));
 
       const input = {
         prd: "Application with complex features requiring subtask breakdown",
@@ -212,27 +213,15 @@ describe("TaskGenerationService", () => {
 
   describe("analyzeTaskComplexity", () => {
     it("should analyze task complexity and provide recommendations", async () => {
-      const mockAnalysis = {
-        originalComplexity: 5,
-        newComplexity: 7,
-        estimatedHours: 16,
-        analysis: "Task complexity analysis shows increased complexity due to real-time features",
-        recommendations: [
-          "Consider breaking into smaller tasks",
-          "Ensure team has WebSocket experience",
-          "Plan for additional testing time",
-        ],
-      };
-
-      vi.mocked(generateObject).mockResolvedValue({
-        object: {
+      vi.mocked(generateObject).mockResolvedValue(
+        generateObjectResult({
           complexity: 7,
           estimatedHours: 16,
           analysis: "Task complexity analysis shows increased complexity due to real-time features",
           riskFactors: ["WebSocket complexity"],
           recommendations: [],
-        },
-      });
+        })
+      );
 
       const task = {
         id: "task-1",
@@ -263,23 +252,15 @@ describe("TaskGenerationService", () => {
     });
 
     it("should handle simple tasks with low complexity", async () => {
-      const mockSimpleAnalysis = {
-        originalComplexity: 2,
-        newComplexity: 2,
-        estimatedHours: 3,
-        analysis: "Simple task with low complexity",
-        recommendations: ["Straightforward implementation", "Good starter task"],
-      };
-
-      vi.mocked(generateObject).mockResolvedValue({
-        object: {
+      vi.mocked(generateObject).mockResolvedValue(
+        generateObjectResult({
           complexity: 2,
           estimatedHours: 3,
           analysis: "Simple task with low complexity",
           riskFactors: [],
           recommendations: [],
-        },
-      });
+        })
+      );
 
       const simpleTask = {
         id: "task-1",
@@ -310,41 +291,6 @@ describe("TaskGenerationService", () => {
 
   describe("expandTaskIntoSubtasks", () => {
     it("should break down complex task into manageable subtasks", async () => {
-      const mockSubtasks = [
-        {
-          id: "subtask-1",
-          title: "Design dashboard layout",
-          description: "Create wireframes and design for the dashboard layout",
-          complexity: 3,
-          estimatedHours: 6,
-          priority: "high",
-          status: "pending",
-          dependencies: [],
-          acceptanceCriteria: ["Wireframes are approved", "Design is finalized"],
-          tags: ["design"],
-          aiGenerated: true,
-          subtasks: [],
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        },
-        {
-          id: "subtask-2",
-          title: "Implement dashboard components",
-          description: "Build React components for the dashboard",
-          complexity: 5,
-          estimatedHours: 12,
-          priority: "high",
-          status: "pending",
-          dependencies: ["subtask-1"],
-          acceptanceCriteria: ["Components are implemented", "Components are tested"],
-          tags: ["frontend"],
-          aiGenerated: true,
-          subtasks: [],
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        },
-      ];
-
       vi.mocked(generateObject).mockRejectedValue(new Error("mock not configured"));
 
       const complexTask = {
@@ -386,7 +332,7 @@ describe("TaskGenerationService", () => {
 
   describe("error handling", () => {
     it("should handle AI service errors gracefully", async () => {
-      generateObject.mockRejectedValue(new Error("AI service error"));
+      vi.mocked(generateObject).mockRejectedValue(new Error("AI service error"));
 
       const input = {
         prd: "Test PRD content",
@@ -400,7 +346,7 @@ describe("TaskGenerationService", () => {
     });
 
     it("should handle empty PRD input gracefully", async () => {
-      generateObject.mockResolvedValue({ object: [] }); // Return empty tasks for empty PRD
+      vi.mocked(generateObject).mockResolvedValue(generateObjectResult([])); // Return empty tasks for empty PRD
 
       const emptyInput = {
         prd: "", // Empty PRD

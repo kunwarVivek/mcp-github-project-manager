@@ -4,6 +4,7 @@ import {
   agentWorkSchema,
 } from "../../../../infrastructure/tools/compound/compound-schemas";
 import { ToolRegistry } from "../../../../infrastructure/tools/ToolRegistry";
+import { must } from "../../../helpers/must";
 
 /**
  * Regression guard for a silent, total breakage.
@@ -44,7 +45,7 @@ describe("MCP tool schema generation", () => {
     const project = tools.find((t) => t.name === "manage_project");
     expect(project).toBeDefined();
 
-    const schema = project!.inputSchema as {
+    const schema = must(project, "manage_project tool").inputSchema as {
       required?: string[];
       properties: Record<string, { enum?: unknown[] }>;
     };

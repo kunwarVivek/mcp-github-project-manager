@@ -1,9 +1,10 @@
-import { beforeEach, describe, expect, it, type Mocked, type MockedFunction, vi } from "vitest";
+import { beforeEach, describe, expect, it, type Mock, type Mocked, vi } from "vitest";
 import { DomainError } from "../../../domain/errors";
 import { ResourceStatus } from "../../../domain/resource-types";
 import type { Issue } from "../../../domain/types";
 import type { GitHubRepositoryFactory } from "../../../infrastructure/github/GitHubRepositoryFactory";
 import { SubIssueService } from "../../../services/SubIssueService";
+import type { AsyncFn } from "../../helpers/mockTypes";
 
 // Mock the factory
 vi.mock("../../../infrastructure/github/GitHubRepositoryFactory");
@@ -12,12 +13,12 @@ describe("SubIssueService", () => {
   let service: SubIssueService;
   let mockFactory: Mocked<GitHubRepositoryFactory>;
   let mockIssueRepo: {
-    findById: MockedFunction<any>;
-    update: MockedFunction<any>;
-    findAll: MockedFunction<any>;
+    findById: Mock<AsyncFn>;
+    update: Mock<AsyncFn>;
+    findAll: Mock<AsyncFn>;
   };
   let mockMilestoneRepo: {
-    findById: MockedFunction<any>;
+    findById: Mock<AsyncFn>;
   };
 
   const mockIssue: Issue = {

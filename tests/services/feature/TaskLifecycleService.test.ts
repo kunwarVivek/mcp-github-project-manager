@@ -1,4 +1,4 @@
-import { vi } from "vitest";
+import { type MockedFunction, vi } from "vitest";
 
 /**
  * Unit tests for TaskLifecycleService
@@ -8,6 +8,7 @@ import { vi } from "vitest";
  */
 
 import { generateObject } from "ai";
+import { generateObjectResult, partialFake } from "../../../src/__tests__/helpers/aiFakes";
 import {
   type AITask,
   type TaskComplexity,
@@ -74,10 +75,12 @@ describe("TaskLifecycleService", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2024-01-15T12:00:00Z"));
 
-    AIServiceFactory.getInstance.mockReturnValue({
-      getMainModel: mockGetMainModel,
-      getBestAvailableModel: mockGetBestAvailableModel,
-    } as any);
+    vi.mocked(AIServiceFactory.getInstance).mockReturnValue(
+      partialFake<AIServiceFactory>({
+        getMainModel: mockGetMainModel,
+        getBestAvailableModel: mockGetBestAvailableModel,
+      })
+    );
 
     service = new TaskLifecycleService();
   });
@@ -93,10 +96,10 @@ describe("TaskLifecycleService", () => {
     });
 
     it("should create instance with injected AIServiceFactory", () => {
-      const mockFactory = {
+      const mockFactory = partialFake<AIServiceFactory>({
         getMainModel: vi.fn(),
         getBestAvailableModel: vi.fn(),
-      } as any;
+      });
       const customService = new TaskLifecycleService(mockFactory);
       expect(customService).toBeDefined();
     });
@@ -463,15 +466,15 @@ describe("TaskLifecycleService", () => {
       beforeEach(() => {
         mockGetMainModel.mockReturnValue({ id: "test-model" });
         // partial mock — only fields consumed by getNextTaskActions
-        mockGenerateObject.mockResolvedValue({
-          object: {
+        mockGenerateObject.mockResolvedValue(
+          generateObjectResult({
             nextActions: ["Focus on core functionality first", "Implement comprehensive testing"],
             recommendations: [
               "Focus on core functionality first",
               "Implement comprehensive testing",
             ],
-          },
-        } as unknown as Parameters<typeof mockGenerateObject.mockResolvedValue>[0]);
+          })
+        );
       });
 
       it("should return actions with all required fields", async () => {
@@ -524,12 +527,12 @@ describe("TaskLifecycleService", () => {
         mockGetMainModel.mockReturnValue(null);
         mockGetBestAvailableModel.mockReturnValue({ id: "backup-model" });
         // partial mock — only fields consumed by getNextTaskActions
-        mockGenerateObject.mockResolvedValue({
-          object: {
+        mockGenerateObject.mockResolvedValue(
+          generateObjectResult({
             nextActions: ["Continue with current tasks"],
             recommendations: ["Continue with current tasks"],
-          },
-        } as unknown as Parameters<typeof mockGenerateObject.mockResolvedValue>[0]);
+          })
+        );
 
         const result = await service.getNextTaskActions(mockLifecycle);
 

@@ -7,7 +7,10 @@ import { ProjectStatusService } from "../../../services/ProjectStatusService";
 
 // Mock tsyringe decorators
 vi.mock("tsyringe", () => ({
-  injectable: () => (target: any) => target,
+  injectable:
+    () =>
+    <T>(target: T) =>
+      target,
   inject: () => () => undefined,
 }));
 

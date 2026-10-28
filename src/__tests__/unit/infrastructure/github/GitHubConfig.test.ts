@@ -18,15 +18,15 @@ describe("GitHubConfig", () => {
     const config = new GitHubConfig(owner, repo, token);
 
     expect(() => {
-      (config as any).owner = "new-owner";
+      Object.assign(config, { owner: "new-owner" });
     }).toThrow();
 
     expect(() => {
-      (config as any).repo = "new-repo";
+      Object.assign(config, { repo: "new-repo" });
     }).toThrow();
 
     expect(() => {
-      (config as any).token = "new-token";
+      Object.assign(config, { token: "new-token" });
     }).toThrow();
 
     expect(config.owner).toBe(owner);

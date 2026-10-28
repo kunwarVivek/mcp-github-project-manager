@@ -26,6 +26,7 @@ vi.mock("ai", () => ({
 import { generateObject, generateText } from "ai";
 import type { EnhancedTaskGenerationParams, PRDDocument } from "../../domain/ai-types";
 import { TaskGenerationService } from "../../services/TaskGenerationService";
+import { generateObjectResult, generateTextResult } from "../helpers/aiFakes";
 
 describe("TaskGenerationService - Enhanced Context Generation", () => {
   let service: TaskGenerationService;
@@ -125,10 +126,12 @@ describe("TaskGenerationService - Enhanced Context Generation", () => {
       },
     ];
 
-    generateObject.mockResolvedValue({ object: mockTasks });
-    generateText.mockResolvedValue({
-      text: "Task complexity analysis: complexity 5, estimated 40 hours. Standard implementation.",
-    });
+    vi.mocked(generateObject).mockResolvedValue(generateObjectResult(mockTasks));
+    vi.mocked(generateText).mockResolvedValue(
+      generateTextResult(
+        "Task complexity analysis: complexity 5, estimated 40 hours. Standard implementation."
+      )
+    );
 
     service = new TaskGenerationService();
   });

@@ -276,7 +276,9 @@ describe("ConfidenceScorer", () => {
 
         expect(result.tier).toBe("low");
         expect(result.clarifyingQuestions).toBeDefined();
-        expect(result.clarifyingQuestions!.length).toBeGreaterThan(0);
+        expect(
+          defined(result.clarifyingQuestions, "result.clarifyingQuestions should be defined").length
+        ).toBeGreaterThan(0);
       });
 
       it("marks needsReview for scores below warning threshold", () => {
@@ -398,24 +400,31 @@ describe("ConfidenceScorer", () => {
     describe("configuration", () => {
       it("allows custom config via constructor", () => {
         const customScorer = new ConfidenceScorer({
-          warningThreshold: 80,
+          warningScore: 80,
           errorThreshold: 60,
         });
 
-        expect(customScorer.getConfig().warningThreshold).toBe(80);
+        expect(customScorer.getConfig().warningScore).toBe(80);
         expect(customScorer.getConfig().errorThreshold).toBe(60);
       });
 
       it("allows updating config", () => {
-        scorer.updateConfig({ warningThreshold: 90 });
-        expect(scorer.getConfig().warningThreshold).toBe(90);
+        scorer.updateConfig({ warningScore: 90 });
+        expect(scorer.getConfig().warningScore).toBe(90);
       });
 
       it("preserves other config values when updating", () => {
         const original = scorer.getConfig().errorThreshold;
-        scorer.updateConfig({ warningThreshold: 90 });
+        scorer.updateConfig({ warningScore: 90 });
         expect(scorer.getConfig().errorThreshold).toBe(original);
       });
     });
   });
 });
+
+function defined<T>(value: T | undefined | null, message: string): T {
+  if (value === undefined || value === null) {
+    throw new Error(message);
+  }
+  return value;
+}

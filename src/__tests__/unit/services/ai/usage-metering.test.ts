@@ -4,6 +4,7 @@ import {
   AIServiceFactory,
   usageMeteringMiddleware,
 } from "../../../../services/ai/AIServiceFactory";
+import { must } from "../../../helpers/must";
 
 /**
  * Server-side token metering.
@@ -113,10 +114,10 @@ describe("AI usage metering middleware", () => {
     await Promise.all([
       traceContext.run(trace("agent-a", a), async () => {
         await new Promise((r) => setTimeout(r, 5));
-        traceContext.getStore()!.usage!.tokens += 10;
+        must(must(traceContext.getStore(), "trace store").usage, "usage").tokens += 10;
       }),
       traceContext.run(trace("agent-b", b), async () => {
-        traceContext.getStore()!.usage!.tokens += 99;
+        must(must(traceContext.getStore(), "trace store").usage, "usage").tokens += 99;
       }),
     ]);
     expect(a.tokens).toBe(10);

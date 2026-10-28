@@ -194,7 +194,7 @@ describe("WebhookServer", () => {
 
       expect(res.headers["Access-Control-Allow-Origin"]).toBe("https://allowed.com");
       expect(res.headers["Access-Control-Allow-Methods"]).toBe("GET, POST, DELETE, OPTIONS");
-      expect(res.headers["Vary"]).toBe("Origin");
+      expect(res.headers.Vary).toBe("Origin");
       expect(securityLog.record).not.toHaveBeenCalled();
     });
 

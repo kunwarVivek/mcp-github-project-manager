@@ -139,7 +139,7 @@ describe("DomainEventBus", () => {
     });
 
     it("should catch errors when catchErrors is true", () => {
-      const consoleSpy = vi.spyOn(console, "error").mockImplementation();
+      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
 
       eventBus.subscribeByName(
         "IssueCreated",
@@ -179,7 +179,7 @@ describe("DomainEventBus", () => {
     });
 
     it("should catch errors in async handlers when catchErrors is true", async () => {
-      const consoleSpy = vi.spyOn(console, "error").mockImplementation();
+      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
 
       eventBus.subscribeByNameAsync(
         "IssueCreated",

@@ -114,7 +114,7 @@ describe("MilestoneMetrics Value Object", () => {
     it("should not allow modification of properties", () => {
       const metrics = MilestoneMetrics.create(baseConfig);
       expect(() => {
-        (metrics as any).title = "Modified";
+        Object.assign(metrics, { title: "Modified" });
       }).toThrow();
     });
   });
@@ -136,7 +136,7 @@ describe("MilestoneMetrics Value Object", () => {
 
     it("should not be equal to a non-MilestoneMetrics object", () => {
       const metrics = MilestoneMetrics.create(baseConfig);
-      expect(metrics.equals({ milestoneId: "milestone-1" } as any)).toBe(false);
+      expect(metrics.equals({ milestoneId: "milestone-1" } as MilestoneMetrics)).toBe(false);
     });
   });
 

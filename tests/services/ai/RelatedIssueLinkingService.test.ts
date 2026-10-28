@@ -1,4 +1,4 @@
-import { type Mock, vi } from "vitest";
+import { type MockedFunction, vi } from "vitest";
 
 /**
  * Unit tests for RelatedIssueLinkingService
@@ -8,6 +8,12 @@ import { type Mock, vi } from "vitest";
  */
 
 import { cosineSimilarity, embed, embedMany, generateObject } from "ai";
+import {
+  embedManyResult,
+  embedResult,
+  generateObjectResult,
+  partialFake,
+} from "../../../src/__tests__/helpers/aiFakes";
 import { AIServiceFactory } from "../../../src/services/ai/AIServiceFactory";
 import { RelatedIssueLinkingService } from "../../../src/services/ai/RelatedIssueLinkingService";
 
@@ -95,16 +101,18 @@ describe("RelatedIssueLinkingService", () => {
   beforeEach(() => {
     vi.clearAllMocks();
 
-    (AIServiceFactory.getInstance as Mock).mockReturnValue({
-      getModel: mockGetModel,
-      getBestAvailableModel: mockGetBestAvailableModel,
-    });
+    vi.mocked(AIServiceFactory.getInstance).mockReturnValue(
+      partialFake<AIServiceFactory>({
+        getModel: mockGetModel,
+        getBestAvailableModel: mockGetBestAvailableModel,
+      })
+    );
 
     // Default embedding mocks
-    mockEmbed.mockResolvedValue({ embedding: [0.1, 0.2, 0.3] } as any);
-    mockEmbedMany.mockResolvedValue({
-      embeddings: mockRepositoryIssues.map(() => [0.1, 0.2, 0.3]),
-    } as any);
+    mockEmbed.mockResolvedValue(embedResult([0.1, 0.2, 0.3]));
+    mockEmbedMany.mockResolvedValue(
+      embedManyResult(mockRepositoryIssues.map(() => [0.1, 0.2, 0.3]))
+    );
     mockCosineSimilarity.mockReturnValue(0.5);
     mockGetModel.mockReturnValue(null);
     mockGetBestAvailableModel.mockReturnValue(null);
@@ -206,9 +214,6 @@ describe("RelatedIssueLinkingService", () => {
         repositoryIssues: mockRepositoryIssues,
       });
 
-      const blocksRelations = result.relationships.filter(
-        (r) => r.relationshipType === "dependency" && r.subType === "blocks"
-      );
       // May find blocks relationships based on keywords
       expect(result.relationships).toBeDefined();
     });
@@ -221,17 +226,14 @@ describe("RelatedIssueLinkingService", () => {
         repositoryIssues: mockRepositoryIssues,
       });
 
-      const blockedByRelations = result.relationships.filter(
-        (r) => r.relationshipType === "dependency" && r.subType === "blocked_by"
-      );
       // May find blocked_by relationships based on keywords
       expect(result.relationships).toBeDefined();
     });
 
     it("should use AI for enhanced dependency detection", async () => {
       mockGetModel.mockReturnValue({ id: "test-model" });
-      mockGenerateObject.mockResolvedValue({
-        object: {
+      mockGenerateObject.mockResolvedValue(
+        generateObjectResult({
           relationships: [
             {
               targetIssueId: "1",
@@ -240,8 +242,8 @@ describe("RelatedIssueLinkingService", () => {
               reasoning: "Requires auth",
             },
           ],
-        },
-      } as any);
+        })
+      );
 
       const result = await service.findRelatedIssues({
         issueId: "source",

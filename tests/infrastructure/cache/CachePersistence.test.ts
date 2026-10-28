@@ -1,4 +1,4 @@
-import { vi } from "vitest";
+import { type MockInstance, vi } from "vitest";
 /**
  * Unit tests for CachePersistence
  *
@@ -21,7 +21,7 @@ import {
 
 describe("CachePersistence", () => {
   let tempDir: string;
-  let stderrSpy: jest.SpyInstance;
+  let stderrSpy: MockInstance<typeof process.stderr.write>;
 
   beforeEach(() => {
     // Create temp directory for each test
@@ -108,8 +108,9 @@ describe("CachePersistence", () => {
       await persistence.save(entries);
 
       const lastPersist = persistence.getLastPersistTime();
+      if (lastPersist === undefined) throw new Error("lastPersistTime should be defined");
       expect(lastPersist).toBeDefined();
-      expect(new Date(lastPersist!).getTime()).toBeLessThanOrEqual(Date.now());
+      expect(new Date(lastPersist).getTime()).toBeLessThanOrEqual(Date.now());
     });
   });
 

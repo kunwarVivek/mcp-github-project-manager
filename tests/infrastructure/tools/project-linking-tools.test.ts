@@ -1,4 +1,4 @@
-import { vi } from "vitest";
+import { type Mock, type MockedClass, vi } from "vitest";
 
 /**
  * Unit tests for project linking MCP tools
@@ -9,6 +9,7 @@ import { vi } from "vitest";
  * - Executor functions (with mocked repositories)
  */
 
+import { partialFake } from "../../../src/__tests__/helpers/aiFakes.js";
 import { GitHubRepositoryFactory } from "../../../src/infrastructure/github/GitHubRepositoryFactory.js";
 import {
   executeLinkProjectToRepository,
@@ -366,7 +367,7 @@ describe("Project Linking Tools", () => {
 
     it("all tools have examples", () => {
       expect(linkProjectToRepositoryTool.examples).toBeDefined();
-      expect(linkProjectToRepositoryTool.examples!.length).toBeGreaterThan(0);
+      expect(linkProjectToRepositoryTool.examples?.length).toBeGreaterThan(0);
       expect(unlinkProjectFromRepositoryTool.examples).toBeDefined();
       expect(linkProjectToTeamTool.examples).toBeDefined();
       expect(unlinkProjectFromTeamTool.examples).toBeDefined();
@@ -385,10 +386,10 @@ describe("Project Linking Tools", () => {
       mockGraphql = vi.fn();
 
       MockedFactory.mockImplementation(function () {
-        return {
+        return partialFake<GitHubRepositoryFactory>({
           graphql: mockGraphql,
           getConfig: vi.fn().mockReturnValue({ owner: "placeholder", repo: "placeholder" }),
-        } as unknown as GitHubRepositoryFactory;
+        });
       });
     });
 
@@ -449,7 +450,7 @@ describe("Project Linking Tools", () => {
       });
 
       it("returns error when GITHUB_TOKEN is missing", async () => {
-        vi.stubEnv("GITHUB_TOKEN", undefined as unknown as string);
+        vi.stubEnv("GITHUB_TOKEN", undefined);
 
         const input = LinkProjectToRepositoryInputSchema.parse({
           projectId: "PVT_kwDOTest123",
@@ -491,7 +492,7 @@ describe("Project Linking Tools", () => {
       });
 
       it("returns error when GITHUB_TOKEN is missing", async () => {
-        vi.stubEnv("GITHUB_TOKEN", undefined as unknown as string);
+        vi.stubEnv("GITHUB_TOKEN", undefined);
 
         const input = UnlinkProjectFromRepositoryInputSchema.parse({
           projectId: "PVT_kwDOTest123",
@@ -576,7 +577,7 @@ describe("Project Linking Tools", () => {
       });
 
       it("returns error when GITHUB_TOKEN is missing", async () => {
-        vi.stubEnv("GITHUB_TOKEN", undefined as unknown as string);
+        vi.stubEnv("GITHUB_TOKEN", undefined);
 
         const input = LinkProjectToTeamInputSchema.parse({
           projectId: "PVT_kwDOTest123",
@@ -618,7 +619,7 @@ describe("Project Linking Tools", () => {
       });
 
       it("returns error when GITHUB_TOKEN is missing", async () => {
-        vi.stubEnv("GITHUB_TOKEN", undefined as unknown as string);
+        vi.stubEnv("GITHUB_TOKEN", undefined);
 
         const input = UnlinkProjectFromTeamInputSchema.parse({
           projectId: "PVT_kwDOTest123",
@@ -750,7 +751,7 @@ describe("Project Linking Tools", () => {
       });
 
       it("returns error when GITHUB_TOKEN is missing", async () => {
-        vi.stubEnv("GITHUB_TOKEN", undefined as unknown as string);
+        vi.stubEnv("GITHUB_TOKEN", undefined);
 
         const input = ListLinkedRepositoriesInputSchema.parse({
           projectId: "PVT_kwDOTest123",
@@ -878,7 +879,7 @@ describe("Project Linking Tools", () => {
       });
 
       it("returns error when GITHUB_TOKEN is missing", async () => {
-        vi.stubEnv("GITHUB_TOKEN", undefined as unknown as string);
+        vi.stubEnv("GITHUB_TOKEN", undefined);
 
         const input = ListLinkedTeamsInputSchema.parse({
           projectId: "PVT_kwDOTest123",

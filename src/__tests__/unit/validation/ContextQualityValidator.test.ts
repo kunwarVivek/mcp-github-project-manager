@@ -14,6 +14,7 @@ import {
   QUALITY_THRESHOLDS,
   type QualityReport,
 } from "../../../services/validation/ContextQualityValidator";
+import { must } from "../../helpers/must";
 
 describe("ContextQualityValidator", () => {
   let validator: ContextQualityValidator;
@@ -264,7 +265,7 @@ describe("ContextQualityValidator", () => {
 
     it("should warn about missing implementation guidance", () => {
       const context = createValidContext();
-      delete (context as any).implementationGuidance;
+      delete context.implementationGuidance;
 
       const result = validator.validateCompleteness(context);
 
@@ -273,7 +274,7 @@ describe("ContextQualityValidator", () => {
 
     it("should warn about missing contextual references", () => {
       const context = createValidContext();
-      delete (context as any).contextualReferences;
+      delete context.contextualReferences;
 
       const result = validator.validateCompleteness(context);
 
@@ -282,7 +283,7 @@ describe("ContextQualityValidator", () => {
 
     it("should warn about missing enhanced acceptance criteria", () => {
       const context = createValidContext();
-      delete (context as any).enhancedAcceptanceCriteria;
+      delete context.enhancedAcceptanceCriteria;
 
       const result = validator.validateCompleteness(context);
 
@@ -458,7 +459,10 @@ describe("ContextQualityValidator", () => {
 
     it("should handle context without code examples", () => {
       const context = createValidContext();
-      (context.contextualReferences as any).codeExamples = undefined;
+      Reflect.deleteProperty(
+        must(context.contextualReferences, "contextualReferences"),
+        "codeExamples"
+      );
       const task = createMockTask();
 
       const result = validator.validateRelevance(context, task);
@@ -669,7 +673,7 @@ describe("ContextQualityValidator", () => {
     });
 
     it("should use task title as fallback for taskId", () => {
-      const task = createMockTask({ id: undefined as any });
+      const task = createMockTask({ id: undefined });
       const context = createValidContext();
       const metrics = createQualityMetrics();
 
@@ -737,10 +741,10 @@ describe("ContextQualityValidator", () => {
 
     it("should handle undefined optional fields", () => {
       const context = createValidContext();
-      delete (context as any).implementationGuidance;
-      delete (context as any).contextualReferences;
-      delete (context as any).enhancedAcceptanceCriteria;
-      delete (context as any).dependencyContext;
+      delete context.implementationGuidance;
+      delete context.contextualReferences;
+      delete context.enhancedAcceptanceCriteria;
+      delete context.dependencyContext;
       const task = createMockTask();
 
       // Should not throw

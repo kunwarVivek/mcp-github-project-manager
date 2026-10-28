@@ -1,4 +1,4 @@
-import { vi } from "vitest";
+import { type Mock, vi } from "vitest";
 
 /**
  * Unit tests for RoadmapAIService
@@ -164,7 +164,7 @@ describe("RoadmapAIService", () => {
         result.milestones.forEach((milestone) => {
           const phase = result.phases.find((p) => p.id === milestone.phaseId);
           expect(phase).toBeDefined();
-          expect(phase!.milestones).toContain(milestone.id);
+          expect(defined(phase, "phase should be defined").milestones).toContain(milestone.id);
         });
       });
 
@@ -540,3 +540,10 @@ describe("RoadmapAIService", () => {
     });
   });
 });
+
+function defined<T>(value: T | undefined | null, message: string): T {
+  if (value === undefined || value === null) {
+    throw new Error(message);
+  }
+  return value;
+}

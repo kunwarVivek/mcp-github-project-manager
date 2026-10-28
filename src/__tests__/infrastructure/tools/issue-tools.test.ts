@@ -38,6 +38,7 @@ import {
   updateMilestoneSchema,
   updateMilestoneTool,
 } from "../../../infrastructure/tools/ToolSchemas.js";
+import { must } from "../../helpers/must";
 
 describe("Issue Tools", () => {
   describe("Input Schemas", () => {
@@ -292,7 +293,7 @@ describe("Issue Tools", () => {
 
       it("has examples", () => {
         expect(createIssueTool.examples).toBeDefined();
-        expect(createIssueTool.examples!.length).toBeGreaterThan(0);
+        expect(must(createIssueTool.examples, "examples").length).toBeGreaterThan(0);
       });
     });
 
@@ -320,7 +321,7 @@ describe("Issue Tools", () => {
 
       it("has examples", () => {
         expect(listIssuesTool.examples).toBeDefined();
-        expect(listIssuesTool.examples!.length).toBeGreaterThan(0);
+        expect(must(listIssuesTool.examples, "examples").length).toBeGreaterThan(0);
       });
     });
 
@@ -348,7 +349,7 @@ describe("Issue Tools", () => {
 
       it("has examples", () => {
         expect(getIssueTool.examples).toBeDefined();
-        expect(getIssueTool.examples!.length).toBeGreaterThan(0);
+        expect(must(getIssueTool.examples, "examples").length).toBeGreaterThan(0);
       });
     });
 
@@ -376,7 +377,7 @@ describe("Issue Tools", () => {
 
       it("has examples", () => {
         expect(updateIssueTool.examples).toBeDefined();
-        expect(updateIssueTool.examples!.length).toBeGreaterThan(0);
+        expect(must(updateIssueTool.examples, "examples").length).toBeGreaterThan(0);
       });
     });
   });
@@ -572,7 +573,7 @@ describe("Issue Comment Tools", () => {
 
       it("has examples", () => {
         expect(createIssueCommentTool.examples).toBeDefined();
-        expect(createIssueCommentTool.examples!.length).toBeGreaterThan(0);
+        expect(must(createIssueCommentTool.examples, "examples").length).toBeGreaterThan(0);
       });
     });
 
@@ -600,7 +601,7 @@ describe("Issue Comment Tools", () => {
 
       it("has examples", () => {
         expect(updateIssueCommentTool.examples).toBeDefined();
-        expect(updateIssueCommentTool.examples!.length).toBeGreaterThan(0);
+        expect(must(updateIssueCommentTool.examples, "examples").length).toBeGreaterThan(0);
       });
     });
 
@@ -628,7 +629,7 @@ describe("Issue Comment Tools", () => {
 
       it("has examples", () => {
         expect(deleteIssueCommentTool.examples).toBeDefined();
-        expect(deleteIssueCommentTool.examples!.length).toBeGreaterThan(0);
+        expect(must(deleteIssueCommentTool.examples, "examples").length).toBeGreaterThan(0);
       });
     });
 
@@ -656,7 +657,7 @@ describe("Issue Comment Tools", () => {
 
       it("has examples", () => {
         expect(listIssueCommentsTool.examples).toBeDefined();
-        expect(listIssueCommentsTool.examples!.length).toBeGreaterThan(0);
+        expect(must(listIssueCommentsTool.examples, "examples").length).toBeGreaterThan(0);
       });
     });
   });
@@ -812,7 +813,7 @@ describe("Draft Issue Tools", () => {
 
       it("has examples", () => {
         expect(createDraftIssueTool.examples).toBeDefined();
-        expect(createDraftIssueTool.examples!.length).toBeGreaterThan(0);
+        expect(must(createDraftIssueTool.examples, "examples").length).toBeGreaterThan(0);
       });
     });
 
@@ -840,7 +841,7 @@ describe("Draft Issue Tools", () => {
 
       it("has examples", () => {
         expect(updateDraftIssueTool.examples).toBeDefined();
-        expect(updateDraftIssueTool.examples!.length).toBeGreaterThan(0);
+        expect(must(updateDraftIssueTool.examples, "examples").length).toBeGreaterThan(0);
       });
     });
 
@@ -868,7 +869,7 @@ describe("Draft Issue Tools", () => {
 
       it("has examples", () => {
         expect(deleteDraftIssueTool.examples).toBeDefined();
-        expect(deleteDraftIssueTool.examples!.length).toBeGreaterThan(0);
+        expect(must(deleteDraftIssueTool.examples, "examples").length).toBeGreaterThan(0);
       });
     });
   });
@@ -1091,7 +1092,7 @@ describe("Milestone Tools", () => {
 
       it("has examples", () => {
         expect(createMilestoneTool.examples).toBeDefined();
-        expect(createMilestoneTool.examples!.length).toBeGreaterThan(0);
+        expect(must(createMilestoneTool.examples, "examples").length).toBeGreaterThan(0);
       });
     });
 
@@ -1119,7 +1120,7 @@ describe("Milestone Tools", () => {
 
       it("has examples", () => {
         expect(listMilestonesTool.examples).toBeDefined();
-        expect(listMilestonesTool.examples!.length).toBeGreaterThan(0);
+        expect(must(listMilestonesTool.examples, "examples").length).toBeGreaterThan(0);
       });
     });
 
@@ -1147,7 +1148,7 @@ describe("Milestone Tools", () => {
 
       it("has examples", () => {
         expect(updateMilestoneTool.examples).toBeDefined();
-        expect(updateMilestoneTool.examples!.length).toBeGreaterThan(0);
+        expect(must(updateMilestoneTool.examples, "examples").length).toBeGreaterThan(0);
       });
     });
 
@@ -1175,7 +1176,7 @@ describe("Milestone Tools", () => {
 
       it("has examples", () => {
         expect(deleteMilestoneTool.examples).toBeDefined();
-        expect(deleteMilestoneTool.examples!.length).toBeGreaterThan(0);
+        expect(must(deleteMilestoneTool.examples, "examples").length).toBeGreaterThan(0);
       });
     });
   });

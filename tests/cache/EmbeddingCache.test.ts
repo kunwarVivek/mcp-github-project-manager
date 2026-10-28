@@ -220,7 +220,10 @@ describe("EmbeddingCache", () => {
     });
 
     it("should handle null-ish values", () => {
-      const hash = EmbeddingCache.computeContentHash(null as any, undefined as any);
+      const hash: string = Reflect.apply(EmbeddingCache.computeContentHash, EmbeddingCache, [
+        null,
+        undefined,
+      ]);
       expect(hash.length).toBe(64);
     });
   });
@@ -311,7 +314,9 @@ describe("EmbeddingCache", () => {
 
       const stats = cache.getStats();
 
-      expect(stats.oldestEntryAge).toBeGreaterThan(stats.newestEntryAge!);
+      const newestAge = stats.newestEntryAge;
+      if (newestAge === undefined) throw new Error("newestEntryAge should be defined");
+      expect(stats.oldestEntryAge).toBeGreaterThan(newestAge);
     });
 
     it("should handle empty cache stats", () => {

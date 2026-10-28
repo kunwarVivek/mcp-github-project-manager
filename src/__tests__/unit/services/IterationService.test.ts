@@ -2,20 +2,18 @@ import { beforeEach, describe, expect, it, type Mocked, vi } from "vitest";
 import { DomainError } from "../../../domain/errors";
 import { ResourceType } from "../../../domain/resource-types";
 import type { CustomField, ProjectItem } from "../../../domain/types";
-import type { GitHubRepositoryFactory } from "../../../infrastructure/github/GitHubRepositoryFactory";
 import type { FieldValueService } from "../../../services/FieldValueService";
 import { IterationService } from "../../../services/IterationService";
 import type { ProjectLinkingService } from "../../../services/ProjectLinkingService";
 import type { ProjectTemplateService } from "../../../services/ProjectTemplateService";
+import { must } from "../../helpers/must";
 
-vi.mock("../../../infrastructure/github/GitHubRepositoryFactory");
 vi.mock("../../../services/FieldValueService");
 vi.mock("../../../services/ProjectTemplateService");
 vi.mock("../../../services/ProjectLinkingService");
 
 describe("IterationService", () => {
   let service: IterationService;
-  let mockFactory: Mocked<GitHubRepositoryFactory>;
   let mockFieldValueService: Mocked<FieldValueService>;
   let mockTemplateService: Mocked<ProjectTemplateService>;
   let mockLinkingService: Mocked<ProjectLinkingService>;
@@ -62,19 +60,13 @@ describe("IterationService", () => {
   beforeEach(() => {
     vi.clearAllMocks();
 
-    mockFactory = {} as Mocked<GitHubRepositoryFactory>;
     mockFieldValueService = { setFieldValue: vi.fn() } as unknown as Mocked<FieldValueService>;
     mockTemplateService = {
       listProjectFields: vi.fn(),
     } as unknown as Mocked<ProjectTemplateService>;
     mockLinkingService = { listProjectItems: vi.fn() } as unknown as Mocked<ProjectLinkingService>;
 
-    service = new IterationService(
-      mockFactory,
-      mockFieldValueService,
-      mockTemplateService,
-      mockLinkingService
-    );
+    service = new IterationService(mockFieldValueService, mockTemplateService, mockLinkingService);
   });
 
   describe("getIterationConfiguration", () => {
@@ -141,9 +133,9 @@ describe("IterationService", () => {
       const result = await service.getCurrentIteration({ projectId });
 
       expect(result).not.toBeNull();
-      expect(result!.id).toBe("iter-current");
-      expect(result!.title).toBe("Sprint 2");
-      expect(result!.duration).toBe(14);
+      expect(must(result, "iteration").id).toBe("iter-current");
+      expect(must(result, "iteration").title).toBe("Sprint 2");
+      expect(must(result, "iteration").duration).toBe(14);
     });
 
     it("should return null when no iteration covers today", async () => {
@@ -222,7 +214,7 @@ describe("IterationService", () => {
       });
 
       expect(result).not.toBeNull();
-      expect(result!.id).toBe("iter-current");
+      expect(must(result, "iteration").id).toBe("iter-current");
     });
 
     it("should return null for a date not in any iteration", async () => {

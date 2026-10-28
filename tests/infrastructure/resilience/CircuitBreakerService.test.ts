@@ -1,4 +1,4 @@
-import { vi } from "vitest";
+import { type MockInstance, vi } from "vitest";
 /**
  * Unit tests for CircuitBreakerService
  *
@@ -12,7 +12,7 @@ import { vi } from "vitest";
 import { CircuitBreakerService } from "../../../src/infrastructure/resilience/CircuitBreakerService.js";
 
 describe("CircuitBreakerService", () => {
-  let stderrSpy: jest.SpyInstance;
+  let stderrSpy: MockInstance<typeof process.stderr.write>;
 
   beforeEach(() => {
     // Suppress stderr output during tests

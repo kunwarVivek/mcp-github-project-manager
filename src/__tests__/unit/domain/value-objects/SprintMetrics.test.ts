@@ -93,7 +93,7 @@ describe("SprintMetrics Value Object", () => {
     it("should not allow modification of properties", () => {
       const metrics = SprintMetrics.create(baseConfig);
       expect(() => {
-        (metrics as any).title = "Modified";
+        Object.assign(metrics, { title: "Modified" });
       }).toThrow();
     });
   });
@@ -115,7 +115,7 @@ describe("SprintMetrics Value Object", () => {
 
     it("should not be equal to a non-SprintMetrics object", () => {
       const metrics = SprintMetrics.create(baseConfig);
-      expect(metrics.equals({ sprintId: "sprint-1" } as any)).toBe(false);
+      expect(metrics.equals({ sprintId: "sprint-1" } as SprintMetrics)).toBe(false);
     });
   });
 

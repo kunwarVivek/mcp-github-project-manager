@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { AITask, FeatureRequirement, MockPRD, UseCase } from "../../src/domain/ai-types";
 import {
   RequirementStatus,
   RequirementType,
@@ -39,7 +40,7 @@ describe("RequirementsTraceabilityService", () => {
         aiGenerated: false,
       };
 
-      const requirements = service.extractBusinessRequirementsFromPRD(mockPRD as any);
+      const requirements = service.extractBusinessRequirementsFromPRD(mockPRD as MockPRD);
 
       expect(requirements).toHaveLength(6); // 3 objectives + 3 metrics
 
@@ -73,7 +74,7 @@ describe("RequirementsTraceabilityService", () => {
         aiGenerated: false,
       };
 
-      const requirements = service.extractBusinessRequirementsFromPRD(mockPRD as any);
+      const requirements = service.extractBusinessRequirementsFromPRD(mockPRD as MockPRD);
 
       expect(requirements).toHaveLength(0);
     });
@@ -93,7 +94,7 @@ describe("RequirementsTraceabilityService", () => {
         aiGenerated: false,
       };
 
-      const requirements = service.extractBusinessRequirementsFromPRD(mockPRD as any);
+      const requirements = service.extractBusinessRequirementsFromPRD(mockPRD as MockPRD);
 
       expect(requirements[0].id).toBe("br-prd-test-123-obj-1");
       expect(requirements[1].id).toBe("br-prd-test-123-obj-2");
@@ -145,7 +146,7 @@ describe("RequirementsTraceabilityService", () => {
       ];
 
       const useCases = service.generateUseCasesFromFeature(
-        mockFeature as any,
+        mockFeature as FeatureRequirement,
         mockBusinessRequirements
       );
 
@@ -184,7 +185,7 @@ describe("RequirementsTraceabilityService", () => {
         estimatedComplexity: 3,
       };
 
-      const useCases = service.generateUseCasesFromFeature(mockFeature as any, []);
+      const useCases = service.generateUseCasesFromFeature(mockFeature as FeatureRequirement, []);
 
       expect(useCases).toHaveLength(3);
       expect(useCases[0].primaryActor).toBe("User"); // Default actor for malformed story
@@ -196,7 +197,7 @@ describe("RequirementsTraceabilityService", () => {
 
   describe("enhanceTasksWithTraceability", () => {
     it("should enhance tasks with complete traceability information", () => {
-      const mockTasks = [
+      const mockTasks: AITask[] = [
         {
           id: "task-1",
           title: "Create task API endpoint",
@@ -206,7 +207,10 @@ describe("RequirementsTraceabilityService", () => {
           priority: TaskPriority.HIGH,
           status: TaskStatus.PENDING,
           dependencies: [],
-          acceptanceCriteria: ["API endpoint is created", "API returns proper responses"],
+          acceptanceCriteria: [
+            { id: "ac-1", description: "API endpoint is created", completed: false },
+            { id: "ac-2", description: "API returns proper responses", completed: false },
+          ],
           tags: ["api", "backend"],
           aiGenerated: true,
           subtasks: [],
@@ -280,9 +284,9 @@ describe("RequirementsTraceabilityService", () => {
       ];
 
       const enhancedTasks = service.enhanceTasksWithTraceability(
-        mockTasks as any,
-        mockUseCases as any,
-        mockFeatures as any,
+        mockTasks,
+        mockUseCases as UseCase[],
+        mockFeatures as FeatureRequirement[],
         mockBusinessRequirements,
         "prd-1"
       );
@@ -324,7 +328,7 @@ describe("RequirementsTraceabilityService", () => {
       ];
 
       const enhancedTasks = service.enhanceTasksWithTraceability(
-        mockOrphanedTasks as any,
+        mockOrphanedTasks as AITask[],
         [],
         [],
         [],
@@ -369,7 +373,7 @@ describe("RequirementsTraceabilityService", () => {
         },
       ];
 
-      const mockTasks = [
+      const mockTasks: AITask[] = [
         {
           id: "task-1",
           title: "Design UI components",
@@ -379,7 +383,9 @@ describe("RequirementsTraceabilityService", () => {
           priority: TaskPriority.HIGH,
           status: TaskStatus.PENDING,
           dependencies: [],
-          acceptanceCriteria: ["Components are created"],
+          acceptanceCriteria: [
+            { id: "ac-1", description: "Components are created", completed: false },
+          ],
           tags: ["ui"],
           aiGenerated: true,
           subtasks: [],
@@ -390,9 +396,9 @@ describe("RequirementsTraceabilityService", () => {
 
       const matrix = service.createTraceabilityMatrix(
         "project-1",
-        mockPRD as any,
-        mockFeatures as any,
-        mockTasks as any
+        mockPRD as MockPRD,
+        mockFeatures as FeatureRequirement[],
+        mockTasks
       );
 
       expect(matrix.projectId).toBe("project-1");
@@ -434,7 +440,7 @@ describe("RequirementsTraceabilityService", () => {
         },
       ];
 
-      const mockTasks = [
+      const mockTasks: AITask[] = [
         {
           id: "task-connected",
           title: "Connected task",
@@ -471,9 +477,9 @@ describe("RequirementsTraceabilityService", () => {
 
       const matrix = service.createTraceabilityMatrix(
         "coverage-project",
-        mockPRD as any,
-        mockFeatures as any,
-        mockTasks as any
+        mockPRD as MockPRD,
+        mockFeatures as FeatureRequirement[],
+        mockTasks
       );
 
       expect(matrix.coverage.orphanedTasks.length).toBeGreaterThanOrEqual(0);
@@ -529,7 +535,11 @@ describe("RequirementsTraceabilityService", () => {
         aiGenerated: true,
       };
 
-      const isRelated = (service as any).isTaskRelatedToUseCase(task, useCase);
+      const isRelated: boolean = Reflect.apply(
+        Reflect.get(service, "isTaskRelatedToUseCase"),
+        service,
+        [task, useCase]
+      );
 
       expect(isRelated).toBe(true); // Both contain "create" and "task"
     });
@@ -568,9 +578,10 @@ describe("RequirementsTraceabilityService", () => {
         aiGenerated: false,
       };
 
-      const isRelated = (service as any).isFeatureRelatedToBusinessRequirement(
-        feature,
-        requirement
+      const isRelated: boolean = Reflect.apply(
+        Reflect.get(service, "isFeatureRelatedToBusinessRequirement"),
+        service,
+        [feature, requirement]
       );
 
       expect(isRelated).toBe(true); // Both contain "productivity" and "management"

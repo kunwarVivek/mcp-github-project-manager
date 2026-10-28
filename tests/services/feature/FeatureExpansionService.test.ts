@@ -1,4 +1,4 @@
-import { vi } from "vitest";
+import { type Mocked, type MockedFunction, vi } from "vitest";
 
 /**
  * Unit tests for FeatureExpansionService
@@ -8,6 +8,7 @@ import { vi } from "vitest";
  */
 
 import { generateObject } from "ai";
+import { generateObjectResult, partialFake } from "../../../src/__tests__/helpers/aiFakes";
 import {
   type AITask,
   type FeatureRequirement,
@@ -108,14 +109,16 @@ describe("FeatureExpansionService", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    AIServiceFactory.getInstance.mockReturnValue({
-      getMainModel: mockGetMainModel,
-      getBestAvailableModel: mockGetBestAvailableModel,
-    } as any);
+    vi.mocked(AIServiceFactory.getInstance).mockReturnValue(
+      partialFake<AIServiceFactory>({
+        getMainModel: mockGetMainModel,
+        getBestAvailableModel: mockGetBestAvailableModel,
+      })
+    );
 
-    mockTaskService = {
+    mockTaskService = partialFake<Mocked<TaskGenerationService>>({
       detectTaskDependencies: mockDetectTaskDependencies,
-    } as any;
+    });
 
     service = new FeatureExpansionService(undefined, mockTaskService);
   });
@@ -135,9 +138,7 @@ describe("FeatureExpansionService", () => {
     describe("AI Path", () => {
       beforeEach(() => {
         mockGetMainModel.mockReturnValue({ id: "test-model" });
-        mockGenerateObject.mockResolvedValue({
-          object: mockAITasks,
-        } as any);
+        mockGenerateObject.mockResolvedValue(generateObjectResult(mockAITasks));
         mockDetectTaskDependencies.mockImplementation((tasks) => Promise.resolve(tasks));
       });
 
@@ -249,9 +250,7 @@ describe("FeatureExpansionService", () => {
       it("should fall back to best available model", async () => {
         mockGetMainModel.mockReturnValue(null);
         mockGetBestAvailableModel.mockReturnValue({ id: "backup-model" });
-        mockGenerateObject.mockResolvedValue({
-          object: mockAITasks,
-        } as any);
+        mockGenerateObject.mockResolvedValue(generateObjectResult(mockAITasks));
         mockDetectTaskDependencies.mockImplementation((tasks) => Promise.resolve(tasks));
 
         const result = await service.expandFeatureToTasks({
@@ -279,9 +278,7 @@ describe("FeatureExpansionService", () => {
       });
 
       it("should handle task dependency detection errors", async () => {
-        mockGenerateObject.mockResolvedValue({
-          object: mockAITasks,
-        } as any);
+        mockGenerateObject.mockResolvedValue(generateObjectResult(mockAITasks));
         mockDetectTaskDependencies.mockRejectedValue(new Error("Detection failed"));
 
         await expect(

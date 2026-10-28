@@ -1,4 +1,4 @@
-import { vi } from "vitest";
+import { type Mock, type MockedClass, vi } from "vitest";
 
 /**
  * Unit tests for project advanced MCP tools
@@ -12,6 +12,7 @@ import { vi } from "vitest";
  * thoroughly tested to ensure the workaround for GitHub API limitations works.
  */
 
+import { partialFake } from "../../../src/__tests__/helpers/aiFakes.js";
 import { GitHubRepositoryFactory } from "../../../src/infrastructure/github/GitHubRepositoryFactory.js";
 import {
   executeFilterProjectItems,
@@ -348,7 +349,7 @@ describe("Project Advanced Tools", () => {
 
       it("has examples", () => {
         expect(updateItemPositionTool.examples).toBeDefined();
-        expect(updateItemPositionTool.examples!.length).toBe(2); // move to top + move after
+        expect(updateItemPositionTool.examples?.length).toBe(2); // move to top + move after
       });
     });
 
@@ -376,7 +377,7 @@ describe("Project Advanced Tools", () => {
 
       it("has examples", () => {
         expect(searchIssuesAdvancedTool.examples).toBeDefined();
-        expect(searchIssuesAdvancedTool.examples!.length).toBe(2);
+        expect(searchIssuesAdvancedTool.examples?.length).toBe(2);
       });
     });
 
@@ -404,7 +405,7 @@ describe("Project Advanced Tools", () => {
 
       it("has examples", () => {
         expect(filterProjectItemsTool.examples).toBeDefined();
-        expect(filterProjectItemsTool.examples!.length).toBe(4); // status, labels, type, combined
+        expect(filterProjectItemsTool.examples?.length).toBe(4); // status, labels, type, combined
       });
     });
   });
@@ -419,10 +420,10 @@ describe("Project Advanced Tools", () => {
       mockGraphql = vi.fn();
 
       MockedFactory.mockImplementation(function () {
-        return {
+        return partialFake<GitHubRepositoryFactory>({
           graphql: mockGraphql,
           getConfig: vi.fn().mockReturnValue({ owner: "placeholder", repo: "placeholder" }),
-        } as unknown as GitHubRepositoryFactory;
+        });
       });
     });
 
@@ -520,7 +521,7 @@ describe("Project Advanced Tools", () => {
       });
 
       it("throws error when GITHUB_TOKEN is missing", async () => {
-        vi.stubEnv("GITHUB_TOKEN", undefined as unknown as string);
+        vi.stubEnv("GITHUB_TOKEN", undefined);
 
         const input = UpdateItemPositionInputSchema.parse({
           projectId: "PVT_kwDOTest123",
@@ -693,7 +694,7 @@ describe("Project Advanced Tools", () => {
       });
 
       it("throws error when GITHUB_TOKEN is missing", async () => {
-        vi.stubEnv("GITHUB_TOKEN", undefined as unknown as string);
+        vi.stubEnv("GITHUB_TOKEN", undefined);
 
         const input = SearchIssuesAdvancedInputSchema.parse({
           query: "is:issue",
@@ -1089,7 +1090,7 @@ describe("Project Advanced Tools", () => {
       });
 
       it("throws error when GITHUB_TOKEN is missing", async () => {
-        vi.stubEnv("GITHUB_TOKEN", undefined as unknown as string);
+        vi.stubEnv("GITHUB_TOKEN", undefined);
 
         const input = FilterProjectItemsInputSchema.parse({
           projectId: "PVT_kwDOTest123",

@@ -35,7 +35,7 @@ describe("Persistence and Events Integration", () => {
     });
 
     // Reset singleton instance for testing
-    (ResourceCache as any).instance = null;
+    Object.assign(ResourceCache, { instance: null });
     cache = ResourceCache.getInstance();
     await cache.clear(); // Clear any existing data
     webhookHandler = new GitHubWebhookHandler("test-secret");
@@ -48,7 +48,7 @@ describe("Persistence and Events Integration", () => {
     await cache.clear();
 
     // Reset singleton for next test
-    (ResourceCache as any).instance = null;
+    Object.assign(ResourceCache, { instance: null });
 
     // EventStore instances are created fresh in each test
 

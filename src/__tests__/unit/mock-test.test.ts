@@ -23,7 +23,7 @@ describe("Mock test", () => {
     console.log("AIServiceFactory:", AIServiceFactory);
     console.log("getInstance:", AIServiceFactory.getInstance);
     console.log("getInstance type:", typeof AIServiceFactory.getInstance);
-    console.log("getInstance._isMock:", (AIServiceFactory.getInstance as any)._isMockFunction);
+    console.log("getInstance._isMock:", vi.isMockFunction(AIServiceFactory.getInstance));
     expect(typeof AIServiceFactory.getInstance).toBe("function");
   });
 });

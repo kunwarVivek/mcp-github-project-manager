@@ -60,7 +60,9 @@ describe("BacklogPrioritizer", () => {
         // Higher priority items should have higher scores
         const critical = result.prioritizedItems.find((i) => i.itemId === "3");
         const low = result.prioritizedItems.find((i) => i.itemId === "1");
-        expect(critical!.score).toBeGreaterThan(low!.score);
+        expect(defined(critical, "critical should be defined").score).toBeGreaterThan(
+          defined(low, "low should be defined").score
+        );
       });
 
       it("should assign priority tiers based on score", async () => {
@@ -76,10 +78,16 @@ describe("BacklogPrioritizer", () => {
         const lowItem = result.prioritizedItems.find((i) => i.itemId === "2");
 
         // Both should have valid priority tiers
-        expect(["critical", "high", "medium", "low"]).toContain(highItem!.priority);
-        expect(["critical", "high", "medium", "low"]).toContain(lowItem!.priority);
+        expect(["critical", "high", "medium", "low"]).toContain(
+          defined(highItem, "highItem should be defined").priority
+        );
+        expect(["critical", "high", "medium", "low"]).toContain(
+          defined(lowItem, "lowItem should be defined").priority
+        );
         // Higher input priority should yield higher or equal score
-        expect(highItem!.score).toBeGreaterThanOrEqual(lowItem!.score);
+        expect(defined(highItem, "highItem should be defined").score).toBeGreaterThanOrEqual(
+          defined(lowItem, "lowItem should be defined").score
+        );
       });
 
       it("should return empty result for empty backlog", async () => {
@@ -152,7 +160,9 @@ describe("BacklogPrioritizer", () => {
         const small = result.prioritizedItems.find((i) => i.itemId === "small");
         const large = result.prioritizedItems.find((i) => i.itemId === "large");
 
-        expect(small!.factors.effortFit).toBeGreaterThan(large!.factors.effortFit);
+        expect(defined(small, "small should be defined").factors.effortFit).toBeGreaterThan(
+          defined(large, "large should be defined").factors.effortFit
+        );
       });
     });
 
@@ -169,8 +179,10 @@ describe("BacklogPrioritizer", () => {
         const orphan = result.prioritizedItems.find((i) => i.itemId === "1");
         const dependent = result.prioritizedItems.find((i) => i.itemId === "2");
 
-        expect(orphan!.factors.dependencyScore).toBeGreaterThanOrEqual(
-          dependent!.factors.dependencyScore
+        expect(
+          defined(orphan, "orphan should be defined").factors.dependencyScore
+        ).toBeGreaterThanOrEqual(
+          defined(dependent, "dependent should be defined").factors.dependencyScore
         );
       });
 
@@ -413,4 +425,11 @@ function createBacklogItem(overrides: Partial<BacklogItem> = {}): BacklogItem {
     dependencies: [],
     ...overrides,
   };
+}
+
+function defined<T>(value: T | undefined | null, message: string): T {
+  if (value === undefined || value === null) {
+    throw new Error(message);
+  }
+  return value;
 }

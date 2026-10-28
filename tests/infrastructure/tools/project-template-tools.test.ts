@@ -1,4 +1,4 @@
-import { vi } from "vitest";
+import { type Mock, type MockedClass, vi } from "vitest";
 
 /**
  * Unit tests for project template MCP tools
@@ -9,6 +9,7 @@ import { vi } from "vitest";
  * - Executor functions (with mocked repositories)
  */
 
+import { partialFake } from "../../../src/__tests__/helpers/aiFakes.js";
 import { GitHubRepositoryFactory } from "../../../src/infrastructure/github/GitHubRepositoryFactory.js";
 import {
   copyProjectFromTemplateTool,
@@ -280,12 +281,12 @@ describe("Project Template Tools", () => {
 
     it("all tools have examples", () => {
       expect(markProjectAsTemplateTool.examples).toBeDefined();
-      expect(markProjectAsTemplateTool.examples!.length).toBeGreaterThan(0);
+      expect(markProjectAsTemplateTool.examples?.length).toBeGreaterThan(0);
       expect(unmarkProjectAsTemplateTool.examples).toBeDefined();
       expect(copyProjectFromTemplateTool.examples).toBeDefined();
-      expect(copyProjectFromTemplateTool.examples!.length).toBe(2); // Two examples
+      expect(copyProjectFromTemplateTool.examples?.length).toBe(2); // Two examples
       expect(listOrganizationTemplatesTool.examples).toBeDefined();
-      expect(listOrganizationTemplatesTool.examples!.length).toBe(2); // Two examples
+      expect(listOrganizationTemplatesTool.examples?.length).toBe(2); // Two examples
     });
   });
 
@@ -299,10 +300,10 @@ describe("Project Template Tools", () => {
       mockGraphql = vi.fn();
 
       MockedFactory.mockImplementation(function () {
-        return {
+        return partialFake<GitHubRepositoryFactory>({
           graphql: mockGraphql,
           getConfig: vi.fn().mockReturnValue({ owner: "placeholder", repo: "placeholder" }),
-        } as unknown as GitHubRepositoryFactory;
+        });
       });
     });
 
@@ -335,7 +336,7 @@ describe("Project Template Tools", () => {
       });
 
       it("returns error when GITHUB_TOKEN is missing", async () => {
-        vi.stubEnv("GITHUB_TOKEN", undefined as unknown as string);
+        vi.stubEnv("GITHUB_TOKEN", undefined);
 
         const input = MarkProjectAsTemplateInputSchema.parse({
           projectId: "PVT_kwDOTest123",
@@ -371,7 +372,7 @@ describe("Project Template Tools", () => {
       });
 
       it("returns error when GITHUB_TOKEN is missing", async () => {
-        vi.stubEnv("GITHUB_TOKEN", undefined as unknown as string);
+        vi.stubEnv("GITHUB_TOKEN", undefined);
 
         const input = UnmarkProjectAsTemplateInputSchema.parse({
           projectId: "PVT_kwDOTest123",
@@ -440,7 +441,7 @@ describe("Project Template Tools", () => {
       });
 
       it("returns error when GITHUB_TOKEN is missing", async () => {
-        vi.stubEnv("GITHUB_TOKEN", undefined as unknown as string);
+        vi.stubEnv("GITHUB_TOKEN", undefined);
 
         const input = CopyProjectFromTemplateInputSchema.parse({
           projectId: "PVT_kwDOTemplate123",
@@ -601,7 +602,7 @@ describe("Project Template Tools", () => {
       });
 
       it("returns error when GITHUB_TOKEN is missing", async () => {
-        vi.stubEnv("GITHUB_TOKEN", undefined as unknown as string);
+        vi.stubEnv("GITHUB_TOKEN", undefined);
 
         const input = ListOrganizationTemplatesInputSchema.parse({
           org: "my-org",

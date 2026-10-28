@@ -1,4 +1,4 @@
-import { vi } from "vitest";
+import { type Mock, vi } from "vitest";
 
 /**
  * Unit tests for HealthService
@@ -10,6 +10,7 @@ import { vi } from "vitest";
  * - AI availability and circuit state
  */
 
+import { partialFake } from "../../../src/__tests__/helpers/aiFakes.js";
 import type { CacheStats, ResourceCache } from "../../../src/infrastructure/cache/ResourceCache.js";
 import type { GitHubRepositoryFactory } from "../../../src/infrastructure/github/GitHubRepositoryFactory.js";
 import { HealthService } from "../../../src/infrastructure/health/HealthService.js";
@@ -90,10 +91,10 @@ describe("HealthService", () => {
 
     it("returns healthy status when all services ok", async () => {
       const healthService = new HealthService({
-        aiFactory: mockAIFactory as unknown as AIServiceFactory,
-        aiResilience: mockResilience as unknown as AIResiliencePolicy,
-        cache: mockCache as unknown as ResourceCache,
-        githubFactory: mockGitHubFactory as unknown as GitHubRepositoryFactory,
+        aiFactory: partialFake<AIServiceFactory>(mockAIFactory),
+        aiResilience: partialFake<AIResiliencePolicy>(mockResilience),
+        cache: partialFake<ResourceCache>(mockCache),
+        githubFactory: partialFake<GitHubRepositoryFactory>(mockGitHubFactory),
       });
 
       const status = await healthService.check();
@@ -115,10 +116,10 @@ describe("HealthService", () => {
       });
 
       const healthService = new HealthService({
-        aiFactory: mockAIFactory as unknown as AIServiceFactory,
-        aiResilience: mockResilience as unknown as AIResiliencePolicy,
-        cache: mockCache as unknown as ResourceCache,
-        githubFactory: mockGitHubFactory as unknown as GitHubRepositoryFactory,
+        aiFactory: partialFake<AIServiceFactory>(mockAIFactory),
+        aiResilience: partialFake<AIResiliencePolicy>(mockResilience),
+        cache: partialFake<ResourceCache>(mockCache),
+        githubFactory: partialFake<GitHubRepositoryFactory>(mockGitHubFactory),
       });
 
       const status = await healthService.check();
@@ -131,10 +132,10 @@ describe("HealthService", () => {
       mockAIFactory.isAIAvailable.mockReturnValue(false);
 
       const healthService = new HealthService({
-        aiFactory: mockAIFactory as unknown as AIServiceFactory,
-        aiResilience: mockResilience as unknown as AIResiliencePolicy,
-        cache: mockCache as unknown as ResourceCache,
-        githubFactory: mockGitHubFactory as unknown as GitHubRepositoryFactory,
+        aiFactory: partialFake<AIServiceFactory>(mockAIFactory),
+        aiResilience: partialFake<AIResiliencePolicy>(mockResilience),
+        cache: partialFake<ResourceCache>(mockCache),
+        githubFactory: partialFake<GitHubRepositoryFactory>(mockGitHubFactory),
       });
 
       const status = await healthService.check();
@@ -147,10 +148,10 @@ describe("HealthService", () => {
       mockResilience.getCircuitState.mockReturnValue("open");
 
       const healthService = new HealthService({
-        aiFactory: mockAIFactory as unknown as AIServiceFactory,
-        aiResilience: mockResilience as unknown as AIResiliencePolicy,
-        cache: mockCache as unknown as ResourceCache,
-        githubFactory: mockGitHubFactory as unknown as GitHubRepositoryFactory,
+        aiFactory: partialFake<AIServiceFactory>(mockAIFactory),
+        aiResilience: partialFake<AIResiliencePolicy>(mockResilience),
+        cache: partialFake<ResourceCache>(mockCache),
+        githubFactory: partialFake<GitHubRepositoryFactory>(mockGitHubFactory),
       });
 
       const status = await healthService.check();
@@ -161,7 +162,7 @@ describe("HealthService", () => {
 
     it("includes cache stats", async () => {
       const healthService = new HealthService({
-        cache: mockCache as unknown as ResourceCache,
+        cache: partialFake<ResourceCache>(mockCache),
       });
 
       const status = await healthService.check();
@@ -173,8 +174,8 @@ describe("HealthService", () => {
 
     it("includes AI model configuration", async () => {
       const healthService = new HealthService({
-        aiFactory: mockAIFactory as unknown as AIServiceFactory,
-        aiResilience: mockResilience as unknown as AIResiliencePolicy,
+        aiFactory: partialFake<AIServiceFactory>(mockAIFactory),
+        aiResilience: partialFake<AIResiliencePolicy>(mockResilience),
       });
 
       const status = await healthService.check();
@@ -206,7 +207,7 @@ describe("HealthService", () => {
   describe("service availability", () => {
     it("handles missing aiFactory gracefully", async () => {
       const healthService = new HealthService({
-        cache: mockCache as unknown as ResourceCache,
+        cache: partialFake<ResourceCache>(mockCache),
       });
 
       const status = await healthService.check();
@@ -223,8 +224,8 @@ describe("HealthService", () => {
 
     it("handles missing cache gracefully", async () => {
       const healthService = new HealthService({
-        aiFactory: mockAIFactory as unknown as AIServiceFactory,
-        aiResilience: mockResilience as unknown as AIResiliencePolicy,
+        aiFactory: partialFake<AIServiceFactory>(mockAIFactory),
+        aiResilience: partialFake<AIResiliencePolicy>(mockResilience),
       });
 
       const status = await healthService.check();
@@ -236,8 +237,8 @@ describe("HealthService", () => {
 
     it("handles missing resilience gracefully", async () => {
       const healthService = new HealthService({
-        aiFactory: mockAIFactory as unknown as AIServiceFactory,
-        cache: mockCache as unknown as ResourceCache,
+        aiFactory: partialFake<AIServiceFactory>(mockAIFactory),
+        cache: partialFake<ResourceCache>(mockCache),
       });
 
       const status = await healthService.check();
@@ -264,16 +265,16 @@ describe("HealthService", () => {
 
     it("accepts partial dependencies", () => {
       const healthService = new HealthService({
-        cache: mockCache as unknown as ResourceCache,
+        cache: partialFake<ResourceCache>(mockCache),
       });
       expect(healthService).toBeInstanceOf(HealthService);
     });
 
     it("accepts all dependencies", () => {
       const healthService = new HealthService({
-        aiFactory: mockAIFactory as unknown as AIServiceFactory,
-        aiResilience: mockResilience as unknown as AIResiliencePolicy,
-        cache: mockCache as unknown as ResourceCache,
+        aiFactory: partialFake<AIServiceFactory>(mockAIFactory),
+        aiResilience: partialFake<AIResiliencePolicy>(mockResilience),
+        cache: partialFake<ResourceCache>(mockCache),
       });
       expect(healthService).toBeInstanceOf(HealthService);
     });

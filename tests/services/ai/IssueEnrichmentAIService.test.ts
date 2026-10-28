@@ -1,4 +1,4 @@
-import { type Mock, vi } from "vitest";
+import { type MockedFunction, vi } from "vitest";
 
 /**
  * Unit tests for IssueEnrichmentAIService
@@ -8,6 +8,7 @@ import { type Mock, vi } from "vitest";
  */
 
 import { generateObject } from "ai";
+import { generateObjectResult, partialFake } from "../../../src/__tests__/helpers/aiFakes";
 import { AIServiceFactory } from "../../../src/services/ai/AIServiceFactory";
 import { IssueEnrichmentAIService } from "../../../src/services/ai/IssueEnrichmentAIService";
 
@@ -40,10 +41,12 @@ describe("IssueEnrichmentAIService", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    (AIServiceFactory.getInstance as Mock).mockReturnValue({
-      getModel: mockGetModel,
-      getBestAvailableModel: mockGetBestAvailableModel,
-    });
+    vi.mocked(AIServiceFactory.getInstance).mockReturnValue(
+      partialFake<AIServiceFactory>({
+        getModel: mockGetModel,
+        getBestAvailableModel: mockGetBestAvailableModel,
+      })
+    );
     service = new IssueEnrichmentAIService();
   });
 
@@ -56,8 +59,8 @@ describe("IssueEnrichmentAIService", () => {
 
     describe("enrichIssue", () => {
       it("should return enriched issue with all sections", async () => {
-        mockGenerateObject.mockResolvedValue({
-          object: {
+        mockGenerateObject.mockResolvedValue(
+          generateObjectResult({
             enrichedBody: "## Problem\nThe app crashes on login.\n\n## Solution\nFix auth flow.",
             sections: {
               problem: { content: "The app crashes on login.", confidence: 0.9 },
@@ -68,8 +71,8 @@ describe("IssueEnrichmentAIService", () => {
             },
             suggestedLabels: ["bug", "auth", "high-priority"],
             overallConfidence: 0.88,
-          },
-        } as any);
+          })
+        );
 
         const result = await service.enrichIssue({
           issueTitle: "App crashes on login",
@@ -84,8 +87,8 @@ describe("IssueEnrichmentAIService", () => {
       });
 
       it("should calculate per-section confidence scores", async () => {
-        mockGenerateObject.mockResolvedValue({
-          object: {
+        mockGenerateObject.mockResolvedValue(
+          generateObjectResult({
             enrichedBody: "Enriched content",
             sections: {
               problem: { content: "Problem content", confidence: 0.9 },
@@ -93,8 +96,8 @@ describe("IssueEnrichmentAIService", () => {
             },
             suggestedLabels: [],
             overallConfidence: 0.85,
-          },
-        } as any);
+          })
+        );
 
         const result = await service.enrichIssue({
           issueTitle: "Test issue",
@@ -109,14 +112,14 @@ describe("IssueEnrichmentAIService", () => {
       it("should preserve original when description is substantial (>200 chars)", async () => {
         const longDescription = `${"A".repeat(250)} This is a very detailed issue description.`;
 
-        mockGenerateObject.mockResolvedValue({
-          object: {
+        mockGenerateObject.mockResolvedValue(
+          generateObjectResult({
             enrichedBody: "Enriched version",
             sections: {},
             suggestedLabels: [],
             overallConfidence: 0.8,
-          },
-        } as any);
+          })
+        );
 
         const result = await service.enrichIssue({
           issueTitle: "Test issue",
@@ -130,14 +133,14 @@ describe("IssueEnrichmentAIService", () => {
       it("should not preserve original when description is short", async () => {
         const shortDescription = "Fix bug.";
 
-        mockGenerateObject.mockResolvedValue({
-          object: {
+        mockGenerateObject.mockResolvedValue(
+          generateObjectResult({
             enrichedBody: "Enriched version with more detail",
             sections: { problem: { content: "The bug causes issues", confidence: 0.8 } },
             suggestedLabels: ["bug"],
             overallConfidence: 0.7,
-          },
-        } as any);
+          })
+        );
 
         const result = await service.enrichIssue({
           issueTitle: "Bug fix",
@@ -148,14 +151,14 @@ describe("IssueEnrichmentAIService", () => {
       });
 
       it("should include suggested labels", async () => {
-        mockGenerateObject.mockResolvedValue({
-          object: {
+        mockGenerateObject.mockResolvedValue(
+          generateObjectResult({
             enrichedBody: "Content",
             sections: {},
             suggestedLabels: ["bug", "enhancement", "docs"],
             overallConfidence: 0.8,
-          },
-        } as any);
+          })
+        );
 
         const result = await service.enrichIssue({
           issueTitle: "Test",
@@ -169,15 +172,15 @@ describe("IssueEnrichmentAIService", () => {
         // Create service with suggestAssignees enabled (default is false)
         const assigneeService = new IssueEnrichmentAIService(undefined, { suggestAssignees: true });
 
-        mockGenerateObject.mockResolvedValue({
-          object: {
+        mockGenerateObject.mockResolvedValue(
+          generateObjectResult({
             enrichedBody: "Content",
             sections: {},
             suggestedLabels: [],
             suggestedAssignees: ["alice", "bob"],
             overallConfidence: 0.8,
-          },
-        } as any);
+          })
+        );
 
         const result = await assigneeService.enrichIssue({
           issueTitle: "Test",
@@ -188,14 +191,14 @@ describe("IssueEnrichmentAIService", () => {
       });
 
       it("should pass project context to AI when provided", async () => {
-        mockGenerateObject.mockResolvedValue({
-          object: {
+        mockGenerateObject.mockResolvedValue(
+          generateObjectResult({
             enrichedBody: "Context-aware content",
             sections: {},
             suggestedLabels: [],
             overallConfidence: 0.9,
-          },
-        } as any);
+          })
+        );
 
         await service.enrichIssue({
           issueTitle: "Test",
@@ -211,14 +214,14 @@ describe("IssueEnrichmentAIService", () => {
       });
 
       it("should pass repository labels to AI when provided", async () => {
-        mockGenerateObject.mockResolvedValue({
-          object: {
+        mockGenerateObject.mockResolvedValue(
+          generateObjectResult({
             enrichedBody: "Content",
             sections: {},
             suggestedLabels: ["bug"],
             overallConfidence: 0.8,
-          },
-        } as any);
+          })
+        );
 
         await service.enrichIssue({
           issueTitle: "Test",
@@ -230,8 +233,8 @@ describe("IssueEnrichmentAIService", () => {
       });
 
       it("should calculate overall confidence from multiple factors", async () => {
-        mockGenerateObject.mockResolvedValue({
-          object: {
+        mockGenerateObject.mockResolvedValue(
+          generateObjectResult({
             enrichedBody: "Content",
             sections: {
               problem: { content: "Problem", confidence: 0.9 },
@@ -239,8 +242,8 @@ describe("IssueEnrichmentAIService", () => {
             },
             suggestedLabels: [],
             overallConfidence: 0.85,
-          },
-        } as any);
+          })
+        );
 
         const result = await service.enrichIssue({
           issueTitle: "Test",
@@ -254,14 +257,14 @@ describe("IssueEnrichmentAIService", () => {
       });
 
       it("should set needsReview based on confidence tier", async () => {
-        mockGenerateObject.mockResolvedValue({
-          object: {
+        mockGenerateObject.mockResolvedValue(
+          generateObjectResult({
             enrichedBody: "Content",
             sections: {},
             suggestedLabels: [],
             overallConfidence: 0.4, // Low confidence
-          },
-        } as any);
+          })
+        );
 
         const result = await service.enrichIssue({
           issueTitle: "Vague title",

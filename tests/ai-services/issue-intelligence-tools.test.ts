@@ -1,4 +1,4 @@
-import { vi } from "vitest";
+import { type Mock, type MockedFunction, vi } from "vitest";
 
 /**
  * Unit tests for Issue Intelligence MCP Tools
@@ -7,7 +7,7 @@ import { vi } from "vitest";
  * Phase 11 issue intelligence AI features.
  */
 
-import { cosineSimilarity, embed, embedMany, generateObject } from "ai";
+import { cosineSimilarity, type EmbedManyResult, type EmbedResult, embed, embedMany } from "ai";
 import {
   detectDuplicatesTool,
   enrichIssueTool,
@@ -50,7 +50,6 @@ vi.mock("ai", () => ({
   cosineSimilarity: vi.fn(),
 }));
 
-const mockGenerateObject = generateObject as MockedFunction<typeof generateObject>;
 const mockEmbed = embed as MockedFunction<typeof embed>;
 const mockEmbedMany = embedMany as MockedFunction<typeof embedMany>;
 const mockCosineSimilarity = cosineSimilarity as MockedFunction<typeof cosineSimilarity>;
@@ -66,8 +65,18 @@ describe("Issue Intelligence MCP Tools", () => {
     });
 
     // Default mock for embeddings
-    mockEmbed.mockResolvedValue({ embedding: [0.1, 0.2, 0.3] } as any);
-    mockEmbedMany.mockResolvedValue({ embeddings: [[0.1, 0.2, 0.3]] } as any);
+    mockEmbed.mockResolvedValue({
+      value: "",
+      embedding: [0.1, 0.2, 0.3],
+      usage: { tokens: 0 },
+      warnings: [],
+    } satisfies EmbedResult);
+    mockEmbedMany.mockResolvedValue({
+      values: [""],
+      embeddings: [[0.1, 0.2, 0.3]],
+      usage: { tokens: 0 },
+      warnings: [],
+    } satisfies EmbedManyResult);
     mockCosineSimilarity.mockReturnValue(0.5);
   });
 

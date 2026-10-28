@@ -63,7 +63,7 @@ describe("CorrelationContext", () => {
         expect(context?.correlationId).toBeDefined();
         expect(context?.operation).toBe("my-operation");
         expect(typeof context?.startTime).toBe("number");
-        expect(context!.startTime).toBeLessThanOrEqual(Date.now());
+        expect(context?.startTime).toBeLessThanOrEqual(Date.now());
       });
     });
   });
@@ -108,11 +108,11 @@ describe("CorrelationContext", () => {
       const ids: string[] = [];
 
       await startTrace("test1", async () => {
-        ids.push(getCorrelationId()!);
+        ids.push(getCorrelationId() ?? "");
       });
 
       await startTrace("test2", async () => {
-        ids.push(getCorrelationId()!);
+        ids.push(getCorrelationId() ?? "");
       });
 
       expect(ids[0]).not.toBe(ids[1]);

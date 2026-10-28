@@ -12,8 +12,15 @@ import type {
   Sprint,
 } from "../domain/types";
 
-export class TestFactory {
-  static createProject(overrides: Partial<CreateProject> = {}): CreateProject {
+/** Value shapes accepted when faking a GitHub project field-value response. */
+type FieldValueInput =
+  | string
+  | number
+  | string[]
+  | { iterationId?: string; milestoneId?: string; title?: string };
+
+export const TestFactory = {
+  createProject(overrides: Partial<CreateProject> = {}): CreateProject {
     return {
       title: "Test Project",
       shortDescription: "A test project",
@@ -23,18 +30,18 @@ export class TestFactory {
       fields: [],
       ...overrides,
     };
-  }
+  },
 
-  static createMilestone(overrides: Partial<CreateMilestone> = {}): CreateMilestone {
+  createMilestone(overrides: Partial<CreateMilestone> = {}): CreateMilestone {
     return {
       title: "Test Milestone",
       description: "A test milestone",
       dueDate: TestFactory.futureDate(30),
       ...overrides,
     };
-  }
+  },
 
-  static createIssue(overrides: Partial<CreateIssue> = {}): CreateIssue {
+  createIssue(overrides: Partial<CreateIssue> = {}): CreateIssue {
     return {
       title: "Test Issue",
       description: "A test issue",
@@ -42,9 +49,9 @@ export class TestFactory {
       labels: [],
       ...overrides,
     };
-  }
+  },
 
-  static createSprint(overrides: Partial<CreateSprint> = {}): CreateSprint {
+  createSprint(overrides: Partial<CreateSprint> = {}): CreateSprint {
     const startDate = new Date();
     const endDate = new Date(startDate);
     endDate.setDate(endDate.getDate() + 14);
@@ -58,9 +65,9 @@ export class TestFactory {
       issues: [],
       ...overrides,
     };
-  }
+  },
 
-  static createProjectView(overrides: Partial<ProjectView> = {}): ProjectView {
+  createProjectView(overrides: Partial<ProjectView> = {}): ProjectView {
     return {
       id: `view-${Date.now()}`,
       name: "Test View",
@@ -71,9 +78,9 @@ export class TestFactory {
       },
       ...overrides,
     };
-  }
+  },
 
-  static createCustomField(overrides: Partial<CustomField> = {}): CustomField {
+  createCustomField(overrides: Partial<CustomField> = {}): CustomField {
     return {
       id: `field-${Date.now()}`,
       name: "Test Field",
@@ -81,9 +88,9 @@ export class TestFactory {
       options: [],
       ...overrides,
     };
-  }
+  },
 
-  static completeProject(data: CreateProject = TestFactory.createProject()): Project {
+  completeProject(data: CreateProject = TestFactory.createProject()): Project {
     return {
       id: `proj-${Date.now()}`,
       type: ResourceType.PROJECT,
@@ -101,9 +108,9 @@ export class TestFactory {
       visibility: data.visibility || "private",
       version: 1,
     };
-  }
+  },
 
-  static completeMilestone(data: CreateMilestone = TestFactory.createMilestone()): Milestone {
+  completeMilestone(data: CreateMilestone = TestFactory.createMilestone()): Milestone {
     return {
       id: `milestone-${Date.now()}`,
       number: 1,
@@ -120,9 +127,9 @@ export class TestFactory {
         total: 0,
       },
     };
-  }
+  },
 
-  static completeIssue(data: CreateIssue = TestFactory.createIssue()): Issue {
+  completeIssue(data: CreateIssue = TestFactory.createIssue()): Issue {
     return {
       id: `issue-${Date.now()}`,
       number: 1,
@@ -136,9 +143,9 @@ export class TestFactory {
       updatedAt: new Date().toISOString(),
       url: `https://github.com/test-owner/test-repo/issues/1`,
     };
-  }
+  },
 
-  static completeSprint(data: CreateSprint = TestFactory.createSprint()): Sprint {
+  completeSprint(data: CreateSprint = TestFactory.createSprint()): Sprint {
     return {
       id: `sprint-${Date.now()}`,
       title: data.title,
@@ -150,30 +157,30 @@ export class TestFactory {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
-  }
+  },
 
-  static futureDate(daysFromNow: number): string {
+  futureDate(daysFromNow: number): string {
     const date = new Date();
     date.setDate(date.getDate() + daysFromNow);
     return date.toISOString();
-  }
+  },
 
-  static pastDate(daysAgo: number): string {
+  pastDate(daysAgo: number): string {
     const date = new Date();
     date.setDate(date.getDate() - daysAgo);
     return date.toISOString();
-  }
+  },
 
-  static randomId(): string {
+  randomId(): string {
     return Math.random().toString(36).substring(2, 15);
-  }
+  },
 
-  static mockGitHubResponse<T>(data: T): Promise<{ data: T }> {
+  mockGitHubResponse<T>(data: T): Promise<{ data: T }> {
     return Promise.resolve({ data });
-  }
+  },
 
   // Field Value Test Data Helpers
-  static createFieldValueTestData(fieldType: string, overrides: any = {}) {
+  createFieldValueTestData(fieldType: string, overrides: Record<string, unknown> = {}) {
     const baseData = {
       projectId: "PVT_kwDOLhQ7gc4AOEbH",
       itemId: "PVTI_lADOLhQ7gc4AOEbHzM4AOAJ7",
@@ -196,9 +203,9 @@ export class TestFactory {
       value: fieldTypeValues[fieldType as keyof typeof fieldTypeValues],
       ...overrides,
     };
-  }
+  },
 
-  static createMockField(fieldType: string, overrides: any = {}) {
+  createMockField(fieldType: string, overrides: Record<string, unknown> = {}) {
     const baseField = {
       id: "PVTF_lADOLhQ7gc4AOEbHzM4AOAI1",
       name: `Test ${fieldType} Field`,
@@ -218,16 +225,17 @@ export class TestFactory {
     }
 
     return { ...baseField, ...overrides };
-  }
+  },
 
-  static createMockFieldValueResponse(fieldType: string, value: any) {
+  createMockFieldValueResponse(fieldType: string, value: FieldValueInput) {
     const baseField = {
       name: `Test ${fieldType} Field`,
       dataType: fieldType,
     };
 
     // Create the field value object based on type
-    const fieldValue: any = { field: baseField };
+    const fieldValue: Record<string, unknown> = { field: baseField };
+    const objectValue = typeof value === "object" && !Array.isArray(value) ? value : undefined;
 
     switch (fieldType) {
       case "TEXT":
@@ -243,12 +251,12 @@ export class TestFactory {
         fieldValue.name = value;
         break;
       case "ITERATION":
-        fieldValue.iterationId = typeof value === "object" ? value.iterationId : value;
-        fieldValue.title = typeof value === "object" ? value.title : "Sprint 1";
+        fieldValue.iterationId = objectValue ? objectValue.iterationId : value;
+        fieldValue.title = objectValue ? objectValue.title : "Sprint 1";
         break;
       case "MILESTONE":
-        fieldValue.milestoneId = typeof value === "object" ? value.milestoneId : value;
-        fieldValue.title = typeof value === "object" ? value.title : "v1.0 Release";
+        fieldValue.milestoneId = objectValue ? objectValue.milestoneId : value;
+        fieldValue.title = objectValue ? objectValue.title : "v1.0 Release";
         break;
       case "ASSIGNEES":
         fieldValue.users = {
@@ -269,9 +277,9 @@ export class TestFactory {
         },
       },
     };
-  }
+  },
 
-  static createMockUpdateResponse() {
+  createMockUpdateResponse() {
     return {
       updateProjectV2ItemFieldValue: {
         projectV2Item: {
@@ -279,5 +287,5 @@ export class TestFactory {
         },
       },
     };
-  }
-}
+  },
+};

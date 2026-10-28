@@ -1,4 +1,5 @@
-import { beforeEach, describe, expect, it, type Mocked, vi } from "vitest";
+import { beforeEach, describe, expect, it, type Mock, type Mocked, vi } from "vitest";
+import type { PRDDocument } from "../../src/domain/ai-types";
 import type { MCPResponse, MCPSuccessResponse } from "../../src/domain/mcp-types";
 import { executeGeneratePRD } from "../../src/infrastructure/tools/ai-tasks/GeneratePRDTool";
 import { PRDGenerationService } from "../../src/services/PRDGenerationService";
@@ -17,7 +18,7 @@ function extractContentFromMCPResponse(response: MCPResponse): string {
     // If content is an object, try to extract the summary or convert to JSON
     if (typeof content === "object" && content !== null) {
       // First try to parse as JSON if it's a string
-      let parsedContent: any = content;
+      let parsedContent: object = content;
       if (typeof content === "string") {
         try {
           parsedContent = JSON.parse(content);
@@ -52,8 +53,35 @@ vi.mock("../../src/services/PRDGenerationService", () => ({
   }),
 }));
 
+/** PRD sections a fixture does not care about, so each fixture still satisfies PRDDocument. */
+const emptyPRDSections = {
+  scope: { inScope: [], outOfScope: [], assumptions: [], constraints: [] },
+  targetUsers: [],
+  userJourney: "",
+  technicalRequirements: [],
+  timeline: "",
+  milestones: [],
+  successMetrics: [],
+  stakeholders: [],
+  tags: [],
+} satisfies Pick<
+  PRDDocument,
+  | "scope"
+  | "targetUsers"
+  | "userJourney"
+  | "technicalRequirements"
+  | "timeline"
+  | "milestones"
+  | "successMetrics"
+  | "stakeholders"
+  | "tags"
+>;
+
 describe("GeneratePRDTool", () => {
-  let mockPRDService: Mocked<PRDGenerationService>;
+  let mockPRDService: Pick<
+    Mocked<PRDGenerationService>,
+    "generatePRDFromIdea" | "validatePRDCompleteness" | "enhancePRD" | "extractFeaturesFromPRD"
+  >;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -64,7 +92,7 @@ describe("GeneratePRDTool", () => {
       validatePRDCompleteness: vi.fn(),
       enhancePRD: vi.fn(),
       extractFeaturesFromPRD: vi.fn(),
-    } as any;
+    };
 
     // Mock the constructor
     (PRDGenerationService as Mock).mockImplementation(function () {
@@ -150,7 +178,7 @@ describe("GeneratePRDTool", () => {
         qualityIssues: [],
       };
 
-      mockPRDService.generatePRDFromIdea.mockResolvedValue(mockPRD as any);
+      mockPRDService.generatePRDFromIdea.mockResolvedValue(mockPRD as PRDDocument);
       mockPRDService.validatePRDCompleteness.mockResolvedValue(mockValidation);
 
       const args = {
@@ -200,7 +228,8 @@ describe("GeneratePRDTool", () => {
     });
 
     it("should handle PRD generation with market research", async () => {
-      const mockPRDWithResearch = {
+      const mockPRDWithResearch: PRDDocument = {
+        ...emptyPRDSections,
         id: "prd-research-123",
         title: "FitTracker - AI-Powered Fitness Application",
         overview: "Revolutionary fitness tracking app with AI coaching capabilities",
@@ -235,7 +264,7 @@ describe("GeneratePRDTool", () => {
         qualityIssues: [],
       };
 
-      mockPRDService.generatePRDFromIdea.mockResolvedValue(mockPRDWithResearch as any);
+      mockPRDService.generatePRDFromIdea.mockResolvedValue(mockPRDWithResearch);
       mockPRDService.validatePRDCompleteness.mockResolvedValue(mockValidation);
 
       const args = {
@@ -260,7 +289,8 @@ describe("GeneratePRDTool", () => {
     });
 
     it("should handle incomplete PRD with recommendations", async () => {
-      const mockIncompletePRD = {
+      const mockIncompletePRD: PRDDocument = {
+        ...emptyPRDSections,
         id: "prd-incomplete-123",
         title: "Basic App",
         overview: "A simple application",
@@ -293,7 +323,7 @@ describe("GeneratePRDTool", () => {
         qualityIssues: [],
       };
 
-      mockPRDService.generatePRDFromIdea.mockResolvedValue(mockIncompletePRD as any);
+      mockPRDService.generatePRDFromIdea.mockResolvedValue(mockIncompletePRD);
       mockPRDService.validatePRDCompleteness.mockResolvedValue(mockValidation);
 
       const args = {
@@ -429,7 +459,7 @@ describe("GeneratePRDTool", () => {
         qualityIssues: [],
       };
 
-      mockPRDService.generatePRDFromIdea.mockResolvedValue(mockComprehensivePRD as any);
+      mockPRDService.generatePRDFromIdea.mockResolvedValue(mockComprehensivePRD as PRDDocument);
       mockPRDService.validatePRDCompleteness.mockResolvedValue(mockValidation);
 
       const args = {

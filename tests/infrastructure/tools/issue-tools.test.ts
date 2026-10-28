@@ -292,7 +292,7 @@ describe("Issue Tools", () => {
 
       it("has examples", () => {
         expect(createIssueTool.examples).toBeDefined();
-        expect(createIssueTool.examples!.length).toBeGreaterThan(0);
+        expect(createIssueTool.examples?.length).toBeGreaterThan(0);
       });
     });
 
@@ -320,7 +320,7 @@ describe("Issue Tools", () => {
 
       it("has examples", () => {
         expect(listIssuesTool.examples).toBeDefined();
-        expect(listIssuesTool.examples!.length).toBeGreaterThan(0);
+        expect(listIssuesTool.examples?.length).toBeGreaterThan(0);
       });
     });
 
@@ -348,7 +348,7 @@ describe("Issue Tools", () => {
 
       it("has examples", () => {
         expect(getIssueTool.examples).toBeDefined();
-        expect(getIssueTool.examples!.length).toBeGreaterThan(0);
+        expect(getIssueTool.examples?.length).toBeGreaterThan(0);
       });
     });
 
@@ -376,7 +376,7 @@ describe("Issue Tools", () => {
 
       it("has examples", () => {
         expect(updateIssueTool.examples).toBeDefined();
-        expect(updateIssueTool.examples!.length).toBeGreaterThan(0);
+        expect(updateIssueTool.examples?.length).toBeGreaterThan(0);
       });
     });
   });
@@ -572,7 +572,7 @@ describe("Issue Comment Tools", () => {
 
       it("has examples", () => {
         expect(createIssueCommentTool.examples).toBeDefined();
-        expect(createIssueCommentTool.examples!.length).toBeGreaterThan(0);
+        expect(createIssueCommentTool.examples?.length).toBeGreaterThan(0);
       });
     });
 
@@ -600,7 +600,7 @@ describe("Issue Comment Tools", () => {
 
       it("has examples", () => {
         expect(updateIssueCommentTool.examples).toBeDefined();
-        expect(updateIssueCommentTool.examples!.length).toBeGreaterThan(0);
+        expect(updateIssueCommentTool.examples?.length).toBeGreaterThan(0);
       });
     });
 
@@ -628,7 +628,7 @@ describe("Issue Comment Tools", () => {
 
       it("has examples", () => {
         expect(deleteIssueCommentTool.examples).toBeDefined();
-        expect(deleteIssueCommentTool.examples!.length).toBeGreaterThan(0);
+        expect(deleteIssueCommentTool.examples?.length).toBeGreaterThan(0);
       });
     });
 
@@ -656,7 +656,7 @@ describe("Issue Comment Tools", () => {
 
       it("has examples", () => {
         expect(listIssueCommentsTool.examples).toBeDefined();
-        expect(listIssueCommentsTool.examples!.length).toBeGreaterThan(0);
+        expect(listIssueCommentsTool.examples?.length).toBeGreaterThan(0);
       });
     });
   });
@@ -812,7 +812,7 @@ describe("Draft Issue Tools", () => {
 
       it("has examples", () => {
         expect(createDraftIssueTool.examples).toBeDefined();
-        expect(createDraftIssueTool.examples!.length).toBeGreaterThan(0);
+        expect(createDraftIssueTool.examples?.length).toBeGreaterThan(0);
       });
     });
 
@@ -840,7 +840,7 @@ describe("Draft Issue Tools", () => {
 
       it("has examples", () => {
         expect(updateDraftIssueTool.examples).toBeDefined();
-        expect(updateDraftIssueTool.examples!.length).toBeGreaterThan(0);
+        expect(updateDraftIssueTool.examples?.length).toBeGreaterThan(0);
       });
     });
 
@@ -868,7 +868,7 @@ describe("Draft Issue Tools", () => {
 
       it("has examples", () => {
         expect(deleteDraftIssueTool.examples).toBeDefined();
-        expect(deleteDraftIssueTool.examples!.length).toBeGreaterThan(0);
+        expect(deleteDraftIssueTool.examples?.length).toBeGreaterThan(0);
       });
     });
   });
@@ -1091,7 +1091,7 @@ describe("Milestone Tools", () => {
 
       it("has examples", () => {
         expect(createMilestoneTool.examples).toBeDefined();
-        expect(createMilestoneTool.examples!.length).toBeGreaterThan(0);
+        expect(createMilestoneTool.examples?.length).toBeGreaterThan(0);
       });
     });
 
@@ -1119,7 +1119,7 @@ describe("Milestone Tools", () => {
 
       it("has examples", () => {
         expect(listMilestonesTool.examples).toBeDefined();
-        expect(listMilestonesTool.examples!.length).toBeGreaterThan(0);
+        expect(listMilestonesTool.examples?.length).toBeGreaterThan(0);
       });
     });
 
@@ -1147,7 +1147,7 @@ describe("Milestone Tools", () => {
 
       it("has examples", () => {
         expect(updateMilestoneTool.examples).toBeDefined();
-        expect(updateMilestoneTool.examples!.length).toBeGreaterThan(0);
+        expect(updateMilestoneTool.examples?.length).toBeGreaterThan(0);
       });
     });
 
@@ -1175,7 +1175,7 @@ describe("Milestone Tools", () => {
 
       it("has examples", () => {
         expect(deleteMilestoneTool.examples).toBeDefined();
-        expect(deleteMilestoneTool.examples!.length).toBeGreaterThan(0);
+        expect(deleteMilestoneTool.examples?.length).toBeGreaterThan(0);
       });
     });
   });

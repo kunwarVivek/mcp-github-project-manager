@@ -30,17 +30,22 @@ import {
   SUPPORTED_PROVIDERS,
 } from "../../src/services/ai/AIServiceFactory";
 
+// The singleton slot is private; reset it between tests for isolation.
+function resetFactorySingleton(): void {
+  Reflect.set(AIServiceFactory, "instance", undefined);
+}
+
 describe("AIServiceFactory", () => {
   let factory: AIServiceFactory;
 
   beforeEach(() => {
     vi.clearAllMocks();
-    (AIServiceFactory as any).instance = undefined;
+    resetFactorySingleton();
     factory = AIServiceFactory.getInstance();
   });
 
   afterEach(() => {
-    (AIServiceFactory as any).instance = undefined;
+    resetFactorySingleton();
   });
 
   describe("singleton pattern", () => {

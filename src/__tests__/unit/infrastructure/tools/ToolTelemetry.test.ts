@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ToolTelemetry } from "../../../../infrastructure/tools/ToolTelemetry";
+import { must } from "../../../helpers/must";
 
 describe("ToolTelemetry", () => {
   describe("recordCall", () => {
@@ -21,7 +22,9 @@ describe("ToolTelemetry", () => {
 
       const metrics = telemetry.getToolMetrics("tool_a");
       expect(metrics?.lastCalledAt).toBeDefined();
-      expect(new Date(metrics!.lastCalledAt!).getTime()).toBeGreaterThanOrEqual(before);
+      expect(
+        new Date(must(metrics?.lastCalledAt, "lastCalledAt")).getTime()
+      ).toBeGreaterThanOrEqual(before);
     });
 
     it("increments errorCount only for failed calls", () => {

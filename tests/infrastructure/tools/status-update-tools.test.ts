@@ -1,4 +1,4 @@
-import { vi } from "vitest";
+import { type Mock, type MockedClass, vi } from "vitest";
 
 /**
  * Unit tests for status update MCP tools
@@ -9,6 +9,7 @@ import { vi } from "vitest";
  * - Executor functions (with mocked repositories)
  */
 
+import { partialFake } from "../../../src/__tests__/helpers/aiFakes.js";
 import { GitHubRepositoryFactory } from "../../../src/infrastructure/github/GitHubRepositoryFactory.js";
 import { StatusUpdateStatus } from "../../../src/infrastructure/github/repositories/types.js";
 import {
@@ -214,7 +215,7 @@ describe("Status Update Tools", () => {
 
     it("all tools have examples", () => {
       expect(createStatusUpdateTool.examples).toBeDefined();
-      expect(createStatusUpdateTool.examples!.length).toBe(2); // Two examples
+      expect(createStatusUpdateTool.examples?.length).toBe(2); // Two examples
       expect(listStatusUpdatesTool.examples).toBeDefined();
       expect(getStatusUpdateTool.examples).toBeDefined();
     });
@@ -227,11 +228,11 @@ describe("Status Update Tools", () => {
   });
 
   describe("Executors", () => {
-    let mockStatusUpdateRepo: Mocked<{
+    let mockStatusUpdateRepo: {
       createStatusUpdate: Mock;
       listStatusUpdates: Mock;
       getStatusUpdate: Mock;
-    }>;
+    };
 
     beforeEach(() => {
       vi.resetAllMocks();
@@ -244,9 +245,9 @@ describe("Status Update Tools", () => {
       };
 
       MockedFactory.mockImplementation(function () {
-        return {
+        return partialFake<GitHubRepositoryFactory>({
           createStatusUpdateRepository: vi.fn().mockReturnValue(mockStatusUpdateRepo),
-        } as unknown as GitHubRepositoryFactory;
+        });
       });
     });
 
@@ -304,7 +305,7 @@ describe("Status Update Tools", () => {
       });
 
       it("returns error when token is missing", async () => {
-        vi.stubEnv("GITHUB_TOKEN", undefined as unknown as string);
+        vi.stubEnv("GITHUB_TOKEN", undefined);
 
         await expect(
           executeCreateStatusUpdate({
@@ -412,8 +413,8 @@ describe("Status Update Tools", () => {
 
         expect(result.content[0].text).toContain("SU_found");
         expect(result.structuredContent).not.toBeNull();
-        expect(result.structuredContent!.id).toBe("SU_found");
-        expect(result.structuredContent!.status).toBe(StatusUpdateStatus.COMPLETE);
+        expect(result.structuredContent?.id).toBe("SU_found");
+        expect(result.structuredContent?.status).toBe(StatusUpdateStatus.COMPLETE);
       });
 
       it("handles null dates in result", async () => {
@@ -432,8 +433,8 @@ describe("Status Update Tools", () => {
           statusUpdateId: "SU_nodates",
         });
 
-        expect(result.structuredContent!.startDate).toBeNull();
-        expect(result.structuredContent!.targetDate).toBeNull();
+        expect(result.structuredContent?.startDate).toBeNull();
+        expect(result.structuredContent?.targetDate).toBeNull();
       });
     });
   });

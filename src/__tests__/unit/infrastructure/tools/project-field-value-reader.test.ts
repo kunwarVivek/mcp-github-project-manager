@@ -161,7 +161,7 @@ describe("project item field value reader", () => {
   });
 
   it("selects every member of the field value union", async () => {
-    await executeFilterProjectItems({ projectId: "PVT_test", filter: {} });
+    await executeFilterProjectItems({ projectId: "PVT_test", filter: {}, first: 50 });
 
     const query = graphql.mock.calls[0][0] as string;
     for (const member of FIELD_VALUE_MEMBERS) {
@@ -171,7 +171,7 @@ describe("project item field value reader", () => {
   });
 
   it("selects the whole field configuration union for every field value", async () => {
-    await executeFilterProjectItems({ projectId: "PVT_test", filter: {} });
+    await executeFilterProjectItems({ projectId: "PVT_test", filter: {}, first: 50 });
 
     const query = graphql.mock.calls[0][0] as string;
     for (const member of FIELD_CONFIGURATION_MEMBERS) {
@@ -180,7 +180,11 @@ describe("project item field value reader", () => {
   });
 
   it("renders every field value kind as a string", async () => {
-    const result = await executeFilterProjectItems({ projectId: "PVT_test", filter: {} });
+    const result = await executeFilterProjectItems({
+      projectId: "PVT_test",
+      filter: {},
+      first: 50,
+    });
 
     expect(result.structuredContent.items[0].fieldValues).toEqual({
       Notes: "Some notes",
@@ -203,6 +207,7 @@ describe("project item field value reader", () => {
     const result = await executeFilterProjectItems({
       projectId: "PVT_test",
       filter: { status: "Done" },
+      first: 50,
     });
 
     expect(result.structuredContent.filteredCount).toBe(1);

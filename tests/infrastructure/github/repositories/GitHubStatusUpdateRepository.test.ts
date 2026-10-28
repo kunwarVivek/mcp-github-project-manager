@@ -9,7 +9,7 @@ import { vi } from "vitest";
  * - getStatusUpdate: Get single status update by ID
  */
 
-import type { Octokit } from "@octokit/rest";
+import { octokitWithGraphql } from "../../../../src/__tests__/helpers/aiFakes.js";
 import { GitHubConfig } from "../../../../src/infrastructure/github/GitHubConfig.js";
 import { GitHubStatusUpdateRepository } from "../../../../src/infrastructure/github/repositories/GitHubStatusUpdateRepository.js";
 import { StatusUpdateStatus } from "../../../../src/infrastructure/github/repositories/types.js";
@@ -17,10 +17,7 @@ import { StatusUpdateStatus } from "../../../../src/infrastructure/github/reposi
 // Mock Octokit graphql method
 const mockGraphql = vi.fn();
 
-const mockOctokit = {
-  graphql: mockGraphql,
-  rest: {},
-} as unknown as Octokit;
+const mockOctokit = octokitWithGraphql(mockGraphql);
 
 // Create a real GitHubConfig instance
 const mockConfig = GitHubConfig.create("test-owner", "test-repo", "test-token");
@@ -288,12 +285,12 @@ describe("GitHubStatusUpdateRepository", () => {
       const result = await repository.getStatusUpdate("SU_single");
 
       expect(result).not.toBeNull();
-      expect(result!.id).toBe("SU_single");
-      expect(result!.body).toBe("Single update");
-      expect(result!.status).toBe(StatusUpdateStatus.INACTIVE);
-      expect(result!.startDate).toBe("2025-01-01");
-      expect(result!.targetDate).toBe("2025-06-30");
-      expect(result!.creator.login).toBe("admin");
+      expect(result?.id).toBe("SU_single");
+      expect(result?.body).toBe("Single update");
+      expect(result?.status).toBe(StatusUpdateStatus.INACTIVE);
+      expect(result?.startDate).toBe("2025-01-01");
+      expect(result?.targetDate).toBe("2025-06-30");
+      expect(result?.creator.login).toBe("admin");
     });
 
     it("returns null when not found", async () => {
@@ -321,8 +318,8 @@ describe("GitHubStatusUpdateRepository", () => {
       const result = await repository.getStatusUpdate("SU_nodates");
 
       expect(result).not.toBeNull();
-      expect(result!.startDate).toBeUndefined();
-      expect(result!.targetDate).toBeUndefined();
+      expect(result?.startDate).toBeUndefined();
+      expect(result?.targetDate).toBeUndefined();
     });
   });
 });

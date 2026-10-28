@@ -1,7 +1,8 @@
-import { beforeEach, describe, expect, it, type Mocked, type MockedFunction, vi } from "vitest";
+import { beforeEach, describe, expect, it, type Mock, type Mocked, vi } from "vitest";
 import { DomainError } from "../../../domain/errors";
 import type { GitHubRepositoryFactory } from "../../../infrastructure/github/GitHubRepositoryFactory";
 import { LabelService } from "../../../services/LabelService";
+import type { RestCallFn } from "../../helpers/mockTypes";
 
 vi.mock("../../../infrastructure/github/GitHubRepositoryFactory");
 
@@ -11,8 +12,8 @@ describe("LabelService", () => {
   let mockOctokit: {
     rest: {
       issues: {
-        createLabel: MockedFunction<any>;
-        listLabelsForRepo: MockedFunction<any>;
+        createLabel: Mock<RestCallFn>;
+        listLabelsForRepo: Mock<RestCallFn>;
       };
     };
   };
@@ -25,8 +26,8 @@ describe("LabelService", () => {
     mockOctokit = {
       rest: {
         issues: {
-          createLabel: vi.fn(),
-          listLabelsForRepo: vi.fn(),
+          createLabel: vi.fn<RestCallFn>(),
+          listLabelsForRepo: vi.fn<RestCallFn>(),
         },
       },
     };

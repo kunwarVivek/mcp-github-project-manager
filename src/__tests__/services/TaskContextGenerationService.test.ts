@@ -8,6 +8,7 @@ import {
   TaskStatus,
 } from "../../domain/ai-types";
 import { TaskContextGenerationService } from "../../services/TaskContextGenerationService";
+import { must } from "../helpers/must";
 
 describe("TaskContextGenerationService", () => {
   let service: TaskContextGenerationService;
@@ -199,7 +200,7 @@ describe("TaskContextGenerationService", () => {
   describe("generateImplementationGuidance", () => {
     it("should return fallback guidance when AI is not available", async () => {
       // Act
-      const result = await service.generateImplementationGuidance(mockTask);
+      const result = must(await service.generateImplementationGuidance(mockTask), "guidance");
 
       // Assert - Should return fallback guidance when AI is not available
       expect(result).not.toBeNull();

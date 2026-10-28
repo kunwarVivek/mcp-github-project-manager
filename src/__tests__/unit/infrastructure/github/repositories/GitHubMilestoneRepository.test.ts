@@ -1,16 +1,29 @@
 import { Octokit } from "@octokit/rest";
-import { beforeEach, describe, expect, it, type Mocked, type MockedClass, vi } from "vitest";
+import { beforeEach, describe, expect, it, type Mock, type MockedClass, vi } from "vitest";
 import { ResourceStatus } from "../../../../../domain/resource-types";
 import type { CreateMilestone, Issue } from "../../../../../domain/types";
 import { GitHubConfig } from "../../../../../infrastructure/github/GitHubConfig";
 import { GitHubMilestoneRepository } from "../../../../../infrastructure/github/repositories/GitHubMilestoneRepository";
+import { asOctokit, type GraphqlFn, type RestCallFn } from "../../../../helpers/mockTypes";
 
 // Mock Octokit and GraphQL response
 vi.mock("@octokit/rest");
 
 describe("GitHubMilestoneRepository", () => {
   let repository: GitHubMilestoneRepository;
-  let mockOctokit: Mocked<Octokit>;
+  let mockOctokit: {
+    graphql: Mock<GraphqlFn>;
+    rest: {
+      issues: Record<
+        | "createMilestone"
+        | "updateMilestone"
+        | "deleteMilestone"
+        | "getMilestone"
+        | "listMilestones",
+        Mock<RestCallFn>
+      >;
+    };
+  };
   let config: GitHubConfig;
 
   beforeEach(() => {
@@ -19,26 +32,26 @@ describe("GitHubMilestoneRepository", () => {
 
     // Create mock Octokit instance with GraphQL method
     mockOctokit = {
-      graphql: vi.fn(),
+      graphql: vi.fn<GraphqlFn>(),
       // Include required REST methods that might be used
       rest: {
         issues: {
-          createMilestone: vi.fn(),
-          updateMilestone: vi.fn(),
-          deleteMilestone: vi.fn(),
-          getMilestone: vi.fn(),
-          listMilestones: vi.fn(),
+          createMilestone: vi.fn<RestCallFn>(),
+          updateMilestone: vi.fn<RestCallFn>(),
+          deleteMilestone: vi.fn<RestCallFn>(),
+          getMilestone: vi.fn<RestCallFn>(),
+          listMilestones: vi.fn<RestCallFn>(),
         },
       },
-    } as any;
+    };
 
-    (Octokit as MockedClass<typeof Octokit>).mockImplementation(() => mockOctokit);
+    (Octokit as MockedClass<typeof Octokit>).mockImplementation(() => asOctokit(mockOctokit));
 
     // Create configuration
     config = new GitHubConfig("test-owner", "test-repo", "test-token");
 
     // Create repository instance with both octokit and config
-    repository = new GitHubMilestoneRepository(mockOctokit, config);
+    repository = new GitHubMilestoneRepository(asOctokit(mockOctokit), config);
   });
 
   describe("create", () => {
@@ -72,7 +85,7 @@ describe("GitHubMilestoneRepository", () => {
         status: 201,
         url: "https://api.github.com/repos/test-owner/test-repo/milestones",
         headers: {},
-      } as any;
+      };
 
       mockOctokit.rest.issues.createMilestone.mockResolvedValueOnce(mockRestResponse);
 
@@ -213,10 +226,10 @@ describe("GitHubMilestoneRepository", () => {
       };
 
       // Mock the private factory field using reflection or replace it directly
-      const repository: any = new GitHubMilestoneRepository(mockOctokit, config);
-      repository.factory = {
-        createIssueRepository: () => mockIssueRepository,
-      };
+      const repository = new GitHubMilestoneRepository(asOctokit(mockOctokit), config);
+      Object.assign(repository, {
+        factory: { createIssueRepository: () => mockIssueRepository },
+      });
 
       // Act
       const milestoneId = "milestone-123";

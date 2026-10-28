@@ -7,7 +7,12 @@ import { GitHubProjectRepository } from "../../../../infrastructure/github/repos
 vi.mock("@octokit/rest");
 
 /** The GraphQL call the repository makes. */
-type GraphqlMock = Mock<(query: string, variables?: Record<string, unknown>) => Promise<unknown>>;
+/** Variables of a create/update project-field mutation, as far as these tests read them. */
+interface FieldMutationVariables {
+  input: { multiSelectOptions?: unknown; singleSelectOptions?: unknown };
+}
+
+type GraphqlMock = Mock<(query: string, variables?: FieldMutationVariables) => Promise<unknown>>;
 
 /**
  * The field types the API can create, and what it does with the ones it
@@ -35,10 +40,9 @@ describe("creatable project field types", () => {
   });
 
   /** The variables of the last GraphQL call that carried a `dataType`. */
-  function lastCreateVariables(): Record<string, unknown> {
-    const calls = graphql.mock.calls as Array<[string, Record<string, unknown>]>;
-    for (const [query, variables] of calls.reverse()) {
-      if (query.includes("createProjectV2Field")) {
+  function lastCreateVariables(): FieldMutationVariables {
+    for (const [query, variables] of [...graphql.mock.calls].reverse()) {
+      if (variables && query.includes("createProjectV2Field")) {
         return variables;
       }
     }
@@ -46,10 +50,9 @@ describe("creatable project field types", () => {
   }
 
   /** The variables of the last GraphQL call that carried field options. */
-  function lastUpdateVariables(): Record<string, unknown> {
-    const calls = graphql.mock.calls as Array<[string, Record<string, unknown>]>;
-    for (const [query, variables] of calls.reverse()) {
-      if (query.includes("updateProjectV2Field")) {
+  function lastUpdateVariables(): FieldMutationVariables {
+    for (const [query, variables] of [...graphql.mock.calls].reverse()) {
+      if (variables && query.includes("updateProjectV2Field")) {
         return variables;
       }
     }

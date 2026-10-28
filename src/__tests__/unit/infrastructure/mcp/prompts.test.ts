@@ -2,6 +2,7 @@ import type { McpServer } from "@modelcontextprotocol/server";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { registerPrompts } from "../../../../infrastructure/mcp/prompts";
 import { InputSanitizer } from "../../../../services/utils/InputSanitizer";
+import { must } from "../../../helpers/must";
 
 /**
  * Unit tests for the six reusable MCP prompt templates registered by
@@ -97,8 +98,8 @@ describe("registerPrompts", () => {
 
     it("enforces prdContent as a required argument", () => {
       const { config } = getPrompt("review-prd");
-      expect(() => config.argsSchema!.parse({})).toThrow();
-      expect(() => config.argsSchema!.parse({ prdContent: "ok" })).not.toThrow();
+      expect(() => must(config.argsSchema, "argsSchema").parse({})).toThrow();
+      expect(() => must(config.argsSchema, "argsSchema").parse({ prdContent: "ok" })).not.toThrow();
     });
   });
 
@@ -127,8 +128,8 @@ describe("registerPrompts", () => {
 
     it("enforces taskTitle as required while taskDescription stays optional", () => {
       const { config } = getPrompt("explain-task-complexity");
-      expect(() => config.argsSchema!.parse({})).toThrow();
-      expect(() => config.argsSchema!.parse({ taskTitle: "x" })).not.toThrow();
+      expect(() => must(config.argsSchema, "argsSchema").parse({})).toThrow();
+      expect(() => must(config.argsSchema, "argsSchema").parse({ taskTitle: "x" })).not.toThrow();
     });
   });
 
@@ -157,8 +158,8 @@ describe("registerPrompts", () => {
 
     it("enforces issueTitle as a required argument", () => {
       const { config } = getPrompt("suggest-issue-labels");
-      expect(() => config.argsSchema!.parse({})).toThrow();
-      expect(() => config.argsSchema!.parse({ issueTitle: "x" })).not.toThrow();
+      expect(() => must(config.argsSchema, "argsSchema").parse({})).toThrow();
+      expect(() => must(config.argsSchema, "argsSchema").parse({ issueTitle: "x" })).not.toThrow();
     });
   });
 
@@ -193,8 +194,12 @@ describe("registerPrompts", () => {
 
     it("enforces sprintGoals as required and coerces issueCount/teamSize strings to numbers", () => {
       const { config } = getPrompt("analyze-sprint-risk");
-      expect(() => config.argsSchema!.parse({})).toThrow();
-      const parsed = config.argsSchema!.parse({ sprintGoals: "g", issueCount: "5", teamSize: "2" });
+      expect(() => must(config.argsSchema, "argsSchema").parse({})).toThrow();
+      const parsed = must(config.argsSchema, "argsSchema").parse({
+        sprintGoals: "g",
+        issueCount: "5",
+        teamSize: "2",
+      });
       expect(parsed).toMatchObject({ issueCount: 5, teamSize: 2 });
     });
   });
@@ -225,10 +230,12 @@ describe("registerPrompts", () => {
 
     it("enforces milestone as required and rejects an invalid includeMetrics value", () => {
       const { config } = getPrompt("generate-release-notes");
-      expect(() => config.argsSchema!.parse({})).toThrow();
-      expect(() => config.argsSchema!.parse({ milestone: "m", includeMetrics: "yes" })).toThrow();
+      expect(() => must(config.argsSchema, "argsSchema").parse({})).toThrow();
       expect(() =>
-        config.argsSchema!.parse({ milestone: "m", includeMetrics: "true" })
+        must(config.argsSchema, "argsSchema").parse({ milestone: "m", includeMetrics: "yes" })
+      ).toThrow();
+      expect(() =>
+        must(config.argsSchema, "argsSchema").parse({ milestone: "m", includeMetrics: "true" })
       ).not.toThrow();
     });
   });
@@ -262,8 +269,8 @@ describe("registerPrompts", () => {
 
     it("enforces issueTitle as required while issueDescription/existingLabels stay optional", () => {
       const { config } = getPrompt("triage-issue");
-      expect(() => config.argsSchema!.parse({})).toThrow();
-      expect(() => config.argsSchema!.parse({ issueTitle: "x" })).not.toThrow();
+      expect(() => must(config.argsSchema, "argsSchema").parse({})).toThrow();
+      expect(() => must(config.argsSchema, "argsSchema").parse({ issueTitle: "x" })).not.toThrow();
     });
   });
 });

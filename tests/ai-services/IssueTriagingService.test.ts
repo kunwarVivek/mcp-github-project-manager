@@ -1,7 +1,7 @@
 import { generateObject } from "ai";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, type Mock, vi } from "vitest";
+import { generateObjectResult, partialFake } from "../../src/__tests__/helpers/aiFakes.js";
 import { AIServiceFactory } from "../../src/services/ai/AIServiceFactory";
-import { IssueEnrichmentService } from "../../src/services/IssueEnrichmentService";
 import { IssueTriagingService } from "../../src/services/IssueTriagingService";
 import { ProjectManagementService } from "../../src/services/ProjectManagementService";
 
@@ -44,21 +44,16 @@ vi.mock("../../src/services/ProjectManagementService", () => ({
   }),
 }));
 
-// Mock IssueEnrichmentService
-vi.mock("../../src/services/IssueEnrichmentService", () => ({
-  IssueEnrichmentService: vi.fn().mockImplementation(function () {
-    return {
-      enrichIssue: vi.fn(),
-      getEnrichmentContext: vi.fn(),
-    };
-  }),
-}));
-
 describe("IssueTriagingService", () => {
   let service: IssueTriagingService;
-  let mockAIService: any;
-  let mockProjectService: any;
-  let mockEnrichmentService: any;
+  let mockAIService: { modelId: string; provider: string };
+  let mockProjectService: {
+    listProjectItems: Mock;
+    updateProjectItem: Mock;
+    listIssues: Mock;
+    updateIssue: Mock;
+    createIssueComment: Mock;
+  };
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -95,19 +90,11 @@ describe("IssueTriagingService", () => {
 
     (ProjectManagementService as Mock).mockImplementation(() => mockProjectService);
 
-    // Mock IssueEnrichmentService
-    mockEnrichmentService = {
-      enrichIssue: vi.fn(),
-    };
-
-    (IssueEnrichmentService as Mock).mockImplementation(() => mockEnrichmentService);
-
-    // Use mock services directly since both ProjectManagementService and IssueEnrichmentService are mocked
+    // Use the mock project service directly since ProjectManagementService is mocked
     // This avoids TypeScript errors from the new 7-argument constructor signature
     service = new IssueTriagingService(
       AIServiceFactory.getInstance(),
-      mockProjectService as unknown as ProjectManagementService,
-      mockEnrichmentService as unknown as IssueEnrichmentService
+      partialFake<ProjectManagementService>(mockProjectService)
     );
   });
 
@@ -143,9 +130,7 @@ describe("IssueTriagingService", () => {
         reasoning: "Critical security vulnerability affecting production users",
       };
 
-      vi.mocked(generateObject).mockResolvedValue({
-        object: mockTriageResult,
-      });
+      vi.mocked(generateObject).mockResolvedValue(generateObjectResult(mockTriageResult));
 
       const result = await service.triageIssue({
         projectId: "project-123",
@@ -191,9 +176,7 @@ describe("IssueTriagingService", () => {
         reasoning: "Valid feature request that aligns with product roadmap",
       };
 
-      vi.mocked(generateObject).mockResolvedValue({
-        object: mockTriageResult,
-      });
+      vi.mocked(generateObject).mockResolvedValue(generateObjectResult(mockTriageResult));
 
       const result = await service.triageIssue({
         projectId: "project-123",
@@ -233,9 +216,7 @@ describe("IssueTriagingService", () => {
         reasoning: "User question that should be answered in discussions",
       };
 
-      vi.mocked(generateObject).mockResolvedValue({
-        object: mockTriageResult,
-      });
+      vi.mocked(generateObject).mockResolvedValue(generateObjectResult(mockTriageResult));
 
       const result = await service.triageIssue({
         projectId: "project-123",
@@ -274,9 +255,7 @@ describe("IssueTriagingService", () => {
         reasoning: "Simple documentation fix suitable for new contributors",
       };
 
-      vi.mocked(generateObject).mockResolvedValue({
-        object: mockTriageResult,
-      });
+      vi.mocked(generateObject).mockResolvedValue(generateObjectResult(mockTriageResult));
 
       const result = await service.triageIssue({
         projectId: "project-123",
@@ -324,8 +303,8 @@ describe("IssueTriagingService", () => {
       mockProjectService.listIssues.mockResolvedValue(mockIssues);
 
       vi.mocked(generateObject)
-        .mockResolvedValueOnce({
-          object: {
+        .mockResolvedValueOnce(
+          generateObjectResult({
             classification: {
               category: "bug",
               priority: "critical",
@@ -334,10 +313,10 @@ describe("IssueTriagingService", () => {
             },
             actions: [{ type: "add_label", description: "Add critical label", value: "critical" }],
             reasoning: "Critical bug",
-          },
-        })
-        .mockResolvedValueOnce({
-          object: {
+          })
+        )
+        .mockResolvedValueOnce(
+          generateObjectResult({
             classification: {
               category: "feature",
               priority: "medium",
@@ -346,8 +325,8 @@ describe("IssueTriagingService", () => {
             },
             actions: [{ type: "add_label", description: "Add enhancement", value: "enhancement" }],
             reasoning: "Valid feature",
-          },
-        });
+          })
+        );
 
       const result = await service.triageAllIssues({
         projectId: "project-123",
@@ -399,8 +378,8 @@ describe("IssueTriagingService", () => {
 
       mockProjectService.listIssues.mockResolvedValue(mockIssues);
 
-      vi.mocked(generateObject).mockResolvedValue({
-        object: {
+      vi.mocked(generateObject).mockResolvedValue(
+        generateObjectResult({
           classification: {
             category: "feature",
             priority: "medium",
@@ -409,8 +388,8 @@ describe("IssueTriagingService", () => {
           },
           actions: [],
           reasoning: "Feature request",
-        },
-      });
+        })
+      );
 
       const result = await service.triageAllIssues({
         projectId: "project-123",
@@ -441,7 +420,7 @@ describe("IssueTriagingService", () => {
 
     it("should handle malformed AI responses", async () => {
       vi.mocked(generateObject).mockResolvedValue({
-        object: { invalid: true } as unknown as Record<string, unknown>,
+        object: { invalid: true },
       } as never);
 
       await expect(
@@ -518,9 +497,7 @@ describe("IssueTriagingService", () => {
         reasoning: "Critical production bug",
       };
 
-      vi.mocked(generateObject).mockResolvedValue({
-        object: mockTriageResult,
-      });
+      vi.mocked(generateObject).mockResolvedValue(generateObjectResult(mockTriageResult));
 
       const result = await service.triageIssue({
         projectId: "project-123",
@@ -551,9 +528,7 @@ describe("IssueTriagingService", () => {
         reasoning: "Data loss bug",
       };
 
-      vi.mocked(generateObject).mockResolvedValue({
-        object: mockTriageResult,
-      });
+      vi.mocked(generateObject).mockResolvedValue(generateObjectResult(mockTriageResult));
 
       const result = await service.triageIssue({
         projectId: "project-123",
@@ -579,9 +554,7 @@ describe("IssueTriagingService", () => {
         reasoning: "Minor UI alignment issue",
       };
 
-      vi.mocked(generateObject).mockResolvedValue({
-        object: mockTriageResult,
-      });
+      vi.mocked(generateObject).mockResolvedValue(generateObjectResult(mockTriageResult));
 
       const result = await service.triageIssue({
         projectId: "project-123",

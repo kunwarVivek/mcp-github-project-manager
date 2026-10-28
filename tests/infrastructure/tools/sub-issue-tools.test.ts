@@ -1,4 +1,4 @@
-import { vi } from "vitest";
+import { type Mock, type MockedClass, vi } from "vitest";
 
 /**
  * Unit tests for sub-issue MCP tools
@@ -9,6 +9,7 @@ import { vi } from "vitest";
  * - Executor functions (with mocked repositories)
  */
 
+import { partialFake } from "../../../src/__tests__/helpers/aiFakes.js";
 import { GitHubRepositoryFactory } from "../../../src/infrastructure/github/GitHubRepositoryFactory.js";
 import {
   AddSubIssueInputSchema,
@@ -262,23 +263,23 @@ describe("Sub-issue Tools", () => {
 
     it("all tools have examples", () => {
       expect(addSubIssueTool.examples).toBeDefined();
-      expect(addSubIssueTool.examples!.length).toBeGreaterThan(0);
+      expect(addSubIssueTool.examples?.length).toBeGreaterThan(0);
       expect(listSubIssuesTool.examples).toBeDefined();
       expect(getParentIssueTool.examples).toBeDefined();
       expect(reprioritizeSubIssueTool.examples).toBeDefined();
-      expect(reprioritizeSubIssueTool.examples!.length).toBe(2); // Two examples
+      expect(reprioritizeSubIssueTool.examples?.length).toBe(2); // Two examples
       expect(removeSubIssueTool.examples).toBeDefined();
     });
   });
 
   describe("Executors", () => {
-    let mockSubIssueRepo: Mocked<{
+    let mockSubIssueRepo: {
       addSubIssue: Mock;
       listSubIssues: Mock;
       getParentIssue: Mock;
       reprioritizeSubIssue: Mock;
       removeSubIssue: Mock;
-    }>;
+    };
     let mockGraphql: Mock;
 
     beforeEach(() => {
@@ -296,11 +297,11 @@ describe("Sub-issue Tools", () => {
       mockGraphql = vi.fn();
 
       MockedFactory.mockImplementation(function () {
-        return {
+        return partialFake<GitHubRepositoryFactory>({
           createSubIssueRepository: vi.fn().mockReturnValue(mockSubIssueRepo),
           graphql: mockGraphql,
           getConfig: vi.fn().mockReturnValue({ owner: "octocat", repo: "hello-world" }),
-        } as unknown as GitHubRepositoryFactory;
+        });
       });
     });
 
@@ -341,7 +342,7 @@ describe("Sub-issue Tools", () => {
       });
 
       it("returns error when token is missing", async () => {
-        vi.stubEnv("GITHUB_TOKEN", undefined as unknown as string);
+        vi.stubEnv("GITHUB_TOKEN", undefined);
 
         const input = AddSubIssueInputSchema.parse({
           owner: "octocat",
@@ -432,8 +433,8 @@ describe("Sub-issue Tools", () => {
         const result = await executeGetParentIssue(input);
 
         expect(result.parent).not.toBeNull();
-        expect(result.parent!.number).toBe(100);
-        expect(result.parent!.state).toBe("open"); // normalized
+        expect(result.parent?.number).toBe(100);
+        expect(result.parent?.state).toBe("open"); // normalized
       });
     });
 

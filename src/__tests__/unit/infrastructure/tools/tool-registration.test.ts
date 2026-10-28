@@ -21,13 +21,17 @@ import { ToolRegistry } from "../../../../infrastructure/tools/ToolRegistry";
  *    exactly.
  */
 describe("tool registration surface", () => {
-  it("registers no duplicate tool names", () => {
+  it("registers no duplicate tool names", async () => {
     const stderr = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
     try {
-      // Fresh instance: the constructor registers every built-in and compound
-      // tool and logs a warning for each duplicate name.
-      // biome-ignore lint/complexity/noVoid: the instance is the side effect under test
-      void new ToolRegistry();
+      // Fresh singleton: re-importing the module resets `getInstance()`, whose
+      // first call registers every built-in and compound tool and logs a
+      // warning for each duplicate name.
+      vi.resetModules();
+      const { ToolRegistry: FreshToolRegistry } = await import(
+        "../../../../infrastructure/tools/ToolRegistry"
+      );
+      FreshToolRegistry.getInstance();
     } finally {
       stderr.mockRestore();
     }
