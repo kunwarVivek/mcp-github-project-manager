@@ -925,4 +925,4 @@ To restore granular tool exposure (not recommended), consult the `ToolRegistry` 
 
 ---
 
-*Reference for `mcp-github-project-manager` v2.4.0 — MCP SDK v2 (2026-07-28 spec).*
+*Reference for `mcp-github-project-manager` v3.0.0 — MCP SDK v2 (2026-07-28 spec).*

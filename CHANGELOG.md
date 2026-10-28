@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+No unreleased changes.
+
+## [3.0.0] - 2026-10-28
+
+### Breaking changes — read before upgrading from 2.x
+- **The GitHub token needs `contents: write`** — the agent registry is now `registry.json` on an orphan `agent-registry` branch (sha compare-and-swap), so no branch ruleset may block that branch and the repository needs at least one commit. An existing "Agent Registry" issue is imported automatically on first use.
+- **`get_activity` output** — `heartbeatHistory` is removed; the response carries `heartbeatSource` and `currentTask.progress` / `currentTask.branch`.
+- **`manage_automation`** — the rule actions (`create_rule`, `update_rule`, `enable_rule`, `disable_rule`, `get_rule`, `list_rules`, `delete_rule`) and `ai_analyze`/`schedule_triaging` are gone: GitHub has no such API. Use `list_workflows`, `get_workflow` and `delete_workflow`.
+- **Heartbeats fail loudly** — a heartbeat that could not be written is now an error instead of a success; the first heartbeat or checkout on an older project adds the new `agent_*` fields itself (the token needs project admin, or run `agent_manage setup_fields` once).
+- **Field types and view layouts** — `create_field` accepts only the types GitHub can create (text, number, date, single_select, multi_select, iteration) and views only board, table and roadmap.
+- **Node.js 22.12 or newer** is required.
+
 ### Added
 - **Project roles and views as claiming pools** — the platform could neither read nor set who may see a board, and it scanned the whole board client-side on every claim. `manage_project`/`set_collaborators` now sets the role of a user or a team on a project through GitHub's native `updateProjectV2Collaborators` mutation, with the four roles of its `ProjectV2Roles` enum (`ADMIN`, `WRITER`, `READER`, `NONE`), and `manage_project`/`list_views` now answers with the configuration GitHub stores for a view: the server-side `filter` it selects its items with, the fields it groups and sorts by, and the fields it shows. A named view is therefore a pool the server selects from, instead of a filter the platform re-implements on every claim. GitHub has no read path for collaborator roles — `ProjectV2` has no `collaborators` field — so the roles that come back are the ones the call granted, and a role it did not touch is reported as unknown rather than guessed.
 - **Native issue dependencies, issue types and reverse membership** — the platform emulated "issue A is blocked by issue B" with a `blocked-by:#N` label plus body parsing, the issue kind with a `type:` label, and never asked which boards a task was on. GitHub has all three: `Issue.blockedBy` / `Issue.blocking` edges (written with `addBlockedBy` / `removeBlockedBy`), `Issue.issueType` (written with `updateIssueIssueType`, with the organization's type catalogue) and `Issue.projectItems(includeArchived: true)`. They are reachable through `manage_issues/list_dependencies`, `add_blocker`, `remove_blocker` and `list_issue_types`; the label emulation is still honoured, so a board wired up before the native edge keeps working. In the claim path the native edge decides whether a task is blocked, and a task that is already claimed on **another** board is no longer handed out a second time.

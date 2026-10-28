@@ -1002,4 +1002,4 @@ AI_FALLBACK_MODEL=gpt-4o-mini
 
 ---
 
-*Refreshed: 2026-10-21 — MCP GitHub Project Manager v2.4.0*
+*Refreshed: 2026-10-21 — MCP GitHub Project Manager v3.0.0*

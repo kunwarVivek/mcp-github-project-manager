@@ -1,6 +1,5 @@
 #!/usr/bin/env node
 import { randomUUID } from "node:crypto";
-import { readFileSync } from "node:fs";
 import {
   type CallToolResult,
   fromJsonSchema,
@@ -17,6 +16,7 @@ import { traceContext } from "./infrastructure/observability/CorrelationContext"
 import { createGitHubFactory } from "./infrastructure/tools/tool-factory";
 import { AgentBudgetService, type BudgetDebitFailure } from "./services/agent/AgentBudgetService";
 import type { UnpaidDebitLedger } from "./services/agent/UnpaidDebitLedger";
+import { PACKAGE_VERSION } from "./version";
 
 /**
  * v2 compatibility aliases.
@@ -51,39 +51,6 @@ import {
   WEBHOOK_SECRET,
 } from "./env";
 import { ResourceCache } from "./infrastructure/cache/ResourceCache";
-import { withBudgetDebitFailure } from "./infrastructure/mcp/budget-debit-meta";
-import { registerPrompts as registerPromptTemplates } from "./infrastructure/mcp/prompts";
-import { registerResources as registerResourceHandlers } from "./infrastructure/mcp/resources";
-import { registerCompoundExecutors } from "./infrastructure/tools/compound/register-executors";
-import { ToolRegistry } from "./infrastructure/tools/ToolRegistry";
-import { ToolResultFormatter } from "./infrastructure/tools/ToolResultFormatter";
-import { ToolTelemetry } from "./infrastructure/tools/ToolTelemetry";
-import { ToolValidator } from "./infrastructure/tools/ToolValidator";
-import { GitHubStateSyncService } from "./services/GitHubStateSyncService";
-import type { ProjectManagementService } from "./services/ProjectManagementService";
-
-/**
- * Supported MCP protocol versions.
- * The MCP SDK handles version negotiation, but we track supported versions
- * for error messaging and compatibility checks.
- */
-/**
- * Server version, read from package.json so `serverInfo.version` cannot drift
- * from the published package (it was hardcoded to "0.1.0" against a 1.1.0 package).
- *
- * Protocol version constants are gone: the v2 SDK negotiates the protocol
- * revision per connection, so a hand-maintained list here could only ever be
- * wrong.
- */
-const SERVER_VERSION: string = (() => {
-  try {
-    const pkgPath = new URL("../package.json", import.meta.url);
-    return JSON.parse(readFileSync(pkgPath, "utf8")).version ?? "0.0.0";
-  } catch {
-    return "0.0.0";
-  }
-})();
-
 import { EventStore } from "./infrastructure/events/EventStore";
 import { EventSubscriptionManager } from "./infrastructure/events/EventSubscriptionManager";
 import {
@@ -93,9 +60,19 @@ import {
 import { WebhookServer } from "./infrastructure/http/WebhookServer";
 import { GracefulShutdown } from "./infrastructure/lifecycle/GracefulShutdown";
 import { type ILogger, logger } from "./infrastructure/logger/index";
+import { withBudgetDebitFailure } from "./infrastructure/mcp/budget-debit-meta";
+import { registerPrompts as registerPromptTemplates } from "./infrastructure/mcp/prompts";
+import { registerResources as registerResourceHandlers } from "./infrastructure/mcp/resources";
 import { FilePersistenceAdapter } from "./infrastructure/persistence/FilePersistenceAdapter";
+import { registerCompoundExecutors } from "./infrastructure/tools/compound/register-executors";
+import { ToolRegistry } from "./infrastructure/tools/ToolRegistry";
+import { ToolResultFormatter } from "./infrastructure/tools/ToolResultFormatter";
+import { ToolTelemetry } from "./infrastructure/tools/ToolTelemetry";
+import { ToolValidator } from "./infrastructure/tools/ToolValidator";
 import type { AgentReclaimScheduler } from "./services/agent/AgentReclaimScheduler";
 import type { AIServiceFactory } from "./services/ai/AIServiceFactory";
+import { GitHubStateSyncService } from "./services/GitHubStateSyncService";
+import type { ProjectManagementService } from "./services/ProjectManagementService";
 
 class GitHubProjectManagerServer {
   private server: McpServer;
@@ -137,7 +114,7 @@ class GitHubProjectManagerServer {
     this.server = new McpServer(
       {
         name: "github-project-manager",
-        version: SERVER_VERSION,
+        version: PACKAGE_VERSION,
       },
       {
         capabilities: {
@@ -356,7 +333,7 @@ class GitHubProjectManagerServer {
       agentStore: this.agentStore,
       aiFactory: this.aiFactory,
       logger: this.logger,
-      serverVersion: SERVER_VERSION,
+      serverVersion: PACKAGE_VERSION,
     });
   }
 

@@ -1,20 +1,5 @@
-import fs from "node:fs";
-import path from "node:path";
 import { Command } from "commander";
-
-// Read version from package.json
-let VERSION = "0.1.0";
-try {
-  // Try to read the version from package.json
-  const packageJsonPath = path.resolve(process.cwd(), "package.json");
-  if (fs.existsSync(packageJsonPath)) {
-    const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, "utf8"));
-    VERSION = packageJson.version || VERSION;
-  }
-} catch {
-  // Fallback to default version if there's an error
-  process.stderr.write("Warning: Could not read version from package.json");
-}
+import { PACKAGE_VERSION } from "./version";
 
 export interface CliOptions {
   token?: string;
@@ -34,7 +19,7 @@ export function parseCommandLineArgs(): CliOptions {
   program
     .name("mcp-github-project-manager")
     .description("A Model Context Protocol (MCP) server for managing GitHub Projects")
-    .version(VERSION)
+    .version(PACKAGE_VERSION)
     .option("-t, --token <token>", "GitHub personal access token")
     .option("-o, --owner <owner>", "GitHub repository owner (username or organization)")
     .option("-r, --repo <repo>", "GitHub repository name")

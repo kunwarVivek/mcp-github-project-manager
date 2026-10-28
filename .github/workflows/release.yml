@@ -1,19 +1,43 @@
 name: Release
 
+# Publishes one version to npm and GitHub together.
+#
+# Triggers:
+# - a `v*` tag pushed by a person (`git push origin vX.Y.Z`);
+# - `workflow_dispatch` on a tag ref. bump-version.yml uses this: a tag pushed
+#   with the workflow's GITHUB_TOKEN never triggers another workflow, but a
+#   dispatch does.
+#
+# npm authentication is Trusted Publishing (OIDC): npmjs.com trusts this
+# repository's `release.yml`, so no npm token is stored anywhere and every
+# publish carries a provenance attestation. Requires npm >= 11.5.1.
+
 on:
   push:
     tags:
       - 'v*'
+  workflow_dispatch:
 
 permissions:
   contents: write
   id-token: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   release:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Require a version tag
+        run: |
+          case "$GITHUB_REF" in
+            refs/tags/v*) echo "Releasing ${GITHUB_REF#refs/tags/}" ;;
+            *) echo "::error::run this workflow on a v* tag, not $GITHUB_REF"; exit 1 ;;
+          esac
+
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
@@ -25,11 +49,22 @@ jobs:
           cache: 'npm'
           registry-url: 'https://registry.npmjs.org'
 
+      - name: Require npm with Trusted Publishing support
+        run: |
+          NPM_VERSION=$(npm --version)
+          if ! node -e 'const [a,b,c]=process.argv[1].split(".").map(Number);process.exit(a>11||(a===11&&(b>5||(b===5&&c>=1)))?0:1)' "$NPM_VERSION"; then
+            echo "::error::npm $NPM_VERSION cannot publish with OIDC; 11.5.1 or newer is required"
+            exit 1
+          fi
+
       - name: Install dependencies
         run: npm ci
 
       - name: Build
         run: npm run build
+
+      - name: Typecheck
+        run: npm run typecheck
 
       - name: Run tests
         run: npm test
@@ -42,48 +77,49 @@ jobs:
             echo "::error::tag v$TAG_VERSION does not match package.json version $PKG_VERSION"
             exit 1
           fi
-          echo "Publishing v$TAG_VERSION"
 
-      - name: Publish to npm
-        run: |
-          VERSION=$(node -p "require('./package.json').version")
-          if npm view "mcp-github-project-manager@$VERSION" version >/dev/null 2>&1; then
-            echo "::notice::v$VERSION is already published - skipping npm publish"
-          else
-            npm publish --provenance --access public
-          fi
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-
-      - name: Extract version from tag
-        id: version
-        run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
-
+      # Checked before anything is published, so npm and GitHub get the
+      # release together or not at all.
       - name: Extract changelog for version
         id: changelog
         run: |
-          VERSION="${{ steps.version.outputs.VERSION }}"
-          VERSION_NUM="${VERSION#v}"
-          # Extract changelog section for version
-          CHANGELOG=$(awk "/^## \[${VERSION_NUM}\]/{flag=1; next} /^## \[/{flag=0} flag" CHANGELOG.md)
-          # Handle multiline output
-          echo "CHANGELOG<<EOF" >> $GITHUB_OUTPUT
-          echo "$CHANGELOG" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+          VERSION_NUM="${GITHUB_REF#refs/tags/v}"
+          CHANGELOG=$(awk -v v="$VERSION_NUM" 'index($0, "## [" v "]")==1{flag=1; next} /^## \[/{flag=0} flag' CHANGELOG.md)
+          if [ -z "$(echo "$CHANGELOG" | tr -d '[:space:]')" ]; then
+            echo "::error::CHANGELOG.md has no '## [$VERSION_NUM]' section"
+            exit 1
+          fi
+          {
+            echo "VERSION=$VERSION_NUM"
+            echo "CHANGELOG<<CHANGELOG_EOF"
+            echo "$CHANGELOG"
+            echo "CHANGELOG_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Publish to npm
+        run: |
+          VERSION="${{ steps.changelog.outputs.VERSION }}"
+          if npm view "mcp-github-project-manager@$VERSION" version >/dev/null 2>&1; then
+            echo "::notice::$VERSION is already on npm - skipping npm publish"
+          else
+            npm publish --access public
+          fi
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          name: ${{ steps.version.outputs.VERSION }}
+          tag_name: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
           body: |
             ${{ steps.changelog.outputs.CHANGELOG }}
 
             ---
 
-            📦 **npm:** `npm install mcp-github-project-manager@${{ steps.version.outputs.VERSION }}`
+            📦 **npm:** `npm install mcp-github-project-manager@${{ steps.changelog.outputs.VERSION }}`
 
             See [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md) for full details.
           draft: false
-          prerelease: ${{ contains(steps.version.outputs.VERSION, '-') }}
+          prerelease: ${{ contains(github.ref_name, '-') }}
+          make_latest: ${{ !contains(github.ref_name, '-') }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

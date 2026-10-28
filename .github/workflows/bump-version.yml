@@ -15,6 +15,7 @@ on:
 
 permissions:
   contents: write
+  actions: write
 
 jobs:
   bump:
@@ -81,11 +82,19 @@ jobs:
           git push origin main
           git push origin "v${{ steps.bump.outputs.VERSION }}"
 
+      # A tag pushed with GITHUB_TOKEN does not trigger release.yml (GitHub
+      # suppresses workflow runs caused by GITHUB_TOKEN events, except
+      # workflow_dispatch), so the release is dispatched on the new tag.
+      - name: Start the release
+        run: gh workflow run release.yml --ref "v${{ steps.bump.outputs.VERSION }}"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Summary
         run: |
-          echo "## Release v${{ steps.bump.outputs.VERSION }} created! 🚀" >> $GITHUB_STEP_SUMMARY
+          echo "## Release v${{ steps.bump.outputs.VERSION }} tagged" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "The release workflow will now:" >> $GITHUB_STEP_SUMMARY
-          echo "1. Run tests" >> $GITHUB_STEP_SUMMARY
-          echo "2. Publish to npm" >> $GITHUB_STEP_SUMMARY
-          echo "3. Create GitHub release" >> $GITHUB_STEP_SUMMARY
+          echo "release.yml was dispatched on the tag. It will:" >> $GITHUB_STEP_SUMMARY
+          echo "1. Build, typecheck and test" >> $GITHUB_STEP_SUMMARY
+          echo "2. Publish to npm (Trusted Publishing)" >> $GITHUB_STEP_SUMMARY
+          echo "3. Create the GitHub release from the CHANGELOG section" >> $GITHUB_STEP_SUMMARY
