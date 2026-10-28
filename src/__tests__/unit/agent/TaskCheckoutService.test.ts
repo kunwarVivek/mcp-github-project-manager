@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, type Mocked, vi } from "vitest";
+import { beforeEach, describe, expect, it, type Mock, type Mocked, vi } from "vitest";
 import type { Agent } from "../../../domain/agent-orchestration-types";
 import type { AgentStore } from "../../../infrastructure/agent/AgentStore";
 import type { GitHubRepositoryFactory } from "../../../infrastructure/github/GitHubRepositoryFactory";
@@ -12,7 +12,7 @@ vi.mock("../../../infrastructure/github/GitHubRepositoryFactory", () => {
       createMilestoneRepository: vi.fn(),
       createProjectRepository: vi.fn(),
       createSprintRepository: vi.fn(),
-      createAutomationRuleRepository: vi.fn(),
+      createProjectWorkflowRepository: vi.fn(),
       createSubIssueRepository: vi.fn(),
       createStatusUpdateRepository: vi.fn(),
     };
@@ -24,6 +24,15 @@ vi.mock("../../../infrastructure/github/GitHubRepositoryFactory", () => {
 // Fixture builders
 // ---------------------------------------------------------------------------
 
+interface ProjectItemFixture {
+  id?: string;
+  projectId: string;
+  claimedBy?: string;
+  status?: string;
+  /** Extra field values (e.g. the field a view sorts by). */
+  fields?: Array<{ name: string; value: string }>;
+}
+
 interface IssueFixture {
   id?: string;
   number: number;
@@ -34,9 +43,44 @@ interface IssueFixture {
   milestone?: { title: string; dueOn?: string | null } | null;
   claimedBy?: string;
   status?: string;
+  projectItems?: ProjectItemFixture[];
+  /** Native "blocked by" edges (issue numbers). */
+  blockedBy?: number[];
+}
+interface ProjectFieldValueFixture {
+  field: { name: string };
+  text?: string;
+  name?: string;
 }
 
-function makeIssue(overrides: IssueFixture) {
+interface ProjectItemNodeFixture {
+  id: string;
+  project: { id: string };
+  fieldValues: { nodes: ProjectFieldValueFixture[] };
+}
+
+interface IssueNodeFixture {
+  id: string;
+  number: number;
+  title: string;
+  body: string;
+  state: "OPEN";
+  createdAt: string;
+  labels: { nodes: Array<{ name: string }> };
+  milestone: { title: string; dueOn?: string | null } | null;
+  blockedBy?: { nodes: Array<{ number: number }> };
+  projectItems: { nodes: ProjectItemNodeFixture[] };
+}
+type GraphqlVars = Record<string, string | number | undefined>;
+
+function projectItemFieldValues(claimedBy?: string, status?: string): ProjectFieldValueFixture[] {
+  return [
+    ...(claimedBy ? [{ field: { name: "agent_claimed_by" }, text: claimedBy }] : []),
+    ...(status ? [{ field: { name: "agent_status" }, name: status }] : []),
+  ];
+}
+
+function makeIssue(overrides: IssueFixture): IssueNodeFixture {
   const {
     id = `issue-${overrides.number}`,
     number,
@@ -47,12 +91,20 @@ function makeIssue(overrides: IssueFixture) {
     milestone = null,
     claimedBy,
     status,
+    projectItems,
+    blockedBy,
   } = overrides;
 
-  const fieldValues = [
-    ...(claimedBy ? [{ field: { name: "agent_claimed_by" }, text: claimedBy }] : []),
-    ...(status ? [{ field: { name: "agent_status" }, name: status }] : []),
-  ];
+  const nodes = (projectItems ?? [{ projectId: "project-1", claimedBy, status }]).map((item) => ({
+    id: item.id ?? `item-${number}`,
+    project: { id: item.projectId },
+    fieldValues: {
+      nodes: [
+        ...projectItemFieldValues(item.claimedBy, item.status),
+        ...(item.fields ?? []).map((f) => ({ field: { name: f.name }, text: f.value })),
+      ],
+    },
+  }));
 
   return {
     id,
@@ -63,15 +115,8 @@ function makeIssue(overrides: IssueFixture) {
     createdAt,
     labels: { nodes: labels.map((name) => ({ name })) },
     milestone,
-    projectItems: {
-      nodes: [
-        {
-          id: `item-${number}`,
-          project: { id: "project-1" },
-          fieldValues: { nodes: fieldValues },
-        },
-      ],
-    },
+    ...(blockedBy ? { blockedBy: { nodes: blockedBy.map((number) => ({ number })) } } : {}),
+    projectItems: { nodes },
   };
 }
 
@@ -113,91 +158,149 @@ const LIST_FIELDS_RESPONSE = {
 describe("TaskCheckoutService", () => {
   let service: TaskCheckoutService;
   let mockFactory: Mocked<GitHubRepositoryFactory>;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let mockAgentStore: {
-    getAgent: Mock<any>;
-    upsertAgent: Mock<any>;
-    listAgents: Mock<any>;
-    getChildren: Mock<any>;
-    removeAgent: Mock<any>;
-    registryExists: Mock<any>;
+    getAgent: Mock;
+    upsertAgent: Mock;
+    listAgents: Mock;
+    getChildren: Mock;
+    removeAgent: Mock;
+    registryExists: Mock;
   };
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let mockContextService: { getTaskContext: Mock<any> };
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let octokit: any;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let issuesFixture: ReturnType<typeof makeIssue>[];
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let graphqlMock: Mock<any>;
-  // Simulated persisted claims: itemId → agentId (written by claim mutations)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let mockContextService: { getTaskContext: Mock };
+  let octokit: {
+    rest: {
+      issues: { createComment: Mock; update: Mock };
+      pulls: { get: Mock; listReviews: Mock };
+    };
+  };
+  let issuesFixture: IssueNodeFixture[];
+  let graphqlMock: Mock;
+  // Simulated project field persistence written by mutations.
   let persistedClaims: Map<string, string>;
+  let clearedClaims: Set<string>;
+  let persistedStatuses: Map<string, string>;
+
+  function applyPersistedFields(issue: IssueNodeFixture): IssueNodeFixture {
+    return {
+      ...issue,
+      projectItems: {
+        nodes: issue.projectItems.nodes.map((item) => {
+          const fieldValues = item.fieldValues.nodes.filter((fv) => {
+            if (fv.field?.name === "agent_claimed_by" && clearedClaims.has(item.id)) return false;
+            if (fv.field?.name === "agent_status" && persistedStatuses.has(item.id)) return false;
+            return true;
+          });
+
+          const persisted = persistedClaims.get(item.id);
+          if (persisted) {
+            const existing = fieldValues.findIndex((fv) => fv.field?.name === "agent_claimed_by");
+            const claimed = { field: { name: "agent_claimed_by" }, text: persisted };
+            if (existing >= 0) fieldValues[existing] = claimed;
+            else fieldValues.push(claimed);
+          }
+
+          const status = persistedStatuses.get(item.id);
+          if (status) {
+            fieldValues.push({ field: { name: "agent_status" }, name: status });
+          }
+
+          return { ...item, fieldValues: { nodes: fieldValues } };
+        }),
+      },
+    };
+  }
+
+  function statusNameForOption(optionId: string): string | undefined {
+    const statusByOptionId: Record<string, string> = {
+      "opt-unclaimed": "unclaimed",
+      "opt-in-progress": "in_progress",
+      "opt-review": "review",
+      "opt-completed": "completed",
+    };
+    return statusByOptionId[optionId];
+  }
 
   function configureGraphqlMock() {
-    graphqlMock.mockImplementation(async (query: string, vars: Record<string, any>) => {
-      // Claim mutations persist the claimed_by value so post-write
-      // verification reads see it.
+    graphqlMock.mockImplementation(async (query: string, vars: GraphqlVars) => {
       if (
         query.includes("updateProjectV2ItemFieldValue") &&
         vars.fieldId === "f-claimed-by" &&
+        typeof vars.itemId === "string" &&
         typeof vars.value === "string"
       ) {
         persistedClaims.set(vars.itemId, vars.value);
+        clearedClaims.delete(vars.itemId);
       }
-      // Project fields lookup
+
+      if (query.includes("updateProjectV2ItemFieldValue") && vars.fieldId === "f-status") {
+        const status = typeof vars.value === "string" ? statusNameForOption(vars.value) : undefined;
+        if (typeof vars.itemId === "string" && status) persistedStatuses.set(vars.itemId, status);
+      }
+
       if (
-        vars.projectId === "project-1" &&
-        vars.itemId === undefined &&
-        vars.number === undefined
+        query.includes("clearProjectV2ItemFieldValue") &&
+        vars.fieldId === "f-claimed-by" &&
+        typeof vars.itemId === "string"
       ) {
+        persistedClaims.delete(vars.itemId);
+        clearedClaims.add(vars.itemId);
+      }
+
+      // Project fields lookup
+      if (vars.projectId && vars.itemId === undefined && vars.number === undefined) {
         return LIST_FIELDS_RESPONSE;
       }
       // Open issues list
-      if (vars.owner && vars.repo && vars.cursor === undefined && vars.itemId === undefined) {
+      if (
+        vars.owner &&
+        vars.repo &&
+        vars.cursor === undefined &&
+        vars.itemId === undefined &&
+        vars.number === undefined
+      ) {
         return {
           repository: {
             issues: {
-              nodes: issuesFixture,
+              nodes: issuesFixture.map(applyPersistedFields),
               pageInfo: { hasNextPage: false, endCursor: null },
             },
           },
         };
       }
       // Fresh item read (atomic claim verification)
-      if (vars.itemId) {
-        const num = Number(vars.itemId.replace("item-", ""));
-        const issue = issuesFixture.find((i) => i.number === num);
-        const fieldValues = issue ? [...issue.projectItems.nodes[0].fieldValues.nodes] : [];
-        const persisted = persistedClaims.get(vars.itemId);
-        if (persisted) {
-          // Persisted claim supersedes fixture state
-          const existing = fieldValues.findIndex((fv) => fv.field?.name === "agent_claimed_by");
-          const claimed = { field: { name: "agent_claimed_by" }, text: persisted };
-          if (existing >= 0) fieldValues[existing] = claimed;
-          else fieldValues.push(claimed);
-        }
+      if (typeof vars.itemId === "string") {
+        const issue = issuesFixture
+          .map(applyPersistedFields)
+          .find((candidateIssue) =>
+            candidateIssue.projectItems.nodes.some((item) => item.id === vars.itemId)
+          );
+        const item = issue?.projectItems.nodes.find(
+          (candidateItem) => candidateItem.id === vars.itemId
+        );
         return {
-          node: {
-            project: { id: "project-1" },
-            fieldValues: { nodes: fieldValues },
-          },
+          node: item
+            ? {
+                project: { id: item.project.id },
+                fieldValues: { nodes: item.fieldValues.nodes },
+              }
+            : null,
         };
       }
-      // Issue project items lookup (clearClaimFields / setStatusField)
+      // Issue project items lookup (clearClaimFields)
       if (vars.number != null) {
+        const issue = issuesFixture.find((candidateIssue) => candidateIssue.number === vars.number);
         return {
           repository: {
-            issue: {
-              projectItems: {
-                nodes: [
-                  {
-                    id: `item-${vars.number}`,
-                    project: { id: "project-1" },
+            issue: issue
+              ? {
+                  projectItems: {
+                    nodes: issue.projectItems.nodes.map((item) => ({
+                      id: item.id,
+                      project: { id: item.project.id },
+                    })),
                   },
-                ],
-              },
-            },
+                }
+              : null,
           },
         };
       }
@@ -209,6 +312,8 @@ describe("TaskCheckoutService", () => {
     vi.clearAllMocks();
     issuesFixture = [];
     persistedClaims = new Map();
+    clearedClaims = new Set();
+    persistedStatuses = new Map();
 
     octokit = {
       rest: {
@@ -229,6 +334,9 @@ describe("TaskCheckoutService", () => {
       getConfig: vi.fn(() => ({ owner: "test-owner", repo: "test-repo" })),
       getOctokit: vi.fn(() => octokit),
       graphql: graphqlMock,
+      createProjectRepository: vi.fn(() => ({
+        listViews: vi.fn(async () => [] as unknown[]),
+      })),
     } as unknown as Mocked<GitHubRepositoryFactory>;
 
     mockAgentStore = {
@@ -354,6 +462,101 @@ describe("TaskCheckoutService", () => {
       expect(result.issueNumber).toBe(2);
     });
 
+    it("uses the matching project item when projectId is provided", async () => {
+      issuesFixture = [
+        makeIssue({
+          number: 1,
+          projectItems: [
+            { id: "item-1-alpha", projectId: "project-alpha" },
+            { id: "item-1-beta", projectId: "project-beta" },
+          ],
+        }),
+      ];
+      mockAgentStore.getAgent.mockResolvedValue(makeAgent("agent-1"));
+
+      const result = await service.checkoutTask("agent-1", { projectId: "project-beta" });
+
+      expect(result.success).toBe(true);
+      expect(result.issueNumber).toBe(1);
+      expect(persistedClaims.get("item-1-beta")).toBe("agent-1");
+      expect(persistedClaims.has("item-1-alpha")).toBe(false);
+    });
+
+    it("claims the first task in the order of the named view", async () => {
+      // The view sorts its pool by "Priority" (descending), so the task with
+      // the higher value is handed out first — even though the other one is
+      // older.
+      (mockFactory.createProjectRepository as unknown as Mock).mockReturnValue({
+        listViews: vi.fn(async () => [
+          {
+            id: "view-1",
+            name: "Sprint",
+            layout: "board",
+            sortBy: [{ field: "Priority", direction: "DESC" }],
+          },
+        ]),
+      });
+      issuesFixture = [
+        makeIssue({
+          number: 1,
+          projectItems: [
+            { id: "item-1", projectId: "project-1", fields: [{ name: "Priority", value: "1" }] },
+          ],
+        }),
+        makeIssue({
+          number: 2,
+          projectItems: [
+            { id: "item-2", projectId: "project-1", fields: [{ name: "Priority", value: "9" }] },
+          ],
+        }),
+      ];
+      mockAgentStore.getAgent.mockResolvedValue(makeAgent("agent-1"));
+
+      const result = await service.checkoutTask("agent-1", {
+        projectId: "project-1",
+        view: "Sprint",
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.issueNumber).toBe(2);
+    });
+
+    it("skips a task that is already claimed on another board", async () => {
+      // The same issue is tracked on two boards. It is being worked on one of
+      // them, so it must not be handed out on the other.
+      issuesFixture = [
+        makeIssue({
+          number: 1,
+          projectItems: [
+            { id: "item-1-alpha", projectId: "project-alpha", claimedBy: "agent-other" },
+            { id: "item-1-beta", projectId: "project-beta" },
+          ],
+        }),
+      ];
+      mockAgentStore.getAgent.mockResolvedValue(makeAgent("agent-1"));
+
+      const result = await service.checkoutTask("agent-1", { projectId: "project-beta" });
+
+      expect(result.success).toBe(false);
+      expect(persistedClaims.has("item-1-beta")).toBe(false);
+      expect(persistedClaims.has("item-1-alpha")).toBe(false);
+    });
+
+    it("fails direct assignment when issue is not in the requested project", async () => {
+      issuesFixture = [makeIssue({ number: 7 })];
+      mockAgentStore.getAgent.mockResolvedValue(makeAgent("agent-1"));
+
+      const result = await service.checkoutTask("agent-1", {
+        issueNumber: 7,
+        projectId: "project-other",
+      });
+
+      expect(result.success).toBe(false);
+      expect(result.message).toContain("not in project project-other");
+      expect(mockAgentStore.upsertAgent).not.toHaveBeenCalled();
+      expect(persistedClaims.size).toBe(0);
+    });
+
     it("returns failure when no tasks are available", async () => {
       mockAgentStore.getAgent.mockResolvedValue(makeAgent("agent-1"));
       const result = await service.checkoutTask("agent-1");
@@ -399,6 +602,31 @@ describe("TaskCheckoutService", () => {
       expect(result.success).toBe(true);
       expect(result.issueNumber).toBe(1);
     });
+
+    it("skips issues whose native blocker edge points at an open issue", async () => {
+      // The native "blocked by" edge is authoritative — no label, no body
+      // reference.
+      issuesFixture = [makeIssue({ number: 1, blockedBy: [2] }), makeIssue({ number: 2 })];
+      mockAgentStore.getAgent.mockResolvedValue(makeAgent("agent-1"));
+
+      const result = await service.checkoutTask("agent-1", { skipBlocked: true });
+
+      expect(result.success).toBe(true);
+      expect(result.issueNumber).toBe(2);
+    });
+
+    it("honors every blocker reference in supported phrases", async () => {
+      issuesFixture = [
+        makeIssue({ number: 1, body: "Depends on #99 and #2" }),
+        makeIssue({ number: 2 }),
+      ];
+      mockAgentStore.getAgent.mockResolvedValue(makeAgent("agent-1"));
+
+      const result = await service.checkoutTask("agent-1", { skipBlocked: true });
+
+      expect(result.success).toBe(true);
+      expect(result.issueNumber).toBe(2);
+    });
   });
 
   describe("checkoutTask — atomic claim guard", () => {
@@ -409,7 +637,7 @@ describe("TaskCheckoutService", () => {
       // Simulate a claim that landed between the candidate list fetch and
       // the claim write: the fresh claim-time item read shows the issue has
       // been claimed by another agent (TOCTOU window).
-      graphqlMock.mockImplementation(async (query: string, vars: Record<string, any>) => {
+      graphqlMock.mockImplementation(async (query: string, vars: GraphqlVars) => {
         // The pre-write check sees another agent's claim → abort.
         if (vars.itemId && query.includes("node(")) {
           return {
@@ -446,6 +674,35 @@ describe("TaskCheckoutService", () => {
 
       expect(result.success).toBe(false);
       expect(result.message).toContain("concurrently");
+      expect(mockAgentStore.upsertAgent).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("releaseTask", () => {
+    it("returns project release failures without clearing the agent registry claim", async () => {
+      mockAgentStore.getAgent.mockResolvedValue(makeAgent("agent-1", { currentTaskId: "42" }));
+      issuesFixture = [makeIssue({ number: 42, claimedBy: "agent-1", status: "in_progress" })];
+      graphqlMock.mockImplementation(async (query: string, vars: GraphqlVars) => {
+        if (query.includes("clearProjectV2ItemFieldValue"))
+          throw new Error("project update failed");
+        if (vars.projectId && vars.itemId === undefined && vars.number === undefined) {
+          return LIST_FIELDS_RESPONSE;
+        }
+        if (vars.number != null) {
+          return {
+            repository: {
+              issue: { projectItems: { nodes: [{ id: "item-42", project: { id: "project-1" } }] } },
+            },
+          };
+        }
+        return { node: { fields: { nodes: [] } } };
+      });
+
+      const result = await service.releaseTask("agent-1", "42");
+
+      expect(result.success).toBe(false);
+      expect(result.message).toContain("project update failed");
+      expect(mockAgentStore.upsertAgent).not.toHaveBeenCalled();
     });
   });
 
@@ -533,6 +790,33 @@ describe("TaskCheckoutService", () => {
 
       expect(result.success).toBe(true);
       expect(result.issueNumber).toBe(2);
+    });
+
+    it("reviewer checkout succeeds after submit_for_review clears submitter project claim", async () => {
+      const original = makeAgent("agent-1", { currentTaskId: "42", status: "working" });
+      const reviewer = makeAgent("reviewer-1", { role: "reviewer" });
+      mockAgentStore.getAgent.mockImplementation(async (agentId: string) =>
+        agentId === "agent-1" ? original : reviewer
+      );
+      mockAgentStore.listAgents.mockResolvedValue([original, reviewer]);
+      issuesFixture = [makeIssue({ number: 42, claimedBy: "agent-1", status: "in_progress" })];
+
+      const submitted = await service.submitForReview("agent-1", "42", "Ready");
+      const checkedOut = await service.checkoutTask("reviewer-1", { reviewQueue: true });
+
+      expect(submitted.success).toBe(true);
+      expect(checkedOut.success).toBe(true);
+      expect(checkedOut.issueNumber).toBe(42);
+      expect(persistedClaims.get("item-42")).toBe("reviewer-1");
+
+      const approved = await service.approveTask("reviewer-1", "42", "LGTM");
+      expect(approved.success).toBe(true);
+      expect(mockAgentStore.upsertAgent).toHaveBeenCalledWith(
+        expect.objectContaining({ id: "agent-1", status: "idle", currentTaskId: undefined })
+      );
+      expect(mockAgentStore.upsertAgent).toHaveBeenCalledWith(
+        expect.objectContaining({ id: "reviewer-1", status: "idle", currentTaskId: undefined })
+      );
     });
   });
 

@@ -22,6 +22,8 @@ import {
 import { domainEventBus } from "../../domain/events/DomainEventBus";
 import type { AgentStore } from "../../infrastructure/agent/AgentStore";
 import type { GitHubRepositoryFactory } from "../../infrastructure/github/GitHubRepositoryFactory";
+import { isMissingNativeCapability } from "../../infrastructure/github/native-capability";
+import { projectFieldUnionSelection } from "../../infrastructure/github/project-field-fragments";
 import { AIServiceFactory } from "../ai/AIServiceFactory";
 import { mapErrorToMCPError } from "../utils/ErrorMapper";
 import { InputSanitizer } from "../utils/InputSanitizer";
@@ -55,9 +57,36 @@ interface IssueWithProject {
   createdAt: string;
   labels: { nodes: Array<{ name: string }> };
   milestone: { title: string; dueOn?: string | null } | null;
+  /** Native "blocked by" edges (absent when the schema does not know the field). */
+  blockedBy?: { nodes: Array<{ number: number }> };
   projectItems: {
     nodes: ProjectItemNode[];
   };
+}
+
+/**
+ * The order a named project view sorts its pool by.
+ *
+ * A view is GitHub's own pool definition: it carries the filter it selects
+ * with and the order it sorts by. The order is what the claim path can
+ * honour, so the first task in the view's order is the one handed out.
+ */
+interface ViewOrder {
+  /** The view's name — used in the rationale. */
+  view: string;
+  /** The field the view sorts by. */
+  field: string;
+  /** The direction the view sorts in. */
+  direction: "ASC" | "DESC";
+}
+
+/** A claimable task with the scores the strategies order it by. */
+interface Candidate {
+  issue: IssueWithProject;
+  priorityScore: number;
+  skillScore: number;
+  createdAt: number;
+  dueOn: number | null;
 }
 
 interface ListIssuesResponse {
@@ -104,7 +133,8 @@ const LIST_OPEN_ISSUES_QUERY = `
           createdAt
           labels(first: 30) { nodes { name } }
           milestone { title dueOn }
-          projectItems(first: 5) {
+          blockedBy(first: 20) { nodes { number } }
+          projectItems(includeArchived: true, first: 100) {
             nodes {
               id
               project { id }
@@ -123,6 +153,19 @@ const LIST_OPEN_ISSUES_QUERY = `
   }
 `;
 
+/**
+ * The same query without the native `blockedBy` edge.
+ *
+ * `Issue.blockedBy` is part of today's public schema, but a deployment whose
+ * schema does not know the field would reject the whole query — and with it
+ * the checkout path. The label/body blocker parsing is the fallback, so the
+ * pool is fetched without the edge in that case.
+ */
+const LIST_OPEN_ISSUES_QUERY_WITHOUT_NATIVE_BLOCKERS = LIST_OPEN_ISSUES_QUERY.replace(
+  "          blockedBy(first: 20) { nodes { number } }\n",
+  ""
+);
+
 /** Max pages of open issues to scan for checkout (config bound). */
 const MAX_CHECKOUT_PAGES = 5;
 
@@ -132,8 +175,7 @@ const LIST_FIELDS_QUERY = `
       ... on ProjectV2 {
         fields(first: 50) {
           nodes {
-            ... on ProjectV2Field { id name dataType }
-            ... on ProjectV2SingleSelectField { id name dataType options { id name } }
+            ${projectFieldUnionSelection({ singleSelect: "options { id name }" })}
           }
         }
       }
@@ -175,6 +217,17 @@ export interface CheckoutOptions {
   strategy?: CheckoutStrategy;
   labels?: string[];
   projectId?: string;
+  /**
+   * The named project view that defines the claiming pool.
+   *
+   * A view is GitHub's own pool definition: it carries the filter the view
+   * selects with and the order the view sorts by. The order is what the
+   * claim path can honour — the first task in the view's order is the one
+   * that is handed out. The view's filter expression is GitHub-internal and
+   * stays where it belongs: `manage_project/list_views` returns it, so a
+   * caller can see exactly which tasks the view selects.
+   */
+  view?: string;
   /** Skip issues whose declared blockers are still open. */
   skipBlocked?: boolean;
   /**
@@ -278,14 +331,23 @@ export class TaskCheckoutService {
             message: `Issue #${options.issueNumber} not found or not in a project`,
           };
         }
+        if (!this.selectProjectItem(target, options.projectId)) {
+          return {
+            success: false,
+            message: options.projectId
+              ? `Issue #${options.issueNumber} is not in project ${options.projectId}`
+              : `Issue #${options.issueNumber} is not in a project`,
+          };
+        }
         candidate = { issue: target, rationale: "PM direct assignment" };
       } else {
         // 2. Find an unclaimed issue via strategy
+        const viewOrder = await this.resolveViewOrder(options);
         candidate = options?.reviewQueue
-          ? this.pickCandidate(issues, options, agent.capabilities)
+          ? this.pickCandidate(issues, options, agent.capabilities, viewOrder)
           : options?.strategy === "ai"
-            ? await this.pickCandidateWithAI(issues, options, agent)
-            : this.pickCandidate(issues, options, agent.capabilities);
+            ? await this.pickCandidateWithAI(issues, options, agent, viewOrder)
+            : this.pickCandidate(issues, options, agent.capabilities, viewOrder);
       }
       if (!candidate) {
         return { success: false, message: "No unclaimed tasks available" };
@@ -294,19 +356,24 @@ export class TaskCheckoutService {
       // 3. Atomically claim via project field updates — verify the claim
       //    is still free immediately before writing to avoid TOCTOU races
       //    between concurrent agents.
-      const projectItem = candidate.issue.projectItems.nodes[0];
-      if (projectItem) {
-        const claimed = await this.claimProjectItemAtomic(
-          projectItem.project.id,
-          projectItem.id,
-          agentId
-        );
-        if (!claimed) {
-          return {
-            success: false,
-            message: `Task #${candidate.issue.number} was claimed by another agent concurrently — try again`,
-          };
-        }
+      const projectItem = this.selectProjectItem(candidate.issue, options?.projectId);
+      if (!projectItem) {
+        return {
+          success: false,
+          message: `Task #${candidate.issue.number} is not claimable in the requested project`,
+        };
+      }
+
+      const claimed = await this.claimProjectItemAtomic(
+        projectItem.project.id,
+        projectItem.id,
+        agentId
+      );
+      if (!claimed) {
+        return {
+          success: false,
+          message: `Task #${candidate.issue.number} was claimed by another agent concurrently — try again`,
+        };
       }
 
       // 4. Update agent record
@@ -380,12 +447,20 @@ export class TaskCheckoutService {
         return { success: false, message: `Agent ${agentId} does not own task ${taskId}` };
       }
 
-      // Clear project fields
+      // Clear project fields before releasing the registry claim. If the
+      // project update fails, keep the agent claim intact and return a
+      // meaningful failure instead of pretending the task is claimable.
       const issueNumber = parseInt(taskId, 10);
       if (!Number.isNaN(issueNumber)) {
-        await this.clearClaimFields(issueNumber, "unclaimed").catch(() => {
-          // Non-fatal — agent record update is the source of truth
-        });
+        try {
+          await this.clearClaimFields(issueNumber, "unclaimed");
+        } catch (error) {
+          const reason = error instanceof Error ? error.message : String(error);
+          return {
+            success: false,
+            message: `Failed to release task ${taskId}: ${reason}`,
+          };
+        }
       }
 
       // Update agent record
@@ -699,7 +774,7 @@ export class TaskCheckoutService {
 
       const issueNumber = parseInt(taskId, 10);
       if (!Number.isNaN(issueNumber)) {
-        await this.setStatusField(issueNumber, "review").catch(() => {});
+        await this.clearClaimFields(issueNumber, "review");
         // Record a structured comment so reviewers/humans can see the submission
         const config = this.factory.getConfig();
         const octokit = this.factory.getOctokit();
@@ -855,15 +930,19 @@ export class TaskCheckoutService {
     _reviewerId: string,
     reviewer: Agent
   ): Promise<void> {
-    // The reviewer may have claimed the task from the review queue (in which
-    // case they own it) or may be an external reviewer — find the current owner.
-    let owner: Agent | undefined = reviewer;
-    if (reviewer.currentTaskId !== taskId) {
-      const agents = await this.agentStore.listAgents();
-      owner = agents.find((a) => a.currentTaskId === taskId) ?? undefined;
+    const agents = await this.agentStore.listAgents();
+    const owners = new Map<string, Agent>();
+
+    if (reviewer.currentTaskId === taskId) {
+      owners.set(reviewer.id, reviewer);
+    }
+    for (const agent of agents) {
+      if (agent.currentTaskId === taskId) {
+        owners.set(agent.id, agent);
+      }
     }
 
-    if (owner && owner.currentTaskId === taskId) {
+    for (const owner of owners.values()) {
       owner.currentTaskId = undefined;
       owner.currentTaskTitle = undefined;
       owner.status = "idle";
@@ -876,16 +955,53 @@ export class TaskCheckoutService {
    * The query orders by CREATED_AT ASC; we walk `after` cursors until
    * exhaustion or MAX_CHECKOUT_PAGES.
    */
+  /**
+   * The order of the named view the caller claims from.
+   *
+   * `undefined` when the caller named no view, named a view that does not
+   * exist, or named a view without a project — the claim then falls back to
+   * the strategy.
+   */
+  private async resolveViewOrder(options?: CheckoutOptions): Promise<ViewOrder | undefined> {
+    const view = options?.view;
+    if (!view || !options?.projectId) return undefined;
+
+    try {
+      const views = await this.factory
+        .createProjectRepository()
+        .listViews(options.projectId, { name: view });
+      const sort = views[0]?.sortBy?.[0];
+      if (!sort?.field) return undefined;
+      return { view, field: sort.field, direction: sort.direction ?? "ASC" };
+    } catch {
+      // A view that cannot be read must not break the claim.
+      return undefined;
+    }
+  }
+
   private async fetchOpenIssues(owner: string, repo: string): Promise<IssueWithProject[]> {
     const all: IssueWithProject[] = [];
     let cursor: string | null | undefined;
+    let query = LIST_OPEN_ISSUES_QUERY;
 
     for (let page = 0; page < MAX_CHECKOUT_PAGES; page++) {
-      const resp = await this.factory.graphql<ListIssuesResponse>(LIST_OPEN_ISSUES_QUERY, {
-        owner,
-        repo,
-        cursor: cursor ?? undefined,
-      });
+      let resp: ListIssuesResponse;
+      try {
+        resp = await this.factory.graphql<ListIssuesResponse>(query, {
+          owner,
+          repo,
+          cursor: cursor ?? undefined,
+        });
+      } catch (error) {
+        // A schema that does not know `Issue.blockedBy` rejects the whole
+        // query. Retry without the native edge: the label/body blocker
+        // parsing still applies.
+        if (query === LIST_OPEN_ISSUES_QUERY && isMissingNativeCapability(error)) {
+          query = LIST_OPEN_ISSUES_QUERY_WITHOUT_NATIVE_BLOCKERS;
+          continue;
+        }
+        throw error;
+      }
       const issues = resp.repository.issues;
       all.push(...issues.nodes);
 
@@ -907,9 +1023,10 @@ export class TaskCheckoutService {
   private async pickCandidateWithAI(
     issues: IssueWithProject[],
     options?: CheckoutOptions,
-    agent?: Agent
+    agent?: Agent,
+    viewOrder?: ViewOrder
   ): Promise<{ issue: IssueWithProject; rationale?: string } | null> {
-    const fallback = this.pickCandidate(issues, options, agent?.capabilities);
+    const fallback = this.pickCandidate(issues, options, agent?.capabilities, viewOrder);
     if (!fallback) return null;
 
     try {
@@ -929,20 +1046,15 @@ export class TaskCheckoutService {
       }> = [];
 
       for (const issue of issues) {
-        if (issue.projectItems.nodes.length === 0) continue;
-        if (
-          options?.projectId &&
-          !issue.projectItems.nodes.some((pi) => pi.project.id === options.projectId)
-        )
-          continue;
+        const item = this.selectProjectItem(issue, options?.projectId);
+        if (!item) continue;
         const labels = issue.labels.nodes.map((l) => l.name);
-        const claimedBy = issue.projectItems.nodes[0].fieldValues.nodes.find(
+        const claimedBy = item.fieldValues.nodes.find(
           (fv) => fv.field?.name === AGENT_FIELDS.CLAIMED_BY
         );
-        const status = issue.projectItems.nodes[0].fieldValues.nodes.find(
-          (fv) => fv.field?.name === AGENT_FIELDS.STATUS
-        );
+        const status = item.fieldValues.nodes.find((fv) => fv.field?.name === AGENT_FIELDS.STATUS);
         if (claimedBy?.text) continue;
+        if (isClaimedOnAnotherBoard(issue, item.id)) continue;
         if (status?.name && status.name !== "unclaimed") continue;
         if (options?.skipBlocked && hasOpenBlocker(issue, openNumbers)) continue;
         if (options?.labels?.length) {
@@ -1017,7 +1129,8 @@ export class TaskCheckoutService {
   private pickCandidate(
     issues: IssueWithProject[],
     options?: CheckoutOptions,
-    agentCapabilities?: string[]
+    agentCapabilities?: string[],
+    viewOrder?: ViewOrder
   ): { issue: IssueWithProject; rationale?: string } | null {
     const strategy = options?.reviewQueue
       ? "review_queue"
@@ -1030,17 +1143,12 @@ export class TaskCheckoutService {
 
     // Build the pool of claimable candidates with scoring context.
     const openNumbers = new Set(issues.map((i) => i.number));
-    const candidates: Array<{
-      issue: IssueWithProject;
-      priorityScore: number;
-      skillScore: number;
-      createdAt: number;
-      dueOn: number | null;
-    }> = [];
+    const candidates: Candidate[] = [];
 
     for (const issue of issues) {
-      // Skip issues without project items (can't track agent fields)
-      if (issue.projectItems.nodes.length === 0) continue;
+      // Skip issues without a claimable project item for the requested project.
+      const item = this.selectProjectItem(issue, options?.projectId);
+      if (!item) continue;
 
       // Filter by labels if requested
       if (options?.labels?.length) {
@@ -1048,20 +1156,12 @@ export class TaskCheckoutService {
         if (!options.labels.some((l) => issueLabels.has(l))) continue;
       }
 
-      // Filter by projectId if requested
-      if (options?.projectId) {
-        const inProject = issue.projectItems.nodes.some(
-          (pi) => pi.project.id === options.projectId
-        );
-        if (!inProject) continue;
-      }
-
-      // Check agent fields — must be unclaimed
-      const item = issue.projectItems.nodes[0]!;
+      // Check agent fields on the selected project item — must be unclaimed
       const fieldValues = item.fieldValues.nodes;
 
       const claimedBy = fieldValues.find((fv) => fv.field?.name === AGENT_FIELDS.CLAIMED_BY);
       if (claimedBy?.text) continue; // already claimed
+      if (isClaimedOnAnotherBoard(issue, item.id)) continue; // claimed on another board
 
       const status = fieldValues.find((fv) => fv.field?.name === AGENT_FIELDS.STATUS);
       // Accept if status is absent, 'unclaimed', or empty
@@ -1095,6 +1195,16 @@ export class TaskCheckoutService {
     }
 
     if (candidates.length === 0) return null;
+
+    // A named view IS the pool: its order decides which task is handed out
+    // first. The strategy still decides which tasks qualify at all.
+    if (viewOrder) {
+      this.sortByViewOrder(candidates, options, viewOrder);
+      return {
+        issue: candidates[0].issue,
+        rationale: `First in the "${viewOrder.view}" view order (${viewOrder.field} ${viewOrder.direction})`,
+      };
+    }
 
     switch (strategy) {
       case "oldest_first": {
@@ -1159,6 +1269,39 @@ export class TaskCheckoutService {
     }
   }
 
+  /**
+   * Order the candidates the way the named view orders its pool.
+   *
+   * The view's sort field is read from the item's field values; an item
+   * that does not carry the field sorts last, so a task that cannot be
+   * compared never wins the claim by accident.
+   */
+  private sortByViewOrder(
+    candidates: Candidate[],
+    options: CheckoutOptions | undefined,
+    viewOrder: ViewOrder
+  ): void {
+    const fieldValue = (issue: IssueWithProject): string | null => {
+      const item = this.selectProjectItem(issue, options?.projectId);
+      if (!item) return null;
+      for (const fv of item.fieldValues.nodes) {
+        if (fv.field?.name !== viewOrder.field) continue;
+        return fv.text ?? fv.name ?? null;
+      }
+      return null;
+    };
+
+    candidates.sort((a, b) => {
+      const left = fieldValue(a.issue);
+      const right = fieldValue(b.issue);
+      if (left === null && right === null) return 0;
+      if (left === null) return 1;
+      if (right === null) return -1;
+      const comparison = left.localeCompare(right, undefined, { numeric: true });
+      return viewOrder.direction === "DESC" ? -comparison : comparison;
+    });
+  }
+
   /** Pick from issues in a specific agent_status state (e.g. review queue). */
   private pickFromState(
     issues: IssueWithProject[],
@@ -1167,16 +1310,9 @@ export class TaskCheckoutService {
     label = "Issue in queue"
   ): { issue: IssueWithProject; rationale?: string } | null {
     for (const issue of issues) {
-      if (issue.projectItems.nodes.length === 0) continue;
+      const item = this.selectProjectItem(issue, options?.projectId);
+      if (!item) continue;
 
-      if (options?.projectId) {
-        const inProject = issue.projectItems.nodes.some(
-          (pi) => pi.project.id === options.projectId
-        );
-        if (!inProject) continue;
-      }
-
-      const item = issue.projectItems.nodes[0]!;
       const status = item.fieldValues.nodes.find((fv) => fv.field?.name === AGENT_FIELDS.STATUS);
       if (status?.name !== state) continue;
 
@@ -1286,64 +1422,20 @@ export class TaskCheckoutService {
     return resp.node?.fieldValues.nodes ?? [];
   }
 
-  /** Set only the agent_status field to the given value (used by review flow). */
-  private async setStatusField(
-    issueNumber: number,
-    newStatus: "review" | "blocked"
-  ): Promise<void> {
-    const config = this.factory.getConfig();
-
-    const query = `
-      query($owner: String!, $repo: String!, $number: Int!) {
-        repository(owner: $owner, name: $repo) {
-          issue(number: $number) {
-            projectItems(first: 5) {
-              nodes { id project { id } }
-            }
-          }
-        }
-      }
-    `;
-
-    interface Resp {
-      repository: {
-        issue: {
-          projectItems: {
-            nodes: Array<{ id: string; project: { id: string } }>;
-          };
-        } | null;
-      };
+  private selectProjectItem(
+    issue: IssueWithProject,
+    projectId?: string
+  ): ProjectItemNode | undefined {
+    if (projectId) {
+      return issue.projectItems.nodes.find((item) => item.project.id === projectId);
     }
-
-    const resp = await this.factory.graphql<Resp>(query, {
-      owner: config.owner,
-      repo: config.repo,
-      number: issueNumber,
-    });
-
-    const items = resp.repository.issue?.projectItems.nodes;
-    if (!items || items.length === 0) return;
-
-    const item = items[0]!;
-    const fields = await this.loadFieldMap(item.project.id);
-    const statusField = fields.get(AGENT_FIELDS.STATUS);
-    if (statusField?.options) {
-      const option = statusField.options.find((o) => o.name === newStatus);
-      if (option) {
-        await this.factory.graphql(UPDATE_SELECT_FIELD, {
-          projectId: item.project.id,
-          itemId: item.id,
-          fieldId: statusField.id,
-          value: option.id,
-        });
-      }
-    }
+    return issue.projectItems.nodes[0];
   }
 
   /** Clear claim fields and set status on a project item for a given issue. */
   private async clearClaimFields(
     issueNumber: number,
-    newStatus: "unclaimed" | "completed"
+    newStatus: "unclaimed" | "completed" | "review"
   ): Promise<void> {
     const config = this.factory.getConfig();
 
@@ -1352,7 +1444,7 @@ export class TaskCheckoutService {
       query($owner: String!, $repo: String!, $number: Int!) {
         repository(owner: $owner, name: $repo) {
           issue(number: $number) {
-            projectItems(first: 5) {
+            projectItems(includeArchived: true, first: 100) {
               nodes { id project { id } }
             }
           }
@@ -1472,24 +1564,55 @@ function labelPriorityScore(labels: string[]): number {
 
 /**
  * Detect whether an issue declares blockers that are still open.
- * Recognizes `Blocked by #N`, `Depends on #N`, and a `blocked` label.
+ *
+ * The native `blockedBy` edge is authoritative; the label and body
+ * references (`Blocked by #N`, `Depends on #N`, a `blocked` label) are the
+ * emulation that predates the native edge and are still honoured, so a
+ * board wired up before the edge exists keeps working.
  */
 function hasOpenBlocker(issue: IssueWithProject, openNumbers: Set<number>): boolean {
+  const nativeBlockers = issue.blockedBy?.nodes ?? [];
+  if (nativeBlockers.some((blocker) => openNumbers.has(blocker.number))) return true;
+
   const labels = issue.labels.nodes.map((l) => l.name.toLowerCase());
   if (labels.includes("blocked")) return true;
+  const body = issue.body;
 
-  const body = issue.body ?? "";
+  const referenceList = String.raw`#?\d+(?:\s*(?:,|and|&)\s*#?\d+)*`;
   const patterns = [
-    /blocked\s+by\s+#?(\d+)/gi,
-    /blocker\s*:\s*#?(\d+)/gi,
-    /depends\s+on\s+#?(\d+)/gi,
-    /depends\s*:\s*#?(\d+)/gi,
+    new RegExp(String.raw`blocked\s+by\s+(${referenceList})`, "gi"),
+    new RegExp(String.raw`blocker\s*:\s*(${referenceList})`, "gi"),
+    new RegExp(String.raw`depends\s+on\s+(${referenceList})`, "gi"),
+    new RegExp(String.raw`depends\s*:\s*(${referenceList})`, "gi"),
   ];
   for (const pattern of patterns) {
-    const match = pattern.exec(body);
-    if (match?.[1] && openNumbers.has(Number(match[1]))) {
-      return true;
+    let match = pattern.exec(body);
+    while (match !== null) {
+      const refs = match[1]?.match(/#?\d+/g) ?? [];
+      if (refs.some((ref) => openNumbers.has(Number(ref.replace("#", ""))))) {
+        return true;
+      }
+      match = pattern.exec(body);
     }
   }
   return false;
+}
+
+/**
+ * Is the task already claimed on another board?
+ *
+ * An issue can be tracked on several projects. The claim is written on ONE
+ * project item, so without this guard a second board would still see the
+ * task as free and a second agent would pick up the very same work. The
+ * issue's other project items come with the pool, so the check costs
+ * nothing extra.
+ */
+function isClaimedOnAnotherBoard(issue: IssueWithProject, selectedItemId: string): boolean {
+  return issue.projectItems.nodes.some(
+    (item) =>
+      item.id !== selectedItemId &&
+      item.fieldValues.nodes.some(
+        (fv) => fv.field?.name === AGENT_FIELDS.CLAIMED_BY && Boolean(fv.text)
+      )
+  );
 }

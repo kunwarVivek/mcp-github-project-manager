@@ -1,6 +1,8 @@
 import type { WorkProduct } from "../../domain/agent-orchestration-types.js";
-import { WORK_PRODUCT_MARKER } from "../../domain/agent-orchestration-types.js";
+import { WORK_PRODUCT_MARKER, WorkProductSchema } from "../../domain/agent-orchestration-types.js";
 import type { GitHubRepositoryFactory } from "../github/GitHubRepositoryFactory.js";
+
+const COMMENT_PAGE_SIZE = 100;
 
 /**
  * Stores work products as structured JSON comments on GitHub issues.
@@ -14,6 +16,27 @@ export class WorkProductStore {
 
   constructor(factory: GitHubRepositoryFactory) {
     this.factory = factory;
+  }
+
+  /** Parse a structured work-product comment body, returning null for non-work-product comments. */
+  static parseCommentBody(body: string): WorkProduct | null {
+    const markerIdx = body.indexOf(WORK_PRODUCT_MARKER);
+    if (markerIdx < 0) return null;
+
+    const jsonStart = markerIdx + WORK_PRODUCT_MARKER.length;
+    const endIdx = body.indexOf("-->", jsonStart);
+    if (endIdx < 0) return null;
+
+    const jsonStr = body.substring(jsonStart, endIdx).trim();
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(jsonStr);
+    } catch {
+      return null;
+    }
+
+    const result = WorkProductSchema.safeParse(parsed);
+    return result.success ? result.data : null;
   }
 
   /** Submit a work product as a structured comment on the issue. */
@@ -63,33 +86,28 @@ export class WorkProductStore {
     const octokit = this.factory.getOctokit();
     const config = this.factory.getConfig();
 
-    const { data: comments } = await octokit.rest.issues.listComments({
-      owner: config.owner,
-      repo: config.repo,
-      issue_number: issueNumber,
-      per_page: 100,
-    });
-
     const products: WorkProduct[] = [];
-    for (const comment of comments) {
-      const body = comment.body;
-      if (!body) continue;
+    let page = 1;
 
-      // The marker may be preceded by a human-readable summary, so search
-      // for it anywhere in the body rather than requiring it at the start.
-      const markerIdx = body.indexOf(WORK_PRODUCT_MARKER);
-      if (markerIdx < 0) continue;
+    while (true) {
+      const { data: comments } = await octokit.rest.issues.listComments({
+        owner: config.owner,
+        repo: config.repo,
+        issue_number: issueNumber,
+        per_page: COMMENT_PAGE_SIZE,
+        page,
+      });
 
-      const jsonStart = markerIdx + WORK_PRODUCT_MARKER.length;
-      const endIdx = body.indexOf("-->", jsonStart);
-      if (endIdx < 0) continue;
+      for (const comment of comments) {
+        const body = comment.body;
+        if (!body) continue;
 
-      const jsonStr = body.substring(jsonStart, endIdx).trim();
-      try {
-        products.push(JSON.parse(jsonStr) as WorkProduct);
-      } catch {
-        /* skip malformed comments */
+        const product = WorkProductStore.parseCommentBody(body);
+        if (product) products.push(product);
       }
+
+      if (comments.length < COMMENT_PAGE_SIZE) break;
+      page++;
     }
 
     return products;

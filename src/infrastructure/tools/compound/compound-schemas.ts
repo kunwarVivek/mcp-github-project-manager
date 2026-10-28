@@ -1,20 +1,36 @@
 /**
  * Compound Zod schemas for the 16 consolidated MCP tools + 1 discover_tools meta-tool.
  *
- * Each schema uses a flat z.object with an `action` discriminator. Parameters from
- * all granular tools in the group are merged and marked `.optional()` since they
- * are action-dependent. The compound executor validates action-specific requirements
- * at dispatch time.
+ * Most schemas use a flat z.object with an `action` discriminator for grouped
+ * actions. Agent orchestration schemas use action-discriminated unions so MCP
+ * validation enforces per-action required arguments and defaults before the
+ * compound executor routes to granular implementations.
  */
 
 import { z } from "zod";
 import {
-  AgentOperationalStatusSchema,
-  AgentRoleSchema,
-  AgentRuntimeSchema,
-  BudgetResetPeriodSchema,
-  CheckoutStrategySchema,
-} from "../../../domain/agent-orchestration-types";
+  agentHeartbeatSchema,
+  approveTaskSchema,
+  checkoutTaskSchema,
+  checkWorkStatusSchema,
+  completeTaskSchema,
+  deregisterAgentSchema,
+  getAgentActivitySchema,
+  getAgentMetricsSchema,
+  getBudgetStatusSchema,
+  getTaskContextSchema,
+  listAgentsSchema,
+  reclaimStaleTasksSchema,
+  recordUsageSchema,
+  registerAgentSchema,
+  rejectTaskSchema,
+  releaseTaskSchema,
+  setAgentBudgetSchema,
+  setupAgentFieldsSchema,
+  submitForReviewSchema,
+  submitWorkProductSchema,
+} from "../schemas/agent-orchestration-schemas";
+import { projectCollaboratorSchema } from "../schemas/project-role-schemas";
 
 // ============================================================================
 // 1. manage_project — 22+ granular project tools
@@ -61,6 +77,7 @@ export const manageProjectSchema = z
         "update_item_position",
         "filter_items",
         "setup_agent_fields",
+        "set_collaborators",
       ])
       .describe("The project operation to perform"),
     // Common
@@ -79,7 +96,12 @@ export const manageProjectSchema = z
     // Fields
     fieldId: z.string().optional(),
     name: z.string().optional(),
-    type: z.string().optional(),
+    type: z
+      .enum(["text", "number", "date", "single_select", "multi_select", "iteration"])
+      .describe(
+        "Type of the field to create — exactly the types GitHub's ProjectV2CustomFieldType accepts"
+      )
+      .optional(),
     options: z
       .array(
         z.object({
@@ -93,7 +115,10 @@ export const manageProjectSchema = z
     required: z.boolean().optional(),
     // Views
     viewId: z.string().optional(),
-    layout: z.enum(["board", "table", "timeline", "roadmap"]).optional(),
+    layout: z
+      .enum(["board", "table", "roadmap"])
+      .describe("Layout of the view — exactly the layouts GitHub's ProjectV2ViewLayout accepts")
+      .optional(),
     // Items
     itemId: z.string().optional(),
     contentId: z.string().optional(),
@@ -110,6 +135,11 @@ export const manageProjectSchema = z
     // Linking
     repo: z.string().optional(),
     teamSlug: z.string().optional(),
+    // Collaborators (project access)
+    collaborators: z
+      .array(projectCollaboratorSchema)
+      .optional()
+      .describe("The collaborators to grant a role to, one entry per user or team"),
     // Position
     afterId: z.string().optional(),
     // Filter items
@@ -152,6 +182,10 @@ export const manageIssuesSchema = z
         "get_parent_issue",
         "reprioritize_sub_issue",
         "remove_sub_issue",
+        "list_dependencies",
+        "add_blocker",
+        "remove_blocker",
+        "list_issue_types",
       ])
       .describe("The issue operation to perform"),
     // Common
@@ -163,7 +197,21 @@ export const manageIssuesSchema = z
     assignees: z.array(z.string()).optional(),
     labels: z.array(z.string()).optional(),
     priority: z.enum(["high", "medium", "low"]).optional(),
-    type: z.enum(["bug", "feature", "enhancement", "documentation"]).optional(),
+    type: z
+      .string()
+      .optional()
+      .describe(
+        "The issue type: a native organization issue type (its name or `IT_…` id) or one of bug/feature/enhancement/documentation for the label emulation"
+      ),
+    // Native dependencies
+    blockingIssueId: z
+      .string()
+      .optional()
+      .describe("The issue that blocks the given issue (native `blocked by` edge)"),
+    dependencyDirection: z
+      .enum(["blocked_by", "blocking"])
+      .optional()
+      .describe("`blocked_by` lists the issues that block this one, `blocking` the ones it blocks"),
     // List
     status: z.enum(["open", "closed", "all"]).optional(),
     milestone: z.string().optional(),
@@ -339,85 +387,22 @@ export const manageLabelsSchema = z
 export type ManageLabelsArgs = z.infer<typeof manageLabelsSchema>;
 
 // ============================================================================
-// 7. manage_automation — 7 granular automation rule tools
+// 7. manage_automation — 3 granular project workflow tools
 // ============================================================================
 
 export const manageAutomationSchema = z
   .object({
     action: z
-      .enum([
-        "create_rule",
-        "update_rule",
-        "delete_rule",
-        "get_rule",
-        "list_rules",
-        "enable_rule",
-        "disable_rule",
-      ])
-      .describe("The automation rule operation to perform"),
-    // Common
-    ruleId: z.string().optional(),
+      .enum(["list_workflows", "get_workflow", "delete_workflow"])
+      .describe("The project automation workflow operation to perform"),
+    // List
     projectId: z.string().optional(),
-    // Create / Update
-    name: z.string().optional(),
-    description: z.string().optional(),
-    enabled: z.boolean().optional(),
-    triggers: z
-      .array(
-        z.object({
-          type: z.enum([
-            "resource_created",
-            "resource_updated",
-            "resource_deleted",
-            "issue_opened",
-            "issue_closed",
-            "issue_labeled",
-            "issue_assigned",
-            "pr_opened",
-            "pr_closed",
-            "pr_merged",
-            "pr_approved",
-            "sprint_started",
-            "sprint_ended",
-            "milestone_reached",
-            "schedule",
-          ]),
-          resourceType: z.string().optional(),
-          conditions: z
-            .array(
-              z.object({
-                field: z.string(),
-                operator: z.string(),
-                value: z.unknown(),
-              })
-            )
-            .optional(),
-        })
-      )
-      .optional(),
-    actions: z
-      .array(
-        z.object({
-          type: z.enum([
-            "update_resource",
-            "create_resource",
-            "delete_resource",
-            "add_label",
-            "remove_label",
-            "assign_user",
-            "unassign_user",
-            "create_relationship",
-            "delete_relationship",
-            "notify",
-            "webhook",
-            "custom_script",
-          ]),
-          parameters: z.record(z.string(), z.unknown()).optional(),
-        })
-      )
-      .optional(),
+    // Get / Delete
+    workflowId: z.string().optional(),
   })
-  .describe("Manage Automation Rules — create, update, delete, enable/disable project automation");
+  .describe(
+    "Manage Project Automations — list, read and delete the automation workflows of a GitHub project"
+  );
 
 export type ManageAutomationArgs = z.infer<typeof manageAutomationSchema>;
 
@@ -685,7 +670,6 @@ export const aiAnalyzeSchema = z
         "enrich_bulk",
         "triage_issue",
         "triage_all",
-        "schedule_triaging",
         "suggest_labels",
         "detect_duplicates",
         "find_related",
@@ -703,8 +687,6 @@ export const aiAnalyzeSchema = z
     issueIds: z.array(z.string()).optional(),
     // Triage all
     onlyUntriaged: z.boolean().optional(),
-    // Schedule triaging
-    schedule: z.enum(["hourly", "daily", "weekly"]).optional(),
     // Suggest labels (from issue-intelligence-schemas)
     existingLabels: z
       .array(
@@ -933,6 +915,20 @@ export const aiPlanSchema = z
         })
       )
       .optional(),
+    // generate_roadmap against an EXISTING project: the plan is generated
+    // from the issues already in the project, and (with autoCreate) the
+    // milestones are created and assigned to those issues.
+    projectId: z.string().optional(),
+    projectTitle: z.string().optional(),
+    projectDescription: z.string().optional(),
+    sprintDurationWeeks: z.number().optional(),
+    targetMilestones: z.number().optional(),
+    autoCreate: z
+      .boolean()
+      .optional()
+      .describe(
+        "generate_roadmap only: create the milestones in GitHub and assign them to the project's issues. Requires projectId."
+      ),
   })
   .describe(
     "AI Planning — sprint capacity, backlog prioritization, risk assessment, sprint composition, roadmap generation"
@@ -941,65 +937,37 @@ export const aiPlanSchema = z
 export type AiPlanArgs = z.infer<typeof aiPlanSchema>;
 
 // ============================================================================
-// 14. agent_work — 7 granular agent work tools
+// 14. agent_work — 12 granular agent work tools
 // ============================================================================
 
+const agentIdSchema = z.string().min(1, "Agent ID is required");
+const reviewerIdSchema = z.string().min(1, "Reviewer ID is required");
+const taskIdSchema = z.string().min(1, "Task/Issue ID is required");
+const projectIdSchema = z.string().min(1, "Project ID is required");
+const issueNumberSchema = z.number().int().positive("Issue number required");
+
 export const agentWorkSchema = z
-  .object({
-    action: z
-      .enum([
-        "register",
-        "checkout_task",
-        "release_task",
-        "complete_task",
-        "heartbeat",
-        "check_work_status",
-        "get_task_context",
-        "submit_for_review",
-        "approve_task",
-        "reject_task",
-        "validate_work_product",
-        "get_handoff_context",
-      ])
-      .describe("The agent work operation to perform"),
-    // Common
-    agentId: z.string().optional(),
-    taskId: z.string().optional(),
-    // Register
-    name: z.string().optional(),
-    role: AgentRoleSchema.optional(),
-    runtime: AgentRuntimeSchema.optional(),
-    capabilities: z.array(z.string()).optional(),
-    budgetTokens: z.number().optional(),
-    metadata: z.record(z.string(), z.unknown()).optional(),
-    parentAgentId: z.string().optional(),
-    // Checkout task
-    projectId: z.string().optional(),
-    strategy: CheckoutStrategySchema.optional(),
-    labels: z.array(z.string()).optional(),
-    milestone: z.string().optional(),
-    skipBlocked: z.boolean().optional(),
-    reviewQueue: z.boolean().optional(),
-    // Release task
-    reason: z.string().optional(),
-    // Complete task
-    summary: z.string().optional(),
-    closeIssue: z.boolean().optional(),
-    prNumber: z.number().optional(),
-    autoCheckoutNext: z.boolean().optional(),
-    // Heartbeat
-    status: z.enum(["working", "blocked", "needs_review"]).optional(),
-    progress: z.number().optional(),
-    progressSummary: z.string().optional(),
-    currentBranch: z.string().optional(),
-    estimatedCompletionMinutes: z.number().optional(),
-    blockerDescription: z.string().optional(),
-    // Get task context
-    issueNumber: z.number().optional(),
-    // Review
-    reviewerId: z.string().optional(),
-    feedback: z.string().optional(),
-  })
+  .discriminatedUnion("action", [
+    registerAgentSchema.extend({ action: z.literal("register") }),
+    checkoutTaskSchema.extend({ action: z.literal("checkout_task") }),
+    releaseTaskSchema.extend({ action: z.literal("release_task") }),
+    completeTaskSchema.extend({ action: z.literal("complete_task") }),
+    agentHeartbeatSchema.extend({ action: z.literal("heartbeat") }),
+    checkWorkStatusSchema.extend({ action: z.literal("check_work_status") }),
+    getTaskContextSchema.extend({ action: z.literal("get_task_context") }),
+    submitForReviewSchema.extend({ action: z.literal("submit_for_review") }),
+    approveTaskSchema.extend({ action: z.literal("approve_task") }),
+    rejectTaskSchema.extend({ action: z.literal("reject_task") }),
+    z.object({
+      action: z.literal("validate_work_product"),
+      agentId: agentIdSchema,
+      taskId: taskIdSchema,
+    }),
+    z.object({
+      action: z.literal("get_handoff_context"),
+      taskId: taskIdSchema,
+    }),
+  ])
   .describe(
     "Agent Work — register, checkout/release/complete tasks, heartbeat, review, work status"
   );
@@ -1007,90 +975,96 @@ export const agentWorkSchema = z
 export type AgentWorkArgs = z.infer<typeof agentWorkSchema>;
 
 // ============================================================================
-// 15. agent_manage — 5 granular agent management tools
+// 15. agent_manage — 18 granular agent management tools
 // ============================================================================
 
+const positiveIntSchema = z.number().int().positive();
+const fractionSchema = z.number().min(0).max(1);
+
 export const agentManageSchema = z
-  .object({
-    action: z
-      .enum([
-        "list",
-        "deregister",
-        "get_activity",
-        "submit_work_product",
-        "get_budget",
-        "set_budget",
-        "reclaim_stale",
-        "record_usage",
-        "get_metrics",
-        "setup_fields",
-        // PM coordination
-        "assign_task",
-        "get_swarm_status",
-        "rebalance_workload",
-        "decompose_task",
-        "smart_assign",
-        "converge_project",
-        "converge_until_done",
-        "cleanup_registry",
-      ])
-      .describe("The agent management operation to perform"),
-    // Common
-    agentId: z.string().optional(),
-    projectId: z.string().optional(),
-    // List
-    role: AgentRoleSchema.optional(),
-    status: AgentOperationalStatusSchema.optional(),
-    // Deregister — just agentId
-    // Get activity
-    includeOffline: z.boolean().optional(),
-    // Submit work product
-    taskId: z.string().optional(),
-    issueNumber: z.number().optional(),
-    branch: z.string().optional(),
-    prNumber: z.number().optional(),
-    commitShas: z.array(z.string()).optional(),
-    filesChanged: z.array(z.string()).optional(),
-    testsPassed: z.number().optional(),
-    testsFailed: z.number().optional(),
-    testsTotal: z.number().optional(),
-    summary: z.string().optional(),
-    // Set budget
-    totalTokens: z.number().optional(),
-    warningThreshold: z.number().optional(),
-    hardStop: z.boolean().optional(),
-    resetPeriod: BudgetResetPeriodSchema.optional(),
-    // Reclaim stale
-    timeoutMinutes: z.number().optional(),
-    // Record usage
-    tokensUsed: z.number().optional(),
-    // Metrics
-    staleAfterMinutes: z.number().optional(),
-    // Smart assign
-    maxAssignments: z.number().optional(),
-    agentIds: z.array(z.string()).optional().describe("Filter smart_assign to specific agent IDs"),
-    roleFilter: z.string().optional().describe("Filter smart_assign to agents with this role"),
-    // Converge until done
-    iteration: z
-      .number()
-      .optional()
-      .describe("Current iteration number for converge_until_done loop (starts at 1)"),
-    maxIterations: z
-      .number()
-      .optional()
-      .describe("Maximum iterations before converge_until_done gives up (default 10)"),
-    // Decompose task
-    subtasks: z
-      .array(
-        z.object({
-          title: z.string(),
-          description: z.string(),
-          acceptanceCriteria: z.string().optional(),
-        })
-      )
-      .optional()
-      .describe("Subtasks for decompose_task — PM splits a rejected task into smaller pieces"),
-  })
+  .discriminatedUnion("action", [
+    listAgentsSchema.extend({ action: z.literal("list") }),
+    deregisterAgentSchema.extend({ action: z.literal("deregister") }),
+    getAgentActivitySchema.extend({ action: z.literal("get_activity") }),
+    submitWorkProductSchema.extend({ action: z.literal("submit_work_product") }),
+    getBudgetStatusSchema.extend({ action: z.literal("get_budget") }),
+    setAgentBudgetSchema.omit({ warningFraction: true }).extend({
+      action: z.literal("set_budget"),
+      warningFraction: fractionSchema.optional().describe("Warning threshold as a 0-1 fraction"),
+      warningThreshold: fractionSchema
+        .optional()
+        .describe("Compatibility alias for warningFraction (0-1 warning threshold)"),
+    }),
+    reclaimStaleTasksSchema.extend({ action: z.literal("reclaim_stale") }),
+    recordUsageSchema.extend({ action: z.literal("record_usage") }),
+    getAgentMetricsSchema.extend({ action: z.literal("get_metrics") }),
+    setupAgentFieldsSchema.extend({ action: z.literal("setup_fields") }),
+    z.object({
+      action: z.literal("assign_task"),
+      agentId: agentIdSchema,
+      projectId: projectIdSchema,
+      issueNumber: issueNumberSchema,
+    }),
+    z.object({
+      action: z.literal("get_swarm_status"),
+      staleAfterMinutes: z.number().positive().default(30),
+    }),
+    z.object({
+      action: z.literal("rebalance_workload"),
+      projectId: projectIdSchema,
+      staleAfterMinutes: z.number().positive().default(30),
+      maxAssignments: positiveIntSchema.optional(),
+      agentIds: z
+        .array(z.string())
+        .optional()
+        .describe("Filter reassignment to specific agent IDs"),
+      roleFilter: z.string().optional().describe("Filter reassignment to agents with this role"),
+    }),
+    z.object({
+      action: z.literal("decompose_task"),
+      projectId: projectIdSchema,
+      issueNumber: issueNumberSchema,
+      subtasks: z
+        .array(
+          z.object({
+            title: z.string().min(1),
+            description: z.string().min(1),
+            acceptanceCriteria: z.string().optional(),
+          })
+        )
+        .min(1)
+        .describe("Subtasks for decompose_task — PM splits a rejected task into smaller pieces"),
+    }),
+    z.object({
+      action: z.literal("smart_assign"),
+      projectId: projectIdSchema,
+      maxAssignments: positiveIntSchema.optional(),
+      agentIds: z
+        .array(z.string())
+        .optional()
+        .describe("Filter smart_assign to specific agent IDs"),
+      roleFilter: z.string().optional().describe("Filter smart_assign to agents with this role"),
+    }),
+    z.object({
+      action: z.literal("converge_project"),
+      projectId: projectIdSchema,
+      reviewerId: reviewerIdSchema
+        .optional()
+        .describe(
+          "Reviewer agent to attribute approve/reject lifecycle actions to, when available"
+        ),
+    }),
+    z.object({
+      action: z.literal("converge_until_done"),
+      projectId: projectIdSchema,
+      iteration: positiveIntSchema.default(1),
+      maxIterations: positiveIntSchema.default(10),
+    }),
+    z.object({
+      action: z.literal("cleanup_registry"),
+      staleAfterMinutes: z.number().positive().default(60),
+    }),
+  ])
   .describe(
     "Agent Management — list, deregister, activity, work products, budget, reclaim, usage, metrics, PM coordination"
   );

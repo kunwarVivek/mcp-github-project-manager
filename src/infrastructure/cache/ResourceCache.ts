@@ -95,6 +95,12 @@ export class ResourceCache {
     };
 
     const cacheKey = this.getCacheKey(type, id);
+    // Drop the previous entry's tag/type/namespace memberships so a re-set with
+    // different tags or namespaces does not leave stale index rows behind.
+    const previous = this.cache.get(cacheKey);
+    if (previous) {
+      this.removeFromIndices(cacheKey, previous);
+    }
     // Re-set moves the key to the end (most-recently-written) so eviction
     // targets the oldest keys first.
     this.cache.delete(cacheKey);

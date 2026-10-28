@@ -148,7 +148,7 @@ export function configureContainer(
     useFactory: (c) => {
       const f = c.resolve<GitHubRepositoryFactory>("GitHubRepositoryFactory");
       return new ProjectAutomationService(
-        f.createAutomationRuleRepository(),
+        f.createProjectWorkflowRepository(),
         f.createProjectRepository(),
         c.resolve<ILogger>("ILogger")
       );
@@ -369,7 +369,7 @@ export function createProjectManagementService(
     new IssueService(factory),
     new RoadmapService(factory),
     new ProjectAutomationService(
-      factory.createAutomationRuleRepository(),
+      factory.createProjectWorkflowRepository(),
       factory.createProjectRepository(),
       logger
     ),

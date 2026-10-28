@@ -3,12 +3,9 @@ import type {
   AgentMetrics,
   WorkProduct,
 } from "../../domain/agent-orchestration-types";
-import {
-  DEFAULT_HEARTBEAT_TIMEOUT_MINUTES,
-  WORK_PRODUCT_MARKER,
-} from "../../domain/agent-orchestration-types";
+import { DEFAULT_HEARTBEAT_TIMEOUT_MINUTES } from "../../domain/agent-orchestration-types";
 import type { AgentStore } from "../../infrastructure/agent/AgentStore";
-import type { WorkProductStore } from "../../infrastructure/agent/WorkProductStore";
+import { WorkProductStore } from "../../infrastructure/agent/WorkProductStore";
 import type { GitHubRepositoryFactory } from "../../infrastructure/github/GitHubRepositoryFactory";
 import { safeCall } from "../utils/safeCall";
 
@@ -22,7 +19,6 @@ import { safeCall } from "../utils/safeCall";
 export class AgentMetricsService {
   private readonly factory: GitHubRepositoryFactory;
   private readonly agentStore: AgentStore;
-  private readonly workProductStore: WorkProductStore;
 
   private static readonly CACHE_TTL_MS = 5 * 60_000; // 5 minutes
   private workProductCache: {
@@ -37,11 +33,10 @@ export class AgentMetricsService {
   constructor(
     factory: GitHubRepositoryFactory,
     agentStore: AgentStore,
-    workProductStore: WorkProductStore
+    _workProductStore: WorkProductStore
   ) {
     this.factory = factory;
     this.agentStore = agentStore;
-    this.workProductStore = workProductStore;
   }
 
   /** Compute aggregate + per-agent metrics. */
@@ -180,11 +175,11 @@ export class AgentMetricsService {
 
       for (const comment of comments) {
         const body = comment.body;
-        if (!body || !body.includes(WORK_PRODUCT_MARKER)) continue;
+        if (!body) continue;
         // Work products are submitted on task issues, not PR conversations.
         if (comment.html_url?.includes("/pull/")) continue;
 
-        const product = this.parseWorkProductComment(body);
+        const product = WorkProductStore.parseCommentBody(body);
         if (!product?.agentId) continue;
 
         const bucket = productsByAgent.get(product.agentId) ?? [];
@@ -211,25 +206,5 @@ export class AgentMetricsService {
     const result = { completedByAgent, cycleTimesByAgent, isTruncated };
     this.workProductCache = { data: result, fetchedAt: Date.now() };
     return result;
-  }
-
-  /**
-   * Parse a work-product comment body: the structured JSON payload trails
-   * a hidden `<!-- agent-work-product: ... -->` marker (see WorkProductStore).
-   */
-  private parseWorkProductComment(body: string): WorkProduct | null {
-    const markerIdx = body.indexOf(WORK_PRODUCT_MARKER);
-    if (markerIdx < 0) return null;
-
-    const jsonStart = markerIdx + WORK_PRODUCT_MARKER.length;
-    const endIdx = body.indexOf("-->", jsonStart);
-    if (endIdx < 0) return null;
-
-    const jsonStr = body.substring(jsonStart, endIdx).trim();
-    try {
-      return JSON.parse(jsonStr) as WorkProduct;
-    } catch {
-      return null;
-    }
   }
 }

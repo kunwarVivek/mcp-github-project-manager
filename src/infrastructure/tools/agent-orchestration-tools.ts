@@ -39,6 +39,7 @@ import { mapErrorToMCPError } from "../../services/utils/ErrorMapper";
 import { AgentStore } from "../agent/AgentStore";
 import { ProjectFieldSetup } from "../agent/ProjectFieldSetup";
 import { WorkProductStore } from "../agent/WorkProductStore";
+import type { OctokitInstance } from "../github/types";
 import { ANNOTATION_PATTERNS } from "./annotations/tool-annotations";
 import type {
   AgentHeartbeatArgs,
@@ -868,6 +869,7 @@ export async function executeCheckoutTask(args: CheckoutTaskArgs): Promise<{
 
     const result = await service.checkoutTask(args.agentId, {
       projectId: args.projectId,
+      view: args.view,
       strategy: args.strategy,
       labels: args.labels,
       skipBlocked: args.skipBlocked,
@@ -1201,6 +1203,101 @@ export async function executeSetAgentBudget(args: SetAgentBudgetArgs): Promise<{
   }
 }
 
+/** How many reviews to request per page. The REST API serves at most 100. */
+const REVIEWS_PER_PAGE = 100;
+
+/**
+ * A pull request review, reduced to the fields this tool reads.
+ */
+interface PullRequestReview {
+  id: number;
+  user?: { login?: string | null } | null;
+  body?: string | null;
+  state: string;
+  submitted_at?: string | null;
+}
+
+/**
+ * Fetch every review of a pull request.
+ *
+ * `pulls.listReviews` serves 30 reviews per page by default and the endpoint
+ * has no cursor, so a pull request with more reviews than a single page holds
+ * silently loses the rest - and with them the review that decides its
+ * outcome. The endpoint paginates with `per_page` and `page`; a page that
+ * comes back shorter than requested is the last one.
+ */
+async function fetchPullRequestReviews(
+  octokit: OctokitInstance,
+  owner: string,
+  repo: string,
+  pullNumber: number
+): Promise<PullRequestReview[]> {
+  const reviews: PullRequestReview[] = [];
+  let page = 1;
+
+  while (true) {
+    const { data } = await octokit.rest.pulls.listReviews({
+      owner,
+      repo,
+      pull_number: pullNumber,
+      per_page: REVIEWS_PER_PAGE,
+      page,
+    });
+
+    reviews.push(...data);
+
+    if (data.length < REVIEWS_PER_PAGE) break;
+    page++;
+  }
+
+  return reviews;
+}
+
+/**
+ * Is `candidate` a more recent review than `current`?
+ *
+ * A review carries `submitted_at` once it is submitted; a draft review (state
+ * PENDING) has none and never displaces a submitted review.
+ */
+function isNewerReview(candidate: PullRequestReview, current: PullRequestReview): boolean {
+  const candidateTime = candidate.submitted_at ? Date.parse(candidate.submitted_at) : NaN;
+  const currentTime = current.submitted_at ? Date.parse(current.submitted_at) : NaN;
+
+  if (!Number.isNaN(candidateTime) && !Number.isNaN(currentTime)) {
+    return candidateTime > currentTime;
+  }
+  if (!Number.isNaN(candidateTime)) return true;
+  if (!Number.isNaN(currentTime)) return false;
+  // Neither carries a timestamp: the API returns reviews oldest first, so the
+  // one seen later is the newer one.
+  return true;
+}
+
+/**
+ * Keep the newest review of every author.
+ *
+ * The REST API returns the reviews of a pull request oldest first, so the last
+ * review of an author is the newest one - but the choice is made on
+ * `submitted_at`, so it does not depend on the ordering alone. A review that
+ * carries a state but no body (a comment-only review) states no decision and
+ * is skipped, so it cannot mask an approval.
+ */
+function selectLatestReviews(reviews: PullRequestReview[]): Map<string, PullRequestReview> {
+  const latest = new Map<string, PullRequestReview>();
+
+  for (const review of reviews) {
+    if (review.state === "COMMENTED" && !review.body) continue;
+
+    const author = review.user?.login ?? "unknown";
+    const current = latest.get(author);
+    if (!current || isNewerReview(review, current)) {
+      latest.set(author, review);
+    }
+  }
+
+  return latest;
+}
+
 /**
  * Execute the check_work_status tool.
  * Checks PR state and review status for a task's work product.
@@ -1253,12 +1350,8 @@ export async function executeCheckWorkStatus(args: CheckWorkStatusArgs): Promise
       pull_number: prNumber,
     });
 
-    // Fetch reviews
-    const { data: reviews } = await octokit.rest.pulls.listReviews({
-      owner: config.owner,
-      repo: config.repo,
-      pull_number: prNumber,
-    });
+    // Fetch reviews (paginated: the REST endpoint serves 30 per page by default)
+    const reviews = await fetchPullRequestReviews(octokit, config.owner, config.repo, prNumber);
 
     // Determine PR state
     let prState: string;
@@ -1271,14 +1364,7 @@ export async function executeCheckWorkStatus(args: CheckWorkStatusArgs): Promise
     }
 
     // Determine review status from the latest substantive review per reviewer
-    const reviewMap = new Map<string, { state: string; body: string }>();
-    for (const review of reviews) {
-      if (review.state === "COMMENTED" && !review.body) continue;
-      reviewMap.set(review.user?.login ?? "unknown", {
-        state: review.state,
-        body: review.body ?? "",
-      });
-    }
+    const reviewMap = selectLatestReviews(reviews);
 
     let reviewStatus = "pending";
     const hasApproval = [...reviewMap.values()].some((r) => r.state === "APPROVED");
@@ -1295,7 +1381,7 @@ export async function executeCheckWorkStatus(args: CheckWorkStatusArgs): Promise
     const reviewComments = [...reviewMap.entries()].map(([author, r]) => ({
       author,
       state: r.state,
-      body: r.body,
+      body: r.body ?? "",
     }));
 
     // Determine action required

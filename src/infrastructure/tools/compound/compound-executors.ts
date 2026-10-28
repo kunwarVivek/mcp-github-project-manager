@@ -11,12 +11,14 @@ import { createProjectManagementService } from "../../../container";
 import { CACHE_DIRECTORY, GITHUB_OWNER, GITHUB_REPO, GITHUB_TOKEN } from "../../../env";
 import type { ProjectManagementService } from "../../../services/ProjectManagementService";
 import { ProjectFieldSetup } from "../../agent/ProjectFieldSetup";
+import type { GitHubRepositoryFactory } from "../../github/GitHubRepositoryFactory";
+import { projectFieldUnionSelection } from "../../github/project-field-fragments";
 import { Logger } from "../../logger";
 import { createGitHubFactory } from "../tool-factory";
 
 const logger = Logger.getInstance();
 
-import type { BudgetStatus } from "../../../domain/agent-orchestration-types";
+import { AGENT_FIELDS, type BudgetStatus } from "../../../domain/agent-orchestration-types";
 import { AgentBudgetService } from "../../../services/agent/AgentBudgetService";
 import { AgentContextService } from "../../../services/agent/AgentContextService";
 import { TaskCheckoutService } from "../../../services/agent/TaskCheckoutService";
@@ -24,6 +26,7 @@ import { TaskCheckoutService } from "../../../services/agent/TaskCheckoutService
 import { AIServiceFactory } from "../../../services/ai/AIServiceFactory";
 import { IssueEnrichmentService } from "../../../services/IssueEnrichmentService";
 import { IssueTriagingService } from "../../../services/IssueTriagingService";
+import { RoadmapPlanningService } from "../../../services/RoadmapPlanningService";
 // PM coordination services
 import { AgentStore } from "../../agent/AgentStore";
 import { WorkProductStore } from "../../agent/WorkProductStore";
@@ -166,12 +169,33 @@ function pms(svc: ProjectManagementService, method: string, ...args: unknown[]):
  * Routes compound args to a granular executor function. The action
  * discriminator guarantees structural compatibility; the executor provides
  * its own runtime validation.
+ *
+ * The granular executors are written to the MCP tool-result convention
+ * (`{ content, structuredContent }`) because they are the implementation
+ * contract of the compound layer. The compound surface answers with the
+ * ACTION'S PAYLOAD, so the envelope is unwrapped here — otherwise one
+ * action of a tool answers with a bare payload and the next with a
+ * double-wrapped one, and every client has to know which is which.
  */
 function route<TArgs, TResult>(
   executor: (args: TArgs) => Promise<TResult>,
   args: unknown
 ): Promise<TResult> {
-  return executor(args as TArgs);
+  return executor(args as TArgs).then((result) => unwrapToolResult(result) as TResult);
+}
+
+/** Unwrap `{ content, structuredContent }` down to the payload it carries. */
+function unwrapToolResult(result: unknown): unknown {
+  if (!result || typeof result !== "object" || Array.isArray(result)) return result;
+  const envelope = result as { content?: unknown; structuredContent?: unknown };
+  if (!("structuredContent" in envelope) || !("content" in envelope)) return result;
+  return envelope.structuredContent;
+}
+
+function withoutAction<TArgs extends { action: string }>(args: TArgs): Omit<TArgs, "action"> {
+  const { action, ...rest } = args;
+  void action;
+  return rest;
 }
 
 /**
@@ -208,6 +232,14 @@ function getEnrichmentService(): IssueEnrichmentService {
     _enrichmentService = new IssueEnrichmentService(AIServiceFactory.getInstance(), getPMS());
   }
   return _enrichmentService;
+}
+
+let _roadmapPlanningService: RoadmapPlanningService | null = null;
+function getRoadmapPlanningService(): RoadmapPlanningService {
+  if (!_roadmapPlanningService) {
+    _roadmapPlanningService = new RoadmapPlanningService(AIServiceFactory.getInstance(), getPMS());
+  }
+  return _roadmapPlanningService;
 }
 
 let _triagingService: IssueTriagingService | null = null;
@@ -248,6 +280,151 @@ function getEventStore(): EventStore {
 /** Throws a consistent error for unrecognised actions. */
 function unknownAction(tool: string, action: string): never {
   throw new Error(`Unknown ${tool} action: ${action}`);
+}
+
+const CLEAR_CONVERGENCE_FIELD = `
+  mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!) {
+    clearProjectV2ItemFieldValue(input: {
+      projectId: $projectId, itemId: $itemId, fieldId: $fieldId
+    }) { projectV2Item { id } }
+  }
+`;
+
+const UPDATE_CONVERGENCE_STATUS_FIELD = `
+  mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $value: String!) {
+    updateProjectV2ItemFieldValue(input: {
+      projectId: $projectId,
+      itemId: $itemId,
+      fieldId: $fieldId,
+      value: { singleSelectOptionId: $value }
+    }) { projectV2Item { id } }
+  }
+`;
+
+const LIST_CONVERGENCE_FIELDS = `
+  query($projectId: ID!) {
+    node(id: $projectId) {
+      ... on ProjectV2 {
+        fields(first: 100) {
+          nodes {
+            ${projectFieldUnionSelection({ singleSelect: "options { id name }" })}
+          }
+        }
+      }
+    }
+  }
+`;
+
+interface ConvergenceFieldNode {
+  id: string;
+  name: string;
+  options?: Array<{ id: string; name: string }>;
+}
+
+interface ConvergenceFieldsResponse {
+  node: { fields: { nodes: ConvergenceFieldNode[] } } | null;
+}
+
+async function releaseConvergedTaskOwner(store: AgentStore, taskId: string): Promise<void> {
+  const agents = await store.listAgents();
+  const owner = agents.find((agent) => agent.currentTaskId === taskId);
+  if (!owner) return;
+
+  owner.currentTaskId = undefined;
+  owner.currentTaskTitle = undefined;
+  owner.status = "idle";
+  await store.upsertAgent(owner);
+}
+
+async function clearConvergedProjectState(
+  factory: GitHubRepositoryFactory,
+  issueNumber: number,
+  newStatus: "unclaimed" | "completed"
+): Promise<void> {
+  const config = factory.getConfig();
+  const itemResp = await factory.graphql<{
+    repository: {
+      issue: { projectItems: { nodes: Array<{ id: string; project: { id: string } }> } } | null;
+    };
+  }>(
+    `query($owner: String!, $repo: String!, $number: Int!) {
+      repository(owner: $owner, name: $repo) {
+        issue(number: $number) { projectItems(first: 5) { nodes { id project { id } } } }
+      }
+    }`,
+    { owner: config.owner, repo: config.repo, number: issueNumber }
+  );
+
+  const item = itemResp.repository.issue?.projectItems.nodes[0];
+  if (!item) return;
+
+  const fieldsResp = await factory.graphql<ConvergenceFieldsResponse>(LIST_CONVERGENCE_FIELDS, {
+    projectId: item.project.id,
+  });
+  const fields = new Map((fieldsResp.node?.fields.nodes ?? []).map((field) => [field.name, field]));
+
+  for (const fieldName of [AGENT_FIELDS.CLAIMED_BY, AGENT_FIELDS.CLAIMED_AT]) {
+    const field = fields.get(fieldName);
+    if (!field) continue;
+    await factory.graphql(CLEAR_CONVERGENCE_FIELD, {
+      projectId: item.project.id,
+      itemId: item.id,
+      fieldId: field.id,
+    });
+  }
+
+  const statusField = fields.get(AGENT_FIELDS.STATUS);
+  const statusOption = statusField?.options?.find((option) => option.name === newStatus);
+  if (statusField && statusOption) {
+    await factory.graphql(UPDATE_CONVERGENCE_STATUS_FIELD, {
+      projectId: item.project.id,
+      itemId: item.id,
+      fieldId: statusField.id,
+      value: statusOption.id,
+    });
+  }
+}
+
+async function settleConvergedTask(params: {
+  factory: GitHubRepositoryFactory;
+  store: AgentStore;
+  checkoutService: TaskCheckoutService;
+  reviewerId?: string;
+  issueNumber: number;
+  approved: boolean;
+  summary?: string;
+  feedback?: string;
+  fallback: () => Promise<void>;
+}): Promise<void> {
+  const taskId = String(params.issueNumber);
+
+  if (params.reviewerId) {
+    try {
+      const result = params.approved
+        ? await params.checkoutService.approveTask(params.reviewerId, taskId, params.summary)
+        : await params.checkoutService.rejectTask(params.reviewerId, taskId, params.feedback);
+      if (result.success) return;
+      logger.warn(`converge: lifecycle ${params.approved ? "approve" : "reject"} failed`, {
+        taskId,
+        message: result.message,
+      });
+    } catch (error) {
+      logger.warn(`converge: lifecycle ${params.approved ? "approve" : "reject"} threw`, {
+        taskId,
+        error,
+      });
+    }
+  }
+
+  await releaseConvergedTaskOwner(params.store, taskId);
+  await clearConvergedProjectState(
+    params.factory,
+    params.issueNumber,
+    params.approved ? "completed" : "unclaimed"
+  ).catch((error) => {
+    logger.warn(`converge: failed to clear project state for issue #${params.issueNumber}`, error);
+  });
+  await params.fallback();
 }
 
 // ============================================================================
@@ -350,6 +527,23 @@ export async function executeManageProject(args: ManageProjectArgs): Promise<unk
       return setup.ensureFields(rest.projectId as string);
     }
 
+    // ── Project access (roles / collaborators) ───────────────────
+    case "set_collaborators": {
+      if (!rest.projectId) {
+        throw new Error("projectId is required for set_collaborators");
+      }
+      if (!rest.collaborators || rest.collaborators.length === 0) {
+        throw new Error("collaborators is required for set_collaborators");
+      }
+      return toPlain(
+        await pms(svc, "setProjectCollaborators", {
+          projectId: rest.projectId,
+          org: rest.org,
+          collaborators: rest.collaborators,
+        })
+      );
+    }
+
     default:
       unknownAction("manage_project", action);
   }
@@ -396,8 +590,44 @@ export async function executeManageIssues(args: ManageIssuesArgs): Promise<unkno
           milestoneId: rest.milestoneId,
           assignees: rest.assignees,
           labels: rest.labels,
+          type: rest.type,
         })
       );
+
+    // ── Native issue capabilities ───────────────────────────────────────
+    // The native "blocked by" edges, the native issue types and the reverse
+    // issue→project membership. The label emulation (`blocked-by:#N`,
+    // `type:x`) is the fallback when the deployment does not know the field.
+    case "list_dependencies": {
+      if (!rest.issueId) throw new Error("issueId is required for list_dependencies");
+      return toPlain(
+        await pms(svc, "listIssueBlockers", rest.issueId, rest.dependencyDirection ?? "blocked_by")
+      );
+    }
+    case "add_blocker": {
+      if (!rest.issueId) throw new Error("issueId is required for add_blocker");
+      if (!rest.blockingIssueId) {
+        throw new Error("blockingIssueId is required for add_blocker");
+      }
+      return toPlain(await pms(svc, "addIssueBlocker", rest.issueId, rest.blockingIssueId));
+    }
+    case "remove_blocker": {
+      if (!rest.issueId) throw new Error("issueId is required for remove_blocker");
+      if (!rest.blockingIssueId) {
+        throw new Error("blockingIssueId is required for remove_blocker");
+      }
+      await pms(svc, "removeIssueBlocker", rest.issueId, rest.blockingIssueId);
+      // The service returns nothing; an executor must hand back a payload
+      // or the MCP response carries no content at all.
+      return {
+        success: true,
+        issueId: rest.issueId,
+        blockingIssueId: rest.blockingIssueId,
+        message: "Blocker removed",
+      };
+    }
+    case "list_issue_types":
+      return toPlain(await pms(svc, "listIssueTypes"));
 
     // ── Standalone executors ─────────────────────────────────────
     case "convert_draft":
@@ -549,20 +779,12 @@ export async function executeManageAutomation(args: ManageAutomationArgs): Promi
   const svc = getPMS();
 
   switch (action) {
-    case "create_rule":
-      return pms(svc, "createAutomationRule", rest);
-    case "update_rule":
-      return pms(svc, "updateAutomationRule", rest);
-    case "delete_rule":
-      return pms(svc, "deleteAutomationRule", rest);
-    case "get_rule":
-      return pms(svc, "getAutomationRule", rest);
-    case "list_rules":
-      return pms(svc, "listAutomationRules", rest);
-    case "enable_rule":
-      return pms(svc, "enableAutomationRule", rest);
-    case "disable_rule":
-      return pms(svc, "disableAutomationRule", rest);
+    case "list_workflows":
+      return pms(svc, "listProjectWorkflows", rest);
+    case "get_workflow":
+      return pms(svc, "getProjectWorkflow", rest);
+    case "delete_workflow":
+      return pms(svc, "deleteProjectWorkflow", rest);
     default:
       unknownAction("manage_automation", action);
   }
@@ -1152,16 +1374,6 @@ export async function executeAiAnalyze(args: AiAnalyzeArgs): Promise<unknown> {
       return { success: true, triaged: result.triaged, results: result.results };
     }
 
-    case "schedule_triaging": {
-      const svc = getTriagingService();
-      const result = await svc.scheduleTriaging({
-        projectId: rest.projectId as string,
-        schedule: rest.schedule as "hourly" | "daily" | "weekly",
-        autoApply: rest.autoApply as boolean,
-      });
-      return { success: true, ruleId: result.ruleId, schedule: rest.schedule };
-    }
-
     default:
       unknownAction("ai_analyze", action);
   }
@@ -1184,6 +1396,32 @@ export async function executeAiPlan(args: AiPlanArgs): Promise<unknown> {
     case "suggest_composition":
       return route(executeSuggestSprintComposition, rest);
     case "generate_roadmap":
+      // Two shapes of the same request:
+      // - no projectId: plan a roadmap from a free-form brief (AI only).
+      // - projectId: plan from the issues ALREADY in that project, and with
+      //   autoCreate also create the milestones and assign them to those
+      //   issues. The project id is what makes the persistence land on the
+      //   right project instead of only on the repository.
+      if (rest.projectId) {
+        const planner = getRoadmapPlanningService();
+        const projectTitle =
+          rest.projectTitle ?? (await getPMS().getProject(rest.projectId))?.title ?? "Project";
+        const plan = await planner.generateRoadmap({
+          projectId: rest.projectId,
+          projectTitle,
+          projectDescription: rest.projectDescription,
+          sprintDurationWeeks: rest.sprintDurationWeeks,
+          targetMilestones: rest.targetMilestones,
+        });
+        if (!rest.autoCreate) {
+          return toPlain(plan);
+        }
+        const created = await planner.createRoadmapInGitHub({
+          projectId: rest.projectId,
+          roadmap: plan,
+        });
+        return toPlain({ ...plan, created });
+      }
       return route(executeGenerateRoadmap, rest);
     case "generate_visualization":
       return route(executeGenerateRoadmapVisualization, rest);
@@ -1197,33 +1435,31 @@ export async function executeAiPlan(args: AiPlanArgs): Promise<unknown> {
 // ============================================================================
 
 export async function executeAgentWork(args: AgentWorkArgs): Promise<unknown> {
-  const { action, ...rest } = args;
-
-  switch (action) {
+  switch (args.action) {
     case "register":
-      return route(executeRegisterAgent, rest);
+      return route(executeRegisterAgent, withoutAction(args));
     case "checkout_task":
-      return route(executeCheckoutTask, rest);
+      return route(executeCheckoutTask, withoutAction(args));
     case "release_task":
-      return route(executeReleaseTask, rest);
+      return route(executeReleaseTask, withoutAction(args));
     case "complete_task":
-      return route(executeCompleteTask, rest);
+      return route(executeCompleteTask, withoutAction(args));
     case "heartbeat":
-      return route(executeAgentHeartbeat, rest);
+      return route(executeAgentHeartbeat, withoutAction(args));
     case "check_work_status":
-      return route(executeCheckWorkStatus, rest);
+      return route(executeCheckWorkStatus, withoutAction(args));
     case "get_task_context":
-      return route(executeGetTaskContext, rest);
+      return route(executeGetTaskContext, withoutAction(args));
     case "submit_for_review":
-      return route(executeSubmitForReview, rest);
+      return route(executeSubmitForReview, withoutAction(args));
     case "approve_task":
-      return route(executeApproveTask, rest);
+      return route(executeApproveTask, withoutAction(args));
     case "reject_task":
-      return route(executeRejectTask, rest);
+      return route(executeRejectTask, withoutAction(args));
     case "validate_work_product": {
       const factory = createGitHubFactory();
       const wpStore = new WorkProductStore(factory);
-      const issueNumber = parseInt(rest.taskId as string, 10);
+      const issueNumber = parseInt(args.taskId, 10);
       if (Number.isNaN(issueNumber))
         return { valid: false, findings: ["Invalid taskId — expected issue number"] };
 
@@ -1289,6 +1525,7 @@ export async function executeAgentWork(args: AgentWorkArgs): Promise<unknown> {
         findings,
         workProduct: {
           id: latest.id,
+          agentId: latest.agentId,
           files: latest.filesChanged,
           tests: latest.testResults,
           branch: latest.branch,
@@ -1305,7 +1542,7 @@ export async function executeAgentWork(args: AgentWorkArgs): Promise<unknown> {
       const config = factory.getConfig();
       const octokit = factory.getOctokit();
       const wpStore = new WorkProductStore(factory);
-      const issueNumber = parseInt(rest.taskId as string, 10);
+      const issueNumber = parseInt(args.taskId, 10);
       if (Number.isNaN(issueNumber)) return { error: "Invalid taskId" };
 
       // 1. Get this issue
@@ -1386,8 +1623,6 @@ export async function executeAgentWork(args: AgentWorkArgs): Promise<unknown> {
         parentContext,
       };
     }
-    default:
-      unknownAction("agent_work", action);
   }
 }
 
@@ -1396,31 +1631,35 @@ export async function executeAgentWork(args: AgentWorkArgs): Promise<unknown> {
 // ============================================================================
 
 export async function executeAgentManage(args: AgentManageArgs): Promise<unknown> {
-  const { action, ...rest } = args;
-
-  switch (action) {
+  const originalAction = args.action;
+  switch (args.action) {
     case "list":
-      return route(executeListAgents, rest);
+      return route(executeListAgents, withoutAction(args));
     case "deregister":
-      return route(executeDeregisterAgent, rest);
+      return route(executeDeregisterAgent, withoutAction(args));
     case "get_activity":
-      return route(executeGetAgentActivity, rest);
+      return route(executeGetAgentActivity, withoutAction(args));
     case "submit_work_product":
-      return route(executeSubmitWorkProduct, rest);
+      return route(executeSubmitWorkProduct, withoutAction(args));
     case "get_budget":
-      return route(executeGetBudgetStatus, rest);
-    case "set_budget":
-      return route(executeSetAgentBudget, rest);
+      return route(executeGetBudgetStatus, withoutAction(args));
+    case "set_budget": {
+      const { warningThreshold, ...budgetArgs } = withoutAction(args);
+      return route(executeSetAgentBudget, {
+        ...budgetArgs,
+        warningFraction: budgetArgs.warningFraction ?? warningThreshold ?? 0.8,
+      });
+    }
     case "record_usage":
-      return route(executeRecordUsage, rest);
+      return route(executeRecordUsage, withoutAction(args));
     case "get_metrics":
-      return route(executeGetAgentMetrics, rest);
+      return route(executeGetAgentMetrics, withoutAction(args));
     case "reclaim_stale":
-      return route(executeReclaimStaleTasks, rest);
+      return route(executeReclaimStaleTasks, withoutAction(args));
     case "setup_fields": {
       const factory = createGitHubFactory();
       const setup = new ProjectFieldSetup(factory);
-      return setup.ensureFields(rest.projectId as string);
+      return setup.ensureFields(args.projectId);
     }
 
     // ── PM coordination ──────────────────────────────────────────
@@ -1431,9 +1670,9 @@ export async function executeAgentManage(args: AgentManageArgs): Promise<unknown
       const store = new AgentStore(factory);
       const contextService = new AgentContextService(factory);
       const service = new TaskCheckoutService(factory, store, contextService);
-      const result = await service.checkoutTask(rest.agentId as string, {
-        projectId: rest.projectId,
-        issueNumber: rest.issueNumber,
+      const result = await service.checkoutTask(args.agentId, {
+        projectId: args.projectId,
+        issueNumber: args.issueNumber,
       });
       return result;
     }
@@ -1445,7 +1684,7 @@ export async function executeAgentManage(args: AgentManageArgs): Promise<unknown
       const budgetService = new AgentBudgetService(store);
       const agents = await store.listAgents();
       const now = Date.now();
-      const staleThreshold = ((rest.staleAfterMinutes as number) || 30) * 60 * 1000;
+      const staleThreshold = (args.staleAfterMinutes || 30) * 60 * 1000;
 
       const agentStatuses = await Promise.all(
         agents.map(async (agent) => {
@@ -1494,22 +1733,39 @@ export async function executeAgentManage(args: AgentManageArgs): Promise<unknown
     }
 
     case "rebalance_workload": {
-      // Reclaim stale agents + return available unclaimed tasks
+      // Reclaim tasks held by stale agents, then immediately redistribute
+      // available project work through the same capability/budget-aware seam
+      // used by smart_assign.
       const factory = createGitHubFactory();
       const store = new AgentStore(factory);
       const contextService = new AgentContextService(factory);
       const service = new TaskCheckoutService(factory, store, contextService);
 
-      // Reclaim stale tasks
-      const result = await service.reclaimStaleTasks((rest.staleAfterMinutes as number) || 30);
+      const reclaimResult = await service.reclaimStaleTasks(args.staleAfterMinutes);
+      const assignResult = (await executeAgentManage({
+        action: "smart_assign",
+        projectId: args.projectId,
+        agentIds: args.agentIds,
+        roleFilter: args.roleFilter,
+        maxAssignments: args.maxAssignments,
+      } as AgentManageArgs)) as {
+        success: boolean;
+        totalAssigned: number;
+        totalIdleAgents: number;
+        totalOpenIssues: number;
+        assignments: Array<unknown>;
+        message?: string;
+      };
 
       return {
-        reclaimed: result.reclaimed,
-        reclaimedTasks: result.details,
-        message:
-          result.reclaimed > 0
-            ? `Reclaimed ${result.reclaimed} task(s) from stale agents. Tasks are now available for checkout.`
-            : "No stale agents found. All active agents have recent heartbeats.",
+        success: reclaimResult.reclaimed > 0 || assignResult.success,
+        reclaimed: reclaimResult.reclaimed,
+        reclaimedTasks: reclaimResult.details,
+        assigned: assignResult.totalAssigned ?? 0,
+        assignments: assignResult.assignments ?? [],
+        totalIdleAgents: assignResult.totalIdleAgents ?? 0,
+        totalOpenIssues: assignResult.totalOpenIssues ?? 0,
+        message: `Reclaimed ${reclaimResult.reclaimed} stale task(s); assigned ${assignResult.totalAssigned ?? 0} task(s).${assignResult.message ? ` ${assignResult.message}` : ""}`,
       };
     }
 
@@ -1523,14 +1779,14 @@ export async function executeAgentManage(args: AgentManageArgs): Promise<unknown
       const budgetService = new AgentBudgetService(store);
       const contextService = new AgentContextService(factory);
       const checkoutService = new TaskCheckoutService(factory, store, contextService);
-      const projectId = rest.projectId as string;
+      const projectId = args.projectId;
 
       if (!projectId) return { success: false, message: "projectId is required" };
 
       // 1. Get all agents, filtering to eligible ones only
       const agents = await store.listAgents();
-      const agentIdFilter = rest.agentIds as string[] | undefined;
-      const roleFilter = rest.roleFilter as string | undefined;
+      const agentIdFilter = args.agentIds;
+      const roleFilter = args.roleFilter;
       const staleMs = 60 * 60 * 1000; // 1 hour
       const now = Date.now();
 
@@ -1588,7 +1844,7 @@ export async function executeAgentManage(args: AgentManageArgs): Promise<unknown
         reason: string;
       }> = [];
       const assignedIssues = new Set<number>();
-      const maxAssignments = (rest.maxAssignments as number) || eligibleAgents.length;
+      const maxAssignments = args.maxAssignments || eligibleAgents.length;
 
       for (const agent of eligibleAgents) {
         if (assignments.length >= maxAssignments) break;
@@ -1683,13 +1939,9 @@ export async function executeAgentManage(args: AgentManageArgs): Promise<unknown
       const factory = createGitHubFactory();
       const config = factory.getConfig();
       const octokit = factory.getOctokit();
-      const issueNumber = rest.issueNumber as number;
-      const subtaskDefs = rest.subtasks as Array<{
-        title: string;
-        description: string;
-        acceptanceCriteria?: string;
-      }>;
-      const projectId = rest.projectId as string;
+      const issueNumber = args.issueNumber;
+      const subtaskDefs = args.subtasks;
+      const projectId = args.projectId;
 
       if (!issueNumber || !subtaskDefs?.length) {
         return { success: false, message: "issueNumber and subtasks[] are required" };
@@ -1789,7 +2041,8 @@ export async function executeAgentManage(args: AgentManageArgs): Promise<unknown
       const store = new AgentStore(factory);
       const contextService = new AgentContextService(factory);
       const checkoutService = new TaskCheckoutService(factory, store, contextService);
-      const projectId = rest.projectId as string;
+      const projectId = args.projectId;
+      const reviewerId = args.reviewerId;
 
       if (!projectId) return { success: false, message: "projectId is required" };
 
@@ -1849,40 +2102,66 @@ export async function executeAgentManage(args: AgentManageArgs): Promise<unknown
         }
 
         if (findings.length === 0) {
-          // Auto-approve: close the issue with approval comment
-          await octokit.rest.issues
-            .createComment({
-              owner: config.owner,
-              repo: config.repo,
-              issue_number: issue.number,
-              body: `## Auto-Approved by Convergence Loop\n\nAll validation checks passed.\n**Approved at:** ${new Date().toISOString()}`,
-            })
-            .catch((err) => {
-              logger.warn(`converge: failed to comment approval on issue #${issue.number}`, err);
-            });
-          await octokit.rest.issues
-            .update({
-              owner: config.owner,
-              repo: config.repo,
-              issue_number: issue.number,
-              state: "closed",
-            })
-            .catch((err) => {
-              logger.warn(`converge: failed to close issue #${issue.number}`, err);
-            });
+          await settleConvergedTask({
+            factory,
+            store,
+            checkoutService,
+            reviewerId,
+            issueNumber: issue.number,
+            approved: true,
+            summary: "Auto-approved by convergence loop: all validation checks passed.",
+            fallback: async () => {
+              await octokit.rest.issues
+                .createComment({
+                  owner: config.owner,
+                  repo: config.repo,
+                  issue_number: issue.number,
+                  body: `## Auto-Approved by Convergence Loop\n\nAll validation checks passed.\n**Approved at:** ${new Date().toISOString()}`,
+                })
+                .catch((err) => {
+                  logger.warn(
+                    `converge: failed to comment approval on issue #${issue.number}`,
+                    err
+                  );
+                });
+              await octokit.rest.issues
+                .update({
+                  owner: config.owner,
+                  repo: config.repo,
+                  issue_number: issue.number,
+                  state: "closed",
+                })
+                .catch((err) => {
+                  logger.warn(`converge: failed to close issue #${issue.number}`, err);
+                });
+            },
+          });
           report.approved.push({ issue: issue.number, title: issue.title });
         } else {
-          // Reject with findings
-          await octokit.rest.issues
-            .createComment({
-              owner: config.owner,
-              repo: config.repo,
-              issue_number: issue.number,
-              body: `## Auto-Rejected by Convergence Loop\n\nFindings:\n${findings.map((f) => "- " + f).join("\n")}\n\n**Rejected at:** ${new Date().toISOString()}`,
-            })
-            .catch((err) => {
-              logger.warn(`converge: failed to comment rejection on issue #${issue.number}`, err);
-            });
+          await settleConvergedTask({
+            factory,
+            store,
+            checkoutService,
+            reviewerId,
+            issueNumber: issue.number,
+            approved: false,
+            feedback: findings.join("; "),
+            fallback: async () => {
+              await octokit.rest.issues
+                .createComment({
+                  owner: config.owner,
+                  repo: config.repo,
+                  issue_number: issue.number,
+                  body: `## Auto-Rejected by Convergence Loop\n\nFindings:\n${findings.map((f) => "- " + f).join("\n")}\n\n**Rejected at:** ${new Date().toISOString()}`,
+                })
+                .catch((err) => {
+                  logger.warn(
+                    `converge: failed to comment rejection on issue #${issue.number}`,
+                    err
+                  );
+                });
+            },
+          });
           report.rejected.push({ issue: issue.number, title: issue.title, findings });
 
           // Auto-decompose if test failures (create a fix subtask)
@@ -1929,7 +2208,7 @@ export async function executeAgentManage(args: AgentManageArgs): Promise<unknown
       const factory = createGitHubFactory();
       const store = new AgentStore(factory);
       const agents = await store.listAgents();
-      const staleThreshold = ((rest.staleAfterMinutes as number) || 60) * 60 * 1000;
+      const staleThreshold = (args.staleAfterMinutes || 60) * 60 * 1000;
       const now = Date.now();
 
       const staleAgents = agents.filter((a) => {
@@ -1972,9 +2251,9 @@ export async function executeAgentManage(args: AgentManageArgs): Promise<unknown
       // The calling agent runs this in a loop until all issues are closed.
       const factory = createGitHubFactory();
       const wpStore = new WorkProductStore(factory);
-      const projectId = rest.projectId as string;
-      const iteration = (rest.iteration as number) || 1;
-      const maxIterations = (rest.maxIterations as number) || 10;
+      const projectId = args.projectId;
+      const iteration = args.iteration || 1;
+      const maxIterations = args.maxIterations || 10;
 
       if (!projectId) return { success: false, message: "projectId is required" };
       if (iteration > maxIterations)
@@ -2066,7 +2345,7 @@ export async function executeAgentManage(args: AgentManageArgs): Promise<unknown
     }
 
     default:
-      unknownAction("agent_manage", action);
+      unknownAction("agent_manage", originalAction);
   }
 }
 
@@ -2145,6 +2424,7 @@ const TOOL_CATALOG: Record<
       "update_item_position",
       "filter_items",
       "setup_agent_fields",
+      "set_collaborators",
     ],
     description: "GitHub Projects v2 management — CRUD, fields, views, items, templates, linking",
   },
@@ -2169,8 +2449,13 @@ const TOOL_CATALOG: Record<
       "get_parent_issue",
       "reprioritize_sub_issue",
       "remove_sub_issue",
+      "list_dependencies",
+      "add_blocker",
+      "remove_blocker",
+      "list_issue_types",
     ],
-    description: "GitHub Issues — CRUD, comments, drafts, sub-issues, advanced search",
+    description:
+      "GitHub Issues — CRUD, comments, drafts, sub-issues, advanced search, native blockers and issue types",
   },
   pull_requests: {
     tool: "manage_prs",
@@ -2203,16 +2488,8 @@ const TOOL_CATALOG: Record<
   },
   automation: {
     tool: "manage_automation",
-    actions: [
-      "create_rule",
-      "update_rule",
-      "delete_rule",
-      "get_rule",
-      "list_rules",
-      "enable_rule",
-      "disable_rule",
-    ],
-    description: "Automation rules — CRUD, enable/disable project automation",
+    actions: ["list_workflows", "get_workflow", "delete_workflow"],
+    description: "Project automations — list, read and delete project workflows",
   },
   iterations: {
     tool: "manage_iterations",
@@ -2253,7 +2530,6 @@ const TOOL_CATALOG: Record<
       "enrich_bulk",
       "triage_issue",
       "triage_all",
-      "schedule_triaging",
       "suggest_labels",
       "detect_duplicates",
       "find_related",
@@ -2308,7 +2584,7 @@ const TOOL_CATALOG: Record<
       "cleanup_registry",
     ],
     description:
-      "Agent orchestration — task lifecycle (agent_work), administration (agent_manage), PM coordination (assign_task, get_swarm_status, rebalance_workload)",
+      "Agent orchestration — task lifecycle (agent_work), administration (agent_manage), PM coordination (assign_task, get_swarm_status, rebalance_workload with stale reclaim plus smart assignment)",
   },
   system: {
     tool: "system",

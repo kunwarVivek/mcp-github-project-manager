@@ -26,7 +26,7 @@ vi.mock("../../../infrastructure/github/GitHubRepositoryFactory", () => {
       createMilestoneRepository: vi.fn(),
       createProjectRepository: vi.fn(),
       createSprintRepository: vi.fn(),
-      createAutomationRuleRepository: vi.fn(),
+      createProjectWorkflowRepository: vi.fn(),
       createSubIssueRepository: vi.fn(),
       createStatusUpdateRepository: vi.fn(),
     };

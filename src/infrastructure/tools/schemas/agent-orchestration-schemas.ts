@@ -48,6 +48,8 @@ export type DeregisterAgentArgs = z.infer<typeof deregisterAgentSchema>;
 export const checkoutTaskSchema = z.object({
   agentId: z.string().min(1, "Agent ID is required"),
   projectId: z.string().optional(),
+  /** The named project view that defines the claiming pool. */
+  view: z.string().optional(),
   strategy: CheckoutStrategySchema.default("highest_priority"),
   labels: z.array(z.string()).optional(),
   milestone: z.string().optional(),

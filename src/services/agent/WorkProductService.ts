@@ -2,6 +2,7 @@ import type { WorkProduct } from "../../domain/agent-orchestration-types";
 import { AGENT_FIELDS } from "../../domain/agent-orchestration-types";
 import type { WorkProductStore } from "../../infrastructure/agent/WorkProductStore";
 import type { GitHubRepositoryFactory } from "../../infrastructure/github/GitHubRepositoryFactory";
+import { projectFieldUnionSelection } from "../../infrastructure/github/project-field-fragments";
 import { safeCall } from "../utils/safeCall";
 
 // ---------------------------------------------------------------------------
@@ -58,8 +59,7 @@ const LIST_FIELDS_QUERY = `
       ... on ProjectV2 {
         fields(first: 50) {
           nodes {
-            ... on ProjectV2Field { id name dataType }
-            ... on ProjectV2SingleSelectField { id name dataType options { id name } }
+            ${projectFieldUnionSelection({ singleSelect: "options { id name }" })}
           }
         }
       }

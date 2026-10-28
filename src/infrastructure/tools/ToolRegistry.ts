@@ -112,8 +112,6 @@ import {
   assignItemsToIterationTool,
   clearFieldValueTool,
   copyProjectFromTemplateTool,
-  // Automation service tools
-  createAutomationRuleTool,
   // Draft issue tools
   createDraftIssueTool,
   // Issue comment tools
@@ -134,14 +132,13 @@ import {
   // Status update tools
   createStatusUpdateTool,
   createTraceabilityMatrixTool,
-  deleteAutomationRuleTool,
   deleteDraftIssueTool,
   deleteIssueCommentTool,
   deleteMilestoneTool,
   deleteProjectTool,
   deleteProjectViewTool,
-  disableAutomationRuleTool,
-  enableAutomationRuleTool,
+  // Project automation workflow tools
+  deleteProjectWorkflowTool,
   enhancePRDTool,
   enrichIssuesBulkTool,
   enrichIssueTool,
@@ -149,7 +146,6 @@ import {
   generatePRDTool,
   // AI-powered automation tools
   generateRoadmapTool,
-  getAutomationRuleTool,
   getCurrentIterationTool,
   getCurrentSprintTool,
   getFieldValueTool,
@@ -164,11 +160,12 @@ import {
   getParentIssueTool,
   getProjectReadmeTool,
   getProjectTool,
+  // Project automation workflow tools
+  getProjectWorkflowTool,
   getPullRequestTool,
   getSprintMetricsTool,
   getStatusUpdateTool,
   getUpcomingMilestonesTool,
-  listAutomationRulesTool,
   listIssueCommentsTool,
   listIssuesTool,
   listLabelsTool,
@@ -179,6 +176,8 @@ import {
   listProjectsTool,
   // View tools
   listProjectViewsTool,
+  // Project automation workflow tools
+  listProjectWorkflowsTool,
   listPullRequestReviewsTool,
   listPullRequestsTool,
   listSprintsTool,
@@ -193,14 +192,12 @@ import {
   removeProjectItemTool,
   removeSubIssueTool,
   reprioritizeSubIssueTool,
-  scheduleTriagingTool,
   // Field values tools
   setFieldValueTool,
   triageAllIssuesTool,
   triageIssueTool,
   unarchiveProjectItemTool,
   unmarkProjectAsTemplateTool,
-  updateAutomationRuleTool,
   updateDraftIssueTool,
   updateIssueCommentTool,
   updateIssueTool,
@@ -217,6 +214,65 @@ import {
 } from "./ToolSchemas";
 import type { ToolAnnotations, ToolDefinition } from "./ToolValidator";
 
+/** A JSON Schema document as produced by zod's converter. */
+type JsonSchema = Record<string, unknown>;
+
+/**
+ * Merge the properties of every union variant into one flat map.
+ *
+ * A name that several variants declare with DIFFERENT shapes is widened to the
+ * union of the observed shapes (`anyOf`) instead of silently taking the first
+ * one: the top level must never be stricter than the variant that actually
+ * matches the call, or a valid call would be rejected before the handler runs.
+ * `anyOf` of the observed shapes is a superset of each of them, so widening
+ * always succeeds — a shape that cannot be represented at all is left out of
+ * the top level rather than described with a lie.
+ */
+const mergeVariantProperties = (variants: JsonSchema[]): JsonSchema => {
+  const byName = new Map<string, JsonSchema[]>();
+  for (const variant of variants) {
+    const properties = (variant.properties ?? {}) as Record<string, JsonSchema>;
+    for (const [name, propertySchema] of Object.entries(properties)) {
+      const seen = byName.get(name);
+      if (seen) {
+        seen.push(propertySchema);
+      } else {
+        byName.set(name, [propertySchema]);
+      }
+    }
+  }
+
+  const merged: JsonSchema = {};
+  for (const [name, schemas] of byName) {
+    const distinct: JsonSchema[] = [];
+    for (const candidate of schemas) {
+      const serialized = JSON.stringify(candidate);
+      if (!distinct.some((known) => JSON.stringify(known) === serialized)) {
+        distinct.push(candidate);
+      }
+    }
+
+    if (distinct.length === 1) {
+      merged[name] = distinct[0];
+      continue;
+    }
+
+    const widened: JsonSchema = { anyOf: distinct };
+    // Hoist a default only when every observed shape agrees on it, so the
+    // advertised default is never a value some variant would reject.
+    const defaults = distinct.map((shape) => shape.default);
+    if (
+      defaults.every((value) => value !== undefined) &&
+      new Set(defaults.map((value) => JSON.stringify(value))).size === 1
+    ) {
+      widened.default = defaults[0];
+    }
+    merged[name] = widened;
+  }
+
+  return merged;
+};
+
 /**
  * Convert a Zod schema to JSON Schema.
  *
@@ -230,13 +286,57 @@ import type { ToolAnnotations, ToolDefinition } from "./ToolValidator";
  *
  * `io: "input"` matters: schemas carry `.default()`s, and the input view is
  * what a caller must satisfy (the output view marks defaulted fields required).
+ * Output schemas are converted with `io: "output"` for the same reason — the
+ * value the server returns does contain the defaults.
+ *
+ * A union (the compound tools are discriminated unions of one variant per
+ * action) is published as a HYBRID: the per-action `oneOf` variants are kept,
+ * so a client that understands them still gets the per-action required
+ * arguments, AND every argument of every action is merged into the top-level
+ * `properties`, so a client that only reads the top level (the flat shape
+ * every other tool has) still sees the complete argument list. The top level
+ * requires only `action`; the per-action required arguments are enforced by
+ * the `oneOf` branch that matches.
  */
-const toJsonSchema = (schema: ZodTypeAny): Record<string, unknown> =>
-  z.toJSONSchema(schema as never, {
-    io: "input",
+const toJsonSchema = (schema: ZodTypeAny, io: "input" | "output" = "input"): JsonSchema => {
+  const json = z.toJSONSchema(schema as never, {
+    io,
     // Inline definitions: MCP clients expect a self-contained schema per tool.
     unrepresentable: "any",
-  }) as Record<string, unknown>;
+  }) as JsonSchema;
+
+  const variants = (json.oneOf ?? json.anyOf) as JsonSchema[] | undefined;
+  if (!json.type && variants?.every((variant) => variant.type === "object")) {
+    const actionValues = variants
+      .map((variant) => {
+        const properties = variant.properties as Record<string, { const?: unknown }> | undefined;
+        return properties?.action?.const;
+      })
+      .filter((value): value is string => typeof value === "string");
+
+    const merged = mergeVariantProperties(variants);
+    // The discriminator is published as an enum of every action, not as the
+    // per-variant `const`.
+    delete merged.action;
+
+    const actionRequired = variants.some((variant) => {
+      const required = variant.required as string[] | undefined;
+      return Array.isArray(required) && required.includes("action");
+    });
+
+    return {
+      ...json,
+      type: "object",
+      properties: {
+        ...merged,
+        ...(actionValues.length ? { action: { type: "string", enum: actionValues } } : {}),
+      },
+      required: actionRequired ? ["action"] : [],
+    };
+  }
+
+  return json;
+};
 
 /**
  * Capability groups for compound tools.
@@ -364,6 +464,19 @@ export class ToolRegistry {
   }
 
   /**
+   * Names of every registered executor.
+   *
+   * An executor is only reachable through `execute(toolName)`, and the only
+   * caller passes the name of a tool an MCP client called - so a registered
+   * executor whose name is not a public tool name can never run. Exposing the
+   * names lets a test pin that invariant instead of leaving it to be
+   * re-derived by inspection.
+   */
+  public getExecutorNames(): string[] {
+    return Array.from(this._executors.keys());
+  }
+
+  /**
    * Convert compound tools to MCP format for list_tools response.
    * Only returns tools from enabled capability groups.
    * discover_tools is always included regardless of group filter.
@@ -387,7 +500,9 @@ export class ToolRegistry {
       title: tool.title,
       description: tool.description,
       inputSchema: toJsonSchema(tool.schema),
-      outputSchema: tool.outputSchema ? toJsonSchema(tool.outputSchema) : undefined,
+      // The output view is the one the server's result must satisfy: the
+      // value it returns carries the defaults, so they are required there.
+      outputSchema: tool.outputSchema ? toJsonSchema(tool.outputSchema, "output") : undefined,
       annotations: tool.annotations,
     }));
   }
@@ -490,14 +605,10 @@ export class ToolRegistry {
     this.registerTool(enhancePRDTool);
     this.registerTool(createTraceabilityMatrixTool);
 
-    // Register automation service tools
-    this.registerTool(createAutomationRuleTool);
-    this.registerTool(updateAutomationRuleTool);
-    this.registerTool(deleteAutomationRuleTool);
-    this.registerTool(getAutomationRuleTool);
-    this.registerTool(listAutomationRulesTool);
-    this.registerTool(enableAutomationRuleTool);
-    this.registerTool(disableAutomationRuleTool);
+    // Register project automation workflow tools
+    this.registerTool(listProjectWorkflowsTool);
+    this.registerTool(getProjectWorkflowTool);
+    this.registerTool(deleteProjectWorkflowTool);
 
     // Register iteration management tools
     this.registerTool(getIterationConfigurationTool);
@@ -512,7 +623,6 @@ export class ToolRegistry {
     this.registerTool(enrichIssuesBulkTool);
     this.registerTool(triageIssueTool);
     this.registerTool(triageAllIssuesTool);
-    this.registerTool(scheduleTriagingTool);
 
     // Register health check tool
     this.registerTool(healthCheckTool);
@@ -691,7 +801,7 @@ export class ToolRegistry {
         name: "manage_automation",
         title: "Manage Automation",
         description:
-          "Manage Automation Rules: create, update, delete, get, list rules; enable and disable rules. Use the `action` field to select the operation.",
+          "Manage Project Automations: list, get and delete the automation workflows of a GitHub project. Use the `action` field to select the operation.",
         schema: manageAutomationSchema,
         annotations: {
           readOnlyHint: false,
@@ -789,7 +899,7 @@ export class ToolRegistry {
         name: "agent_work",
         title: "Agent Work",
         description:
-          "Agent work operations: register agents, checkout/release/complete tasks, send heartbeats, check work status, get task context. Use the `action` field to select the operation.",
+          "Agent work operations: register agents, checkout/release/complete tasks, send heartbeats, submit/check review state, validate work products, and get handoff context. Use the `action` field to select the operation.",
         schema: agentWorkSchema,
         annotations: {
           readOnlyHint: false,
@@ -803,7 +913,7 @@ export class ToolRegistry {
         name: "agent_manage",
         title: "Agent Management",
         description:
-          "Agent management: list/deregister agents, get activity, submit work products, get/set budgets. Use the `action` field to select the operation.",
+          "Agent management: list/deregister agents, activity, work products, budgets (warningFraction or warningThreshold), stale reclaim, smart assignment, workload rebalancing, convergence, and registry cleanup. Use the `action` field to select the operation.",
         schema: agentManageSchema,
         annotations: {
           readOnlyHint: false,
