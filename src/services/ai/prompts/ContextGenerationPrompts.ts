@@ -66,6 +66,8 @@ export const BusinessContextSchema = z.object({
 // Technical Context Generation
 // ============================================================================
 
+export type BusinessContext = z.infer<typeof BusinessContextSchema>;
+
 export const TECHNICAL_CONTEXT_PROMPT = {
   systemPrompt: `You are a senior software architect specializing in extracting technical context for development tasks.
 
@@ -152,6 +154,8 @@ export const TechnicalContextSchema = z.object({
 // ============================================================================
 // Implementation Guidance Generation
 // ============================================================================
+
+export type TechnicalContext = z.infer<typeof TechnicalContextSchema>;
 
 export const IMPLEMENTATION_GUIDANCE_PROMPT = {
   systemPrompt: `You are a senior software engineer and technical mentor specializing in providing implementation guidance.
@@ -243,6 +247,8 @@ export const ImplementationGuidanceSchema = z.object({
 // ============================================================================
 // Contextual References Generation
 // ============================================================================
+
+export type GeneratedImplementationGuidance = z.infer<typeof ImplementationGuidanceSchema>;
 
 export const CONTEXTUAL_REFERENCES_PROMPT = {
   systemPrompt: `You are a technical documentation specialist who excels at creating contextual references for development tasks.
@@ -458,7 +464,7 @@ export const CONTEXT_GENERATION_CONFIGS = {
 /**
  * Helper function to format prompts with variables
  */
-export function formatContextPrompt(template: string, variables: Record<string, any>): string {
+export function formatContextPrompt(template: string, variables: Record<string, unknown>): string {
   return template.replace(/\{(\w+)\}/g, (match, key) => {
     return variables[key] !== undefined ? String(variables[key]) : match;
   });

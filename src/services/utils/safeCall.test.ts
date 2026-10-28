@@ -45,14 +45,14 @@ describe("safeCall", () => {
   });
 
   it("should propagate the mapped error type", async () => {
-    try {
-      await safeCall(async () => {
-        throw new Error("test error");
-      });
-      fail("Should have thrown");
-    } catch (error: any) {
-      // mapErrorToMCPError wraps errors in an MCP-compatible format
-      expect(error).toBeDefined();
-    }
+    // mapErrorToMCPError wraps errors in an MCP-compatible format
+    const error = await safeCall(async () => {
+      throw new Error("test error");
+    }).then(
+      () => undefined,
+      (caught: unknown) => caught
+    );
+    expect(error).toBeInstanceOf(Error);
+    expect((error as Error).message).toContain("test error");
   });
 });

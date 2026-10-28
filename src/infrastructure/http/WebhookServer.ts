@@ -1,4 +1,5 @@
 import * as http from "node:http";
+import type { ParsedUrlQuery } from "node:querystring";
 import * as url from "node:url";
 import {
   SSE_ENABLED,
@@ -107,7 +108,8 @@ export class WebhookServer {
    * Stop the webhook server
    */
   async stop(): Promise<void> {
-    if (!this.isRunning || !this.server) {
+    const server = this.server;
+    if (!this.isRunning || !server) {
       return;
     }
 
@@ -118,7 +120,7 @@ export class WebhookServer {
       }
       this.sseConnections.clear();
 
-      this.server!.close(() => {
+      server.close(() => {
         this.isRunning = false;
         this.logger.info("Webhook server stopped");
         resolve();
@@ -482,9 +484,9 @@ export class WebhookServer {
   private async handleRecentEvents(
     _req: http.IncomingMessage,
     res: http.ServerResponse,
-    query: any
+    query: ParsedUrlQuery
   ): Promise<void> {
-    const limit = parseInt(query.limit as string, 10) || 100;
+    const limit = parseInt(String(query.limit), 10) || 100;
 
     try {
       const events = await this.eventStore.getRecentEvents(limit);
@@ -543,9 +545,10 @@ export class WebhookServer {
   /**
    * Send SSE event
    */
-  private sendSSEEvent(res: http.ServerResponse, type: string, data: any): void {
+  private sendSSEEvent(res: http.ServerResponse, type: string, data: object): void {
     try {
-      const eventData = `event: ${type}\ndata: ${JSON.stringify(data)}\nid: ${data.id || Date.now()}\n\n`;
+      const eventId = ("id" in data && data.id) || Date.now();
+      const eventData = `event: ${type}\ndata: ${JSON.stringify(data)}\nid: ${eventId}\n\n`;
       res.write(eventData);
     } catch (error) {
       this.logger.error("Error sending SSE event:", error);
@@ -586,11 +589,11 @@ export class WebhookServer {
         "Content-Type, X-Hub-Signature-256, X-GitHub-Event, X-GitHub-Delivery"
       );
       res.setHeader("Vary", "Origin");
-    } else if (req.headers["origin"]) {
+    } else if (req.headers.origin) {
       this.securityLog.record({
         type: "cors_origin_rejected",
         source: req.socket.remoteAddress ?? "unknown",
-        details: { origin: req.headers["origin"] },
+        details: { origin: req.headers.origin },
         severity: "medium",
       });
     }
@@ -608,7 +611,7 @@ export class WebhookServer {
       .split(",")
       .map((o) => o.trim())
       .filter(Boolean);
-    const origin = req.headers["origin"];
+    const origin = req.headers.origin;
     if (origin && allowed.includes(origin)) return origin;
     return undefined;
   }
@@ -645,7 +648,10 @@ export class WebhookServer {
     this.processedDeliveries.add(delivery);
     this.processedDeliveriesOrder.push(delivery);
     while (this.processedDeliveriesOrder.length > WebhookServer.MAX_DELIVERY_CACHE) {
-      const oldest = this.processedDeliveriesOrder.shift()!;
+      const oldest = this.processedDeliveriesOrder.shift();
+      if (oldest === undefined) {
+        break;
+      }
       this.processedDeliveries.delete(oldest);
     }
   }
@@ -653,7 +659,7 @@ export class WebhookServer {
   /**
    * Send JSON response
    */
-  private sendJSONResponse(res: http.ServerResponse, statusCode: number, data: any): void {
+  private sendJSONResponse(res: http.ServerResponse, statusCode: number, data: unknown): void {
     res.writeHead(statusCode, { "Content-Type": "application/json" });
     res.end(JSON.stringify(data));
   }

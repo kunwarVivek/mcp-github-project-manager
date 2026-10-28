@@ -153,12 +153,12 @@ export class MilestoneMetrics {
    * Whether the milestone is overdue
    */
   get isOverdue(): boolean {
-    if (!this.hasDueDate) {
+    if (this.dueDate === null) {
       return false;
     }
 
     const now = new Date();
-    const due = new Date(this.dueDate!);
+    const due = new Date(this.dueDate);
     return now > due && this.status !== ResourceStatus.COMPLETED;
   }
 
@@ -168,12 +168,12 @@ export class MilestoneMetrics {
    * Returns negative number if overdue
    */
   get daysUntilDue(): number | undefined {
-    if (!this.hasDueDate) {
+    if (this.dueDate === null) {
       return undefined;
     }
 
     const now = new Date();
-    const due = new Date(this.dueDate!);
+    const due = new Date(this.dueDate);
     const diffMs = due.getTime() - now.getTime();
     return Math.ceil(diffMs / (1000 * 60 * 60 * 24));
   }

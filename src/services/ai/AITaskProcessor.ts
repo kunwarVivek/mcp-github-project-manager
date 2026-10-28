@@ -1,4 +1,4 @@
-import { generateObject, generateText } from "ai";
+import { generateObject, generateText, type LanguageModel } from "ai";
 import { v4 as uuidv4 } from "uuid";
 import { z } from "zod";
 import {
@@ -24,12 +24,25 @@ import { CONFIDENCE_PROMPT_CONFIGS, withConfidenceAssessment } from "./prompts/C
 import { formatPrompt, PRD_PROMPT_CONFIGS } from "./prompts/PRDGenerationPrompts";
 import { formatTaskPrompt, TASK_PROMPT_CONFIGS } from "./prompts/TaskGenerationPrompts";
 
+/** `LanguageModel` is either a gateway model id string or a model object. */
+function modelIdOf(model: LanguageModel): string {
+  return typeof model === "string" ? model : model.modelId;
+}
+
+/** A subtask produced by AI task expansion (or its deterministic fallback). */
+export interface GeneratedSubtask {
+  id: string;
+  title: string;
+  description: string;
+  complexity: number;
+  estimatedHours: number;
+}
+
 /**
  * Core AI Task Processor using Vercel AI SDK
  */
 export class AITaskProcessor {
   private aiFactory: AIServiceFactory;
-  private confidenceScorer: ConfidenceScorer;
   private readonly logger: ILogger;
 
   /**
@@ -41,14 +54,15 @@ export class AITaskProcessor {
   constructor(aiFactory?: AIServiceFactory, logger?: ILogger) {
     this.aiFactory = aiFactory ?? AIServiceFactory.getInstance();
     this.logger = logger ?? Logger.getInstance();
-    this.confidenceScorer = new ConfidenceScorer();
   }
 
   /**
    * Get AI model with fallback logic
    */
-  private getModelWithFallback(preferredType?: "main" | "research" | "fallback" | "prd"): any {
-    let model = null;
+  private getModelWithFallback(
+    preferredType?: "main" | "research" | "fallback" | "prd"
+  ): LanguageModel {
+    let model: LanguageModel | null = null;
 
     if (preferredType) {
       model = this.aiFactory.getModel(preferredType);
@@ -110,7 +124,7 @@ export class AITaskProcessor {
       const prd = result.object;
       prd.id = uuidv4();
       prd.aiGenerated = true;
-      prd.aiMetadata = this.createAIMetadata(model.modelId, prompt);
+      prd.aiMetadata = this.createAIMetadata(modelIdOf(model), prompt);
       prd.createdAt = new Date().toISOString();
       prd.updatedAt = new Date().toISOString();
 
@@ -223,7 +237,7 @@ export class AITaskProcessor {
         ...generated,
         id: uuidv4(),
         aiGenerated: true,
-        aiMetadata: this.createAIMetadata(model.modelId, prompt),
+        aiMetadata: this.createAIMetadata(modelIdOf(model), prompt),
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
@@ -275,7 +289,7 @@ export class AITaskProcessor {
 
       const prd = result.object;
       prd.aiGenerated = true;
-      prd.aiMetadata = this.createAIMetadata(model.modelId, prompt);
+      prd.aiMetadata = this.createAIMetadata(modelIdOf(model), prompt);
       prd.updatedAt = new Date().toISOString();
 
       return prd;
@@ -353,7 +367,7 @@ export class AITaskProcessor {
         id: task.id || uuidv4(),
         status: TaskStatus.PENDING,
         aiGenerated: true,
-        aiMetadata: this.createAIMetadata(model.modelId, prompt),
+        aiMetadata: this.createAIMetadata(modelIdOf(model), prompt),
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
         subtasks: task.subtasks || [],
@@ -431,7 +445,7 @@ export class AITaskProcessor {
     taskDescription: string;
     currentComplexity: number;
     maxDepth: number;
-  }): Promise<any[]> {
+  }): Promise<GeneratedSubtask[]> {
     const config = TASK_PROMPT_CONFIGS.expandTask;
     const model = this.getModelWithFallback("main");
 

@@ -1,7 +1,7 @@
 import { ResourceStatus, ResourceType } from "../../../domain/resource-types";
 
-export class GitHubTypeConverter {
-  static toResourceType(githubType: string): ResourceType {
+export const GitHubTypeConverter = {
+  toResourceType(githubType: string): ResourceType {
     switch (githubType.toLowerCase()) {
       case "issue":
         return ResourceType.ISSUE;
@@ -14,9 +14,9 @@ export class GitHubTypeConverter {
       default:
         throw new Error(`Invalid GitHub type: ${githubType}`);
     }
-  }
+  },
 
-  static toGitHubType(type: ResourceType): string {
+  toGitHubType(type: ResourceType): string {
     switch (type) {
       case ResourceType.ISSUE:
         return "issue";
@@ -29,9 +29,9 @@ export class GitHubTypeConverter {
       default:
         throw new Error(`Invalid resource type: ${type}`);
     }
-  }
+  },
 
-  static toResourceStatus(githubStatus: string): ResourceStatus {
+  toResourceStatus(githubStatus: string): ResourceStatus {
     switch (githubStatus.toLowerCase()) {
       case "open":
         return ResourceStatus.ACTIVE;
@@ -50,9 +50,9 @@ export class GitHubTypeConverter {
       default:
         throw new Error(`Invalid GitHub status: ${githubStatus}`);
     }
-  }
+  },
 
-  static toGitHubStatus(status: ResourceStatus): string {
+  toGitHubStatus(status: ResourceStatus): string {
     switch (status) {
       case ResourceStatus.ACTIVE:
         return "open";
@@ -68,27 +68,27 @@ export class GitHubTypeConverter {
       default:
         throw new Error(`Invalid resource status: ${status}`);
     }
-  }
+  },
 
-  static toISOString(date: string | Date | undefined | null): string | undefined {
+  toISOString(date: string | Date | undefined | null): string | undefined {
     if (!date) return undefined;
     return date instanceof Date ? date.toISOString() : new Date(date).toISOString();
-  }
+  },
 
-  static parseDate(dateString: string | null | undefined): Date | undefined {
+  parseDate(dateString: string | null | undefined): Date | undefined {
     if (!dateString) return undefined;
     const date = new Date(dateString);
-    return isNaN(date.getTime()) ? undefined : date;
-  }
+    return Number.isNaN(date.getTime()) ? undefined : date;
+  },
 
-  static formatDuration(startDate: Date, endDate: Date): number {
+  formatDuration(startDate: Date, endDate: Date): number {
     const diffTime = Math.abs(endDate.getTime() - startDate.getTime());
     return Math.ceil(diffTime / (1000 * 60 * 60 * 24 * 7)); // weeks
-  }
+  },
 
-  static addDuration(startDate: Date, durationWeeks: number): Date {
+  addDuration(startDate: Date, durationWeeks: number): Date {
     const result = new Date(startDate);
     result.setDate(result.getDate() + durationWeeks * 7);
     return result;
-  }
-}
+  },
+};

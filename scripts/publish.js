@@ -28,7 +28,7 @@ async function runPublish() {
     // Check for uncommitted changes
     try {
       execSync("git diff-index --quiet HEAD --");
-    } catch (error) {
+    } catch {
       process.stderr.write(
         "❌ You have uncommitted changes. Please commit or stash them before publishing."
       );

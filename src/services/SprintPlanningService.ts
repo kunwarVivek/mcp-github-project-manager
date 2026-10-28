@@ -18,10 +18,10 @@ const PlanSprintSchema = z.object({
   sprint: z.object({
     title: z.string().min(1, "Sprint title is required"),
     description: z.string(),
-    startDate: z.string().refine((val) => !isNaN(Date.parse(val)), {
+    startDate: z.string().refine((val) => !Number.isNaN(Date.parse(val)), {
       message: "Start date must be a valid date string",
     }),
-    endDate: z.string().refine((val) => !isNaN(Date.parse(val)), {
+    endDate: z.string().refine((val) => !Number.isNaN(Date.parse(val)), {
       message: "End date must be a valid date string",
     }),
     status: z.nativeEnum(ResourceStatus).optional(),

@@ -1,3 +1,4 @@
+import type { RestEndpointMethodTypes } from "@octokit/rest";
 import {
   blockerLabelName,
   ISSUE_TYPE_LABEL_PREFIX,
@@ -395,7 +396,7 @@ export class GitHubIssueRepository extends BaseGitHubRepository implements Issue
   /** Resolve any issue ID format to its GraphQL node ID. */
   private async resolveNodeId(id: IssueId): Promise<string> {
     const parsed = parseInt(id, 10);
-    if (isNaN(parsed) || String(parsed) !== id) return id; // already a node ID
+    if (Number.isNaN(parsed) || String(parsed) !== id) return id; // already a node ID
     // Numeric — look up the issue to get the node ID
     const issue = await this.findByNumber(parsed);
     if (!issue) throw new Error(`Issue not found: ${id}`);
@@ -407,7 +408,7 @@ export class GitHubIssueRepository extends BaseGitHubRepository implements Issue
 
     // If id is a numeric string (e.g. "42"), query by issue number.
     // If id is a node ID (e.g. "I_kwDOTxNJaM8..."), query by node ID.
-    if (!isNaN(issueNumber) && String(issueNumber) === id) {
+    if (!Number.isNaN(issueNumber) && String(issueNumber) === id) {
       return this.findByNumber(issueNumber);
     }
     return this.findByNodeId(id);
@@ -889,7 +890,8 @@ export class GitHubIssueRepository extends BaseGitHubRepository implements Issue
   /** Resolve an issue reference to its node id and number. */
   private async resolveIssueRef(id: IssueId): Promise<IssueRef> {
     const parsed = parseInt(id, 10);
-    const issue = !isNaN(parsed) && String(parsed) === id ? await this.findByNumber(parsed) : null;
+    const issue =
+      !Number.isNaN(parsed) && String(parsed) === id ? await this.findByNumber(parsed) : null;
 
     if (issue) return { nodeId: issue.id, number: issue.number };
 
@@ -969,8 +971,9 @@ export class GitHubIssueRepository extends BaseGitHubRepository implements Issue
 
   /** Create a repository label and return its GraphQL node id. */
   private async createLabel(name: string): Promise<string> {
-    const created = await this.rest<{ id: number; node_id: string; name: string }>(
-      (params) => this.octokit.rest.issues.createLabel(params),
+    const created = await this.rest(
+      (params: RestEndpointMethodTypes["issues"]["createLabel"]["parameters"]) =>
+        this.octokit.rest.issues.createLabel(params),
       { name, color: "ededed" }
     );
 

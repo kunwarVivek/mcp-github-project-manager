@@ -1,5 +1,12 @@
 import { z } from "zod";
-import { type TaskComplexity, TaskPriority, TaskStatus } from "../../../domain/ai-types.js";
+import {
+  type AcceptanceCriteria,
+  type AITask,
+  type SubTask,
+  type TaskComplexity,
+  TaskPriority,
+  TaskStatus,
+} from "../../../domain/ai-types.js";
 import type { MCPResponse } from "../../../domain/mcp-types.js";
 import { TaskGenerationService } from "../../../services/TaskGenerationService.js";
 import { Logger } from "../../logger/index.js";
@@ -49,6 +56,29 @@ const expandTaskSchema = z.object({
 
 export type ExpandTaskArgs = z.infer<typeof expandTaskSchema>;
 
+/** Subtask enriched with acceptance criteria, tags and priority. */
+interface EnhancedSubtask extends SubTask {
+  acceptanceCriteria: AcceptanceCriteria[];
+  tags: string[];
+  priority: TaskPriority;
+}
+
+interface SubtaskDependency {
+  from: string;
+  to: string;
+  type: "blocks" | "depends_on";
+  description: string;
+}
+
+interface SubtaskMetrics {
+  totalSubtasks: number;
+  totalEffort: number;
+  avgComplexity: number;
+  complexityReduction: number;
+  effortIncrease: number;
+  effortIncreasePercent: number;
+}
+
 /**
  * Implementation function for expand_task tool
  */
@@ -57,7 +87,7 @@ async function executeExpandTask(args: ExpandTaskArgs): Promise<MCPResponse> {
 
   try {
     // Create a mock parent task
-    const parentTask = {
+    const parentTask: AITask = {
       id: "parent-task",
       title: args.taskTitle,
       description: args.taskDescription,
@@ -142,7 +172,7 @@ async function executeExpandTask(args: ExpandTaskArgs): Promise<MCPResponse> {
 /**
  * Enhance subtasks with additional details
  */
-function enhanceSubtasks(subtasks: any[], args: ExpandTaskArgs) {
+function enhanceSubtasks(subtasks: SubTask[], args: ExpandTaskArgs): EnhancedSubtask[] {
   return subtasks.map((subtask, index) => {
     // Generate acceptance criteria if requested
     const acceptanceCriteria = args.includeAcceptanceCriteria
@@ -153,7 +183,11 @@ function enhanceSubtasks(subtasks: any[], args: ExpandTaskArgs) {
     const tags = generateSubtaskTags(subtask, args.projectType);
 
     // Adjust complexity to target if needed
-    const adjustedComplexity = Math.min(subtask.complexity, args.targetComplexity);
+    // min of two values in 1..10 stays within the TaskComplexity range
+    const adjustedComplexity = Math.min(
+      subtask.complexity,
+      args.targetComplexity
+    ) as TaskComplexity;
 
     return {
       ...subtask,
@@ -162,8 +196,8 @@ function enhanceSubtasks(subtasks: any[], args: ExpandTaskArgs) {
       estimatedHours: adjustedComplexity * 2, // Subtasks are smaller
       acceptanceCriteria,
       tags,
-      priority: index < 2 ? "high" : "medium", // First few subtasks are high priority
-      status: "pending",
+      priority: index < 2 ? TaskPriority.HIGH : TaskPriority.MEDIUM, // First few subtasks are high priority
+      status: TaskStatus.PENDING,
     };
   });
 }
@@ -171,9 +205,7 @@ function enhanceSubtasks(subtasks: any[], args: ExpandTaskArgs) {
 /**
  * Generate acceptance criteria for a subtask
  */
-function generateAcceptanceCriteria(
-  subtask: any
-): Array<{ id: string; description: string; completed: boolean }> {
+function generateAcceptanceCriteria(subtask: SubTask): AcceptanceCriteria[] {
   const criteria = [];
 
   // Generic criteria
@@ -223,7 +255,7 @@ function generateAcceptanceCriteria(
 /**
  * Generate appropriate tags for subtasks
  */
-function generateSubtaskTags(subtask: any, projectType?: string): string[] {
+function generateSubtaskTags(subtask: SubTask, projectType?: string): string[] {
   const tags = ["subtask"];
 
   if (projectType) {
@@ -247,12 +279,7 @@ function generateSubtaskTags(subtask: any, projectType?: string): string[] {
 /**
  * Detect dependencies between subtasks
  */
-function detectSubtaskDependencies(subtasks: any[]): Array<{
-  from: string;
-  to: string;
-  type: "blocks" | "depends_on";
-  description: string;
-}> {
+function detectSubtaskDependencies(subtasks: EnhancedSubtask[]): SubtaskDependency[] {
   const dependencies = [];
 
   // Simple heuristic-based dependency detection
@@ -305,7 +332,7 @@ function detectSubtaskDependencies(subtasks: any[]): Array<{
 /**
  * Calculate metrics for subtasks
  */
-function calculateSubtaskMetrics(subtasks: any[], parentTask: any) {
+function calculateSubtaskMetrics(subtasks: EnhancedSubtask[], parentTask: AITask): SubtaskMetrics {
   const totalEffort = subtasks.reduce((sum, task) => sum + task.estimatedHours, 0);
   const avgComplexity = subtasks.reduce((sum, task) => sum + task.complexity, 0) / subtasks.length;
 
@@ -326,9 +353,9 @@ function calculateSubtaskMetrics(subtasks: any[], parentTask: any) {
  * Generate recommendations for subtask management
  */
 function generateSubtaskRecommendations(
-  subtasks: any[],
+  subtasks: EnhancedSubtask[],
   args: ExpandTaskArgs,
-  metrics: any
+  metrics: SubtaskMetrics
 ): string[] {
   const recommendations = [];
 
@@ -374,10 +401,10 @@ function generateSubtaskRecommendations(
  * Format task expansion summary
  */
 function formatTaskExpansion(
-  parentTask: any,
-  subtasks: any[],
-  dependencies: any[],
-  metrics: any,
+  parentTask: AITask,
+  subtasks: EnhancedSubtask[],
+  dependencies: SubtaskDependency[],
+  metrics: SubtaskMetrics,
   recommendations: string[],
   _args: ExpandTaskArgs
 ): string {
@@ -415,9 +442,7 @@ function formatTaskExpansion(
     if (subtask.acceptanceCriteria.length > 0) {
       sections.push(
         "**Acceptance Criteria:**",
-        ...subtask.acceptanceCriteria
-          .slice(0, 2)
-          .map((criteria: any) => `- ${criteria.description}`),
+        ...subtask.acceptanceCriteria.slice(0, 2).map((criteria) => `- ${criteria.description}`),
         ""
       );
     }

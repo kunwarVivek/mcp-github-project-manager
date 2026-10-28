@@ -2,10 +2,10 @@
  * Simple logger interface used across the application
  */
 export interface ILogger {
-  debug(message: string, ...args: any[]): void;
-  info(message: string, ...args: any[]): void;
-  warn(message: string, ...args: any[]): void;
-  error(message: string, ...args: any[]): void;
+  debug(message: string, ...args: unknown[]): void;
+  info(message: string, ...args: unknown[]): void;
+  warn(message: string, ...args: unknown[]): void;
+  error(message: string, ...args: unknown[]): void;
 }
 
 /**
@@ -83,7 +83,7 @@ export class ConsoleLogger implements ILogger {
     this.prefix = prefix ? `[${prefix}] ` : "";
   }
 
-  debug(message: string, ...args: any[]): void {
+  debug(message: string, ...args: unknown[]): void {
     // Write to stderr to avoid interfering with MCP protocol
     process.stderr.write(`${this.prefix}${message}\n`);
     if (args.length > 0) {
@@ -91,7 +91,7 @@ export class ConsoleLogger implements ILogger {
     }
   }
 
-  info(message: string, ...args: any[]): void {
+  info(message: string, ...args: unknown[]): void {
     // Write to stderr to avoid interfering with MCP protocol
     process.stderr.write(`${this.prefix}${message}\n`);
     if (args.length > 0) {
@@ -99,7 +99,7 @@ export class ConsoleLogger implements ILogger {
     }
   }
 
-  warn(message: string, ...args: any[]): void {
+  warn(message: string, ...args: unknown[]): void {
     // Write to stderr to avoid interfering with MCP protocol
     process.stderr.write(`${this.prefix}${message}\n`);
     if (args.length > 0) {
@@ -107,7 +107,7 @@ export class ConsoleLogger implements ILogger {
     }
   }
 
-  error(message: string, ...args: any[]): void {
+  error(message: string, ...args: unknown[]): void {
     // Write to stderr to avoid interfering with MCP protocol
     process.stderr.write(`${this.prefix}${message}\n`);
     if (args.length > 0) {
@@ -120,10 +120,10 @@ export class ConsoleLogger implements ILogger {
  * No-op logger that doesn't do any logging
  */
 export class NoopLogger implements ILogger {
-  debug(_message: string, ..._args: any[]): void {}
-  info(_message: string, ..._args: any[]): void {}
-  warn(_message: string, ..._args: any[]): void {}
-  error(_message: string, ..._args: any[]): void {}
+  debug(_message: string, ..._args: unknown[]): void {}
+  info(_message: string, ..._args: unknown[]): void {}
+  warn(_message: string, ..._args: unknown[]): void {}
+  error(_message: string, ..._args: unknown[]): void {}
 }
 
 /**
@@ -161,19 +161,19 @@ export class Logger implements ILogger {
     return Logger.instance;
   }
 
-  debug(message: string, ...args: any[]): void {
+  debug(message: string, ...args: unknown[]): void {
     this.logger.debug(message, ...args);
   }
 
-  info(message: string, ...args: any[]): void {
+  info(message: string, ...args: unknown[]): void {
     this.logger.info(message, ...args);
   }
 
-  warn(message: string, ...args: any[]): void {
+  warn(message: string, ...args: unknown[]): void {
     this.logger.warn(message, ...args);
   }
 
-  error(message: string, ...args: any[]): void {
+  error(message: string, ...args: unknown[]): void {
     this.logger.error(message, ...args);
   }
 }

@@ -5,6 +5,7 @@ import {
   type TaskComplexity,
   type TaskPriority,
   TaskStatus,
+  type TraceabilityMatrix,
 } from "../../../domain/ai-types.js";
 import type { MCPResponse } from "../../../domain/mcp-types.js";
 import { RequirementsTraceabilityService } from "../../../services/RequirementsTraceabilityService.js";
@@ -124,8 +125,7 @@ async function executeCreateTraceabilityMatrix(
     );
 
     // Validate completeness if requested
-    // biome-ignore lint/suspicious/noExplicitAny: unvalidated AI response shape
-    let validation: any;
+    let validation: TraceabilityValidation | undefined;
     if (args.validateCompleteness) {
       validation = validateTraceabilityCompleteness(traceabilityMatrix);
     }
@@ -204,15 +204,17 @@ function extractSuccessMetricsFromContent(content: string): string[] {
   return metrics;
 }
 
-/**
- * Validate traceability matrix completeness
- */
-function validateTraceabilityCompleteness(matrix: any): {
+interface TraceabilityValidation {
   isComplete: boolean;
   score: number;
   issues: string[];
   recommendations: string[];
-} {
+}
+
+/**
+ * Validate traceability matrix completeness
+ */
+function validateTraceabilityCompleteness(matrix: TraceabilityMatrix): TraceabilityValidation {
   const issues = [];
   const recommendations = [];
   let score = 100;
@@ -264,8 +266,8 @@ function validateTraceabilityCompleteness(matrix: any): {
  * Format traceability matrix summary
  */
 function formatTraceabilityMatrixSummary(
-  matrix: any,
-  validation: any,
+  matrix: TraceabilityMatrix,
+  validation: TraceabilityValidation | undefined,
   args: CreateTraceabilityMatrixArgs
 ): string {
   const sections = [
@@ -304,8 +306,8 @@ function formatTraceabilityMatrixSummary(
   if (coverage.orphanedTasks.length > 0) {
     sections.push(
       "### ⚠️ Orphaned Tasks (No Requirements Link)",
-      ...coverage.orphanedTasks.slice(0, 5).map((taskId: string) => {
-        const task = matrix.tasks.find((t: any) => t.id === taskId);
+      ...coverage.orphanedTasks.slice(0, 5).map((taskId) => {
+        const task = matrix.tasks.find((t) => t.id === taskId);
         return `- ${task?.title || taskId}`;
       }),
       coverage.orphanedTasks.length > 5 ? `... and ${coverage.orphanedTasks.length - 5} more` : "",
@@ -316,8 +318,8 @@ function formatTraceabilityMatrixSummary(
   if (coverage.unimplementedRequirements.length > 0) {
     sections.push(
       "### ⚠️ Unimplemented Requirements",
-      ...coverage.unimplementedRequirements.slice(0, 5).map((reqId: string) => {
-        const req = matrix.businessRequirements.find((r: any) => r.id === reqId);
+      ...coverage.unimplementedRequirements.slice(0, 5).map((reqId) => {
+        const req = matrix.businessRequirements.find((r) => r.id === reqId);
         return `- ${req?.title || reqId}`;
       }),
       coverage.unimplementedRequirements.length > 5
@@ -357,20 +359,18 @@ function formatTraceabilityMatrixSummary(
   sections.push("## Sample Traceability Paths", "");
 
   // Show a few complete traceability paths
-  matrix.businessRequirements.slice(0, 3).forEach((req: any, index: number) => {
-    const relatedFeatures = matrix.features.filter((f: any) =>
+  matrix.businessRequirements.slice(0, 3).forEach((req, index) => {
+    const relatedFeatures = matrix.features.filter((f) =>
       matrix.traceabilityLinks.some(
-        (link: any) => link.fromRequirementId === req.id && link.toRequirementId === f.id
+        (link) => link.fromRequirementId === req.id && link.toRequirementId === f.id
       )
     );
 
     if (relatedFeatures.length > 0) {
       const feature = relatedFeatures[0];
-      const relatedUseCases = matrix.useCases.filter(
-        (uc: any) => uc.parentFeatureId === feature.id
-      );
-      const relatedTasks = matrix.tasks.filter((task: any) =>
-        task.implementsFeatures.includes(feature.id)
+      const relatedUseCases = matrix.useCases.filter((uc) => uc.parentFeatureId === feature.id);
+      const relatedTasks = matrix.tasks.filter((task) =>
+        task.implementsFeatures?.includes(feature.id)
       );
 
       sections.push(

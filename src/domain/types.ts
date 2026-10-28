@@ -304,6 +304,15 @@ export function createResource<T>(type: ResourceType, data: T): T & { type: Reso
   return { ...data, type };
 }
 
+// Type-specific field configuration. The iteration keys are the ones the
+// platform reads; other keys are carried through untouched.
+export interface FieldConfig {
+  iterationDuration?: number;
+  iterationStart?: string | Date;
+  iterations?: Array<{ id: string; title: string; startDate: string; duration: number }>;
+  [key: string]: unknown;
+}
+
 // Custom field configuration
 export interface CustomField {
   id: FieldId;
@@ -317,9 +326,9 @@ export interface CustomField {
   }>;
   description?: string;
   required?: boolean;
-  defaultValue?: any;
-  validation?: Record<string, any>;
-  config?: Record<string, any>;
+  defaultValue?: unknown;
+  validation?: Record<string, unknown>;
+  config?: FieldConfig;
 }
 
 // Field creation data
@@ -333,9 +342,9 @@ export interface CreateField {
   }>;
   description?: string;
   required?: boolean;
-  defaultValue?: any;
-  validation?: Record<string, any>;
-  config?: Record<string, any>;
+  defaultValue?: unknown;
+  validation?: Record<string, unknown>;
+  config?: FieldConfig;
 }
 
 // Field update data
@@ -349,9 +358,9 @@ export interface UpdateField {
   }>;
   description?: string;
   required?: boolean;
-  defaultValue?: any;
-  validation?: Record<string, any>;
-  config?: Record<string, any>;
+  defaultValue?: unknown;
+  validation?: Record<string, unknown>;
+  config?: FieldConfig;
 }
 
 // Project view configuration
@@ -389,18 +398,20 @@ export interface ProjectView {
   filters?: Array<{
     field: string;
     operator: string;
-    value: any;
+    value: unknown;
   }>;
-  settings?: Record<string, any>;
+  settings?: Record<string, unknown>;
 }
 
 // Project item interface
 export interface ProjectItem {
   id: ItemId;
   contentId: string;
+  /** Title of the linked issue / pull request, when the query returned it. */
+  title?: string;
   contentType: ResourceType;
   projectId: ProjectId;
-  fieldValues: Record<FieldId, any>;
+  fieldValues: Record<FieldId, unknown>;
   createdAt: string;
   updatedAt: string;
 }

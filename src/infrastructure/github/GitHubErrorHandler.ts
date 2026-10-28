@@ -10,7 +10,7 @@ export class GitHubApiError extends Error {
     public readonly status?: number,
     public readonly code?: string,
     public readonly mcpErrorCode: MCPErrorCode = MCPErrorCode.INTERNAL_ERROR,
-    public readonly details?: Record<string, any>
+    public readonly details?: Record<string, unknown>
   ) {
     super(message);
     this.name = "GitHubApiError";
@@ -21,7 +21,7 @@ export class GitHubRateLimitError extends GitHubApiError {
   constructor(
     message: string,
     public readonly resetDate: Date,
-    details?: Record<string, any>
+    details?: Record<string, unknown>
   ) {
     super(message, 429, "RATE_LIMIT_EXCEEDED", MCPErrorCode.RATE_LIMITED, {
       resetAt: resetDate.toISOString(),
@@ -84,7 +84,10 @@ export class GitHubErrorHandler {
   handleError(error: unknown, context?: string): Error {
     if (this.isGitHubError(error)) {
       const status = error.status || error.response?.status;
-      const message = error.message || error.response?.data?.message || "Unknown GitHub error";
+      const message =
+        error.message ||
+        this.responseDataField(error, "message", "string") ||
+        "Unknown GitHub error";
       const contextMessage = context ? ` while ${context}` : "";
 
       // Handle rate limit errors
@@ -139,7 +142,7 @@ export class GitHubErrorHandler {
 
       // Handle validation errors
       if (status === 422) {
-        const errors = error.response?.data?.errors || [];
+        const errors = this.responseDataField(error, "errors", "array") ?? [];
         const details = errors.length > 0 ? { validationErrors: errors } : undefined;
 
         return new GitHubApiError(
@@ -155,7 +158,7 @@ export class GitHubErrorHandler {
       return new GitHubApiError(
         `GitHub API error (${status})${contextMessage}: ${message}`,
         status,
-        error.response?.data?.error || "API_ERROR",
+        this.responseDataField(error, "error", "string") || "API_ERROR",
         this.mapStatusToMCPErrorCode(status)
       );
     }
@@ -211,12 +214,38 @@ export class GitHubErrorHandler {
   }
 
   /**
+   * Read a typed field from the untrusted `response.data` payload of a GitHub error.
+   * Returns undefined when the payload is absent or the field has a different type.
+   */
+  private responseDataField(
+    error: GitHubError,
+    field: "message" | "error",
+    kind: "string"
+  ): string | undefined;
+  private responseDataField(
+    error: GitHubError,
+    field: "errors",
+    kind: "array"
+  ): unknown[] | undefined;
+  private responseDataField(
+    error: GitHubError,
+    field: string,
+    kind: "string" | "array"
+  ): string | unknown[] | undefined {
+    const data = error.response?.data;
+    if (typeof data !== "object" || data === null) return undefined;
+    const value = (data as Record<string, unknown>)[field];
+    if (kind === "string") return typeof value === "string" ? value : undefined;
+    return Array.isArray(value) ? value : undefined;
+  }
+
+  /**
    * Check if error is due to rate limiting
    */
   private isRateLimitError(error: GitHubError): boolean {
     return (
       error.response?.headers?.["x-ratelimit-remaining"] === "0" ||
-      error.response?.data?.message?.includes("rate limit") ||
+      this.responseDataField(error, "message", "string")?.includes("rate limit") ||
       error.message?.includes("rate limit")
     );
   }

@@ -307,11 +307,12 @@ export class EventStore {
     if (query.source) {
       events = events.filter((e) => e.source === query.source);
     }
-    if (query.fromTimestamp) {
-      events = events.filter((e) => e.timestamp >= query.fromTimestamp!);
+    const { fromTimestamp, toTimestamp } = query;
+    if (fromTimestamp) {
+      events = events.filter((e) => e.timestamp >= fromTimestamp);
     }
-    if (query.toTimestamp) {
-      events = events.filter((e) => e.timestamp <= query.toTimestamp!);
+    if (toTimestamp) {
+      events = events.filter((e) => e.timestamp <= toTimestamp);
     }
 
     return events;

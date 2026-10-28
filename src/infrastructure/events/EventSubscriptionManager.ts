@@ -21,7 +21,7 @@ export interface EventSubscription {
   createdAt: string;
   expiresAt?: string;
   active: boolean;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 export interface SubscriptionStats {
@@ -29,6 +29,15 @@ export interface SubscriptionStats {
   activeSubscriptions: number;
   subscriptionsByTransport: Record<string, number>;
   subscriptionsByResourceType: Record<string, number>;
+}
+
+function addToSetIndex<K>(index: Map<K, Set<string>>, key: K, id: string): void {
+  const ids = index.get(key);
+  if (ids) {
+    ids.add(id);
+  } else {
+    index.set(key, new Set([id]));
+  }
 }
 
 export class EventSubscriptionManager extends EventEmitter {
@@ -61,10 +70,7 @@ export class EventSubscriptionManager extends EventEmitter {
     this.subscriptions.set(subscriptionId, fullSubscription);
 
     // Index by client
-    if (!this.clientSubscriptions.has(subscription.clientId)) {
-      this.clientSubscriptions.set(subscription.clientId, new Set());
-    }
-    this.clientSubscriptions.get(subscription.clientId)!.add(subscriptionId);
+    addToSetIndex(this.clientSubscriptions, subscription.clientId, subscriptionId);
 
     // Index by resource types and event types in filters
     this.indexSubscription(subscriptionId, fullSubscription);
@@ -311,18 +317,12 @@ export class EventSubscriptionManager extends EventEmitter {
     for (const filter of subscription.filters) {
       // Index by resource type
       if (filter.resourceType) {
-        if (!this.resourceTypeIndex.has(filter.resourceType)) {
-          this.resourceTypeIndex.set(filter.resourceType, new Set());
-        }
-        this.resourceTypeIndex.get(filter.resourceType)!.add(subscriptionId);
+        addToSetIndex(this.resourceTypeIndex, filter.resourceType, subscriptionId);
       }
 
       // Index by event type
       if (filter.eventType) {
-        if (!this.eventTypeIndex.has(filter.eventType)) {
-          this.eventTypeIndex.set(filter.eventType, new Set());
-        }
-        this.eventTypeIndex.get(filter.eventType)!.add(subscriptionId);
+        addToSetIndex(this.eventTypeIndex, filter.eventType, subscriptionId);
       }
     }
   }
@@ -395,7 +395,8 @@ export class EventSubscriptionManager extends EventEmitter {
 
     // Check tags (if event has metadata with tags)
     if (filter.tags && filter.tags.length > 0) {
-      const eventTags = event.metadata?.tags || [];
+      const metadataTags = event.metadata?.tags;
+      const eventTags: unknown[] = Array.isArray(metadataTags) ? metadataTags : [];
       const hasMatchingTag = filter.tags.some((tag) => eventTags.includes(tag));
       if (!hasMatchingTag) {
         return false;
@@ -415,10 +416,12 @@ export class EventSubscriptionManager extends EventEmitter {
 
     for (const subscription of subscriptions) {
       const transport = subscription.transport;
-      if (!grouped.has(transport)) {
-        grouped.set(transport, []);
+      const group = grouped.get(transport);
+      if (group) {
+        group.push(subscription);
+      } else {
+        grouped.set(transport, [subscription]);
       }
-      grouped.get(transport)!.push(subscription);
     }
 
     return grouped;

@@ -1,337 +1,121 @@
 /**
- * Script to generate OpenAPI documentation from tool schemas
+ * Generate docs/api-reference/openapi.json from the tools the server advertises.
  *
- * This script extracts the Zod schemas from tool definitions and converts them
- * to OpenAPI format for use in the API Explorer.
+ * The document is derived from the same public tool definitions and the same
+ * `toMcpTool` conversion `ToolRegistry.getToolsForMCP()` uses - the exact list
+ * (and the exact JSON Schemas) an MCP client receives from `tools/list` - so
+ * it cannot drift from the server: input schemas come from
+ * `z.toJSONSchema(schema, { io: "input" })`, output schemas from
+ * `{ io: "output" }`, and the compound tools keep their hybrid
+ * flat-properties + per-action `oneOf` shape.
  *
- * Usage:
- * ts-node scripts/generate-openapi.ts
+ * Usage: pnpm run docs:api
+ * Needs no server configuration: it imports only the schema-producing module.
  */
 
-import { writeFileSync } from "node:fs";
-import { ToolRegistry } from "../src/infrastructure/tools/ToolRegistry.js";
+import { mkdirSync, writeFileSync } from "node:fs";
+import { dirname } from "node:path";
+import {
+  compoundToolDefinitions,
+  toMcpTool,
+} from "../src/infrastructure/tools/compound/compound-tool-definitions.js";
 
-// Simple conversion of Zod schema to OpenAPI schema
-function zodToOpenAPI(schema: any): any {
-  // This is a simplified implementation
-  // In a real implementation, you would use a library like zod-to-openapi
+const OUTPUT_PATH = "./docs/api-reference/openapi.json";
 
-  try {
-    // Handle object schemas
-    if (schema._def && schema._def.typeName === "ZodObject") {
-      const properties: Record<string, any> = {};
-      const required: string[] = [];
+type JsonObject = Record<string, unknown>;
 
-      const shape = schema._def.shape();
-      for (const [key, zodType] of Object.entries(shape)) {
-        properties[key] = zodTypeToJsonSchemaType(zodType);
+const errorResponse = (description: string): JsonObject => ({
+  description,
+  content: { "application/json": { schema: { $ref: "#/components/schemas/Error" } } },
+});
 
-        // Check if the field is required
-        if (zodType._def && zodType._def.typeName !== "ZodOptional") {
-          required.push(key);
-        }
-      }
-
-      return {
-        type: "object",
-        properties,
-        required: required.length > 0 ? required : undefined,
-      };
-    }
-
-    // Handle array schemas
-    if (schema._def && schema._def.typeName === "ZodArray") {
-      return {
-        type: "array",
-        items: zodTypeToJsonSchemaType(schema._def.type),
-      };
-    }
-
-    // Handle enum schemas
-    if (schema._def && schema._def.typeName === "ZodEnum") {
-      return {
-        type: "string",
-        enum: schema._def.values,
-      };
-    }
-
-    // Default to a simple object schema
-    return {
-      type: "object",
-      properties: {},
-    };
-  } catch (error) {
-    process.stderr.write("Error converting Zod schema to OpenAPI:", error);
-    return {
-      type: "object",
-      properties: {},
-    };
-  }
+/** JSON Schema `$schema` markers are meaningless inside an OpenAPI 3.1 document. */
+function withoutSchemaMarker(schema: JsonObject): JsonObject {
+  const { $schema: _marker, ...rest } = schema;
+  return rest;
 }
 
-// Convert Zod type to JSON Schema type
-function zodTypeToJsonSchemaType(zodType: any): any {
-  try {
-    // Handle optional types
-    if (zodType._def && zodType._def.typeName === "ZodOptional") {
-      return zodTypeToJsonSchemaType(zodType._def.innerType);
-    }
+function buildDocument(): JsonObject {
+  const tools = compoundToolDefinitions.map(toMcpTool);
+  const paths: Record<string, JsonObject> = {};
 
-    // Handle string type
-    if (zodType._def && zodType._def.typeName === "ZodString") {
-      return { type: "string" };
-    }
-
-    // Handle number type
-    if (zodType._def && zodType._def.typeName === "ZodNumber") {
-      return { type: "number" };
-    }
-
-    // Handle boolean type
-    if (zodType._def && zodType._def.typeName === "ZodBoolean") {
-      return { type: "boolean" };
-    }
-
-    // Handle array type
-    if (zodType._def && zodType._def.typeName === "ZodArray") {
-      return {
-        type: "array",
-        items: zodTypeToJsonSchemaType(zodType._def.type),
-      };
-    }
-
-    // Handle object type
-    if (zodType._def && zodType._def.typeName === "ZodObject") {
-      const properties: Record<string, any> = {};
-      const required: string[] = [];
-
-      const shape = zodType._def.shape();
-      for (const [key, fieldType] of Object.entries(shape)) {
-        properties[key] = zodTypeToJsonSchemaType(fieldType);
-
-        // Check if the field is required
-        if (fieldType._def && fieldType._def.typeName !== "ZodOptional") {
-          required.push(key);
+  for (const tool of tools) {
+    const successContent: JsonObject = tool.outputSchema
+      ? {
+          "application/json": {
+            schema: withoutSchemaMarker(tool.outputSchema),
+          },
         }
-      }
-
-      return {
-        type: "object",
-        properties,
-        required: required.length > 0 ? required : undefined,
-      };
-    }
-
-    // Handle enum type
-    if (zodType._def && zodType._def.typeName === "ZodEnum") {
-      return {
-        type: "string",
-        enum: zodType._def.values,
-      };
-    }
-
-    // Default to string type
-    return { type: "string" };
-  } catch (error) {
-    process.stderr.write("Error converting Zod type to JSON Schema type:", error);
-    return { type: "string" };
-  }
-}
-
-// Generate OpenAPI document
-async function generateOpenAPI() {
-  try {
-    // Get all tools from the registry
-    const registry = ToolRegistry.getInstance();
-    const tools = registry.getAllTools();
-
-    // Create OpenAPI document
-    const openApiDocument = {
-      openapi: "3.0.0",
-      info: {
-        title: "GitHub Project Manager MCP API",
-        version: "1.0.0",
-        description: "API for managing GitHub Projects through the Model Context Protocol",
-      },
-      servers: [
-        {
-          url: "/",
-          description: "MCP Server",
-        },
-      ],
-      paths: {} as Record<string, any>,
-      components: {
-        schemas: {
-          Error: {
-            type: "object",
-            properties: {
-              code: {
-                type: "string",
-                description: "Error code",
-              },
-              message: {
-                type: "string",
-                description: "Error message",
-              },
-              details: {
-                type: "array",
-                items: {
-                  type: "object",
-                  properties: {
-                    code: { type: "string" },
-                    message: { type: "string" },
-                  },
-                },
-              },
-            },
-          },
-        },
-      },
-    };
-
-    // Add each tool as a path
-    for (const tool of tools) {
-      const path = `/tools/${tool.name}`;
-
-      // Convert tool schema to OpenAPI schema
-      const requestSchema = zodToOpenAPI(tool.schema);
-
-      // Add path to OpenAPI document
-      openApiDocument.paths[path] = {
-        post: {
-          summary: tool.description,
-          requestBody: {
-            content: {
-              "application/json": {
-                schema: requestSchema,
-              },
-            },
-          },
-          responses: {
-            "200": {
-              description: "Successful operation",
-              content: {
-                "application/json": {
-                  schema: {
+      : {
+          "application/json": {
+            schema: {
+              type: "object",
+              properties: {
+                content: {
+                  type: "array",
+                  items: {
                     type: "object",
-                    properties: {
-                      // Generic response schema
-                      content: {
-                        type: "array",
-                        items: {
-                          type: "object",
-                          properties: {
-                            type: {
-                              type: "string",
-                              enum: ["text", "json", "markdown", "html"],
-                            },
-                            text: {
-                              type: "string",
-                            },
-                            contentType: {
-                              type: "string",
-                            },
-                          },
-                        },
-                      },
-                      metadata: {
-                        type: "object",
-                        properties: {
-                          timestamp: {
-                            type: "string",
-                            format: "date-time",
-                          },
-                          status: {
-                            type: "integer",
-                          },
-                          requestId: {
-                            type: "string",
-                          },
-                        },
-                      },
-                    },
-                  },
-                },
-              },
-            },
-            "400": {
-              description: "Validation error",
-              content: {
-                "application/json": {
-                  schema: {
-                    $ref: "#/components/schemas/Error",
-                  },
-                },
-              },
-            },
-            "401": {
-              description: "Unauthorized",
-              content: {
-                "application/json": {
-                  schema: {
-                    $ref: "#/components/schemas/Error",
-                  },
-                },
-              },
-            },
-            "404": {
-              description: "Resource not found",
-              content: {
-                "application/json": {
-                  schema: {
-                    $ref: "#/components/schemas/Error",
-                  },
-                },
-              },
-            },
-            "429": {
-              description: "Rate limited",
-              content: {
-                "application/json": {
-                  schema: {
-                    $ref: "#/components/schemas/Error",
-                  },
-                },
-              },
-            },
-            "500": {
-              description: "Internal server error",
-              content: {
-                "application/json": {
-                  schema: {
-                    $ref: "#/components/schemas/Error",
+                    properties: { type: { type: "string" }, text: { type: "string" } },
                   },
                 },
               },
             },
           },
+        };
+
+    paths[`/tools/${tool.name}`] = {
+      post: {
+        operationId: tool.name,
+        summary: tool.title ?? tool.name,
+        description: tool.description,
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": { schema: withoutSchemaMarker(tool.inputSchema) },
+          },
         },
-      };
-
-      // Add examples if available
-      if (tool.examples && tool.examples.length > 0) {
-        const examples: Record<string, any> = {};
-
-        for (const example of tool.examples) {
-          examples[example.name.replace(/\s+/g, "_").toLowerCase()] = {
-            summary: example.name,
-            description: example.description,
-            value: example.args,
-          };
-        }
-
-        openApiDocument.paths[path].post.requestBody.content["application/json"].examples =
-          examples;
-      }
-    }
-
-    // Write OpenAPI document to file
-    writeFileSync("./docs/api-reference/openapi.json", JSON.stringify(openApiDocument, null, 2));
-    console.log("OpenAPI documentation generated successfully!");
-  } catch (error) {
-    process.stderr.write("Error generating OpenAPI documentation:", error);
+        responses: {
+          "200": { description: "Successful operation", content: successContent },
+          "400": errorResponse("Validation error"),
+          "401": errorResponse("Unauthorized"),
+          "404": errorResponse("Resource not found"),
+          "429": errorResponse("Rate limited"),
+          "500": errorResponse("Internal server error"),
+        },
+      },
+    };
   }
+
+  return {
+    openapi: "3.1.0",
+    info: {
+      title: "GitHub Project Manager MCP API",
+      version: "1.0.0",
+      description: "API for managing GitHub Projects through the Model Context Protocol",
+    },
+    servers: [{ url: "/", description: "MCP Server" }],
+    paths,
+    components: {
+      schemas: {
+        Error: {
+          type: "object",
+          properties: {
+            code: { type: "string", description: "Error code" },
+            message: { type: "string", description: "Error message" },
+            details: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: { code: { type: "string" }, message: { type: "string" } },
+              },
+            },
+          },
+        },
+      },
+    },
+  };
 }
 
-// Run the script
-generateOpenAPI().catch(process.stderr.write);
+mkdirSync(dirname(OUTPUT_PATH), { recursive: true });
+writeFileSync(OUTPUT_PATH, `${JSON.stringify(buildDocument(), null, 2)}\n`);
+process.stdout.write(`OpenAPI documentation written to ${OUTPUT_PATH}\n`);

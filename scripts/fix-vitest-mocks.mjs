@@ -27,7 +27,9 @@ function findTestFiles(dir) {
         results.push(full);
       }
     }
-  } catch (e) {}
+  } catch {
+    // Unreadable directories are skipped; the walk reports what it could reach.
+  }
   return results;
 }
 
@@ -122,7 +124,7 @@ for (const file of files) {
 
   // Find vi.mock() calls without factory functions
   // Pattern: vi.mock('path/to/module');
-  content = content.replace(/vi\.mock\('([^']+)'[\s]*\);/g, (match, path) => {
+  content = content.replace(/vi\.mock\('([^']+)'[\s]*\);/g, (_match, path) => {
     // Check if this module has a known mock factory
     for (const [moduleName, factory] of Object.entries(mockFactories)) {
       if (path.includes(moduleName)) {

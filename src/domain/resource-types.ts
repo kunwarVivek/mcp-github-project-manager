@@ -77,7 +77,7 @@ export interface ResourceEvent {
   resourceType: ResourceType;
   eventType: ResourceEventType;
   timestamp: Date;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 export class ResourceNotFoundError extends Error {
@@ -110,8 +110,8 @@ export class ResourceValidationError extends Error {
 
 export interface ResourceValidationRule {
   field: string; // Added this field property
-  validate(resource: any): boolean;
-  getErrorMessage(resource: any): string;
+  validate(resource: unknown): boolean;
+  getErrorMessage(resource: unknown): string;
   message: string; // Added this message property
 }
 
@@ -153,5 +153,5 @@ export interface ResourceRepository<T extends Resource> {
   update(id: string, data: Partial<T>): Promise<T>;
   delete(id: string): Promise<void>;
   findById(id: string): Promise<T | null>;
-  findAll(options?: any): Promise<T[]>;
+  findAll(options?: Record<string, unknown>): Promise<T[]>;
 }

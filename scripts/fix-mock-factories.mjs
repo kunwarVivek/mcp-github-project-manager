@@ -27,7 +27,9 @@ function findTestFiles(dir) {
         results.push(full);
       }
     }
-  } catch (e) {}
+  } catch {
+    // Unreadable directories are skipped; the walk reports what it could reach.
+  }
   return results;
 }
 
@@ -94,13 +96,13 @@ for (const file of files) {
   // Pattern: vi.mock('...', () => ({ GitHubRepositoryFactory: vi.fn() }));
   content = content.replace(
     /vi\.mock\('([^']*GitHubRepositoryFactory[^']*)',\s*\(\)\s*=>\s*\(\{\s*GitHubRepositoryFactory:\s*vi\.fn\(\)[^}]*\}\)\);/g,
-    (match, path) => githubRepoFactoryMock.replace(/\$PATH/g, path)
+    (_match, path) => githubRepoFactoryMock.replace(/\$PATH/g, path)
   );
 
   // Also fix multi-line patterns
   content = content.replace(
     /vi\.mock\('([^']*GitHubRepositoryFactory[^']*)',\s*\(\)\s*=>\s*\(\{[\s\S]*?GitHubRepositoryFactory:[\s\S]*?\}\)\);/g,
-    (match, path) => githubRepoFactoryMock.replace(/\$PATH/g, path)
+    (_match, path) => githubRepoFactoryMock.replace(/\$PATH/g, path)
   );
 
   if (content !== original) {

@@ -13,7 +13,7 @@
 
 import { generateObject } from "ai";
 import { z } from "zod";
-import { complexityToPoints, EstimationCalibrator } from "../../analysis/EstimationCalibrator";
+import { complexityToPoints } from "../../analysis/EstimationCalibrator";
 import type { SectionConfidence, TaskComplexity } from "../../domain/ai-types";
 import type {
   GeneratedRoadmap,
@@ -95,7 +95,6 @@ type ParsedRequirement = z.infer<typeof RequirementParseSchema>["requirements"][
  *
  * Key features:
  * - Parses text requirements into structured format
- * - Uses EstimationCalibrator for effort estimation
  * - Generates phases with proper sequencing (AI-14)
  * - Calculates dates algorithmically from velocity (AI-15)
  * - Provides visualization data for Gantt rendering (AI-16)
@@ -103,11 +102,9 @@ type ParsedRequirement = z.infer<typeof RequirementParseSchema>["requirements"][
  */
 export class RoadmapAIService {
   private aiFactory: AIServiceFactory;
-  private estimationCalibrator: EstimationCalibrator;
 
-  constructor(aiFactory?: AIServiceFactory, estimationCalibrator?: EstimationCalibrator) {
+  constructor(aiFactory?: AIServiceFactory) {
     this.aiFactory = aiFactory ?? AIServiceFactory.getInstance();
-    this.estimationCalibrator = estimationCalibrator || new EstimationCalibrator();
   }
 
   // ==========================================================================
@@ -269,7 +266,7 @@ export class RoadmapAIService {
   // ==========================================================================
 
   /**
-   * Estimate effort for requirements using EstimationCalibrator
+   * Estimate effort for requirements (explicit points, else derived from priority)
    */
   private estimateRequirements(
     requirements: RequirementItem[]

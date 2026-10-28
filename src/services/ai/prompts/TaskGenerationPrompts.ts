@@ -244,7 +244,7 @@ Return as a structured estimate with detailed breakdown.`;
 /**
  * Helper function to format task generation prompts
  */
-export function formatTaskPrompt(template: string, variables: Record<string, any>): string {
+export function formatTaskPrompt(template: string, variables: Record<string, unknown>): string {
   let formatted = template;
 
   for (const [key, value] of Object.entries(variables)) {

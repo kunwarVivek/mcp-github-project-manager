@@ -170,7 +170,7 @@ export function buildFieldOptions(
 /**
  * Base response type for all GraphQL responses
  */
-export interface GraphQLResponse<T = any> {
+export interface GraphQLResponse<T = unknown> {
   data?: T;
   errors?: Array<{
     message: string;
@@ -179,7 +179,7 @@ export interface GraphQLResponse<T = any> {
       column: number;
     }>;
     path?: string[];
-    extensions?: any;
+    extensions?: unknown;
   }>;
 }
 
@@ -260,7 +260,7 @@ export interface GetProjectItemResponse {
           id: string;
           name: string;
         };
-        value?: any;
+        value?: unknown;
       }>;
     };
     content: {
@@ -301,7 +301,7 @@ export interface ListProjectItemsResponse {
                 id: string;
                 name: string;
               };
-              value?: any;
+              value?: unknown;
             }>;
           };
           content: {

@@ -11,7 +11,7 @@ export interface GitHubError extends Error {
   status?: number;
   response?: {
     status: number;
-    data: any;
+    data: unknown;
     headers?: Record<string, string>;
     url?: string; // Added the missing url property
   };
@@ -20,7 +20,7 @@ export interface GitHubError extends Error {
 
 export interface GitHubErrorResponse {
   status: number;
-  data: any;
+  data: unknown;
   headers?: Record<string, string>;
   url?: string; // Adding the missing url property
 }
@@ -68,10 +68,10 @@ export interface GitHubIssue {
   reactions: {
     url: string;
     total_count: number;
-    [key: string]: any;
+    [key: string]: unknown;
   };
   timeline_url: string;
-  performed_via_github_app: any | null;
+  performed_via_github_app: unknown | null;
   draft?: boolean;
 }
 
@@ -113,7 +113,7 @@ export interface GraphQLErrorResponse {
   errors: GraphQLError[];
 }
 
-export interface GraphQLResponse<T = any> {
+export interface GraphQLResponse<T = unknown> {
   data?: T;
   errors?: GraphQLError[];
 }

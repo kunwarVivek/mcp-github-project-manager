@@ -4,7 +4,7 @@ import { hasRestUserProperties } from "../../domain/type-guards";
 type OctokitIssue = components["schemas"]["issue"];
 
 export interface RequestParameters {
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 export interface RestUser {

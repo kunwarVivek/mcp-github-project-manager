@@ -2,7 +2,6 @@ import { generateObject } from "ai";
 import { z } from "zod";
 import { type ILogger, Logger } from "../infrastructure/logger";
 import type { AIServiceFactory } from "./ai/AIServiceFactory";
-import type { IssueEnrichmentService } from "./IssueEnrichmentService";
 import type { ProjectManagementService } from "./ProjectManagementService";
 import { InputSanitizer } from "./utils/InputSanitizer";
 
@@ -30,7 +29,6 @@ export class IssueTriagingService {
   constructor(
     private aiFactory: AIServiceFactory,
     private projectService: ProjectManagementService,
-    private enrichmentService: IssueEnrichmentService,
     logger?: ILogger
   ) {
     this.logger = logger ?? Logger.getInstance();

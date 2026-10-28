@@ -208,10 +208,12 @@ export class TemplateValidator {
     const normalizedPlaceholders = new Map<string, string[]>();
     for (const p of placeholders) {
       const normalized = p.toLowerCase();
-      if (!normalizedPlaceholders.has(normalized)) {
-        normalizedPlaceholders.set(normalized, []);
+      const variants = normalizedPlaceholders.get(normalized);
+      if (variants) {
+        variants.push(p);
+      } else {
+        normalizedPlaceholders.set(normalized, [p]);
       }
-      normalizedPlaceholders.get(normalized)!.push(p);
     }
 
     for (const [normalized, variants] of normalizedPlaceholders) {

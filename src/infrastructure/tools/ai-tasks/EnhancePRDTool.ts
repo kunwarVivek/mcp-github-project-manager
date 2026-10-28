@@ -1,4 +1,9 @@
 import { z } from "zod";
+import {
+  type FeatureRequirement,
+  type PRDDocument,
+  TaskPriority,
+} from "../../../domain/ai-types.js";
 import type { MCPResponse } from "../../../domain/mcp-types.js";
 import { PRDGenerationService } from "../../../services/PRDGenerationService.js";
 import { ANNOTATION_PATTERNS } from "../annotations/tool-annotations.js";
@@ -38,6 +43,15 @@ const enhancePRDSchema = z.object({
 
 export type EnhancePRDArgs = z.infer<typeof enhancePRDSchema>;
 
+/** Result of `PRDGenerationService.validatePRDCompleteness`. */
+interface PRDValidation {
+  isComplete: boolean;
+  score: number;
+  missingElements: string[];
+  recommendations: string[];
+  qualityIssues: string[];
+}
+
 /**
  * Implementation function for enhance_prd tool
  */
@@ -53,8 +67,7 @@ async function executeEnhancePRD(args: EnhancePRDArgs): Promise<MCPResponse> {
     });
 
     // Validate the enhanced PRD if requested
-    // biome-ignore lint/suspicious/noExplicitAny: unvalidated AI response shape
-    let validation: any;
+    let validation: PRDValidation | undefined;
     if (args.validateQuality) {
       validation = await prdService.validatePRDCompleteness(enhancedPRD);
     }
@@ -96,21 +109,23 @@ async function executeEnhancePRD(args: EnhancePRDArgs): Promise<MCPResponse> {
   }
 }
 
-/**
- * Generate enhancement summary comparing before and after
- */
-function generateEnhancementSummary(
-  _originalPRD: string,
-  enhancedPRD: any,
-  enhancementType: string,
-  focusAreas?: string[]
-): {
+interface EnhancementSummary {
   addedSections: string[];
   improvedSections: string[];
   newFeatures: number;
   newRequirements: number;
   enhancementHighlights: string[];
-} {
+}
+
+/**
+ * Generate enhancement summary comparing before and after
+ */
+function generateEnhancementSummary(
+  _originalPRD: string,
+  enhancedPRD: PRDDocument,
+  enhancementType: string,
+  focusAreas?: string[]
+): EnhancementSummary {
   // Simplified analysis - in a real implementation, this would be more sophisticated
   const addedSections = [];
   const improvedSections = [];
@@ -171,10 +186,10 @@ function generateEnhancementSummary(
  * Format PRD enhancement summary
  */
 function formatPRDEnhancement(
-  enhancedPRD: any,
-  validation: any,
-  features: any[],
-  enhancementSummary: any,
+  enhancedPRD: PRDDocument,
+  validation: PRDValidation | undefined,
+  features: FeatureRequirement[],
+  enhancementSummary: EnhancementSummary,
   args: EnhancePRDArgs
 ): string {
   const sections = [
@@ -255,7 +270,7 @@ function formatPRDEnhancement(
     sections.push("## Feature Analysis", `**Total Features:** ${features.length}`, "");
 
     // Feature breakdown by priority
-    const featuresByPriority = features.reduce((acc, feature) => {
+    const featuresByPriority = features.reduce<Record<string, number>>((acc, feature) => {
       acc[feature.priority] = (acc[feature.priority] || 0) + 1;
       return acc;
     }, {});
@@ -263,21 +278,21 @@ function formatPRDEnhancement(
     sections.push(
       "**Features by Priority:**",
       ...Object.entries(featuresByPriority).map(
-        ([priority, count]) => `- ${priority}: ${count} feature${(count as number) > 1 ? "s" : ""}`
+        ([priority, count]) => `- ${priority}: ${count} feature${count > 1 ? "s" : ""}`
       ),
       ""
     );
 
     // Top features
     const topFeatures = features
-      .filter((f) => f.priority === "critical" || f.priority === "high")
+      .filter((f) => f.priority === TaskPriority.CRITICAL || f.priority === TaskPriority.HIGH)
       .slice(0, 5);
 
     if (topFeatures.length > 0) {
       sections.push(
         "**High-Priority Features:**",
         ...topFeatures.map(
-          (feature: any) => `- ${feature.title} (complexity: ${feature.estimatedComplexity}/10)`
+          (feature) => `- ${feature.title} (complexity: ${feature.estimatedComplexity}/10)`
         ),
         ""
       );
@@ -293,16 +308,18 @@ function formatPRDEnhancement(
     );
 
     // Requirements by category
-    const reqsByCategory = enhancedPRD.technicalRequirements.reduce((acc: any, req: any) => {
-      acc[req.category] = (acc[req.category] || 0) + 1;
-      return acc;
-    }, {});
+    const reqsByCategory = enhancedPRD.technicalRequirements.reduce<Record<string, number>>(
+      (acc, req) => {
+        acc[req.category] = (acc[req.category] || 0) + 1;
+        return acc;
+      },
+      {}
+    );
 
     sections.push(
       "**By Category:**",
       ...Object.entries(reqsByCategory).map(
-        ([category, count]) =>
-          `- ${category}: ${count} requirement${(count as number) > 1 ? "s" : ""}`
+        ([category, count]) => `- ${category}: ${count} requirement${count > 1 ? "s" : ""}`
       ),
       ""
     );
@@ -312,7 +329,7 @@ function formatPRDEnhancement(
   if (enhancedPRD.targetUsers && enhancedPRD.targetUsers.length > 0) {
     sections.push("## User Personas", `**Total Personas:** ${enhancedPRD.targetUsers.length}`, "");
 
-    enhancedPRD.targetUsers.slice(0, 3).forEach((user: any) => {
+    enhancedPRD.targetUsers.slice(0, 3).forEach((user) => {
       sections.push(`**${user.name}** (${user.technicalLevel})`, `- ${user.description}`, "");
     });
   }

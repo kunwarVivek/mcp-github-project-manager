@@ -95,7 +95,7 @@ export function parseBlockerLabelNumbers(labels: string[]): number[] {
       const numStr = afterPrefix.startsWith("#") ? afterPrefix.slice(1) : afterPrefix;
       return parseInt(numStr, 10);
     })
-    .filter((n) => !isNaN(n));
+    .filter((n) => !Number.isNaN(n));
 }
 
 /**

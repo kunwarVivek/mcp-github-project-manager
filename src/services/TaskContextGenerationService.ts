@@ -7,7 +7,9 @@ import type {
 } from "../domain/ai-types";
 import {
   type ContextQualityMetrics,
+  type ContextualReferences,
   calculateCompletenessScore,
+  type ImplementationGuidance,
   type TaskExecutionContext,
 } from "../domain/task-context-schemas";
 import {
@@ -20,14 +22,17 @@ import {
 import { type ILogger, Logger } from "../infrastructure/logger";
 import { AIServiceFactory } from "./ai/AIServiceFactory";
 import {
+  type BusinessContext,
   BusinessContextSchema,
   CONTEXT_GENERATION_CONFIGS,
   formatContextPrompt,
+  type GeneratedImplementationGuidance,
+  type TechnicalContext,
   TechnicalContextSchema,
 } from "./ai/prompts/ContextGenerationPrompts";
 import { TokenCounter } from "./ai/TokenCounter";
-import { CodeExampleGenerator } from "./context/CodeExampleGenerator";
 // Import new context generation services
+import { CodeExampleGenerator } from "./context/CodeExampleGenerator";
 import { ContextualReferenceGenerator } from "./context/ContextualReferenceGenerator";
 import { DependencyContextGenerator } from "./context/DependencyContextGenerator";
 import { InputSanitizer } from "./utils/InputSanitizer";
@@ -44,8 +49,8 @@ import { ContextQualityValidator } from "./validation/ContextQualityValidator";
 export class TaskContextGenerationService {
   private aiFactory: AIServiceFactory;
   private contextualRefGenerator: ContextualReferenceGenerator;
-  private dependencyContextGenerator: DependencyContextGenerator;
   private codeExampleGenerator: CodeExampleGenerator;
+  private dependencyContextGenerator: DependencyContextGenerator;
   private qualityValidator: ContextQualityValidator;
   private readonly logger: ILogger;
 
@@ -58,8 +63,8 @@ export class TaskContextGenerationService {
   constructor(aiFactory?: AIServiceFactory, logger?: ILogger) {
     this.aiFactory = aiFactory ?? AIServiceFactory.getInstance();
     this.contextualRefGenerator = new ContextualReferenceGenerator(this.aiFactory);
+    this.codeExampleGenerator = new CodeExampleGenerator(this.aiFactory, logger);
     this.dependencyContextGenerator = new DependencyContextGenerator(this.aiFactory);
-    this.codeExampleGenerator = new CodeExampleGenerator(this.aiFactory);
     this.qualityValidator = new ContextQualityValidator();
     this.logger = logger ?? Logger.getInstance();
   }
@@ -234,7 +239,7 @@ export class TaskContextGenerationService {
       }
 
       // FR-2: Generate technical context if enabled
-      let technicalContext: any = null;
+      let technicalContext: TechnicalContext | null = null;
       if (config.includeTechnicalContext) {
         technicalContext = await this.generateTechnicalContext(task, prdContent);
         if (technicalContext) {
@@ -245,12 +250,12 @@ export class TaskContextGenerationService {
           enhancedContext.technicalConstraints = technicalContext.technicalConstraints ?? [];
           enhancedContext.architecturalDecisions = (
             technicalContext.architecturalDecisions ?? []
-          ).map((ad: any) => ad?.decision);
+          ).map((ad) => ad?.decision);
           enhancedContext.integrationPoints = (technicalContext.integrationPoints ?? []).map(
-            (ip: any) => ip?.description
+            (ip) => ip?.description
           );
           enhancedContext.dataRequirements = (technicalContext.dataRequirements ?? []).map(
-            (dr: any) => dr?.description
+            (dr) => dr?.description
           );
           totalTokens += TokenCounter.estimateFromObject(technicalContext);
         }
@@ -278,6 +283,25 @@ export class TaskContextGenerationService {
       if (contextualRefs) {
         enhancedContext.contextualReferences = contextualRefs;
         totalTokens += TokenCounter.estimateFromObject(contextualRefs);
+      }
+
+      // FR-4b: Merge generated code examples into the contextual references.
+      // Same gates as the guidance generator (config switch + an AI model);
+      // CodeExampleGenerator itself logs and falls back on AI errors.
+      if (config.includeImplementationGuidance && this.aiFactory.getBestAvailableModel()) {
+        const examples = await this.codeExampleGenerator.generateExamples(
+          task,
+          technicalContext ?? undefined,
+          3
+        );
+        const merged = this.mergeCodeExamples(enhancedContext.contextualReferences, examples);
+        if (
+          merged.codeExamples.length >
+          (enhancedContext.contextualReferences?.codeExamples.length ?? 0)
+        ) {
+          enhancedContext.contextualReferences = merged;
+          totalTokens += TokenCounter.estimateFromObject(examples);
+        }
       }
 
       // FR-5: Generate enhanced acceptance criteria (integration)
@@ -309,7 +333,10 @@ export class TaskContextGenerationService {
   /**
    * Generate business context using AI
    */
-  private async generateBusinessContext(task: AITask, prdContent: string): Promise<any> {
+  private async generateBusinessContext(
+    task: AITask,
+    prdContent: string
+  ): Promise<BusinessContext | null> {
     try {
       const model = this.aiFactory.getBestAvailableModel();
       if (!model) return null;
@@ -341,7 +368,10 @@ export class TaskContextGenerationService {
   /**
    * Generate technical context using AI
    */
-  private async generateTechnicalContext(task: AITask, prdContent: string): Promise<any> {
+  private async generateTechnicalContext(
+    task: AITask,
+    prdContent: string
+  ): Promise<TechnicalContext | null> {
     try {
       const model = this.aiFactory.getBestAvailableModel();
       if (!model) return null;
@@ -375,17 +405,10 @@ export class TaskContextGenerationService {
    */
   async generateImplementationGuidance(
     task: AITask,
-    businessContext?: any,
-    technicalContext?: any
-  ): Promise<any> {
+    businessContext?: Partial<TaskExecutionContext> | BusinessContext | null,
+    technicalContext?: TechnicalContext | null
+  ): Promise<ImplementationGuidance | null> {
     try {
-      // Use the code example generator for implementation guidance
-      const codeExamples = await this.codeExampleGenerator.generateExamples(
-        task,
-        technicalContext,
-        3
-      );
-
       const model = this.aiFactory.getBestAvailableModel();
       if (!model) {
         // Return basic guidance without AI
@@ -433,15 +456,7 @@ export class TaskContextGenerationService {
       });
 
       // Merge with code examples
-      const guidance = this.transformImplementationGuidance(result.object);
-      if (codeExamples.length > 0 && guidance.contextualReferences) {
-        guidance.contextualReferences = {
-          ...guidance.contextualReferences,
-          codeExamples,
-        };
-      }
-
-      return guidance;
+      return this.transformImplementationGuidance(result.object);
     } catch (error) {
       this.logger.error("Error generating implementation guidance", error);
       return null;
@@ -449,18 +464,43 @@ export class TaskContextGenerationService {
   }
 
   /**
+   * Merge code examples into contextual references, dropping duplicates
+   * (same language and snippet).
+   */
+  private mergeCodeExamples(
+    references: ContextualReferences | undefined,
+    examples: ContextualReferences["codeExamples"]
+  ): ContextualReferences {
+    const base: ContextualReferences = references ?? {
+      prdSections: [],
+      relatedFeatures: [],
+      technicalSpecs: [],
+      codeExamples: [],
+      externalReferences: [],
+    };
+    const seen = new Set(base.codeExamples.map((e) => `${e.language}\n${e.snippet}`));
+    const added = examples.filter((e) => {
+      const key = `${e.language}\n${e.snippet}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+    return { ...base, codeExamples: [...base.codeExamples, ...added] };
+  }
+
+  /**
    * Transform AI implementation guidance to our format
    */
-  private transformImplementationGuidance(aiGuidance: any): any {
+  private transformImplementationGuidance(
+    aiGuidance: GeneratedImplementationGuidance
+  ): ImplementationGuidance {
     return {
       recommendedApproach: aiGuidance.recommendedApproach,
-      implementationSteps: aiGuidance.implementationSteps.map(
-        (step: any) => step.description || step
-      ),
+      implementationSteps: aiGuidance.implementationSteps.map((step) => step.description),
       technicalConsiderations: aiGuidance.technicalConsiderations,
-      commonPitfalls: aiGuidance.commonPitfalls.map((pitfall: any) => pitfall.pitfall || pitfall),
+      commonPitfalls: aiGuidance.commonPitfalls.map((pitfall) => pitfall.pitfall),
       testingStrategy: aiGuidance.testingStrategy?.approach || "Standard testing approach",
-      recommendedTools: aiGuidance.bestPractices?.map((bp: any) => bp.practice) || [],
+      recommendedTools: aiGuidance.bestPractices?.map((bp) => bp.practice) || [],
       codeQualityStandards: aiGuidance.qualityAssurance || [],
       performanceConsiderations: aiGuidance.performanceOptimization || [],
       securityConsiderations: [],

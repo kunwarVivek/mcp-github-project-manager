@@ -1,6 +1,5 @@
 import { ResourceNotFoundError, ResourceType } from "../domain/resource-types";
 import type { CustomField, ProjectItem } from "../domain/types";
-import type { GitHubRepositoryFactory } from "../infrastructure/github/GitHubRepositoryFactory";
 import type { FieldValueService } from "./FieldValueService";
 import type { ProjectLinkingService } from "./ProjectLinkingService";
 import type { ProjectTemplateService } from "./ProjectTemplateService";
@@ -19,21 +18,18 @@ import { safeCall } from "./utils/safeCall";
  * Iterations are a built-in field type in GitHub Projects v2 that allow
  * time-boxed work management similar to sprints.
  *
- * Can be instantiated directly with a GitHubRepositoryFactory or via dependency injection.
+ * Can be instantiated directly with its sub-services or via dependency injection.
  */
 export class IterationService {
-  private readonly factory: GitHubRepositoryFactory;
   private readonly fieldValueService: FieldValueService;
   private readonly templateService: ProjectTemplateService;
   private readonly linkingService: ProjectLinkingService;
 
   constructor(
-    factory: GitHubRepositoryFactory,
     fieldValueService: FieldValueService,
     templateService: ProjectTemplateService,
     linkingService: ProjectLinkingService
   ) {
-    this.factory = factory;
     this.fieldValueService = fieldValueService;
     this.templateService = templateService;
     this.linkingService = linkingService;

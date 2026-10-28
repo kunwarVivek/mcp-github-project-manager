@@ -213,8 +213,9 @@ export class ConfidenceScorer {
   ): number {
     const cacheKey = `${sectionName}:${JSON.stringify(inputData).substring(0, 100)}`;
 
-    if (this.patternCache.has(cacheKey)) {
-      return this.patternCache.get(cacheKey)!;
+    const cached = this.patternCache.get(cacheKey);
+    if (cached !== undefined) {
+      return cached;
     }
 
     let score = 0.5; // Base score

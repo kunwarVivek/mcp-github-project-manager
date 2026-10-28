@@ -50,7 +50,7 @@ export class CodeExampleGenerator {
    */
   async generateExamples(
     task: AITask,
-    technicalContext?: any,
+    technicalContext?: Record<string, unknown>,
     maxExamples: number = 3
   ): Promise<CodeExample[]> {
     try {
@@ -630,7 +630,7 @@ const data = await withRetry(() => fetchDataFromAPI(), 3, 1000);`,
   /**
    * Build prompt for code example generation
    */
-  private buildCodeExamplePrompt(task: AITask, technicalContext?: any): string {
+  private buildCodeExamplePrompt(task: AITask, technicalContext?: Record<string, unknown>): string {
     const techStack = this.detectTechnologyStack(task, technicalContext);
 
     return `Generate relevant code examples for this development task:
@@ -657,7 +657,10 @@ Focus on practical examples that developers can reference during implementation.
   /**
    * Detect technology stack from task
    */
-  private detectTechnologyStack(task: AITask, _technicalContext?: any): string[] {
+  private detectTechnologyStack(
+    task: AITask,
+    _technicalContext?: Record<string, unknown>
+  ): string[] {
     const stack: string[] = [];
     const taskText = `${task.title} ${task.description}`.toLowerCase();
 

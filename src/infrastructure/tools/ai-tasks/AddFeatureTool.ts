@@ -1,4 +1,11 @@
 import { z } from "zod";
+import type {
+  FeatureAdditionRequest,
+  FeatureExpansionResult,
+  PRDDocument,
+  ProjectFeatureRoadmap,
+  TaskLifecycleState,
+} from "../../../domain/ai-types.js";
 import type { MCPResponse } from "../../../domain/mcp-types.js";
 import { FeatureManagementService } from "../../../services/FeatureManagementService.js";
 import { ANNOTATION_PATTERNS } from "../annotations/tool-annotations.js";
@@ -70,10 +77,26 @@ async function executeAddFeature(args: AddFeatureArgs): Promise<MCPResponse> {
   }
 }
 
+/** Subset of the feature lifecycle result consumed by the summary formatter. */
+interface FeatureAdditionSummaryInput {
+  featureRequest: FeatureAdditionRequest;
+  analysis?: {
+    recommendation: string;
+    priority: string;
+    complexity: number;
+    estimatedEffort: number;
+    risks: string[];
+  };
+  updatedPRD?: PRDDocument;
+  expansionResult?: FeatureExpansionResult;
+  lifecycleStates?: TaskLifecycleState[];
+  roadmapUpdate?: ProjectFeatureRoadmap;
+}
+
 /**
  * Helper function to format feature addition summary
  */
-function formatFeatureAdditionSummary(result: any): string {
+function formatFeatureAdditionSummary(result: FeatureAdditionSummaryInput): string {
   const sections = [
     "# Feature Addition Complete",
     "",
@@ -127,10 +150,13 @@ function formatFeatureAdditionSummary(result: any): string {
     );
 
     // Task summary by priority
-    const tasksByPriority = result.expansionResult.tasks.reduce((acc: any, task: any) => {
-      acc[task.priority] = (acc[task.priority] || 0) + 1;
-      return acc;
-    }, {});
+    const tasksByPriority = result.expansionResult.tasks.reduce<Record<string, number>>(
+      (acc, task) => {
+        acc[task.priority] = (acc[task.priority] || 0) + 1;
+        return acc;
+      },
+      {}
+    );
 
     sections.push(
       "**Tasks by Priority:**",
@@ -142,14 +168,14 @@ function formatFeatureAdditionSummary(result: any): string {
 
     // High-priority tasks
     const highPriorityTasks = result.expansionResult.tasks
-      .filter((task: any) => task.priority === "critical" || task.priority === "high")
+      .filter((task) => task.priority === "critical" || task.priority === "high")
       .slice(0, 5);
 
     if (highPriorityTasks.length > 0) {
       sections.push(
         "**High-Priority Tasks:**",
         ...highPriorityTasks.map(
-          (task: any) => `- ${task.title} (${task.complexity}/10, ${task.estimatedHours}h)`
+          (task) => `- ${task.title} (${task.complexity}/10, ${task.estimatedHours}h)`
         ),
         ""
       );

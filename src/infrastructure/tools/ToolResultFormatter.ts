@@ -7,129 +7,112 @@ export interface FormattingOptions {
   includeRawData?: boolean;
 }
 
-export class ToolResultFormatter {
+export const ToolResultFormatter = {
   /**
    * Format a tool result as a successful MCP response
    */
-  static formatSuccess<T>(
-    toolName: string,
-    result: T,
-    options: FormattingOptions = {}
-  ): MCPResponse {
+  formatSuccess<T>(toolName: string, result: T, options: FormattingOptions = {}): MCPResponse {
     const contentType = options.contentType || MCPContentType.JSON;
 
     // Determine the right content format based on the result type and requested content type
     switch (contentType) {
       case MCPContentType.MARKDOWN:
-        return ToolResultFormatter.formatAsMarkdown(toolName, result, options);
+        return formatAsMarkdown(toolName, result, options);
 
       case MCPContentType.HTML:
-        return ToolResultFormatter.formatAsHtml(toolName, result, options);
+        return formatAsHtml(toolName, result, options);
 
       case MCPContentType.TEXT:
-        return ToolResultFormatter.formatAsText(toolName, result, options);
+        return formatAsText(toolName, result, options);
 
-      case MCPContentType.JSON:
       default:
-        return ToolResultFormatter.formatAsJson(toolName, result, options);
+        return formatAsJson(toolName, result, options);
     }
-  }
+  },
+};
 
-  /**
-   * Format result as JSON
-   */
-  private static formatAsJson<T>(
-    toolName: string,
-    result: T,
-    options: FormattingOptions
-  ): MCPResponse {
-    // Add metadata specific to tool results
-    const metadata = {
-      tool: toolName,
-      timestamp: new Date().toISOString(),
-      requestId: options.requestId,
-    };
+/**
+ * Format result as JSON
+ */
+function formatAsJson<T>(toolName: string, result: T, options: FormattingOptions): MCPResponse {
+  // Add metadata specific to tool results
+  const metadata = {
+    tool: toolName,
+    timestamp: new Date().toISOString(),
+    requestId: options.requestId,
+  };
 
-    return MCPResponseFormatter.format(result, MCPContentType.JSON, metadata);
-  }
+  return MCPResponseFormatter.format(result, MCPContentType.JSON, metadata);
+}
 
-  /**
-   * Format result as Markdown
-   */
-  private static formatAsMarkdown<T>(
-    toolName: string,
-    result: T,
-    options: FormattingOptions
-  ): MCPResponse {
-    // Add a title based on the tool name
-    let markdown = `# ${ToolResultFormatter.formatToolName(toolName)} Result\n\n`;
+/**
+ * Format result as Markdown
+ */
+function formatAsMarkdown<T>(toolName: string, result: T, options: FormattingOptions): MCPResponse {
+  // Add a title based on the tool name
+  let markdown = `# ${formatToolName(toolName)} Result\n\n`;
 
-    // Handle different types of results
-    if (Array.isArray(result)) {
-      // Format array results as a table if possible
-      if (result.length > 0 && typeof result[0] === "object") {
-        markdown += MCPResponseFormatter.formatAsMarkdownTable(result);
-      } else {
-        // Simple list for arrays of primitives
-        markdown += result.map((item) => `- ${JSON.stringify(item)}`).join("\n");
-      }
-    } else if (result && typeof result === "object") {
-      // Format key properties as headers with details
-      markdown += Object.entries(result)
-        .map(([key, value]) => {
-          const formattedKey =
-            key.charAt(0).toUpperCase() + key.slice(1).replace(/([A-Z])/g, " $1");
-
-          if (Array.isArray(value)) {
-            // Format arrays as lists
-            return `## ${formattedKey}\n${value.map((item) => `- ${JSON.stringify(item)}`).join("\n")}`;
-          } else if (value && typeof value === "object") {
-            // Format objects with nested details
-            return `## ${formattedKey}\n\`\`\`json\n${JSON.stringify(value)}\n\`\`\``;
-          } else {
-            return `## ${formattedKey}\n${value}`;
-          }
-        })
-        .join("\n\n");
+  // Handle different types of results
+  if (Array.isArray(result)) {
+    // Format array results as a table if possible
+    if (result.length > 0 && typeof result[0] === "object") {
+      markdown += MCPResponseFormatter.formatAsMarkdownTable(result);
     } else {
-      // Simple value
-      markdown += String(result);
+      // Simple list for arrays of primitives
+      markdown += result.map((item) => `- ${JSON.stringify(item)}`).join("\n");
     }
+  } else if (result && typeof result === "object") {
+    // Format key properties as headers with details
+    markdown += Object.entries(result)
+      .map(([key, value]) => {
+        const formattedKey = key.charAt(0).toUpperCase() + key.slice(1).replace(/([A-Z])/g, " $1");
 
-    // Include raw JSON data if requested
-    if (options.includeRawData) {
-      markdown += `\n\n## Raw Data\n\n\`\`\`json\n${JSON.stringify(result)}\n\`\`\``;
-    }
-
-    // Create MCP response with markdown content
-    return MCPResponseFormatter.format(markdown, MCPContentType.MARKDOWN, {
-      tool: toolName,
-      timestamp: new Date().toISOString(),
-      requestId: options.requestId,
-    });
+        if (Array.isArray(value)) {
+          // Format arrays as lists
+          return `## ${formattedKey}\n${value.map((item) => `- ${JSON.stringify(item)}`).join("\n")}`;
+        } else if (value && typeof value === "object") {
+          // Format objects with nested details
+          return `## ${formattedKey}\n\`\`\`json\n${JSON.stringify(value)}\n\`\`\``;
+        } else {
+          return `## ${formattedKey}\n${value}`;
+        }
+      })
+      .join("\n\n");
+  } else {
+    // Simple value
+    markdown += String(result);
   }
 
-  /**
-   * Format result as HTML
-   */
-  private static formatAsHtml<T>(
-    toolName: string,
-    result: T,
-    options: FormattingOptions
-  ): MCPResponse {
-    // Generate HTML template based on the result type
-    const htmlTemplate = (data: T) => {
-      let html = `
+  // Include raw JSON data if requested
+  if (options.includeRawData) {
+    markdown += `\n\n## Raw Data\n\n\`\`\`json\n${JSON.stringify(result)}\n\`\`\``;
+  }
+
+  // Create MCP response with markdown content
+  return MCPResponseFormatter.format(markdown, MCPContentType.MARKDOWN, {
+    tool: toolName,
+    timestamp: new Date().toISOString(),
+    requestId: options.requestId,
+  });
+}
+
+/**
+ * Format result as HTML
+ */
+function formatAsHtml<T>(toolName: string, result: T, options: FormattingOptions): MCPResponse {
+  // Generate HTML template based on the result type
+  const htmlTemplate = (data: T) => {
+    let html = `
         <div class="tool-result">
-          <h1 class="tool-name">${ToolResultFormatter.formatToolName(toolName)} Result</h1>
+          <h1 class="tool-name">${formatToolName(toolName)} Result</h1>
           <div class="tool-content">
       `;
 
-      if (Array.isArray(data)) {
-        if (data.length > 0 && typeof data[0] === "object") {
-          // Table for array of objects
-          const keys = Object.keys(data[0]);
-          html += `
+    if (Array.isArray(data)) {
+      if (data.length > 0 && typeof data[0] === "object") {
+        // Table for array of objects
+        const keys = Object.keys(data[0]);
+        html += `
             <table class="tool-table">
               <thead>
                 <tr>
@@ -149,17 +132,17 @@ export class ToolResultFormatter {
               </tbody>
             </table>
           `;
-        } else {
-          // List for array of primitives
-          html += `
+      } else {
+        // List for array of primitives
+        html += `
             <ul class="tool-list">
               ${data.map((item) => `<li>${JSON.stringify(item)}</li>`).join("")}
             </ul>
           `;
-        }
-      } else if (data && typeof data === "object") {
-        // Format object properties
-        html += `
+      }
+    } else if (data && typeof data === "object") {
+      // Format object properties
+      html += `
           <div class="tool-object">
             ${Object.entries(data)
               .map(([key, value]) => {
@@ -169,7 +152,7 @@ export class ToolResultFormatter {
                 <div class="tool-property">
                   <h2 class="tool-property-name">${formattedKey}</h2>
                   <div class="tool-property-value">
-                    ${ToolResultFormatter.formatHtmlValue(value)}
+                    ${formatHtmlValue(value)}
                   </div>
                 </div>
               `;
@@ -177,87 +160,82 @@ export class ToolResultFormatter {
               .join("")}
           </div>
         `;
-      } else {
-        // Simple value
-        html += `<p class="tool-simple-value">${data}</p>`;
-      }
+    } else {
+      // Simple value
+      html += `<p class="tool-simple-value">${data}</p>`;
+    }
 
-      html += `
+    html += `
           </div>
         </div>
       `;
 
-      if (options.includeRawData) {
-        html += `
+    if (options.includeRawData) {
+      html += `
           <div class="tool-raw-data">
             <h2>Raw Data</h2>
             <pre>${JSON.stringify(data, null, 2)}</pre>
           </div>
         `;
-      }
-
-      return html;
-    };
-
-    return MCPResponseFormatter.format(
-      MCPResponseFormatter.formatAsRichHtml(result, htmlTemplate),
-      MCPContentType.HTML,
-      {
-        tool: toolName,
-        timestamp: new Date().toISOString(),
-        requestId: options.requestId,
-      }
-    );
-  }
-
-  /**
-   * Format result as plain text
-   */
-  private static formatAsText<T>(
-    toolName: string,
-    result: T,
-    options: FormattingOptions
-  ): MCPResponse {
-    // Format as simple text representation
-    let text = `${ToolResultFormatter.formatToolName(toolName)} Result:\n\n`;
-
-    if (typeof result === "string") {
-      text += result;
-    } else {
-      text += JSON.stringify(result);
     }
 
-    return MCPResponseFormatter.format(text, MCPContentType.TEXT, {
+    return html;
+  };
+
+  return MCPResponseFormatter.format(
+    MCPResponseFormatter.formatAsRichHtml(result, htmlTemplate),
+    MCPContentType.HTML,
+    {
       tool: toolName,
       timestamp: new Date().toISOString(),
       requestId: options.requestId,
-    });
+    }
+  );
+}
+
+/**
+ * Format result as plain text
+ */
+function formatAsText<T>(toolName: string, result: T, options: FormattingOptions): MCPResponse {
+  // Format as simple text representation
+  let text = `${formatToolName(toolName)} Result:\n\n`;
+
+  if (typeof result === "string") {
+    text += result;
+  } else {
+    text += JSON.stringify(result);
   }
 
-  /**
-   * Format a value as HTML
-   */
-  private static formatHtmlValue(value: any): string {
-    if (Array.isArray(value)) {
-      return `
+  return MCPResponseFormatter.format(text, MCPContentType.TEXT, {
+    tool: toolName,
+    timestamp: new Date().toISOString(),
+    requestId: options.requestId,
+  });
+}
+
+/**
+ * Format a value as HTML
+ */
+function formatHtmlValue(value: unknown): string {
+  if (Array.isArray(value)) {
+    return `
         <ul class="tool-list">
           ${value.map((item) => `<li>${JSON.stringify(item)}</li>`).join("")}
         </ul>
       `;
-    } else if (value && typeof value === "object") {
-      return `<pre>${JSON.stringify(value, null, 2)}</pre>`;
-    } else {
-      return `<span>${value}</span>`;
-    }
+  } else if (value && typeof value === "object") {
+    return `<pre>${JSON.stringify(value, null, 2)}</pre>`;
+  } else {
+    return `<span>${value}</span>`;
   }
+}
 
-  /**
-   * Format tool name for display
-   */
-  private static formatToolName(name: string): string {
-    return name
-      .split("_")
-      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-      .join(" ");
-  }
+/**
+ * Format tool name for display
+ */
+function formatToolName(name: string): string {
+  return name
+    .split("_")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
 }

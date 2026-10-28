@@ -15,10 +15,12 @@ export class PromptRegistry {
 
   /** Register a new prompt version. */
   register(id: string, version: string, template: string, description?: string): void {
-    if (!this.prompts.has(id)) {
-      this.prompts.set(id, []);
+    let versions = this.prompts.get(id);
+    if (!versions) {
+      versions = [];
+      this.prompts.set(id, versions);
     }
-    this.prompts.get(id)!.push({
+    versions.push({
       id,
       version,
       template,

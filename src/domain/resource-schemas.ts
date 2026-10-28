@@ -203,10 +203,10 @@ export const resourceSchemas: Record<string, ResourceSchema> = {
 export type ResourceSchemaMap = typeof resourceSchemas;
 
 // Type for a resource schema
-export type ResourceSchema = z.ZodType<any, any, any>;
+export type ResourceSchema = z.ZodType;
 
 // Function to validate a resource by its type
-export function validateResourceByType(type: ResourceType, resource: any): any {
+export function validateResourceByType(type: ResourceType, resource: unknown): unknown {
   // Remove generic type parameter which was causing the compilation error
   const schema = resourceSchemas[type];
 

@@ -321,9 +321,9 @@ export class ProjectLinkingService {
 
       return response.node.items.nodes.map((item) => {
         // Build field values map
-        const fieldValues: Record<string, any> = {};
+        const fieldValues: Record<string, unknown> = {};
         if (item.fieldValues?.nodes) {
-          item.fieldValues.nodes.forEach((fieldValue: any) => {
+          item.fieldValues.nodes.forEach((fieldValue) => {
             if (!fieldValue?.field) return;
 
             const fieldId = fieldValue.field.id;
@@ -348,6 +348,7 @@ export class ProjectLinkingService {
         return {
           id: item.id,
           contentId: item.content?.id || "",
+          title: item.content?.title,
           contentType,
           projectId: data.projectId,
           fieldValues,

@@ -107,7 +107,7 @@ async function main() {
   }
 
   await listToolsExample();
-  // await discoverToolsExample();
+  await discoverToolsExample();
 }
 
 main().catch((error) => {

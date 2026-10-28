@@ -149,21 +149,21 @@ export interface MCPRequest {
   correlationId?: string;
   requestId: string;
   inputs: {
-    parameters: Record<string, any>;
+    parameters: Record<string, unknown>;
     content?: string;
-    context?: Record<string, any>;
+    context?: Record<string, unknown>;
   };
 }
 
 export interface MCPResponseFormat {
   type: string;
-  schema?: Record<string, any>;
+  schema?: Record<string, unknown>;
 }
 
 export interface MCPResource {
   type: ResourceType;
   id: string;
-  properties: Record<string, any>;
+  properties: Record<string, unknown>;
   links?: Record<string, string>;
 }
 
@@ -176,7 +176,7 @@ export interface MCPSuccessResponse {
     content?: string;
     format?: MCPResponseFormat;
     resources?: MCPResource[];
-    context?: Record<string, any>;
+    context?: Record<string, unknown>;
   };
 }
 
@@ -185,7 +185,7 @@ export interface MCPErrorDetail {
   message: string;
   target?: string;
   details?: MCPErrorDetail[];
-  innerError?: Record<string, any>;
+  innerError?: Record<string, unknown>;
   data?: MCPErrorData;
 }
 

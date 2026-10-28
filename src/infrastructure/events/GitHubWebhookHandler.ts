@@ -3,11 +3,33 @@ import { ResourceType } from "../../domain/resource-types";
 import { WEBHOOK_ALLOW_UNSIGNED, WEBHOOK_SECRET } from "../../env";
 import { type ILogger, Logger } from "../logger/index";
 
+/** A GitHub resource object embedded in a webhook payload. */
+export interface WebhookResource {
+  id: string | number;
+  [key: string]: unknown;
+}
+
+/** The parts of a GitHub webhook payload the handler reads. */
+export interface GitHubWebhookPayload {
+  action?: string;
+  projects_v2?: WebhookResource;
+  projects_v2_item?: {
+    content_type?: string;
+    content_node_id?: string;
+    project_node_id?: string;
+    [key: string]: unknown;
+  };
+  milestone?: WebhookResource;
+  issue?: WebhookResource;
+  pull_request?: WebhookResource;
+  [key: string]: unknown;
+}
+
 export interface WebhookEvent {
   id: string;
   type: string;
   timestamp: string;
-  payload: any;
+  payload: GitHubWebhookPayload;
   signature: string;
   delivery: string;
 }
@@ -18,9 +40,9 @@ export interface ResourceEvent {
   resourceType: ResourceType;
   resourceId: string;
   timestamp: string;
-  data: any;
+  data: unknown;
   source: "github" | "api";
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 export interface WebhookProcessingResult {
@@ -360,7 +382,7 @@ export class GitHubWebhookHandler {
   /**
    * Map GitHub action to our event type
    */
-  private mapActionToEventType(action: string): ResourceEvent["type"] | null {
+  private mapActionToEventType(action: string | undefined): ResourceEvent["type"] | null {
     switch (action) {
       case "created":
       case "opened":
@@ -384,7 +406,7 @@ export class GitHubWebhookHandler {
    */
   createWebhookEvent(
     eventType: string,
-    payload: any,
+    payload: GitHubWebhookPayload,
     signature: string,
     delivery: string
   ): WebhookEvent {
@@ -401,23 +423,24 @@ export class GitHubWebhookHandler {
   /**
    * Validate webhook payload structure
    */
-  validateWebhookPayload(eventType: string, payload: any): boolean {
+  validateWebhookPayload(eventType: string, payload: unknown): payload is GitHubWebhookPayload {
     if (!payload || typeof payload !== "object") {
       return false;
     }
+    const candidate = payload as GitHubWebhookPayload;
 
     // Basic validation based on event type
     switch (eventType) {
       case "projects_v2":
-        return !!(payload.projects_v2 && payload.action);
+        return !!(candidate.projects_v2 && candidate.action);
       case "projects_v2_item":
-        return !!(payload.projects_v2_item && payload.action);
+        return !!(candidate.projects_v2_item && candidate.action);
       case "milestone":
-        return !!(payload.milestone && payload.action);
+        return !!(candidate.milestone && candidate.action);
       case "issues":
-        return !!(payload.issue && payload.action);
+        return !!(candidate.issue && candidate.action);
       case "pull_request":
-        return !!(payload.pull_request && payload.action);
+        return !!(candidate.pull_request && candidate.action);
       default:
         return true; // Allow unknown event types for future compatibility
     }

@@ -67,6 +67,10 @@ interface GitHubProject {
   version?: number;
 }
 
+interface ProjectsByOwnerResponse {
+  user?: { projectsV2?: { nodes?: GitHubProject[] } } | null;
+  organization?: { projectsV2?: { nodes?: GitHubProject[] } } | null;
+}
 interface CreateProjectResponse {
   createProjectV2: {
     projectV2: GitHubProject;
@@ -183,7 +187,7 @@ export class GitHubProjectRepository extends BaseGitHubRepository implements Pro
     // the configured owner login / repo name — resolve them first.
     const ownerId = await this.resolveOwnerNodeId(this.owner);
 
-    const createInput: any = {
+    const createInput: { ownerId: string; title: string; repositoryId?: string } = {
       ownerId,
       title: data.title,
     };
@@ -416,7 +420,7 @@ export class GitHubProjectRepository extends BaseGitHubRepository implements Pro
     `;
 
     try {
-      const response = await this.graphql<any>(query, { owner });
+      const response = await this.graphql<ProjectsByOwnerResponse>(query, { owner });
 
       // Combine projects from both user and organization contexts
       const userProjects = response.user?.projectsV2?.nodes || [];
@@ -586,7 +590,7 @@ export class GitHubProjectRepository extends BaseGitHubRepository implements Pro
   }
 
   async updateView(
-    projectId: ProjectId,
+    _projectId: ProjectId,
     viewId: string,
     data: Partial<ProjectView>
   ): Promise<ProjectView> {
@@ -606,7 +610,7 @@ export class GitHubProjectRepository extends BaseGitHubRepository implements Pro
       // UpdateProjectV2ViewInput carries the view id only — the project is
       // implied by the view. Sending `projectId` is a schema error
       // ("Field 'projectId' is not defined by type 'UpdateProjectV2ViewInput'").
-      const input: Record<string, any> = {
+      const input: Record<string, unknown> = {
         viewId,
       };
 

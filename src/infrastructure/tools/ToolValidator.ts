@@ -26,7 +26,7 @@ type ErrorCodeValue = number;
 
 import { MCPErrorCode, type MCPErrorData } from "../../domain/mcp-types";
 import { MCPResponseFormatter } from "../mcp/MCPResponseFormatter";
-import { ParameterCoercion } from "./ParameterCoercion";
+import { coerceParameters } from "./ParameterCoercion";
 
 export type ToolSchema<T> = z.ZodType<T>;
 
@@ -92,14 +92,35 @@ interface OctokitRequestError {
   };
 }
 
-export class ToolValidator {
+/**
+ * Map MCP SDK error codes to our custom error codes
+ */
+function mapErrorCode(mcpErrorCode: ErrorCodeValue): MCPErrorCode {
+  switch (mcpErrorCode) {
+    case ErrorCode.InvalidParams:
+      return MCPErrorCode.VALIDATION_ERROR;
+    case ErrorCode.MethodNotFound:
+      return MCPErrorCode.RESOURCE_NOT_FOUND;
+    case ErrorCode.InternalError:
+      return MCPErrorCode.INTERNAL_ERROR;
+    // Replace non-existent enum values with valid ones
+    case ErrorCode.InvalidRequest: // Instead of Unauthorized
+      return MCPErrorCode.UNAUTHORIZED;
+    case ErrorCode.ParseError: // Instead of RateLimited
+      return MCPErrorCode.RATE_LIMITED;
+    default:
+      return MCPErrorCode.INTERNAL_ERROR;
+  }
+}
+
+export const ToolValidator = {
   /**
    * Validate tool arguments against the schema
    */
-  static validate<T>(toolName: string, args: unknown, schema: ToolSchema<T>): T {
+  validate<T>(toolName: string, args: unknown, schema: ToolSchema<T>): T {
     try {
       // Apply parameter coercion before validation
-      const coercedArgs = ParameterCoercion.coerceParameters(args as Record<string, any>, schema);
+      const coercedArgs = coerceParameters(args as Record<string, unknown>, schema);
       return schema.parse(coercedArgs);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -122,13 +143,13 @@ export class ToolValidator {
         cause: String(error),
       });
     }
-  }
+  },
 
   /**
    * Map GitHub API errors to MCP error codes with rich context.
    * Handles Octokit RequestError and extracts rate limit info, validation errors, etc.
    */
-  static mapGitHubError(error: unknown, toolName: string): ProtocolError {
+  mapGitHubError(error: unknown, toolName: string): ProtocolError {
     const data: MCPErrorData = { tool: toolName };
 
     // Handle Octokit RequestError
@@ -249,15 +270,12 @@ export class ToolValidator {
       tool: toolName,
       error: String(error),
     });
-  }
+  },
 
   /**
    * Transform MCP SDK errors to our custom error format
    */
-  static handleToolError(
-    error: unknown,
-    toolName: string
-  ): ReturnType<typeof MCPResponseFormatter.error> {
+  handleToolError(error: unknown, toolName: string): ReturnType<typeof MCPResponseFormatter.error> {
     // Use stderr to avoid interfering with MCP protocol on stdout
     process.stderr.write(`[${toolName}] Error: ${error}\n`);
 
@@ -279,7 +297,7 @@ export class ToolValidator {
     // Handle MCP SDK errors
     if (error instanceof McpError) {
       return MCPResponseFormatter.error(
-        ToolValidator.mapErrorCode(error.code),
+        mapErrorCode(error.code),
         error.message,
         // Safely handle potentially unknown error.data
         error.data && typeof error.data === "object"
@@ -303,26 +321,5 @@ export class ToolValidator {
       `Unknown error executing tool ${toolName}`,
       { error: String(error) }
     );
-  }
-
-  /**
-   * Map MCP SDK error codes to our custom error codes
-   */
-  private static mapErrorCode(mcpErrorCode: ErrorCodeValue): MCPErrorCode {
-    switch (mcpErrorCode) {
-      case ErrorCode.InvalidParams:
-        return MCPErrorCode.VALIDATION_ERROR;
-      case ErrorCode.MethodNotFound:
-        return MCPErrorCode.RESOURCE_NOT_FOUND;
-      case ErrorCode.InternalError:
-        return MCPErrorCode.INTERNAL_ERROR;
-      // Replace non-existent enum values with valid ones
-      case ErrorCode.InvalidRequest: // Instead of Unauthorized
-        return MCPErrorCode.UNAUTHORIZED;
-      case ErrorCode.ParseError: // Instead of RateLimited
-        return MCPErrorCode.RATE_LIMITED;
-      default:
-        return MCPErrorCode.INTERNAL_ERROR;
-    }
-  }
-}
+  },
+};

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { type PRDDocument, TaskPriority } from "../../../domain/ai-types.js";
 import type { MCPResponse } from "../../../domain/mcp-types.js";
 import { PRDGenerationService } from "../../../services/PRDGenerationService.js";
 import { Logger } from "../../logger/index.js";
@@ -143,10 +144,19 @@ While AI services are unavailable, you can still:
 The MCP server will continue to work normally for all non-AI features.`;
 }
 
+/** Result of `PRDGenerationService.validatePRDCompleteness`. */
+interface PRDValidation {
+  isComplete: boolean;
+  score: number;
+  missingElements: string[];
+  recommendations: string[];
+  qualityIssues: string[];
+}
+
 /**
  * Helper function to format PRD generation summary
  */
-function formatPRDGenerationSummary(prd: any, validation: any): string {
+function formatPRDGenerationSummary(prd: PRDDocument, validation: PRDValidation): string {
   const sections = [
     "# PRD Generation Complete",
     "",
@@ -181,7 +191,7 @@ function formatPRDGenerationSummary(prd: any, validation: any): string {
   if (prd.targetUsers && prd.targetUsers.length > 0) {
     sections.push(
       "## Target Users",
-      ...prd.targetUsers.slice(0, 3).map((user: any) => `- **${user.name}**: ${user.description}`),
+      ...prd.targetUsers.slice(0, 3).map((user) => `- **${user.name}**: ${user.description}`),
       ""
     );
   }
@@ -191,7 +201,7 @@ function formatPRDGenerationSummary(prd: any, validation: any): string {
     sections.push("## Key Features", `**Total Features:** ${prd.features.length}`, "");
 
     // Feature breakdown by priority
-    const featuresByPriority = prd.features.reduce((acc: any, feature: any) => {
+    const featuresByPriority = prd.features.reduce<Record<string, number>>((acc, feature) => {
       acc[feature.priority] = (acc[feature.priority] || 0) + 1;
       return acc;
     }, {});
@@ -199,21 +209,21 @@ function formatPRDGenerationSummary(prd: any, validation: any): string {
     sections.push(
       "**Features by Priority:**",
       ...Object.entries(featuresByPriority).map(
-        ([priority, count]) => `- ${priority}: ${count} feature${(count as number) > 1 ? "s" : ""}`
+        ([priority, count]) => `- ${priority}: ${count} feature${count > 1 ? "s" : ""}`
       ),
       ""
     );
 
     // Top priority features
     const highPriorityFeatures = prd.features
-      .filter((f: any) => f.priority === "critical" || f.priority === "high")
+      .filter((f) => f.priority === TaskPriority.CRITICAL || f.priority === TaskPriority.HIGH)
       .slice(0, 5);
 
     if (highPriorityFeatures.length > 0) {
       sections.push(
         "**High-Priority Features:**",
         ...highPriorityFeatures.map(
-          (feature: any) => `- ${feature.title} (complexity: ${feature.estimatedComplexity}/10)`
+          (feature) => `- ${feature.title} (complexity: ${feature.estimatedComplexity}/10)`
         ),
         ""
       );
@@ -229,7 +239,7 @@ function formatPRDGenerationSummary(prd: any, validation: any): string {
     );
 
     // Requirements by category
-    const reqsByCategory = prd.technicalRequirements.reduce((acc: any, req: any) => {
+    const reqsByCategory = prd.technicalRequirements.reduce<Record<string, number>>((acc, req) => {
       acc[req.category] = (acc[req.category] || 0) + 1;
       return acc;
     }, {});
@@ -237,8 +247,7 @@ function formatPRDGenerationSummary(prd: any, validation: any): string {
     sections.push(
       "**Requirements by Category:**",
       ...Object.entries(reqsByCategory).map(
-        ([category, count]) =>
-          `- ${category}: ${count} requirement${(count as number) > 1 ? "s" : ""}`
+        ([category, count]) => `- ${category}: ${count} requirement${count > 1 ? "s" : ""}`
       ),
       ""
     );

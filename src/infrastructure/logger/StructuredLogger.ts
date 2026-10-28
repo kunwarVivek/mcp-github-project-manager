@@ -25,7 +25,7 @@ export type LogFormat = "text" | "json";
  * the existing human-readable Logger.
  */
 export class StructuredLogger {
-  private static _instance: StructuredLogger;
+  private static _instance: StructuredLogger | undefined;
   private format: LogFormat;
   private level: LogLevel;
 
@@ -43,7 +43,7 @@ export class StructuredLogger {
 
   /** Reset singleton for testing. */
   static resetInstance(): void {
-    StructuredLogger._instance = undefined!;
+    StructuredLogger._instance = undefined;
   }
 
   private parseLevel(level: string): LogLevel {

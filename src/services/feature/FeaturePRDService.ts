@@ -111,7 +111,7 @@ export class FeaturePRDService {
   assessFeatureImpact(params: {
     newFeature: FeatureRequirement;
     existingFeatures: FeatureRequirement[];
-    systemContext: any;
+    systemContext: unknown;
   }): string {
     return `Adding ${params.newFeature.title} will require integration with ${params.existingFeatures.length} existing features.`;
   }

@@ -1,0 +1,5610 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "GitHub Project Manager MCP API",
+    "version": "1.0.0",
+    "description": "API for managing GitHub Projects through the Model Context Protocol"
+  },
+  "servers": [
+    {
+      "url": "/",
+      "description": "MCP Server"
+    }
+  ],
+  "paths": {
+    "/tools/manage_project": {
+      "post": {
+        "operationId": "manage_project",
+        "summary": "Manage Projects",
+        "description": "Manage GitHub Projects (v2): create, list, get, update, delete projects; manage readme, fields, views, items; handle templates and link to repos/teams. Use the `action` field to select the operation.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "action": {
+                    "type": "string",
+                    "enum": [
+                      "create",
+                      "list",
+                      "get",
+                      "update",
+                      "delete",
+                      "get_readme",
+                      "update_readme",
+                      "create_field",
+                      "list_fields",
+                      "update_field",
+                      "create_view",
+                      "list_views",
+                      "update_view",
+                      "delete_view",
+                      "add_item",
+                      "remove_item",
+                      "list_items",
+                      "archive_item",
+                      "unarchive_item",
+                      "set_field_value",
+                      "get_field_value",
+                      "clear_field_value",
+                      "close",
+                      "reopen",
+                      "mark_as_template",
+                      "unmark_as_template",
+                      "copy_from_template",
+                      "list_templates",
+                      "link_to_repo",
+                      "unlink_from_repo",
+                      "link_to_team",
+                      "unlink_from_team",
+                      "list_linked_repos",
+                      "list_linked_teams",
+                      "update_item_position",
+                      "filter_items",
+                      "setup_agent_fields",
+                      "set_collaborators"
+                    ],
+                    "description": "The project operation to perform"
+                  },
+                  "projectId": {
+                    "type": "string"
+                  },
+                  "title": {
+                    "type": "string"
+                  },
+                  "shortDescription": {
+                    "type": "string"
+                  },
+                  "description": {
+                    "type": "string"
+                  },
+                  "owner": {
+                    "type": "string"
+                  },
+                  "visibility": {
+                    "type": "string",
+                    "enum": [
+                      "private",
+                      "public"
+                    ]
+                  },
+                  "status": {
+                    "type": "string"
+                  },
+                  "limit": {
+                    "type": "number"
+                  },
+                  "readme": {
+                    "type": "string"
+                  },
+                  "fieldId": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "text",
+                      "number",
+                      "date",
+                      "single_select",
+                      "multi_select",
+                      "iteration"
+                    ],
+                    "description": "Type of the field to create — exactly the types GitHub's ProjectV2CustomFieldType accepts"
+                  },
+                  "options": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "name": {
+                          "type": "string"
+                        },
+                        "description": {
+                          "type": "string"
+                        },
+                        "color": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "name"
+                      ]
+                    }
+                  },
+                  "required": {
+                    "type": "boolean"
+                  },
+                  "viewId": {
+                    "type": "string"
+                  },
+                  "layout": {
+                    "type": "string",
+                    "enum": [
+                      "board",
+                      "table",
+                      "roadmap"
+                    ],
+                    "description": "Layout of the view — exactly the layouts GitHub's ProjectV2ViewLayout accepts"
+                  },
+                  "itemId": {
+                    "type": "string"
+                  },
+                  "contentId": {
+                    "type": "string"
+                  },
+                  "contentType": {
+                    "type": "string",
+                    "enum": [
+                      "issue",
+                      "pull_request"
+                    ]
+                  },
+                  "value": {},
+                  "targetOwner": {
+                    "type": "string"
+                  },
+                  "includeDraftIssues": {
+                    "type": "boolean"
+                  },
+                  "org": {
+                    "type": "string"
+                  },
+                  "first": {
+                    "type": "number"
+                  },
+                  "after": {
+                    "type": "string"
+                  },
+                  "repo": {
+                    "type": "string"
+                  },
+                  "teamSlug": {
+                    "type": "string"
+                  },
+                  "collaborators": {
+                    "description": "The collaborators to grant a role to, one entry per user or team",
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "userLogin": {
+                          "description": "Login of the user to grant the role to",
+                          "type": "string"
+                        },
+                        "teamSlug": {
+                          "description": "Slug of the team to grant the role to",
+                          "type": "string"
+                        },
+                        "role": {
+                          "type": "string",
+                          "enum": [
+                            "ADMIN",
+                            "WRITER",
+                            "READER",
+                            "NONE"
+                          ],
+                          "description": "The role to grant — exactly the roles GitHub's ProjectV2Roles accepts"
+                        }
+                      },
+                      "required": [
+                        "role"
+                      ]
+                    }
+                  },
+                  "afterId": {
+                    "type": "string"
+                  },
+                  "filter": {
+                    "type": "object",
+                    "properties": {
+                      "status": {
+                        "type": "string"
+                      },
+                      "labels": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "assignee": {
+                        "type": "string"
+                      },
+                      "type": {
+                        "type": "string",
+                        "enum": [
+                          "Issue",
+                          "PullRequest",
+                          "DraftIssue"
+                        ]
+                      }
+                    }
+                  }
+                },
+                "required": [
+                  "action"
+                ],
+                "description": "Manage GitHub Projects v2 — all project operations"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "content": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "type": {
+                            "type": "string"
+                          },
+                          "text": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/tools/manage_issues": {
+      "post": {
+        "operationId": "manage_issues",
+        "summary": "Manage Issues",
+        "description": "Manage GitHub Issues: create, list, get, update issues; manage comments and drafts; search with advanced filters; manage sub-issues. Use the `action` field to select the operation.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "action": {
+                    "type": "string",
+                    "enum": [
+                      "create",
+                      "list",
+                      "get",
+                      "update",
+                      "create_comment",
+                      "update_comment",
+                      "delete_comment",
+                      "list_comments",
+                      "create_draft",
+                      "update_draft",
+                      "delete_draft",
+                      "convert_draft",
+                      "search_advanced",
+                      "add_sub_issue",
+                      "list_sub_issues",
+                      "get_parent_issue",
+                      "reprioritize_sub_issue",
+                      "remove_sub_issue",
+                      "list_dependencies",
+                      "add_blocker",
+                      "remove_blocker",
+                      "list_issue_types"
+                    ],
+                    "description": "The issue operation to perform"
+                  },
+                  "issueId": {
+                    "type": "string"
+                  },
+                  "title": {
+                    "type": "string"
+                  },
+                  "description": {
+                    "type": "string"
+                  },
+                  "milestoneId": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "assignees": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "labels": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "priority": {
+                    "type": "string",
+                    "enum": [
+                      "high",
+                      "medium",
+                      "low"
+                    ]
+                  },
+                  "type": {
+                    "description": "The issue type: a native organization issue type (its name or `IT_…` id) or one of bug/feature/enhancement/documentation for the label emulation",
+                    "type": "string"
+                  },
+                  "blockingIssueId": {
+                    "description": "The issue that blocks the given issue (native `blocked by` edge)",
+                    "type": "string"
+                  },
+                  "dependencyDirection": {
+                    "description": "`blocked_by` lists the issues that block this one, `blocking` the ones it blocks",
+                    "type": "string",
+                    "enum": [
+                      "blocked_by",
+                      "blocking"
+                    ]
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "open",
+                      "closed",
+                      "all"
+                    ]
+                  },
+                  "milestone": {
+                    "type": "string"
+                  },
+                  "assignee": {
+                    "type": "string"
+                  },
+                  "sort": {
+                    "type": "string",
+                    "enum": [
+                      "created",
+                      "updated",
+                      "comments"
+                    ]
+                  },
+                  "direction": {
+                    "type": "string",
+                    "enum": [
+                      "asc",
+                      "desc"
+                    ]
+                  },
+                  "limit": {
+                    "type": "number"
+                  },
+                  "issueNumber": {
+                    "type": "number"
+                  },
+                  "commentId": {
+                    "type": "number"
+                  },
+                  "body": {
+                    "type": "string"
+                  },
+                  "perPage": {
+                    "type": "number"
+                  },
+                  "projectId": {
+                    "type": "string"
+                  },
+                  "draftIssueId": {
+                    "type": "string"
+                  },
+                  "assigneeIds": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "itemId": {
+                    "type": "string"
+                  },
+                  "owner": {
+                    "type": "string"
+                  },
+                  "repo": {
+                    "type": "string"
+                  },
+                  "query": {
+                    "type": "string"
+                  },
+                  "first": {
+                    "type": "number"
+                  },
+                  "after": {
+                    "type": "string"
+                  },
+                  "parentIssueNumber": {
+                    "type": "number"
+                  },
+                  "subIssueNumber": {
+                    "type": "number"
+                  },
+                  "replaceParent": {
+                    "type": "boolean"
+                  },
+                  "afterIssueNumber": {
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "action"
+                ],
+                "description": "Manage GitHub Issues — CRUD, comments, drafts, sub-issues, and search"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "content": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "type": {
+                            "type": "string"
+                          },
+                          "text": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/tools/manage_prs": {
+      "post": {
+        "operationId": "manage_prs",
+        "summary": "Manage Pull Requests",
+        "description": "Manage Pull Requests: create, get, list, update, merge PRs; list and create reviews. Use the `action` field to select the operation.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "action": {
+                    "type": "string",
+                    "enum": [
+                      "create",
+                      "get",
+                      "list",
+                      "update",
+                      "merge",
+                      "list_reviews",
+                      "create_review"
+                    ],
+                    "description": "The pull request operation to perform"
+                  },
+                  "pullNumber": {
+                    "type": "number"
+                  },
+                  "title": {
+                    "type": "string"
+                  },
+                  "body": {
+                    "type": "string"
+                  },
+                  "head": {
+                    "type": "string"
+                  },
+                  "base": {
+                    "type": "string"
+                  },
+                  "draft": {
+                    "type": "boolean"
+                  },
+                  "state": {
+                    "type": "string",
+                    "enum": [
+                      "open",
+                      "closed",
+                      "all"
+                    ]
+                  },
+                  "perPage": {
+                    "type": "number"
+                  },
+                  "commitTitle": {
+                    "type": "string"
+                  },
+                  "commitMessage": {
+                    "type": "string"
+                  },
+                  "mergeMethod": {
+                    "type": "string",
+                    "enum": [
+                      "merge",
+                      "squash",
+                      "rebase"
+                    ]
+                  },
+                  "event": {
+                    "type": "string",
+                    "enum": [
+                      "APPROVE",
+                      "REQUEST_CHANGES",
+                      "COMMENT"
+                    ]
+                  },
+                  "comments": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "path": {
+                          "type": "string"
+                        },
+                        "position": {
+                          "type": "number"
+                        },
+                        "body": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "path",
+                        "body"
+                      ]
+                    }
+                  }
+                },
+                "required": [
+                  "action"
+                ],
+                "description": "Manage GitHub Pull Requests — create, update, merge, and reviews"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "content": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "type": {
+                            "type": "string"
+                          },
+                          "text": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/tools/manage_milestones": {
+      "post": {
+        "operationId": "manage_milestones",
+        "summary": "Manage Milestones",
+        "description": "Manage Milestones: create, list, update, delete milestones; get metrics; find overdue and upcoming milestones. Use the `action` field to select the operation.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "action": {
+                    "type": "string",
+                    "enum": [
+                      "create",
+                      "list",
+                      "update",
+                      "delete",
+                      "get_metrics",
+                      "get_overdue",
+                      "get_upcoming"
+                    ],
+                    "description": "The milestone operation to perform"
+                  },
+                  "milestoneId": {
+                    "type": "string"
+                  },
+                  "title": {
+                    "type": "string"
+                  },
+                  "description": {
+                    "type": "string"
+                  },
+                  "dueDate": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "state": {
+                    "type": "string",
+                    "enum": [
+                      "open",
+                      "closed"
+                    ]
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "open",
+                      "closed",
+                      "all"
+                    ]
+                  },
+                  "sort": {
+                    "type": "string",
+                    "enum": [
+                      "due_date",
+                      "title",
+                      "created_at"
+                    ]
+                  },
+                  "direction": {
+                    "type": "string",
+                    "enum": [
+                      "asc",
+                      "desc"
+                    ]
+                  },
+                  "includeIssues": {
+                    "type": "boolean"
+                  },
+                  "limit": {
+                    "type": "number"
+                  },
+                  "daysAhead": {
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "action"
+                ],
+                "description": "Manage GitHub Milestones — CRUD, metrics, overdue and upcoming tracking"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "content": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "type": {
+                            "type": "string"
+                          },
+                          "text": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/tools/manage_sprints": {
+      "post": {
+        "operationId": "manage_sprints",
+        "summary": "Manage Sprints",
+        "description": "Manage Sprints: create, list, update sprints; get current sprint; add/remove issues; get metrics and plan. Use the `action` field to select the operation.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "action": {
+                    "type": "string",
+                    "enum": [
+                      "create",
+                      "list",
+                      "get_current",
+                      "update",
+                      "add_issues",
+                      "remove_issues",
+                      "get_metrics",
+                      "plan"
+                    ],
+                    "description": "The sprint operation to perform"
+                  },
+                  "sprintId": {
+                    "type": "string"
+                  },
+                  "projectId": {
+                    "description": "Project ID (required for create — sprints are iteration fields on a specific project)",
+                    "type": "string"
+                  },
+                  "title": {
+                    "type": "string"
+                  },
+                  "description": {
+                    "type": "string"
+                  },
+                  "startDate": {
+                    "type": "string"
+                  },
+                  "endDate": {
+                    "type": "string"
+                  },
+                  "issueIds": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "planned",
+                      "active",
+                      "completed",
+                      "all"
+                    ]
+                  },
+                  "includeIssues": {
+                    "type": "boolean"
+                  },
+                  "sprint": {
+                    "type": "object",
+                    "properties": {
+                      "title": {
+                        "type": "string"
+                      },
+                      "startDate": {
+                        "type": "string"
+                      },
+                      "endDate": {
+                        "type": "string"
+                      },
+                      "goals": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "required": [
+                      "title",
+                      "startDate",
+                      "endDate",
+                      "goals"
+                    ]
+                  }
+                },
+                "required": [
+                  "action"
+                ],
+                "description": "Manage Sprints — create, update, plan, add/remove issues, and metrics"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "content": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "type": {
+                            "type": "string"
+                          },
+                          "text": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/tools/manage_labels": {
+      "post": {
+        "operationId": "manage_labels",
+        "summary": "Manage Labels",
+        "description": "Manage repository Labels: create and list labels. Use the `action` field to select the operation.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "action": {
+                    "type": "string",
+                    "enum": [
+                      "create",
+                      "list"
+                    ],
+                    "description": "The label operation to perform"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "color": {
+                    "type": "string"
+                  },
+                  "description": {
+                    "type": "string"
+                  },
+                  "limit": {
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "action"
+                ],
+                "description": "Manage GitHub Labels — create and list repository labels"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "content": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "type": {
+                            "type": "string"
+                          },
+                          "text": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/tools/manage_automation": {
+      "post": {
+        "operationId": "manage_automation",
+        "summary": "Manage Automation",
+        "description": "Manage Project Automations: list, get and delete the automation workflows of a GitHub project. Use the `action` field to select the operation.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "action": {
+                    "type": "string",
+                    "enum": [
+                      "list_workflows",
+                      "get_workflow",
+                      "delete_workflow"
+                    ],
+                    "description": "The project automation workflow operation to perform"
+                  },
+                  "projectId": {
+                    "type": "string"
+                  },
+                  "workflowId": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "action"
+                ],
+                "description": "Manage Project Automations — list, read and delete the automation workflows of a GitHub project"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "content": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "type": {
+                            "type": "string"
+                          },
+                          "text": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/tools/manage_iterations": {
+      "post": {
+        "operationId": "manage_iterations",
+        "summary": "Manage Iterations",
+        "description": "Manage Project Iterations: get configuration, current iteration, items; find by date; assign items. Use the `action` field to select the operation.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "action": {
+                    "type": "string",
+                    "enum": [
+                      "get_config",
+                      "get_current",
+                      "get_items",
+                      "get_by_date",
+                      "assign_items"
+                    ],
+                    "description": "The iteration operation to perform"
+                  },
+                  "projectId": {
+                    "type": "string"
+                  },
+                  "fieldName": {
+                    "type": "string"
+                  },
+                  "iterationId": {
+                    "type": "string"
+                  },
+                  "limit": {
+                    "type": "number"
+                  },
+                  "date": {
+                    "type": "string"
+                  },
+                  "itemIds": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "required": [
+                  "action"
+                ],
+                "description": "Manage Project Iterations — configuration, current iteration, items, and assignment"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "content": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "type": {
+                            "type": "string"
+                          },
+                          "text": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/tools/manage_events": {
+      "post": {
+        "operationId": "manage_events",
+        "summary": "Manage Events",
+        "description": "Manage Events: subscribe to project events, get recent events, replay events. Use the `action` field to select the operation.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "action": {
+                    "type": "string",
+                    "enum": [
+                      "subscribe",
+                      "get_recent",
+                      "replay"
+                    ],
+                    "description": "The event operation to perform"
+                  },
+                  "clientId": {
+                    "type": "string"
+                  },
+                  "filters": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "resourceType": {
+                          "type": "string",
+                          "enum": [
+                            "PROJECT",
+                            "MILESTONE",
+                            "ISSUE",
+                            "SPRINT"
+                          ]
+                        },
+                        "eventType": {
+                          "type": "string",
+                          "enum": [
+                            "created",
+                            "updated",
+                            "deleted",
+                            "closed",
+                            "reopened"
+                          ]
+                        },
+                        "resourceId": {
+                          "type": "string"
+                        },
+                        "source": {
+                          "type": "string",
+                          "enum": [
+                            "github",
+                            "api"
+                          ]
+                        },
+                        "tags": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "transport": {
+                    "type": "string",
+                    "enum": [
+                      "sse",
+                      "webhook",
+                      "internal"
+                    ]
+                  },
+                  "endpoint": {
+                    "type": "string"
+                  },
+                  "expiresAt": {
+                    "type": "string"
+                  },
+                  "resourceType": {
+                    "type": "string",
+                    "enum": [
+                      "PROJECT",
+                      "MILESTONE",
+                      "ISSUE",
+                      "SPRINT"
+                    ]
+                  },
+                  "resourceId": {
+                    "type": "string"
+                  },
+                  "eventType": {
+                    "type": "string",
+                    "enum": [
+                      "created",
+                      "updated",
+                      "deleted",
+                      "closed",
+                      "reopened"
+                    ]
+                  },
+                  "limit": {
+                    "type": "number"
+                  },
+                  "fromTimestamp": {
+                    "type": "string"
+                  },
+                  "toTimestamp": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "action"
+                ],
+                "description": "Manage Events — subscribe, get recent events, and replay event history"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "content": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "type": {
+                            "type": "string"
+                          },
+                          "text": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/tools/manage_status_updates": {
+      "post": {
+        "operationId": "manage_status_updates",
+        "summary": "Manage Status Updates",
+        "description": "Manage project Status Updates: create, list, and get status updates. Use the `action` field to select the operation.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "action": {
+                    "type": "string",
+                    "enum": [
+                      "create",
+                      "list",
+                      "get"
+                    ],
+                    "description": "The status update operation to perform"
+                  },
+                  "projectId": {
+                    "type": "string"
+                  },
+                  "body": {
+                    "type": "string"
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "ON_TRACK",
+                      "AT_RISK",
+                      "OFF_TRACK",
+                      "COMPLETE",
+                      "INACTIVE"
+                    ]
+                  },
+                  "startDate": {
+                    "type": "string"
+                  },
+                  "targetDate": {
+                    "type": "string"
+                  },
+                  "first": {
+                    "type": "number"
+                  },
+                  "after": {
+                    "type": "string"
+                  },
+                  "statusUpdateId": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "action"
+                ],
+                "description": "Manage Project Status Updates — create, list, and get status updates"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "content": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "type": {
+                            "type": "string"
+                          },
+                          "text": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/tools/ai_generate": {
+      "post": {
+        "operationId": "ai_generate",
+        "summary": "AI Generation",
+        "description": "AI-powered generation: generate/enhance/parse PRDs, add features, get next tasks, analyze complexity, expand tasks, create traceability matrices. Use the `action` field to select the operation.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "agentId": {
+                    "type": "string"
+                  },
+                  "action": {
+                    "type": "string",
+                    "enum": [
+                      "generate_prd",
+                      "enhance_prd",
+                      "parse_prd",
+                      "add_feature",
+                      "get_next_task",
+                      "analyze_complexity",
+                      "expand_task",
+                      "create_traceability_matrix",
+                      "materialize_tasks"
+                    ],
+                    "description": "The AI generation operation to perform"
+                  },
+                  "projectIdea": {
+                    "type": "string"
+                  },
+                  "projectName": {
+                    "type": "string"
+                  },
+                  "targetUsers": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "timeline": {
+                    "type": "string"
+                  },
+                  "complexity": {
+                    "type": "string",
+                    "enum": [
+                      "low",
+                      "medium",
+                      "high"
+                    ]
+                  },
+                  "author": {
+                    "type": "string"
+                  },
+                  "stakeholders": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "includeResearch": {
+                    "type": "boolean"
+                  },
+                  "industryContext": {
+                    "type": "string"
+                  },
+                  "prdContent": {
+                    "type": "string"
+                  },
+                  "enhancementType": {
+                    "type": "string",
+                    "enum": [
+                      "comprehensive",
+                      "technical",
+                      "user_focused",
+                      "business_focused"
+                    ]
+                  },
+                  "focusAreas": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "targetAudience": {
+                    "type": "string",
+                    "enum": [
+                      "technical",
+                      "business",
+                      "mixed"
+                    ]
+                  },
+                  "addMissingElements": {
+                    "type": "boolean"
+                  },
+                  "improveExisting": {
+                    "type": "boolean"
+                  },
+                  "validateQuality": {
+                    "type": "boolean"
+                  },
+                  "maxTasks": {
+                    "type": "number"
+                  },
+                  "includeSubtasks": {
+                    "type": "boolean"
+                  },
+                  "autoEstimate": {
+                    "type": "boolean"
+                  },
+                  "autoPrioritize": {
+                    "type": "boolean"
+                  },
+                  "autoDetectDependencies": {
+                    "type": "boolean"
+                  },
+                  "targetComplexity": {
+                    "type": "number"
+                  },
+                  "teamSkills": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "projectType": {
+                    "type": "string"
+                  },
+                  "createLifecycle": {
+                    "type": "boolean"
+                  },
+                  "createTraceabilityMatrix": {
+                    "type": "boolean"
+                  },
+                  "includeUseCases": {
+                    "type": "boolean"
+                  },
+                  "projectId": {
+                    "type": "string"
+                  },
+                  "enhancedGeneration": {
+                    "type": "boolean"
+                  },
+                  "contextLevel": {
+                    "type": "string",
+                    "enum": [
+                      "minimal",
+                      "standard",
+                      "full"
+                    ]
+                  },
+                  "includeBusinessContext": {
+                    "type": "boolean"
+                  },
+                  "includeTechnicalContext": {
+                    "type": "boolean"
+                  },
+                  "includeImplementationGuidance": {
+                    "type": "boolean"
+                  },
+                  "featureIdea": {
+                    "type": "string"
+                  },
+                  "description": {
+                    "type": "string"
+                  },
+                  "targetPRD": {
+                    "type": "string"
+                  },
+                  "targetProject": {
+                    "type": "string"
+                  },
+                  "businessJustification": {
+                    "type": "string"
+                  },
+                  "requestedBy": {
+                    "type": "string"
+                  },
+                  "autoApprove": {
+                    "type": "boolean"
+                  },
+                  "expandToTasks": {
+                    "type": "boolean"
+                  },
+                  "featureId": {
+                    "type": "string"
+                  },
+                  "assignee": {
+                    "type": "string"
+                  },
+                  "sprintCapacity": {
+                    "type": "number"
+                  },
+                  "currentPhase": {
+                    "type": "string",
+                    "enum": [
+                      "planning",
+                      "development",
+                      "testing",
+                      "review",
+                      "deployment"
+                    ]
+                  },
+                  "excludeBlocked": {
+                    "type": "boolean"
+                  },
+                  "maxComplexity": {
+                    "type": "number"
+                  },
+                  "includeAnalysis": {
+                    "type": "boolean"
+                  },
+                  "limit": {
+                    "type": "number"
+                  },
+                  "taskTitle": {
+                    "type": "string"
+                  },
+                  "taskDescription": {
+                    "type": "string"
+                  },
+                  "currentEstimate": {
+                    "type": "number"
+                  },
+                  "teamExperience": {
+                    "type": "string",
+                    "enum": [
+                      "junior",
+                      "mid",
+                      "senior",
+                      "mixed"
+                    ]
+                  },
+                  "projectContext": {
+                    "type": "string"
+                  },
+                  "includeBreakdown": {
+                    "type": "boolean"
+                  },
+                  "includeRisks": {
+                    "type": "boolean"
+                  },
+                  "includeRecommendations": {
+                    "type": "boolean"
+                  },
+                  "currentComplexity": {
+                    "type": "number"
+                  },
+                  "maxSubtasks": {
+                    "type": "number"
+                  },
+                  "maxDepth": {
+                    "type": "number"
+                  },
+                  "includeEstimates": {
+                    "type": "boolean"
+                  },
+                  "includeDependencies": {
+                    "type": "boolean"
+                  },
+                  "includeAcceptanceCriteria": {
+                    "type": "boolean"
+                  },
+                  "features": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "title": {
+                          "type": "string"
+                        },
+                        "description": {
+                          "type": "string"
+                        },
+                        "priority": {
+                          "type": "string",
+                          "enum": [
+                            "critical",
+                            "high",
+                            "medium",
+                            "low"
+                          ]
+                        },
+                        "userStories": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "acceptanceCriteria": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "estimatedComplexity": {
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "title",
+                        "description",
+                        "priority",
+                        "userStories",
+                        "acceptanceCriteria",
+                        "estimatedComplexity"
+                      ]
+                    }
+                  },
+                  "tasks": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "title": {
+                          "type": "string"
+                        },
+                        "description": {
+                          "type": "string"
+                        },
+                        "complexity": {
+                          "type": "number"
+                        },
+                        "estimatedHours": {
+                          "type": "number"
+                        },
+                        "priority": {
+                          "type": "string",
+                          "enum": [
+                            "critical",
+                            "high",
+                            "medium",
+                            "low"
+                          ]
+                        },
+                        "dependencies": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "type": {
+                                "type": "string",
+                                "enum": [
+                                  "blocks",
+                                  "depends_on",
+                                  "related_to"
+                                ]
+                              },
+                              "description": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "id"
+                            ]
+                          }
+                        },
+                        "acceptanceCriteria": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "description": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "description"
+                            ]
+                          }
+                        },
+                        "tags": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "required": [
+                        "title",
+                        "description"
+                      ]
+                    }
+                  },
+                  "includeTraceabilityLinks": {
+                    "type": "boolean"
+                  },
+                  "includeCoverageAnalysis": {
+                    "type": "boolean"
+                  },
+                  "validateCompleteness": {
+                    "type": "boolean"
+                  },
+                  "labelPrefix": {
+                    "description": "Label prefix for materialized issues (e.g. \"ai-generated\")",
+                    "type": "string"
+                  },
+                  "addToProject": {
+                    "description": "Whether to add created issues to the specified projectId",
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "action"
+                ],
+                "description": "AI Generation — PRD generation/enhancement/parsing, feature management, task analysis, task materialization"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "content": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "type": {
+                            "type": "string"
+                          },
+                          "text": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/tools/ai_analyze": {
+      "post": {
+        "operationId": "ai_analyze",
+        "summary": "AI Analysis",
+        "description": "AI-powered analysis: enrich issues (single/bulk), triage issues, schedule triaging, suggest labels, detect duplicates, find related issues. Use the `action` field to select the operation.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "agentId": {
+                    "type": "string"
+                  },
+                  "action": {
+                    "type": "string",
+                    "enum": [
+                      "enrich_issue",
+                      "enrich_issue_sections",
+                      "enrich_bulk",
+                      "triage_issue",
+                      "triage_all",
+                      "suggest_labels",
+                      "detect_duplicates",
+                      "find_related"
+                    ],
+                    "description": "The AI analysis operation to perform"
+                  },
+                  "projectId": {
+                    "type": "string"
+                  },
+                  "issueId": {
+                    "type": "string"
+                  },
+                  "issueNumber": {
+                    "type": "number"
+                  },
+                  "issueTitle": {
+                    "type": "string"
+                  },
+                  "issueDescription": {
+                    "type": "string"
+                  },
+                  "projectContext": {
+                    "type": "string"
+                  },
+                  "autoApply": {
+                    "type": "boolean"
+                  },
+                  "issueIds": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "onlyUntriaged": {
+                    "type": "boolean"
+                  },
+                  "existingLabels": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string"
+                        },
+                        "description": {
+                          "type": "string"
+                        },
+                        "color": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "name"
+                      ]
+                    }
+                  },
+                  "issueHistory": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "labels": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "title": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "labels",
+                        "title"
+                      ]
+                    }
+                  },
+                  "config": {
+                    "type": "object",
+                    "properties": {
+                      "preferExisting": {
+                        "type": "boolean"
+                      },
+                      "maxSuggestions": {
+                        "type": "number"
+                      },
+                      "includeNewProposals": {
+                        "type": "boolean"
+                      }
+                    }
+                  },
+                  "repositoryLabels": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string"
+                        },
+                        "description": {
+                          "type": "string"
+                        },
+                        "color": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "name"
+                      ]
+                    }
+                  },
+                  "existingIssues": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "number": {
+                          "type": "number"
+                        },
+                        "title": {
+                          "type": "string"
+                        },
+                        "body": {
+                          "type": "string"
+                        },
+                        "state": {
+                          "type": "string",
+                          "enum": [
+                            "open",
+                            "closed"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "number",
+                        "title",
+                        "body",
+                        "state"
+                      ]
+                    }
+                  },
+                  "thresholds": {
+                    "type": "object",
+                    "properties": {
+                      "high": {
+                        "type": "number"
+                      },
+                      "medium": {
+                        "type": "number"
+                      }
+                    }
+                  },
+                  "maxResults": {
+                    "type": "number"
+                  },
+                  "issueLabels": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "repositoryIssues": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "number": {
+                          "type": "number"
+                        },
+                        "title": {
+                          "type": "string"
+                        },
+                        "body": {
+                          "type": "string"
+                        },
+                        "labels": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "state": {
+                          "type": "string",
+                          "enum": [
+                            "open",
+                            "closed"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "number",
+                        "title",
+                        "body",
+                        "labels",
+                        "state"
+                      ]
+                    }
+                  },
+                  "relationConfig": {
+                    "type": "object",
+                    "properties": {
+                      "includeSemanticSimilarity": {
+                        "type": "boolean"
+                      },
+                      "includeDependencies": {
+                        "type": "boolean"
+                      },
+                      "includeComponentGrouping": {
+                        "type": "boolean"
+                      }
+                    }
+                  }
+                },
+                "required": [
+                  "action"
+                ],
+                "description": "AI Analysis — issue enrichment, triage, label suggestion, duplicate detection, related issues"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "content": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "type": {
+                            "type": "string"
+                          },
+                          "text": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/tools/ai_plan": {
+      "post": {
+        "operationId": "ai_plan",
+        "summary": "AI Planning",
+        "description": "AI-powered planning: calculate capacity, prioritize backlog, assess risk, suggest sprint composition, generate roadmaps and visualizations. Use the `action` field to select the operation.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "agentId": {
+                    "type": "string"
+                  },
+                  "action": {
+                    "type": "string",
+                    "enum": [
+                      "calculate_capacity",
+                      "prioritize_backlog",
+                      "assess_risk",
+                      "suggest_composition",
+                      "generate_roadmap",
+                      "generate_visualization"
+                    ],
+                    "description": "The AI planning operation to perform"
+                  },
+                  "velocity": {
+                    "anyOf": [
+                      {
+                        "type": "number"
+                      },
+                      {
+                        "type": "string",
+                        "const": "auto"
+                      }
+                    ]
+                  },
+                  "sprintDurationDays": {
+                    "type": "number"
+                  },
+                  "teamMembers": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string"
+                        },
+                        "role": {
+                          "type": "string"
+                        },
+                        "availabilityPercent": {
+                          "type": "number"
+                        },
+                        "skills": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "timezone": {
+                          "type": "string"
+                        },
+                        "hoursPerDay": {
+                          "type": "number"
+                        },
+                        "daysOff": {
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "name"
+                      ]
+                    }
+                  },
+                  "historicalSprints": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "sprintId": {
+                          "type": "string"
+                        },
+                        "name": {
+                          "type": "string"
+                        },
+                        "startDate": {
+                          "type": "string"
+                        },
+                        "endDate": {
+                          "type": "string"
+                        },
+                        "plannedPoints": {
+                          "type": "number"
+                        },
+                        "completedPoints": {
+                          "type": "number"
+                        },
+                        "totalIssues": {
+                          "type": "number"
+                        },
+                        "completedIssues": {
+                          "type": "number"
+                        },
+                        "carryoverIssues": {
+                          "type": "number"
+                        },
+                        "averageCycleTimeDays": {
+                          "type": "number"
+                        },
+                        "teamSize": {
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "sprintId",
+                        "startDate",
+                        "endDate",
+                        "plannedPoints",
+                        "completedPoints",
+                        "totalIssues",
+                        "completedIssues"
+                      ]
+                    }
+                  },
+                  "backlogItems": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "title": {
+                          "type": "string"
+                        },
+                        "description": {
+                          "type": "string"
+                        },
+                        "points": {
+                          "type": "number"
+                        },
+                        "priority": {
+                          "type": "string",
+                          "enum": [
+                            "critical",
+                            "high",
+                            "medium",
+                            "low"
+                          ]
+                        },
+                        "labels": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "dependencies": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "title"
+                      ]
+                    }
+                  },
+                  "sprintCapacity": {
+                    "type": "number"
+                  },
+                  "businessGoals": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "riskTolerance": {
+                    "type": "string",
+                    "enum": [
+                      "high",
+                      "medium",
+                      "low"
+                    ]
+                  },
+                  "sprintItems": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "title": {
+                          "type": "string"
+                        },
+                        "description": {
+                          "type": "string"
+                        },
+                        "points": {
+                          "type": "number"
+                        },
+                        "priority": {
+                          "type": "string",
+                          "enum": [
+                            "critical",
+                            "high",
+                            "medium",
+                            "low"
+                          ]
+                        },
+                        "labels": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "dependencies": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "title"
+                      ]
+                    }
+                  },
+                  "capacity": {
+                    "type": "object",
+                    "properties": {
+                      "totalPoints": {
+                        "type": "number"
+                      },
+                      "recommendedLoad": {
+                        "type": "number"
+                      },
+                      "teamAvailability": {},
+                      "buffer": {
+                        "type": "object",
+                        "properties": {
+                          "percentage": {
+                            "type": "number"
+                          },
+                          "reasoning": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "percentage",
+                          "reasoning"
+                        ]
+                      },
+                      "confidence": {}
+                    },
+                    "required": [
+                      "totalPoints",
+                      "recommendedLoad",
+                      "teamAvailability",
+                      "buffer",
+                      "confidence"
+                    ]
+                  },
+                  "requirements": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "title": {
+                              "type": "string"
+                            },
+                            "description": {
+                              "type": "string"
+                            },
+                            "priority": {
+                              "type": "string",
+                              "enum": [
+                                "critical",
+                                "high",
+                                "medium",
+                                "low"
+                              ]
+                            },
+                            "estimatedPoints": {
+                              "type": "number"
+                            },
+                            "category": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "title"
+                          ]
+                        }
+                      }
+                    ]
+                  },
+                  "constraints": {
+                    "type": "object",
+                    "properties": {
+                      "timeline": {
+                        "type": "string"
+                      },
+                      "teamSize": {
+                        "type": "number"
+                      },
+                      "velocity": {
+                        "type": "number"
+                      },
+                      "sprintDurationWeeks": {
+                        "type": "number"
+                      }
+                    }
+                  },
+                  "businessContext": {
+                    "type": "string"
+                  },
+                  "roadmap": {
+                    "type": "object",
+                    "properties": {
+                      "title": {
+                        "type": "string"
+                      },
+                      "summary": {
+                        "type": "string"
+                      },
+                      "phases": {
+                        "type": "array",
+                        "items": {}
+                      },
+                      "milestones": {
+                        "type": "array",
+                        "items": {}
+                      },
+                      "timeline": {},
+                      "confidence": {}
+                    },
+                    "required": [
+                      "title",
+                      "phases"
+                    ]
+                  },
+                  "dependencies": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "fromItemId": {
+                          "type": "string"
+                        },
+                        "toItemId": {
+                          "type": "string"
+                        },
+                        "type": {
+                          "type": "string",
+                          "enum": [
+                            "blocks",
+                            "depends_on",
+                            "related_to"
+                          ]
+                        },
+                        "description": {
+                          "type": "string"
+                        },
+                        "confidence": {
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "fromItemId",
+                        "toItemId",
+                        "type",
+                        "confidence"
+                      ]
+                    }
+                  },
+                  "projectId": {
+                    "type": "string"
+                  },
+                  "projectTitle": {
+                    "type": "string"
+                  },
+                  "projectDescription": {
+                    "type": "string"
+                  },
+                  "sprintDurationWeeks": {
+                    "type": "number"
+                  },
+                  "targetMilestones": {
+                    "type": "number"
+                  },
+                  "autoCreate": {
+                    "description": "generate_roadmap only: create the milestones in GitHub and assign them to the project's issues. Requires projectId.",
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "action"
+                ],
+                "description": "AI Planning — sprint capacity, backlog prioritization, risk assessment, sprint composition, roadmap generation"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "content": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "type": {
+                            "type": "string"
+                          },
+                          "text": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/tools/agent_work": {
+      "post": {
+        "operationId": "agent_work",
+        "summary": "Agent Work",
+        "description": "Agent work operations: register agents, checkout/release/complete tasks, send heartbeats, submit/check review state, validate work products, and get handoff context. Use the `action` field to select the operation.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "role": {
+                        "default": "engineer",
+                        "type": "string",
+                        "enum": [
+                          "engineer",
+                          "reviewer",
+                          "pm",
+                          "designer",
+                          "qa",
+                          "devops",
+                          "general"
+                        ]
+                      },
+                      "runtime": {
+                        "default": "claude-code",
+                        "type": "string",
+                        "enum": [
+                          "claude-code",
+                          "codex",
+                          "cursor",
+                          "cli",
+                          "http",
+                          "custom"
+                        ]
+                      },
+                      "capabilities": {
+                        "default": [],
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "budgetTokens": {
+                        "type": "number",
+                        "exclusiveMinimum": 0
+                      },
+                      "metadata": {
+                        "type": "object",
+                        "propertyNames": {
+                          "type": "string"
+                        },
+                        "additionalProperties": {}
+                      },
+                      "parentAgentId": {
+                        "type": "string"
+                      },
+                      "action": {
+                        "type": "string",
+                        "const": "register"
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "action"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "agentId": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "projectId": {
+                        "type": "string"
+                      },
+                      "view": {
+                        "type": "string"
+                      },
+                      "strategy": {
+                        "default": "highest_priority",
+                        "type": "string",
+                        "enum": [
+                          "highest_priority",
+                          "oldest_first",
+                          "skills_match",
+                          "milestone_deadline",
+                          "ai"
+                        ]
+                      },
+                      "labels": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "milestone": {
+                        "type": "string"
+                      },
+                      "skipBlocked": {
+                        "type": "boolean"
+                      },
+                      "reviewQueue": {
+                        "type": "boolean"
+                      },
+                      "action": {
+                        "type": "string",
+                        "const": "checkout_task"
+                      }
+                    },
+                    "required": [
+                      "agentId",
+                      "action"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "agentId": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "taskId": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "reason": {
+                        "type": "string"
+                      },
+                      "action": {
+                        "type": "string",
+                        "const": "release_task"
+                      }
+                    },
+                    "required": [
+                      "agentId",
+                      "taskId",
+                      "action"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "agentId": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "taskId": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "summary": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "closeIssue": {
+                        "default": true,
+                        "type": "boolean"
+                      },
+                      "prNumber": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "autoCheckoutNext": {
+                        "default": true,
+                        "type": "boolean"
+                      },
+                      "action": {
+                        "type": "string",
+                        "const": "complete_task"
+                      }
+                    },
+                    "required": [
+                      "agentId",
+                      "taskId",
+                      "summary",
+                      "action"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "agentId": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "status": {
+                        "type": "string",
+                        "enum": [
+                          "working",
+                          "blocked",
+                          "needs_review"
+                        ]
+                      },
+                      "taskId": {
+                        "type": "string"
+                      },
+                      "progress": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 100
+                      },
+                      "progressSummary": {
+                        "type": "string"
+                      },
+                      "currentBranch": {
+                        "type": "string"
+                      },
+                      "estimatedCompletionMinutes": {
+                        "type": "number",
+                        "exclusiveMinimum": 0
+                      },
+                      "blockerDescription": {
+                        "type": "string"
+                      },
+                      "action": {
+                        "type": "string",
+                        "const": "heartbeat"
+                      }
+                    },
+                    "required": [
+                      "agentId",
+                      "status",
+                      "action"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "agentId": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "taskId": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "prNumber": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "action": {
+                        "type": "string",
+                        "const": "check_work_status"
+                      }
+                    },
+                    "required": [
+                      "agentId",
+                      "taskId",
+                      "action"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "issueNumber": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "action": {
+                        "type": "string",
+                        "const": "get_task_context"
+                      }
+                    },
+                    "required": [
+                      "issueNumber",
+                      "action"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "agentId": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "taskId": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "summary": {
+                        "type": "string"
+                      },
+                      "action": {
+                        "type": "string",
+                        "const": "submit_for_review"
+                      }
+                    },
+                    "required": [
+                      "agentId",
+                      "taskId",
+                      "action"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "reviewerId": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "taskId": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "summary": {
+                        "type": "string"
+                      },
+                      "action": {
+                        "type": "string",
+                        "const": "approve_task"
+                      }
+                    },
+                    "required": [
+                      "reviewerId",
+                      "taskId",
+                      "action"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "reviewerId": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "taskId": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "feedback": {
+                        "type": "string"
+                      },
+                      "action": {
+                        "type": "string",
+                        "const": "reject_task"
+                      }
+                    },
+                    "required": [
+                      "reviewerId",
+                      "taskId",
+                      "action"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "const": "validate_work_product"
+                      },
+                      "agentId": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "taskId": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "required": [
+                      "action",
+                      "agentId",
+                      "taskId"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "const": "get_handoff_context"
+                      },
+                      "taskId": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "required": [
+                      "action",
+                      "taskId"
+                    ]
+                  }
+                ],
+                "description": "Agent Work — register, checkout/release/complete tasks, heartbeat, review, work status",
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "role": {
+                    "default": "engineer",
+                    "type": "string",
+                    "enum": [
+                      "engineer",
+                      "reviewer",
+                      "pm",
+                      "designer",
+                      "qa",
+                      "devops",
+                      "general"
+                    ]
+                  },
+                  "runtime": {
+                    "default": "claude-code",
+                    "type": "string",
+                    "enum": [
+                      "claude-code",
+                      "codex",
+                      "cursor",
+                      "cli",
+                      "http",
+                      "custom"
+                    ]
+                  },
+                  "capabilities": {
+                    "default": [],
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "budgetTokens": {
+                    "type": "number",
+                    "exclusiveMinimum": 0
+                  },
+                  "metadata": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {}
+                  },
+                  "parentAgentId": {
+                    "type": "string"
+                  },
+                  "agentId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "projectId": {
+                    "type": "string"
+                  },
+                  "view": {
+                    "type": "string"
+                  },
+                  "strategy": {
+                    "default": "highest_priority",
+                    "type": "string",
+                    "enum": [
+                      "highest_priority",
+                      "oldest_first",
+                      "skills_match",
+                      "milestone_deadline",
+                      "ai"
+                    ]
+                  },
+                  "labels": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "milestone": {
+                    "type": "string"
+                  },
+                  "skipBlocked": {
+                    "type": "boolean"
+                  },
+                  "reviewQueue": {
+                    "type": "boolean"
+                  },
+                  "taskId": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      {
+                        "type": "string"
+                      }
+                    ]
+                  },
+                  "reason": {
+                    "type": "string"
+                  },
+                  "summary": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      {
+                        "type": "string"
+                      }
+                    ]
+                  },
+                  "closeIssue": {
+                    "default": true,
+                    "type": "boolean"
+                  },
+                  "prNumber": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "autoCheckoutNext": {
+                    "default": true,
+                    "type": "boolean"
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "working",
+                      "blocked",
+                      "needs_review"
+                    ]
+                  },
+                  "progress": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 100
+                  },
+                  "progressSummary": {
+                    "type": "string"
+                  },
+                  "currentBranch": {
+                    "type": "string"
+                  },
+                  "estimatedCompletionMinutes": {
+                    "type": "number",
+                    "exclusiveMinimum": 0
+                  },
+                  "blockerDescription": {
+                    "type": "string"
+                  },
+                  "issueNumber": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "reviewerId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "feedback": {
+                    "type": "string"
+                  },
+                  "action": {
+                    "type": "string",
+                    "enum": [
+                      "register",
+                      "checkout_task",
+                      "release_task",
+                      "complete_task",
+                      "heartbeat",
+                      "check_work_status",
+                      "get_task_context",
+                      "submit_for_review",
+                      "approve_task",
+                      "reject_task",
+                      "validate_work_product",
+                      "get_handoff_context"
+                    ]
+                  }
+                },
+                "required": [
+                  "action"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "content": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "type": {
+                            "type": "string"
+                          },
+                          "text": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/tools/agent_manage": {
+      "post": {
+        "operationId": "agent_manage",
+        "summary": "Agent Management",
+        "description": "Agent management: list/deregister agents, activity, work products, budgets (warningFraction or warningThreshold), stale reclaim, smart assignment, workload rebalancing, convergence, and registry cleanup. Use the `action` field to select the operation.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "role": {
+                        "type": "string",
+                        "enum": [
+                          "engineer",
+                          "reviewer",
+                          "pm",
+                          "designer",
+                          "qa",
+                          "devops",
+                          "general"
+                        ]
+                      },
+                      "status": {
+                        "type": "string",
+                        "enum": [
+                          "idle",
+                          "working",
+                          "blocked",
+                          "needs_review",
+                          "offline",
+                          "budget_exhausted"
+                        ]
+                      },
+                      "action": {
+                        "type": "string",
+                        "const": "list"
+                      }
+                    },
+                    "required": [
+                      "action"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "agentId": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "action": {
+                        "type": "string",
+                        "const": "deregister"
+                      }
+                    },
+                    "required": [
+                      "agentId",
+                      "action"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "includeOffline": {
+                        "default": false,
+                        "type": "boolean"
+                      },
+                      "action": {
+                        "type": "string",
+                        "const": "get_activity"
+                      }
+                    },
+                    "required": [
+                      "action"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "agentId": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "taskId": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "issueNumber": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "branch": {
+                        "type": "string"
+                      },
+                      "prNumber": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "commitShas": {
+                        "default": [],
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "filesChanged": {
+                        "default": [],
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "testsPassed": {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      "testsFailed": {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      "testsTotal": {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      "summary": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "action": {
+                        "type": "string",
+                        "const": "submit_work_product"
+                      }
+                    },
+                    "required": [
+                      "agentId",
+                      "taskId",
+                      "issueNumber",
+                      "summary",
+                      "action"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "agentId": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "action": {
+                        "type": "string",
+                        "const": "get_budget"
+                      }
+                    },
+                    "required": [
+                      "agentId",
+                      "action"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "agentId": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "totalTokens": {
+                        "type": "number",
+                        "exclusiveMinimum": 0
+                      },
+                      "hardStop": {
+                        "default": true,
+                        "type": "boolean"
+                      },
+                      "resetPeriod": {
+                        "type": "string",
+                        "enum": [
+                          "daily",
+                          "weekly",
+                          "monthly",
+                          "never"
+                        ]
+                      },
+                      "action": {
+                        "type": "string",
+                        "const": "set_budget"
+                      },
+                      "warningFraction": {
+                        "description": "Warning threshold as a 0-1 fraction",
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1
+                      },
+                      "warningThreshold": {
+                        "description": "Compatibility alias for warningFraction (0-1 warning threshold)",
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1
+                      }
+                    },
+                    "required": [
+                      "agentId",
+                      "totalTokens",
+                      "action"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "timeoutMinutes": {
+                        "type": "number",
+                        "exclusiveMinimum": 0
+                      },
+                      "action": {
+                        "type": "string",
+                        "const": "reclaim_stale"
+                      }
+                    },
+                    "required": [
+                      "action"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "agentId": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "tokensUsed": {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      "action": {
+                        "type": "string",
+                        "const": "record_usage"
+                      }
+                    },
+                    "required": [
+                      "agentId",
+                      "tokensUsed",
+                      "action"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "staleAfterMinutes": {
+                        "type": "number",
+                        "exclusiveMinimum": 0
+                      },
+                      "action": {
+                        "type": "string",
+                        "const": "get_metrics"
+                      }
+                    },
+                    "required": [
+                      "action"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "projectId": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "action": {
+                        "type": "string",
+                        "const": "setup_fields"
+                      }
+                    },
+                    "required": [
+                      "projectId",
+                      "action"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "const": "assign_task"
+                      },
+                      "agentId": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "projectId": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "issueNumber": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
+                      }
+                    },
+                    "required": [
+                      "action",
+                      "agentId",
+                      "projectId",
+                      "issueNumber"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "const": "get_swarm_status"
+                      },
+                      "staleAfterMinutes": {
+                        "default": 30,
+                        "type": "number",
+                        "exclusiveMinimum": 0
+                      }
+                    },
+                    "required": [
+                      "action"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "const": "rebalance_workload"
+                      },
+                      "projectId": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "staleAfterMinutes": {
+                        "default": 30,
+                        "type": "number",
+                        "exclusiveMinimum": 0
+                      },
+                      "maxAssignments": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "agentIds": {
+                        "description": "Filter reassignment to specific agent IDs",
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "roleFilter": {
+                        "description": "Filter reassignment to agents with this role",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "action",
+                      "projectId"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "const": "decompose_task"
+                      },
+                      "projectId": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "issueNumber": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "subtasks": {
+                        "minItems": 1,
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "title": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "description": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "acceptanceCriteria": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "title",
+                            "description"
+                          ]
+                        },
+                        "description": "Subtasks for decompose_task — PM splits a rejected task into smaller pieces"
+                      }
+                    },
+                    "required": [
+                      "action",
+                      "projectId",
+                      "issueNumber",
+                      "subtasks"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "const": "smart_assign"
+                      },
+                      "projectId": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "maxAssignments": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "agentIds": {
+                        "description": "Filter smart_assign to specific agent IDs",
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "roleFilter": {
+                        "description": "Filter smart_assign to agents with this role",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "action",
+                      "projectId"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "const": "converge_project"
+                      },
+                      "projectId": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "reviewerId": {
+                        "description": "Reviewer agent to attribute approve/reject lifecycle actions to, when available",
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "required": [
+                      "action",
+                      "projectId"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "const": "converge_until_done"
+                      },
+                      "projectId": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "iteration": {
+                        "default": 1,
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "maxIterations": {
+                        "default": 10,
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
+                      }
+                    },
+                    "required": [
+                      "action",
+                      "projectId"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "const": "cleanup_registry"
+                      },
+                      "staleAfterMinutes": {
+                        "default": 60,
+                        "type": "number",
+                        "exclusiveMinimum": 0
+                      }
+                    },
+                    "required": [
+                      "action"
+                    ]
+                  }
+                ],
+                "description": "Agent Management — list, deregister, activity, work products, budget, reclaim, usage, metrics, PM coordination",
+                "type": "object",
+                "properties": {
+                  "role": {
+                    "type": "string",
+                    "enum": [
+                      "engineer",
+                      "reviewer",
+                      "pm",
+                      "designer",
+                      "qa",
+                      "devops",
+                      "general"
+                    ]
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "idle",
+                      "working",
+                      "blocked",
+                      "needs_review",
+                      "offline",
+                      "budget_exhausted"
+                    ]
+                  },
+                  "agentId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "includeOffline": {
+                    "default": false,
+                    "type": "boolean"
+                  },
+                  "taskId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "issueNumber": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "branch": {
+                    "type": "string"
+                  },
+                  "prNumber": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "commitShas": {
+                    "default": [],
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "filesChanged": {
+                    "default": [],
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "testsPassed": {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  "testsFailed": {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  "testsTotal": {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  "summary": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "totalTokens": {
+                    "type": "number",
+                    "exclusiveMinimum": 0
+                  },
+                  "hardStop": {
+                    "default": true,
+                    "type": "boolean"
+                  },
+                  "resetPeriod": {
+                    "type": "string",
+                    "enum": [
+                      "daily",
+                      "weekly",
+                      "monthly",
+                      "never"
+                    ]
+                  },
+                  "warningFraction": {
+                    "description": "Warning threshold as a 0-1 fraction",
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  "warningThreshold": {
+                    "description": "Compatibility alias for warningFraction (0-1 warning threshold)",
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  "timeoutMinutes": {
+                    "type": "number",
+                    "exclusiveMinimum": 0
+                  },
+                  "tokensUsed": {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  "staleAfterMinutes": {
+                    "anyOf": [
+                      {
+                        "type": "number",
+                        "exclusiveMinimum": 0
+                      },
+                      {
+                        "default": 30,
+                        "type": "number",
+                        "exclusiveMinimum": 0
+                      },
+                      {
+                        "default": 60,
+                        "type": "number",
+                        "exclusiveMinimum": 0
+                      }
+                    ]
+                  },
+                  "projectId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "maxAssignments": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "agentIds": {
+                    "anyOf": [
+                      {
+                        "description": "Filter reassignment to specific agent IDs",
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      {
+                        "description": "Filter smart_assign to specific agent IDs",
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      }
+                    ]
+                  },
+                  "roleFilter": {
+                    "anyOf": [
+                      {
+                        "description": "Filter reassignment to agents with this role",
+                        "type": "string"
+                      },
+                      {
+                        "description": "Filter smart_assign to agents with this role",
+                        "type": "string"
+                      }
+                    ]
+                  },
+                  "subtasks": {
+                    "minItems": 1,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "title": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "description": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "acceptanceCriteria": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "title",
+                        "description"
+                      ]
+                    },
+                    "description": "Subtasks for decompose_task — PM splits a rejected task into smaller pieces"
+                  },
+                  "reviewerId": {
+                    "description": "Reviewer agent to attribute approve/reject lifecycle actions to, when available",
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "iteration": {
+                    "default": 1,
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "maxIterations": {
+                    "default": 10,
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "action": {
+                    "type": "string",
+                    "enum": [
+                      "list",
+                      "deregister",
+                      "get_activity",
+                      "submit_work_product",
+                      "get_budget",
+                      "set_budget",
+                      "reclaim_stale",
+                      "record_usage",
+                      "get_metrics",
+                      "setup_fields",
+                      "assign_task",
+                      "get_swarm_status",
+                      "rebalance_workload",
+                      "decompose_task",
+                      "smart_assign",
+                      "converge_project",
+                      "converge_until_done",
+                      "cleanup_registry"
+                    ]
+                  }
+                },
+                "required": [
+                  "action"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "content": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "type": {
+                            "type": "string"
+                          },
+                          "text": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/tools/system": {
+      "post": {
+        "operationId": "system",
+        "summary": "System",
+        "description": "System operations: health check and project field setup. Use the `action` field to select the operation.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "action": {
+                    "type": "string",
+                    "enum": [
+                      "health_check",
+                      "setup_project_fields"
+                    ],
+                    "description": "The system operation to perform"
+                  },
+                  "projectId": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "action"
+                ],
+                "description": "System — health check and project field setup"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "content": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "type": {
+                            "type": "string"
+                          },
+                          "text": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/tools/discover_tools": {
+      "post": {
+        "operationId": "discover_tools",
+        "summary": "Discover Tools",
+        "description": "Discover available compound tools, their actions, and parameters. Always available regardless of group filter.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "domain": {
+                    "description": "Filter tools by domain",
+                    "type": "string",
+                    "enum": [
+                      "projects",
+                      "issues",
+                      "pull_requests",
+                      "milestones",
+                      "sprints",
+                      "labels",
+                      "automation",
+                      "iterations",
+                      "events",
+                      "status_updates",
+                      "ai_generation",
+                      "ai_analysis",
+                      "ai_planning",
+                      "agents",
+                      "system"
+                    ]
+                  },
+                  "query": {
+                    "description": "Free-text search across tool names and descriptions",
+                    "type": "string"
+                  }
+                },
+                "description": "Discover available tool actions by domain or search query"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "content": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "type": {
+                            "type": "string"
+                          },
+                          "text": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/tools/manage_branches": {
+      "post": {
+        "operationId": "manage_branches",
+        "summary": "Manage Branches",
+        "description": "Manage GitHub Branch Protection: get, update, and delete a branch's protection rules; list repository branches. Use the `action` field to select the operation.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "action": {
+                    "type": "string",
+                    "enum": [
+                      "get_protection",
+                      "update_protection",
+                      "delete_protection",
+                      "list_branches"
+                    ],
+                    "description": "The branch protection operation to perform"
+                  },
+                  "owner": {
+                    "description": "Repository owner (defaults to the configured GITHUB_OWNER)",
+                    "type": "string"
+                  },
+                  "repo": {
+                    "description": "Repository name (defaults to the configured GITHUB_REPO)",
+                    "type": "string"
+                  },
+                  "branch": {
+                    "description": "Branch name — required for get_protection, update_protection, and delete_protection",
+                    "type": "string"
+                  },
+                  "protected": {
+                    "description": "Filter to only protected branches (list_branches)",
+                    "type": "boolean"
+                  },
+                  "perPage": {
+                    "description": "Results per page (list_branches)",
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "page": {
+                    "description": "Page number (list_branches)",
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "required_status_checks": {
+                    "description": "Required status checks — pass null to disable the requirement (update_protection)",
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "strict": {
+                            "type": "boolean"
+                          },
+                          "contexts": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "checks": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "context": {
+                                  "type": "string"
+                                },
+                                "app_id": {
+                                  "type": "number"
+                                }
+                              },
+                              "required": [
+                                "context"
+                              ]
+                            }
+                          }
+                        },
+                        "required": [
+                          "strict",
+                          "contexts"
+                        ]
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "enforce_admins": {
+                    "description": "Whether the restrictions also apply to repository admins (update_protection)",
+                    "type": [
+                      "boolean",
+                      "null"
+                    ]
+                  },
+                  "required_pull_request_reviews": {
+                    "description": "Required pull request review rules — pass null to disable the requirement (update_protection)",
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "dismissal_restrictions": {
+                            "type": "object",
+                            "properties": {
+                              "users": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              },
+                              "teams": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              },
+                              "apps": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              }
+                            }
+                          },
+                          "dismiss_stale_reviews": {
+                            "type": "boolean"
+                          },
+                          "require_code_owner_reviews": {
+                            "type": "boolean"
+                          },
+                          "required_approving_review_count": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 6
+                          },
+                          "require_last_push_approval": {
+                            "type": "boolean"
+                          },
+                          "bypass_pull_request_allowances": {
+                            "type": "object",
+                            "properties": {
+                              "users": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              },
+                              "teams": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              },
+                              "apps": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              }
+                            }
+                          }
+                        }
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "restrictions": {
+                    "description": "Restrict who can push to the branch — pass null to disable restrictions (update_protection)",
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "users": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "teams": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "apps": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          }
+                        },
+                        "required": [
+                          "users",
+                          "teams"
+                        ]
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "required_linear_history": {
+                    "type": "boolean"
+                  },
+                  "allow_force_pushes": {
+                    "type": [
+                      "boolean",
+                      "null"
+                    ]
+                  },
+                  "allow_deletions": {
+                    "type": "boolean"
+                  },
+                  "block_creations": {
+                    "type": "boolean"
+                  },
+                  "required_conversation_resolution": {
+                    "type": "boolean"
+                  },
+                  "lock_branch": {
+                    "type": "boolean"
+                  },
+                  "allow_fork_syncing": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "action"
+                ],
+                "description": "Manage GitHub Branch Protection — get, update, and delete protection rules; list repository branches"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "content": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "type": {
+                            "type": "string"
+                          },
+                          "text": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/tools/manage_releases": {
+      "post": {
+        "operationId": "manage_releases",
+        "summary": "Manage Releases",
+        "description": "Manage GitHub Releases: create, list, get, update, delete releases; get the latest release. Use the `action` field to select the operation.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "action": {
+                    "type": "string",
+                    "enum": [
+                      "create",
+                      "list",
+                      "get",
+                      "update",
+                      "delete",
+                      "get_latest"
+                    ],
+                    "description": "The release operation to perform"
+                  },
+                  "owner": {
+                    "description": "Repository owner (org or user login)",
+                    "type": "string"
+                  },
+                  "repo": {
+                    "description": "Repository name",
+                    "type": "string"
+                  },
+                  "releaseId": {
+                    "description": "The release ID (required for get, update, delete)",
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "tag_name": {
+                    "description": "The git tag the release is based on (required for create)",
+                    "type": "string"
+                  },
+                  "target_commitish": {
+                    "description": "The branch name or commit SHA the git tag is created from (create only; defaults to the repository's default branch when the tag doesn't already exist)",
+                    "type": "string"
+                  },
+                  "name": {
+                    "description": "The release title",
+                    "type": "string"
+                  },
+                  "body": {
+                    "description": "Text describing the release (release notes)",
+                    "type": "string"
+                  },
+                  "draft": {
+                    "description": "Whether to save the release as a draft (unpublished)",
+                    "type": "boolean"
+                  },
+                  "prerelease": {
+                    "description": "Whether to identify the release as a prerelease",
+                    "type": "boolean"
+                  },
+                  "generate_release_notes": {
+                    "description": "Whether GitHub should automatically generate release notes for this release (create only)",
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "action"
+                ],
+                "description": "Manage GitHub Releases — create, list, get, update, delete, and get the latest release"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "content": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "type": {
+                            "type": "string"
+                          },
+                          "text": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/tools/manage_workflows": {
+      "post": {
+        "operationId": "manage_workflows",
+        "summary": "Manage Workflows",
+        "description": "Manage GitHub Actions Workflows: list workflows, trigger dispatch events, inspect run status and logs, list runs, and cancel runs. Use the `action` field to select the operation.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "action": {
+                    "type": "string",
+                    "enum": [
+                      "list_workflows",
+                      "trigger_dispatch",
+                      "get_run",
+                      "list_runs",
+                      "get_run_logs",
+                      "cancel_run"
+                    ],
+                    "description": "The GitHub Actions workflow operation to perform"
+                  },
+                  "owner": {
+                    "description": "Repository owner (defaults to the configured GITHUB_OWNER)",
+                    "type": "string"
+                  },
+                  "repo": {
+                    "description": "Repository name (defaults to the configured GITHUB_REPO)",
+                    "type": "string"
+                  },
+                  "limit": {
+                    "description": "Results per page (list_workflows, list_runs) — maps to per_page",
+                    "type": "number"
+                  },
+                  "page": {
+                    "description": "Page number for pagination (list_workflows, list_runs)",
+                    "type": "number"
+                  },
+                  "workflowId": {
+                    "description": "Workflow ID or filename (e.g. 'ci.yml') — required for trigger_dispatch and list_runs",
+                    "type": [
+                      "string",
+                      "number"
+                    ]
+                  },
+                  "ref": {
+                    "description": "Git branch or tag ref — required for trigger_dispatch",
+                    "type": "string"
+                  },
+                  "inputs": {
+                    "description": "Input values for the workflow's `workflow_dispatch` trigger (trigger_dispatch)",
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {
+                      "type": "string"
+                    }
+                  },
+                  "runId": {
+                    "description": "Workflow run ID — required for get_run, get_run_logs, cancel_run",
+                    "type": "number"
+                  },
+                  "status": {
+                    "description": "Filter runs by status (list_runs)",
+                    "type": "string",
+                    "enum": [
+                      "completed",
+                      "action_required",
+                      "cancelled",
+                      "failure",
+                      "neutral",
+                      "skipped",
+                      "stale",
+                      "success",
+                      "timed_out",
+                      "in_progress",
+                      "queued",
+                      "requested",
+                      "waiting",
+                      "pending"
+                    ]
+                  },
+                  "branch": {
+                    "description": "Filter runs by branch name (list_runs)",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "action"
+                ],
+                "description": "Manage GitHub Actions Workflows — list workflows, trigger dispatch events, inspect run status and logs, list runs, and cancel runs"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "content": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "type": {
+                            "type": "string"
+                          },
+                          "text": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Error": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "Error code"
+          },
+          "message": {
+            "type": "string",
+            "description": "Error message"
+          },
+          "details": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "string"
+                },
+                "message": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

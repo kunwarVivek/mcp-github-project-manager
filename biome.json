@@ -1,5 +1,5 @@
 {
-  "$schema": "https://biomejs.dev/schemas/2.5.7/schema.json",
+  "$schema": "https://biomejs.dev/schemas/2.5.15/schema.json",
   "vcs": {
     "enabled": true,
     "clientKind": "git",
@@ -12,6 +12,7 @@
       "!coverage",
       "!.gitnexus",
       "!.beads",
+      "!docs/api-reference/openapi.json",
       "!**/*.test.ts.new",
       "!**/*.test.ts.fixed",
       "!**/*.test.ts.bak"
@@ -36,9 +37,12 @@
   "linter": {
     "enabled": true,
     "rules": {
-      "recommended": true,
+      "preset": "recommended",
       "suspicious": {
-        "noExplicitAny": "warn"
+        "noExplicitAny": "error"
+      },
+      "style": {
+        "noNonNullAssertion": "error"
       },
       "complexity": {
         "useArrowFunction": "off"

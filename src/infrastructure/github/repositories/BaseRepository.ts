@@ -3,7 +3,10 @@ import { getLogger, type ILogger } from "../../logger";
 import type { GitHubConfig } from "../GitHubConfig"; // Fixed import path
 import { GitHubErrorHandler } from "../GitHubErrorHandler";
 import type { GitHubError, OctokitInstance } from "../types";
-import { GitHubApiUtil, type PaginationOptions } from "../util/GitHubApiUtil";
+import { GitHubApiUtil } from "../util/GitHubApiUtil";
+
+/** Parameters every repository-scoped REST endpoint takes; `rest()` fills them in. */
+type RepoScopedParams = { owner: string; repo: string };
 
 export interface IGitHubRepository {
   readonly octokit: OctokitInstance;
@@ -310,64 +313,13 @@ export abstract class BaseGitHubRepository implements IGitHubRepository {
   /**
    * Execute REST API call with rate limiting support
    */
-  protected async rest<T>(
-    operation: (params: any) => Promise<{ data: T }>,
-    params?: Record<string, unknown>
+  protected async rest<T, P extends RepoScopedParams>(
+    operation: (params: P) => Promise<{ data: T }>,
+    params?: Omit<P, keyof RepoScopedParams>
   ): Promise<T> {
-    const result = await this.withRetry(
-      () => operation(this.getRequestParams(params)),
-      "executing REST API call"
-    );
+    const scoped = { owner: this.owner, repo: this.repo, ...params } as P;
+    const result = await this.withRetry(() => operation(scoped), "executing REST API call");
     return result.data;
-  }
-
-  /**
-   * Execute paginated REST API call with comprehensive pagination support
-   */
-  protected async paginatedRest<T>(
-    operation: (params: any) => Promise<{ data: T[] }>,
-    params?: Record<string, unknown>,
-    paginationOptions?: PaginationOptions
-  ): Promise<T[]> {
-    const finalParams = this.getRequestParams(params);
-
-    return this.apiUtil.paginateRequest<T>(
-      (paginationParams) =>
-        operation({
-          ...finalParams,
-          ...paginationParams,
-        }),
-      paginationOptions
-    );
-  }
-
-  /**
-   * Execute paginated GraphQL query with cursor-based pagination support
-   */
-  protected async paginatedGraphQL<T>(
-    query: string,
-    getNodesAndPageInfo: (data: any) => {
-      pageInfo: { hasNextPage: boolean; endCursor?: string };
-      nodes: T[];
-    },
-    variables: Record<string, unknown> = {},
-    options: {
-      pageSize?: number;
-      maxItems?: number;
-      initialCursor?: string;
-    } = {}
-  ): Promise<T[]> {
-    return this.apiUtil.paginateGraphQL<T>(async ({ cursor, pageSize }) => {
-      const data = await this.graphql(query, {
-        ...variables,
-        first: pageSize,
-        after: cursor,
-        owner: this.owner,
-        repo: this.repo,
-      });
-
-      return getNodesAndPageInfo(data);
-    }, options);
   }
 
   /**
@@ -375,16 +327,6 @@ export abstract class BaseGitHubRepository implements IGitHubRepository {
    */
   protected async getRateLimit() {
     return this.apiUtil.getRateLimit(this.octokit);
-  }
-
-  protected getRequestParams<T extends Record<string, unknown>>(
-    params?: Partial<T>
-  ): T & { owner: string; repo: string } {
-    return {
-      owner: this.owner,
-      repo: this.repo,
-      ...params,
-    } as T & { owner: string; repo: string };
   }
 
   protected toISOString(date: string | Date): string {

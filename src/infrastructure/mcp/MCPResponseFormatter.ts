@@ -20,17 +20,106 @@ export interface ProgressUpdate {
   status: "in-progress" | "completed" | "failed";
 }
 
-export class MCPResponseFormatter {
+function formatContent(data: unknown, contentType: MCPContentType): string {
+  switch (contentType) {
+    case MCPContentType.JSON:
+      // Use compact JSON for MCP protocol compliance (single line)
+      return JSON.stringify(data);
+
+    case MCPContentType.TEXT:
+      return String(data);
+
+    case MCPContentType.MARKDOWN:
+      if (typeof data === "string") return data;
+
+      // Create a simple markdown representation for objects
+      if (data && typeof data === "object") {
+        if (Array.isArray(data)) {
+          return data.map((item) => `- ${JSON.stringify(item)}`).join("\n");
+        } else {
+          return Object.entries(data)
+            .map(([key, value]) => `### ${key}\n${JSON.stringify(value, null, 2)}`)
+            .join("\n\n");
+        }
+      }
+
+      return String(data);
+
+    case MCPContentType.HTML:
+      if (typeof data === "string") {
+        // Check if it's already HTML
+        if (data.trim().startsWith("<") && data.trim().endsWith(">")) {
+          return data;
+        }
+        return `<pre>${data}</pre>`;
+      }
+
+      // Create a simple HTML representation for objects
+      if (data && typeof data === "object") {
+        if (Array.isArray(data)) {
+          return `<ul>${data.map((item) => `<li>${JSON.stringify(item)}</li>`).join("")}</ul>`;
+        } else {
+          return `<div class="mcp-object">
+            ${Object.entries(data)
+              .map(
+                ([key, value]) => `
+                <div class="mcp-property">
+                  <div class="mcp-key">${key}</div>
+                  <div class="mcp-value"><pre>${JSON.stringify(value, null, 2)}</pre></div>
+                </div>
+              `
+              )
+              .join("")}
+          </div>`;
+        }
+      }
+
+      return `<pre>${String(data)}</pre>`;
+
+    default:
+      return String(data);
+  }
+}
+
+function getTypeFromContentType(
+  contentType: MCPContentType
+): "text" | "json" | "markdown" | "html" {
+  switch (contentType) {
+    case MCPContentType.JSON:
+      return "json";
+    case MCPContentType.MARKDOWN:
+      return "markdown";
+    case MCPContentType.HTML:
+      return "html";
+    default:
+      return "text";
+  }
+}
+
+function getContentTypeFromType(type: "text" | "json" | "markdown" | "html"): MCPContentType {
+  switch (type) {
+    case "json":
+      return MCPContentType.JSON;
+    case "markdown":
+      return MCPContentType.MARKDOWN;
+    case "html":
+      return MCPContentType.HTML;
+    default:
+      return MCPContentType.TEXT;
+  }
+}
+
+export const MCPResponseFormatter = {
   /**
    * Format data into MCP response format with proper content type handling
    */
-  static format(
+  format(
     data: unknown,
     contentType: MCPContentType = MCPContentType.JSON,
     metadata?: Record<string, unknown>
   ): MCPSuccessResponse {
     // Convert the formatted content to string
-    const formattedContent = MCPResponseFormatter.formatContent(data, contentType);
+    const formattedContent = formatContent(data, contentType);
 
     // Create a success response that matches the MCPSuccessResponse type
     return {
@@ -40,17 +129,17 @@ export class MCPResponseFormatter {
       output: {
         content: formattedContent,
         format: {
-          type: MCPResponseFormatter.getTypeFromContentType(contentType),
+          type: getTypeFromContentType(contentType),
         },
         context: metadata,
       },
     };
-  }
+  },
 
   /**
    * Format multiple content pieces into a single MCP response
    */
-  static formatMultiple(
+  formatMultiple(
     contents: Array<{
       data: unknown;
       contentType: MCPContentType;
@@ -60,7 +149,7 @@ export class MCPResponseFormatter {
     // Combine all content into a single string with formatting
     let combinedContent = "";
     contents.forEach(({ data, contentType }) => {
-      combinedContent += `${MCPResponseFormatter.formatContent(data, contentType)}\n\n`;
+      combinedContent += `${formatContent(data, contentType)}\n\n`;
     });
 
     // Create a success response with combined content
@@ -75,21 +164,18 @@ export class MCPResponseFormatter {
         },
       },
     };
-  }
+  },
 
   /**
    * Format rich content with multiple types and proper structure
    */
-  static formatRich(
-    contents: RichContent[],
-    metadata?: Record<string, unknown>
-  ): MCPSuccessResponse {
+  formatRich(contents: RichContent[], metadata?: Record<string, unknown>): MCPSuccessResponse {
     // Combine content from multiple rich content objects
     let combinedContent = "";
 
     contents.forEach(({ type, data }) => {
-      const contentType = MCPResponseFormatter.getContentTypeFromType(type);
-      combinedContent += `${MCPResponseFormatter.formatContent(data, contentType)}\n\n`;
+      const contentType = getContentTypeFromType(type);
+      combinedContent += `${formatContent(data, contentType)}\n\n`;
     });
 
     // Create a success response with the combined content
@@ -105,12 +191,12 @@ export class MCPResponseFormatter {
         context: metadata,
       },
     };
-  }
+  },
 
   /**
    * Format data to markdown table (for structured data)
    */
-  static formatAsMarkdownTable<T extends Record<string, unknown>>(
+  formatAsMarkdownTable<T extends Record<string, unknown>>(
     data: T[],
     options?: {
       title?: string;
@@ -140,19 +226,19 @@ export class MCPResponseFormatter {
     }
 
     return markdown;
-  }
+  },
 
   /**
    * Format as rich HTML (with classes for styling)
    */
-  static formatAsRichHtml<T>(data: T, template: (data: T) => string): string {
+  formatAsRichHtml<T>(data: T, template: (data: T) => string): string {
     return template(data);
-  }
+  },
 
   /**
    * Create error response with proper MCP error formatting
    */
-  static error(
+  error(
     code: MCPErrorCode,
     message: string,
     details?: Record<string, unknown>,
@@ -178,12 +264,12 @@ export class MCPResponseFormatter {
         details: details ? [{ code: "details", message: JSON.stringify(details) }] : undefined,
       },
     };
-  }
+  },
 
   /**
    * Create a progressive response for long-running operations
    */
-  static progress(update: ProgressUpdate, requestId: string): MCPSuccessResponse {
+  progress(update: ProgressUpdate, requestId: string): MCPSuccessResponse {
     return {
       version: "1.0",
       requestId: requestId,
@@ -199,21 +285,18 @@ export class MCPResponseFormatter {
         },
       },
     };
-  }
+  },
 
   /**
    * Create success response with optional request ID
    */
-  static success<T>(
+  success<T>(
     data: T,
     contentType?: MCPContentType,
     requestId?: string,
     metadata?: Record<string, unknown>
   ): MCPSuccessResponse {
-    const formattedContent = MCPResponseFormatter.formatContent(
-      data,
-      contentType || MCPContentType.JSON
-    );
+    const formattedContent = formatContent(data, contentType || MCPContentType.JSON);
 
     return {
       version: "1.0",
@@ -222,17 +305,17 @@ export class MCPResponseFormatter {
       output: {
         content: formattedContent,
         format: {
-          type: MCPResponseFormatter.getTypeFromContentType(contentType || MCPContentType.JSON),
+          type: getTypeFromContentType(contentType || MCPContentType.JSON),
         },
         context: metadata,
       },
     };
-  }
+  },
 
   /**
    * Create paginated response
    */
-  static paginated<T>(
+  paginated<T>(
     data: T[],
     page: number,
     totalPages: number,
@@ -242,10 +325,7 @@ export class MCPResponseFormatter {
       totalItems?: number;
     }
   ): MCPSuccessResponse {
-    const formattedContent = MCPResponseFormatter.formatContent(
-      data,
-      options?.contentType || MCPContentType.JSON
-    );
+    const formattedContent = formatContent(data, options?.contentType || MCPContentType.JSON);
 
     return {
       version: "1.0",
@@ -254,9 +334,7 @@ export class MCPResponseFormatter {
       output: {
         content: formattedContent,
         format: {
-          type: MCPResponseFormatter.getTypeFromContentType(
-            options?.contentType || MCPContentType.JSON
-          ),
+          type: getTypeFromContentType(options?.contentType || MCPContentType.JSON),
         },
         context: {
           pagination: {
@@ -267,12 +345,12 @@ export class MCPResponseFormatter {
         },
       },
     };
-  }
+  },
 
   /**
    * Validate the structure of an MCP response
    */
-  static validateResponse(response: unknown): boolean {
+  validateResponse(response: unknown): boolean {
     const result = z
       .object({
         content: z
@@ -292,96 +370,5 @@ export class MCPResponseFormatter {
       .safeParse(response);
 
     return result.success;
-  }
-
-  private static formatContent(data: unknown, contentType: MCPContentType): string {
-    switch (contentType) {
-      case MCPContentType.JSON:
-        // Use compact JSON for MCP protocol compliance (single line)
-        return JSON.stringify(data);
-
-      case MCPContentType.TEXT:
-        return String(data);
-
-      case MCPContentType.MARKDOWN:
-        if (typeof data === "string") return data;
-
-        // Create a simple markdown representation for objects
-        if (data && typeof data === "object") {
-          if (Array.isArray(data)) {
-            return data.map((item) => `- ${JSON.stringify(item)}`).join("\n");
-          } else {
-            return Object.entries(data)
-              .map(([key, value]) => `### ${key}\n${JSON.stringify(value, null, 2)}`)
-              .join("\n\n");
-          }
-        }
-
-        return String(data);
-
-      case MCPContentType.HTML:
-        if (typeof data === "string") {
-          // Check if it's already HTML
-          if (data.trim().startsWith("<") && data.trim().endsWith(">")) {
-            return data;
-          }
-          return `<pre>${data}</pre>`;
-        }
-
-        // Create a simple HTML representation for objects
-        if (data && typeof data === "object") {
-          if (Array.isArray(data)) {
-            return `<ul>${data.map((item) => `<li>${JSON.stringify(item)}</li>`).join("")}</ul>`;
-          } else {
-            return `<div class="mcp-object">
-              ${Object.entries(data)
-                .map(
-                  ([key, value]) => `
-                  <div class="mcp-property">
-                    <div class="mcp-key">${key}</div>
-                    <div class="mcp-value"><pre>${JSON.stringify(value, null, 2)}</pre></div>
-                  </div>
-                `
-                )
-                .join("")}
-            </div>`;
-          }
-        }
-
-        return `<pre>${String(data)}</pre>`;
-
-      default:
-        return String(data);
-    }
-  }
-
-  private static getTypeFromContentType(
-    contentType: MCPContentType
-  ): "text" | "json" | "markdown" | "html" {
-    switch (contentType) {
-      case MCPContentType.JSON:
-        return "json";
-      case MCPContentType.MARKDOWN:
-        return "markdown";
-      case MCPContentType.HTML:
-        return "html";
-      default:
-        return "text";
-    }
-  }
-
-  private static getContentTypeFromType(
-    type: "text" | "json" | "markdown" | "html"
-  ): MCPContentType {
-    switch (type) {
-      case "json":
-        return MCPContentType.JSON;
-      case "markdown":
-        return MCPContentType.MARKDOWN;
-      case "html":
-        return MCPContentType.HTML;
-      default:
-        return MCPContentType.TEXT;
-    }
-  }
-}
+  },
+};

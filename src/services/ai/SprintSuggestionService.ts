@@ -163,9 +163,10 @@ export class SprintSuggestionService {
     const utilization = totalPoints / capacity.recommendedLoad;
 
     // 6. Assess risks for selected items
-    const selectedBacklogItems = selectedItems
-      .map((si) => params.backlogItems.find((bi) => bi.id === si.itemId)!)
-      .filter(Boolean);
+    const selectedBacklogItems = selectedItems.flatMap((si) => {
+      const item = params.backlogItems.find((bi) => bi.id === si.itemId);
+      return item ? [item] : [];
+    });
 
     const riskAssessment = await this.riskAssessor.assessRisks({
       sprintItems: selectedBacklogItems,

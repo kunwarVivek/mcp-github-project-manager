@@ -228,7 +228,7 @@ Return actionable recommendations with specific next steps and updated timelines
 /**
  * Helper function to format feature addition prompts
  */
-export function formatFeaturePrompt(template: string, variables: Record<string, any>): string {
+export function formatFeaturePrompt(template: string, variables: Record<string, unknown>): string {
   let formatted = template;
 
   for (const [key, value] of Object.entries(variables)) {

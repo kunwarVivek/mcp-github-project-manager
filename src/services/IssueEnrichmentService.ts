@@ -91,13 +91,16 @@ export class IssueEnrichmentService {
     });
 
     for (const issueId of params.issueIds) {
-      const item = items.find((i: any) => i.id === issueId);
+      const item = items.find((i) => i.id === issueId);
       if (item) {
+        // Project items can carry the linked content's title and body, which
+        // the domain ProjectItem type does not declare.
+        const details: unknown = item;
         const enrichment = await this.enrichIssue({
           projectId: params.projectId,
           issueId: issueId,
-          issueTitle: isProjectItem(item) && item.title ? item.title : "Untitled",
-          issueDescription: isProjectItem(item) ? item.content?.body : undefined,
+          issueTitle: isProjectItem(details) && details.title ? details.title : "Untitled",
+          issueDescription: isProjectItem(details) ? details.content?.body : undefined,
         });
         results.push(enrichment);
       }

@@ -15,6 +15,7 @@ import {
   type AITask,
   type ConfidenceConfig,
   DEFAULT_CONFIDENCE_CONFIG,
+  type EnhancedAcceptanceCriteria,
   type MockPRD,
   type PRDDocument,
   type SectionConfidence,
@@ -22,6 +23,7 @@ import {
   type TaskComplexity,
   type TaskDependency,
   TaskStatus,
+  type TraceabilityMatrix,
 } from "../domain/ai-types";
 import {
   AUTO_CREATE_LIFECYCLE,
@@ -79,7 +81,6 @@ export class TaskGenerationService {
   private contextGenerationService: TaskContextGenerationService;
   private dependencyGraph: DependencyGraph;
   private estimationCalibrator: EstimationCalibrator;
-  private confidenceScorer: ConfidenceScorer;
   private readonly logger: ILogger;
 
   /**
@@ -95,7 +96,6 @@ export class TaskGenerationService {
     this.contextGenerationService = new TaskContextGenerationService(aiFactory);
     this.dependencyGraph = new DependencyGraph();
     this.estimationCalibrator = new EstimationCalibrator();
-    this.confidenceScorer = new ConfidenceScorer();
     this.logger = logger ?? Logger.getInstance();
   }
 
@@ -141,11 +141,7 @@ export class TaskGenerationService {
       const basicTasks = await this.generateBasicTasksFromPRD(params);
 
       // Create traceability matrix if enabled
-      // Explicit `any`: this holds an unvalidated AI response. Properly typing
-      // it is real work (the shape varies by prompt); making the `any` explicit
-      // at least removes the *implicit* one so the gap is visible.
-      // biome-ignore lint/suspicious/noExplicitAny: unvalidated AI response shape
-      let traceabilityMatrix: any;
+      let traceabilityMatrix: TraceabilityMatrix | undefined;
       if (config.createTraceabilityMatrix) {
         // Create mock PRD for traceability
         const mockPRD: MockPRD = {
@@ -261,7 +257,7 @@ export class TaskGenerationService {
     basicTasks: AITask[],
     prdContent: string,
     config: EnhancedTaskGenerationConfig,
-    traceabilityMatrix?: any
+    traceabilityMatrix?: TraceabilityMatrix
   ): Promise<EnhancedAITask[]> {
     const enhancedTasks: EnhancedAITask[] = [];
 
@@ -270,7 +266,7 @@ export class TaskGenerationService {
         // Start with traceability-enhanced task if available
         let enhancedTask: EnhancedAITask;
         if (config.createTraceabilityMatrix && traceabilityMatrix) {
-          const traceabilityTask = traceabilityMatrix.tasks.find((t: any) => t.id === task.id);
+          const traceabilityTask = traceabilityMatrix.tasks.find((t) => t.id === task.id);
           enhancedTask = traceabilityTask || ({ ...task } as EnhancedAITask);
         } else {
           enhancedTask = { ...task } as EnhancedAITask;
@@ -312,7 +308,9 @@ export class TaskGenerationService {
   /**
    * Enhance basic acceptance criteria with additional details
    */
-  private enhanceAcceptanceCriteria(basicCriteria: any[]): any[] {
+  private enhanceAcceptanceCriteria(
+    basicCriteria: AcceptanceCriteria[]
+  ): EnhancedAcceptanceCriteria[] {
     return basicCriteria.map((criterion, index) => ({
       id: criterion.id || `ac-${index + 1}`,
       description: criterion.description,
@@ -370,8 +368,9 @@ export class TaskGenerationService {
       });
 
       // Convert to SubTask format and enrich with metadata
-      return subtasks.map((subtask: any) => ({
+      return subtasks.map((subtask) => ({
         ...subtask,
+        complexity: subtask.complexity as TaskComplexity,
         id: subtask.id || uuidv4(),
         parentTaskId: params.task.id,
         status: TaskStatus.PENDING,

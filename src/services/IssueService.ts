@@ -121,7 +121,6 @@ export class IssueService {
             valueA = a.updatedAt;
             valueB = b.updatedAt;
             break;
-          case "created":
           default:
             valueA = a.createdAt;
             valueB = b.createdAt;

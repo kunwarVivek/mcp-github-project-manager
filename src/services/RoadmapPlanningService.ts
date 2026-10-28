@@ -5,6 +5,39 @@ import type { AIServiceFactory } from "./ai/AIServiceFactory";
 import type { ProjectManagementService } from "./ProjectManagementService";
 import { InputSanitizer } from "./utils/InputSanitizer";
 
+const RoadmapPlanSchema = z.object({
+  roadmap: z.object({
+    phases: z.array(
+      z.object({
+        name: z.string(),
+        description: z.string(),
+        duration: z.string(),
+        milestones: z.array(z.string()),
+      })
+    ),
+  }),
+  milestones: z.array(
+    z.object({
+      title: z.string(),
+      description: z.string(),
+      dueDate: z.string(),
+      issueIds: z.array(z.string()),
+    })
+  ),
+  sprints: z.array(
+    z.object({
+      title: z.string(),
+      description: z.string(),
+      startDate: z.string(),
+      endDate: z.string(),
+      issueIds: z.array(z.string()),
+    })
+  ),
+});
+
+/** AI-generated roadmap: phases, milestones and sprints. */
+export type RoadmapPlan = z.infer<typeof RoadmapPlanSchema>;
+
 /**
  * AI-powered roadmap planning service
  * Analyzes project context and issues to create intelligent roadmaps, milestones, and sprints
@@ -29,34 +62,7 @@ export class RoadmapPlanningService {
     projectDescription?: string;
     sprintDurationWeeks?: number;
     targetMilestones?: number;
-  }): Promise<{
-    roadmap: {
-      phases: Array<{
-        name: string;
-        description: string;
-        duration: string;
-        milestones: Array<{
-          title: string;
-          description: string;
-          dueDate?: string;
-          issues: string[];
-        }>;
-      }>;
-    };
-    milestones: Array<{
-      title: string;
-      description: string;
-      dueDate?: string;
-      issueIds: string[];
-    }>;
-    sprints: Array<{
-      title: string;
-      description: string;
-      startDate: string;
-      endDate: string;
-      issueIds: string[];
-    }>;
-  }> {
+  }): Promise<RoadmapPlan> {
     try {
       this.logger.info(`Generating roadmap for project ${params.projectId}`);
 
@@ -67,11 +73,10 @@ export class RoadmapPlanningService {
       });
 
       // Extract issue information
-      const issues = items.map((item: any) => ({
+      const issues = items.map((item) => ({
         id: item.id,
         title: item.title || "Untitled",
-        type: item.type,
-        content: item.content,
+        type: item.contentType,
       }));
 
       if (issues.length === 0) {
@@ -100,10 +105,10 @@ export class RoadmapPlanningService {
   private async analyzeIssuesForRoadmap(params: {
     projectTitle: string;
     projectDescription: string;
-    issues: Array<{ id: string; title: string; type: string; content?: any }>;
+    issues: Array<{ id: string; title: string; type: string }>;
     sprintDurationWeeks: number;
     targetMilestones: number;
-  }): Promise<any> {
+  }): Promise<RoadmapPlan> {
     const model = this.aiFactory.getModel("main") || this.aiFactory.getBestAvailableModel();
     if (!model) {
       throw new Error("AI service is not available");
@@ -133,40 +138,10 @@ REQUIREMENTS:
 - Suggest realistic timelines
 - Start sprints from today's date (${new Date().toISOString().split("T")[0]}).`;
 
-    const RoadmapAnalysisSchema = z.object({
-      roadmap: z.object({
-        phases: z.array(
-          z.object({
-            name: z.string(),
-            description: z.string(),
-            duration: z.string(),
-            milestones: z.array(z.string()),
-          })
-        ),
-      }),
-      milestones: z.array(
-        z.object({
-          title: z.string(),
-          description: z.string(),
-          dueDate: z.string(),
-          issueIds: z.array(z.string()),
-        })
-      ),
-      sprints: z.array(
-        z.object({
-          title: z.string(),
-          description: z.string(),
-          startDate: z.string(),
-          endDate: z.string(),
-          issueIds: z.array(z.string()),
-        })
-      ),
-    });
-
     const result = await generateObject({
       model,
       prompt,
-      schema: RoadmapAnalysisSchema,
+      schema: RoadmapPlanSchema,
       temperature: 0.7,
       maxOutputTokens: 4000,
     });
@@ -189,7 +164,10 @@ REQUIREMENTS:
    * reported rather than swallowed: `failures` lists every item that could
    * not be created or updated, with the reason.
    */
-  async createRoadmapInGitHub(params: { projectId: string; roadmap: any }): Promise<{
+  async createRoadmapInGitHub(params: {
+    projectId: string;
+    roadmap: Pick<RoadmapPlan, "milestones">;
+  }): Promise<{
     createdMilestones: number;
     updatedIssues: number;
     failures: Array<{ target: string; error: string }>;

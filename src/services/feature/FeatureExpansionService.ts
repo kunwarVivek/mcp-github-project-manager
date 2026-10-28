@@ -52,7 +52,7 @@ export class FeatureExpansionService {
    */
   async expandFeatureToTasks(params: {
     feature: FeatureRequirement;
-    systemContext?: any;
+    systemContext?: Record<string, unknown>;
     integrationPoints?: string[];
     teamSkills?: string[];
   }): Promise<FeatureExpansionResult> {

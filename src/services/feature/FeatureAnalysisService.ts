@@ -10,6 +10,17 @@ import {
 import { InputSanitizer } from "../utils/InputSanitizer";
 import { safeCall } from "../utils/safeCall";
 
+/** Structured outcome of a feature-request analysis. */
+export interface FeatureAnalysisResult {
+  analysis: string;
+  recommendation: "approve" | "reject" | "modify";
+  priority: TaskPriority;
+  complexity: TaskComplexity;
+  estimatedEffort: number;
+  risks: string[];
+  dependencies: string[];
+}
+
 /**
  * AI-powered analysis of feature requests.
  *
@@ -39,19 +50,11 @@ export class FeatureAnalysisService {
     featureIdea: string;
     description: string;
     existingPRD?: PRDDocument;
-    projectState?: any;
+    projectState?: Record<string, unknown>;
     businessJustification?: string;
     targetUsers?: string[];
     requestedBy: string;
-  }): Promise<{
-    analysis: string;
-    recommendation: "approve" | "reject" | "modify";
-    priority: TaskPriority;
-    complexity: TaskComplexity;
-    estimatedEffort: number;
-    risks: string[];
-    dependencies: string[];
-  }> {
+  }): Promise<FeatureAnalysisResult> {
     const FeatureAnalysisSchema = z.object({
       analysis: z.string().describe("Full analysis text"),
       recommendation: z.enum(["approve", "reject", "modify"]),

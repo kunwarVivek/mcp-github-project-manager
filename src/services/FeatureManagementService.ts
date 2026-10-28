@@ -7,9 +7,12 @@ import type {
   ProjectFeatureRoadmap,
   TaskLifecycleState,
 } from "../domain/ai-types.js";
-import { type ILogger, Logger } from "../infrastructure/logger";
+import type { TaskBlocker } from "../domain/feature-lifecycle-types.js";
 import { AIServiceFactory } from "./ai/AIServiceFactory.js";
-import { FeatureAnalysisService } from "./feature/FeatureAnalysisService.js";
+import {
+  type FeatureAnalysisResult,
+  FeatureAnalysisService,
+} from "./feature/FeatureAnalysisService.js";
 import { FeatureExpansionService } from "./feature/FeatureExpansionService.js";
 import { FeaturePRDService } from "./feature/FeaturePRDService.js";
 import { TaskLifecycleService } from "./feature/TaskLifecycleService.js";
@@ -32,22 +35,18 @@ export class FeatureManagementService {
   private readonly prdService: FeaturePRDService;
   private readonly expansionService: FeatureExpansionService;
   private readonly lifecycleService: TaskLifecycleService;
-  private readonly logger: ILogger;
 
   /**
    * @param aiFactory - AI service factory for model access. When omitted (DI mode),
    *   defaults to the global singleton via `AIServiceFactory.getInstance()`.
    *   Passed through to all four sub-services.
-   * @param logger - Logger instance for diagnostics. When omitted, defaults to
-   *   the global singleton via `Logger.getInstance()`.
    */
-  constructor(aiFactory?: AIServiceFactory, logger?: ILogger) {
+  constructor(aiFactory?: AIServiceFactory) {
     const factory = aiFactory ?? AIServiceFactory.getInstance();
     this.analysisService = new FeatureAnalysisService(factory);
     this.prdService = new FeaturePRDService(this.analysisService);
     this.expansionService = new FeatureExpansionService(factory);
     this.lifecycleService = new TaskLifecycleService(factory);
-    this.logger = logger ?? Logger.getInstance();
   }
 
   // ---------------------------------------------------------------------------
@@ -59,7 +58,7 @@ export class FeatureManagementService {
     featureIdea: string;
     description: string;
     existingPRD?: PRDDocument;
-    projectState?: any;
+    projectState?: Record<string, unknown>;
     businessJustification?: string;
     targetUsers?: string[];
     requestedBy: string;
@@ -79,7 +78,7 @@ export class FeatureManagementService {
   /** @see FeatureExpansionService.expandFeatureToTasks */
   async expandFeatureToTasks(params: {
     feature: FeatureRequirement;
-    systemContext?: any;
+    systemContext?: Record<string, unknown>;
     integrationPoints?: string[];
     teamSkills?: string[];
   }): Promise<FeatureExpansionResult> {
@@ -96,7 +95,7 @@ export class FeatureManagementService {
       assignee?: string;
       notes?: string;
       artifacts?: string[];
-      blockers?: any[];
+      blockers?: TaskBlocker[];
     };
   }): Promise<TaskLifecycleState> {
     return this.lifecycleService.updateTaskLifecycle(params);
@@ -126,7 +125,7 @@ export class FeatureManagementService {
     autoApprove?: boolean;
   }): Promise<{
     featureRequest: FeatureAdditionRequest;
-    analysis: any;
+    analysis: FeatureAnalysisResult;
     updatedPRD?: PRDDocument;
     expansionResult: FeatureExpansionResult;
     lifecycleStates: TaskLifecycleState[];
@@ -156,7 +155,7 @@ export class FeatureManagementService {
       });
 
       // Step 3: Add to PRD if approved and PRD exists
-      let updatedPRD: any | undefined;
+      let updatedPRD: PRDDocument | undefined;
       let newFeature: FeatureRequirement;
 
       if (params.targetPRD && (params.autoApprove || analysis.recommendation === "approve")) {

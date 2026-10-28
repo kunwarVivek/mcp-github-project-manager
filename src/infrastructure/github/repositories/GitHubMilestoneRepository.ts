@@ -1,3 +1,5 @@
+import type { components } from "@octokit/openapi-types";
+import type { RestEndpointMethodTypes } from "@octokit/rest";
 import { ResourceStatus } from "../../../domain/resource-types";
 import type {
   CreateMilestone,
@@ -7,8 +9,15 @@ import type {
   MilestoneRepository,
 } from "../../../domain/types";
 import { parseResourceStatus, toStatusString } from "../../../domain/utils/StatusParser";
+import type { GitHubConfig } from "../GitHubConfig";
+import type { OctokitInstance } from "../types";
 import { BaseGitHubRepository } from "./BaseRepository";
 import { GitHubIssueRepository } from "./GitHubIssueRepository";
+
+type RestMilestonePayload = components["schemas"]["milestone"];
+type CreateMilestoneParams = RestEndpointMethodTypes["issues"]["createMilestone"]["parameters"];
+type UpdateMilestoneParams = RestEndpointMethodTypes["issues"]["updateMilestone"]["parameters"];
+type DeleteMilestoneParams = RestEndpointMethodTypes["issues"]["deleteMilestone"]["parameters"];
 
 interface GitHubMilestone {
   id: string;
@@ -19,8 +28,8 @@ interface GitHubMilestone {
   state: "open" | "closed";
   createdAt: string;
   updatedAt: string;
-  closedAt: string | null;
-  progress: {
+  closedAt?: string | null;
+  progress?: {
     enabled: boolean;
     openIssues: number;
     closedIssues: number;
@@ -43,9 +52,9 @@ interface ListMilestonesResponse {
 }
 
 export class GitHubMilestoneRepository extends BaseGitHubRepository implements MilestoneRepository {
-  private readonly factory: any;
+  private readonly factory: { createIssueRepository: () => GitHubIssueRepository };
 
-  constructor(octokit: any, config: any) {
+  constructor(octokit: OctokitInstance, config: GitHubConfig) {
     super(octokit, config);
     // We need to add a factory field to the class in order to create other repositories
     this.factory = {
@@ -76,7 +85,7 @@ export class GitHubMilestoneRepository extends BaseGitHubRepository implements M
     };
   }
 
-  private mapRestMilestoneToMilestone(restMilestone: any): Milestone {
+  private mapRestMilestoneToMilestone(restMilestone: RestMilestonePayload): Milestone {
     return {
       id: restMilestone.node_id,
       number: restMilestone.number,
@@ -97,12 +106,15 @@ export class GitHubMilestoneRepository extends BaseGitHubRepository implements M
 
   async create(data: CreateMilestone): Promise<Milestone> {
     // Use REST API for milestone creation since GraphQL doesn't support it
-    const response = await this.rest((params) => this.octokit.rest.issues.createMilestone(params), {
-      title: data.title,
-      description: data.description,
-      due_on: data.dueDate,
-      state: "open",
-    });
+    const response = await this.rest(
+      (params: CreateMilestoneParams) => this.octokit.rest.issues.createMilestone(params),
+      {
+        title: data.title,
+        description: data.description,
+        due_on: data.dueDate,
+        state: "open",
+      }
+    );
 
     return this.mapRestMilestoneToMilestone(response);
   }
@@ -112,13 +124,16 @@ export class GitHubMilestoneRepository extends BaseGitHubRepository implements M
     // numeric string ("22") or a GraphQL node ID ("MI_kwDO...").
     const milestoneNumber = await this.resolveNumber(id);
 
-    const response = await this.rest((params) => this.octokit.rest.issues.updateMilestone(params), {
-      milestone_number: milestoneNumber,
-      title: data.title,
-      description: data.description,
-      due_on: data.dueDate,
-      state: toStatusString(data.status || ResourceStatus.ACTIVE, "githubMilestone"),
-    });
+    const response = await this.rest(
+      (params: UpdateMilestoneParams) => this.octokit.rest.issues.updateMilestone(params),
+      {
+        milestone_number: milestoneNumber,
+        title: data.title,
+        description: data.description,
+        due_on: data.dueDate,
+        state: toStatusString(data.status || ResourceStatus.ACTIVE, "githubMilestone"),
+      }
+    );
 
     return this.mapRestMilestoneToMilestone(response);
   }
@@ -126,15 +141,16 @@ export class GitHubMilestoneRepository extends BaseGitHubRepository implements M
   async delete(id: MilestoneId): Promise<void> {
     const milestoneNumber = await this.resolveNumber(id);
 
-    await this.rest((params) => this.octokit.rest.issues.deleteMilestone(params), {
-      milestone_number: milestoneNumber,
-    });
+    await this.rest(
+      (params: DeleteMilestoneParams) => this.octokit.rest.issues.deleteMilestone(params),
+      { milestone_number: milestoneNumber }
+    );
   }
 
   /** Resolve any milestone ID format to its numeric milestone_number. */
   private async resolveNumber(id: MilestoneId): Promise<number> {
     const parsed = parseInt(id, 10);
-    if (!isNaN(parsed) && String(parsed) === id) return parsed;
+    if (!Number.isNaN(parsed) && String(parsed) === id) return parsed;
     // Node ID — look up the milestone to get its number
     const milestone = await this.findByNodeId(id);
     if (!milestone) throw new Error(`Milestone not found: ${id}`);
@@ -146,7 +162,7 @@ export class GitHubMilestoneRepository extends BaseGitHubRepository implements M
 
     // If id is a numeric string (e.g. "22"), query by milestone number.
     // If id is a node ID (e.g. "MI_kwDO..."), query by node ID.
-    if (!isNaN(milestoneNumber) && String(milestoneNumber) === id) {
+    if (!Number.isNaN(milestoneNumber) && String(milestoneNumber) === id) {
       return this.findByNumber(milestoneNumber);
     }
     return this.findByNodeId(id);
@@ -200,22 +216,11 @@ export class GitHubMilestoneRepository extends BaseGitHubRepository implements M
       }
     `;
 
-    type NodeResponse = {
-      node: {
-        id: string;
-        number: number;
-        title: string;
-        description: string;
-        dueOn: string;
-        state: string;
-        createdAt: string;
-        updatedAt: string;
-      } | null;
-    };
+    type NodeResponse = { node: GitHubMilestone | null };
     const response = await this.graphql<NodeResponse>(query, { id: nodeId });
     if (!response.node) return null;
 
-    return this.mapGitHubMilestoneToMilestone(response.node as any);
+    return this.mapGitHubMilestoneToMilestone(response.node);
   }
 
   async findAll(): Promise<Milestone[]> {

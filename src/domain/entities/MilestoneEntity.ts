@@ -143,8 +143,8 @@ export class MilestoneEntity implements Milestone {
    * Check if the milestone is overdue
    */
   get isOverdue(): boolean {
-    if (!this.hasDueDate) return false;
-    const due = new Date(this.dueDate!);
+    if (this.dueDate === undefined || this.dueDate === null) return false;
+    const due = new Date(this.dueDate);
     const now = new Date();
     return due < now && this.status !== ResourceStatus.COMPLETED;
   }
@@ -153,8 +153,8 @@ export class MilestoneEntity implements Milestone {
    * Get the number of days until the due date (negative if overdue)
    */
   get daysUntilDue(): number | null {
-    if (!this.hasDueDate) return null;
-    const due = new Date(this.dueDate!);
+    if (this.dueDate === undefined || this.dueDate === null) return null;
+    const due = new Date(this.dueDate);
     const now = new Date();
     const diffMs = due.getTime() - now.getTime();
     return Math.ceil(diffMs / (1000 * 60 * 60 * 24));
@@ -164,8 +164,8 @@ export class MilestoneEntity implements Milestone {
    * Check if the milestone is at risk (due within threshold)
    */
   get isAtRisk(): boolean {
-    if (!this.hasDueDate || this.isOverdue) return false;
-    const daysLeft = this.daysUntilDue!;
+    const daysLeft = this.daysUntilDue;
+    if (daysLeft === null || this.isOverdue) return false;
     return daysLeft <= (this.config.atRiskDaysThreshold ?? 7);
   }
 

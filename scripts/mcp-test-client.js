@@ -108,7 +108,7 @@ class MCPTestClient {
           try {
             const response = JSON.parse(line);
             this.handleResponse(response);
-          } catch (error) {
+          } catch {
             // Ignore non-JSON output
             console.log(colorize(`Non-JSON output: ${line.substring(0, 100)}...`, "yellow"));
           }
@@ -204,7 +204,6 @@ class MCPTestClient {
 // Function to get sample data with dynamic values
 function getSampleData() {
   const githubOwner = CONFIG.githubOwner;
-  const githubRepo = CONFIG.githubRepo;
 
   return {
     // Project tools
@@ -486,7 +485,7 @@ async function listToolsCommand(client) {
     ) {
       categories["AI Task Management"].push(tool);
     } else {
-      categories["Other"].push(tool);
+      categories.Other.push(tool);
     }
   });
 
@@ -565,7 +564,7 @@ async function testAllCommand(client) {
     console.log(colorize(`\n🔧 Testing ${tool.name}...`, "blue"));
 
     try {
-      const result = await client.callTool(tool.name, sampleArgs);
+      await client.callTool(tool.name, sampleArgs);
       console.log(colorize(`✅ ${tool.name} - PASSED`, "green"));
       results.passed.push(tool.name);
     } catch (error) {

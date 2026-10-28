@@ -15,6 +15,11 @@ export interface EstimationRecord {
 }
 
 /**
+ * An estimation record whose actual outcome has been recorded
+ */
+type CompletedRecord = EstimationRecord & { actualPoints: number };
+
+/**
  * Effort estimate with confidence
  */
 export interface EffortEstimate {
@@ -127,19 +132,26 @@ export class EstimationCalibrator {
   }
 
   /**
+   * Records in a complexity band that have an actual outcome recorded
+   */
+  private completedRecordsFor(band: EstimationRecord["complexityBand"]): CompletedRecord[] {
+    return this.records.filter(
+      (r): r is CompletedRecord => r.actualPoints !== undefined && r.complexityBand === band
+    );
+  }
+
+  /**
    * Recalculate calibration factors from completed records
    */
   private recalculateFactors(): void {
     const bands: Array<"low" | "medium" | "high"> = ["low", "medium", "high"];
 
     for (const band of bands) {
-      const completed = this.records.filter(
-        (r) => r.actualPoints !== undefined && r.complexityBand === band
-      );
+      const completed = this.completedRecordsFor(band);
 
       if (completed.length >= 3) {
         // Need at least 3 data points for meaningful calibration
-        const ratios = completed.map((r) => r.actualPoints! / r.estimatedPoints);
+        const ratios = completed.map((r) => r.actualPoints / r.estimatedPoints);
 
         // Use median ratio to avoid outlier influence
         ratios.sort((a, b) => a - b);
@@ -224,16 +236,14 @@ export class EstimationCalibrator {
    * Calculate confidence in estimates for a complexity band
    */
   private calculateConfidence(band: "low" | "medium" | "high"): number {
-    const completed = this.records.filter(
-      (r) => r.actualPoints !== undefined && r.complexityBand === band
-    );
+    const completed = this.completedRecordsFor(band);
 
     if (completed.length === 0) return 50; // No data = 50% confidence
     if (completed.length < 3) return 60; // Limited data = 60% confidence
     if (completed.length < 10) return 75; // Some data = 75% confidence
 
     // Calculate variance in estimate accuracy
-    const ratios = completed.map((r) => r.actualPoints! / r.estimatedPoints);
+    const ratios = completed.map((r) => r.actualPoints / r.estimatedPoints);
     const mean = ratios.reduce((a, b) => a + b, 0) / ratios.length;
     const variance = ratios.reduce((sum, r) => sum + (r - mean) ** 2, 0) / ratios.length;
     const stdDev = Math.sqrt(variance);
@@ -255,9 +265,7 @@ export class EstimationCalibrator {
     factor?: number | null
   ): string {
     const band = getComplexityBand(complexity);
-    const dataCount = this.records.filter(
-      (r) => r.actualPoints !== undefined && r.complexityBand === band
-    ).length;
+    const dataCount = this.completedRecordsFor(band).length;
 
     if (!calibrated) {
       return `Base estimate for complexity ${complexity}/10. No calibration data available.`;
@@ -294,9 +302,7 @@ export class EstimationCalibrator {
     > = {};
 
     for (const band of bands) {
-      const completed = this.records.filter(
-        (r) => r.actualPoints !== undefined && r.complexityBand === band
-      );
+      const completed = this.completedRecordsFor(band);
 
       if (completed.length === 0) {
         accuracyByBand[band] = { count: 0, avgError: 0, calibrationFactor: null };
@@ -304,7 +310,7 @@ export class EstimationCalibrator {
       }
 
       const errors = completed.map(
-        (r) => Math.abs(r.actualPoints! - r.estimatedPoints) / r.estimatedPoints
+        (r) => Math.abs(r.actualPoints - r.estimatedPoints) / r.estimatedPoints
       );
       const avgError = errors.reduce((a, b) => a + b, 0) / errors.length;
 

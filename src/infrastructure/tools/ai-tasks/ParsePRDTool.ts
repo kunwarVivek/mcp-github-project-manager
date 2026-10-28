@@ -1,5 +1,11 @@
 import { z } from "zod";
-import type { MockPRD } from "../../../domain/ai-types.js";
+import {
+  type AITask,
+  type FeatureRequirement,
+  type MockPRD,
+  TaskPriority,
+  type TraceabilityMatrix,
+} from "../../../domain/ai-types.js";
 import type { MCPResponse } from "../../../domain/mcp-types.js";
 import { PRDGenerationService } from "../../../services/PRDGenerationService.js";
 import { RequirementsTraceabilityService } from "../../../services/RequirementsTraceabilityService.js";
@@ -118,14 +124,14 @@ async function executeParsePRD(args: ParsePRDArgs): Promise<MCPResponse> {
         });
 
     // Filter tasks by target complexity if specified
+    const targetComplexity = args.targetComplexity;
     let filteredTasks = tasks;
-    if (args.targetComplexity) {
-      filteredTasks = tasks.filter((task) => task.complexity <= args.targetComplexity!);
+    if (targetComplexity) {
+      filteredTasks = tasks.filter((task) => task.complexity <= targetComplexity);
     }
 
     // Create traceability matrix if requested
-    // biome-ignore lint/suspicious/noExplicitAny: unvalidated AI response shape
-    let traceabilityMatrix: any;
+    let traceabilityMatrix: TraceabilityMatrix | undefined;
     if (args.createTraceabilityMatrix) {
       // Create mock PRD for traceability
       const mockPRD: MockPRD = {
@@ -193,25 +199,42 @@ async function executeParsePRD(args: ParsePRDArgs): Promise<MCPResponse> {
   }
 }
 
+interface ProjectMetrics {
+  totalEffort: number;
+  avgComplexity: number;
+  estimatedDuration: number;
+  tasksByPriority: Record<string, number>;
+  tasksByComplexity: Record<string, number>;
+  featuresByPriority: Record<string, number>;
+  riskLevel: "high" | "medium" | "low";
+}
+
+interface TaskRecommendations {
+  startWithTasks: AITask[];
+  highPriorityTasks: AITask[];
+  complexTasksNeedingBreakdown: AITask[];
+  recommendedFirstSprint: AITask[];
+}
+
 /**
  * Calculate project metrics from tasks and features
  */
-function calculateProjectMetrics(tasks: any[], features: any[]) {
+function calculateProjectMetrics(tasks: AITask[], features: FeatureRequirement[]): ProjectMetrics {
   const totalEffort = tasks.reduce((sum, task) => sum + task.estimatedHours, 0);
   const avgComplexity = tasks.reduce((sum, task) => sum + task.complexity, 0) / tasks.length;
 
-  const tasksByPriority = tasks.reduce((acc, task) => {
+  const tasksByPriority = tasks.reduce<Record<string, number>>((acc, task) => {
     acc[task.priority] = (acc[task.priority] || 0) + 1;
     return acc;
   }, {});
 
-  const tasksByComplexity = tasks.reduce((acc, task) => {
+  const tasksByComplexity = tasks.reduce<Record<string, number>>((acc, task) => {
     const level = task.complexity <= 3 ? "low" : task.complexity <= 7 ? "medium" : "high";
     acc[level] = (acc[level] || 0) + 1;
     return acc;
   }, {});
 
-  const featuresByPriority = features.reduce((acc, feature) => {
+  const featuresByPriority = features.reduce<Record<string, number>>((acc, feature) => {
     acc[feature.priority] = (acc[feature.priority] || 0) + 1;
     return acc;
   }, {});
@@ -230,10 +253,15 @@ function calculateProjectMetrics(tasks: any[], features: any[]) {
 /**
  * Generate task recommendations
  */
-async function generateTaskRecommendations(tasks: any[], _args: ParsePRDArgs) {
+async function generateTaskRecommendations(
+  tasks: AITask[],
+  _args: ParsePRDArgs
+): Promise<TaskRecommendations> {
   // Get high-priority tasks
   const highPriorityTasks = tasks
-    .filter((task) => task.priority === "critical" || task.priority === "high")
+    .filter(
+      (task) => task.priority === TaskPriority.CRITICAL || task.priority === TaskPriority.HIGH
+    )
     .slice(0, 5);
 
   // Get setup/infrastructure tasks
@@ -254,7 +282,9 @@ async function generateTaskRecommendations(tasks: any[], _args: ParsePRDArgs) {
     highPriorityTasks,
     complexTasksNeedingBreakdown: complexTasks,
     recommendedFirstSprint: tasks
-      .filter((task) => task.priority === "critical" || task.priority === "high")
+      .filter(
+        (task) => task.priority === TaskPriority.CRITICAL || task.priority === TaskPriority.HIGH
+      )
       .filter((task) => task.complexity <= 6)
       .slice(0, 8),
   };
@@ -264,12 +294,12 @@ async function generateTaskRecommendations(tasks: any[], _args: ParsePRDArgs) {
  * Format PRD parsing result summary
  */
 function formatPRDParsingResult(
-  tasks: any[],
-  features: any[],
-  metrics: any,
-  recommendations: any,
+  tasks: AITask[],
+  features: FeatureRequirement[],
+  metrics: ProjectMetrics,
+  recommendations: TaskRecommendations,
   args: ParsePRDArgs,
-  traceabilityMatrix?: any
+  traceabilityMatrix?: TraceabilityMatrix
 ): string {
   const sections = [
     "# PRD Parsing Complete",
@@ -317,12 +347,12 @@ function formatPRDParsingResult(
     "",
     "**By Priority:**",
     ...Object.entries(metrics.tasksByPriority).map(
-      ([priority, count]) => `- ${priority}: ${count} task${(count as number) > 1 ? "s" : ""}`
+      ([priority, count]) => `- ${priority}: ${count} task${count > 1 ? "s" : ""}`
     ),
     "",
     "**By Complexity:**",
     ...Object.entries(metrics.tasksByComplexity).map(
-      ([level, count]) => `- ${level}: ${count} task${(count as number) > 1 ? "s" : ""}`
+      ([level, count]) => `- ${level}: ${count} task${count > 1 ? "s" : ""}`
     ),
     ""
   );
@@ -335,14 +365,14 @@ function formatPRDParsingResult(
       "",
       "**By Priority:**",
       ...Object.entries(metrics.featuresByPriority).map(
-        ([priority, count]) => `- ${priority}: ${count} feature${(count as number) > 1 ? "s" : ""}`
+        ([priority, count]) => `- ${priority}: ${count} feature${count > 1 ? "s" : ""}`
       ),
       "",
       "**Top Features:**",
       ...features
         .slice(0, 5)
         .map(
-          (feature: any) =>
+          (feature) =>
             `- ${feature.title} (${feature.priority}, complexity: ${feature.estimatedComplexity}/10)`
         ),
       ""
@@ -357,7 +387,7 @@ function formatPRDParsingResult(
       "",
       "**Start With These Tasks:**",
       ...recommendations.startWithTasks.map(
-        (task: any) => `- ${task.title} (${task.priority}, ${task.estimatedHours}h)`
+        (task) => `- ${task.title} (${task.priority}, ${task.estimatedHours}h)`
       ),
       ""
     );
@@ -367,7 +397,7 @@ function formatPRDParsingResult(
     sections.push(
       "**Complex Tasks Needing Breakdown:**",
       ...recommendations.complexTasksNeedingBreakdown.map(
-        (task: any) => `- ${task.title} (complexity: ${task.complexity}/10)`
+        (task) => `- ${task.title} (complexity: ${task.complexity}/10)`
       ),
       ""
     );
@@ -375,7 +405,7 @@ function formatPRDParsingResult(
 
   if (recommendations.recommendedFirstSprint.length > 0) {
     const sprintEffort = recommendations.recommendedFirstSprint.reduce(
-      (sum: number, task: any) => sum + task.estimatedHours,
+      (sum, task) => sum + task.estimatedHours,
       0
     );
     sections.push(

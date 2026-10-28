@@ -27,7 +27,9 @@ function findTestFiles(dir) {
         results.push(full);
       }
     }
-  } catch (e) {}
+  } catch {
+    // Unreadable directories are skipped; the walk reports what it could reach.
+  }
   return results;
 }
 
@@ -44,7 +46,7 @@ for (const file of files) {
   // Pattern: import { describe, it, expect, beforeEach, jest } from '@jest/globals';
   content = content.replace(
     /import\s*\{([^}]*)\}\s*from\s*['"]@jest\/globals['"]\s*;/g,
-    (match, imports) => {
+    (_match, imports) => {
       // Replace 'jest' with 'vi' in the import list
       const newImports = imports
         .split(",")
@@ -92,7 +94,7 @@ for (const file of files) {
       // Add Mocked to the vitest import
       content = content.replace(
         /import\s*\{([^}]*)\}\s*from\s*['"]vitest['"]\s*;/g,
-        (match, imports) => {
+        (_match, imports) => {
           if (!imports.includes("Mocked")) {
             return `import { ${imports.trim()}, Mocked, MockedClass, MockedFunction } from 'vitest';`;
           }

@@ -57,7 +57,7 @@ export class GitHubAPIError extends Error {
   constructor(
     message: string,
     public status?: number,
-    public response?: any
+    public response?: unknown
   ) {
     super(message);
     this.name = "GitHubAPIError";
@@ -76,7 +76,7 @@ export class MCPProtocolError extends Error {
 
 export function isErrorType<T extends Error>(
   error: unknown,
-  errorType: new (...args: any[]) => T
+  errorType: new (...args: never[]) => T
 ): error is T {
   return error instanceof errorType;
 }

@@ -32,6 +32,25 @@ const getNextTaskSchema = z.object({
 
 export type GetNextTaskArgs = z.infer<typeof getNextTaskSchema>;
 
+interface RecommendedTask {
+  id: string;
+  title: string;
+  description: string;
+  priority: string;
+  complexity: number;
+  estimatedHours: number;
+  status: string;
+  dependencies: string[];
+  tags: string[];
+}
+
+interface SprintMetrics {
+  totalHours: number;
+  sprintCapacity: number;
+  sprintFit: boolean;
+  filtersApplied: string[];
+}
+
 /**
  * Implementation function for get_next_task tool
  */
@@ -39,7 +58,7 @@ async function executeGetNextTask(args: GetNextTaskArgs): Promise<MCPResponse> {
   try {
     // For now, create mock tasks for demonstration
     // In a full implementation, this would integrate with ResourceManager
-    const mockTasks = [
+    const mockTasks: RecommendedTask[] = [
       {
         id: "task-1",
         title: "Set up project infrastructure",
@@ -78,8 +97,9 @@ async function executeGetNextTask(args: GetNextTaskArgs): Promise<MCPResponse> {
     // Apply filters
     let filteredTasks = mockTasks;
 
-    if (args.maxComplexity) {
-      filteredTasks = filteredTasks.filter((task) => task.complexity <= args.maxComplexity!);
+    const maxComplexity = args.maxComplexity;
+    if (maxComplexity) {
+      filteredTasks = filteredTasks.filter((task) => task.complexity <= maxComplexity);
     }
 
     if (args.assignee) {
@@ -138,7 +158,7 @@ async function executeGetNextTask(args: GetNextTaskArgs): Promise<MCPResponse> {
 /**
  * Generate AI analysis for task recommendations
  */
-function generateTaskAnalysis(tasks: any[], _args: GetNextTaskArgs): string {
+function generateTaskAnalysis(tasks: RecommendedTask[], _args: GetNextTaskArgs): string {
   const highComplexityTasks = tasks.filter((task) => task.complexity >= 7).length;
   const setupTasks = tasks.filter((task) => task.tags.includes("setup")).length;
 
@@ -175,9 +195,9 @@ function getAppliedFilters(args: GetNextTaskArgs): string[] {
  * Format task recommendations summary
  */
 function formatNextTaskRecommendations(
-  tasks: any[],
+  tasks: RecommendedTask[],
   analysis: string | null,
-  metrics: any
+  metrics: SprintMetrics
 ): string {
   const sections = [
     "# Next Task Recommendations",
@@ -194,7 +214,7 @@ function formatNextTaskRecommendations(
   if (metrics.filtersApplied.length > 0) {
     sections.push(
       "**Applied Filters:**",
-      ...metrics.filtersApplied.map((filter: string) => `- ${filter}`),
+      ...metrics.filtersApplied.map((filter) => `- ${filter}`),
       ""
     );
   }
@@ -242,7 +262,7 @@ function formatNextTaskRecommendations(
     });
 
     // Priority breakdown
-    const priorityBreakdown = tasks.reduce((acc, task) => {
+    const priorityBreakdown = tasks.reduce<Record<string, number>>((acc, task) => {
       acc[task.priority] = (acc[task.priority] || 0) + 1;
       return acc;
     }, {});
@@ -251,7 +271,7 @@ function formatNextTaskRecommendations(
       "## Summary",
       "**Priority Breakdown:**",
       ...Object.entries(priorityBreakdown).map(
-        ([priority, count]) => `- ${priority}: ${count} task${(count as number) > 1 ? "s" : ""}`
+        ([priority, count]) => `- ${priority}: ${count} task${count > 1 ? "s" : ""}`
       ),
       ""
     );

@@ -36,7 +36,7 @@ export interface CacheStats {
 }
 
 export class ResourceCache {
-  private cache: Map<string, CacheEntry<any>>;
+  private cache: Map<string, CacheEntry<unknown>>;
   private defaultTTL: number = 3600000; // 1 hour in milliseconds
   private tagIndex: Map<string, Set<string>>;
   private typeIndex: Map<ResourceType, Set<string>>;
@@ -361,7 +361,7 @@ export class ResourceCache {
     const relationshipKey = this.getRelationshipKey(sourceId, relationshipType, targetId);
 
     // Create a simple relationship entry
-    const entry: CacheEntry<any> = {
+    const entry: CacheEntry<unknown> = {
       value: {
         sourceId,
         relationshipType,
@@ -373,27 +373,14 @@ export class ResourceCache {
 
     // Also keep an index of relationships by source id and type
     const sourceTypeKey = `relationship:${sourceId}:${relationshipType}`;
-    let relationships = this.cache.get(sourceTypeKey);
-
-    if (!relationships) {
-      relationships = {
-        value: new Set<string>(),
-      };
-      this.cache.set(sourceTypeKey, relationships);
-    }
-
-    relationships.value.add(targetId);
+    this.getOrCreateRelationshipSet(sourceTypeKey).add(targetId);
   }
 
   async getRelationships(sourceId: string, relationshipType: string): Promise<string[]> {
     const sourceTypeKey = `relationship:${sourceId}:${relationshipType}`;
-    const relationships = this.cache.get(sourceTypeKey);
+    const relationships = this.cache.get(sourceTypeKey)?.value;
 
-    if (!relationships) {
-      return [];
-    }
-
-    return Array.from(relationships.value);
+    return relationships instanceof Set ? Array.from(relationships as Set<string>) : [];
   }
 
   async removeRelationship(
@@ -408,16 +395,26 @@ export class ResourceCache {
 
     // Update the relationship index
     const sourceTypeKey = `relationship:${sourceId}:${relationshipType}`;
-    const relationships = this.cache.get(sourceTypeKey);
+    const relationships = this.cache.get(sourceTypeKey)?.value;
 
-    if (relationships) {
-      relationships.value.delete(targetId);
+    if (relationships instanceof Set) {
+      relationships.delete(targetId);
 
       // If no more relationships of this type, remove the index entry
-      if (relationships.value.size === 0) {
+      if (relationships.size === 0) {
         this.cache.delete(sourceTypeKey);
       }
     }
+  }
+
+  private getOrCreateRelationshipSet(sourceTypeKey: string): Set<string> {
+    const existing = this.cache.get(sourceTypeKey)?.value;
+    if (existing instanceof Set) {
+      return existing as Set<string>;
+    }
+    const created = new Set<string>();
+    this.cache.set(sourceTypeKey, { value: created });
+    return created;
   }
 
   private getRelationshipKey(sourceId: string, relationshipType: string, targetId: string): string {
@@ -428,35 +425,43 @@ export class ResourceCache {
     return value.deletedAt !== null && value.deletedAt !== undefined;
   }
 
-  private hasMatchingTags(entry: CacheEntry<any>, tags: string[]): boolean {
-    if (!entry.tags || entry.tags.length === 0) return false;
-    return tags.some((tag) => entry.tags!.includes(tag));
+  private hasMatchingTags(entry: CacheEntry<unknown>, tags: string[]): boolean {
+    const entryTags = entry.tags;
+    if (!entryTags || entryTags.length === 0) return false;
+    return tags.some((tag) => entryTags.includes(tag));
+  }
+
+  private addToIndex<K>(index: Map<K, Set<string>>, key: K, id: string): void {
+    let ids = index.get(key);
+    if (!ids) {
+      ids = new Set();
+      index.set(key, ids);
+    }
+    ids.add(id);
   }
 
   private addToTagIndex(id: string, tags: string[]): void {
     for (const tag of tags) {
-      if (!this.tagIndex.has(tag)) {
-        this.tagIndex.set(tag, new Set());
-      }
-      this.tagIndex.get(tag)!.add(id);
+      this.addToIndex(this.tagIndex, tag, id);
     }
   }
 
   private addToTypeIndex(type: ResourceType, id: string): void {
-    if (!this.typeIndex.has(type)) {
-      this.typeIndex.set(type, new Set());
-    }
-    this.typeIndex.get(type)!.add(id);
+    this.addToIndex(this.typeIndex, type, id);
   }
 
   private addToNamespaceIndex(namespace: string, id: string): void {
-    if (!this.namespaceIndex.has(namespace)) {
-      this.namespaceIndex.set(namespace, new Set());
-    }
-    this.namespaceIndex.get(namespace)!.add(id);
+    this.addToIndex(this.namespaceIndex, namespace, id);
   }
 
-  private removeFromIndices(id: string, entry: CacheEntry<any>): void {
+  private resourceTypeOf(value: unknown): ResourceType | undefined {
+    if (typeof value !== "object" || value === null || !("type" in value)) {
+      return undefined;
+    }
+    return value.type ? (value.type as ResourceType) : undefined;
+  }
+
+  private removeFromIndices(id: string, entry: CacheEntry<unknown>): void {
     // Remove from tag index
     if (entry.tags) {
       for (const tag of entry.tags) {
@@ -471,8 +476,8 @@ export class ResourceCache {
     }
 
     // Remove from type index
-    if (entry.value?.type) {
-      const type = entry.value.type;
+    const type = this.resourceTypeOf(entry.value);
+    if (type) {
       const typeIds = this.typeIndex.get(type);
       if (typeIds) {
         typeIds.delete(id);
@@ -837,7 +842,7 @@ export class ResourceCache {
       if (parsed && parsed.type === type) {
         // Check if expired
         if (!entry.expiresAt || Date.now() <= entry.expiresAt) {
-          resources.push(entry.value);
+          resources.push(entry.value as T);
         }
       }
     }
@@ -848,7 +853,7 @@ export class ResourceCache {
   /**
    * Warm cache with initial data
    */
-  warmCache(type: ResourceType, resources: any[]): void {
+  warmCache(type: ResourceType, resources: Array<{ id?: string | number; number?: number }>): void {
     for (const resource of resources) {
       const id = resource.id?.toString() || resource.number?.toString();
       if (id) {

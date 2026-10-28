@@ -247,7 +247,6 @@ export class MilestoneService {
             valueA = a.title;
             valueB = b.title;
             break;
-          case "created_at":
           default:
             valueA = a.createdAt;
             valueB = b.createdAt;

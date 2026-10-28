@@ -97,10 +97,40 @@ async function executeAnalyzeTaskComplexity(args: AnalyzeTaskComplexityArgs): Pr
   }
 }
 
+/** Result of `TaskGenerationService.analyzeTaskComplexity`. */
+interface ComplexityAnalysis {
+  originalComplexity: TaskComplexity;
+  newComplexity: TaskComplexity;
+  estimatedHours: number;
+  analysis: string;
+  recommendations: string[];
+}
+
+interface EffortBreakdown {
+  analysis: number;
+  implementation: number;
+  testing: number;
+  documentation: number;
+  total: number;
+}
+
+interface TaskRisk {
+  type: string;
+  level: "low" | "medium" | "high";
+  description: string;
+  mitigation: string;
+}
+
+interface ConfidenceLevel {
+  level: "high" | "medium" | "low";
+  percentage: number;
+  factors: string[];
+}
+
 /**
  * Generate effort breakdown by activity type
  */
-function generateEffortBreakdown(totalHours: number, teamExperience: string) {
+function generateEffortBreakdown(totalHours: number, teamExperience: string): EffortBreakdown {
   // Adjust percentages based on team experience
   let analysisPercent = 0.15;
   let implementationPercent = 0.6;
@@ -136,13 +166,8 @@ function generateEffortBreakdown(totalHours: number, teamExperience: string) {
  */
 function assessTaskRisks(
   args: AnalyzeTaskComplexityArgs,
-  analysis: any
-): Array<{
-  type: string;
-  level: "low" | "medium" | "high";
-  description: string;
-  mitigation: string;
-}> {
+  analysis: ComplexityAnalysis
+): TaskRisk[] {
   const risks = [];
 
   // Complexity risk
@@ -203,8 +228,8 @@ function assessTaskRisks(
  */
 function generateTaskRecommendations(
   args: AnalyzeTaskComplexityArgs,
-  analysis: any,
-  risks: any[]
+  analysis: ComplexityAnalysis,
+  risks: TaskRisk[]
 ): string[] {
   const recommendations = [];
 
@@ -256,12 +281,8 @@ function generateTaskRecommendations(
  */
 function calculateConfidenceLevel(
   args: AnalyzeTaskComplexityArgs,
-  analysis: any
-): {
-  level: "high" | "medium" | "low";
-  percentage: number;
-  factors: string[];
-} {
+  analysis: ComplexityAnalysis
+): ConfidenceLevel {
   let confidence = 70; // Base confidence
   const factors = [];
 
@@ -313,11 +334,11 @@ function calculateConfidenceLevel(
  */
 function formatComplexityAnalysis(
   args: AnalyzeTaskComplexityArgs,
-  analysis: any,
-  breakdown: any,
-  risks: any[],
+  analysis: ComplexityAnalysis,
+  breakdown: EffortBreakdown,
+  risks: TaskRisk[],
   recommendations: string[],
-  confidence: any
+  confidence: ConfidenceLevel
 ): string {
   const sections = [
     "# Task Complexity Analysis",

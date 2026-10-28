@@ -92,7 +92,7 @@ export class GitHubRepositoryFactory {
   /**
    * Execute a GraphQL query directly
    */
-  public async graphql<T>(query: string, variables: Record<string, any> = {}): Promise<T> {
+  public async graphql<T>(query: string, variables: Record<string, unknown> = {}): Promise<T> {
     try {
       return await this.octokit.graphql<T>(query, {
         ...variables,

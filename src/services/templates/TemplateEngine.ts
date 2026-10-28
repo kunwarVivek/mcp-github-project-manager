@@ -92,8 +92,9 @@ export class TemplateEngine {
     const content = typeof template === "string" ? template : template.rawContent;
     const cacheKey = content.substring(0, 200);
 
-    if (this.compiledCache.has(cacheKey)) {
-      return this.compiledCache.get(cacheKey)!;
+    const cached = this.compiledCache.get(cacheKey);
+    if (cached) {
+      return cached;
     }
 
     try {

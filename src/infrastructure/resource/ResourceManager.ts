@@ -56,7 +56,7 @@ export class ResourceManager extends EventEmitter {
 
     // Also validate with legacy validation rules if provided
     if (options?.validationRules) {
-      this.validateResource(data, options.validationRules);
+      this.validateResource(type, data, options.validationRules);
     }
 
     await this.cache.set(resource.type, resource.id, resource, options?.cacheOptions);
@@ -162,7 +162,7 @@ export class ResourceManager extends EventEmitter {
 
     // Also validate with legacy validation rules if provided
     if (options?.validationRules) {
-      this.validateResource(updated, options.validationRules);
+      this.validateResource(type, updated, options.validationRules);
     }
 
     // Check for optimistic locking
@@ -335,18 +335,22 @@ export class ResourceManager extends EventEmitter {
     });
   }
 
-  private validateResource(data: any, rules: ResourceValidationRule[]): void {
+  private validateResource(
+    type: ResourceType,
+    data: unknown,
+    rules: ResourceValidationRule[]
+  ): void {
     const errors = rules
       .filter((rule) => !rule.validate(data))
       .map((rule) => rule.getErrorMessage(data));
 
     if (errors.length > 0) {
-      throw new ResourceValidationError(data.type, `Validation failed: ${errors.join(", ")}`);
+      throw new ResourceValidationError(type, `Validation failed: ${errors.join(", ")}`);
     }
   }
 
   // Modified method to work with the validateResource function that returns string[] instead of validation result
-  validateWithZod(type: ResourceType, data: unknown): any {
+  validateWithZod(type: ResourceType, data: unknown): unknown {
     try {
       return validateResourceByType(type, data);
     } catch (error) {

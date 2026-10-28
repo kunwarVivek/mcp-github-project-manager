@@ -4,22 +4,10 @@ import { createOpenAI } from "@ai-sdk/openai";
 import { createPerplexity } from "@ai-sdk/perplexity";
 import { type LanguageModel, type LanguageModelMiddleware, wrapLanguageModel } from "ai";
 import {
-  AI_FALLBACK_API_KEY,
-  AI_FALLBACK_BASE_URL,
   AI_FALLBACK_MODEL,
-  AI_FALLBACK_PROVIDER,
-  AI_MAIN_API_KEY,
-  AI_MAIN_BASE_URL,
   AI_MAIN_MODEL,
-  AI_MAIN_PROVIDER,
-  AI_PRD_API_KEY,
-  AI_PRD_BASE_URL,
   AI_PRD_MODEL,
-  AI_PRD_PROVIDER,
-  AI_RESEARCH_API_KEY,
-  AI_RESEARCH_BASE_URL,
   AI_RESEARCH_MODEL,
-  AI_RESEARCH_PROVIDER,
   ANTHROPIC_API_KEY,
   GOOGLE_API_KEY,
   getOptionalConfigValue,

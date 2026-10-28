@@ -106,16 +106,16 @@ export class GitHubStateSyncService {
         // Brute-force: re-fetch everything regardless of freshness
         switch (type) {
           case ResourceType.PROJECT:
-            await this.syncProjects(forceSync);
+            await this.syncProjects();
             break;
           case ResourceType.MILESTONE:
-            await this.syncMilestones(forceSync);
+            await this.syncMilestones();
             break;
           case ResourceType.ISSUE:
-            await this.syncIssues(forceSync);
+            await this.syncIssues();
             break;
           case ResourceType.SPRINT:
-            await this.syncSprints(forceSync);
+            await this.syncSprints();
             break;
           default:
             this.logger.warn(`Unknown resource type for sync: ${type}`);
@@ -225,10 +225,12 @@ export class GitHubStateSyncService {
     const grouped = new Map<ResourceType, SyncMetadata[]>();
 
     for (const meta of metadata) {
-      if (!grouped.has(meta.resourceType)) {
-        grouped.set(meta.resourceType, []);
+      const group = grouped.get(meta.resourceType);
+      if (group) {
+        group.push(meta);
+      } else {
+        grouped.set(meta.resourceType, [meta]);
       }
-      grouped.get(meta.resourceType)!.push(meta);
     }
 
     return grouped;
@@ -316,7 +318,7 @@ export class GitHubStateSyncService {
   private async updateMetadata(
     type: ResourceType,
     resourceId: string,
-    resource: any
+    resource: { updatedAt?: string; version?: number }
   ): Promise<void> {
     const metadata: SyncMetadata = {
       resourceId,
@@ -332,7 +334,7 @@ export class GitHubStateSyncService {
   /**
    * Sync all projects
    */
-  private async syncProjects(forceSync: boolean): Promise<void> {
+  private async syncProjects(): Promise<void> {
     const projectRepo = this.factory.createProjectRepository();
     const projects = await projectRepo.findAll();
 
@@ -345,7 +347,7 @@ export class GitHubStateSyncService {
   /**
    * Sync all milestones
    */
-  private async syncMilestones(forceSync: boolean): Promise<void> {
+  private async syncMilestones(): Promise<void> {
     const milestoneRepo = this.factory.createMilestoneRepository();
     const milestones = await milestoneRepo.findAll();
 
@@ -358,7 +360,7 @@ export class GitHubStateSyncService {
   /**
    * Sync all issues
    */
-  private async syncIssues(forceSync: boolean): Promise<void> {
+  private async syncIssues(): Promise<void> {
     const issueRepo = this.factory.createIssueRepository();
     const issues = await issueRepo.findAll();
 
@@ -371,7 +373,7 @@ export class GitHubStateSyncService {
   /**
    * Sync all sprints
    */
-  private async syncSprints(forceSync: boolean): Promise<void> {
+  private async syncSprints(): Promise<void> {
     const sprintRepo = this.factory.createSprintRepository();
     const sprints = await sprintRepo.findAll();
 

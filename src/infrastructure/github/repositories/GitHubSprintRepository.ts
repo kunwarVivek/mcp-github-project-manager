@@ -3,29 +3,32 @@ import type { Issue, IssueId, Sprint, SprintId, SprintRepository } from "../../.
 import { logger } from "../../logger";
 import type { GitHubConfig } from "../GitHubConfig"; // Import the class, not the interface
 import { projectFieldUnionSelection } from "../project-field-fragments";
+import type { OctokitInstance } from "../types";
 import { BaseGitHubRepository } from "./BaseRepository";
 import { GitHubIssueRepository } from "./GitHubIssueRepository";
+
+interface IterationProjectNode {
+  id: string;
+  fields: {
+    nodes: Array<{
+      id?: string;
+      name?: string;
+      configuration?: {
+        iterations: Array<{
+          id: string;
+          title: string;
+          startDate: string;
+          duration: number;
+        }>;
+      };
+    }>;
+  };
+}
 
 interface ListIterationFieldsResponse {
   repository: {
     projectsV2: {
-      nodes: Array<{
-        id: string;
-        fields: {
-          nodes: Array<{
-            id?: string;
-            name?: string;
-            configuration?: {
-              iterations: Array<{
-                id: string;
-                title: string;
-                startDate: string;
-                duration: number;
-              }>;
-            };
-          }>;
-        };
-      }>;
+      nodes: IterationProjectNode[];
     };
   };
 }
@@ -80,9 +83,9 @@ export function nextIterationStart(
 }
 
 export class GitHubSprintRepository extends BaseGitHubRepository implements SprintRepository {
-  private readonly factory: any;
+  private readonly factory: { createIssueRepository: () => GitHubIssueRepository };
 
-  constructor(octokit: any, config: GitHubConfig) {
+  constructor(octokit: OctokitInstance, config: GitHubConfig) {
     super(octokit, config);
     // We need to add a factory field to the class in order to create other repositories
     this.factory = {
@@ -96,9 +99,7 @@ export class GitHubSprintRepository extends BaseGitHubRepository implements Spri
     data: Omit<Sprint, "id" | "createdAt" | "updatedAt" | "type"> & { projectId?: string }
   ): Promise<Sprint> {
     // Find the target project's iteration field, creating one if needed
-    const { fieldId, projectId, existingIterations } = await this.ensureIterationField(
-      data.projectId
-    );
+    const { fieldId, existingIterations } = await this.ensureIterationField(data.projectId);
 
     // Where the new iteration may start.
     //
@@ -210,7 +211,7 @@ export class GitHubSprintRepository extends BaseGitHubRepository implements Spri
     projectId: string;
     existingIterations: Array<{ id: string; title: string; startDate: string; duration: number }>;
   }> {
-    let projectNode: { id: string; fields: { nodes: any[] } } | undefined;
+    let projectNode: IterationProjectNode | undefined;
 
     if (targetProjectId) {
       // Query the specific project by node ID
@@ -234,10 +235,9 @@ export class GitHubSprintRepository extends BaseGitHubRepository implements Spri
           }
         }
       `;
-      const result = await this.graphql<{ node: { id: string; fields: { nodes: any[] } } | null }>(
-        query,
-        { id: targetProjectId }
-      );
+      const result = await this.graphql<{ node: IterationProjectNode | null }>(query, {
+        id: targetProjectId,
+      });
       projectNode = result.node || undefined;
     } else {
       // Fallback: most recent project
@@ -276,12 +276,17 @@ export class GitHubSprintRepository extends BaseGitHubRepository implements Spri
 
     // Look for an existing iteration field
     const iterField = projectNode.fields.nodes.find(
-      (f: any) => f.configuration?.iterations !== undefined
+      (f) => f.configuration?.iterations !== undefined
     );
 
     if (iterField) {
+      if (!iterField.id) {
+        throw new Error(
+          `Iteration field in project ${projectNode.id} was returned without an id; cannot add a sprint to it`
+        );
+      }
       return {
-        fieldId: iterField.id!,
+        fieldId: iterField.id,
         projectId: projectNode.id,
         existingIterations: iterField.configuration?.iterations || [],
       };
