@@ -27,7 +27,7 @@ describe("MCP Server E2E Tests", () => {
     const owner = process.env.GITHUB_OWNER || "test-owner";
     const repo = process.env.GITHUB_REPO || "test-repo";
 
-    createProjectManagementService(owner, repo, token);
+    createProjectManagementService(owner, repo, { kind: "pat", token });
     toolRegistry = ToolRegistry.getInstance();
   });
 

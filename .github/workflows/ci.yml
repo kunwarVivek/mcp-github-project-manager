@@ -112,3 +112,32 @@ jobs:
 
       - name: Lint
         run: pnpm run lint
+
+      # package-lock.json and pnpm-lock.yaml must resolve the same version of
+      # every direct dependency (no network needed).
+      - name: Lockfiles in sync
+        run: pnpm run check:lockfiles
+
+      # Tool/action counts quoted in README, docs and package.json must equal
+      # what the ToolRegistry serves.
+      - name: Doc counts match the registry
+        run: pnpm run check:docs
+
+  # The compound-tool schema snapshot (schema-snapshot unit test) runs in the
+  # `test` matrix above as part of `vitest run`; no separate step is needed.
+
+  audit:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Use Node.js '24.x'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24.x'
+          cache: 'npm'
+
+      # Fails on any high or critical advisory in the resolved tree.
+      - name: Audit dependencies
+        run: npm audit --audit-level=high

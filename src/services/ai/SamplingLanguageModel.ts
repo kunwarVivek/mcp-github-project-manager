@@ -12,6 +12,7 @@ import type {
   LanguageModelV4,
   LanguageModelV4CallOptions,
   LanguageModelV4GenerateResult,
+  LanguageModelV4StreamPart,
   LanguageModelV4StreamResult,
 } from "@ai-sdk/provider";
 
@@ -120,12 +121,22 @@ export class SamplingLanguageModel implements LanguageModelV4 {
       }
     }
 
+    // MCP sampling reports no token usage, so meter an estimate (~4 chars per
+    // token) — otherwise sampling spend would never reach the agent budget.
+    const inputChars =
+      (systemPrompt?.length ?? 0) + messages.reduce((n, m) => n + m.content.text.length, 0);
+
     return {
       content: [{ type: "text" as const, text }],
       finishReason: { unified: "stop" as const, raw: undefined },
       usage: {
-        inputTokens: { total: 0, noCache: undefined, cacheRead: undefined, cacheWrite: undefined },
-        outputTokens: { total: 0, text: undefined, reasoning: undefined },
+        inputTokens: {
+          total: Math.ceil(inputChars / 4),
+          noCache: undefined,
+          cacheRead: undefined,
+          cacheWrite: undefined,
+        },
+        outputTokens: { total: Math.ceil(text.length / 4), text: undefined, reasoning: undefined },
       },
       warnings: [],
     };
@@ -137,12 +148,12 @@ export class SamplingLanguageModel implements LanguageModelV4 {
     const textContent = result.content.find((c) => c.type === "text");
     const text = textContent && "text" in textContent ? textContent.text : "";
 
-    const stream = new ReadableStream({
+    const stream = new ReadableStream<LanguageModelV4StreamPart>({
       start(controller) {
         const id = `sampling-${Date.now()}`;
         controller.enqueue({ type: "stream-start", warnings: [] });
         controller.enqueue({ type: "text-start", id });
-        controller.enqueue({ type: "text-delta", id, textDelta: text });
+        controller.enqueue({ type: "text-delta", id, delta: text });
         controller.enqueue({ type: "text-end", id });
         controller.enqueue({
           type: "finish",

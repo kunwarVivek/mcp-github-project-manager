@@ -28,7 +28,7 @@ exactly like `pnpm run <script>`, and `npm test` like `pnpm test`.
 | E2E (mock) | `pnpm run test:e2e` · tools `pnpm run test:e2e:tools` |
 | E2E (live API) | `E2E_REAL_API=true pnpm run test:e2e:tools:real` · agent orchestration tiers: `pnpm run test:e2e:smoke` (~242 GraphQL pts) · `pnpm run test:e2e:full` (~4,500 of 5,000/h) |
 | E2E runner | `pnpm run e2e` — `--suite <name>`, `--real-api`, `--json <path>` (never `--testPathPattern`: Vitest 5 rejects it) |
-| Action sweep | `pnpm run test:e2e:sweep` · gate `pnpm run test:e2e:coverage` — every one of the 169 actions, no credentials needed |
+| Action sweep | `pnpm run test:e2e:sweep` · gate `pnpm run test:e2e:coverage` — every one of the <!-- count:actions -->175<!-- /count --> actions, no credentials needed |
 | Coverage | `pnpm run test:coverage` |
 | Lint / format | `pnpm run lint` (Biome) · `pnpm run format` |
 | Inspect MCP server | `pnpm run inspect` |
@@ -37,18 +37,36 @@ exactly like `pnpm run <script>`, and `npm test` like `pnpm test`.
 
 - `src/index.ts` — entry; boots an `McpServer` (`@modelcontextprotocol/server`
   v2, 2026-07-28 spec) via `serveStdio`, which negotiates the protocol revision
-  per connection. Each tool is registered with `registerTool`; all of them share
-  one `dispatchTool` carrying the shutdown gate, in-flight tracking and result
-  formatting. Wires `ToolRegistry` + `ProjectManagementService` through
-  `src/container.ts` (tsyringe DI).
-- Tool errors: an execution failure returns `{content, isError: true}` so the
-  model can see and recover from it. A JSON-RPC error is reserved for protocol
-  faults (unknown tool). Note v2 validates arguments against the declared
-  `inputSchema` *before* the handler runs, so `ToolValidator` never sees a
-  missing required field.
-- `src/domain/` — types, zod schemas, errors. No logic.
-- `src/services/` — business logic. `ProjectManagementService` orchestrates
-  per-feature services; `services/ai/` holds AI SDK providers.
+  per connection. Each of the <!-- count:tools -->21<!-- /count --> tools is registered with `registerTool`; all of them share
+  one `dispatchTool` carrying the shutdown gate and in-flight tracking, then
+  delegating to `ToolDispatcher` (`infrastructure/mcp/ToolDispatcher.ts`):
+  argument validation → budget gate → audited execution inside an OTel span →
+  budget debit → result formatting.
+- Composition root (`src/container.ts`, tsyringe): `configureContainer(auth,
+  owner, repo)` registers the components `index.ts` owns — `ResourceCache`,
+  `FilePersistenceAdapter`, `GitHubWebhookHandler`, `EventStore`,
+  `EventSubscriptionManager`, `GracefulShutdown`, `MutationAuditLog`,
+  `TelemetryConfig` — plus the services; `index.ts` resolves
+  them and constructs none by hand. **Documented exception:** tool executors
+  (`infrastructure/tools/**`) do NOT resolve from the container. They
+  self-construct through the one shared factory (`createGitHubFactory()` in
+  `tools/tool-factory.ts` / the shared-services accessor), which itself uses
+  `resolveGitHubAuth()`. Do not add a second construction path.
+- Tool errors: unknown tool is the only JSON-RPC error (`McpError`
+  MethodNotFound). Every other failure — invalid arguments (field-level
+  messages), GitHub API errors (`ToolValidator.mapGitHubError`: 401/403/404/422/
+  rate-limit/5xx with actionable text), exhausted agent budget (`BudgetExhausted`
+  with remaining/limit) — returns `{content, isError: true}` with the stable
+  code in `_meta.error`, so the model can recover. Note v2 validates arguments
+  against the declared `inputSchema` *before* the handler runs; `ToolValidator`
+  additionally applies parameter coercion and the zod schema.
+- Granular (per-operation) tools stay registered in `ToolRegistry` as internal
+  implementation contracts; only the compound tools are listed over MCP.
+- `src/domain/` — types, zod schemas, errors, and entity/value-object behavior
+  (rich entities). Imports nothing from `services/` or `infrastructure/`.
+- `src/services/` — business logic. `ProjectManagementService` is a thin
+  facade of typed per-feature service getters (no behavior of its own);
+  `services/ai/` holds AI SDK providers.
 - `src/infrastructure/` — `github/` (Octokit GraphQL/REST), `tools/` (MCP tool
   defs + registry + validators), plus cache, persistence, resilience, events.
 - `src/env.ts` + `src/cli.ts` — config. CLI flags override env vars.
@@ -63,18 +81,38 @@ exactly like `pnpm run <script>`, and `npm test` like `pnpm test`.
   (it is also off automatically under `NODE_ENV=test`, so tests never shell out).
 - GitHub App installation auth (optional, outranks the PAT when all three are
   set): `GITHUB_APP_ID`, `GITHUB_APP_PRIVATE_KEY`, `GITHUB_APP_INSTALLATION_ID`.
-  A partial App config falls back to the PAT rather than failing, so a half-set
-  environment cannot lock the server out.
+  A partial App config falls back to the PAT rather than failing, so a
+  half-set environment cannot lock the server out. With a complete App config
+  `GITHUB_TOKEN` is not required (startup validation accepts token OR App).
+  Code gets auth only via `resolveGitHubAuth()`
+  (`infrastructure/github/GitHubAuthResolver.ts`) and builds repositories only
+  via `GitHubRepositoryFactory.fromAuth(auth, owner, repo)`.
 - Every credential read goes through `getSecret()`/`requireToken()`. Do NOT read
   `process.env.GITHUB_TOKEN` directly — that bypasses the whole chain, which is
   exactly how `SECRETS_DIR` and `--token` were silently broken before.
 - AI (optional, unlocks AI tools): `ANTHROPIC_API_KEY`, `GOOGLE_API_KEY`,
   `OPENAI_API_KEY`, `PERPLEXITY_API_KEY`; model overrides `AI_MAIN_MODEL`,
-  `AI_PRD_MODEL`, `AI_RESEARCH_MODEL`, `AI_FALLBACK_MODEL`.
+  `AI_PRD_MODEL`, `AI_RESEARCH_MODEL`, `AI_FALLBACK_MODEL`. Embeddings (semantic
+  duplicate detection): `AI_EMBEDDING_MODEL` (default `text-embedding-3-small`),
+  `AI_EMBEDDING_API_KEY` (falls back to `OPENAI_API_KEY`; resolved through the
+  secret chain), `AI_EMBEDDING_BASE_URL` (OpenAI-compatible endpoint).
 - Optional: `SYNC_ENABLED`, `SYNC_TIMEOUT_MS`, `CACHE_DIRECTORY`,
   `WEBHOOK_SECRET`, `WEBHOOK_PORT`, `SSE_ENABLED`.
+- Rate limits: `RATE_LIMIT_FLOOR` (default 100) — below this many remaining
+  GraphQL points the client backs off proactively instead of burning the budget
+  and hitting a 403.
+- Observability: `AUDIT_LOG_ENABLED` / `AUDIT_LOG_PATH` write an append-only,
+  redacted JSONL record of every state-changing tool call (actor = agent id or
+  `token`); `OTEL_EXPORTER_OTLP_ENDPOINT` / `OTEL_SERVICE_NAME` enable OTLP
+  tracing (`tool.<name>` spans). Both flush in graceful shutdown.
 - Webhook security: signature validation fails closed. With no `WEBHOOK_SECRET`,
   webhooks are rejected unless `WEBHOOK_ALLOW_UNSIGNED=true` (trusted dev only).
+  The HTTP server is hardened by default, each with an opt-out/tuning var:
+  binds loopback (`WEBHOOK_HOST=0.0.0.0` to expose), `/events/*` needs
+  `EVENTS_AUTH_TOKEN` (or `EVENTS_ALLOW_UNAUTHENTICATED=true`, dev only; startup
+  warns when SSE is on with neither), CORS allow-list `WEBHOOK_ALLOWED_ORIGINS`,
+  rate limit `WEBHOOK_RATE_LIMIT` / `WEBHOOK_RATE_WINDOW_MS`, request timeout
+  `WEBHOOK_TIMEOUT_MS`, `X-Forwarded-For` only from `WEBHOOK_TRUSTED_PROXIES`.
 - Secrets: set `SECRETS_DIR` (e.g. `/run/secrets`) to load any config/secret from
   a file named after it (Docker/k8s secret convention), checked before env vars.
   `getSecret(name)` in `env.ts` reads fresh (rotation-aware). Vault/AWS SM are an
@@ -110,7 +148,7 @@ exactly like `pnpm run <script>`, and `npm test` like `pnpm test`.
   outright — `--testPathPattern` / `--testPathIgnorePatterns` exit with
   `CACError: Unknown option`, which silently broke 17 npm scripts. Filter by
   positional pattern (`vitest run ai-services`) and exclude with
-  `--exclude='**/tests/x/**'`.
+  `--exclude='**/e2e/**'`.
 - Test mocks must use `function`, not an arrow, wherever the code under test
   calls `new` — `mockImplementation(() => ({...}))` fails with
   "is not a constructor". Likewise a `beforeEach(() => x.mockReset())` with an

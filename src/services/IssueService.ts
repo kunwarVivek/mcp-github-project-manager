@@ -7,24 +7,18 @@ import type {
 } from "../domain/types";
 import { filterByStatus, parseResourceStatus } from "../domain/utils/StatusParser";
 import type { GitHubRepositoryFactory } from "../infrastructure/github/GitHubRepositoryFactory";
+import type {
+  DraftIssue,
+  GitHubDraftIssueRepository,
+} from "../infrastructure/github/repositories/GitHubDraftIssueRepository";
+import type {
+  GitHubIssueCommentRepository,
+  IssueComment,
+} from "../infrastructure/github/repositories/GitHubIssueCommentRepository";
 import type { GitHubIssueRepository } from "../infrastructure/github/repositories/GitHubIssueRepository";
 import { safeCall } from "./utils/safeCall";
 
-/** A GitHub issue comment as returned by the REST API. */
-export interface IssueComment {
-  id: number;
-  body: string;
-  user: string;
-  createdAt: string;
-  updatedAt: string;
-}
-
-/** A GitHub Projects v2 draft issue. */
-export interface DraftIssue {
-  id: string;
-  title: string;
-  body: string;
-}
+export type { DraftIssue, IssueComment };
 
 /**
  * IssueService handles issue CRUD, issue comments, and Projects v2 draft issues.
@@ -42,6 +36,14 @@ export class IssueService {
 
   private get issueRepo(): GitHubIssueRepository {
     return this.factory.createIssueRepository();
+  }
+
+  private get commentRepo(): GitHubIssueCommentRepository {
+    return this.factory.createIssueCommentRepository();
+  }
+
+  private get draftRepo(): GitHubDraftIssueRepository {
+    return this.factory.createDraftIssueRepository();
   }
 
   async createIssue(data: {
@@ -231,86 +233,24 @@ export class IssueService {
   }
 
   async createIssueComment(data: { issueNumber: number; body: string }): Promise<IssueComment> {
-    return safeCall(async () => {
-      const octokit = this.factory.getOctokit();
-      const config = this.factory.getConfig();
-
-      const response = await octokit.rest.issues.createComment({
-        owner: config.owner,
-        repo: config.repo,
-        issue_number: data.issueNumber,
-        body: data.body,
-      });
-
-      return {
-        id: response.data.id,
-        body: response.data.body || "",
-        user: response.data.user?.login || "unknown",
-        createdAt: response.data.created_at,
-        updatedAt: response.data.updated_at,
-      };
-    });
+    return safeCall(async () => this.commentRepo.create(data.issueNumber, data.body));
   }
 
   async updateIssueComment(data: { commentId: number; body: string }): Promise<IssueComment> {
-    return safeCall(async () => {
-      const octokit = this.factory.getOctokit();
-      const config = this.factory.getConfig();
-
-      const response = await octokit.rest.issues.updateComment({
-        owner: config.owner,
-        repo: config.repo,
-        comment_id: data.commentId,
-        body: data.body,
-      });
-
-      return {
-        id: response.data.id,
-        body: response.data.body || "",
-        user: response.data.user?.login || "unknown",
-        createdAt: response.data.created_at,
-        updatedAt: response.data.updated_at,
-      };
-    });
+    return safeCall(async () => this.commentRepo.update(data.commentId, data.body));
   }
 
   async deleteIssueComment(data: {
     commentId: number;
   }): Promise<{ success: boolean; message: string }> {
     return safeCall(async () => {
-      const octokit = this.factory.getOctokit();
-      const config = this.factory.getConfig();
-
-      await octokit.rest.issues.deleteComment({
-        owner: config.owner,
-        repo: config.repo,
-        comment_id: data.commentId,
-      });
-
+      await this.commentRepo.delete(data.commentId);
       return { success: true, message: `Comment ${data.commentId} deleted successfully` };
     });
   }
 
   async listIssueComments(data: { issueNumber: number; limit?: number }): Promise<IssueComment[]> {
-    return safeCall(async () => {
-      const octokit = this.factory.getOctokit();
-      const config = this.factory.getConfig();
-
-      const response = await octokit.rest.issues.listComments({
-        owner: config.owner,
-        repo: config.repo,
-        issue_number: data.issueNumber,
-        per_page: data.limit || 30,
-      });
-
-      return response.data.map((comment) => ({
-        id: comment.id,
-        body: comment.body || "",
-        user: comment.user?.login || "unknown",
-        createdAt: comment.created_at,
-        updatedAt: comment.updated_at,
-      }));
-    });
+    return safeCall(async () => this.commentRepo.list(data.issueNumber, data.limit || 30));
   }
 
   async createDraftIssue(data: {
@@ -319,45 +259,7 @@ export class IssueService {
     body?: string;
     assigneeIds?: string[];
   }): Promise<DraftIssue> {
-    return safeCall(async () => {
-      const mutation = `
-        mutation($input: AddProjectV2DraftIssueInput!) {
-          addProjectV2DraftIssue(input: $input) {
-            projectV2Item {
-              id
-              content {
-                ... on DraftIssue {
-                  id
-                  title
-                  body
-                }
-              }
-            }
-          }
-        }
-      `;
-
-      interface AddDraftIssueResponse {
-        addProjectV2DraftIssue: {
-          projectV2Item: {
-            id: string;
-            content: { id: string; title: string; body: string };
-          };
-        };
-      }
-
-      const response = await this.factory.graphql<AddDraftIssueResponse>(mutation, {
-        input: {
-          projectId: data.projectId,
-          title: data.title,
-          body: data.body || "",
-          assigneeIds: data.assigneeIds || [],
-        },
-      });
-
-      const content = response.addProjectV2DraftIssue.projectV2Item.content;
-      return { id: content.id, title: content.title, body: content.body };
-    });
+    return safeCall(async () => this.draftRepo.create(data));
   }
 
   async updateDraftIssue(data: {
@@ -366,49 +268,14 @@ export class IssueService {
     body?: string;
     assigneeIds?: string[];
   }): Promise<DraftIssue> {
-    return safeCall(async () => {
-      const mutation = `
-        mutation($input: UpdateProjectV2DraftIssueInput!) {
-          updateProjectV2DraftIssue(input: $input) {
-            draftIssue {
-              id
-              title
-              body
-            }
-          }
-        }
-      `;
-
-      interface UpdateDraftIssueResponse {
-        updateProjectV2DraftIssue: {
-          draftIssue: { id: string; title: string; body: string };
-        };
-      }
-
-      const input: Record<string, unknown> = { draftIssueId: data.draftIssueId };
-      if (data.title !== undefined) input.title = data.title;
-      if (data.body !== undefined) input.body = data.body;
-      if (data.assigneeIds !== undefined) input.assigneeIds = data.assigneeIds;
-
-      const response = await this.factory.graphql<UpdateDraftIssueResponse>(mutation, { input });
-      const draftIssue = response.updateProjectV2DraftIssue.draftIssue;
-      return { id: draftIssue.id, title: draftIssue.title, body: draftIssue.body };
-    });
+    return safeCall(async () => this.draftRepo.update(data));
   }
 
   async deleteDraftIssue(data: {
     draftIssueId: string;
   }): Promise<{ success: boolean; message: string }> {
     return safeCall(async () => {
-      const mutation = `
-        mutation($input: DeleteProjectV2DraftIssueInput!) {
-          deleteProjectV2DraftIssue(input: $input) {
-            draftIssue { id }
-          }
-        }
-      `;
-
-      await this.factory.graphql(mutation, { input: { draftIssueId: data.draftIssueId } });
+      await this.draftRepo.delete(data.draftIssueId);
       return { success: true, message: `Draft issue ${data.draftIssueId} deleted successfully` };
     });
   }

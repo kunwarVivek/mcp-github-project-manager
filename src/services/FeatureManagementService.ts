@@ -6,16 +6,16 @@ import type {
   PRDDocument,
   ProjectFeatureRoadmap,
   TaskLifecycleState,
-} from "../domain/ai-types.js";
-import type { TaskBlocker } from "../domain/feature-lifecycle-types.js";
-import { AIServiceFactory } from "./ai/AIServiceFactory.js";
+} from "../domain/ai-types";
+import type { TaskBlocker } from "../domain/feature-lifecycle-types";
+import { AIServiceFactory } from "./ai/AIServiceFactory";
 import {
   type FeatureAnalysisResult,
   FeatureAnalysisService,
-} from "./feature/FeatureAnalysisService.js";
-import { FeatureExpansionService } from "./feature/FeatureExpansionService.js";
-import { FeaturePRDService } from "./feature/FeaturePRDService.js";
-import { TaskLifecycleService } from "./feature/TaskLifecycleService.js";
+} from "./feature/FeatureAnalysisService";
+import { FeatureExpansionService } from "./feature/FeatureExpansionService";
+import { FeaturePRDService } from "./feature/FeaturePRDService";
+import { TaskLifecycleService } from "./feature/TaskLifecycleService";
 import { safeCall } from "./utils/safeCall";
 
 /**

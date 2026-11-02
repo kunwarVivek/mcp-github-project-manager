@@ -3,7 +3,7 @@ import { DomainError } from "../../../domain/errors";
 import { ResourceStatus } from "../../../domain/resource-types";
 import type { Issue } from "../../../domain/types";
 import type { GitHubRepositoryFactory } from "../../../infrastructure/github/GitHubRepositoryFactory";
-import { SubIssueService } from "../../../services/SubIssueService";
+import { mapTimelineToHistory, SubIssueService } from "../../../services/SubIssueService";
 import type { AsyncFn } from "../../helpers/mockTypes";
 
 // Mock the factory
@@ -19,6 +19,15 @@ describe("SubIssueService", () => {
   };
   let mockMilestoneRepo: {
     findById: Mock<AsyncFn>;
+  };
+  let mockSubIssueRepo: {
+    getIssueNodeId: Mock<AsyncFn>;
+    addSubIssue: Mock<AsyncFn>;
+    listSubIssues: Mock<AsyncFn>;
+    getParentIssue: Mock<AsyncFn>;
+    reprioritizeSubIssue: Mock<AsyncFn>;
+    removeSubIssue: Mock<AsyncFn>;
+    getIssueTimeline: Mock<AsyncFn>;
   };
 
   const mockIssue: Issue = {
@@ -48,10 +57,21 @@ describe("SubIssueService", () => {
       findById: vi.fn(),
     };
 
+    mockSubIssueRepo = {
+      getIssueNodeId: vi.fn(),
+      addSubIssue: vi.fn(),
+      listSubIssues: vi.fn(),
+      getParentIssue: vi.fn(),
+      reprioritizeSubIssue: vi.fn(),
+      removeSubIssue: vi.fn(),
+      getIssueTimeline: vi.fn(),
+    };
+
     // Create mock factory
     mockFactory = {
       createIssueRepository: vi.fn().mockReturnValue(mockIssueRepo),
       createMilestoneRepository: vi.fn().mockReturnValue(mockMilestoneRepo),
+      createSubIssueRepository: vi.fn().mockReturnValue(mockSubIssueRepo),
     } as unknown as Mocked<GitHubRepositoryFactory>;
 
     // Create service with mock factory
@@ -191,20 +211,224 @@ describe("SubIssueService", () => {
   });
 
   describe("getIssueHistory", () => {
-    it("should return history entries for issue", async () => {
+    it("reads the timeline of the issue by number and maps it", async () => {
       mockIssueRepo.findById.mockResolvedValue(mockIssue);
+      mockSubIssueRepo.getIssueTimeline.mockResolvedValue([
+        {
+          __typename: "ClosedEvent",
+          id: "CE_1",
+          createdAt: "2024-01-03T00:00:00Z",
+          actor: { login: "octocat" },
+          stateReason: "COMPLETED",
+        },
+      ]);
 
       const result = await service.getIssueHistory("issue-1");
 
-      expect(result).toHaveLength(2);
-      expect(result[0].action).toBe("created");
-      expect(result[1].action).toBe("updated");
+      expect(mockSubIssueRepo.getIssueTimeline).toHaveBeenCalledWith(mockIssue.number);
+      expect(result).toEqual([
+        {
+          id: "CE_1",
+          action: "closed",
+          timestamp: "2024-01-03T00:00:00Z",
+          actor: "octocat",
+          changes: { stateReason: "COMPLETED" },
+        },
+      ]);
     });
 
     it("should throw error when issue not found", async () => {
       mockIssueRepo.findById.mockResolvedValue(null);
 
       await expect(service.getIssueHistory("non-existent")).rejects.toThrow(DomainError);
+      expect(mockSubIssueRepo.getIssueTimeline).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("mapTimelineToHistory", () => {
+    const base = { id: "N_1", createdAt: "2024-02-01T00:00:00Z", actor: { login: "alice" } };
+
+    it.each([
+      [{ __typename: "LabeledEvent", label: { name: "bug" } }, "labeled", { label: "bug" }],
+      [{ __typename: "UnlabeledEvent", label: { name: "bug" } }, "unlabeled", { label: "bug" }],
+      [
+        { __typename: "AssignedEvent", assignee: { login: "bob" } },
+        "assigned",
+        { assignee: "bob" },
+      ],
+      [
+        { __typename: "UnassignedEvent", assignee: { login: "bob" } },
+        "unassigned",
+        { assignee: "bob" },
+      ],
+      [
+        { __typename: "ClosedEvent", stateReason: "NOT_PLANNED" },
+        "closed",
+        { stateReason: "NOT_PLANNED" },
+      ],
+      [{ __typename: "ReopenedEvent" }, "reopened", {}],
+      [{ __typename: "MilestonedEvent", milestoneTitle: "v1" }, "milestoned", { milestone: "v1" }],
+      [
+        { __typename: "DemilestonedEvent", milestoneTitle: "v1" },
+        "demilestoned",
+        { milestone: "v1" },
+      ],
+      [
+        { __typename: "RenamedTitleEvent", previousTitle: "a", currentTitle: "b" },
+        "renamed",
+        { title: { from: "a", to: "b" } },
+      ],
+      [
+        { __typename: "AddedToProjectV2Event", project: { title: "Roadmap" } },
+        "added_to_project",
+        { project: "Roadmap" },
+      ],
+      [
+        { __typename: "RemovedFromProjectV2Event", project: { title: "Roadmap" } },
+        "removed_from_project",
+        { project: "Roadmap" },
+      ],
+      [
+        {
+          __typename: "ProjectV2ItemStatusChangedEvent",
+          project: { title: "Roadmap" },
+          previousStatus: "Todo",
+          status: "Done",
+        },
+        "project_status_changed",
+        { project: "Roadmap", status: { from: "Todo", to: "Done" } },
+      ],
+      [
+        {
+          __typename: "CrossReferencedEvent",
+          source: { __typename: "PullRequest", number: 7, title: "Fix", url: "http://pr" },
+        },
+        "cross_referenced",
+        { source: { type: "PullRequest", number: 7, title: "Fix", url: "http://pr" } },
+      ],
+      [{ __typename: "IssueComment", url: "http://c" }, "commented", { url: "http://c" }],
+      [
+        { __typename: "SubIssueAddedEvent", subIssue: { number: 2, title: "Sub" } },
+        "sub_issue_added",
+        { subIssue: { number: 2, title: "Sub" } },
+      ],
+      [
+        { __typename: "SubIssueRemovedEvent", subIssue: { number: 2, title: "Sub" } },
+        "sub_issue_removed",
+        { subIssue: { number: 2, title: "Sub" } },
+      ],
+      [
+        { __typename: "ParentIssueAddedEvent", parent: { number: 1, title: "P" } },
+        "parent_issue_added",
+        { parent: { number: 1, title: "P" } },
+      ],
+      [
+        { __typename: "ParentIssueRemovedEvent", parent: { number: 1, title: "P" } },
+        "parent_issue_removed",
+        { parent: { number: 1, title: "P" } },
+      ],
+    ])("maps %j", (partial, action, changes) => {
+      const [entry] = mapTimelineToHistory([{ ...base, ...partial }]);
+      expect(entry).toEqual({
+        id: "N_1",
+        action,
+        timestamp: "2024-02-01T00:00:00Z",
+        actor: "alice",
+        changes,
+      });
+    });
+
+    it("uses the comment author as actor and 'unknown' when there is none", () => {
+      const [comment, ghost] = mapTimelineToHistory([
+        { __typename: "IssueComment", id: "C_1", createdAt: "t", author: { login: "carol" } },
+        { __typename: "ReopenedEvent", id: "R_1", createdAt: "t", actor: null },
+      ]);
+      expect(comment.actor).toBe("carol");
+      expect(ghost.actor).toBe("unknown");
+    });
+
+    it("skips unknown event kinds without throwing", () => {
+      expect(
+        mapTimelineToHistory([
+          { __typename: "SomeFutureEvent", id: "X", createdAt: "t" },
+          { __typename: "ReopenedEvent", id: "R_1", createdAt: "t" },
+        ])
+      ).toHaveLength(1);
+    });
+  });
+
+  describe("sub-issue hierarchy", () => {
+    const subIssueResult = {
+      issue: { id: "I_parent", title: "Parent" },
+      subIssue: { id: "I_sub", number: 2, title: "Sub", state: "OPEN" as const, url: "http://u" },
+    };
+
+    beforeEach(() => {
+      mockSubIssueRepo.getIssueNodeId.mockImplementation(async (n: unknown) => `I_${n}`);
+    });
+
+    it("addSubIssue resolves both numbers to node IDs and forwards replaceParent", async () => {
+      mockSubIssueRepo.addSubIssue.mockResolvedValue(subIssueResult);
+
+      const result = await service.addSubIssue(1, 2, true);
+
+      expect(result).toBe(subIssueResult);
+      expect(mockSubIssueRepo.addSubIssue).toHaveBeenCalledWith("I_1", "I_2", true);
+    });
+
+    it("addSubIssue defaults replaceParent to false", async () => {
+      mockSubIssueRepo.addSubIssue.mockResolvedValue(subIssueResult);
+
+      await service.addSubIssue(1, 2);
+
+      expect(mockSubIssueRepo.addSubIssue).toHaveBeenCalledWith("I_1", "I_2", false);
+    });
+
+    it("listSubIssues forwards node ID, page size and cursor", async () => {
+      mockSubIssueRepo.listSubIssues.mockResolvedValue({ subIssues: [] });
+
+      await service.listSubIssues(7, 5, "cursor");
+      await service.listSubIssues(7);
+
+      expect(mockSubIssueRepo.listSubIssues).toHaveBeenNthCalledWith(1, "I_7", 5, "cursor");
+      expect(mockSubIssueRepo.listSubIssues).toHaveBeenNthCalledWith(2, "I_7", 20, undefined);
+    });
+
+    it("getParentIssue returns null when there is no parent", async () => {
+      mockSubIssueRepo.getParentIssue.mockResolvedValue(null);
+
+      expect(await service.getParentIssue(3)).toBeNull();
+      expect(mockSubIssueRepo.getParentIssue).toHaveBeenCalledWith("I_3");
+    });
+
+    it("reprioritizeSubIssue resolves the optional after-issue only when given", async () => {
+      mockSubIssueRepo.reprioritizeSubIssue.mockResolvedValue(subIssueResult);
+
+      await service.reprioritizeSubIssue(1, 2);
+      await service.reprioritizeSubIssue(1, 2, 3);
+
+      expect(mockSubIssueRepo.reprioritizeSubIssue).toHaveBeenNthCalledWith(
+        1,
+        "I_1",
+        "I_2",
+        undefined
+      );
+      expect(mockSubIssueRepo.reprioritizeSubIssue).toHaveBeenNthCalledWith(2, "I_1", "I_2", "I_3");
+    });
+
+    it("removeSubIssue unlinks using node IDs", async () => {
+      mockSubIssueRepo.removeSubIssue.mockResolvedValue(undefined);
+
+      await service.removeSubIssue(1, 2);
+
+      expect(mockSubIssueRepo.removeSubIssue).toHaveBeenCalledWith("I_1", "I_2");
+    });
+
+    it("maps node ID resolution failures", async () => {
+      mockSubIssueRepo.getIssueNodeId.mockRejectedValue(new Error("Issue #9 not found"));
+
+      await expect(service.addSubIssue(9, 2)).rejects.toThrow();
+      expect(mockSubIssueRepo.addSubIssue).not.toHaveBeenCalled();
     });
   });
 });

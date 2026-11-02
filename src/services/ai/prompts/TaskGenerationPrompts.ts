@@ -1,8 +1,11 @@
+import type { PromptRegistry } from "./PromptRegistry";
+
 /**
- * Prompts for AI Task Generation and Management
+ * Prompts for AI Task Generation and Management.
+ * Templates use {{variable}} placeholders and are served through the PromptRegistry.
  */
 
-export const TASK_GENERATION_SYSTEM_PROMPT = `You are an expert project manager and software development lead specializing in breaking down complex projects into manageable, actionable tasks. Your role is to analyze requirements and create comprehensive task lists that development teams can execute efficiently.
+const TASK_GENERATION_SYSTEM_PROMPT = `You are an expert project manager and software development lead specializing in breaking down complex projects into manageable, actionable tasks. Your role is to analyze requirements and create comprehensive task lists that development teams can execute efficiently.
 
 Key responsibilities:
 - Break down features into specific, actionable tasks
@@ -20,12 +23,12 @@ Guidelines:
 - Identify potential blockers and dependencies
 - Ensure tasks are properly sized for the team's capacity`;
 
-export const GENERATE_TASKS_FROM_PRD_PROMPT = `Based on the following PRD, generate a comprehensive list of development tasks that need to be completed to build this product.
+const GENERATE_TASKS_FROM_PRD_PROMPT = `Based on the following PRD, generate a comprehensive list of development tasks that need to be completed to build this product.
 
-PRD Content: {prdContent}
-Maximum Tasks: {maxTasks}
-Include Subtasks: {includeSubtasks}
-Auto Estimate: {autoEstimate}
+PRD Content: {{prdContent}}
+Maximum Tasks: {{maxTasks}}
+Include Subtasks: {{includeSubtasks}}
+Auto Estimate: {{autoEstimate}}
 
 Please create tasks that cover:
 
@@ -71,12 +74,12 @@ For each task, provide:
 
 Return as a structured JSON array of AITask objects.`;
 
-export const EXPAND_TASK_INTO_SUBTASKS_PROMPT = `Break down the following task into smaller, more manageable subtasks.
+const EXPAND_TASK_INTO_SUBTASKS_PROMPT = `Break down the following task into smaller, more manageable subtasks.
 
-Task: {taskTitle}
-Description: {taskDescription}
-Current Complexity: {currentComplexity}
-Max Subtask Depth: {maxDepth}
+Task: {{taskTitle}}
+Description: {{taskDescription}}
+Current Complexity: {{currentComplexity}}
+Max Subtask Depth: {{maxDepth}}
 
 Create subtasks that:
 
@@ -101,11 +104,11 @@ For each subtask, provide:
 
 Return as a structured JSON array of SubTask objects.`;
 
-export const ANALYZE_TASK_COMPLEXITY_PROMPT = `Analyze the complexity of the following task and provide a detailed assessment.
+const ANALYZE_TASK_COMPLEXITY_PROMPT = `Analyze the complexity of the following task and provide a detailed assessment.
 
-Task: {taskTitle}
-Description: {taskDescription}
-Current Estimate: {currentEstimate}
+Task: {{taskTitle}}
+Description: {{taskDescription}}
+Current Estimate: {{currentEstimate}}
 
 Please evaluate complexity based on:
 
@@ -142,9 +145,9 @@ Provide:
 
 Return as a structured analysis with specific recommendations.`;
 
-export const SUGGEST_TASK_DEPENDENCIES_PROMPT = `Analyze the following list of tasks and suggest dependencies between them.
+const SUGGEST_TASK_DEPENDENCIES_PROMPT = `Analyze the following list of tasks and suggest dependencies between them.
 
-Tasks: {taskList}
+Tasks: {{taskList}}
 
 For each task, identify:
 
@@ -167,12 +170,12 @@ For each dependency, provide:
 
 Return as a structured JSON object mapping task IDs to their dependencies.`;
 
-export const PRIORITIZE_TASKS_PROMPT = `Prioritize the following list of tasks based on business value, technical dependencies, and project goals.
+const PRIORITIZE_TASKS_PROMPT = `Prioritize the following list of tasks based on business value, technical dependencies, and project goals.
 
-Tasks: {taskList}
-Project Goals: {projectGoals}
-Timeline: {timeline}
-Team Size: {teamSize}
+Tasks: {{taskList}}
+Project Goals: {{projectGoals}}
+Timeline: {{timeline}}
+Team Size: {{teamSize}}
 
 Prioritization criteria:
 1. **Business Value** - Impact on user experience and business objectives
@@ -196,12 +199,12 @@ Consider:
 
 Return as a structured JSON array with prioritized tasks and reasoning.`;
 
-export const ESTIMATE_TASK_EFFORT_PROMPT = `Provide detailed effort estimates for the following task.
+const ESTIMATE_TASK_EFFORT_PROMPT = `Provide detailed effort estimates for the following task.
 
-Task: {taskTitle}
-Description: {taskDescription}
-Complexity: {complexity}
-Team Experience: {teamExperience}
+Task: {{taskTitle}}
+Description: {{taskDescription}}
+Complexity: {{complexity}}
+Team Experience: {{teamExperience}}
 
 Break down the effort estimate into:
 
@@ -241,63 +244,69 @@ Provide:
 
 Return as a structured estimate with detailed breakdown.`;
 
-/**
- * Helper function to format task generation prompts
- */
-export function formatTaskPrompt(template: string, variables: Record<string, unknown>): string {
-  let formatted = template;
+export const TASK_PROMPT_IDS = {
+  system: "task.system",
+  generateFromPRD: "task.generate-from-prd",
+  expandIntoSubtasks: "task.expand-into-subtasks",
+  analyzeComplexity: "task.analyze-complexity",
+  suggestDependencies: "task.suggest-dependencies",
+  prioritize: "task.prioritize",
+  estimateEffort: "task.estimate-effort",
+} as const;
 
-  for (const [key, value] of Object.entries(variables)) {
-    const placeholder = `{${key}}`;
-    const stringValue = typeof value === "object" ? JSON.stringify(value) : String(value);
-    formatted = formatted.replace(new RegExp(placeholder, "g"), stringValue);
-  }
-
-  return formatted;
+/** Register every task prompt (version 1.0.0). */
+export function registerTaskPrompts(registry: PromptRegistry): void {
+  registry.register(TASK_PROMPT_IDS.system, "1.0.0", TASK_GENERATION_SYSTEM_PROMPT);
+  registry.register(TASK_PROMPT_IDS.generateFromPRD, "1.0.0", GENERATE_TASKS_FROM_PRD_PROMPT);
+  registry.register(TASK_PROMPT_IDS.expandIntoSubtasks, "1.0.0", EXPAND_TASK_INTO_SUBTASKS_PROMPT);
+  registry.register(TASK_PROMPT_IDS.analyzeComplexity, "1.0.0", ANALYZE_TASK_COMPLEXITY_PROMPT);
+  registry.register(TASK_PROMPT_IDS.suggestDependencies, "1.0.0", SUGGEST_TASK_DEPENDENCIES_PROMPT);
+  registry.register(TASK_PROMPT_IDS.prioritize, "1.0.0", PRIORITIZE_TASKS_PROMPT);
+  registry.register(TASK_PROMPT_IDS.estimateEffort, "1.0.0", ESTIMATE_TASK_EFFORT_PROMPT);
 }
 
 /**
- * Task generation prompt configurations
+ * Task generation prompt configurations: registry ids plus generation settings.
  */
 export const TASK_PROMPT_CONFIGS = {
   generateFromPRD: {
-    systemPrompt: TASK_GENERATION_SYSTEM_PROMPT,
-    userPrompt: GENERATE_TASKS_FROM_PRD_PROMPT,
+    systemPromptId: TASK_PROMPT_IDS.system,
+    userPromptId: TASK_PROMPT_IDS.generateFromPRD,
     maxTokens: 4000,
     temperature: 0.6,
   },
 
   expandTask: {
-    systemPrompt: TASK_GENERATION_SYSTEM_PROMPT,
-    userPrompt: EXPAND_TASK_INTO_SUBTASKS_PROMPT,
+    systemPromptId: TASK_PROMPT_IDS.system,
+    userPromptId: TASK_PROMPT_IDS.expandIntoSubtasks,
     maxTokens: 2000,
     temperature: 0.5,
   },
 
   analyzeComplexity: {
-    systemPrompt: TASK_GENERATION_SYSTEM_PROMPT,
-    userPrompt: ANALYZE_TASK_COMPLEXITY_PROMPT,
+    systemPromptId: TASK_PROMPT_IDS.system,
+    userPromptId: TASK_PROMPT_IDS.analyzeComplexity,
     maxTokens: 1500,
     temperature: 0.4,
   },
 
   suggestDependencies: {
-    systemPrompt: TASK_GENERATION_SYSTEM_PROMPT,
-    userPrompt: SUGGEST_TASK_DEPENDENCIES_PROMPT,
+    systemPromptId: TASK_PROMPT_IDS.system,
+    userPromptId: TASK_PROMPT_IDS.suggestDependencies,
     maxTokens: 2000,
     temperature: 0.5,
   },
 
   prioritizeTasks: {
-    systemPrompt: TASK_GENERATION_SYSTEM_PROMPT,
-    userPrompt: PRIORITIZE_TASKS_PROMPT,
+    systemPromptId: TASK_PROMPT_IDS.system,
+    userPromptId: TASK_PROMPT_IDS.prioritize,
     maxTokens: 2500,
     temperature: 0.6,
   },
 
   estimateEffort: {
-    systemPrompt: TASK_GENERATION_SYSTEM_PROMPT,
-    userPrompt: ESTIMATE_TASK_EFFORT_PROMPT,
+    systemPromptId: TASK_PROMPT_IDS.system,
+    userPromptId: TASK_PROMPT_IDS.estimateEffort,
     maxTokens: 1500,
     temperature: 0.4,
   },

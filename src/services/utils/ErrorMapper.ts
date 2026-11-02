@@ -1,6 +1,6 @@
 import {
   DomainError,
-  GitHubAPIError,
+  GitHubApiError,
   RateLimitError,
   ResourceNotFoundError,
   UnauthorizedError,
@@ -21,7 +21,7 @@ export function mapErrorToMCPError(error: unknown): Error {
   if (error instanceof UnauthorizedError) {
     return new DomainError(`${MCPErrorCode.UNAUTHORIZED}: ${error.message}`);
   }
-  if (error instanceof GitHubAPIError) {
+  if (error instanceof GitHubApiError) {
     return new DomainError(`${MCPErrorCode.INTERNAL_ERROR}: GitHub API Error - ${error.message}`);
   }
   return new DomainError(

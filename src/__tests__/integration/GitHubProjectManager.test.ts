@@ -14,7 +14,7 @@ const shouldSkip = process.env.GITHUB_TOKEN === undefined;
     const repo = process.env.GITHUB_REPO || "test-repo";
     const token = process.env.GITHUB_TOKEN || "test-token";
 
-    config = new GitHubConfig(owner, repo, token);
+    config = new GitHubConfig(owner, repo, { kind: "pat", token: token });
   });
 
   it("should create proper config from environment variables", () => {

@@ -36,7 +36,7 @@ async function planSprint() {
     const service = createProjectManagementService(
       process.env.GITHUB_OWNER ?? "",
       process.env.GITHUB_REPO ?? "",
-      process.env.GITHUB_TOKEN ?? ""
+      { kind: "pat", token: process.env.GITHUB_TOKEN ?? "" }
     );
 
     console.log("Planning a sprint...");
@@ -52,7 +52,7 @@ async function planSprint() {
     endDate.setDate(startDate.getDate() + 14); // 2-week sprint
 
     // Plan a sprint with the specified issues
-    const result = await service.planSprint({
+    const result = await service.sprints.planSprint({
       sprint: {
         title: "Sprint 1: Project Setup",
         description: "Complete the initial project setup and implement core functionality",

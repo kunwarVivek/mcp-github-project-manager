@@ -9,14 +9,12 @@ import {
   type TaskDependency,
   TaskPriority,
   TaskStatus,
-} from "../../domain/ai-types.js";
-import { type ILogger, Logger } from "../../infrastructure/logger";
-import { AIServiceFactory } from "../ai/AIServiceFactory.js";
-import {
-  FEATURE_PROMPT_CONFIGS,
-  formatFeaturePrompt,
-} from "../ai/prompts/FeatureAdditionPrompts.js";
-import { TaskGenerationService } from "../TaskGenerationService.js";
+} from "../../domain/ai-types";
+import { getLogger, type ILogger } from "../../infrastructure/logger";
+import { AIServiceFactory } from "../ai/AIServiceFactory";
+import { defaultPromptRegistry } from "../ai/prompts";
+import { FEATURE_PROMPT_CONFIGS } from "../ai/prompts/FeatureAdditionPrompts";
+import { TaskGenerationService } from "../TaskGenerationService";
 import { InputSanitizer } from "../utils/InputSanitizer";
 import { safeCall } from "../utils/safeCall";
 
@@ -39,12 +37,12 @@ export class FeatureExpansionService {
    * @param taskService - Optional injected TaskGenerationService for dependency detection.
    *   Falls back to a new instance using the provided aiFactory when omitted.
    * @param logger - Logger instance for diagnostics. When omitted, defaults to
-   *   the global singleton via `Logger.getInstance()`.
+   *   a prefixed console logger via `getLogger()`.
    */
   constructor(aiFactory?: AIServiceFactory, taskService?: TaskGenerationService, logger?: ILogger) {
     this.aiFactory = aiFactory ?? AIServiceFactory.getInstance();
     this.taskService = taskService ?? new TaskGenerationService(this.aiFactory);
-    this.logger = logger ?? Logger.getInstance();
+    this.logger = logger ?? getLogger("FeatureExpansionService");
   }
 
   /**
@@ -67,7 +65,7 @@ export class FeatureExpansionService {
         );
       }
 
-      const prompt = formatFeaturePrompt(config.userPrompt, {
+      const prompt = defaultPromptRegistry.render(config.userPromptId, {
         featureTitle: InputSanitizer.sanitizeText(params.feature.title),
         featureDescription: InputSanitizer.sanitizeIssueContent(params.feature.description),
         userStories: params.feature.userStories.join("\n"),
@@ -80,7 +78,7 @@ export class FeatureExpansionService {
 
       const result = await generateObject({
         model,
-        system: config.systemPrompt,
+        system: defaultPromptRegistry.render(config.systemPromptId),
         prompt,
         schema: z.array(AITaskSchema),
         maxOutputTokens: config.maxTokens,

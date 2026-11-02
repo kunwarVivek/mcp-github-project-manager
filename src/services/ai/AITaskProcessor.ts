@@ -20,9 +20,10 @@ import { type ILogger, Logger } from "../../infrastructure/logger";
 import { InputSanitizer } from "../utils/InputSanitizer";
 import { AIServiceFactory } from "./AIServiceFactory";
 import { ConfidenceScorer } from "./ConfidenceScorer";
-import { CONFIDENCE_PROMPT_CONFIGS, withConfidenceAssessment } from "./prompts/ConfidencePrompts";
-import { formatPrompt, PRD_PROMPT_CONFIGS } from "./prompts/PRDGenerationPrompts";
-import { formatTaskPrompt, TASK_PROMPT_CONFIGS } from "./prompts/TaskGenerationPrompts";
+import { defaultPromptRegistry } from "./prompts";
+import { CONFIDENCE_PROMPT_IDS, withConfidenceAssessment } from "./prompts/ConfidencePrompts";
+import { PRD_PROMPT_CONFIGS } from "./prompts/PRDGenerationPrompts";
+import { TASK_PROMPT_CONFIGS } from "./prompts/TaskGenerationPrompts";
 
 /** `LanguageModel` is either a gateway model id string or a model object. */
 function modelIdOf(model: LanguageModel): string {
@@ -103,7 +104,7 @@ export class AITaskProcessor {
     const config = PRD_PROMPT_CONFIGS.generateFromIdea;
     const model = this.getModelWithFallback("prd");
 
-    const prompt = formatPrompt(config.userPrompt, {
+    const prompt = defaultPromptRegistry.render(config.userPromptId, {
       projectIdea: InputSanitizer.sanitizePRDContent(params.projectIdea),
       targetUsers: InputSanitizer.sanitizeText(params.targetUsers || "General users"),
       timeline: InputSanitizer.sanitizeText(params.timeline || "3-6 months"),
@@ -113,7 +114,7 @@ export class AITaskProcessor {
     try {
       const result = await generateObject({
         model,
-        system: config.systemPrompt,
+        system: defaultPromptRegistry.render(config.systemPromptId),
         prompt,
         schema: PRDDocumentSchema,
         maxOutputTokens: config.maxTokens,
@@ -160,12 +161,12 @@ export class AITaskProcessor {
     const model = this.getModelWithFallback("prd");
 
     const prompt =
-      formatPrompt(prdConfig.userPrompt, {
+      defaultPromptRegistry.render(prdConfig.userPromptId, {
         projectIdea: InputSanitizer.sanitizePRDContent(params.projectIdea),
         targetUsers: InputSanitizer.sanitizeText(params.targetUsers || "General users"),
         timeline: InputSanitizer.sanitizeText(params.timeline || "3-6 months"),
         complexity: InputSanitizer.sanitizeText(params.complexity || "medium"),
-      }) + CONFIDENCE_PROMPT_CONFIGS.selfAssessmentSuffix;
+      }) + defaultPromptRegistry.render(CONFIDENCE_PROMPT_IDS.selfAssessmentSuffix);
 
     // Use schema with confidence assessment
     const PRDWithConfidenceSchema = withConfidenceAssessment(PRDDocumentSchema);
@@ -173,7 +174,7 @@ export class AITaskProcessor {
     try {
       const result = await generateObject({
         model,
-        system: prdConfig.systemPrompt,
+        system: defaultPromptRegistry.render(prdConfig.systemPromptId),
         prompt,
         schema: PRDWithConfidenceSchema,
         maxOutputTokens: prdConfig.maxTokens + 500, // Extra tokens for confidence
@@ -271,7 +272,7 @@ export class AITaskProcessor {
     const config = PRD_PROMPT_CONFIGS.enhanceExisting;
     const model = this.getModelWithFallback("prd");
 
-    const prompt = formatPrompt(config.userPrompt, {
+    const prompt = defaultPromptRegistry.render(config.userPromptId, {
       currentPRD: InputSanitizer.sanitizePRDContent(params.currentPRD),
       enhancementType: InputSanitizer.sanitizeText(params.enhancementType),
       focusAreas: params.focusAreas?.join(", ") || "general improvements",
@@ -280,7 +281,7 @@ export class AITaskProcessor {
     try {
       const result = await generateObject({
         model,
-        system: config.systemPrompt,
+        system: defaultPromptRegistry.render(config.systemPromptId),
         prompt,
         schema: PRDDocumentSchema,
         maxOutputTokens: config.maxTokens,
@@ -308,14 +309,14 @@ export class AITaskProcessor {
     const config = PRD_PROMPT_CONFIGS.extractFeatures;
     const model = this.getModelWithFallback("main");
 
-    const prompt = formatPrompt(config.userPrompt, {
+    const prompt = defaultPromptRegistry.render(config.userPromptId, {
       prdContent: InputSanitizer.sanitizePRDContent(prdContent),
     });
 
     try {
       const result = await generateObject({
         model,
-        system: config.systemPrompt,
+        system: defaultPromptRegistry.render(config.systemPromptId),
         prompt,
         schema: z.array(FeatureRequirementSchema),
         maxOutputTokens: config.maxTokens,
@@ -346,16 +347,16 @@ export class AITaskProcessor {
     const config = TASK_PROMPT_CONFIGS.generateFromPRD;
     const model = this.getModelWithFallback("main");
 
-    const prompt = formatTaskPrompt(config.userPrompt, {
+    const prompt = defaultPromptRegistry.render(config.userPromptId, {
       prdContent: InputSanitizer.sanitizePRDContent(params.prdContent),
-      maxTasks: params.maxTasks || 30,
-      includeSubtasks: params.includeSubtasks || true,
-      autoEstimate: params.autoEstimate || true,
+      maxTasks: String(params.maxTasks || 30),
+      includeSubtasks: String(params.includeSubtasks || true),
+      autoEstimate: String(params.autoEstimate || true),
     });
     try {
       const result = await generateObject({
         model,
-        system: config.systemPrompt,
+        system: defaultPromptRegistry.render(config.systemPromptId),
         prompt,
         schema: z.array(AITaskSchema),
         maxOutputTokens: config.maxTokens,
@@ -400,10 +401,10 @@ export class AITaskProcessor {
     const config = TASK_PROMPT_CONFIGS.analyzeComplexity;
     const model = this.getModelWithFallback("main");
 
-    const prompt = formatTaskPrompt(config.userPrompt, {
+    const prompt = defaultPromptRegistry.render(config.userPromptId, {
       taskTitle: InputSanitizer.sanitizeTaskContent(params.taskTitle),
       taskDescription: InputSanitizer.sanitizeTaskContent(params.taskDescription),
-      currentEstimate: params.currentEstimate || "not provided",
+      currentEstimate: String(params.currentEstimate || "not provided"),
     });
 
     try {
@@ -417,7 +418,7 @@ export class AITaskProcessor {
 
       const result = await generateObject({
         model,
-        system: config.systemPrompt,
+        system: defaultPromptRegistry.render(config.systemPromptId),
         prompt,
         schema: ComplexitySchema,
         maxOutputTokens: config.maxTokens,
@@ -449,11 +450,11 @@ export class AITaskProcessor {
     const config = TASK_PROMPT_CONFIGS.expandTask;
     const model = this.getModelWithFallback("main");
 
-    const prompt = formatTaskPrompt(config.userPrompt, {
+    const prompt = defaultPromptRegistry.render(config.userPromptId, {
       taskTitle: InputSanitizer.sanitizeTaskContent(params.taskTitle),
       taskDescription: InputSanitizer.sanitizeTaskContent(params.taskDescription),
-      currentComplexity: params.currentComplexity,
-      maxDepth: params.maxDepth,
+      currentComplexity: String(params.currentComplexity),
+      maxDepth: String(params.maxDepth),
     });
 
     try {
@@ -470,7 +471,7 @@ export class AITaskProcessor {
 
       const result = await generateObject({
         model,
-        system: config.systemPrompt,
+        system: defaultPromptRegistry.render(config.systemPromptId),
         prompt,
         schema: SubtaskSchema,
         maxOutputTokens: config.maxTokens,
@@ -522,15 +523,17 @@ export class AITaskProcessor {
     const config = TASK_PROMPT_CONFIGS.prioritizeTasks;
     const model = this.getModelWithFallback("main");
 
-    const prompt = formatTaskPrompt(config.userPrompt, {
-      taskList: params.tasks.map((t) => ({
-        id: t.id,
-        title: InputSanitizer.sanitizeTaskContent(t.title),
-        description: InputSanitizer.sanitizeTaskContent(t.description),
-      })),
+    const prompt = defaultPromptRegistry.render(config.userPromptId, {
+      taskList: JSON.stringify(
+        params.tasks.map((t) => ({
+          id: t.id,
+          title: InputSanitizer.sanitizeTaskContent(t.title),
+          description: InputSanitizer.sanitizeTaskContent(t.description),
+        }))
+      ),
       projectGoals: InputSanitizer.sanitizeText(params.projectGoals || "Deliver MVP quickly"),
       timeline: InputSanitizer.sanitizeText(params.timeline || "3 months"),
-      teamSize: params.teamSize || 3,
+      teamSize: String(params.teamSize || 3),
     });
 
     try {
@@ -545,7 +548,7 @@ export class AITaskProcessor {
 
       const result = await generateObject({
         model,
-        system: config.systemPrompt,
+        system: defaultPromptRegistry.render(config.systemPromptId),
         prompt,
         schema: PrioritySchema,
         maxOutputTokens: config.maxTokens,

@@ -24,10 +24,8 @@ import type {
 import { InputSanitizer } from "../utils/InputSanitizer";
 import { AIServiceFactory } from "./AIServiceFactory";
 import { calculateWeightedScore, getConfidenceTier } from "./ConfidenceScorer";
-import {
-  formatLabelPrompt,
-  LABEL_SUGGESTION_SYSTEM_PROMPT,
-} from "./prompts/IssueIntelligencePrompts";
+import { defaultPromptRegistry } from "./prompts";
+import { ISSUE_PROMPT_IDS, labelPromptVariables } from "./prompts/IssueIntelligencePrompts";
 
 // ============================================================================
 // Zod Schemas for AI Response Validation
@@ -132,13 +130,16 @@ export class LabelSuggestionService {
     try {
       const result = await generateObject({
         model,
-        system: LABEL_SUGGESTION_SYSTEM_PROMPT,
-        prompt: formatLabelPrompt({
-          issueTitle: InputSanitizer.sanitizeIssueContent(params.issueTitle),
-          issueDescription: InputSanitizer.sanitizeIssueContent(params.issueDescription),
-          existingLabels: params.existingLabels,
-          issueHistory: params.issueHistory,
-        }),
+        system: defaultPromptRegistry.render(ISSUE_PROMPT_IDS.labelSuggestionSystem),
+        prompt: defaultPromptRegistry.render(
+          ISSUE_PROMPT_IDS.labelSuggestionUser,
+          labelPromptVariables({
+            issueTitle: InputSanitizer.sanitizeIssueContent(params.issueTitle),
+            issueDescription: InputSanitizer.sanitizeIssueContent(params.issueDescription),
+            existingLabels: params.existingLabels,
+            issueHistory: params.issueHistory,
+          })
+        ),
         schema: AILabelResponseSchema,
         temperature: 0.3, // Low temperature for consistent labeling
       });

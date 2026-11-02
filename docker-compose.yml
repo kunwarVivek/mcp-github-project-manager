@@ -21,6 +21,9 @@ services:
       # Optional — Webhook/SSE server
       - WEBHOOK_SECRET=${WEBHOOK_SECRET:-}
       - WEBHOOK_PORT=${WEBHOOK_PORT:-3000}
+      # Containers must bind all interfaces for the published port to be reachable
+      - WEBHOOK_HOST=${WEBHOOK_HOST:-0.0.0.0}
+      - EVENTS_AUTH_TOKEN=${EVENTS_AUTH_TOKEN:-}
       - WEBHOOK_ALLOWED_ORIGINS=${WEBHOOK_ALLOWED_ORIGINS:-}
       - SSE_ENABLED=${SSE_ENABLED:-false}
       # Optional — Sync and caching

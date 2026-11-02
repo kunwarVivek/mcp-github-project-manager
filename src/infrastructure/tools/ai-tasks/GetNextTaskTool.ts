@@ -1,135 +1,98 @@
 import { z } from "zod";
 import type { MCPResponse } from "../../../domain/mcp-types.js";
+import {
+  type NextTaskResult,
+  NextTaskService,
+  type TaskRecommendation,
+} from "../../../services/NextTaskService.js";
 import { ANNOTATION_PATTERNS } from "../annotations/tool-annotations.js";
 import { NextTaskOutputSchema } from "../schemas/ai-schemas.js";
 import { ToolResultFormatter } from "../ToolResultFormatter.js";
-import type { ToolDefinition, ToolSchema } from "../ToolValidator.js";
+import { type ToolDefinition, type ToolSchema, ToolValidator } from "../ToolValidator.js";
+import { createGitHubFactory } from "../tool-factory.js";
 
 // Schema for get_next_task tool
 const getNextTaskSchema = z.object({
-  projectId: z.string().optional().describe("Filter tasks by specific project ID"),
-  featureId: z.string().optional().describe("Filter tasks by specific feature ID"),
+  projectId: z
+    .string()
+    .optional()
+    .describe(
+      "GitHub project node ID whose items are ranked (uses its Status/Priority/Complexity/Estimate fields); without it the configured repository's issues are used"
+    ),
+  featureId: z
+    .string()
+    .optional()
+    .describe("Only tasks labelled with this feature ID or `feature:<featureId>`"),
   assignee: z.string().optional().describe("Filter tasks for specific team member"),
   teamSkills: z
     .array(z.string())
     .optional()
-    .describe("Team skills to match against task requirements"),
+    .describe("Team skills; tasks carrying matching labels rank higher within the same priority"),
   sprintCapacity: z.number().optional().describe("Available hours in current sprint (default: 40)"),
   currentPhase: z
     .enum(["planning", "development", "testing", "review", "deployment"])
     .optional()
-    .describe("Focus on tasks in specific phase"),
+    .describe("Only tasks whose Status or a label places them in this phase"),
   excludeBlocked: z.boolean().default(true).describe("Whether to exclude blocked tasks"),
   maxComplexity: z
     .number()
     .min(1)
     .max(10)
     .optional()
-    .describe("Maximum task complexity to consider"),
-  includeAnalysis: z.boolean().default(true).describe("Whether to include detailed AI analysis"),
+    .describe(
+      "Maximum task complexity (Complexity project field or `complexity:N` label); tasks with no known complexity are kept"
+    ),
+  includeAnalysis: z.boolean().default(true).describe("Whether to include the data summary"),
   limit: z.number().min(1).max(20).default(5).describe("Maximum number of tasks to recommend"),
 });
 
 export type GetNextTaskArgs = z.infer<typeof getNextTaskSchema>;
 
-interface RecommendedTask {
-  id: string;
-  title: string;
-  description: string;
-  priority: string;
-  complexity: number;
-  estimatedHours: number;
-  status: string;
-  dependencies: string[];
-  tags: string[];
-}
-
 interface SprintMetrics {
+  /** Hours of the recommended tasks that carry an hour estimate. */
   totalHours: number;
+  /** Recommended tasks without an hour estimate (not counted in totalHours). */
+  unestimatedTasks: number;
   sprintCapacity: number;
-  sprintFit: boolean;
+  /** Null when no recommended task carries an hour estimate. */
+  sprintFit: boolean | null;
   filtersApplied: string[];
 }
 
 /**
  * Implementation function for get_next_task tool
  */
-async function executeGetNextTask(args: GetNextTaskArgs): Promise<MCPResponse> {
+async function executeGetNextTask(rawArgs: unknown): Promise<MCPResponse> {
+  const args = ToolValidator.validate(
+    "get_next_task",
+    rawArgs,
+    getNextTaskSchema as unknown as ToolSchema<GetNextTaskArgs>
+  );
   try {
-    // For now, create mock tasks for demonstration
-    // In a full implementation, this would integrate with ResourceManager
-    const mockTasks: RecommendedTask[] = [
-      {
-        id: "task-1",
-        title: "Set up project infrastructure",
-        description: "Initialize project structure, CI/CD, and development environment",
-        priority: "high",
-        complexity: 4,
-        estimatedHours: 8,
-        status: "pending",
-        dependencies: [],
-        tags: ["setup", "infrastructure"],
-      },
-      {
-        id: "task-2",
-        title: "Implement user authentication",
-        description: "Create login, registration, and password reset functionality",
-        priority: "critical",
-        complexity: 6,
-        estimatedHours: 16,
-        status: "pending",
-        dependencies: ["task-1"],
-        tags: ["auth", "security"],
-      },
-      {
-        id: "task-3",
-        title: "Design database schema",
-        description: "Create database tables and relationships for core entities",
-        priority: "high",
-        complexity: 5,
-        estimatedHours: 12,
-        status: "pending",
-        dependencies: ["task-1"],
-        tags: ["database", "design"],
-      },
-    ];
+    const service = new NextTaskService(createGitHubFactory());
+    const result = await service.recommend({
+      projectId: args.projectId,
+      featureId: args.featureId,
+      assignee: args.assignee,
+      teamSkills: args.teamSkills,
+      currentPhase: args.currentPhase,
+      excludeBlocked: args.excludeBlocked,
+      maxComplexity: args.maxComplexity,
+      limit: args.limit,
+    });
+    const recommendations = result.recommendations;
 
-    // Apply filters
-    let filteredTasks = mockTasks;
+    const estimated = recommendations.filter((task) => task.estimatedHours !== undefined);
+    const totalHours = estimated.reduce((sum, task) => sum + (task.estimatedHours ?? 0), 0);
+    const sprintCapacity = args.sprintCapacity ?? 40;
+    const sprintFit = estimated.length > 0 ? totalHours <= sprintCapacity : null;
+    const unestimatedTasks = recommendations.length - estimated.length;
 
-    const maxComplexity = args.maxComplexity;
-    if (maxComplexity) {
-      filteredTasks = filteredTasks.filter((task) => task.complexity <= maxComplexity);
-    }
+    const analysis = args.includeAnalysis ? generateTaskAnalysis(recommendations, result) : null;
 
-    if (args.assignee) {
-      // Would filter by assignee in real implementation
-    }
-
-    // Get recommendations (simplified)
-    const recommendations = filteredTasks
-      .sort((a, b) => {
-        // Sort by priority first, then complexity
-        const priorityOrder = { critical: 4, high: 3, medium: 2, low: 1 };
-        const priorityDiff =
-          (priorityOrder[b.priority as keyof typeof priorityOrder] || 0) -
-          (priorityOrder[a.priority as keyof typeof priorityOrder] || 0);
-        if (priorityDiff !== 0) return priorityDiff;
-        return a.complexity - b.complexity; // Prefer lower complexity
-      })
-      .slice(0, args.limit);
-
-    // Calculate sprint fit
-    const totalHours = recommendations.reduce((sum, task) => sum + task.estimatedHours, 0);
-    const sprintCapacity = args.sprintCapacity || 40;
-    const sprintFit = totalHours <= sprintCapacity;
-
-    // Generate AI analysis
-    const analysis = args.includeAnalysis ? generateTaskAnalysis(recommendations, args) : null;
-
-    // Format response
     const summary = formatNextTaskRecommendations(recommendations, analysis, {
       totalHours,
+      unestimatedTasks,
       sprintCapacity,
       sprintFit,
       filtersApplied: getAppliedFilters(args),
@@ -141,7 +104,11 @@ async function executeGetNextTask(args: GetNextTaskArgs): Promise<MCPResponse> {
       analysis,
       metrics: {
         totalTasks: recommendations.length,
+        candidateCount: result.candidateCount,
+        blockedCount: result.blockedCount,
+        source: result.source,
         totalHours,
+        unestimatedTasks,
         sprintCapacity,
         sprintFit,
       },
@@ -156,26 +123,27 @@ async function executeGetNextTask(args: GetNextTaskArgs): Promise<MCPResponse> {
 }
 
 /**
- * Generate AI analysis for task recommendations
+ * Summarise the recommendations from what the data says (no generated advice).
  */
-function generateTaskAnalysis(tasks: RecommendedTask[], _args: GetNextTaskArgs): string {
-  const highComplexityTasks = tasks.filter((task) => task.complexity >= 7).length;
-  const setupTasks = tasks.filter((task) => task.tags.includes("setup")).length;
+function generateTaskAnalysis(tasks: TaskRecommendation[], result: NextTaskResult): string {
+  const source = result.source === "project" ? "project items" : "repository issues";
+  const lines = [
+    `Read ${result.candidateCount} open ${source} matching the filters; ${result.blockedCount} skipped because an open issue blocks them.`,
+  ];
 
-  let analysis = "Based on current project state and team capacity:\n\n";
-
-  if (setupTasks > 0) {
-    analysis += "• Start with infrastructure/setup tasks to establish foundation\n";
+  const unprioritised = tasks.filter((task) => task.priority === undefined).length;
+  if (unprioritised > 0) {
+    lines.push(
+      `${unprioritised} recommended task(s) have no priority (Priority field or priority: label), so they follow the prioritised ones.`
+    );
   }
-
-  if (highComplexityTasks > 0) {
-    analysis += "• Consider breaking down complex tasks before starting\n";
+  const complex = tasks.filter((task) => (task.complexity ?? 0) >= 7).length;
+  if (complex > 0) {
+    lines.push(
+      `${complex} recommended task(s) have complexity 7 or more; consider \`expand_task\`.`
+    );
   }
-
-  analysis += "• Focus on high-priority items to deliver maximum value\n";
-  analysis += "• Ensure dependencies are resolved before starting dependent tasks";
-
-  return analysis;
+  return lines.join("\n");
 }
 
 /**
@@ -195,7 +163,7 @@ function getAppliedFilters(args: GetNextTaskArgs): string[] {
  * Format task recommendations summary
  */
 function formatNextTaskRecommendations(
-  tasks: RecommendedTask[],
+  tasks: TaskRecommendation[],
   analysis: string | null,
   metrics: SprintMetrics
 ): string {
@@ -204,9 +172,9 @@ function formatNextTaskRecommendations(
     "",
     "## Overview",
     `**Recommended Tasks:** ${tasks.length}`,
-    `**Total Effort:** ${metrics.totalHours} hours`,
+    `**Total Effort:** ${metrics.totalHours} hours${metrics.unestimatedTasks > 0 ? ` (${metrics.unestimatedTasks} task(s) without an hour estimate not counted)` : ""}`,
     `**Sprint Capacity:** ${metrics.sprintCapacity} hours`,
-    `**Sprint Fit:** ${metrics.sprintFit ? "✅ Fits in sprint" : "⚠️ Exceeds capacity"}`,
+    `**Sprint Fit:** ${metrics.sprintFit === null ? "Unknown (no hour estimates on the recommended tasks)" : metrics.sprintFit ? "✅ Fits in sprint" : "⚠️ Exceeds capacity"}`,
     "",
   ];
 
@@ -241,8 +209,19 @@ function formatNextTaskRecommendations(
     tasks.forEach((task, index) => {
       sections.push(
         `### ${index + 1}. ${task.title}`,
-        `**Priority:** ${task.priority} | **Complexity:** ${task.complexity}/10 | **Effort:** ${task.estimatedHours}h`,
+        [
+          `**Priority:** ${task.priority ?? "not set"}`,
+          task.complexity !== undefined ? `**Complexity:** ${task.complexity}/10` : null,
+          task.estimatedHours !== undefined
+            ? `**Effort:** ${task.estimatedHours}h`
+            : task.estimate !== undefined
+              ? `**Estimate:** ${task.estimate}`
+              : null,
+        ]
+          .filter((part) => part !== null)
+          .join(" | "),
         `**Status:** ${task.status}`,
+        `**Why:** ${task.reason}`,
         ""
       );
 
@@ -251,7 +230,7 @@ function formatNextTaskRecommendations(
       }
 
       if (task.dependencies.length > 0) {
-        sections.push(`**Dependencies:** ${task.dependencies.length} items`, "");
+        sections.push(`**Blockers:** ${task.dependencies.map((n) => `#${n}`).join(", ")}`, "");
       }
 
       if (task.tags.length > 0) {
@@ -263,7 +242,8 @@ function formatNextTaskRecommendations(
 
     // Priority breakdown
     const priorityBreakdown = tasks.reduce<Record<string, number>>((acc, task) => {
-      acc[task.priority] = (acc[task.priority] || 0) + 1;
+      const priority = task.priority ?? "not set";
+      acc[priority] = (acc[priority] || 0) + 1;
       return acc;
     }, {});
 
@@ -307,7 +287,7 @@ export const getNextTaskTool: ToolDefinition<
   name: "get_next_task",
   title: "Get Next Task",
   description:
-    "Get AI-powered recommendations for the next task to work on based on priorities, dependencies, team capacity, and current project state",
+    "Recommend the next tasks to work on from real project/repository data: open items only, not blocked by open issues (unless excludeBlocked=false), ranked by priority, team-skill match, complexity, estimate and age/board order",
   schema: getNextTaskSchema as unknown as ToolSchema<GetNextTaskArgs>,
   outputSchema: NextTaskOutputSchema,
   annotations: {

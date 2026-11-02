@@ -1,36 +1,8 @@
-import { ResourceNotFoundError } from "../../domain/errors";
+import { GitHubApiError, RateLimitError, ResourceNotFoundError } from "../../domain/errors";
 import { MCPErrorCode } from "../../domain/mcp-types";
 import { ResourceType } from "../../domain/resource-types";
 import { isGitHubErrorWithCode } from "../../domain/type-guards";
 import type { GitHubError } from "./types";
-
-export class GitHubApiError extends Error {
-  constructor(
-    public readonly message: string,
-    public readonly status?: number,
-    public readonly code?: string,
-    public readonly mcpErrorCode: MCPErrorCode = MCPErrorCode.INTERNAL_ERROR,
-    public readonly details?: Record<string, unknown>
-  ) {
-    super(message);
-    this.name = "GitHubApiError";
-  }
-}
-
-export class GitHubRateLimitError extends GitHubApiError {
-  constructor(
-    message: string,
-    public readonly resetDate: Date,
-    details?: Record<string, unknown>
-  ) {
-    super(message, 429, "RATE_LIMIT_EXCEEDED", MCPErrorCode.RATE_LIMITED, {
-      resetAt: resetDate.toISOString(),
-      resetAtFormatted: resetDate.toLocaleString(),
-      ...details,
-    });
-    this.name = "GitHubRateLimitError";
-  }
-}
 
 interface RetryDelay {
   jitter: number;
@@ -97,7 +69,7 @@ export class GitHubErrorHandler {
           ? new Date(parseInt(resetTimestamp, 10) * 1000)
           : new Date(Date.now() + 60000); // Default to 1 minute from now
 
-        return new GitHubRateLimitError(
+        return new RateLimitError(
           `GitHub API rate limit exceeded${contextMessage}. Reset at ${resetDate.toLocaleTimeString()}`,
           resetDate
         );

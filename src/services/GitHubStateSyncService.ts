@@ -1,7 +1,7 @@
 import { ResourceType, type SyncMetadata } from "../domain/resource-types";
 import type { ResourceCache } from "../infrastructure/cache/ResourceCache";
 import type { GitHubRepositoryFactory } from "../infrastructure/github/GitHubRepositoryFactory";
-import { type ILogger, Logger } from "../infrastructure/logger/index";
+import { getLogger, type ILogger } from "../infrastructure/logger";
 import type { FilePersistenceAdapter } from "../infrastructure/persistence/FilePersistenceAdapter";
 
 // SyncMetadata moved to domain/resource-types to break the infra->service cycle.
@@ -22,24 +22,30 @@ export interface SyncOptions {
   batchSize: number;
 }
 
+/** The subset of ResourceCache the sync service uses (structurally satisfied by ResourceCache). */
+export type SyncResourceCache = Pick<ResourceCache, "get" | "set">;
+
+/** The subset of FilePersistenceAdapter the sync service uses. */
+export type SyncMetadataStore = Pick<FilePersistenceAdapter, "loadMetadata" | "saveMetadata">;
+
 export class GitHubStateSyncService {
   private readonly logger: ILogger;
-  private readonly cache: ResourceCache;
-  private readonly persistence: FilePersistenceAdapter;
+  private readonly cache: SyncResourceCache;
+  private readonly persistence: SyncMetadataStore;
   private readonly factory: GitHubRepositoryFactory;
   private syncInProgress = false;
   private lastSyncTime?: Date;
 
   constructor(
     factory: GitHubRepositoryFactory,
-    cache: ResourceCache,
-    persistence: FilePersistenceAdapter,
+    cache: SyncResourceCache,
+    persistence: SyncMetadataStore,
     logger?: ILogger
   ) {
     this.factory = factory;
     this.cache = cache;
     this.persistence = persistence;
-    this.logger = logger ?? Logger.getInstance();
+    this.logger = logger ?? getLogger("GitHubStateSyncService");
   }
 
   /**
@@ -167,7 +173,7 @@ export class GitHubStateSyncService {
     }
 
     // If resource not in cache, needs sync
-    const cached = this.cache.get(metadata.resourceType, metadata.resourceId);
+    const cached = await this.cache.get(metadata.resourceType, metadata.resourceId);
     if (!cached) {
       return true;
     }

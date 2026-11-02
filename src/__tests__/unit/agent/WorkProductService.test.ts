@@ -3,6 +3,7 @@ import type { WorkProduct } from "../../../domain/agent-orchestration-types";
 import type { WorkProductStore } from "../../../infrastructure/agent/WorkProductStore";
 import type { GitHubRepositoryFactory } from "../../../infrastructure/github/GitHubRepositoryFactory";
 import { WorkProductService } from "../../../services/agent/WorkProductService";
+import { asFactory } from "../../helpers/mockTypes";
 
 vi.mock("../../../infrastructure/github/GitHubRepositoryFactory", () => {
   const mockFactory = vi.fn().mockImplementation(function () {
@@ -104,7 +105,7 @@ describe("WorkProductService", () => {
     };
 
     service = new WorkProductService(
-      mockFactory as unknown as GitHubRepositoryFactory,
+      asFactory(mockFactory),
       mockStore as unknown as WorkProductStore
     );
   });

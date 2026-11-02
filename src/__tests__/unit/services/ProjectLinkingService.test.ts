@@ -1,44 +1,50 @@
 import { beforeEach, describe, expect, it, type Mock, vi } from "vitest";
 import { ResourceType } from "../../../domain/resource-types";
 import { ProjectLinkingService } from "../../../services/ProjectLinkingService";
-import { asFactory, type GraphqlFn } from "../../helpers/mockTypes";
+import { type AsyncFn, asFactory } from "../../helpers/mockTypes";
+
+type LinkingRepoMethod =
+  | "addItem"
+  | "removeItem"
+  | "archiveItem"
+  | "unarchiveItem"
+  | "listItems"
+  | "linkRepository"
+  | "unlinkRepository"
+  | "linkTeam"
+  | "unlinkTeam"
+  | "listRepositories"
+  | "listTeams";
 
 describe("ProjectLinkingService", () => {
   let service: ProjectLinkingService;
-  let mockGraphql: Mock<GraphqlFn>;
+  let repo: Record<LinkingRepoMethod, Mock<AsyncFn>>;
 
   beforeEach(() => {
     vi.clearAllMocks();
 
-    // Create mock GraphQL function
-    mockGraphql = vi.fn<GraphqlFn>();
-
-    // Create mock factory
-    const mockFactory = {
-      graphql: mockGraphql,
+    repo = {
+      addItem: vi.fn(),
+      removeItem: vi.fn(),
+      archiveItem: vi.fn(),
+      unarchiveItem: vi.fn(),
+      listItems: vi.fn(),
+      linkRepository: vi.fn(),
+      unlinkRepository: vi.fn(),
+      linkTeam: vi.fn(),
+      unlinkTeam: vi.fn(),
+      listRepositories: vi.fn(),
+      listTeams: vi.fn(),
     };
 
-    // Create service with mock factory
-    service = new ProjectLinkingService(asFactory(mockFactory));
-  });
-
-  it("should be properly initialized", () => {
-    expect(service).toBeDefined();
+    service = new ProjectLinkingService(
+      asFactory({ createProjectLinkingRepository: vi.fn().mockReturnValue(repo) })
+    );
   });
 
   describe("addProjectItem", () => {
-    it("should add an issue to project successfully", async () => {
-      mockGraphql.mockResolvedValueOnce({
-        addProjectV2ItemById: {
-          item: {
-            id: "ITEM_123",
-            content: {
-              id: "ISSUE_456",
-              title: "Test Issue",
-            },
-          },
-        },
-      });
+    it("builds an issue ProjectItem from the repository result", async () => {
+      repo.addItem.mockResolvedValueOnce({ itemId: "ITEM_123", contentId: "ISSUE_456" });
 
       const result = await service.addProjectItem({
         projectId: "PROJECT_123",
@@ -46,6 +52,7 @@ describe("ProjectLinkingService", () => {
         contentType: "issue",
       });
 
+      expect(repo.addItem).toHaveBeenCalledWith("PROJECT_123", "ISSUE_456");
       expect(result).toEqual(
         expect.objectContaining({
           id: "ITEM_123",
@@ -55,29 +62,10 @@ describe("ProjectLinkingService", () => {
           fieldValues: {},
         })
       );
-      expect(mockGraphql).toHaveBeenCalledWith(
-        expect.stringContaining("mutation($input: AddProjectV2ItemByIdInput!)"),
-        expect.objectContaining({
-          input: {
-            projectId: "PROJECT_123",
-            contentId: "ISSUE_456",
-          },
-        })
-      );
     });
 
-    it("should add a pull request to project successfully", async () => {
-      mockGraphql.mockResolvedValueOnce({
-        addProjectV2ItemById: {
-          item: {
-            id: "ITEM_789",
-            content: {
-              id: "PR_101",
-              title: "Test PR",
-            },
-          },
-        },
-      });
+    it("marks pull request content as a pull request", async () => {
+      repo.addItem.mockResolvedValueOnce({ itemId: "ITEM_789", contentId: "PR_101" });
 
       const result = await service.addProjectItem({
         projectId: "PROJECT_123",
@@ -88,8 +76,8 @@ describe("ProjectLinkingService", () => {
       expect(result.contentType).toBe(ResourceType.PULL_REQUEST);
     });
 
-    it("should handle GraphQL errors when adding item", async () => {
-      mockGraphql.mockRejectedValueOnce(new Error("Content not found"));
+    it("maps repository errors", async () => {
+      repo.addItem.mockRejectedValueOnce(new Error("Content not found"));
 
       await expect(
         service.addProjectItem({
@@ -97,322 +85,154 @@ describe("ProjectLinkingService", () => {
           contentId: "NONEXISTENT",
           contentType: "issue",
         })
-      ).rejects.toThrow();
+      ).rejects.toThrow("Content not found");
     });
   });
 
-  describe("removeProjectItem", () => {
-    it("should remove item from project successfully", async () => {
-      mockGraphql.mockResolvedValueOnce({
-        deleteProjectV2Item: {
-          deletedItemId: "ITEM_123",
-        },
-      });
-
+  describe("item removal and archiving", () => {
+    it("removes an item", async () => {
       const result = await service.removeProjectItem({
         projectId: "PROJECT_123",
         itemId: "ITEM_123",
       });
 
+      expect(repo.removeItem).toHaveBeenCalledWith("PROJECT_123", "ITEM_123");
       expect(result).toEqual({
         success: true,
         message: "Item ITEM_123 has been removed from project PROJECT_123",
       });
-      expect(mockGraphql).toHaveBeenCalledWith(
-        expect.stringContaining("mutation($input: DeleteProjectV2ItemInput!)"),
-        expect.objectContaining({
-          input: {
-            projectId: "PROJECT_123",
-            itemId: "ITEM_123",
-          },
-        })
-      );
     });
 
-    it("should handle errors when removing non-existent item", async () => {
-      mockGraphql.mockRejectedValueOnce(new Error("Item not found"));
-
-      await expect(
-        service.removeProjectItem({
-          projectId: "PROJECT_123",
-          itemId: "NONEXISTENT",
-        })
-      ).rejects.toThrow();
-    });
-  });
-
-  describe("archiveProjectItem", () => {
-    it("should archive item successfully", async () => {
-      mockGraphql.mockResolvedValueOnce({
-        archiveProjectV2Item: {
-          item: {
-            id: "ITEM_123",
-            isArchived: true,
-          },
-        },
-      });
-
+    it("archives an item", async () => {
       const result = await service.archiveProjectItem({
         projectId: "PROJECT_123",
         itemId: "ITEM_123",
       });
 
+      expect(repo.archiveItem).toHaveBeenCalledWith("PROJECT_123", "ITEM_123");
       expect(result).toEqual({
         success: true,
         message: "Item ITEM_123 has been archived in project PROJECT_123",
       });
-      expect(mockGraphql).toHaveBeenCalledWith(
-        expect.stringContaining("mutation($input: ArchiveProjectV2ItemInput!)"),
-        expect.objectContaining({
-          input: {
-            projectId: "PROJECT_123",
-            itemId: "ITEM_123",
-          },
-        })
-      );
     });
 
-    it("should handle archive errors", async () => {
-      mockGraphql.mockRejectedValueOnce(new Error("Archive failed"));
-
-      await expect(
-        service.archiveProjectItem({
-          projectId: "PROJECT_123",
-          itemId: "ITEM_123",
-        })
-      ).rejects.toThrow();
-    });
-  });
-
-  describe("unarchiveProjectItem", () => {
-    it("should unarchive item successfully", async () => {
-      mockGraphql.mockResolvedValueOnce({
-        unarchiveProjectV2Item: {
-          item: {
-            id: "ITEM_123",
-            isArchived: false,
-          },
-        },
-      });
-
+    it("unarchives an item", async () => {
       const result = await service.unarchiveProjectItem({
         projectId: "PROJECT_123",
         itemId: "ITEM_123",
       });
 
+      expect(repo.unarchiveItem).toHaveBeenCalledWith("PROJECT_123", "ITEM_123");
       expect(result).toEqual({
         success: true,
         message: "Item ITEM_123 has been unarchived in project PROJECT_123",
       });
-      expect(mockGraphql).toHaveBeenCalledWith(
-        expect.stringContaining("mutation($input: UnarchiveProjectV2ItemInput!)"),
-        expect.objectContaining({
-          input: {
-            projectId: "PROJECT_123",
-            itemId: "ITEM_123",
-          },
-        })
-      );
     });
 
-    it("should handle unarchive errors", async () => {
-      mockGraphql.mockRejectedValueOnce(new Error("Unarchive failed"));
+    it("maps errors from the repository", async () => {
+      repo.removeItem.mockRejectedValueOnce(new Error("Item not found"));
 
       await expect(
-        service.unarchiveProjectItem({
-          projectId: "PROJECT_123",
-          itemId: "ITEM_123",
-        })
-      ).rejects.toThrow();
+        service.removeProjectItem({ projectId: "PROJECT_123", itemId: "NONEXISTENT" })
+      ).rejects.toThrow("Item not found");
     });
   });
 
   describe("listProjectItems", () => {
-    it("should list project items successfully", async () => {
-      mockGraphql.mockResolvedValueOnce({
-        node: {
-          items: {
-            nodes: [
-              {
-                id: "ITEM_1",
-                content: {
-                  id: "ISSUE_1",
-                  title: "Issue 1",
-                  __typename: "Issue",
-                },
-                fieldValues: {
-                  nodes: [
-                    {
-                      text: "Some text",
-                      field: { id: "FIELD_1", name: "Description" },
-                    },
-                  ],
-                },
-              },
-              {
-                id: "ITEM_2",
-                content: {
-                  id: "PR_1",
-                  title: "PR 1",
-                  __typename: "PullRequest",
-                },
-                fieldValues: {
-                  nodes: [],
-                },
-              },
-            ],
-          },
-        },
-      });
+    it("defaults the limit to 50", async () => {
+      repo.listItems.mockResolvedValueOnce([]);
 
-      const result = await service.listProjectItems({ projectId: "PROJECT_123" });
+      await service.listProjectItems({ projectId: "PROJECT_123" });
 
-      expect(result).toHaveLength(2);
-      expect(result[0]).toEqual(
-        expect.objectContaining({
-          id: "ITEM_1",
-          contentId: "ISSUE_1",
-          contentType: ResourceType.ISSUE,
-          projectId: "PROJECT_123",
-        })
-      );
-      expect(result[0].fieldValues).toHaveProperty("FIELD_1", "Some text");
-      expect(result[1]).toEqual(
-        expect.objectContaining({
-          id: "ITEM_2",
-          contentId: "PR_1",
-          contentType: ResourceType.PULL_REQUEST,
-        })
-      );
+      expect(repo.listItems).toHaveBeenCalledWith("PROJECT_123", 50);
     });
 
-    it("should respect limit parameter", async () => {
-      mockGraphql.mockResolvedValueOnce({
-        node: {
-          items: {
-            nodes: [],
-          },
-        },
+    it("passes an explicit limit and returns the repository items", async () => {
+      const items = [{ id: "ITEM_1" }];
+      repo.listItems.mockResolvedValueOnce(items);
+
+      const result = await service.listProjectItems({ projectId: "PROJECT_123", limit: 10 });
+
+      expect(repo.listItems).toHaveBeenCalledWith("PROJECT_123", 10);
+      expect(result).toBe(items);
+    });
+  });
+
+  describe("repository and team links", () => {
+    it("links a repository", async () => {
+      const linked = { id: "R_1", name: "hello-world" };
+      repo.linkRepository.mockResolvedValueOnce(linked);
+
+      const result = await service.linkProjectToRepository({
+        projectId: "PVT_1",
+        owner: "octocat",
+        repo: "hello-world",
       });
 
-      await service.listProjectItems({ projectId: "PROJECT_123", limit: 10 });
-
-      expect(mockGraphql).toHaveBeenCalledWith(
-        expect.any(String),
-        expect.objectContaining({
-          projectId: "PROJECT_123",
-          limit: 10,
-        })
-      );
+      expect(repo.linkRepository).toHaveBeenCalledWith("PVT_1", "octocat", "hello-world");
+      expect(result).toBe(linked);
     });
 
-    it("should return empty array when project has no items", async () => {
-      mockGraphql.mockResolvedValueOnce({
-        node: {
-          items: {
-            nodes: [],
-          },
-        },
+    it("reports the unlinked repository in the message", async () => {
+      const result = await service.unlinkProjectFromRepository({
+        projectId: "PVT_1",
+        owner: "octocat",
+        repo: "hello-world",
       });
 
-      const result = await service.listProjectItems({ projectId: "PROJECT_123" });
-
-      expect(result).toEqual([]);
+      expect(repo.unlinkRepository).toHaveBeenCalledWith("PVT_1", "octocat", "hello-world");
+      expect(result).toEqual({
+        success: true,
+        message: "Successfully unlinked repository octocat/hello-world from project",
+      });
     });
 
-    it("should return empty array when project not found", async () => {
-      mockGraphql.mockResolvedValueOnce({
-        node: null,
+    it("links a team", async () => {
+      const linked = { id: "T_1", slug: "engineering" };
+      repo.linkTeam.mockResolvedValueOnce(linked);
+
+      const result = await service.linkProjectToTeam({
+        projectId: "PVT_1",
+        org: "octocat-org",
+        teamSlug: "engineering",
       });
 
-      const result = await service.listProjectItems({ projectId: "NONEXISTENT" });
-
-      expect(result).toEqual([]);
+      expect(repo.linkTeam).toHaveBeenCalledWith("PVT_1", "octocat-org", "engineering");
+      expect(result).toBe(linked);
     });
 
-    it("should handle items with date field values", async () => {
-      mockGraphql.mockResolvedValueOnce({
-        node: {
-          items: {
-            nodes: [
-              {
-                id: "ITEM_1",
-                content: {
-                  id: "ISSUE_1",
-                  title: "Issue 1",
-                  __typename: "Issue",
-                },
-                fieldValues: {
-                  nodes: [
-                    {
-                      date: "2025-01-15",
-                      field: { id: "FIELD_DUE", name: "Due Date" },
-                    },
-                  ],
-                },
-              },
-            ],
-          },
-        },
+    it("reports the unlinked team in the message", async () => {
+      const result = await service.unlinkProjectFromTeam({
+        projectId: "PVT_1",
+        org: "octocat-org",
+        teamSlug: "engineering",
       });
 
-      const result = await service.listProjectItems({ projectId: "PROJECT_123" });
-
-      expect(result[0].fieldValues).toHaveProperty("FIELD_DUE", "2025-01-15");
+      expect(repo.unlinkTeam).toHaveBeenCalledWith("PVT_1", "octocat-org", "engineering");
+      expect(result).toEqual({
+        success: true,
+        message: "Successfully unlinked team engineering from project",
+      });
     });
 
-    it("should handle items with single select field values", async () => {
-      mockGraphql.mockResolvedValueOnce({
-        node: {
-          items: {
-            nodes: [
-              {
-                id: "ITEM_1",
-                content: {
-                  id: "ISSUE_1",
-                  title: "Issue 1",
-                  __typename: "Issue",
-                },
-                fieldValues: {
-                  nodes: [
-                    {
-                      name: "In Progress",
-                      field: { id: "FIELD_STATUS", name: "Status" },
-                    },
-                  ],
-                },
-              },
-            ],
-          },
-        },
+    it("lists linked repositories with a default page size of 20", async () => {
+      await service.listLinkedRepositories({ projectId: "PVT_1" });
+
+      expect(repo.listRepositories).toHaveBeenCalledWith({
+        projectId: "PVT_1",
+        first: 20,
+        after: undefined,
       });
-
-      const result = await service.listProjectItems({ projectId: "PROJECT_123" });
-
-      expect(result[0].fieldValues).toHaveProperty("FIELD_STATUS", "In Progress");
     });
 
-    it("should handle items without content", async () => {
-      mockGraphql.mockResolvedValueOnce({
-        node: {
-          items: {
-            nodes: [
-              {
-                id: "ITEM_1",
-                content: undefined,
-                fieldValues: {
-                  nodes: [],
-                },
-              },
-            ],
-          },
-        },
+    it("lists linked teams with the given pagination", async () => {
+      await service.listLinkedTeams({ projectId: "PVT_1", first: 5, after: "cursor" });
+
+      expect(repo.listTeams).toHaveBeenCalledWith({
+        projectId: "PVT_1",
+        first: 5,
+        after: "cursor",
       });
-
-      const result = await service.listProjectItems({ projectId: "PROJECT_123" });
-
-      expect(result[0].contentId).toBe("");
-      expect(result[0].contentType).toBe(ResourceType.ISSUE); // Default
     });
   });
 });

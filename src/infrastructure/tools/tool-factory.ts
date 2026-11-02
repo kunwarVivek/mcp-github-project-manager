@@ -1,4 +1,5 @@
-import { getGitHubAppCredentials, getSecret } from "../../env";
+import { getSecret } from "../../env";
+import { resolveGitHubAuth } from "../github/GitHubAuthResolver";
 import { GitHubRepositoryFactory } from "../github/GitHubRepositoryFactory";
 
 /**
@@ -56,13 +57,11 @@ export function resolveRepo(): string | undefined {
  * @param repo  Explicit repository name (optional).
  */
 export function createGitHubFactory(owner?: string, repo?: string): GitHubRepositoryFactory {
-  // A fully configured GitHub App outranks the PAT. When the App is configured
-  // the token is unused, so an App-only deployment needs no PAT at all.
-  const app = getGitHubAppCredentials();
-  return new GitHubRepositoryFactory(
-    app ? "" : requireToken(),
+  // A fully configured GitHub App outranks the PAT (resolveGitHubAuth encodes the chain),
+  // so an App-only deployment needs no PAT at all.
+  return GitHubRepositoryFactory.fromAuth(
+    resolveGitHubAuth(),
     owner || resolveOwner() || UNUSED_REPO_CONTEXT,
-    repo || resolveRepo() || UNUSED_REPO_CONTEXT,
-    app ? { app } : {}
+    repo || resolveRepo() || UNUSED_REPO_CONTEXT
   );
 }

@@ -1,3 +1,4 @@
+import { collectConnection } from "../util/paginate";
 import { BaseGitHubRepository } from "./BaseRepository";
 import type {
   ParentIssueResult,
@@ -185,6 +186,78 @@ const GET_PARENT_ISSUE_QUERY = `
     }
   }
 `;
+
+const ISSUE_TIMELINE_QUERY = `
+  query IssueTimeline($owner: String!, $repo: String!, $number: Int!, $after: String) {
+    repository(owner: $owner, name: $repo) {
+      issue(number: $number) {
+        timelineItems(first: 100, after: $after) {
+          nodes {
+            __typename
+            ... on LabeledEvent { id createdAt actor { login } label { name } }
+            ... on UnlabeledEvent { id createdAt actor { login } label { name } }
+            ... on AssignedEvent { id createdAt actor { login } assignee { ... on User { login } ... on Bot { login } ... on Mannequin { login } ... on Organization { login } } }
+            ... on UnassignedEvent { id createdAt actor { login } assignee { ... on User { login } ... on Bot { login } ... on Mannequin { login } ... on Organization { login } } }
+            ... on ClosedEvent { id createdAt actor { login } stateReason }
+            ... on ReopenedEvent { id createdAt actor { login } }
+            ... on MilestonedEvent { id createdAt actor { login } milestoneTitle }
+            ... on DemilestonedEvent { id createdAt actor { login } milestoneTitle }
+            ... on RenamedTitleEvent { id createdAt actor { login } previousTitle currentTitle }
+            ... on AddedToProjectV2Event { id createdAt actor { login } project { title } }
+            ... on RemovedFromProjectV2Event { id createdAt actor { login } project { title } }
+            ... on ProjectV2ItemStatusChangedEvent { id createdAt actor { login } previousStatus status project { title } }
+            ... on CrossReferencedEvent { id createdAt actor { login } source { __typename ... on Issue { number title url } ... on PullRequest { number title url } } }
+            ... on IssueComment { id createdAt author { login } url }
+            ... on SubIssueAddedEvent { id createdAt actor { login } subIssue { number title } }
+            ... on SubIssueRemovedEvent { id createdAt actor { login } subIssue { number title } }
+            ... on ParentIssueAddedEvent { id createdAt actor { login } parent { number title } }
+            ... on ParentIssueRemovedEvent { id createdAt actor { login } parent { number title } }
+          }
+          pageInfo {
+            hasNextPage
+            endCursor
+          }
+        }
+      }
+    }
+  }
+`;
+
+/**
+ * One raw timeline item. Only `__typename` is guaranteed; the other fields
+ * depend on the event kind (see {@link ISSUE_TIMELINE_QUERY}).
+ */
+export interface IssueTimelineNode {
+  __typename: string;
+  id?: string;
+  createdAt?: string;
+  actor?: { login: string } | null;
+  author?: { login: string } | null;
+  label?: { name: string } | null;
+  assignee?: { login?: string } | null;
+  stateReason?: string | null;
+  milestoneTitle?: string | null;
+  previousTitle?: string | null;
+  currentTitle?: string | null;
+  project?: { title: string } | null;
+  previousStatus?: string | null;
+  status?: string | null;
+  source?: { __typename: string; number?: number; title?: string; url?: string } | null;
+  url?: string | null;
+  subIssue?: { number: number; title: string } | null;
+  parent?: { number: number; title: string } | null;
+}
+
+interface IssueTimelineResponse {
+  repository: {
+    issue: {
+      timelineItems: {
+        nodes: Array<IssueTimelineNode | null>;
+        pageInfo: { hasNextPage: boolean; endCursor: string | null };
+      };
+    } | null;
+  } | null;
+}
 
 // ============================================================================
 // Repository Implementation
@@ -386,5 +459,45 @@ export class GitHubSubIssueRepository extends BaseGitHubRepository {
       },
       GitHubSubIssueRepository.SUB_ISSUES_FEATURE
     );
+  }
+
+  /**
+   * Resolve an issue number in the configured repository to its GraphQL node ID.
+   * Sub-issue mutations/queries take node IDs, while callers know issue numbers.
+   *
+   * @throws Error if the issue is not found
+   */
+  async getIssueNodeId(issueNumber: number): Promise<string> {
+    return this.resolveIssueNodeId(issueNumber);
+  }
+
+  /**
+   * Read the full timeline (labels, assignees, state, milestone, title,
+   * project, cross-reference, comment and parent/sub-issue events) of an issue.
+   *
+   * @throws Error if the issue is not found
+   */
+  async getIssueTimeline(issueNumber: number): Promise<IssueTimelineNode[]> {
+    let found = false;
+    const nodes = await collectConnection<IssueTimelineNode | null>(
+      async (after) => {
+        const response = await this.graphqlWithFeatures<IssueTimelineResponse>(
+          ISSUE_TIMELINE_QUERY,
+          { owner: this.owner, repo: this.repo, number: issueNumber, after },
+          GitHubSubIssueRepository.SUB_ISSUES_FEATURE
+        );
+        const issue = response.repository?.issue;
+        if (!issue) return null;
+        found = true;
+        return issue.timelineItems;
+      },
+      this.logger,
+      `Timeline of issue #${issueNumber}`
+    );
+
+    if (!found) {
+      throw new Error(`Issue #${issueNumber} not found in ${this.owner}/${this.repo}`);
+    }
+    return nodes.filter((node): node is IssueTimelineNode => node !== null);
   }
 }

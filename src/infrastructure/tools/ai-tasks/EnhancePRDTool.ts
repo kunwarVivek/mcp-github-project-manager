@@ -9,7 +9,7 @@ import { PRDGenerationService } from "../../../services/PRDGenerationService.js"
 import { ANNOTATION_PATTERNS } from "../annotations/tool-annotations.js";
 import { PRDEnhanceOutputSchema } from "../schemas/ai-schemas.js";
 import { ToolResultFormatter } from "../ToolResultFormatter.js";
-import type { ToolDefinition, ToolSchema } from "../ToolValidator.js";
+import { type ToolDefinition, type ToolSchema, ToolValidator } from "../ToolValidator.js";
 
 // Schema for enhance_prd tool
 const enhancePRDSchema = z.object({
@@ -55,7 +55,12 @@ interface PRDValidation {
 /**
  * Implementation function for enhance_prd tool
  */
-async function executeEnhancePRD(args: EnhancePRDArgs): Promise<MCPResponse> {
+async function executeEnhancePRD(rawArgs: unknown): Promise<MCPResponse> {
+  const args = ToolValidator.validate(
+    "enhance_prd",
+    rawArgs,
+    enhancePRDSchema as unknown as ToolSchema<EnhancePRDArgs>
+  );
   const prdService = new PRDGenerationService();
 
   try {

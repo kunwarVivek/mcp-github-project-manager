@@ -1,4 +1,5 @@
 // Domain error types and error handling utilities
+import { MCPErrorCode } from "./mcp-types";
 import { ResourceNotFoundError } from "./resource-types";
 
 export class DomainError extends Error {
@@ -26,12 +27,34 @@ export class UnauthorizedError extends Error {
   }
 }
 
-export class RateLimitError extends Error {
+/** Error raised for a failed GitHub API call; carries the HTTP status and MCP code. */
+export class GitHubApiError extends Error {
   constructor(
-    message = "Rate limit exceeded",
-    public resetTime?: Date
+    public readonly message: string,
+    public readonly status?: number,
+    public readonly code?: string,
+    public readonly mcpErrorCode: MCPErrorCode = MCPErrorCode.INTERNAL_ERROR,
+    public readonly details?: Record<string, unknown>
   ) {
     super(message);
+    this.name = "GitHubApiError";
+  }
+}
+
+/** GitHub (or the server) refused the call because a rate limit was hit. */
+export class RateLimitError extends GitHubApiError {
+  constructor(
+    message = "Rate limit exceeded",
+    public readonly resetDate?: Date,
+    details?: Record<string, unknown>
+  ) {
+    super(message, 429, "RATE_LIMIT_EXCEEDED", MCPErrorCode.RATE_LIMITED, {
+      ...(resetDate && {
+        resetAt: resetDate.toISOString(),
+        resetAtFormatted: resetDate.toLocaleString(),
+      }),
+      ...details,
+    });
     this.name = "RateLimitError";
   }
 }
@@ -50,17 +73,6 @@ export class IntegrationError extends Error {
   ) {
     super(message);
     this.name = "IntegrationError";
-  }
-}
-
-export class GitHubAPIError extends Error {
-  constructor(
-    message: string,
-    public status?: number,
-    public response?: unknown
-  ) {
-    super(message);
-    this.name = "GitHubAPIError";
   }
 }
 

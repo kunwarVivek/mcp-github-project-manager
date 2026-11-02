@@ -215,16 +215,31 @@ export class AgentStore {
     if (Array.isArray(data) || data.type !== "file") {
       throw new Error(`${REGISTRY_LOCATION} is not a file; the agent registry cannot be read.`);
     }
-    if (data.encoding !== "base64") {
-      throw new Error(
-        `${REGISTRY_LOCATION} is ${data.size} bytes, above the 1 MB the Contents API returns inline; the agent registry cannot be read.`
-      );
-    }
+
+    // Above 1 MB the Contents API omits the body (`encoding` is "none"); the Git
+    // Blobs API serves it (up to 100 MB). The Contents sha is the blob sha, so
+    // it stays the compare-and-swap token for writes.
+    const base64 =
+      data.encoding === "base64" ? data.content : await this.fetchBlobContent(data.sha, data.size);
 
     return {
-      agents: AgentStore.parseRegistry(Buffer.from(data.content, "base64").toString("utf8")),
+      agents: AgentStore.parseRegistry(Buffer.from(base64, "base64").toString("utf8")),
       sha: data.sha,
     };
+  }
+
+  /** Base64 body of a registry blob too large for the Contents API to inline. */
+  private async fetchBlobContent(sha: string, size: number): Promise<string> {
+    const octokit = this.factory.getOctokit();
+    const { owner, repo } = this.factory.getConfig();
+
+    const { data: blob } = await octokit.rest.git.getBlob({ owner, repo, file_sha: sha });
+    if (blob.encoding !== "base64") {
+      throw new Error(
+        `${REGISTRY_LOCATION} is ${size} bytes and the Git Blobs API returned it as "${blob.encoding}"; the agent registry cannot be read.`
+      );
+    }
+    return blob.content;
   }
 
   /** Read the registry, creating (and migrating into) the branch on first use. */
@@ -327,17 +342,6 @@ export class AgentStore {
   async getAgent(agentId: string): Promise<Agent | undefined> {
     const agents = await this.listAgents();
     return agents.find((a) => a.id === agentId);
-  }
-
-  /**
-   * Replace the whole registry with `agents`, as one compare-and-swap write.
-   *
-   * Intended for administrative repair/tests; operational code should prefer
-   * createAgent/updateAgent/removeAgent/removeAgentCascade for targeted changes.
-   */
-  async saveAgents(agents: Agent[]): Promise<void> {
-    const replacement = AgentStore.validateAgentRecords(agents, "saveAgents replacement");
-    await this.mutateAgents(() => replacement);
   }
 
   /**

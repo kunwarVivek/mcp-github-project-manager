@@ -1,7 +1,7 @@
 import { generateObject } from "ai";
 import { z } from "zod";
 import { isProjectItem } from "../domain/type-guards";
-import { type ILogger, Logger } from "../infrastructure/logger";
+import { getLogger, type ILogger } from "../infrastructure/logger";
 import type { AIServiceFactory } from "./ai/AIServiceFactory";
 import type { ProjectManagementService } from "./ProjectManagementService";
 import { InputSanitizer } from "./utils/InputSanitizer";
@@ -27,7 +27,7 @@ export class IssueEnrichmentService {
     private projectService: ProjectManagementService,
     logger?: ILogger
   ) {
-    this.logger = logger ?? Logger.getInstance();
+    this.logger = logger ?? getLogger("IssueEnrichmentService");
   }
 
   async enrichIssue(params: {
@@ -85,7 +85,7 @@ export class IssueEnrichmentService {
     projectContext?: string;
   }): Promise<IssueEnrichmentResult[]> {
     const results: IssueEnrichmentResult[] = [];
-    const items = await this.projectService.listProjectItems({
+    const items = await this.projectService.linking.listProjectItems({
       projectId: params.projectId,
       limit: 200,
     });

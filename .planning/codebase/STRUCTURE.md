@@ -1,8 +1,8 @@
 # Codebase Structure
 
-**Analysis Date:** 2026-10-21
+**Analysis Date:** 2026-11-02
 
-**Updated:** 2026-10-21 — directory tree, config files, and the "where to add new code" paths rewritten for the current layout (Vitest 5, Biome 2.5, MCP SDK v2, tsyringe container).
+**Updated:** 2026-11-02 — reconciled with code: the legacy root `tests/` tree is gone (single test tree), dead directories removed, new infrastructure directories (`idempotency/`), `GitHubRequestExecutor`, `PromptRegistry`, `analytics` tool.
 
 ## Directory Layout
 
@@ -13,19 +13,13 @@ mcp-github-project-manager/
 │   ├── container.ts              # tsyringe DI container configuration
 │   ├── cli.ts                    # CLI argument parsing (commander)
 │   ├── env.ts                    # Environment / secret resolution
-│   ├── domain/                   # Domain types, zod schemas, errors (no logic)
+│   ├── domain/                   # Domain types, zod schemas, errors, rich entities/value objects
 │   ├── services/                 # Business logic services
 │   ├── infrastructure/           # External integrations
 │   ├── analysis/                 # Pure analysis helpers
 │   ├── cache/                    # Standalone cache helpers
 │   ├── __mocks__/                # Manual mock modules
 │   └── __tests__/                # Test files (mirrors src structure)
-├── tests/                        # Legacy root test tree — still live (48 files)
-│   ├── ai-services/
-│   ├── ai-tools/
-│   ├── cache/
-│   ├── infrastructure/
-│   └── services/
 ├── docs/                         # Documentation
 │   ├── adr/                      # Architecture decision records
 │   ├── api-reference/
@@ -58,7 +52,7 @@ mcp-github-project-manager/
   - `env.ts`: Environment/secret resolution and startup validation
 
 **`src/domain/`:**
-- Purpose: Type definitions, schemas, and error classes — **no logic**
+- Purpose: Type definitions, schemas, error classes, and entity/value-object behavior (rich entities). Imports nothing from `services/` or `infrastructure/`
 - Contains: TypeScript types, Zod 4 schemas, enums, entities, value objects, domain events
 - Key files:
   - `types.ts`: Core domain types (Issue, Milestone, Project, Sprint)
@@ -74,13 +68,13 @@ mcp-github-project-manager/
 - Purpose: Business logic and orchestration
 - Contains: Service classes, AI processing, context generation
 - Key files:
-  - `ProjectManagementService.ts`: Facade service (~724 lines) delegating to the extracted services below
-  - `IssueService.ts`, `MilestoneService.ts`, `SubIssueService.ts`, `FieldValueService.ts`, `LabelService.ts`, `IterationService.ts`, `PullRequestService.ts`, `RoadmapService.ts`, `SprintPlanningService.ts`
+  - `ProjectManagementService.ts`: thin facade (121 lines) exposing the extracted services through getters
+  - `IssueService.ts`, `MilestoneService.ts`, `SubIssueService.ts`, `FieldValueService.ts`, `LabelService.ts`, `IterationService.ts`, `PullRequestService.ts`, `RoadmapService.ts`, `SprintPlanningService.ts`, `AnalyticsService.ts`
   - `TaskGenerationService.ts`: AI task generation
   - `PRDGenerationService.ts`: PRD parsing and generation
   - `GitHubStateSyncService.ts`: State synchronization
   - `RequirementsTraceabilityService.ts`: Requirements tracking
-  - `ai/`: AI provider factory, task processor, prompt templates
+  - `ai/`: AI provider factory, task processor, `prompts/` (`PromptRegistry` + per-feature prompt modules), `TokenBudgetManager`, `AIResponseCache`
   - `agent/`: Agent swarm orchestration services
   - `context/`, `feature/`, `templates/`, `utils/`, `validation/`
 
@@ -92,15 +86,16 @@ mcp-github-project-manager/
   - `tools/`: MCP tool definitions, registry, validators, formatters
   - `cache/`: Resource caching + cache persistence
   - `events/`: Event system and webhook handler
-  - `mcp/`: MCP resources, prompts, error handling, response formatting
+  - `mcp/`: `ToolDispatcher` (validation → budget gate → audited execution → result), MCP resources/prompts, response formatting
   - `persistence/`: File persistence
   - `resilience/`: Circuit breaker, AI resilience policy
-  - `observability/`: Correlation context, tracing logger, security audit log
+  - `observability/`: correlation context, mutation audit log, security audit log, OpenTelemetry setup (`otel.ts`)
+  - `idempotency/`: `IdempotencyStore` (idempotency keys on create actions)
   - `secrets/`: Secret providers (env, file, `gh` CLI)
   - `agent/`: Agent store, work-product store, project field setup
   - `health/`: Health service
   - `http/`: Webhook server
-  - `lifecycle/`, `resource/`, `validation/`, `logger/`
+  - `lifecycle/` (graceful shutdown), `logger/`
 
 **`src/infrastructure/github/`:**
 - Purpose: GitHub API abstraction
@@ -109,7 +104,9 @@ mcp-github-project-manager/
   - `GitHubRepositoryFactory.ts`: Repository creation
   - `GitHubConfig.ts`: GitHub configuration (token is non-enumerable so it cannot be serialized)
   - `GitHubErrorHandler.ts`: Error handling
-  - `RateLimitManager.ts`: Rate-limit tracking
+  - `GitHubRequestExecutor.ts`: the one retry/throttle path for every GitHub call
+  - `RateLimitManager.ts`: proactive rate-limit budgeting (`RATE_LIMIT_FLOOR`)
+  - `GitHubAuthResolver.ts`: `resolveGitHubAuth()` — App auth outranks PAT
   - `repositories/`: Repository implementations
   - `util/`: GraphQL helpers, type conversion
 
@@ -122,28 +119,24 @@ mcp-github-project-manager/
   - `ToolValidator.ts`: Argument validation
   - `ToolResultFormatter.ts`: Result formatting
   - `tool-factory.ts`: `requireToken()` / `createGitHubFactory()` — the credential-aware GitHub client factory
-  - `ai-tasks/`, `compound/`, `schemas/`, `annotations/`: tool families
+  - `ai-tasks/`, `compound/` (the 21 compound tool definitions, schemas, executors, schema versions), `schemas/`, `annotations/`, `shared-services.ts`: tool families
 
 **`src/__tests__/`:**
 - Purpose: Unit, integration, and E2E tests
 - Contains: Test files mirroring source structure
 - Structure:
   - `unit/`: Unit tests
+  - `helpers/`: shared test fakes (`FakeGitHub`, `InMemoryAgentStore`, `aiFakes`, `mockTypes`)
   - `integration/`: Integration tests
   - `e2e/`: End-to-end tests (incl. `e2e/setup.ts`, the global setup file)
   - `services/`, `tools/`, `infrastructure/`: Service/tool/infrastructure tests
   - `setup.ts`: Shared fixture module (imported by tests, not wired into `setupFiles`)
   - `test-utils.ts`: Test utilities
 
-**`tests/` (legacy root tree):**
-- Purpose: Older test suites that predate `src/__tests__/`
-- Contains: `ai-services/`, `ai-tools/`, `cache/`, `infrastructure/`, `services/`
-- **Still live**: `vitest.config.ts` includes `tests/**/*.test.ts` and `tests/**/*.spec.ts`, and these 48 files run in every `pnpm test`. They are not duplicates of `src/__tests__/` and are not candidates for removal.
-
 ## Key File Locations
 
 **Entry Points:**
-- `src/index.ts`: MCP server main entry (shebang, 1250+ lines)
+- `src/index.ts`: MCP server main entry (shebang, ~640 lines)
 - `src/container.ts`: tsyringe DI container configuration
 - `src/cli.ts`: CLI argument parsing with Commander.js
 - `src/env.ts`: Environment/secret resolution and startup validation
@@ -203,10 +196,10 @@ mcp-github-project-manager/
 ## Where to Add New Code
 
 **New MCP Tool:**
-1. Define the tool (name, description, zod input/output schema, executor) in `src/infrastructure/tools/` — e.g. a new `*-tools.ts` module, or `ai-tasks/` for AI-backed tools
-2. Register it in `ToolRegistry.registerBuiltInTools()` (`src/infrastructure/tools/ToolRegistry.ts`)
+1. Add the tool's definition to `src/infrastructure/tools/compound/compound-tool-definitions.ts`, its zod input schema to `compound-schemas.ts` (an `action` enum selects the operation) and its executor to `compound-executors.ts` / `register-executors.ts`. Granular per-operation tools stay registered in `ToolRegistry` (`registerBuiltInTools()`) as internal contracts; only compound tools are listed over MCP
+2. Add its version to `TOOL_SCHEMA_VERSIONS` (`compound/schema-version.ts`) and refresh the schema snapshot (`npm run schema:snapshot`) — the snapshot test fails otherwise
 3. No per-tool switch in the entry point: the server registers every registry tool with `server.registerTool(...)` and all of them share one `dispatchTool`
-4. Tests: `src/__tests__/tools/` or `src/__tests__/e2e/tools/`
+4. Update the tool/action counts in the docs (`npm run check:docs` fails on drift); tests: `src/__tests__/unit/infrastructure/tools/` or `src/__tests__/e2e/tools/`
 
 **New Service:**
 1. Create the service class in `src/services/[ServiceName].ts`
@@ -224,7 +217,7 @@ mcp-github-project-manager/
 1. Add the interface in the appropriate `src/domain/*.ts` file
 2. Add a Zod 4 schema in `src/domain/resource-schemas.ts` if needed
 3. Add to `ResourceType` enum if it's a resource
-4. Domain code stays logic-free — behavior belongs in `src/services/`
+4. Entity/value-object behavior may live in `src/domain/`; orchestration and business workflows belong in `src/services/`. Domain never imports from services or infrastructure
 
 **New AI Prompt:**
 1. Create in `src/services/ai/prompts/`
@@ -264,4 +257,4 @@ mcp-github-project-manager/
 
 ---
 
-*Structure analysis: 2026-10-21*
+*Structure analysis: 2026-11-02*

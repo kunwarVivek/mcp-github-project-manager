@@ -1,3 +1,5 @@
+import type { PromptRegistry } from "./PromptRegistry";
+
 /**
  * AI Prompts for Roadmap Generation
  *
@@ -11,7 +13,7 @@
  * - AI-16: Visualization data generation
  */
 
-export const ROADMAP_GENERATION_SYSTEM_PROMPT = `You are a product roadmap planning expert.
+const ROADMAP_GENERATION_SYSTEM_PROMPT = `You are a product roadmap planning expert.
 You create structured roadmaps with clear phases, realistic milestones, and explicit dependencies.
 
 KEY PRINCIPLES:
@@ -39,7 +41,7 @@ OUTPUT RULES:
 - Assign confidence based on how well-defined the requirements are
 - Provide reasoning for phase ordering decisions`;
 
-export const REQUIREMENTS_PARSING_PROMPT = `Parse the following requirements into structured format.
+const REQUIREMENTS_PARSING_PROMPT = `Parse the following requirements into structured format.
 For each requirement, identify:
 - A unique ID (if not provided, generate one like REQ-001)
 - Title (concise summary)
@@ -50,7 +52,7 @@ For each requirement, identify:
 
 Be conservative with priorities - not everything is critical.`;
 
-export const PHASE_SEQUENCING_PROMPT = `Given the following requirements, group them into logical phases.
+const PHASE_SEQUENCING_PROMPT = `Given the following requirements, group them into logical phases.
 
 SEQUENCING RULES:
 1. Infrastructure/setup requirements go in Phase 1
@@ -67,7 +69,7 @@ For each phase:
 - Identify dependencies on prior phases
 - Estimate duration in weeks`;
 
-export const MILESTONE_ESTIMATION_PROMPT = `Create milestones for the given phase.
+const MILESTONE_ESTIMATION_PROMPT = `Create milestones for the given phase.
 
 For each milestone:
 - Title: Clear, outcome-focused name
@@ -82,7 +84,7 @@ ESTIMATION RULES:
 - Earlier milestones in a phase should be more concrete
 - Later milestones can be broader`;
 
-export const VISUALIZATION_DATA_PROMPT = `Generate visualization-ready data for a Gantt chart.
+const VISUALIZATION_DATA_PROMPT = `Generate visualization-ready data for a Gantt chart.
 
 For each phase:
 - Color assignment (distinct, accessible colors)
@@ -165,56 +167,19 @@ export function formatConstraintsForPrompt(constraints?: {
   return parts.length > 0 ? `\nCONSTRAINTS:\n${parts.join("\n")}` : "";
 }
 
-/**
- * Format phase context for milestone generation
- *
- * @param phase - Phase information
- * @returns Formatted string for AI prompt
- */
-export function formatPhaseContextForPrompt(phase: {
-  name: string;
-  description: string;
-  objectives: string[];
-  durationWeeks: number;
-}): string {
-  return `PHASE: ${phase.name}
-Description: ${phase.description}
-Objectives:
-${phase.objectives.map((obj, i) => `  ${i + 1}. ${obj}`).join("\n")}
-Duration: ${phase.durationWeeks} weeks`;
+export const ROADMAP_PROMPT_IDS = {
+  generationSystem: "roadmap.system",
+  requirementsParsing: "roadmap.requirements-parsing",
+  phaseSequencing: "roadmap.phase-sequencing",
+  milestoneEstimation: "roadmap.milestone-estimation",
+  visualizationData: "roadmap.visualization-data",
+} as const;
+
+/** Register every roadmap prompt (version 1.0.0). */
+export function registerRoadmapPrompts(registry: PromptRegistry): void {
+  registry.register(ROADMAP_PROMPT_IDS.generationSystem, "1.0.0", ROADMAP_GENERATION_SYSTEM_PROMPT);
+  registry.register(ROADMAP_PROMPT_IDS.requirementsParsing, "1.0.0", REQUIREMENTS_PARSING_PROMPT);
+  registry.register(ROADMAP_PROMPT_IDS.phaseSequencing, "1.0.0", PHASE_SEQUENCING_PROMPT);
+  registry.register(ROADMAP_PROMPT_IDS.milestoneEstimation, "1.0.0", MILESTONE_ESTIMATION_PROMPT);
+  registry.register(ROADMAP_PROMPT_IDS.visualizationData, "1.0.0", VISUALIZATION_DATA_PROMPT);
 }
-
-/**
- * Roadmap prompt configurations
- */
-export const ROADMAP_PROMPT_CONFIGS = {
-  parseRequirements: {
-    systemPrompt: REQUIREMENTS_PARSING_PROMPT,
-    maxTokens: 2000,
-    temperature: 0.3,
-  },
-
-  generateStructure: {
-    systemPrompt: ROADMAP_GENERATION_SYSTEM_PROMPT,
-    maxTokens: 4000,
-    temperature: 0.5,
-  },
-
-  sequencePhases: {
-    systemPrompt: PHASE_SEQUENCING_PROMPT,
-    maxTokens: 2500,
-    temperature: 0.4,
-  },
-
-  estimateMilestones: {
-    systemPrompt: MILESTONE_ESTIMATION_PROMPT,
-    maxTokens: 2000,
-    temperature: 0.4,
-  },
-
-  generateVisualization: {
-    systemPrompt: VISUALIZATION_DATA_PROMPT,
-    maxTokens: 1500,
-    temperature: 0.3,
-  },
-};

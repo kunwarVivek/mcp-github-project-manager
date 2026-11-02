@@ -49,6 +49,12 @@ If the server authenticates with a token you did not expect, check for a
 `$SECRETS_DIR/GITHUB_TOKEN` file and for an active `gh` login. Disable the
 fallback with `GH_CLI_TOKEN_FALLBACK=false`.
 
+A **GitHub App** configuration outranks all of the above: when `GITHUB_APP_ID`,
+`GITHUB_APP_PRIVATE_KEY` and `GITHUB_APP_INSTALLATION_ID` are all set, the server
+authenticates as the App installation and does not use a PAT. If only some of the
+three are set, the server silently falls back to the PAT chain — set all three or
+none. Credentials are resolved in one place, `resolveGitHubAuth()`.
+
 ---
 
 ## Common Issues
@@ -534,10 +540,44 @@ Valid group names are `core`, `ai`, `agents`, `events`, `system`, or `all`
 
 Under MCP v2 a tool that runs and fails returns `{ content, isError: true }` —
 the failure is visible to the model so it can recover, and it is **not** a
-JSON-RPC error. JSON-RPC errors are reserved for protocol faults, such as
-calling a tool that does not exist. Arguments are validated against the
-declared `inputSchema` before the handler runs, so a malformed call never
-reaches business logic. See [TOOLS.md](TOOLS.md#error-semantics).
+JSON-RPC error; the stable code is in `_meta.error`. JSON-RPC errors are
+reserved for protocol faults, such as calling a tool that does not exist.
+Arguments are validated against the declared `inputSchema` before the handler
+runs, so a malformed call never reaches business logic. See
+[TOOLS.md](TOOLS.md#error-semantics).
+
+### `BudgetExhausted`
+
+An AI tool refused with `BudgetExhausted` means the calling agent's token budget
+has `hardStop` set and is used up. Check it with `agent_manage` `get_budget`;
+raise it with `set_budget` or wait for its reset period. This is the **per-agent**
+budget; it is unrelated to `AI_SESSION_TOKEN_LIMIT`, which only makes optional AI
+steps of one task-generation run fall back.
+
+### `manage_sprints delete` Is Refused
+
+Deleting a sprint is irreversible, so it needs `confirm: true` in the call.
+
+### The Same `idempotencyKey` Is Rejected
+
+A key may be reused only with the identical request (within 24 h it replays the
+first result, flagged `replayed: true`). Reusing it with different arguments is
+refused; use a new key for a different create.
+
+### Calls Slow Down or Wait on Rate Limits
+
+Once the remaining GraphQL points fall below `RATE_LIMIT_FLOOR` (default 100) the
+server waits for the reset instead of spending the last points; a wait longer
+than its cap surfaces as a rate-limit error. Lower the floor or reduce
+call volume; see [CONFIGURATION.md](CONFIGURATION.md).
+
+### `/events/*` Returns 503 or 401
+
+The event routes require `EVENTS_AUTH_TOKEN` (sent as `Authorization: Bearer …`);
+with no token configured they fail closed with 503. For trusted local development
+only, `EVENTS_ALLOW_UNAUTHENTICATED=true` disables the check. The listener binds
+`127.0.0.1` unless `WEBHOOK_HOST` says otherwise — inside a container publishing
+the port, set `WEBHOOK_HOST=0.0.0.0`.
 
 ---
 
@@ -632,6 +672,6 @@ Report bugs and feature requests at:
 ## See Also
 
 - [Configuration Guide](CONFIGURATION.md) - Complete configuration reference
-- [Tool Reference](TOOLS.md) - 20 compound tools (169 actions)
+- [Tool Reference](TOOLS.md) - <!-- count:tools -->21<!-- /count --> compound tools (<!-- count:actions -->175<!-- /count --> actions)
 - [API Reference](API.md) - Service and infrastructure APIs
 - [Deployment Guide](deployment.md) - Docker and client installation

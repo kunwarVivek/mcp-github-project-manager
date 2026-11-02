@@ -36,7 +36,10 @@ describe("creatable project field types", () => {
     graphql = vi.fn();
     // The Octokit instance is a partial stand-in: only `graphql` is used here.
     const octokit = { graphql } as unknown as Octokit;
-    repository = new GitHubProjectRepository(octokit, new GitHubConfig("owner", "repo", "token"));
+    repository = new GitHubProjectRepository(
+      octokit,
+      new GitHubConfig("owner", "repo", { kind: "pat", token: "token" })
+    );
   });
 
   /** The variables of the last GraphQL call that carried a `dataType`. */
@@ -169,9 +172,14 @@ describe("creatable project field types", () => {
           },
         });
       }
-      if (query.includes("fields(first: 100)")) {
+      if (query.includes("fields(first: 100")) {
         return Promise.resolve({
-          node: { fields: { nodes: [{ id: MULTI_SELECT_FIELD_ID, name: "Tags" }] } },
+          node: {
+            fields: {
+              nodes: [{ id: MULTI_SELECT_FIELD_ID, name: "Tags" }],
+              pageInfo: { hasNextPage: false, endCursor: null },
+            },
+          },
         });
       }
       return Promise.resolve({
@@ -216,9 +224,14 @@ describe("creatable project field types", () => {
           },
         });
       }
-      if (query.includes("fields(first: 100)")) {
+      if (query.includes("fields(first: 100")) {
         return Promise.resolve({
-          node: { fields: { nodes: [{ id: "PVTF_1", name: "Assignees" }] } },
+          node: {
+            fields: {
+              nodes: [{ id: "PVTF_1", name: "Assignees" }],
+              pageInfo: { hasNextPage: false, endCursor: null },
+            },
+          },
         });
       }
       return Promise.resolve({

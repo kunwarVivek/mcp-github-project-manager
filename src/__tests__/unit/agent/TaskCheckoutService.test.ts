@@ -7,6 +7,7 @@ import type { AgentContextService } from "../../../services/agent/AgentContextSe
 import { clearProvisionedAgentProjects } from "../../../services/agent/AgentFieldProvisioner";
 import { TaskCheckoutService } from "../../../services/agent/TaskCheckoutService";
 import { InMemoryAgentStore } from "../../helpers/InMemoryAgentStore";
+import { asFactory } from "../../helpers/mockTypes";
 
 vi.mock("../../../infrastructure/github/GitHubRepositoryFactory", () => {
   const mockFactory = vi.fn().mockImplementation(function () {
@@ -437,7 +438,7 @@ describe("TaskCheckoutService", () => {
     };
 
     service = new TaskCheckoutService(
-      mockFactory as unknown as GitHubRepositoryFactory,
+      asFactory(mockFactory),
       mockAgentStore as unknown as AgentStore,
       mockContextService as unknown as AgentContextService
     );

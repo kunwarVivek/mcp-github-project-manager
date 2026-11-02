@@ -10,19 +10,19 @@
  * Falls back to keyword-based detection when embedding API unavailable.
  */
 
-import { openai } from "@ai-sdk/openai";
-import { cosineSimilarity, embed, embedMany } from "ai";
-import { EmbeddingCache } from "../../cache/EmbeddingCache.js";
-import type { ConfidenceFactors, SectionConfidence } from "../../domain/ai-types.js";
+import { cosineSimilarity, type EmbeddingModel, embed, embedMany } from "ai";
+import { EmbeddingCache } from "../../cache/EmbeddingCache";
+import type { ConfidenceFactors, SectionConfidence } from "../../domain/ai-types";
 import type {
   DuplicateCandidate,
   DuplicateDetectionResult,
   DuplicateDetectionThresholds,
   IssueInput,
-} from "../../domain/issue-intelligence-types.js";
+} from "../../domain/issue-intelligence-types";
 import { type ILogger, Logger } from "../../infrastructure/logger";
 import { InputSanitizer } from "../utils/InputSanitizer";
-import { calculateWeightedScore, getConfidenceTier } from "./ConfidenceScorer.js";
+import { AIServiceFactory } from "./AIServiceFactory";
+import { calculateWeightedScore, getConfidenceTier } from "./ConfidenceScorer";
 
 // ============================================================================
 // Constants
@@ -138,6 +138,7 @@ export class DuplicateDetectionService {
   private embeddingCache: EmbeddingCache;
   private thresholds: DuplicateDetectionThresholds;
   private readonly logger: ILogger;
+  private readonly aiFactory: AIServiceFactory;
 
   /**
    * Create a new duplicate detection service.
@@ -145,10 +146,22 @@ export class DuplicateDetectionService {
    * @param thresholds - Optional custom confidence thresholds
    * @param logger - Optional logger instance for diagnostics
    */
-  constructor(thresholds?: Partial<DuplicateDetectionThresholds>, logger?: ILogger) {
+  constructor(
+    thresholds?: Partial<DuplicateDetectionThresholds>,
+    logger?: ILogger,
+    aiFactory?: AIServiceFactory
+  ) {
     this.embeddingCache = new EmbeddingCache();
     this.thresholds = { ...DEFAULT_THRESHOLDS, ...thresholds };
     this.logger = logger ?? Logger.getInstance();
+    this.aiFactory = aiFactory ?? AIServiceFactory.getInstance();
+  }
+
+  /** Embedding model resolved at call time; throws (→ keyword fallback) without a key. */
+  private requireEmbeddingModel(): EmbeddingModel {
+    const model = this.aiFactory.getEmbeddingModel();
+    if (!model) throw new Error("No embedding API key configured");
+    return model;
   }
 
   /**
@@ -262,7 +275,7 @@ export class DuplicateDetectionService {
    */
   private async getEmbedding(text: string): Promise<number[]> {
     const { embedding } = await embed({
-      model: openai.embedding("text-embedding-3-small"),
+      model: this.requireEmbeddingModel(),
       value: text,
     });
     return embedding;
@@ -297,7 +310,7 @@ export class DuplicateDetectionService {
     // Batch compute embeddings for uncached issues
     if (uncachedTexts.length > 0) {
       const { embeddings } = await embedMany({
-        model: openai.embedding("text-embedding-3-small"),
+        model: this.requireEmbeddingModel(),
         values: uncachedTexts,
       });
 

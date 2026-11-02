@@ -121,7 +121,7 @@ export interface SubTask {
 
 export const TaskPrioritySchema = z.nativeEnum(TaskPriority);
 export const TaskStatusSchema = z.nativeEnum(TaskStatus);
-export const TaskComplexitySchema = z.number().min(1).max(10) as z.ZodType<TaskComplexity>;
+export const TaskComplexitySchema = z.literal([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
 
 export const AIGenerationMetadataSchema = z.object({
   generatedBy: z.string(),

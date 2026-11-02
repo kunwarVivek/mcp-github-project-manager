@@ -105,6 +105,11 @@ jobs:
             npm publish --access public
           fi
 
+      # CycloneDX SBOM of the production dependency tree, published as a
+      # release asset next to the npm provenance attestation.
+      - name: Generate CycloneDX SBOM
+        run: npm sbom --sbom-format cyclonedx --sbom-type application --omit dev > sbom.cdx.json
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -119,6 +124,7 @@ jobs:
 
             See [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md) for full details.
           draft: false
+          files: sbom.cdx.json
           prerelease: ${{ contains(github.ref_name, '-') }}
           make_latest: ${{ !contains(github.ref_name, '-') }}
         env:

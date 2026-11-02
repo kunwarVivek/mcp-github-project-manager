@@ -331,6 +331,21 @@ export class SprintPlanningService {
   }
 
   /**
+   * Delete a sprint: GitHub has no sprint object of its own, so this removes
+   * the iteration from its project field. Items assigned to it lose that field
+   * value. Irreversible.
+   *
+   * @param data - The sprint (iteration) ID to delete
+   * @returns Success result with message
+   */
+  async deleteSprint(data: { sprintId: string }): Promise<{ success: boolean; message: string }> {
+    return safeCall(async () => {
+      await this.sprintRepo.delete(data.sprintId);
+      return { success: true, message: `Sprint ${data.sprintId} has been deleted` };
+    });
+  }
+
+  /**
    * List all sprints, optionally filtered by status.
    *
    * @param status - Filter by status: 'planned', 'active', 'completed', or 'all'

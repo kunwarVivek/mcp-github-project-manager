@@ -36,7 +36,7 @@ async function trackSprintProgress() {
     const service = createProjectManagementService(
       process.env.GITHUB_OWNER ?? "",
       process.env.GITHUB_REPO ?? "",
-      process.env.GITHUB_TOKEN ?? ""
+      { kind: "pat", token: process.env.GITHUB_TOKEN ?? "" }
     );
 
     console.log("Tracking sprint progress...");
@@ -45,7 +45,7 @@ async function trackSprintProgress() {
     const sprintId = "sprint_1";
 
     // Get sprint metrics with detailed issue information
-    const metrics = await service.getSprintMetrics(sprintId, true);
+    const metrics = await service.sprints.getSprintMetrics(sprintId, true);
 
     console.log("Sprint Metrics:");
     console.log("Sprint Title:", metrics.title);

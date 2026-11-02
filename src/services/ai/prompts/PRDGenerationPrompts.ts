@@ -1,8 +1,11 @@
+import type { PromptRegistry } from "./PromptRegistry";
+
 /**
- * Prompts for PRD (Product Requirements Document) Generation
+ * Prompts for PRD (Product Requirements Document) Generation.
+ * Templates use {{variable}} placeholders and are served through the PromptRegistry.
  */
 
-export const PRD_GENERATION_SYSTEM_PROMPT = `You are an expert product manager and technical writer specializing in creating comprehensive Product Requirements Documents (PRDs). Your role is to transform project ideas and descriptions into detailed, actionable PRDs that development teams can use to build successful products.
+const PRD_GENERATION_SYSTEM_PROMPT = `You are an expert product manager and technical writer specializing in creating comprehensive Product Requirements Documents (PRDs). Your role is to transform project ideas and descriptions into detailed, actionable PRDs that development teams can use to build successful products.
 
 Key responsibilities:
 - Analyze project ideas and extract core requirements
@@ -20,12 +23,12 @@ Guidelines:
 - Structure information logically and comprehensively
 - Focus on user value and business objectives`;
 
-export const GENERATE_PRD_FROM_IDEA_PROMPT = `Based on the following project idea, generate a comprehensive Product Requirements Document (PRD).
+const GENERATE_PRD_FROM_IDEA_PROMPT = `Based on the following project idea, generate a comprehensive Product Requirements Document (PRD).
 
-Project Idea: {projectIdea}
-Target Users: {targetUsers}
-Timeline: {timeline}
-Complexity Level: {complexity}
+Project Idea: {{projectIdea}}
+Target Users: {{targetUsers}}
+Timeline: {{timeline}}
+Complexity Level: {{complexity}}
 
 Please create a detailed PRD that includes:
 
@@ -65,11 +68,11 @@ Please create a detailed PRD that includes:
 
 Return the response as a structured JSON object matching the PRDDocument schema.`;
 
-export const ENHANCE_EXISTING_PRD_PROMPT = `Review and enhance the following PRD to make it more comprehensive and actionable.
+const ENHANCE_EXISTING_PRD_PROMPT = `Review and enhance the following PRD to make it more comprehensive and actionable.
 
-Current PRD: {currentPRD}
-Enhancement Type: {enhancementType}
-Focus Areas: {focusAreas}
+Current PRD: {{currentPRD}}
+Enhancement Type: {{enhancementType}}
+Focus Areas: {{focusAreas}}
 
 Please enhance the PRD by:
 
@@ -90,9 +93,9 @@ Focus particularly on:
 
 Return the enhanced PRD as a structured JSON object.`;
 
-export const EXTRACT_FEATURES_FROM_PRD_PROMPT = `Analyze the following PRD and extract a comprehensive list of features that need to be implemented.
+const EXTRACT_FEATURES_FROM_PRD_PROMPT = `Analyze the following PRD and extract a comprehensive list of features that need to be implemented.
 
-PRD Content: {prdContent}
+PRD Content: {{prdContent}}
 
 For each feature, provide:
 
@@ -109,9 +112,9 @@ Group related features together and ensure comprehensive coverage of the PRD req
 
 Return as a structured JSON array of FeatureRequirement objects.`;
 
-export const VALIDATE_PRD_COMPLETENESS_PROMPT = `Evaluate the following PRD for completeness and quality. Identify any gaps, inconsistencies, or areas that need improvement.
+const VALIDATE_PRD_COMPLETENESS_PROMPT = `Evaluate the following PRD for completeness and quality. Identify any gaps, inconsistencies, or areas that need improvement.
 
-PRD to Validate: {prdContent}
+PRD to Validate: {{prdContent}}
 
 Please assess:
 
@@ -144,11 +147,11 @@ Please assess:
 
 Return a detailed assessment with specific recommendations for improvement.`;
 
-export const GENERATE_USER_STORIES_PROMPT = `Based on the following feature description, generate comprehensive user stories that cover all aspects of the feature.
+const GENERATE_USER_STORIES_PROMPT = `Based on the following feature description, generate comprehensive user stories that cover all aspects of the feature.
 
-Feature: {featureTitle}
-Description: {featureDescription}
-Target Users: {targetUsers}
+Feature: {{featureTitle}}
+Description: {{featureDescription}}
+Target Users: {{targetUsers}}
 
 Generate user stories that:
 
@@ -173,55 +176,60 @@ Ensure stories are:
 
 Return as a structured JSON array of user stories.`;
 
-/**
- * Helper function to format prompts with variables
- */
-export function formatPrompt(template: string, variables: Record<string, string>): string {
-  let formatted = template;
+export const PRD_PROMPT_IDS = {
+  system: "prd.system",
+  generateFromIdea: "prd.generate-from-idea",
+  enhanceExisting: "prd.enhance-existing",
+  extractFeatures: "prd.extract-features",
+  validateCompleteness: "prd.validate-completeness",
+  generateUserStories: "prd.generate-user-stories",
+} as const;
 
-  for (const [key, value] of Object.entries(variables)) {
-    const placeholder = `{${key}}`;
-    formatted = formatted.replace(new RegExp(placeholder, "g"), value);
-  }
-
-  return formatted;
+/** Register every PRD prompt (version 1.0.0). */
+export function registerPRDPrompts(registry: PromptRegistry): void {
+  registry.register(PRD_PROMPT_IDS.system, "1.0.0", PRD_GENERATION_SYSTEM_PROMPT);
+  registry.register(PRD_PROMPT_IDS.generateFromIdea, "1.0.0", GENERATE_PRD_FROM_IDEA_PROMPT);
+  registry.register(PRD_PROMPT_IDS.enhanceExisting, "1.0.0", ENHANCE_EXISTING_PRD_PROMPT);
+  registry.register(PRD_PROMPT_IDS.extractFeatures, "1.0.0", EXTRACT_FEATURES_FROM_PRD_PROMPT);
+  registry.register(PRD_PROMPT_IDS.validateCompleteness, "1.0.0", VALIDATE_PRD_COMPLETENESS_PROMPT);
+  registry.register(PRD_PROMPT_IDS.generateUserStories, "1.0.0", GENERATE_USER_STORIES_PROMPT);
 }
 
 /**
- * PRD Generation prompt configurations
+ * PRD Generation prompt configurations: registry ids plus generation settings.
  */
 export const PRD_PROMPT_CONFIGS = {
   generateFromIdea: {
-    systemPrompt: PRD_GENERATION_SYSTEM_PROMPT,
-    userPrompt: GENERATE_PRD_FROM_IDEA_PROMPT,
+    systemPromptId: PRD_PROMPT_IDS.system,
+    userPromptId: PRD_PROMPT_IDS.generateFromIdea,
     maxTokens: 4000,
     temperature: 0.7,
   },
 
   enhanceExisting: {
-    systemPrompt: PRD_GENERATION_SYSTEM_PROMPT,
-    userPrompt: ENHANCE_EXISTING_PRD_PROMPT,
+    systemPromptId: PRD_PROMPT_IDS.system,
+    userPromptId: PRD_PROMPT_IDS.enhanceExisting,
     maxTokens: 3000,
     temperature: 0.6,
   },
 
   extractFeatures: {
-    systemPrompt: PRD_GENERATION_SYSTEM_PROMPT,
-    userPrompt: EXTRACT_FEATURES_FROM_PRD_PROMPT,
+    systemPromptId: PRD_PROMPT_IDS.system,
+    userPromptId: PRD_PROMPT_IDS.extractFeatures,
     maxTokens: 2500,
     temperature: 0.5,
   },
 
   validateCompleteness: {
-    systemPrompt: PRD_GENERATION_SYSTEM_PROMPT,
-    userPrompt: VALIDATE_PRD_COMPLETENESS_PROMPT,
+    systemPromptId: PRD_PROMPT_IDS.system,
+    userPromptId: PRD_PROMPT_IDS.validateCompleteness,
     maxTokens: 2000,
     temperature: 0.4,
   },
 
   generateUserStories: {
-    systemPrompt: PRD_GENERATION_SYSTEM_PROMPT,
-    userPrompt: GENERATE_USER_STORIES_PROMPT,
+    systemPromptId: PRD_PROMPT_IDS.system,
+    userPromptId: PRD_PROMPT_IDS.generateUserStories,
     maxTokens: 2000,
     temperature: 0.6,
   },

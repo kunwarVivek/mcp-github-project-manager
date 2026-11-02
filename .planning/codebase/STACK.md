@@ -1,8 +1,8 @@
 # Technology Stack
 
-**Analysis Date:** 2026-10-21
+**Analysis Date:** 2026-11-02
 
-**Updated:** 2026-10-21 — rewritten for the current stack: TypeScript 7, Vitest 5, Biome 2.5, npm + pnpm, MCP SDK v2, zod 4. The previous snapshot described the pre-migration toolchain and is no longer accurate.
+**Updated:** 2026-11-02 — versions re-read from `package.json` / `.node-version`; OpenTelemetry, `@octokit/auth-app`, handlebars/graphlib added; Husky removed (not a dependency).
 
 ## Languages
 
@@ -10,7 +10,7 @@
 - TypeScript 7.0.2 - All source code in `src/`
 
 **Secondary:**
-- JavaScript (ESM) - Build helper `scripts/fix-imports.js`, Husky hook scripts
+- JavaScript (ESM) - Build/CI helper scripts in `scripts/` (`fix-imports.js`, `check-doc-counts.js`, `check-lockfiles.js`)
 
 ## Runtime
 
@@ -34,7 +34,7 @@
 - `@modelcontextprotocol/client` ^2.3.1 - dev/test client
 - Octokit `@octokit/rest` ^22.0.1 - GitHub REST + GraphQL API client
 - `@octokit/auth-app` ^8.3.1 - GitHub App installation auth
-- Vercel AI SDK `ai` ^7.0.146 - Unified AI model interface
+- Vercel AI SDK `ai` ^7.0.148 - Unified AI model interface
 
 **Testing:**
 - Vitest ^5.0.5 - Test runner (config: `vitest.config.ts`)
@@ -46,7 +46,6 @@
 **Build/Dev:**
 - TypeScript ^7.0.2 - Compiler (`tsc -p tsconfig.build.json`)
 - rimraf ^6.1.3 - Build cleanup
-- Husky ^9.1.7 - Git hooks
 
 **Linting/Formatting:**
 - Biome ^2.5.15 (`@biomejs/biome`) - **both** linting and formatting, configured in `biome.json`
@@ -57,13 +56,13 @@
 **Critical:**
 - `@modelcontextprotocol/server` ^2.3.1 - Core MCP protocol implementation for LLM tool exposure
 - `@octokit/rest` ^22.0.1 - GitHub API client for all GitHub operations
-- `ai` ^7.0.146 - Vercel AI SDK for multi-provider AI model access
+- `ai` ^7.0.148 - Vercel AI SDK for multi-provider AI model access
 
 **AI Provider SDKs:**
-- `@ai-sdk/anthropic` ^4.0.84 - Claude models
-- `@ai-sdk/openai` ^4.0.98 - OpenAI/GPT models
-- `@ai-sdk/google` ^4.0.101 - Gemini models
-- `@ai-sdk/perplexity` ^5.0.16 - Perplexity models (research)
+- `@ai-sdk/anthropic` ^4.0.85 - Claude models
+- `@ai-sdk/openai` ^4.0.99 - OpenAI/GPT models
+- `@ai-sdk/google` ^4.0.102 - Gemini models
+- `@ai-sdk/perplexity` ^5.0.17 - Perplexity models (research)
 - `@ai-sdk/provider` `4.0.31` - **pinned exact and a direct dependency**: `ai`@7 does not re-export `LanguageModelV4*`, and pnpm does not hoist transitive packages the way npm did. An undeclared import compiles under npm and fails under pnpm.
 
 **Infrastructure:**
@@ -74,6 +73,9 @@
 - `commander` ^15.0.0 - CLI argument parsing
 - `cockatiel` ^4.0.0 - Retry/resilience
 - `reflect-metadata` ^0.2.2 - Required by tsyringe decorator metadata
+- `handlebars` ^4.7.10 - PRD/task template rendering
+- `graphlib` ^2.1.8 - dependency-graph analysis
+- OpenTelemetry (`@opentelemetry/api` ^1.10.0, `sdk-trace` ^3.0.0, `exporter-trace-otlp-http` ^0.300.0, `resources`, `context-async-hooks`, `semantic-conventions`) - opt-in OTLP tracing, active only when `OTEL_EXPORTER_OTLP_ENDPOINT` is set
 
 ## Configuration
 
@@ -110,6 +112,14 @@
 - `AI_FALLBACK_MODEL` - Fallback model
 - `AI_PRD_MODEL` - PRD generation
 - Per-role overrides: `AI_<ROLE>_PROVIDER`, `AI_<ROLE>_API_KEY`, `AI_<ROLE>_BASE_URL` (supports any OpenAI-protocol endpoint)
+
+**Operational configuration (all optional):**
+- `RATE_LIMIT_FLOOR` (default 100) - GraphQL points below which the client backs off
+- `AUDIT_LOG_ENABLED`, `AUDIT_LOG_PATH` (default `.mcp-audit/mutations.jsonl`) - mutation audit log
+- `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_SERVICE_NAME` - OpenTelemetry tracing
+- `LOG_LEVEL`, `LOG_FORMAT` (`text` | `json`) - logger
+- `AI_SESSION_TOKEN_LIMIT` (0 = unlimited) - per-session AI token budget
+- Webhook server: `WEBHOOK_HOST` (default `127.0.0.1`), `WEBHOOK_PORT`, `WEBHOOK_SECRET`, `WEBHOOK_ALLOW_UNSIGNED`, `EVENTS_AUTH_TOKEN`, `EVENTS_ALLOW_UNAUTHENTICATED`, `WEBHOOK_TRUSTED_PROXIES`, `WEBHOOK_ALLOWED_ORIGINS`, `WEBHOOK_RATE_LIMIT`, `WEBHOOK_RATE_WINDOW_MS`, `WEBHOOK_TIMEOUT_MS`
 
 **Build:**
 - `tsconfig.json` - Base config (ES2022 target, ESNext modules, `moduleResolution: bundler`)
@@ -160,12 +170,12 @@ npm start          # Run compiled build/index.js
 **Development:**
 - Node.js >= 22.12.0 (24 recommended; `.node-version` pins 24)
 - npm or pnpm (both supported, both lockfiles committed)
-- Git (for husky hooks)
+- Git
 
 **Production:**
 - Node.js >= 22.12.0
 - Runs as MCP server over stdio transport
-- Optional: HTTP server for webhooks (port 3001 default)
+- Optional: HTTP server for webhooks/SSE (port 3001 default, bound to `127.0.0.1` unless `WEBHOOK_HOST` says otherwise)
 
 **Deployment:**
 - Published to npm as `mcp-github-project-manager`
@@ -175,4 +185,4 @@ npm start          # Run compiled build/index.js
 
 ---
 
-*Stack analysis: 2026-10-21*
+*Stack analysis: 2026-11-02*

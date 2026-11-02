@@ -1,19 +1,31 @@
 /**
  * Compound tool executors that route action-based compound tool calls
- * to existing granular executors and PMS service methods.
+ * to the typed sub-services (IssueService, MilestoneService, ...) and to
+ * the standalone execute* functions.
  *
- * Each executor extracts the `action` discriminator, strips it from the
- * args, and dispatches to the underlying implementation — either a PMS
- * facade method or a standalone execute* function.
+ * Each executor extracts the `action` discriminator, validates the arguments
+ * the action needs, and calls the owning sub-service directly.
  */
 
 import { createProjectManagementService } from "../../../container";
-import { CACHE_DIRECTORY, GITHUB_OWNER, GITHUB_REPO, GITHUB_TOKEN } from "../../../env";
+import { ResourceStatus } from "../../../domain/resource-types";
+import type { Project } from "../../../domain/types";
+import { CACHE_DIRECTORY, GITHUB_OWNER, GITHUB_REPO } from "../../../env";
+import { AnalyticsService } from "../../../services/AnalyticsService";
 import type { ProjectManagementService } from "../../../services/ProjectManagementService";
+import { safeCall } from "../../../services/utils/safeCall";
 import { ProjectFieldSetup } from "../../agent/ProjectFieldSetup";
+import { resolveGitHubAuth } from "../../github/GitHubAuthResolver";
 import type { GitHubRepositoryFactory } from "../../github/GitHubRepositoryFactory";
 import { projectFieldUnionSelection } from "../../github/project-field-fragments";
+import {
+  fingerprintOf,
+  getIdempotencyStore,
+  isIdempotentCreate,
+} from "../../idempotency/IdempotencyStore";
 import { Logger } from "../../logger";
+import { AI_SPENDING_TOOL_NAMES } from "../ai-spending-tools";
+import { getSharedAgentStore } from "../shared-services";
 import { createGitHubFactory } from "../tool-factory";
 
 const logger = Logger.getInstance();
@@ -34,7 +46,7 @@ import { IssueEnrichmentService } from "../../../services/IssueEnrichmentService
 import { IssueTriagingService } from "../../../services/IssueTriagingService";
 import { RoadmapPlanningService } from "../../../services/RoadmapPlanningService";
 // PM coordination services
-import { AgentNotFoundError, AgentStore } from "../../agent/AgentStore";
+import { AgentNotFoundError, type AgentStore } from "../../agent/AgentStore";
 import { ItemHeartbeatStore } from "../../agent/ItemHeartbeatStore";
 import { WorkProductStore } from "../../agent/WorkProductStore";
 import { EventStore } from "../../events/EventStore";
@@ -141,6 +153,7 @@ import type {
   AiAnalyzeArgs,
   AiGenerateArgs,
   AiPlanArgs,
+  AnalyticsArgs,
   DiscoverToolsArgs,
   ManageAutomationArgs,
   ManageEventsArgs,
@@ -160,22 +173,91 @@ import type {
 // ============================================================================
 
 /**
- * Dynamic PMS facade dispatch. Each compound action maps to exactly one
- * PMS method; the switch/case structure enforces the mapping at compile time.
- *
- * Uses `as unknown as` because PMS methods are individually typed but
- * compound dispatch routes by action string — the compound schema
- * guarantees the required fields per action.
+ * Fail with a consistent, field-level message when an action's required
+ * argument is missing. The compound schemas keep every field optional (one flat
+ * object covers all actions), so each action checks what it needs.
  */
-function pms(svc: ProjectManagementService, method: string, ...args: unknown[]): unknown {
-  const target = svc as unknown as Record<string, (...a: unknown[]) => unknown>;
-  return target[method](...args);
+function need<T>(value: T | undefined | null, field: string, tool: string, action: string): T {
+  if (value === undefined || value === null) {
+    throw new Error(`${field} is required for ${tool} ${action}`);
+  }
+  return value;
+}
+
+/**
+ * Pick the identifying fields of a created object for the idempotency log, so
+ * a replay answers with a summary of what the first call produced.
+ */
+function describeCreated(value: unknown): unknown {
+  if (!value || typeof value !== "object") return value;
+  const source = value as Record<string, unknown>;
+  const summary: Record<string, unknown> = {};
+  for (const key of ["id", "number", "title", "name", "url", "success", "message"]) {
+    if (source[key] !== undefined) summary[key] = source[key];
+  }
+  return summary;
+}
+
+/**
+ * Run an action once per `idempotencyKey`. Only creates registered in
+ * `isIdempotentCreate` honour the key; for every other action the key is
+ * ignored. A replay returns the original result flagged `replayed: true`, or —
+ * when the result was only recovered from the audit log — its summary.
+ * Reusing a key with different arguments throws `IdempotencyConflictError`.
+ */
+async function withIdempotency<A extends { action: string; idempotencyKey?: string }>(
+  tool: string,
+  args: A,
+  run: (args: Omit<A, "idempotencyKey">) => Promise<unknown>
+): Promise<unknown> {
+  const { idempotencyKey, ...rest } = args;
+  if (idempotencyKey === undefined || !isIdempotentCreate(tool, args.action)) {
+    return run(rest);
+  }
+  const outcome = await getIdempotencyStore().run(
+    idempotencyKey,
+    fingerprintOf(tool, args.action, args),
+    () => run(rest),
+    describeCreated
+  );
+  if (!outcome.replayed) return outcome.value;
+  if (outcome.value && typeof outcome.value === "object" && !Array.isArray(outcome.value)) {
+    return { ...outcome.value, replayed: true };
+  }
+  return {
+    replayed: true,
+    ...(outcome.value !== undefined ? { result: outcome.value } : {}),
+    ...(outcome.summary !== undefined ? { summary: outcome.summary } : {}),
+  };
+}
+
+/**
+ * Like {@link route}, for list actions backed by a cursor: the optional
+ * `cursor` input is the `after` cursor of the underlying page, and a page
+ * with more results answers with `nextCursor` (additive to `pageInfo`).
+ */
+async function routePaged<TArgs, TResult>(
+  executor: (args: TArgs) => Promise<TResult>,
+  args: { cursor?: string; after?: string }
+): Promise<unknown> {
+  const { cursor, ...rest } = args;
+  const pageArgs =
+    cursor !== undefined && rest.after === undefined ? { ...rest, after: cursor } : rest;
+  const result: unknown = await route(executor, pageArgs);
+  if (!result || typeof result !== "object" || !("pageInfo" in result)) return result;
+  const pageInfo = result.pageInfo;
+  if (!pageInfo || typeof pageInfo !== "object") return result;
+  const hasNextPage = "hasNextPage" in pageInfo && pageInfo.hasNextPage === true;
+  const endCursor =
+    "endCursor" in pageInfo && typeof pageInfo.endCursor === "string" ? pageInfo.endCursor : null;
+  return { ...result, nextCursor: hasNextPage ? endCursor : null };
 }
 
 /**
  * Routes compound args to a granular executor function. The action
- * discriminator guarantees structural compatibility; the executor provides
- * its own runtime validation.
+ * discriminator guarantees structural compatibility; argument validation is
+ * NOT done here — each executor validates its own args (ToolValidator) and
+ * throws a field-level ToolArgumentError on invalid input.
  *
  * The granular executors are written to the MCP tool-result convention
  * (`{ content, structuredContent }`) because they are the implementation
@@ -228,7 +310,7 @@ function toPlain<T>(value: T): T {
 let _pms: ProjectManagementService | null = null;
 function getPMS(): ProjectManagementService {
   if (!_pms) {
-    _pms = createProjectManagementService(GITHUB_OWNER, GITHUB_REPO, GITHUB_TOKEN);
+    _pms = createProjectManagementService(GITHUB_OWNER, GITHUB_REPO, resolveGitHubAuth());
   }
   return _pms;
 }
@@ -446,58 +528,200 @@ async function settleConvergedTask(params: {
 // 1. manage_project
 // ============================================================================
 
-export async function executeManageProject(args: ManageProjectArgs): Promise<unknown> {
+export function executeManageProject(args: ManageProjectArgs): Promise<unknown> {
+  return withIdempotency("manage_project", args, dispatchManageProject);
+}
+
+/** `closed`/`status` of a `project.update`: true closes, false reopens, undefined leaves it. */
+function requestedProjectClosedState(rest: {
+  closed?: boolean;
+  status?: string;
+}): boolean | undefined {
+  if (rest.closed !== undefined) return rest.closed;
+  if (rest.status === undefined) return undefined;
+  if (rest.status === "closed") return true;
+  if (rest.status === "active" || rest.status === "open") return false;
+  throw new Error('status for manage_project update must be "active" or "closed"');
+}
+
+async function dispatchManageProject(
+  args: Omit<ManageProjectArgs, "idempotencyKey">
+): Promise<unknown> {
   const { action, ...rest } = args;
   const svc = getPMS();
+  const req = <T>(value: T | undefined | null, field: string): T =>
+    need(value, field, "manage_project", action);
 
   switch (action) {
-    // ── PMS passthrough (single-object arg) — serialize entity results ─
+    // ── Projects ─────────────────────────────────────────────────
     case "create":
-      return toPlain(await pms(svc, "createProject", rest));
-    case "update":
-      return toPlain(await pms(svc, "updateProject", rest));
+      return toPlain(
+        await svc.projects.createProject({
+          title: req(rest.title, "title"),
+          shortDescription: rest.shortDescription ?? rest.description,
+          visibility: rest.visibility,
+        })
+      );
+    case "update": {
+      const projectId = req(rest.projectId, "projectId");
+      const closed = requestedProjectClosedState(rest);
+      const fields = {
+        title: rest.title,
+        description: rest.description ?? rest.shortDescription,
+        visibility: rest.visibility,
+      };
+      const hasFields = Object.values(fields).some((value) => value !== undefined);
+      if (!hasFields && closed === undefined) {
+        throw new Error(
+          "manage_project update needs at least one of title, description (or shortDescription), visibility, closed or status"
+        );
+      }
+      let project: Project | undefined;
+      if (hasFields) project = await svc.projects.updateProject({ projectId, ...fields });
+      if (closed === true) project = await svc.projects.closeProject(projectId);
+      else if (closed === false) project = await svc.projects.reopenProject(projectId);
+      return toPlain(project);
+    }
     case "delete":
-      return toPlain(await pms(svc, "deleteProject", rest));
-    case "get_readme":
-      return toPlain(await pms(svc, "getProjectReadme", rest));
-    case "update_readme":
-      return toPlain(await pms(svc, "updateProjectReadme", rest));
-    case "create_field":
-      return toPlain(await pms(svc, "createProjectField", rest));
-    case "list_fields":
-      return toPlain(await pms(svc, "listProjectFields", rest));
-    case "update_field":
-      return toPlain(await pms(svc, "updateProjectField", rest));
-    case "create_view":
-      return toPlain(await pms(svc, "createProjectView", rest));
-    case "list_views":
-      return toPlain(await pms(svc, "listProjectViews", rest));
-    case "update_view":
-      return toPlain(await pms(svc, "updateProjectView", rest));
-    case "delete_view":
-      return toPlain(await pms(svc, "deleteProjectView", rest));
-    case "add_item":
-      return toPlain(await pms(svc, "addProjectItem", rest));
-    case "remove_item":
-      return toPlain(await pms(svc, "removeProjectItem", rest));
-    case "list_items":
-      return toPlain(await pms(svc, "listProjectItems", rest));
-    case "archive_item":
-      return toPlain(await pms(svc, "archiveProjectItem", rest));
-    case "unarchive_item":
-      return toPlain(await pms(svc, "unarchiveProjectItem", rest));
-    case "set_field_value":
-      return toPlain(await pms(svc, "setFieldValue", rest));
-    case "get_field_value":
-      return toPlain(await pms(svc, "getFieldValue", rest));
-    case "clear_field_value":
-      return toPlain(await pms(svc, "clearFieldValue", rest));
-
-    // ── PMS destructured ─────────────────────────────────────────
+      return toPlain(
+        await svc.projects.deleteProject({ projectId: req(rest.projectId, "projectId") })
+      );
     case "list":
-      return toPlain(await pms(svc, "listProjects", rest.status, rest.limit));
+      return toPlain(await svc.projects.listProjects(rest.status ?? "active", rest.limit ?? 10));
     case "get":
-      return toPlain(await pms(svc, "getProject", rest.projectId));
+      return toPlain(await svc.projects.getProject(req(rest.projectId, "projectId")));
+
+    // ── Readme / fields / views ──────────────────────────────────
+    case "get_readme":
+      return toPlain(
+        await svc.templates.getProjectReadme({ projectId: req(rest.projectId, "projectId") })
+      );
+    case "update_readme":
+      return toPlain(
+        await svc.templates.updateProjectReadme({
+          projectId: req(rest.projectId, "projectId"),
+          readme: req(rest.readme, "readme"),
+        })
+      );
+    case "create_field":
+      return toPlain(
+        await svc.templates.createProjectField({
+          projectId: req(rest.projectId, "projectId"),
+          name: req(rest.name, "name"),
+          type: req(rest.type, "type"),
+          options: rest.options,
+        })
+      );
+    case "list_fields":
+      return toPlain(
+        await svc.templates.listProjectFields({ projectId: req(rest.projectId, "projectId") })
+      );
+    case "update_field":
+      return toPlain(
+        await svc.templates.updateProjectField({
+          projectId: req(rest.projectId, "projectId"),
+          fieldId: req(rest.fieldId, "fieldId"),
+          name: rest.name,
+          options: rest.options,
+        })
+      );
+    case "create_view":
+      return toPlain(
+        await svc.templates.createProjectView({
+          projectId: req(rest.projectId, "projectId"),
+          name: req(rest.name, "name"),
+          layout: rest.layout ?? "table",
+        })
+      );
+    case "list_views":
+      return toPlain(
+        await svc.templates.listProjectViews({
+          projectId: req(rest.projectId, "projectId"),
+          name: rest.name,
+          viewId: rest.viewId,
+        })
+      );
+    case "update_view":
+      return toPlain(
+        await svc.templates.updateProjectView({
+          projectId: req(rest.projectId, "projectId"),
+          viewId: req(rest.viewId, "viewId"),
+          name: rest.name,
+          layout: rest.layout,
+        })
+      );
+    case "delete_view":
+      return toPlain(
+        await svc.templates.deleteProjectView({
+          projectId: req(rest.projectId, "projectId"),
+          viewId: req(rest.viewId, "viewId"),
+        })
+      );
+
+    // ── Items ────────────────────────────────────────────────────
+    case "add_item":
+      return toPlain(
+        await svc.linking.addProjectItem({
+          projectId: req(rest.projectId, "projectId"),
+          contentId: req(rest.contentId, "contentId"),
+          contentType: req(rest.contentType, "contentType"),
+        })
+      );
+    case "remove_item":
+      return toPlain(
+        await svc.linking.removeProjectItem({
+          projectId: req(rest.projectId, "projectId"),
+          itemId: req(rest.itemId, "itemId"),
+        })
+      );
+    case "list_items":
+      return toPlain(
+        await svc.linking.listProjectItems({
+          projectId: req(rest.projectId, "projectId"),
+          limit: rest.limit,
+        })
+      );
+    case "archive_item":
+      return toPlain(
+        await svc.linking.archiveProjectItem({
+          projectId: req(rest.projectId, "projectId"),
+          itemId: req(rest.itemId, "itemId"),
+        })
+      );
+    case "unarchive_item":
+      return toPlain(
+        await svc.linking.unarchiveProjectItem({
+          projectId: req(rest.projectId, "projectId"),
+          itemId: req(rest.itemId, "itemId"),
+        })
+      );
+
+    // ── Field values ─────────────────────────────────────────────
+    case "set_field_value":
+      return toPlain(
+        await svc.fieldValues.setFieldValue({
+          projectId: req(rest.projectId, "projectId"),
+          itemId: req(rest.itemId, "itemId"),
+          fieldId: req(rest.fieldId, "fieldId"),
+          value: rest.value,
+        })
+      );
+    case "get_field_value":
+      return toPlain(
+        await svc.fieldValues.getFieldValue({
+          projectId: req(rest.projectId, "projectId"),
+          itemId: req(rest.itemId, "itemId"),
+          fieldId: req(rest.fieldId, "fieldId"),
+        })
+      );
+    case "clear_field_value":
+      return toPlain(
+        await svc.fieldValues.clearFieldValue({
+          projectId: req(rest.projectId, "projectId"),
+          itemId: req(rest.itemId, "itemId"),
+          fieldId: req(rest.fieldId, "fieldId"),
+        })
+      );
 
     // ── Standalone executors — lifecycle ──────────────────────────
     case "close":
@@ -513,7 +737,7 @@ export async function executeManageProject(args: ManageProjectArgs): Promise<unk
     case "copy_from_template":
       return route(executeCopyProjectFromTemplate, rest);
     case "list_templates":
-      return route(executeListOrganizationTemplates, rest);
+      return routePaged(executeListOrganizationTemplates, rest);
 
     // ── Standalone executors — linking ────────────────────────────
     case "link_to_repo":
@@ -525,36 +749,34 @@ export async function executeManageProject(args: ManageProjectArgs): Promise<unk
     case "unlink_from_team":
       return route(executeUnlinkProjectFromTeam, rest);
     case "list_linked_repos":
-      return route(executeListLinkedRepositories, rest);
+      return routePaged(executeListLinkedRepositories, rest);
     case "list_linked_teams":
-      return route(executeListLinkedTeams, rest);
+      return routePaged(executeListLinkedTeams, rest);
 
     // ── Standalone executors — advanced ──────────────────────────
     case "update_item_position":
       return route(executeUpdateItemPosition, rest);
     case "filter_items":
-      return route(executeFilterProjectItems, rest);
+      return routePaged(executeFilterProjectItems, rest);
 
     // ── Agent field setup ────────────────────────────────────────
     case "setup_agent_fields": {
       const factory = createGitHubFactory();
       const setup = new ProjectFieldSetup(factory);
-      return setup.ensureFields(rest.projectId as string);
+      return setup.ensureFields(req(rest.projectId, "projectId"));
     }
 
     // ── Project access (roles / collaborators) ───────────────────
     case "set_collaborators": {
-      if (!rest.projectId) {
-        throw new Error("projectId is required for set_collaborators");
-      }
-      if (!rest.collaborators || rest.collaborators.length === 0) {
+      const collaborators = req(rest.collaborators, "collaborators");
+      if (collaborators.length === 0) {
         throw new Error("collaborators is required for set_collaborators");
       }
       return toPlain(
-        await pms(svc, "setProjectCollaborators", {
-          projectId: rest.projectId,
+        await svc.projects.setProjectCollaborators({
+          projectId: req(rest.projectId, "projectId"),
           org: rest.org,
-          collaborators: rest.collaborators,
+          collaborators,
         })
       );
     }
@@ -568,37 +790,48 @@ export async function executeManageProject(args: ManageProjectArgs): Promise<unk
 // 2. manage_issues
 // ============================================================================
 
-export async function executeManageIssues(args: ManageIssuesArgs): Promise<unknown> {
+export function executeManageIssues(args: ManageIssuesArgs): Promise<unknown> {
+  return withIdempotency("manage_issues", args, dispatchManageIssues);
+}
+
+async function dispatchManageIssues(
+  args: Omit<ManageIssuesArgs, "idempotencyKey">
+): Promise<unknown> {
   const { action, ...rest } = args;
   const svc = getPMS();
+  const req = <T>(value: T | undefined | null, field: string): T =>
+    need(value, field, "manage_issues", action);
 
   switch (action) {
-    // ── PMS passthrough — serialize entity results ────────────────
     case "create":
-      return toPlain(await pms(svc, "createIssue", rest));
+      return toPlain(
+        await svc.issues.createIssue({
+          title: req(rest.title, "title"),
+          description: rest.description ?? "",
+          milestoneId: rest.milestoneId ?? undefined,
+          assignees: rest.assignees,
+          labels: rest.labels,
+          priority: rest.priority,
+          type: rest.type,
+        })
+      );
     case "list":
-      return toPlain(await pms(svc, "listIssues", rest));
-    case "create_comment":
-      return toPlain(await pms(svc, "createIssueComment", rest));
-    case "update_comment":
-      return toPlain(await pms(svc, "updateIssueComment", rest));
-    case "delete_comment":
-      return toPlain(await pms(svc, "deleteIssueComment", rest));
-    case "list_comments":
-      return toPlain(await pms(svc, "listIssueComments", rest));
-    case "create_draft":
-      return toPlain(await pms(svc, "createDraftIssue", rest));
-    case "update_draft":
-      return toPlain(await pms(svc, "updateDraftIssue", rest));
-    case "delete_draft":
-      return toPlain(await pms(svc, "deleteDraftIssue", rest));
-
-    // ── PMS destructured ─────────────────────────────────────────
+      return toPlain(
+        await svc.issues.listIssues({
+          status: rest.status,
+          milestone: rest.milestone,
+          labels: rest.labels,
+          assignee: rest.assignee,
+          sort: rest.sort,
+          direction: rest.direction,
+          limit: rest.limit,
+        })
+      );
     case "get":
-      return toPlain(await pms(svc, "getIssue", rest.issueId));
+      return toPlain(await svc.issues.getIssue(req(rest.issueId, "issueId")));
     case "update":
       return toPlain(
-        await pms(svc, "updateIssue", rest.issueId, {
+        await svc.issues.updateIssue(req(rest.issueId, "issueId"), {
           title: rest.title,
           description: rest.description,
           status: rest.status,
@@ -609,50 +842,97 @@ export async function executeManageIssues(args: ManageIssuesArgs): Promise<unkno
         })
       );
 
+    // ── Comments ─────────────────────────────────────────────────
+    case "create_comment":
+      return toPlain(
+        await svc.issues.createIssueComment({
+          issueNumber: req(rest.issueNumber, "issueNumber"),
+          body: req(rest.body, "body"),
+        })
+      );
+    case "update_comment":
+      return toPlain(
+        await svc.issues.updateIssueComment({
+          commentId: req(rest.commentId, "commentId"),
+          body: req(rest.body, "body"),
+        })
+      );
+    case "delete_comment":
+      return toPlain(
+        await svc.issues.deleteIssueComment({ commentId: req(rest.commentId, "commentId") })
+      );
+    case "list_comments":
+      return toPlain(
+        await svc.issues.listIssueComments({
+          issueNumber: req(rest.issueNumber, "issueNumber"),
+          limit: rest.limit,
+        })
+      );
+
+    // ── Draft issues ─────────────────────────────────────────────
+    case "create_draft":
+      return toPlain(
+        await svc.issues.createDraftIssue({
+          projectId: req(rest.projectId, "projectId"),
+          title: req(rest.title, "title"),
+          body: rest.body,
+          assigneeIds: rest.assigneeIds,
+        })
+      );
+    case "update_draft":
+      return toPlain(
+        await svc.issues.updateDraftIssue({
+          draftIssueId: req(rest.draftIssueId, "draftIssueId"),
+          title: rest.title,
+          body: rest.body,
+          assigneeIds: rest.assigneeIds,
+        })
+      );
+    case "delete_draft":
+      return toPlain(
+        await svc.issues.deleteDraftIssue({
+          draftIssueId: req(rest.draftIssueId, "draftIssueId"),
+        })
+      );
+
     // ── Native issue capabilities ───────────────────────────────────────
     // The native "blocked by" edges, the native issue types and the reverse
     // issue→project membership. The label emulation (`blocked-by:#N`,
     // `type:x`) is the fallback when the deployment does not know the field.
-    case "list_dependencies": {
-      if (!rest.issueId) throw new Error("issueId is required for list_dependencies");
+    case "list_dependencies":
       return toPlain(
-        await pms(svc, "listIssueBlockers", rest.issueId, rest.dependencyDirection ?? "blocked_by")
+        await svc.issues.listIssueBlockers(
+          req(rest.issueId, "issueId"),
+          rest.dependencyDirection ?? "blocked_by"
+        )
       );
-    }
-    case "add_blocker": {
-      if (!rest.issueId) throw new Error("issueId is required for add_blocker");
-      if (!rest.blockingIssueId) {
-        throw new Error("blockingIssueId is required for add_blocker");
-      }
-      return toPlain(await pms(svc, "addIssueBlocker", rest.issueId, rest.blockingIssueId));
-    }
+    case "add_blocker":
+      return toPlain(
+        await svc.issues.addIssueBlocker(
+          req(rest.issueId, "issueId"),
+          req(rest.blockingIssueId, "blockingIssueId")
+        )
+      );
     case "remove_blocker": {
-      if (!rest.issueId) throw new Error("issueId is required for remove_blocker");
-      if (!rest.blockingIssueId) {
-        throw new Error("blockingIssueId is required for remove_blocker");
-      }
-      await pms(svc, "removeIssueBlocker", rest.issueId, rest.blockingIssueId);
+      const issueId = req(rest.issueId, "issueId");
+      const blockingIssueId = req(rest.blockingIssueId, "blockingIssueId");
+      await svc.issues.removeIssueBlocker(issueId, blockingIssueId);
       // The service returns nothing; an executor must hand back a payload
       // or the MCP response carries no content at all.
-      return {
-        success: true,
-        issueId: rest.issueId,
-        blockingIssueId: rest.blockingIssueId,
-        message: "Blocker removed",
-      };
+      return { success: true, issueId, blockingIssueId, message: "Blocker removed" };
     }
     case "list_issue_types":
-      return toPlain(await pms(svc, "listIssueTypes"));
+      return toPlain(await svc.issues.listIssueTypes());
 
     // ── Standalone executors ─────────────────────────────────────
     case "convert_draft":
       return route(executeConvertDraftIssue, rest);
     case "search_advanced":
-      return route(executeSearchIssuesAdvanced, rest);
+      return routePaged(executeSearchIssuesAdvanced, rest);
     case "add_sub_issue":
       return route(executeAddSubIssue, rest);
     case "list_sub_issues":
-      return route(executeListSubIssues, rest);
+      return routePaged(executeListSubIssues, rest);
     case "get_parent_issue":
       return route(executeGetParentIssue, rest);
     case "reprioritize_sub_issue":
@@ -672,22 +952,61 @@ export async function executeManageIssues(args: ManageIssuesArgs): Promise<unkno
 export async function executeManagePrs(args: ManagePrsArgs): Promise<unknown> {
   const { action, ...rest } = args;
   const svc = getPMS();
+  const req = <T>(value: T | undefined | null, field: string): T =>
+    need(value, field, "manage_prs", action);
 
   switch (action) {
     case "create":
-      return toPlain(await pms(svc, "createPullRequest", rest));
+      return toPlain(
+        await svc.pullRequests.createPullRequest({
+          title: req(rest.title, "title"),
+          body: rest.body,
+          head: req(rest.head, "head"),
+          base: req(rest.base, "base"),
+          draft: rest.draft,
+        })
+      );
     case "get":
-      return toPlain(await pms(svc, "getPullRequest", rest));
+      return toPlain(
+        await svc.pullRequests.getPullRequest({ pullNumber: req(rest.pullNumber, "pullNumber") })
+      );
     case "list":
-      return toPlain(await pms(svc, "listPullRequests", rest));
+      return toPlain(
+        await svc.pullRequests.listPullRequests({ state: rest.state, limit: rest.perPage })
+      );
     case "update":
-      return toPlain(await pms(svc, "updatePullRequest", rest));
+      return toPlain(
+        await svc.pullRequests.updatePullRequest({
+          pullNumber: req(rest.pullNumber, "pullNumber"),
+          title: rest.title,
+          body: rest.body,
+          state: rest.state === "all" ? undefined : rest.state,
+        })
+      );
     case "merge":
-      return toPlain(await pms(svc, "mergePullRequest", rest));
+      return toPlain(
+        await svc.pullRequests.mergePullRequest({
+          pullNumber: req(rest.pullNumber, "pullNumber"),
+          mergeMethod: rest.mergeMethod,
+          commitTitle: rest.commitTitle,
+          commitMessage: rest.commitMessage,
+        })
+      );
     case "list_reviews":
-      return toPlain(await pms(svc, "listPullRequestReviews", rest));
+      return toPlain(
+        await svc.pullRequests.listPullRequestReviews({
+          pullNumber: req(rest.pullNumber, "pullNumber"),
+        })
+      );
     case "create_review":
-      return toPlain(await pms(svc, "createPullRequestReview", rest));
+      return toPlain(
+        await svc.pullRequests.createPullRequestReview({
+          pullNumber: req(rest.pullNumber, "pullNumber"),
+          body: rest.body,
+          event: req(rest.event, "event"),
+          comments: rest.comments,
+        })
+      );
     default:
       unknownAction("manage_prs", action);
   }
@@ -697,29 +1016,67 @@ export async function executeManagePrs(args: ManagePrsArgs): Promise<unknown> {
 // 4. manage_milestones
 // ============================================================================
 
-export async function executeManageMilestones(args: ManageMilestonesArgs): Promise<unknown> {
+export function executeManageMilestones(args: ManageMilestonesArgs): Promise<unknown> {
+  return withIdempotency("manage_milestones", args, dispatchManageMilestones);
+}
+
+async function dispatchManageMilestones(
+  args: Omit<ManageMilestonesArgs, "idempotencyKey">
+): Promise<unknown> {
   const { action, ...rest } = args;
   const svc = getPMS();
+  const req = <T>(value: T | undefined | null, field: string): T =>
+    need(value, field, "manage_milestones", action);
 
   switch (action) {
-    // ── PMS passthrough — serialize entity results ────────────────
     case "create":
-      return toPlain(await pms(svc, "createMilestone", rest));
+      return toPlain(
+        await svc.milestones.createMilestone({
+          title: req(rest.title, "title"),
+          description: rest.description ?? "",
+          dueDate: rest.dueDate ?? undefined,
+        })
+      );
     case "update":
-      return toPlain(await pms(svc, "updateMilestone", rest));
+      return toPlain(
+        await svc.milestones.updateMilestone({
+          milestoneId: req(rest.milestoneId, "milestoneId"),
+          title: rest.title,
+          description: rest.description,
+          dueDate: rest.dueDate ?? undefined,
+          state: rest.state,
+        })
+      );
     case "delete":
-      return toPlain(await pms(svc, "deleteMilestone", rest));
-
-    // ── PMS destructured ─────────────────────────────────────────
+      return toPlain(
+        await svc.milestones.deleteMilestone({ milestoneId: req(rest.milestoneId, "milestoneId") })
+      );
     case "list":
-      return toPlain(await pms(svc, "listMilestones", rest.status, rest.sort, rest.direction));
+      return toPlain(
+        await svc.milestones.listMilestones(
+          rest.status ?? "open",
+          rest.sort ?? "due_on",
+          rest.direction ?? "asc"
+        )
+      );
     case "get_metrics":
-      return toPlain(await pms(svc, "getMilestoneMetrics", rest.milestoneId, rest.includeIssues));
+      return toPlain(
+        await svc.milestones.getMilestoneMetrics(
+          req(rest.milestoneId, "milestoneId"),
+          rest.includeIssues ?? false
+        )
+      );
     case "get_overdue":
-      return toPlain(await pms(svc, "getOverdueMilestones", rest.limit, rest.includeIssues));
+      return toPlain(
+        await svc.milestones.getOverdueMilestones(rest.limit ?? 10, rest.includeIssues ?? false)
+      );
     case "get_upcoming":
       return toPlain(
-        await pms(svc, "getUpcomingMilestones", rest.daysAhead, rest.limit, rest.includeIssues)
+        await svc.milestones.getUpcomingMilestones(
+          rest.daysAhead ?? 30,
+          rest.limit ?? 10,
+          rest.includeIssues ?? false
+        )
       );
 
     default:
@@ -731,36 +1088,103 @@ export async function executeManageMilestones(args: ManageMilestonesArgs): Promi
 // 5. manage_sprints
 // ============================================================================
 
-export async function executeManageSprints(args: ManageSprintsArgs): Promise<unknown> {
+export function executeManageSprints(args: ManageSprintsArgs): Promise<unknown> {
+  return withIdempotency("manage_sprints", args, dispatchManageSprints);
+}
+
+async function dispatchManageSprints(
+  args: Omit<ManageSprintsArgs, "idempotencyKey">
+): Promise<unknown> {
   const { action, ...rest } = args;
   const svc = getPMS();
+  const req = <T>(value: T | undefined | null, field: string): T =>
+    need(value, field, "manage_sprints", action);
 
   switch (action) {
-    // ── PMS passthrough — serialize entity results ────────────────
-    case "create": {
-      if (!rest.projectId) {
+    case "create":
+      return toPlain(
+        await svc.sprints.createSprint({
+          title: req(rest.title, "title"),
+          description: rest.description ?? "",
+          startDate: req(rest.startDate, "startDate"),
+          endDate: req(rest.endDate, "endDate"),
+          issueIds: rest.issueIds,
+          projectId: req(
+            rest.projectId,
+            "projectId (sprints are iteration fields on a specific GitHub project)"
+          ),
+        })
+      );
+    case "update": {
+      if (rest.status === "all") {
+        throw new Error('status "all" is only a list filter; use planned, active or completed');
+      }
+      return toPlain(
+        await svc.sprints.updateSprint({
+          sprintId: req(rest.sprintId, "sprintId"),
+          title: rest.title,
+          description: rest.description,
+          startDate: rest.startDate,
+          endDate: rest.endDate,
+          status: rest.status,
+          issues: rest.issueIds,
+        })
+      );
+    }
+    case "delete": {
+      const sprintId = req(rest.sprintId, "sprintId");
+      if (rest.confirm !== true) {
         throw new Error(
-          "projectId is required for sprint create — sprints are iteration fields on a specific GitHub project"
+          `manage_sprints delete removes sprint ${sprintId} from its project and clears it from every assigned item; this cannot be undone. Pass confirm: true to proceed.`
         );
       }
-      return toPlain(await pms(svc, "createSprint", rest));
+      return toPlain(await svc.sprints.deleteSprint({ sprintId }));
     }
-    case "update":
-      return toPlain(await pms(svc, "updateSprint", rest));
     case "add_issues":
-      return toPlain(await pms(svc, "addIssuesToSprint", rest));
+      return toPlain(
+        await svc.sprints.addIssuesToSprint({
+          sprintId: req(rest.sprintId, "sprintId"),
+          issueIds: req(rest.issueIds, "issueIds"),
+        })
+      );
     case "remove_issues":
-      return toPlain(await pms(svc, "removeIssuesFromSprint", rest));
-    case "plan":
-      return toPlain(await pms(svc, "planSprint", rest));
-
-    // ── PMS destructured ─────────────────────────────────────────
+      return toPlain(
+        await svc.sprints.removeIssuesFromSprint({
+          sprintId: req(rest.sprintId, "sprintId"),
+          issueIds: req(rest.issueIds, "issueIds"),
+        })
+      );
+    case "plan": {
+      const sprint = req(rest.sprint, "sprint");
+      const issueNumbers = (rest.issueIds ?? []).map((id) => Number(id));
+      if (issueNumbers.some((id) => !Number.isInteger(id))) {
+        throw new Error("issueIds for manage_sprints plan must be issue numbers");
+      }
+      return toPlain(
+        await svc.sprints.planSprint({
+          sprint: {
+            title: sprint.title,
+            description: rest.description ?? sprint.goals.join("\n"),
+            startDate: sprint.startDate,
+            endDate: sprint.endDate,
+            status: ResourceStatus.PLANNED,
+            issues: [],
+          },
+          issueIds: issueNumbers,
+        })
+      );
+    }
     case "list":
-      return toPlain(await pms(svc, "listSprints", rest.status));
+      return toPlain(await svc.sprints.listSprints(rest.status ?? "all"));
     case "get_current":
-      return toPlain(await pms(svc, "getCurrentSprint", rest.includeIssues));
+      return toPlain(await svc.sprints.getCurrentSprint(rest.includeIssues ?? true));
     case "get_metrics":
-      return toPlain(await pms(svc, "getSprintMetrics", rest.sprintId, rest.includeIssues));
+      return toPlain(
+        await svc.sprints.getSprintMetrics(
+          req(rest.sprintId, "sprintId"),
+          rest.includeIssues ?? false
+        )
+      );
 
     default:
       unknownAction("manage_sprints", action);
@@ -777,9 +1201,13 @@ export async function executeManageLabels(args: ManageLabelsArgs): Promise<unkno
 
   switch (action) {
     case "create":
-      return pms(svc, "createLabel", rest);
+      return svc.labels.createLabel({
+        name: need(rest.name, "name", "manage_labels", action),
+        color: rest.color,
+        description: rest.description,
+      });
     case "list":
-      return pms(svc, "listLabels", rest);
+      return svc.labels.listLabels({ limit: rest.limit });
     default:
       unknownAction("manage_labels", action);
   }
@@ -792,14 +1220,27 @@ export async function executeManageLabels(args: ManageLabelsArgs): Promise<unkno
 export async function executeManageAutomation(args: ManageAutomationArgs): Promise<unknown> {
   const { action, ...rest } = args;
   const svc = getPMS();
+  const req = <T>(value: T | undefined | null, field: string): T =>
+    need(value, field, "manage_automation", action);
 
   switch (action) {
-    case "list_workflows":
-      return pms(svc, "listProjectWorkflows", rest);
-    case "get_workflow":
-      return pms(svc, "getProjectWorkflow", rest);
-    case "delete_workflow":
-      return pms(svc, "deleteProjectWorkflow", rest);
+    case "list_workflows": {
+      const projectId = req(rest.projectId, "projectId");
+      return safeCall(async () => ({
+        workflows: await svc.automation.listWorkflowDTOs(projectId),
+      }));
+    }
+    case "get_workflow": {
+      const workflowId = req(rest.workflowId, "workflowId");
+      return safeCall(() => svc.automation.getWorkflowDTO(workflowId));
+    }
+    case "delete_workflow": {
+      const workflowId = req(rest.workflowId, "workflowId");
+      return safeCall(async () => {
+        await svc.automation.deleteWorkflow(workflowId);
+        return { success: true };
+      });
+    }
     default:
       unknownAction("manage_automation", action);
   }
@@ -812,18 +1253,39 @@ export async function executeManageAutomation(args: ManageAutomationArgs): Promi
 export async function executeManageIterations(args: ManageIterationsArgs): Promise<unknown> {
   const { action, ...rest } = args;
   const svc = getPMS();
+  const req = <T>(value: T | undefined | null, field: string): T =>
+    need(value, field, "manage_iterations", action);
 
   switch (action) {
     case "get_config":
-      return pms(svc, "getIterationConfiguration", rest);
+      return svc.iterations.getIterationConfiguration({
+        projectId: req(rest.projectId, "projectId"),
+        fieldName: rest.fieldName,
+      });
     case "get_current":
-      return pms(svc, "getCurrentIteration", rest);
+      return svc.iterations.getCurrentIteration({
+        projectId: req(rest.projectId, "projectId"),
+        fieldName: rest.fieldName,
+      });
     case "get_items":
-      return pms(svc, "getIterationItems", rest);
+      return svc.iterations.getIterationItems({
+        projectId: req(rest.projectId, "projectId"),
+        iterationId: req(rest.iterationId, "iterationId"),
+        limit: rest.limit,
+      });
     case "get_by_date":
-      return pms(svc, "getIterationByDate", rest);
+      return svc.iterations.getIterationByDate({
+        projectId: req(rest.projectId, "projectId"),
+        date: req(rest.date, "date"),
+        fieldName: rest.fieldName,
+      });
     case "assign_items":
-      return pms(svc, "assignItemsToIteration", rest);
+      return svc.iterations.assignItemsToIteration({
+        projectId: req(rest.projectId, "projectId"),
+        itemIds: req(rest.itemIds, "itemIds"),
+        iterationId: req(rest.iterationId, "iterationId"),
+        fieldName: rest.fieldName,
+      });
     default:
       unknownAction("manage_iterations", action);
   }
@@ -899,7 +1361,7 @@ export async function executeManageStatusUpdates(args: ManageStatusUpdatesArgs):
     case "create":
       return route(executeCreateStatusUpdate, rest);
     case "list":
-      return route(executeListStatusUpdates, rest);
+      return routePaged(executeListStatusUpdates, rest);
     case "get":
       return route(executeGetStatusUpdate, rest);
     default:
@@ -1076,7 +1538,7 @@ async function executeMaterializeTasks(args: {
     // Create milestone for this phase
     let milestoneNodeId: string | undefined;
     try {
-      const milestone = await svc.createMilestone({
+      const milestone = await svc.milestones.createMilestone({
         title: `${phaseName} — ${labelPrefix}-${Date.now().toString(36).slice(-4)}`,
         description: `Phase ${phaseIdx + 1}/${phases.length}: ${phaseTaskIds.length} task(s). ${phaseIdx > 0 ? "Requires prior phase completion." : "No dependencies — start here."}`,
         dueDate: sprintEnd.toISOString(),
@@ -1098,12 +1560,12 @@ async function executeMaterializeTasks(args: {
     // Create sprint (real GitHub iteration) for this phase
     let sprintId: string | undefined;
     try {
-      const sprint = await svc.createSprint({
+      const sprint = await svc.sprints.createSprint({
         title: `${phaseName} Sprint`,
         description: `Sprint for ${phaseName} phase`,
         startDate: sprintStart.toISOString(),
         endDate: sprintEnd.toISOString(),
-        issues: [],
+        issueIds: [],
         projectId,
       });
       sprintId = sprint.id;
@@ -1188,7 +1650,7 @@ async function executeMaterializeTasks(args: {
         if (task.priority) labels.push(`priority:${task.priority}`);
         if (task.tags) labels.push(...task.tags.slice(0, 3));
 
-        const issue = await svc.createIssue({
+        const issue = await svc.issues.createIssue({
           title: task.title,
           description: issueBody,
           labels,
@@ -1198,7 +1660,11 @@ async function executeMaterializeTasks(args: {
 
         // Add to project so agents can claim via checkoutTask
         try {
-          await svc.addProjectItem({ projectId, contentId: issue.id, contentType: "issue" });
+          await svc.linking.addProjectItem({
+            projectId,
+            contentId: issue.id,
+            contentType: "issue",
+          });
         } catch (addErr) {
           errors.push({
             title: task.title,
@@ -1225,7 +1691,7 @@ async function executeMaterializeTasks(args: {
     const phaseIssueIds = createdIssues.filter((i) => i.phase === phaseIdx).map((i) => i.id);
     if (sprintId && phaseIssueIds.length > 0) {
       try {
-        await svc.addIssuesToSprint({
+        await svc.sprints.addIssuesToSprint({
           sprintId,
           issueIds: phaseIssueIds,
         });
@@ -1351,7 +1817,7 @@ export async function executeAiAnalyze(args: AiAnalyzeArgs): Promise<unknown> {
     case "enrich_bulk": {
       const svc = getEnrichmentService();
       const pmsSvc = getPMS();
-      const items = await pmsSvc.listProjectItems({
+      const items = await pmsSvc.linking.listProjectItems({
         projectId: rest.projectId as string,
         limit: 200,
       });
@@ -1420,7 +1886,9 @@ export async function executeAiPlan(args: AiPlanArgs): Promise<unknown> {
       if (rest.projectId) {
         const planner = getRoadmapPlanningService();
         const projectTitle =
-          rest.projectTitle ?? (await getPMS().getProject(rest.projectId))?.title ?? "Project";
+          rest.projectTitle ??
+          (await getPMS().projects.getProject(rest.projectId))?.title ??
+          "Project";
         const plan = await planner.generateRoadmap({
           projectId: rest.projectId,
           projectTitle,
@@ -1659,10 +2127,10 @@ export async function executeAgentManage(args: AgentManageArgs): Promise<unknown
     case "get_budget":
       return route(executeGetBudgetStatus, withoutAction(args));
     case "set_budget": {
-      const { warningThreshold, ...budgetArgs } = withoutAction(args);
+      const budgetArgs = withoutAction(args);
       return route(executeSetAgentBudget, {
         ...budgetArgs,
-        warningFraction: budgetArgs.warningFraction ?? warningThreshold ?? 0.8,
+        warningFraction: budgetArgs.warningFraction ?? 0.8,
       });
     }
     case "record_usage":
@@ -1682,7 +2150,7 @@ export async function executeAgentManage(args: AgentManageArgs): Promise<unknown
     case "assign_task": {
       // PM explicitly assigns a task to an agent (bypasses self-service checkout)
       const factory = createGitHubFactory();
-      const store = new AgentStore(factory);
+      const store = getSharedAgentStore();
       const contextService = new AgentContextService(factory);
       const service = new TaskCheckoutService(factory, store, contextService);
       const result = await service.checkoutTask(args.agentId, {
@@ -1695,7 +2163,7 @@ export async function executeAgentManage(args: AgentManageArgs): Promise<unknown
     case "get_swarm_status": {
       // Dashboard: all agents, their tasks, heartbeats, budgets, blocked/stale detection
       const factory = createGitHubFactory();
-      const store = new AgentStore(factory);
+      const store = getSharedAgentStore();
       const budgetService = new AgentBudgetService(store);
       const agents = await store.listAgents();
       const now = Date.now();
@@ -1758,7 +2226,7 @@ export async function executeAgentManage(args: AgentManageArgs): Promise<unknown
       // available project work through the same capability/budget-aware seam
       // used by smart_assign.
       const factory = createGitHubFactory();
-      const store = new AgentStore(factory);
+      const store = getSharedAgentStore();
       const contextService = new AgentContextService(factory);
       const service = new TaskCheckoutService(factory, store, contextService);
 
@@ -1794,7 +2262,7 @@ export async function executeAgentManage(args: AgentManageArgs): Promise<unknown
       // Capability-matched, budget-aware task assignment
       // PM specifies a projectId; the system finds the best agent for each unassigned issue
       const factory = createGitHubFactory();
-      const store = new AgentStore(factory);
+      const store = getSharedAgentStore();
       const budgetService = new AgentBudgetService(store);
       const contextService = new AgentContextService(factory);
       const checkoutService = new TaskCheckoutService(factory, store, contextService);
@@ -2023,7 +2491,7 @@ export async function executeAgentManage(args: AgentManageArgs): Promise<unknown
         if (projectId) {
           try {
             const svc = getPMS();
-            await svc.addProjectItem({
+            await svc.linking.addProjectItem({
               projectId,
               contentId: newIssue.node_id,
               contentType: "issue",
@@ -2057,7 +2525,7 @@ export async function executeAgentManage(args: AgentManageArgs): Promise<unknown
       const config = factory.getConfig();
       const octokit = factory.getOctokit();
       const wpStore = new WorkProductStore(factory);
-      const store = new AgentStore(factory);
+      const store = getSharedAgentStore();
       const contextService = new AgentContextService(factory);
       const checkoutService = new TaskCheckoutService(factory, store, contextService);
       const projectId = args.projectId;
@@ -2200,7 +2668,7 @@ export async function executeAgentManage(args: AgentManageArgs): Promise<unknown
               if (projectId) {
                 try {
                   const svc = getPMS();
-                  await svc.addProjectItem({
+                  await svc.linking.addProjectItem({
                     projectId,
                     contentId: sub.node_id,
                     contentType: "issue",
@@ -2224,8 +2692,7 @@ export async function executeAgentManage(args: AgentManageArgs): Promise<unknown
 
     case "cleanup_registry": {
       // Remove stale/dead agents from the registry
-      const factory = createGitHubFactory();
-      const store = new AgentStore(factory);
+      const store = getSharedAgentStore();
       const agents = await store.listAgents();
       const staleThreshold = (args.staleAfterMinutes || 60) * 60 * 1000;
       const now = Date.now();
@@ -2497,8 +2964,10 @@ const TOOL_CATALOG: Record<
       "remove_issues",
       "get_metrics",
       "plan",
+      "delete",
     ],
-    description: "Sprints — CRUD, issue assignment, metrics, AI-powered planning",
+    description:
+      "Sprints — CRUD (delete needs confirm: true), issue assignment, metrics, AI-powered planning",
   },
   labels: {
     tool: "manage_labels",
@@ -2610,6 +3079,12 @@ const TOOL_CATALOG: Record<
     actions: ["health_check", "setup_project_fields"],
     description: "System operations — health check, project field setup",
   },
+  analytics: {
+    tool: "analytics",
+    actions: ["sprint_velocity", "sprint_burndown", "cycle_time", "throughput", "project_summary"],
+    description:
+      "Analytics — read-only sprint velocity and burndown, cycle time, throughput, project summary",
+  },
   branches: {
     tool: "manage_branches",
     actions: ["get_protection", "update_protection", "delete_protection", "list_branches"],
@@ -2637,9 +3112,6 @@ const TOOL_CATALOG: Record<
   },
 };
 
-/** AI-powered tool names that degrade when AI is unavailable. */
-const AI_TOOL_NAMES = ["ai_generate", "ai_analyze", "ai_plan"] as const;
-
 /** Domains whose tools are AI-powered. */
 const AI_DOMAINS: Record<string, true> = {
   ai_generation: true,
@@ -2656,7 +3128,7 @@ function buildAiStatus(): {
   const status = factory.getAvailabilityStatus();
   return {
     ...status,
-    degradedTools: status.available ? [] : [...AI_TOOL_NAMES],
+    degradedTools: status.available ? [] : [...AI_SPENDING_TOOL_NAMES],
   };
 }
 
@@ -2925,5 +3397,30 @@ export async function executeManageWorkflows(args: ManageWorkflowsArgs): Promise
 
     default:
       unknownAction("manage_workflows", action);
+  }
+}
+
+// ============================================================================
+// 21. analytics
+// ============================================================================
+
+export async function executeAnalytics(args: AnalyticsArgs): Promise<unknown> {
+  const { action } = args;
+  const projectId = need(args.projectId, "projectId", "analytics", action);
+  const service = new AnalyticsService(createGitHubFactory());
+
+  switch (action) {
+    case "sprint_velocity":
+      return service.sprintVelocity({ projectId, lastN: args.lastN });
+    case "sprint_burndown":
+      return service.sprintBurndown({ projectId, sprintId: args.sprintId });
+    case "cycle_time":
+      return service.cycleTime({ projectId, sinceDays: args.sinceDays });
+    case "throughput":
+      return service.throughput({ projectId, sinceDays: args.sinceDays, bucket: args.bucket });
+    case "project_summary":
+      return service.projectSummary({ projectId });
+    default:
+      unknownAction("analytics", action);
   }
 }

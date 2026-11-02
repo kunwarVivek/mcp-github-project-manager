@@ -34,13 +34,13 @@ async function createSimpleProject() {
     const service = createProjectManagementService(
       process.env.GITHUB_OWNER ?? "",
       process.env.GITHUB_REPO ?? "",
-      process.env.GITHUB_TOKEN ?? ""
+      { kind: "pat", token: process.env.GITHUB_TOKEN ?? "" }
     );
 
     console.log("Creating a simple project...");
 
     // Create a project with one milestone and two issues
-    const result = await service.createRoadmap({
+    const result = await service.roadmap.createRoadmap({
       project: {
         title: "Sample Project",
         shortDescription: "A sample project created via the MCP API",

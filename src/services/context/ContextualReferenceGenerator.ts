@@ -8,12 +8,10 @@ import type {
   RelatedFeature,
   TechnicalSpecReference,
 } from "../../domain/task-context-schemas";
-import { type ILogger, Logger } from "../../infrastructure/logger";
+import { getLogger, type ILogger } from "../../infrastructure/logger";
 import { AIServiceFactory } from "../ai/AIServiceFactory";
-import {
-  CONTEXT_GENERATION_CONFIGS,
-  formatContextPrompt,
-} from "../ai/prompts/ContextGenerationPrompts";
+import { defaultPromptRegistry } from "../ai/prompts";
+import { CONTEXT_GENERATION_CONFIGS } from "../ai/prompts/ContextGenerationPrompts";
 import { InputSanitizer } from "../utils/InputSanitizer";
 
 /**
@@ -32,7 +30,7 @@ export class ContextualReferenceGenerator {
 
   constructor(aiFactory?: AIServiceFactory, logger?: ILogger) {
     this.aiFactory = aiFactory ?? AIServiceFactory.getInstance();
-    this.logger = logger ?? Logger.getInstance();
+    this.logger = logger ?? getLogger("ContextualReferenceGenerator");
   }
 
   /**
@@ -53,7 +51,7 @@ export class ContextualReferenceGenerator {
       const prdContent = typeof prd === "string" ? prd : JSON.stringify(prd, null, 2);
       const config = CONTEXT_GENERATION_CONFIGS.contextualReferences;
 
-      const prompt = formatContextPrompt(config.userPrompt, {
+      const prompt = defaultPromptRegistry.render(config.userPromptId, {
         prdContent: InputSanitizer.sanitizePRDContent(prdContent),
         taskTitle: InputSanitizer.sanitizeTaskContent(task.title),
         taskDescription: InputSanitizer.sanitizeTaskContent(task.description),
@@ -61,7 +59,7 @@ export class ContextualReferenceGenerator {
 
       const result = await generateObject({
         model,
-        system: config.systemPrompt,
+        system: defaultPromptRegistry.render(config.systemPromptId),
         prompt,
         schema: config.schema,
         maxOutputTokens: config.maxTokens,

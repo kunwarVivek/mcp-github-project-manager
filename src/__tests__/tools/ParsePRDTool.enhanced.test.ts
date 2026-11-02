@@ -491,7 +491,8 @@ Build a modern e-commerce platform to increase online sales and improve customer
     it("should handle invalid PRD content gracefully", async () => {
       // Arrange
       const args = {
-        prdContent: "This is not a valid PRD format",
+        prdContent:
+          "This is not a valid PRD format. It is plain prose with no sections, no requirements and no structure at all, only filler.",
         maxTasks: 2,
         includeSubtasks: false,
         autoEstimate: true,
@@ -517,32 +518,11 @@ Build a modern e-commerce platform to increase online sales and improve customer
       // May succeed with basic tasks or return error, both are acceptable
     });
 
-    it("should handle empty PRD content", async () => {
-      // Arrange
-      const args = {
-        prdContent: "",
-        maxTasks: 1,
-        includeSubtasks: false,
-        autoEstimate: true,
-        autoPrioritize: true,
-        autoDetectDependencies: true,
-        projectType: "web-app" as const,
-        createLifecycle: false,
-        createTraceabilityMatrix: false,
-        includeUseCases: false,
-        projectId: "test-empty",
-        enhancedGeneration: true,
-        contextLevel: "minimal" as const,
-        includeBusinessContext: false,
-        includeTechnicalContext: false,
-        includeImplementationGuidance: false,
-      };
-
-      // Act
-      const result = await executeParsePRD(args);
-
-      // Assert - Should not throw
-      expect(result).toBeDefined();
+    it("should reject empty PRD content with a field-level validation error", async () => {
+      await expect(executeParsePRD({ prdContent: "", maxTasks: 1 })).rejects.toMatchObject({
+        name: "ToolArgumentError",
+        issues: [expect.objectContaining({ path: "prdContent" })],
+      });
     });
   });
 

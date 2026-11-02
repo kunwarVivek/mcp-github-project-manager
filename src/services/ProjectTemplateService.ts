@@ -1,4 +1,10 @@
 import { ResourceNotFoundError } from "../domain/errors";
+import type {
+  CopiedProject,
+  OrganizationTemplatePage,
+  ProjectTemplateRepository,
+  TemplateProject,
+} from "../domain/project-template-linking-types";
 import { ResourceType } from "../domain/resource-types";
 import type { CustomField, FieldType, ProjectView, ViewLayout } from "../domain/types";
 import type { GitHubRepositoryFactory } from "../infrastructure/github/GitHubRepositoryFactory";
@@ -24,33 +30,15 @@ export class ProjectTemplateService {
     return this.factory.createProjectRepository();
   }
 
+  private get templateRepo(): ProjectTemplateRepository {
+    return this.factory.createProjectTemplateRepository();
+  }
+
   // Project README Management
   async getProjectReadme(data: { projectId: string }): Promise<{ readme: string }> {
-    return safeCall(async () => {
-      const query = `
-        query($projectId: ID!) {
-          node(id: $projectId) {
-            ... on ProjectV2 {
-              readme
-            }
-          }
-        }
-      `;
-
-      interface GetReadmeResponse {
-        node: {
-          readme: string | null;
-        };
-      }
-
-      const response = await this.factory.graphql<GetReadmeResponse>(query, {
-        projectId: data.projectId,
-      });
-
-      return {
-        readme: response.node?.readme || "",
-      };
-    });
+    return safeCall(async () => ({
+      readme: await this.templateRepo.getReadme(data.projectId),
+    }));
   }
 
   async updateProjectReadme(data: {
@@ -58,38 +46,52 @@ export class ProjectTemplateService {
     readme: string;
   }): Promise<{ success: boolean; message: string }> {
     return safeCall(async () => {
-      const mutation = `
-        mutation($input: UpdateProjectV2Input!) {
-          updateProjectV2(input: $input) {
-            projectV2 {
-              id
-              readme
-            }
-          }
-        }
-      `;
-
-      interface UpdateReadmeResponse {
-        updateProjectV2: {
-          projectV2: {
-            id: string;
-            readme: string;
-          };
-        };
-      }
-
-      await this.factory.graphql<UpdateReadmeResponse>(mutation, {
-        input: {
-          projectId: data.projectId,
-          readme: data.readme,
-        },
-      });
-
+      await this.templateRepo.updateReadme(data.projectId, data.readme);
       return {
         success: true,
-        message: `Project README updated successfully`,
+        message: "Project README updated successfully",
       };
     });
+  }
+
+  // Project Template Operations
+  async markProjectAsTemplate(data: { projectId: string }): Promise<TemplateProject> {
+    return safeCall(() => this.templateRepo.markAsTemplate(data.projectId));
+  }
+
+  async unmarkProjectAsTemplate(data: { projectId: string }): Promise<TemplateProject> {
+    return safeCall(() => this.templateRepo.unmarkAsTemplate(data.projectId));
+  }
+
+  async copyProjectFromTemplate(data: {
+    projectId: string;
+    targetOwner: string;
+    title: string;
+    includeDraftIssues?: boolean;
+  }): Promise<CopiedProject> {
+    return safeCall(() =>
+      this.templateRepo.copyFromTemplate({
+        projectId: data.projectId,
+        targetOwner: data.targetOwner,
+        title: data.title,
+        includeDraftIssues: data.includeDraftIssues ?? false,
+      })
+    );
+  }
+
+  /** One page of an organization's projects, filtered to those flagged as templates. */
+  async listOrganizationTemplates(data: {
+    org: string;
+    first?: number;
+    after?: string;
+  }): Promise<OrganizationTemplatePage> {
+    return safeCall(() =>
+      this.templateRepo.listOrganizationTemplates({
+        org: data.org,
+        first: data.first ?? 20,
+        after: data.after,
+      })
+    );
   }
 
   async listProjectFields(data: { projectId: string }): Promise<CustomField[]> {

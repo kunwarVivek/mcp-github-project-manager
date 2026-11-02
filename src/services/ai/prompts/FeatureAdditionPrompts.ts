@@ -1,8 +1,11 @@
+import type { PromptRegistry } from "./PromptRegistry";
+
 /**
- * Prompts for Feature Addition and Lifecycle Management
+ * Prompts for Feature Addition and Lifecycle Management.
+ * Templates use {{variable}} placeholders and are served through the PromptRegistry.
  */
 
-export const FEATURE_ADDITION_SYSTEM_PROMPT = `You are an expert product manager and feature analyst specializing in evaluating, designing, and integrating new features into existing products. Your role is to analyze feature requests, assess their impact, and create comprehensive implementation plans.
+const FEATURE_ADDITION_SYSTEM_PROMPT = `You are an expert product manager and feature analyst specializing in evaluating, designing, and integrating new features into existing products. Your role is to analyze feature requests, assess their impact, and create comprehensive implementation plans.
 
 Key responsibilities:
 - Evaluate feature requests for business value and technical feasibility
@@ -20,14 +23,14 @@ Guidelines:
 - Design for scalability and maintainability
 - Focus on user value and business objectives`;
 
-export const ANALYZE_FEATURE_REQUEST_PROMPT = `Analyze the following feature request and provide a comprehensive assessment.
+const ANALYZE_FEATURE_REQUEST_PROMPT = `Analyze the following feature request and provide a comprehensive assessment.
 
-Feature Request: {featureIdea}
-Description: {description}
-Existing PRD: {existingPRD}
-Current Project State: {projectState}
-Business Justification: {businessJustification}
-Target Users: {targetUsers}
+Feature Request: {{featureIdea}}
+Description: {{description}}
+Existing PRD: {{existingPRD}}
+Current Project State: {{projectState}}
+Business Justification: {{businessJustification}}
+Target Users: {{targetUsers}}
 
 Please provide a detailed analysis including:
 
@@ -63,14 +66,14 @@ Please provide a detailed analysis including:
 
 Return as a structured analysis with specific recommendations.`;
 
-export const EXPAND_FEATURE_TO_TASKS_PROMPT = `Break down the following approved feature into a comprehensive set of development tasks.
+const EXPAND_FEATURE_TO_TASKS_PROMPT = `Break down the following approved feature into a comprehensive set of development tasks.
 
-Feature: {featureTitle}
-Description: {featureDescription}
-User Stories: {userStories}
-Acceptance Criteria: {acceptanceCriteria}
-Existing System Context: {systemContext}
-Integration Points: {integrationPoints}
+Feature: {{featureTitle}}
+Description: {{featureDescription}}
+User Stories: {{userStories}}
+Acceptance Criteria: {{acceptanceCriteria}}
+Existing System Context: {{systemContext}}
+Integration Points: {{integrationPoints}}
 
 Create tasks that cover:
 
@@ -117,12 +120,12 @@ For each task, provide:
 
 Return as a structured JSON array of AITask objects with complete lifecycle information.`;
 
-export const ASSESS_FEATURE_IMPACT_PROMPT = `Assess the impact of adding this feature to the existing product.
+const ASSESS_FEATURE_IMPACT_PROMPT = `Assess the impact of adding this feature to the existing product.
 
-New Feature: {newFeature}
-Existing Features: {existingFeatures}
-Current User Base: {userBase}
-System Architecture: {architecture}
+New Feature: {{newFeature}}
+Existing Features: {{existingFeatures}}
+Current User Base: {{userBase}}
+System Architecture: {{architecture}}
 
 Analyze the impact on:
 
@@ -158,13 +161,13 @@ Analyze the impact on:
 
 Provide specific recommendations for managing the integration and minimizing risks.`;
 
-export const GENERATE_FEATURE_ROADMAP_PROMPT = `Create an updated feature roadmap that includes the new feature.
+const GENERATE_FEATURE_ROADMAP_PROMPT = `Create an updated feature roadmap that includes the new feature.
 
-Current Roadmap: {currentRoadmap}
-New Feature: {newFeature}
-Project Timeline: {timeline}
-Team Capacity: {teamCapacity}
-Business Priorities: {businessPriorities}
+Current Roadmap: {{currentRoadmap}}
+New Feature: {{newFeature}}
+Project Timeline: {{timeline}}
+Team Capacity: {{teamCapacity}}
+Business Priorities: {{businessPriorities}}
 
 Generate an updated roadmap that:
 
@@ -183,13 +186,13 @@ For each quarter/milestone, provide:
 
 Structure the roadmap by quarters with clear deliverables and dependencies.`;
 
-export const TRACK_TASK_LIFECYCLE_PROMPT = `Analyze the current state of this task and provide lifecycle management recommendations.
+const TRACK_TASK_LIFECYCLE_PROMPT = `Analyze the current state of this task and provide lifecycle management recommendations.
 
-Task: {taskTitle}
-Current Phase: {currentPhase}
-Progress: {progressData}
-Blockers: {blockers}
-Team Context: {teamContext}
+Task: {{taskTitle}}
+Current Phase: {{currentPhase}}
+Progress: {{progressData}}
+Blockers: {{blockers}}
+Team Context: {{teamContext}}
 
 Provide analysis and recommendations for:
 
@@ -225,56 +228,60 @@ Provide analysis and recommendations for:
 
 Return actionable recommendations with specific next steps and updated timelines.`;
 
-/**
- * Helper function to format feature addition prompts
- */
-export function formatFeaturePrompt(template: string, variables: Record<string, unknown>): string {
-  let formatted = template;
+export const FEATURE_PROMPT_IDS = {
+  system: "feature.system",
+  analyzeRequest: "feature.analyze-request",
+  expandToTasks: "feature.expand-to-tasks",
+  assessImpact: "feature.assess-impact",
+  generateRoadmap: "feature.generate-roadmap",
+  trackLifecycle: "feature.track-lifecycle",
+} as const;
 
-  for (const [key, value] of Object.entries(variables)) {
-    const placeholder = `{${key}}`;
-    const stringValue = typeof value === "object" ? JSON.stringify(value, null, 2) : String(value);
-    formatted = formatted.replace(new RegExp(placeholder, "g"), stringValue);
-  }
-
-  return formatted;
+/** Register every feature prompt (version 1.0.0). */
+export function registerFeaturePrompts(registry: PromptRegistry): void {
+  registry.register(FEATURE_PROMPT_IDS.system, "1.0.0", FEATURE_ADDITION_SYSTEM_PROMPT);
+  registry.register(FEATURE_PROMPT_IDS.analyzeRequest, "1.0.0", ANALYZE_FEATURE_REQUEST_PROMPT);
+  registry.register(FEATURE_PROMPT_IDS.expandToTasks, "1.0.0", EXPAND_FEATURE_TO_TASKS_PROMPT);
+  registry.register(FEATURE_PROMPT_IDS.assessImpact, "1.0.0", ASSESS_FEATURE_IMPACT_PROMPT);
+  registry.register(FEATURE_PROMPT_IDS.generateRoadmap, "1.0.0", GENERATE_FEATURE_ROADMAP_PROMPT);
+  registry.register(FEATURE_PROMPT_IDS.trackLifecycle, "1.0.0", TRACK_TASK_LIFECYCLE_PROMPT);
 }
 
 /**
- * Feature addition prompt configurations
+ * Feature addition prompt configurations: registry ids plus generation settings.
  */
 export const FEATURE_PROMPT_CONFIGS = {
   analyzeRequest: {
-    systemPrompt: FEATURE_ADDITION_SYSTEM_PROMPT,
-    userPrompt: ANALYZE_FEATURE_REQUEST_PROMPT,
+    systemPromptId: FEATURE_PROMPT_IDS.system,
+    userPromptId: FEATURE_PROMPT_IDS.analyzeRequest,
     maxTokens: 3000,
     temperature: 0.6,
   },
 
   expandToTasks: {
-    systemPrompt: FEATURE_ADDITION_SYSTEM_PROMPT,
-    userPrompt: EXPAND_FEATURE_TO_TASKS_PROMPT,
+    systemPromptId: FEATURE_PROMPT_IDS.system,
+    userPromptId: FEATURE_PROMPT_IDS.expandToTasks,
     maxTokens: 4000,
     temperature: 0.5,
   },
 
   assessImpact: {
-    systemPrompt: FEATURE_ADDITION_SYSTEM_PROMPT,
-    userPrompt: ASSESS_FEATURE_IMPACT_PROMPT,
+    systemPromptId: FEATURE_PROMPT_IDS.system,
+    userPromptId: FEATURE_PROMPT_IDS.assessImpact,
     maxTokens: 2500,
     temperature: 0.6,
   },
 
   generateRoadmap: {
-    systemPrompt: FEATURE_ADDITION_SYSTEM_PROMPT,
-    userPrompt: GENERATE_FEATURE_ROADMAP_PROMPT,
+    systemPromptId: FEATURE_PROMPT_IDS.system,
+    userPromptId: FEATURE_PROMPT_IDS.generateRoadmap,
     maxTokens: 3000,
     temperature: 0.7,
   },
 
   trackLifecycle: {
-    systemPrompt: FEATURE_ADDITION_SYSTEM_PROMPT,
-    userPrompt: TRACK_TASK_LIFECYCLE_PROMPT,
+    systemPromptId: FEATURE_PROMPT_IDS.system,
+    userPromptId: FEATURE_PROMPT_IDS.trackLifecycle,
     maxTokens: 2000,
     temperature: 0.4,
   },

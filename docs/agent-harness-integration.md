@@ -219,9 +219,25 @@ task context and budget; deregistering a parent cascades to all descendants.
 
 ## Budget enforcement
 
-Budgets live on the agent record. Agents report spend via `record_usage`;
-`get_budget` returns remaining tokens and warning/exhaustion flags. Hard stops
-flip the agent to `budget_exhausted` and block further draws.
+Budgets live on the agent record. Spend the server itself incurs is metered
+server-side: `AIServiceFactory.getModel` wraps every model with middleware that
+accumulates provider-reported usage, and the dispatcher debits the calling agent's
+budget **once per tool call** (not per AI call). A failed debit is retried once,
+then parked in an in-memory ledger, logged, and flagged on the result as
+`_meta.budgetDebitFailed`; the next `checkout_task` settles it first. An agent's own
+runtime spend never reaches the server, so agents report it via `record_usage`.
+`get_budget` returns remaining tokens and warning/exhaustion flags. With `hardStop`
+set, an exhausted budget flips the agent to `budget_exhausted` and AI tools refuse
+with `BudgetExhausted` (`isError` result, `_meta.error` carries remaining/limit).
+This per-agent budget is distinct from `AI_SESSION_TOKEN_LIMIT`, the per-operation cap
+on one task-generation run.
+
+## Retry safety and audit
+
+Create actions accept an `idempotencyKey`, so an agent that retries after a lost
+response does not create a duplicate (the first result is replayed). Every
+state-changing tool call can be recorded in the mutation audit log
+(`AUDIT_LOG_ENABLED`), with the agent id as the actor.
 
 ## E2E verification
 

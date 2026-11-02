@@ -5,8 +5,8 @@ import {
   type EnhancedFeatureRequirement,
   type ExceptionScenario,
   type FeatureRequirement,
-  type MockPRD,
   type PRDDocument,
+  type PRDSummary,
   type Requirement,
   RequirementStatus,
   RequirementType,
@@ -25,7 +25,7 @@ export class RequirementsTraceabilityService {
   /**
    * Extract business requirements from PRD
    */
-  extractBusinessRequirementsFromPRD(prd: PRDDocument | MockPRD): Requirement[] {
+  extractBusinessRequirementsFromPRD(prd: PRDDocument | PRDSummary): Requirement[] {
     const requirements: Requirement[] = [];
 
     // Extract from objectives
@@ -284,7 +284,7 @@ export class RequirementsTraceabilityService {
    */
   createTraceabilityMatrix(
     projectId: string,
-    prd: PRDDocument | MockPRD,
+    prd: PRDDocument | PRDSummary,
     features: FeatureRequirement[],
     tasks: AITask[]
   ): TraceabilityMatrix {

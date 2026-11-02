@@ -23,7 +23,6 @@
 import type { AIServiceFactory } from "../../services/ai/AIServiceFactory.js";
 import type { CacheStats, ResourceCache } from "../cache/ResourceCache.js";
 import type { GitHubRepositoryFactory } from "../github/GitHubRepositoryFactory.js";
-import type { AIResiliencePolicy } from "../resilience/AIResiliencePolicy.js";
 import type { CircuitBreakerState } from "../resilience/CircuitBreakerService.js";
 
 /**
@@ -85,7 +84,6 @@ export interface HealthStatus {
  */
 export interface HealthServiceDependencies {
   aiFactory?: AIServiceFactory;
-  aiResilience?: AIResiliencePolicy;
   cache?: ResourceCache;
   githubFactory?: GitHubRepositoryFactory;
 }
@@ -98,7 +96,6 @@ export interface HealthServiceDependencies {
  */
 export class HealthService {
   private readonly aiFactory?: AIServiceFactory;
-  private readonly aiResilience?: AIResiliencePolicy;
   private readonly cache?: ResourceCache;
   private readonly githubFactory?: GitHubRepositoryFactory;
 
@@ -109,7 +106,6 @@ export class HealthService {
    */
   constructor(deps?: HealthServiceDependencies) {
     this.aiFactory = deps?.aiFactory;
-    this.aiResilience = deps?.aiResilience;
     this.cache = deps?.cache;
     this.githubFactory = deps?.githubFactory;
   }
@@ -210,11 +206,9 @@ export class HealthService {
     const isAvailable = this.aiFactory.isAIAvailable();
     const config = this.aiFactory.validateConfiguration();
 
-    // Get circuit state from resilience policy if available
-    let circuitState: CircuitBreakerState | "disabled" = "disabled";
-    if (this.aiResilience) {
-      circuitState = this.aiResilience.getCircuitState();
-    }
+    // Authoritative: the factory owns the resilience policy and reports
+    // "disabled" only when resilience is genuinely off.
+    const circuitState = this.aiFactory.getCircuitState();
 
     return {
       available: isAvailable,

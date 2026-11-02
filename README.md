@@ -5,13 +5,13 @@
 [![npm version](https://img.shields.io/npm/v/mcp-github-project-manager.svg)](https://www.npmjs.com/package/mcp-github-project-manager)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-**The task substrate for AI coding agents.** An [MCP](https://modelcontextprotocol.io) server that turns GitHub Projects v2 into an agentic project-management layer: agents register, self-assign work, heartbeat, submit work products for review, and spend against token budgets — through **20 compound tools exposing 169 actions**, backed entirely by GitHub-native storage. No database, no Redis, no external infra.
+**The task substrate for AI coding agents.** An [MCP](https://modelcontextprotocol.io) server that turns GitHub Projects v2 into an agentic project-management layer: agents register, self-assign work, heartbeat, submit work products for review, and spend against token budgets — through **<!-- count:tools -->21<!-- /count --> compound tools exposing <!-- count:actions -->175<!-- /count --> actions**, backed entirely by GitHub-native storage. No database, no Redis, no external infra.
 
 You bring the agents (Claude Code, Codex, Cursor, Windsurf, Roo, OpenCode, any MCP client). This is the backbone that tells them what to work on and keeps them from colliding.
 
 | Surface | Detail |
 |---|---|
-| Tools | 20 compound tools, 169 actions, `action`-routed |
+| Tools | <!-- count:tools -->21<!-- /count --> compound tools, <!-- count:actions -->175<!-- /count --> actions, `action`-routed |
 | Resources | 6 read-only GitHub-backed views |
 | Prompts | 6 reusable AI templates |
 | Transport | MCP v2 over stdio (webhook/SSE optional) |
@@ -23,7 +23,7 @@ You bring the agents (Claude Code, Codex, Cursor, Windsurf, Roo, OpenCode, any M
 - **Agents need a work queue, not a chat window.** `agent_work` / `agent_manage` give agents atomic task checkout, heartbeats, and a review loop instead of "go figure it out."
 - **Budgets must be enforced somewhere the agent cannot skip.** Each agent has a token budget with warning thresholds and a hard stop; the server debits itself, and `record_usage` covers the agent's own runtime spend.
 - **AI plans are worthless if they never become issues.** `ai_generate` runs idea → PRD → tasks → materialized GitHub issues, grouped into milestones and sprints.
-- **Tool lists are a context tax.** 20 tools instead of 169 keeps the schema small; `discover_tools` expands any domain or action on demand.
+- **Tool lists are a context tax.** <!-- count:tools -->21<!-- /count --> tools instead of <!-- count:actions -->175<!-- /count --> keeps the schema small; `discover_tools` expands any domain or action on demand.
 - **State should live where the work already is.** The agent registry is a file on a dedicated branch (compare-and-swap writes), task claims are project fields, work products are issue comments — no new infrastructure to operate.
 
 ## Quick start
@@ -77,17 +77,17 @@ Works with any stdio MCP client — Claude Desktop, Claude Code, Codex, Cursor, 
 
 ## The tool surface
 
-Every tool takes an `action` string that routes to the underlying operation, so clients see 20 schemas instead of 169.
+Every tool takes an `action` string that routes to the underlying operation, so clients see <!-- count:tools -->21<!-- /count --> schemas instead of <!-- count:actions -->175<!-- /count -->.
 
 | Tool | Group | Actions | Covers |
 |---|---|---|---|
-| `manage_project` | core | 37 | Projects v2: CRUD, fields, views, items, templates, repo/team linking |
-| `manage_issues` | core | 18 | Issue CRUD, comments, drafts, advanced search, sub-issues |
+| `manage_project` | core | 38 | Projects v2: CRUD, close/reopen, fields, views, items, templates, repo/team linking, collaborators |
+| `manage_issues` | core | 22 | Issue CRUD, comments, drafts, advanced search, sub-issues, native blockers, issue types |
 | `manage_prs` | core | 7 | Create, list, update, merge, reviews |
 | `manage_milestones` | core | 7 | CRUD, metrics, overdue and upcoming |
-| `manage_sprints` | core | 8 | Create, update, plan, add/remove issues, metrics |
+| `manage_sprints` | core | 9 | Create, update, delete (needs `confirm: true`), plan, add/remove issues, metrics |
 | `manage_labels` | core | 2 | Create and list repository labels |
-| `manage_automation` | core | 7 | Automation rules: create, update, delete, enable, disable |
+| `manage_automation` | core | 3 | Project workflows: list, get, delete |
 | `manage_iterations` | core | 5 | Iteration config, current iteration, items, by-date, assign |
 | `manage_status_updates` | core | 3 | Project status updates: create, list, get |
 | `manage_branches` | core | 4 | Branch protection rules and branch listing |
@@ -95,11 +95,12 @@ Every tool takes an `action` string that routes to the underlying operation, so 
 | `manage_workflows` | core | 6 | GitHub Actions: list, dispatch, run status/logs, cancel |
 | `manage_events` | events | 3 | Subscribe, recent events, replay |
 | `ai_generate` | ai | 9 | PRD generate/enhance/parse, features, next task, complexity, expand, traceability, materialize |
-| `ai_analyze` | ai | 9 | Issue enrichment, triage, label suggestion, duplicate and related detection |
+| `ai_analyze` | ai | 8 | Issue enrichment, triage, label suggestion, duplicate and related detection |
 | `ai_plan` | ai | 6 | Capacity, backlog priority, risk, sprint composition, roadmap, visualization |
 | `agent_work` | agents | 12 | Register, checkout, release, complete, heartbeat, review, task context |
 | `agent_manage` | agents | 18 | Registry, activity, work products, budgets, usage, PM coordination, convergence |
 | `system` | system | 2 | Health check (live GitHub rate-limit probe), project field setup |
+| `analytics` | core | 5 | Read-only sprint velocity and burndown, cycle time, throughput, project summary |
 | `discover_tools` | system | meta | Runtime discovery of tools, actions, and parameters |
 
 Call shape — one discriminator, action-specific parameters:
@@ -111,7 +112,9 @@ Call shape — one discriminator, action-specific parameters:
 { "tool": "discover_tools", "arguments": { "domain": "sprints" } }
 ```
 
-`discover_tools` takes an optional `domain` (projects, issues, pull_requests, milestones, sprints, labels, automation, iterations, events, status_updates, ai_generation, ai_analysis, ai_planning, agents, system) or a free-text `query`. It stays exposed even when tool groups are filtered.
+`discover_tools` takes an optional `domain` (projects, issues, pull_requests, milestones, sprints, labels, automation, iterations, events, status_updates, analytics, ai_generation, ai_analysis, ai_planning, agents, system) or a free-text `query`. It stays exposed even when tool groups are filtered.
+
+Cross-cutting contract: create actions accept an optional `idempotencyKey` (a retry within 24 h replays the first result instead of duplicating it); list actions that page return an additive `nextCursor` to pass back as `cursor`; every tool advertises `_meta.schemaVersion`. See [docs/TOOLS.md](docs/TOOLS.md#cross-cutting-parameters).
 
 Alongside the tools the server exposes **6 read-only resources** (`github://config`, `github://projects`, `github://sprints/current`, `github://milestones`, `github://agents`, `github://tools`) and **6 prompts** (`review-prd`, `explain-task-complexity`, `suggest-issue-labels`, `analyze-sprint-risk`, `generate-release-notes`, `triage-issue`).
 
@@ -121,13 +124,13 @@ Full parameter reference: [docs/TOOLS.md](docs/TOOLS.md).
 
 **AI generation** (`ai_generate`) — generate a PRD from an idea, enhance an existing one, parse a PRD into tasks, add a feature with impact analysis, recommend the next task, analyze complexity and risk, expand a task into subtasks, build a traceability matrix, and materialize tasks into real GitHub issues.
 
-**AI analysis** (`ai_analyze`) — enrich one or many issues, triage (single, bulk, or scheduled), suggest labels, detect duplicates, find related issues.
+**AI analysis** (`ai_analyze`) — enrich one or many issues, triage (single or bulk), suggest labels, detect duplicates, find related issues.
 
 **AI planning** (`ai_plan`) — calculate sprint capacity, prioritize a backlog, assess risk, suggest sprint composition, generate a roadmap or visualization. Given a `projectId` the roadmap is planned from that project's own issues; with `autoCreate` the milestones are created and assigned to them.
 
 **Agent swarm** (`agent_work` / `agent_manage`) — agents register with role, runtime, and capabilities; claim tasks by priority, age, skills, or deadline; heartbeat with progress and blockers; submit work products (branch, PR, files, test results) for review; approve, reject, or decompose. PM-side actions add budgets, usage accounting, stale-agent reclaim, workload rebalancing, smart assignment, and one-call project convergence.
 
-**Deterministic GitHub surface** — projects, issues, pull requests, milestones, sprints, labels, branches, releases, workflows, automation rules, events, and status updates, all with plain `action` routing and no model in the loop.
+**Deterministic GitHub surface** — projects, issues, pull requests, milestones, sprints, labels, branches, releases, workflows, project automations, events, status updates, and analytics, all with plain `action` routing and no model in the loop.
 
 The AI tools are optional. Without a provider key, everything else works unchanged.
 
@@ -162,13 +165,18 @@ Where the state lives — no external database:
 | `GITHUB_TOKEN` | yes\* | GitHub PAT with `repo`, `project`, `write:org` |
 | `GITHUB_OWNER` | yes | Owner (user or org) of the target repository |
 | `GITHUB_REPO` | yes | Target repository name |
-| `GITHUB_APP_ID`, `GITHUB_APP_PRIVATE_KEY`, `GITHUB_APP_INSTALLATION_ID` | no | GitHub App auth; outranks the PAT when all three are set |
+| `GITHUB_APP_ID`, `GITHUB_APP_PRIVATE_KEY`, `GITHUB_APP_INSTALLATION_ID` | no | GitHub App installation auth; outranks the PAT when all three are set (a partial set falls back to the PAT) |
 | `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GOOGLE_API_KEY`, `PERPLEXITY_API_KEY` | no | Unlocks the `ai_*` tools |
 | `AI_{MAIN,PRD,RESEARCH,FALLBACK}_{PROVIDER,MODEL,API_KEY,BASE_URL}` | no | Per-role provider, model, key, endpoint |
 | `MCP_TOOL_GROUPS` | no | Expose only some groups: `core`, `ai`, `agents`, `events`, `system` (default `all`) |
 | `SECRETS_DIR` | no | Read secrets from files named after the variable (Docker/k8s convention) |
 | `WEBHOOK_SECRET`, `WEBHOOK_PORT`, `SSE_ENABLED` | no | Webhook/SSE transport; signature validation fails closed |
+| `WEBHOOK_HOST`, `EVENTS_AUTH_TOKEN`, `WEBHOOK_TRUSTED_PROXIES` | no | HTTP hardening: binds `127.0.0.1` by default; `/events/*` needs the bearer token; `X-Forwarded-For` trusted only from listed proxies |
 | `SYNC_ENABLED`, `CACHE_DIRECTORY`, `MAX_CACHE_ENTRIES` | no | Bidirectional sync and cache tuning |
+| `RATE_LIMIT_FLOOR` | no | Remaining GraphQL points below which requests back off proactively (default 100) |
+| `AUDIT_LOG_ENABLED`, `AUDIT_LOG_PATH` | no | Append-only, redacted JSONL record of every state-changing tool call (`.mcp-audit/mutations.jsonl`) |
+| `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_SERVICE_NAME` | no | Opt-in OpenTelemetry tracing (`tool.<name>` spans) |
+| `AI_SESSION_TOKEN_LIMIT` | no | Per-operation token budget for AI task generation (distinct from per-agent budgets) |
 | `LOG_LEVEL`, `LOG_FORMAT` | no | `debug\|info\|warn\|error`, `text` or `json` |
 
 \* **Credential chain** (first hit wins): `--token` CLI flag → `$SECRETS_DIR/GITHUB_TOKEN` file → `GITHUB_TOKEN` env var → `gh auth token`. If you are already logged in with `gh`, you need no token configuration at all. Disable the fallback with `GH_CLI_TOKEN_FALLBACK=false`. CLI flags override env vars everywhere.
@@ -211,14 +219,14 @@ Deployment and MCP-client setup: [docs/deployment.md](docs/deployment.md). When 
 
 Four layers, dependencies pointing inward:
 
-1. **Domain** (`src/domain/`) — types, Zod schemas, errors. No logic.
+1. **Domain** (`src/domain/`) — types, Zod schemas, errors, and rich entities (`entities/`) that carry their own invariants and state-transition logic. Orchestration and I/O live in services.
 2. **Services** (`src/services/`) — business logic; `ProjectManagementService` orchestrates per-feature services, `src/services/ai/` holds the AI SDK providers.
 3. **Infrastructure** (`src/infrastructure/`) — `github/` (Octokit GraphQL/REST), `tools/` (tool definitions, registry, validators, `compound/`), plus cache, persistence, resilience, events, secrets, logger, MCP resources and prompts.
 4. **MCP** (`src/index.ts`) — boots `McpServer` (MCP v2) over stdio; every tool is registered with `registerTool` and shares one `dispatchTool` carrying the shutdown gate, in-flight tracking, and result formatting.
 
-`src/container.ts` wires everything with tyringe DI; `src/env.ts` and `src/cli.ts` resolve configuration (CLI flags beat env vars). AI providers plug in behind `AIServiceFactory`: it returns a model per role, wraps it in usage-reporting middleware, and the shared dispatcher debits the calling agent's budget once per tool call.
+`src/container.ts` wires the components `index.ts` owns with tsyringe DI; `src/env.ts` and `src/cli.ts` resolve configuration (CLI flags beat env vars). Tool executors self-construct through one shared factory (`createGitHubFactory()`), a documented exception to container resolution. Authentication is resolved once by `resolveGitHubAuth()` (GitHub App outranks the PAT) and all GitHub traffic goes through one `GitHubRequestExecutor` with retry and proactive rate-limit budgeting. AI providers plug in behind `AIServiceFactory`: it returns a model per role, wraps it in usage-reporting middleware, and the shared dispatcher debits the calling agent's budget once per tool call (a hard-stop budget gates AI tools with `BudgetExhausted`).
 
-A tool that runs and fails returns `{ content, isError: true }` so the model can recover; a JSON-RPC error is reserved for protocol faults.
+A tool that runs and fails returns `{ content, isError: true }` with a stable code in `_meta.error` so the model can recover; a JSON-RPC error is reserved for an unknown tool or protocol faults.
 
 Design details: [docs/architecture.md](docs/architecture.md).
 
@@ -232,7 +240,7 @@ Traps that bite contributors:
 
 - **Source imports omit `.js`.** The `postbuild` step adds the extension. Never ship raw `tsc` output — always run the full build.
 - **`isolatedModules` is on.** A type re-exported as a value is a compile error; use `export type` / `import type`, including for decorated constructor parameters.
-- **Vitest rejects foreign test-runner CLI flags.** `--testPathPattern` fails with `CACError: Unknown option`; filter with a positional pattern and exclude with `--exclude='**/tests/x/**'`.
+- **Vitest rejects foreign test-runner CLI flags.** `--testPathPattern` fails with `CACError: Unknown option`; filter with a positional pattern and exclude with `--exclude='**/e2e/**'`.
 - **Mocks must use `function`, not an arrow,** wherever the code under test calls `new`. A `beforeEach` with an implicit return is treated as a teardown callback — use a block body.
 
 Start with [CONTRIBUTING.md](CONTRIBUTING.md) and [docs/contributing/index.md](docs/contributing/index.md).
@@ -245,7 +253,7 @@ Start with [CONTRIBUTING.md](CONTRIBUTING.md) and [docs/contributing/index.md](d
 
 | Guide | What it covers |
 |---|---|
-| [Tool Reference](docs/TOOLS.md) | 20 compound tools, 169 actions, per-action parameters |
+| [Tool Reference](docs/TOOLS.md) | <!-- count:tools -->21<!-- /count --> compound tools, <!-- count:actions -->175<!-- /count --> actions, per-action parameters |
 | [Configuration](docs/CONFIGURATION.md) | Every environment variable and per-role AI setup |
 | [Deployment](docs/deployment.md) | Install paths, Docker, MCP client configuration |
 | [Architecture](docs/architecture.md) | Layers, patterns, data flow, agent orchestration |

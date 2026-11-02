@@ -48,7 +48,9 @@ const RESOLVED_CONFIG_KEYS = [
   "AI_RESEARCH_API_KEY",
   "AI_FALLBACK_API_KEY",
   "AI_PRD_API_KEY",
+  "AI_EMBEDDING_API_KEY",
   "WEBHOOK_SECRET",
+  "EVENTS_AUTH_TOKEN",
 ] as const;
 
 /**
@@ -181,11 +183,6 @@ export function getNumericConfigValue(name: string, defaultValue: number): numbe
 // so live E2E suites that spawn the server as a subprocess can pass real credentials.
 const isTestEnv = process.env.NODE_ENV === "test";
 const isRealE2E = process.env.E2E_REAL_API === "true";
-export const GITHUB_TOKEN = isTestEnv
-  ? isRealE2E
-    ? process.env.GITHUB_TOKEN || "test-token"
-    : "test-token"
-  : getConfigValue("GITHUB_TOKEN", cliOptions.token);
 export const GITHUB_OWNER = isTestEnv
   ? isRealE2E
     ? process.env.GITHUB_OWNER || "test-owner"
@@ -261,6 +258,38 @@ export const WEBHOOK_TIMEOUT_MS = getNumericConfigValue("WEBHOOK_TIMEOUT_MS", 50
 export const WEBHOOK_ALLOWED_ORIGINS = getOptionalConfigValue("WEBHOOK_ALLOWED_ORIGINS", "");
 export const WEBHOOK_RATE_LIMIT = getNumericConfigValue("WEBHOOK_RATE_LIMIT", 100);
 export const WEBHOOK_RATE_WINDOW_MS = getNumericConfigValue("WEBHOOK_RATE_WINDOW_MS", 60000);
+// Network exposure: the HTTP server binds loopback by default. Set WEBHOOK_HOST=0.0.0.0
+// (or a specific interface) explicitly to accept external traffic, e.g. GitHub webhook
+// deliveries or remote SSE clients.
+export const WEBHOOK_HOST = getOptionalConfigValue("WEBHOOK_HOST", "127.0.0.1");
+// Comma-separated exact IPs of reverse proxies whose X-Forwarded-For header is trusted
+// for rate-limit keying. Empty = never trust X-Forwarded-For.
+export const WEBHOOK_TRUSTED_PROXIES = getOptionalConfigValue("WEBHOOK_TRUSTED_PROXIES", "");
+// Security: /events/* (SSE stream, subscriptions, replay, recent) require a bearer token
+// read through getSecret("EVENTS_AUTH_TOKEN"); with none configured they fail closed.
+// Set this to true ONLY in trusted local/dev environments.
+export const EVENTS_ALLOW_UNAUTHENTICATED = getBooleanConfigValue(
+  "EVENTS_ALLOW_UNAUTHENTICATED",
+  false
+);
+
+// Mutation audit log (JSONL file). Off by default.
+export const AUDIT_LOG_ENABLED = getBooleanConfigValue("AUDIT_LOG_ENABLED", false);
+export const DEFAULT_AUDIT_LOG_PATH = ".mcp-audit/mutations.jsonl";
+export const AUDIT_LOG_PATH = getOptionalConfigValue("AUDIT_LOG_PATH", DEFAULT_AUDIT_LOG_PATH);
+
+// OpenTelemetry export. Tracing export is active only when an endpoint is set.
+export const OTEL_EXPORTER_OTLP_ENDPOINT = getOptionalConfigValue(
+  "OTEL_EXPORTER_OTLP_ENDPOINT",
+  ""
+);
+export const OTEL_SERVICE_NAME = getOptionalConfigValue(
+  "OTEL_SERVICE_NAME",
+  "mcp-github-project-manager"
+);
+
+// GitHub GraphQL rate-limit floor: below this many remaining points, callers back off.
+export const RATE_LIMIT_FLOOR = getNumericConfigValue("RATE_LIMIT_FLOOR", 100);
 
 // AI Provider configuration
 export const ANTHROPIC_API_KEY = getOptionalConfigValue("ANTHROPIC_API_KEY", "");
@@ -318,6 +347,11 @@ export const INCLUDE_IMPLEMENTATION_GUIDANCE = getBooleanConfigValue(
 // GitHub AI Integration
 export const AUTO_CREATE_PROJECT_FIELDS = getBooleanConfigValue("AUTO_CREATE_PROJECT_FIELDS", true);
 export const AI_BATCH_SIZE = getNumericConfigValue("AI_BATCH_SIZE", 10);
+// Per-session token budget for the AI task pipeline (0 = unlimited).
+export const AI_SESSION_TOKEN_LIMIT = Math.max(
+  0,
+  getNumericConfigValue("AI_SESSION_TOKEN_LIMIT", 0)
+);
 
 // Export CLI options for use in other modules
 

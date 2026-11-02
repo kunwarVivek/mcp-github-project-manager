@@ -12,7 +12,11 @@ import { BaseGitHubRepository } from "./BaseRepository";
  *
  * The API exposes workflows read-only apart from deletion: they are authored
  * in the GitHub UI, so this repository can list them, read one by node ID and
- * delete one - and nothing else.
+ * delete one - and nothing else. GitHub's public GraphQL schema has no
+ * `createProjectV2Workflow` / `updateProjectV2Workflow` mutation (enabling,
+ * disabling or editing a workflow is UI-only), so creating or updating a
+ * workflow cannot be supported here and is deliberately not faked; the only
+ * callers (`ProjectAutomationService`) need list/get/delete.
  */
 export class GitHubProjectWorkflowRepository
   extends BaseGitHubRepository

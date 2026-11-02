@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, type Mock, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from "vitest";
 import {
   AgentReclaimScheduler,
   type AgentReclaimSchedulerConfig,
@@ -145,19 +145,30 @@ describe("AgentReclaimScheduler", () => {
     expect(mockCheckout.reclaimStaleTasks).not.toHaveBeenCalled();
   });
 
-  it("aborts a hung sweep via the time budget and resets the guard", async () => {
-    mockCheckout.reclaimStaleTasks.mockImplementation(
-      () => new Promise(() => {}) // never resolves
+  it("times out a hung sweep but keeps the guard until it settles", async () => {
+    let finishHung: (value: { reclaimed: number; details: [] }) => void = () => {};
+    mockCheckout.reclaimStaleTasks.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finishHung = resolve;
+        })
     );
     scheduler = create({ sweepTimeoutMs: 1000 });
 
     const sweep = scheduler.runSweep();
     await vi.advanceTimersByTimeAsync(1000);
-
     await expect(sweep).resolves.toEqual({ reclaimed: 0 });
-    // Guard reset — later sweeps are not permanently blocked.
-    mockCheckout.reclaimStaleTasks.mockResolvedValue({ reclaimed: 1, details: [] });
+
+    // The underlying sweep is still running: a new sweep must not overlap it.
+    await expect(scheduler.runSweep()).resolves.toEqual({ reclaimed: 0 });
+    expect(mockCheckout.reclaimStaleTasks).toHaveBeenCalledTimes(1);
+
+    // Once the hung sweep settles the guard is released.
+    finishHung({ reclaimed: 0, details: [] });
+    await vi.advanceTimersByTimeAsync(0);
+    mockCheckout.reclaimStaleTasks.mockResolvedValueOnce({ reclaimed: 1, details: [] });
     await expect(scheduler.runSweep()).resolves.toEqual({ reclaimed: 1 });
+    expect(mockCheckout.reclaimStaleTasks).toHaveBeenCalledTimes(2);
   });
 
   it("recovers after a failed sweep (next sweep still runs)", async () => {

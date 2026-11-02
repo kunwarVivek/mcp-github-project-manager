@@ -6,13 +6,12 @@
  */
 
 import { z } from "zod";
-import { GITHUB_OWNER, GITHUB_REPO, GITHUB_TOKEN } from "../../env.js";
 import { AIServiceFactory } from "../../services/ai/AIServiceFactory.js";
 import { ResourceCache } from "../cache/ResourceCache.js";
-import { GitHubRepositoryFactory } from "../github/GitHubRepositoryFactory.js";
 import { HealthService } from "../health/index.js";
 import { ToolTelemetry } from "./ToolTelemetry.js";
 import type { ToolDefinition, ToolSchema } from "./ToolValidator.js";
+import { createGitHubFactory } from "./tool-factory.js";
 
 /**
  * Schema for health_check tool input (no parameters required)
@@ -108,7 +107,7 @@ export async function executeHealthCheck(): Promise<HealthStatusOutput> {
   const healthService = new HealthService({
     aiFactory: AIServiceFactory.getInstance(),
     cache: ResourceCache.getInstance(),
-    githubFactory: new GitHubRepositoryFactory(GITHUB_TOKEN, GITHUB_OWNER, GITHUB_REPO),
+    githubFactory: createGitHubFactory(),
   });
 
   const baseHealth = await healthService.check();

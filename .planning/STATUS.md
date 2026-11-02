@@ -4,31 +4,38 @@
 
 | Metric | Value |
 |--------|-------|
-| Phases Complete | 12/12 (phase 11 scope changed: Analytics deferred, AI Issue Intelligence delivered) |
-| Current Phase | v2.0.0 released (see CHANGELOG.md) |
-| Last Updated | 2026-08-09 |
+| Phases Complete | 12/12 (Phase 11's original Analytics scope is delivered minimally as the `analytics` tool; Phase 11 keeps AI Issue Intelligence) |
+| Current release | 3.0.0 (`package.json`; see CHANGELOG.md) |
+| MCP surface | 21 tools / 175 actions (derived from the `ToolRegistry`; `npm run check:docs` fails on drift) |
+| Last Updated | 2026-11-02 |
 
-> **Reconciliation note (2026-07-15, updated 2026-08-05):** This file previously
-> froze at "9/12, phase 10 not started" while `REQUIREMENTS.md` claimed "99/99
-> complete". Code-verified truth: all 12 phases are complete. Phase 11 was
-> originally scoped as "Analytics & Reporting" but was delivered as "AI Issue
-> Intelligence" (duplicate detection, related issue linking, enrichment). The
-> original Analytics & Reporting scope is genuinely absent (tracked as feature
-> proposal G6-01). Live remediation status is authoritative in
+> **Reconciliation note (2026-11-02):** every figure in this file is derived from
+> code (`package.json`, `ToolRegistry`, `src/`), not carried over from earlier
+> snapshots. Earlier revisions claimed "v2.0.0 released" and listed four items as
+> tools; the registered tools are the 21 compound tools below, and those items are
+> *actions* (see "Release history"). Phase 11 was scoped as "Analytics & Reporting",
+> executed as "AI Issue Intelligence", and its analytics scope is now delivered by
+> the `analytics` tool (`sprint_velocity`, `sprint_burndown`, `cycle_time`,
+> `throughput`, `project_summary`). Live remediation status is in
 > [`docs/remediation/GAP-TRACKER.md`](../docs/remediation/GAP-TRACKER.md);
 > `docs/GAP-ANALYSIS-LIVE.md` is superseded.
 
-## v2.0.0 (2026-08-09)
+## Registered MCP tools (21)
 
-| Feature | Status |
-|---------|--------|
-| `materialize_tasks` (PRD→issues pipeline) | Shipped, live-verified |
-| PM `assign_task` | Shipped, live-verified |
-| PM `get_swarm_status` | Shipped, live-verified |
-| PM `rebalance_workload` | Shipped |
-| Sprint-issue assignment fix | Shipped, live-verified |
-| `ensureIterationField` project targeting | Shipped, live-verified |
-| Full pipeline E2E test (10 stages) | Shipped |
+`manage_project`, `manage_issues`, `manage_prs`, `manage_milestones`, `manage_sprints`,
+`manage_labels`, `manage_automation`, `manage_iterations`, `manage_events`,
+`manage_status_updates`, `ai_generate`, `ai_analyze`, `ai_plan`, `agent_work`,
+`agent_manage`, `system`, `discover_tools`, `manage_branches`, `manage_releases`,
+`manage_workflows`, `analytics`. Per-tool action counts: `docs/TOOLS.md`.
+
+## Release history (items shipped as actions of the compound tools)
+
+| Release | Feature | Where it lives |
+|---------|---------|----------------|
+| 2.0.0 | `materialize_tasks` (PRD→issues pipeline) | `ai_generate` action |
+| 2.0.0 | PM `assign_task`, `get_swarm_status`, `rebalance_workload` | `agent_manage` actions |
+| 2.0.0 | Sprint-issue assignment fix, `ensureIterationField` project targeting, full pipeline E2E | see CHANGELOG.md `[2.0.0]` |
+| 3.0.0 | Agent registry on the `agent-registry` branch, native dependencies/issue types, project roles | see CHANGELOG.md `[3.0.0]` |
 
 ## Phase Completion Status
 
@@ -41,8 +48,8 @@
 | 8 | Project Lifecycle and Advanced Operations | Complete | 4/4 |
 | 9 | AI PRD and Task Enhancement | Complete | 4/4 |
 | 10 | AI Sprint and Roadmap Planning | Complete | 4/4 |
-| 11 | AI Issue Intelligence | Complete | 4/4 (originally scoped as Analytics & Reporting — that scope is the deferred gap, G6-01) |
-| 12 | Production Hardening | Complete | Shipped in v1.1.0 (release 1672d4e) |
+| 11 | AI Issue Intelligence | Complete | 4/4 (analytics scope delivered post-v1.0 as the `analytics` tool, ANLY-01–05) |
+| 12 | Production Release | Complete | 4/4 (v1.0.x; later hardening in the post-v1.0 remediation, see REQUIREMENTS.md) |
 
 ---
 
@@ -105,10 +112,11 @@
 
 ## Next Phase
 
-**Phase 11 (AI Issue Intelligence)** is complete; the original "Analytics &
-> Reporting" scope was replaced. No other phases remain; post-v1.1.0 remediation
-> is tracked in [`docs/remediation/GAP-TRACKER.md`](../docs/remediation/GAP-TRACKER.md).
+**Phase 11 (AI Issue Intelligence)** is complete and the original "Analytics &
+> Reporting" scope is delivered by the `analytics` tool. No other phases remain;
+> post-v1.0 remediation is tracked in [`docs/remediation/GAP-TRACKER.md`](../docs/remediation/GAP-TRACKER.md)
+> and `REQUIREMENTS.md` ("Post-v1.0 Requirements").
 
 ---
 
-*Last updated: 2026-08-09*
+*Last updated: 2026-11-02*

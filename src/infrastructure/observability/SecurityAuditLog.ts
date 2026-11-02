@@ -1,5 +1,5 @@
-import type { ILogger } from "../logger/index.js";
-import { Logger } from "../logger/index.js";
+import type { ILogger } from "../logger/index";
+import { Logger } from "../logger/index";
 
 export type SecurityEventType =
   | "webhook_signature_invalid"

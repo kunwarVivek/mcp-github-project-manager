@@ -41,6 +41,7 @@ Thumbs.db
 
 # Cache directories
 .mcp-cache/
+.mcp-audit/
 .turbo/
 .cache/
 

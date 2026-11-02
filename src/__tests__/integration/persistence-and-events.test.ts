@@ -2,7 +2,6 @@ import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { ResourceType } from "../../domain/resource-types";
-import { ResourceCache } from "../../infrastructure/cache/ResourceCache";
 import { EventStore } from "../../infrastructure/events/EventStore";
 import { EventSubscriptionManager } from "../../infrastructure/events/EventSubscriptionManager";
 import {
@@ -14,7 +13,6 @@ import { FilePersistenceAdapter } from "../../infrastructure/persistence/FilePer
 describe("Persistence and Events Integration", () => {
   const testCacheDir = ".test-cache";
   let persistence: FilePersistenceAdapter;
-  let cache: ResourceCache;
   let webhookHandler: GitHubWebhookHandler;
   let subscriptionManager: EventSubscriptionManager;
 
@@ -34,22 +32,12 @@ describe("Persistence and Events Integration", () => {
       atomicWrites: true,
     });
 
-    // Reset singleton instance for testing
-    Object.assign(ResourceCache, { instance: null });
-    cache = ResourceCache.getInstance();
-    await cache.clear(); // Clear any existing data
     webhookHandler = new GitHubWebhookHandler("test-secret");
     subscriptionManager = new EventSubscriptionManager();
     // EventStore will be created fresh in each test that needs it
   });
 
   afterEach(async () => {
-    // Clear cache and event store
-    await cache.clear();
-
-    // Reset singleton for next test
-    Object.assign(ResourceCache, { instance: null });
-
     // EventStore instances are created fresh in each test
 
     // Clean up test directory
@@ -118,20 +106,6 @@ describe("Persistence and Events Integration", () => {
       expect(stats.totalMetadataEntries).toBe(1);
       expect(stats.fileSize).toBeGreaterThan(0);
       expect(stats.lastModified).toBeInstanceOf(Date);
-    });
-  });
-
-  describe("ResourceCache with Persistence", () => {
-    it("should cache resources with metadata", async () => {
-      // Skip this test for now due to singleton pattern issues in test environment
-      // The functionality is tested in unit tests and works in production
-      expect(true).toBe(true);
-    });
-
-    it("should check if resources need sync", async () => {
-      // Skip this test for now due to singleton pattern issues in test environment
-      // The functionality is tested in unit tests and works in production
-      expect(true).toBe(true);
     });
   });
 

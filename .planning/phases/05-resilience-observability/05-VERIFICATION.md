@@ -5,6 +5,8 @@ status: passed
 score: 5/5 must-haves verified
 ---
 
+> **Superseded note (2026-11-02):** historical record. The `tests/…` paths listed here were merged into `src/__tests__/` and the old root `tests/` tree removed; `TracingLogger` was deleted (the logger now emits correlation ids itself under `LOG_FORMAT=json`); `HealthService` probes GitHub live. Current state: `.planning/codebase/`.
+
 # Phase 5: Resilience and Observability Verification Report
 
 **Phase Goal:** System handles failures gracefully and operators can observe system health.

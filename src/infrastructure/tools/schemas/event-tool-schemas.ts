@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { ANNOTATION_PATTERNS } from "../annotations/tool-annotations";
-import type { ToolDefinition, ToolSchema } from "../ToolValidator";
+import type { ToolDefinition } from "../ToolValidator";
 import { EventListOutputSchema, SubscriptionOutputSchema } from "./project-schemas";
 
 // ============================================================================
@@ -57,7 +57,7 @@ export const subscribeToEventsTool: ToolDefinition<
   name: "subscribe_to_events",
   title: "Subscribe to Events",
   description: "Subscribe to real-time events for GitHub resources",
-  schema: subscribeToEventsSchema as unknown as ToolSchema<SubscribeToEventsArgs>,
+  schema: subscribeToEventsSchema,
   outputSchema: SubscriptionOutputSchema,
   annotations: ANNOTATION_PATTERNS.create,
   examples: [
@@ -89,7 +89,7 @@ export const getRecentEventsTool: ToolDefinition<
   name: "get_recent_events",
   title: "Get Recent Events",
   description: "Get recent events for GitHub resources",
-  schema: getRecentEventsSchema as unknown as ToolSchema<GetRecentEventsArgs>,
+  schema: getRecentEventsSchema,
   outputSchema: EventListOutputSchema,
   annotations: ANNOTATION_PATTERNS.readOnly,
   examples: [
@@ -120,7 +120,7 @@ export const replayEventsTool: ToolDefinition<
   name: "replay_events",
   title: "Replay Events",
   description: "Replay events from a specific timestamp",
-  schema: replayEventsSchema as unknown as ToolSchema<ReplayEventsArgs>,
+  schema: replayEventsSchema,
   outputSchema: EventListOutputSchema,
   annotations: ANNOTATION_PATTERNS.readOnly,
   examples: [

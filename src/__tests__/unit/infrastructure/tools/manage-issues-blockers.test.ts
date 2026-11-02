@@ -15,8 +15,7 @@ const addIssueBlocker = vi.fn();
 
 vi.mock("../../../../container", () => ({
   createProjectManagementService: vi.fn(() => ({
-    removeIssueBlocker,
-    addIssueBlocker,
+    issues: { removeIssueBlocker, addIssueBlocker },
   })),
 }));
 
@@ -48,7 +47,7 @@ describe("manage_issues blocker actions", () => {
         action: "remove_blocker",
         issueId: "I_blocked",
       } as Parameters<typeof executeManageIssues>[0])
-    ).rejects.toThrow("blockingIssueId is required for remove_blocker");
+    ).rejects.toThrow("blockingIssueId is required for manage_issues remove_blocker");
     expect(removeIssueBlocker).not.toHaveBeenCalled();
   });
 });

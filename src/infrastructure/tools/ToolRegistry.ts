@@ -1,4 +1,5 @@
 import { INTERNAL_ERROR, METHOD_NOT_FOUND, ProtocolError } from "@modelcontextprotocol/server";
+import { MCP_TOOL_GROUPS } from "../../env";
 
 /** v2 compatibility aliases (McpError -> ProtocolError, ErrorCode enum -> constants). */
 const McpError = ProtocolError;
@@ -193,7 +194,8 @@ import type { ToolDefinition } from "./ToolValidator";
 /**
  * Central registry of all available tools.
  *
- * Internal (granular) tools live in `_internalTools` and are used for executor dispatch.
+ * Internal (granular) tools live in `_internalTools`. They are registered for `execute()`
+ * dispatch/fallback and for tests, and are intentionally NOT exposed in the MCP tool listing.
  * Public (compound) tools live in `_publicTools` and are the only tools exposed to MCP clients.
  */
 export class ToolRegistry {
@@ -216,7 +218,7 @@ export class ToolRegistry {
     this._executors = new Map();
 
     // Parse MCP_TOOL_GROUPS env var (default: expose all groups)
-    const groups = process.env.MCP_TOOL_GROUPS || "all";
+    const groups = MCP_TOOL_GROUPS || "all";
     this._enabledGroups =
       groups === "all"
         ? new Set<string>(["core", "ai", "agents", "events", "system"])
@@ -536,7 +538,7 @@ export class ToolRegistry {
   /**
    * Register compound tools for MCP exposure.
    * These aggregate granular tools into domain-oriented compound tools
-   * so MCP clients see ~16 tools instead of 131.
+   * so MCP clients see a small set of domain tools instead of every granular tool.
    */
   private registerCompoundTools(): void {
     for (const tool of compoundToolDefinitions) {

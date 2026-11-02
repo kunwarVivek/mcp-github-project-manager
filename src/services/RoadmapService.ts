@@ -15,7 +15,7 @@ import type { GitHubRepositoryFactory } from "../infrastructure/github/GitHubRep
 import type { GitHubIssueRepository } from "../infrastructure/github/repositories/GitHubIssueRepository";
 import type { GitHubMilestoneRepository } from "../infrastructure/github/repositories/GitHubMilestoneRepository";
 import type { GitHubProjectRepository } from "../infrastructure/github/repositories/GitHubProjectRepository";
-import { type ILogger, Logger } from "../infrastructure/logger";
+import { getLogger, type ILogger } from "../infrastructure/logger";
 import { safeCall } from "./utils/safeCall";
 
 const CreateRoadmapSchema = z.object({
@@ -61,7 +61,7 @@ export class RoadmapService {
 
   constructor(factory: GitHubRepositoryFactory, logger?: ILogger) {
     this.factory = factory;
-    this.logger = logger ?? Logger.getInstance();
+    this.logger = logger ?? getLogger("RoadmapService");
   }
 
   private get projectRepo(): GitHubProjectRepository {

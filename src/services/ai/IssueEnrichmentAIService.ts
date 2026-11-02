@@ -23,10 +23,8 @@ import type {
 import { InputSanitizer } from "../utils/InputSanitizer";
 import { AIServiceFactory } from "./AIServiceFactory";
 import { calculateWeightedScore, getConfidenceTier } from "./ConfidenceScorer";
-import {
-  ENRICHMENT_SYSTEM_PROMPT,
-  formatEnrichmentPrompt,
-} from "./prompts/IssueIntelligencePrompts";
+import { defaultPromptRegistry } from "./prompts";
+import { enrichmentPromptVariables, ISSUE_PROMPT_IDS } from "./prompts/IssueIntelligencePrompts";
 
 // ============================================================================
 // Zod Schemas for AI Response Validation
@@ -129,16 +127,19 @@ export class IssueEnrichmentAIService {
     try {
       const result = await generateObject({
         model,
-        system: ENRICHMENT_SYSTEM_PROMPT,
-        prompt: formatEnrichmentPrompt({
-          issueTitle: InputSanitizer.sanitizeIssueContent(params.issueTitle),
-          issueDescription: InputSanitizer.sanitizeIssueContent(params.issueDescription),
-          projectContext: params.projectContext
-            ? InputSanitizer.sanitizeText(params.projectContext)
-            : undefined,
-          preserveOriginal,
-          repositoryLabels: params.repositoryLabels,
-        }),
+        system: defaultPromptRegistry.render(ISSUE_PROMPT_IDS.enrichmentSystem),
+        prompt: defaultPromptRegistry.render(
+          ISSUE_PROMPT_IDS.enrichmentUser,
+          enrichmentPromptVariables({
+            issueTitle: InputSanitizer.sanitizeIssueContent(params.issueTitle),
+            issueDescription: InputSanitizer.sanitizeIssueContent(params.issueDescription),
+            projectContext: params.projectContext
+              ? InputSanitizer.sanitizeText(params.projectContext)
+              : undefined,
+            preserveOriginal,
+            repositoryLabels: params.repositoryLabels,
+          })
+        ),
         schema: AIEnrichmentResponseSchema,
         temperature: 0.4, // Balanced for consistent enrichment with some creativity
       });

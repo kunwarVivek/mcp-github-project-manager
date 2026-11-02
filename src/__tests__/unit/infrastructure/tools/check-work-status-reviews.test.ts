@@ -1,6 +1,7 @@
-import { beforeEach, describe, expect, it, type Mock, type MockedClass, vi } from "vitest";
-import { GitHubRepositoryFactory } from "../../../../infrastructure/github/GitHubRepositoryFactory";
+import { beforeEach, describe, expect, it, type Mock, vi } from "vitest";
+import type { GitHubRepositoryFactory } from "../../../../infrastructure/github/GitHubRepositoryFactory";
 import { executeCheckWorkStatus } from "../../../../infrastructure/tools/agent-orchestration-tools";
+import { createGitHubFactory } from "../../../../infrastructure/tools/tool-factory";
 
 /**
  * The review status of a pull request must be derived from every review the
@@ -11,16 +12,11 @@ import { executeCheckWorkStatus } from "../../../../infrastructure/tools/agent-o
  * the rest, and with them the review that decides its outcome.
  */
 
-vi.mock("../../../../infrastructure/github/GitHubRepositoryFactory.js", () => ({
-  GitHubRepositoryFactory: vi.fn().mockImplementation(function () {
-    return {
-      getOctokit: vi.fn(),
-      getConfig: vi.fn(),
-    };
-  }),
+vi.mock("../../../../infrastructure/tools/tool-factory", () => ({
+  createGitHubFactory: vi.fn(),
 }));
 
-const MockedFactory = GitHubRepositoryFactory as MockedClass<typeof GitHubRepositoryFactory>;
+const mockedCreateFactory = vi.mocked(createGitHubFactory);
 
 interface ReviewFixture {
   id: number;
@@ -49,24 +45,22 @@ describe("check_work_status review handling", () => {
 
     listReviews = vi.fn();
 
-    MockedFactory.mockImplementation(function () {
-      return {
-        getOctokit: vi.fn().mockReturnValue({
-          rest: {
-            pulls: {
-              get: vi.fn().mockResolvedValue({
-                data: { merged: false, draft: false, state: "open" },
-              }),
-              listReviews,
-            },
-            issues: {
-              listComments: vi.fn().mockResolvedValue({ data: [] }),
-            },
+    mockedCreateFactory.mockReturnValue({
+      getOctokit: vi.fn().mockReturnValue({
+        rest: {
+          pulls: {
+            get: vi.fn().mockResolvedValue({
+              data: { merged: false, draft: false, state: "open" },
+            }),
+            listReviews,
           },
-        }),
-        getConfig: vi.fn().mockReturnValue({ owner: "octocat", repo: "hello-world" }),
-      } as unknown as GitHubRepositoryFactory;
-    });
+          issues: {
+            listComments: vi.fn().mockResolvedValue({ data: [] }),
+          },
+        },
+      }),
+      getConfig: vi.fn().mockReturnValue({ owner: "octocat", repo: "hello-world" }),
+    } as unknown as GitHubRepositoryFactory);
   });
 
   it("requests the reviews page by page and stops after a short page", async () => {

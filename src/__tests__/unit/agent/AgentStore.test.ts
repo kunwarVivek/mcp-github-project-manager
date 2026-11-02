@@ -122,26 +122,6 @@ describe("AgentStore", () => {
     });
   });
 
-  describe("saveAgents", () => {
-    it("replaces the whole registry in one compare-and-swap write", async () => {
-      github.seedRegistry([makeAgent("old")]);
-
-      await store.saveAgents([makeAgent("replacement")]);
-
-      expect(github.registryAgents().map((a) => a.id)).toEqual(["replacement"]);
-      expect(github.contentWrites.map((write) => write.outcome)).toEqual(["committed"]);
-    });
-
-    it("rejects a replacement that does not match the agent schema, writing nothing", async () => {
-      github.seedRegistry([makeAgent("old")]);
-
-      await expect(store.saveAgents([{ id: "broken" } as unknown as Agent])).rejects.toThrow(
-        /invalid agent records/
-      );
-      expect(github.contentWrites).toHaveLength(0);
-    });
-  });
-
   describe("removeAgent / removeAgentCascade", () => {
     it("returns false and writes nothing when the agent does not exist", async () => {
       github.seedRegistry([makeAgent("agent-1")]);

@@ -15,23 +15,20 @@ tree any more — do not reintroduce them. See
 | Unit tests | Individual components in isolation | `src/__tests__/unit/` |
 | Integration tests | Service-layer interactions and wiring | `src/__tests__/integration/` |
 | E2E tests | Full MCP server over stdio, tool suites | `src/__tests__/e2e/` |
-| Legacy suite | Older service/infrastructure suites | `tests/` |
 
-Test files live in **both** `src/__tests__/**` and the legacy root `tests/**` tree.
-Vitest picks up both (see `vitest.config.ts`, `test.include`):
+Every test lives under `src/__tests__/**`; the former root `tests/` tree was merged
+into it and no longer exists (see [ADR-012](adr/012-test-tree-consolidation.md)).
+`vitest.config.ts` (`test.include`) picks up only that tree:
 
 ```ts
 include: [
   "src/__tests__/**/*.test.ts",
   "src/__tests__/**/*.spec.ts",
   "src/__tests__/**/*.e2e.ts",
-  "tests/**/*.test.ts",
-  "tests/**/*.spec.ts",
 ]
 ```
 
-> New tests belong under `src/__tests__/`. The root `tests/` tree is kept working
-> but is not where new files go.
+> New tests belong under `src/__tests__/`. Do not recreate a root `tests/` directory.
 
 For the current pass/fail/skip totals, run the suite — the numbers change with
 every commit and a stale count in a doc is worse than no count:
@@ -71,7 +68,7 @@ npm test -- e2e
 npm test -- stdio-transport
 
 # Exclude a subtree
-npm test -- --exclude='**/tests/ai-services/**'
+npm test -- --exclude='**/e2e/**'
 ```
 
 ### Watch Mode
@@ -86,8 +83,8 @@ npm run test:watch
 npm run test:coverage
 ```
 
-Coverage thresholds are enforced in `vitest.config.ts` (v8 provider, over
-`src/**`): lines 55, functions 57, branches 45, statements 54.
+Coverage thresholds are enforced by vitest thresholds in `vitest.config.ts` (v8
+provider, over `src/**`); see CI for the current gate.
 
 ### E2E
 
@@ -147,7 +144,7 @@ is not an option here (it dies with `CACError: Unknown option`).
 ### The action sweep - every action, no credentials
 
 ```bash
-npm run test:e2e:sweep     # drives all 20 tools / 169 actions
+npm run test:e2e:sweep     # drives every action of every public tool (see TOOLS.md for the counts)
 npm run test:e2e:coverage  # renders the matrix and gates on it
 ```
 
@@ -160,7 +157,7 @@ crashes on a missing argument instead of reporting one. CI runs it.
 ### AI-only Tests
 
 ```bash
-npm run test:ai          # vitest run ai-services ai-tools
+npm run test:ai          # vitest run unit/services/ai/ ai-tools issue-intelligence-tools ai-tasks/
 npm run test:ai:watch
 npm run test:ai:coverage
 ```
@@ -257,18 +254,12 @@ src/__tests__/
 │   ├── infrastructure/            # Infrastructure tests
 │   ├── services/                  # Service tests
 │   └── validation/                # Validator tests
+├── infrastructure/                # Infrastructure tests (tools registry/schema, …)
 ├── services/                      # Service-level tests
 ├── tools/                         # Tool-level tests
+├── helpers/                       # Shared fakes (FakeGitHub, InMemoryAgentStore, aiFakes, …)
 ├── setup.ts                       # Global setup
-├── test-utils.ts                  # Shared helpers
-└── test-utils/                    # Test utilities and mocks
-
-tests/                             # Legacy suite (still in the Vitest include list)
-├── ai-services/
-├── ai-tools/
-├── services/
-├── infrastructure/
-└── cache/
+└── test-utils.ts                  # Shared helpers
 ```
 
 ## Test Requirements
@@ -316,16 +307,12 @@ Solution: run `npm run build` before the E2E tests.
 
 ### The Run Never Ends
 
-E2E suites that spawn processes can leave handles open. Force the run to end:
+E2E suites that spawn processes can leave handles open. Vitest rejects Jest's
+`--forceExit` and `--detectOpenHandles`; to find what keeps the process alive use
+the `hanging-process` reporter:
 
 ```bash
-npm test -- --forceExit
-```
-
-### Detecting Open Handles
-
-```bash
-npm test -- --detectOpenHandles
+npm test -- --reporter=hanging-process
 ```
 
 ### Mocking Traps (Vitest 5)
@@ -351,7 +338,8 @@ Before a production release, verify:
 2. **Typecheck passes**: `npm run typecheck`
 3. **Lint passes**: `npm run lint` (Biome — must exit 0)
 4. **Tests pass**: `npm test` reports 0 failures
-5. **Skipped tests documented**: every skipped suite has a justification (this file)
+5. **Docs and lockfiles agree**: `npm run check:docs` (tool/action counts in README, TOOLS.md, architecture.md, AGENTS.md vs the registry) and `npm run check:lockfiles`
+6. **Skipped tests documented**: every skipped suite has a justification (this file)
 
 The gate runs in that order, and CI runs it on Node 22.x and 24.x under **both**
 npm and pnpm.

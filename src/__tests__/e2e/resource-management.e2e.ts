@@ -3,26 +3,21 @@ import { ResourceStatus } from "../../domain/resource-types";
 import type { Issue, Milestone } from "../../domain/types";
 import type { ProjectManagementService } from "../../services/ProjectManagementService";
 import { TestFactory } from "../test-utils";
+import { MCPToolTestUtils } from "./utils/MCPToolTestUtils";
 
-const hasGitHubCredentials = !!(
-  process.env.GITHUB_TOKEN &&
-  process.env.GITHUB_OWNER &&
-  process.env.GITHUB_REPO
-);
-
-describe.skip("Resource Management E2E Tests", () => {
+// Live-API suite: it creates real issues and milestones, so it runs only when real GitHub
+// credentials (GITHUB_TOKEN, GITHUB_OWNER, GITHUB_REPO) are configured. The fake values seeded by
+// e2e/setup.ts do not count.
+describe.skipIf(MCPToolTestUtils.shouldSkipTest("github"))("Resource Management E2E Tests", () => {
   let service: ProjectManagementService;
 
   beforeAll(() => {
     const { GITHUB_TOKEN: token, GITHUB_OWNER: owner, GITHUB_REPO: repo } = process.env;
-    if (!hasGitHubCredentials || !token || !owner || !repo) {
-      console.log(
-        "Skipping Resource Management E2E tests - requires real GitHub API credentials (GITHUB_TOKEN, GITHUB_OWNER, GITHUB_REPO)"
-      );
-      return;
+    if (!token || !owner || !repo) {
+      throw new Error("GITHUB_TOKEN, GITHUB_OWNER and GITHUB_REPO are required");
     }
 
-    service = createProjectManagementService(owner, repo, token);
+    service = createProjectManagementService(owner, repo, { kind: "pat", token });
   });
 
   describe("Issue Relationship Management", () => {
@@ -31,7 +26,7 @@ describe.skip("Resource Management E2E Tests", () => {
 
     beforeAll(async () => {
       // Create a parent issue
-      parentIssue = await service.createIssue(
+      parentIssue = await service.issues.createIssue(
         TestFactory.createIssue({
           title: "Parent Feature",
           description: "A parent feature with dependencies",
@@ -43,7 +38,7 @@ describe.skip("Resource Management E2E Tests", () => {
 
       // Create child issues
       for (let i = 1; i <= 3; i++) {
-        const childIssue = await service.createIssue(
+        const childIssue = await service.issues.createIssue(
           TestFactory.createIssue({
             title: `Child Task ${i}`,
             description: `Implementation task ${i} for parent feature`,
@@ -59,28 +54,28 @@ describe.skip("Resource Management E2E Tests", () => {
     it("should create dependency relationships between issues", async () => {
       // Add dependencies
       for (const childIssue of childIssues) {
-        await service.addIssueDependency(childIssue.id, parentIssue.id);
+        await service.subIssues.addIssueDependency(childIssue.id, parentIssue.id);
       }
 
       // Verify dependencies
       for (const childIssue of childIssues) {
-        const dependencies = await service.getIssueDependencies(childIssue.id);
+        const dependencies = await service.subIssues.getIssueDependencies(childIssue.id);
         expect(dependencies).toContain(parentIssue.id);
       }
     });
 
     it("should handle bulk status updates", async () => {
       // Update parent issue status
-      await service.updateIssueStatus(parentIssue.id, ResourceStatus.CLOSED);
+      await service.subIssues.updateIssueStatus(parentIssue.id, ResourceStatus.CLOSED);
 
       // Verify parent issue status
-      const updatedParent = await service.getIssue(parentIssue.id);
+      const updatedParent = await service.issues.getIssue(parentIssue.id);
       expect(updatedParent?.status).toBe(ResourceStatus.CLOSED);
 
       // Verify impact on child issues (assuming your implementation has this relationship logic)
       // You might need to adapt this depending on how dependencies affect status in your system
       for (const childIssue of childIssues) {
-        const child = await service.getIssue(childIssue.id);
+        const child = await service.issues.getIssue(childIssue.id);
         expect(child).not.toBeNull();
       }
     });
@@ -92,7 +87,7 @@ describe.skip("Resource Management E2E Tests", () => {
 
     beforeAll(async () => {
       // Create a test milestone
-      testMilestone = await service.createMilestone(
+      testMilestone = await service.milestones.createMilestone(
         TestFactory.createMilestone({
           title: "Batch Assignment Milestone",
           description: "For testing batch assignment operations",
@@ -103,7 +98,7 @@ describe.skip("Resource Management E2E Tests", () => {
 
       // Create multiple test issues
       for (let i = 1; i <= 5; i++) {
-        const issue = await service.createIssue(
+        const issue = await service.issues.createIssue(
           TestFactory.createIssue({
             title: `Assignment Test Issue ${i}`,
             description: `Issue ${i} for batch assignment testing`,
@@ -118,12 +113,12 @@ describe.skip("Resource Management E2E Tests", () => {
     it("should assign multiple issues to a milestone", async () => {
       // Assign all test issues to the milestone
       for (const issue of testIssues) {
-        await service.assignIssueToMilestone(issue.id, testMilestone.id);
+        await service.subIssues.assignIssueToMilestone(issue.id, testMilestone.id);
       }
 
       // Verify all issues are assigned to the milestone
       for (const issue of testIssues) {
-        const updatedIssue = await service.getIssue(issue.id);
+        const updatedIssue = await service.issues.getIssue(issue.id);
         expect(updatedIssue?.milestoneId).toBe(testMilestone.id);
       }
     });
@@ -133,11 +128,11 @@ describe.skip("Resource Management E2E Tests", () => {
       const halfIndex = Math.floor(testIssues.length / 2);
 
       for (let i = 0; i < halfIndex; i++) {
-        await service.updateIssueStatus(testIssues[i].id, ResourceStatus.COMPLETED);
+        await service.subIssues.updateIssueStatus(testIssues[i].id, ResourceStatus.COMPLETED);
       }
 
       // Get milestone metrics
-      const metrics = await service.getMilestoneMetrics(testMilestone.id, true);
+      const metrics = await service.milestones.getMilestoneMetrics(testMilestone.id, true);
 
       // Verify milestone progress reflects the completed issues
       expect(metrics.totalIssues).toBe(testIssues.length);
@@ -152,7 +147,7 @@ describe.skip("Resource Management E2E Tests", () => {
 
     beforeAll(async () => {
       // Create a test issue for history tracking
-      testIssue = await service.createIssue(
+      testIssue = await service.issues.createIssue(
         TestFactory.createIssue({
           title: "History Tracking Issue",
           description: "For testing issue history",
@@ -165,12 +160,12 @@ describe.skip("Resource Management E2E Tests", () => {
 
     it("should track issue status changes in history", async () => {
       // Make multiple status changes
-      await service.updateIssueStatus(testIssue.id, ResourceStatus.IN_PROGRESS);
-      await service.updateIssueStatus(testIssue.id, ResourceStatus.COMPLETED);
-      await service.updateIssueStatus(testIssue.id, ResourceStatus.CLOSED);
+      await service.subIssues.updateIssueStatus(testIssue.id, ResourceStatus.IN_PROGRESS);
+      await service.subIssues.updateIssueStatus(testIssue.id, ResourceStatus.COMPLETED);
+      await service.subIssues.updateIssueStatus(testIssue.id, ResourceStatus.CLOSED);
 
       // Get issue history
-      const history = await service.getIssueHistory(testIssue.id);
+      const history = await service.subIssues.getIssueHistory(testIssue.id);
 
       // Verify history is being tracked
       expect(history.length).toBeGreaterThan(0);
@@ -178,14 +173,14 @@ describe.skip("Resource Management E2E Tests", () => {
 
     it("should track issue field updates in history", async () => {
       // Update issue fields
-      await service.updateIssue(testIssue.id, {
+      await service.issues.updateIssue(testIssue.id, {
         title: "Updated History Test Issue",
         description: "Updated description for history tracking",
       });
 
       // Get updated issue and history
-      const updatedIssue = await service.getIssue(testIssue.id);
-      const history = await service.getIssueHistory(testIssue.id);
+      const updatedIssue = await service.issues.getIssue(testIssue.id);
+      const history = await service.subIssues.getIssueHistory(testIssue.id);
 
       // Verify issue was updated
       expect(updatedIssue?.title).toBe("Updated History Test Issue");

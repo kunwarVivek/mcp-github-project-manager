@@ -16,7 +16,7 @@ export { executeExpandTask, expandTaskTool } from "./ai-tasks/ExpandTaskTool";
 export { executeGeneratePRD, generatePRDTool } from "./ai-tasks/GeneratePRDTool";
 export { executeGetNextTask, getNextTaskTool } from "./ai-tasks/GetNextTaskTool";
 export { executeParsePRD, parsePRDTool } from "./ai-tasks/ParsePRDTool";
-// Compound tool schemas (16 aggregated tools for MCP exposure)
+// Compound tool schemas (aggregated tools exposed over MCP)
 export * from "./compound/compound-schemas";
 export {
   executeFilterProjectItems,

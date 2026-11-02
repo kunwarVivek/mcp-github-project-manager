@@ -29,6 +29,7 @@ import {
   toGraphQLDate,
   type UpdateProjectV2FieldResponse,
 } from "../util/graphql-helpers";
+import { type ConnectionPage, collectConnection } from "../util/paginate";
 import { BaseGitHubRepository } from "./BaseRepository";
 
 /** The `CreateProjectV2FieldInput` payload the API accepts. */
@@ -111,13 +112,17 @@ function looksLikeFieldNodeId(value: string): boolean {
 }
 
 const LIST_PROJECT_FIELDS_QUERY = `
-  query($projectId: ID!) {
+  query($projectId: ID!, $after: String) {
     node(id: $projectId) {
       ... on ProjectV2 {
-        fields(first: 100) {
+        fields(first: 100, after: $after) {
           nodes {
             __typename
             ${projectFieldUnionSelection()}
+          }
+          pageInfo {
+            hasNextPage
+            endCursor
           }
         }
       }
@@ -151,9 +156,7 @@ interface ListedProjectField {
 /** The response of the project field list query. */
 interface ProjectFieldListResponse {
   node?: {
-    fields?: {
-      nodes?: Array<{ id: string; name: string }>;
-    };
+    fields?: ConnectionPage<{ id: string; name: string }>;
   } | null;
 }
 
@@ -268,7 +271,7 @@ export class GitHubProjectRepository extends BaseGitHubRepository implements Pro
         projectId: id,
         title: data.title,
         shortDescription: data.description,
-        closed: data.status === ResourceStatus.CLOSED,
+        closed: data.status === undefined ? undefined : data.status === ResourceStatus.CLOSED,
       },
     });
 
@@ -972,12 +975,18 @@ export class GitHubProjectRepository extends BaseGitHubRepository implements Pro
     // Resolve name from id if needed (ProjectV2.field takes name, not id)
     let fieldName = fieldIdOrName;
     if (looksLikeFieldNodeId(fieldIdOrName)) {
-      const listResp = await this.graphql<ProjectFieldListResponse>(LIST_PROJECT_FIELDS_QUERY, {
-        projectId,
-      });
-      const match = (listResp.node?.fields?.nodes ?? []).find(
-        (f: { id: string }) => f.id === fieldIdOrName
+      const fields = await collectConnection(
+        async (after) => {
+          const listResp = await this.graphql<ProjectFieldListResponse>(LIST_PROJECT_FIELDS_QUERY, {
+            projectId,
+            after,
+          });
+          return listResp.node?.fields;
+        },
+        this.logger,
+        `Fields of project ${projectId}`
       );
+      const match = fields.find((f: { id: string }) => f.id === fieldIdOrName);
       if (!match) return null;
       fieldName = match.name;
     }

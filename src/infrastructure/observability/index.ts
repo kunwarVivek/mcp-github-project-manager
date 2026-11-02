@@ -8,14 +8,26 @@ export {
   startTrace,
   type TraceContext,
   traceContext,
-} from "./CorrelationContext.js";
+} from "./CorrelationContext";
+export {
+  type AuditSink,
+  auditLogConfigFromEnv,
+  createMutationAuditLog,
+  FileAuditSink,
+  type MutationAuditInput,
+  MutationAuditLog,
+  type MutationAuditLogConfig,
+  type MutationAuditRecord,
+} from "./MutationAuditLog";
+export {
+  initTelemetry,
+  shutdownTelemetry,
+  type TelemetryConfig,
+  telemetryConfigFromEnv,
+  withSpan,
+} from "./otel";
 export {
   SecurityAuditLog,
   type SecurityEvent,
   type SecurityEventType,
-} from "./SecurityAuditLog.js";
-export {
-  createTracingLogger,
-  type LogEntry,
-  TracingLogger,
-} from "./TracingLogger.js";
+} from "./SecurityAuditLog";

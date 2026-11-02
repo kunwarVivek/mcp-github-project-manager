@@ -1,7 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Agent } from "../../../domain/agent-orchestration-types";
 import type { AgentStore } from "../../../infrastructure/agent/AgentStore";
-import { AgentBudgetService } from "../../../services/agent/AgentBudgetService";
+import {
+  AgentBudgetService,
+  BudgetExhaustedError,
+} from "../../../services/agent/AgentBudgetService";
 import { UnpaidDebitLedger } from "../../../services/agent/UnpaidDebitLedger";
 import { InMemoryAgentStore } from "../../helpers/InMemoryAgentStore";
 
@@ -322,23 +325,35 @@ describe("AgentBudgetService", () => {
     });
   });
 
-  describe("canAfford / resetBudgetIfDue", () => {
-    it("canAfford respects remaining budget", async () => {
-      mockStore.getAgent.mockResolvedValue(
-        makeAgent("agent-1", {
-          budget: {
-            totalTokens: 1000,
-            meteredTokens: 500,
-            reportedTokens: 400,
-            usedTokens: 900,
-            warningFraction: 0.8,
-            hardStop: true,
-          },
-        })
-      );
+  describe("assertCanSpend / resetBudgetIfDue", () => {
+    const budgetOf = (usedTokens: number, hardStop: boolean) => ({
+      totalTokens: 1000,
+      meteredTokens: usedTokens,
+      reportedTokens: 0,
+      usedTokens,
+      warningFraction: 0.8,
+      hardStop,
+    });
 
-      expect(await service.canAfford("agent-1", 50)).toBe(true);
-      expect(await service.canAfford("agent-1", 200)).toBe(false);
+    it("resolves while budget remains", async () => {
+      mockStore.getAgent.mockResolvedValue(makeAgent("agent-1", { budget: budgetOf(900, true) }));
+
+      await expect(service.assertCanSpend("agent-1")).resolves.toBeUndefined();
+    });
+
+    it("throws BudgetExhaustedError when a hard-stop budget is used up", async () => {
+      mockStore.getAgent.mockResolvedValue(makeAgent("agent-1", { budget: budgetOf(1000, true) }));
+
+      const error = await service.assertCanSpend("agent-1").catch((e: unknown) => e);
+
+      expect(error).toBeInstanceOf(BudgetExhaustedError);
+      expect((error as BudgetExhaustedError).agentId).toBe("agent-1");
+    });
+
+    it("does not throw when the budget is exceeded but hardStop is off", async () => {
+      mockStore.getAgent.mockResolvedValue(makeAgent("agent-1", { budget: budgetOf(1500, false) }));
+
+      await expect(service.assertCanSpend("agent-1")).resolves.toBeUndefined();
     });
 
     it("resets a daily budget that is due", async () => {

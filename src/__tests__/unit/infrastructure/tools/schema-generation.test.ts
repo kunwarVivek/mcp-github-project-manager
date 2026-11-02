@@ -87,7 +87,7 @@ describe("agent compound schemas", () => {
     });
   });
 
-  it("requires action-specific agent_manage arguments and preserves budget aliases", () => {
+  it("requires action-specific agent_manage arguments", () => {
     expect(() => agentManageSchema.parse({ action: "smart_assign" })).toThrow();
 
     expect(
@@ -95,13 +95,13 @@ describe("agent compound schemas", () => {
         action: "set_budget",
         agentId: "agent-1",
         totalTokens: 1000,
-        warningThreshold: 0.75,
+        warningFraction: 0.75,
       })
     ).toMatchObject({
       action: "set_budget",
       agentId: "agent-1",
       totalTokens: 1000,
-      warningThreshold: 0.75,
+      warningFraction: 0.75,
       hardStop: true,
     });
   });

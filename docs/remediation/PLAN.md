@@ -1,12 +1,14 @@
 # Remediation Plan — Layered, Bottom-Up
 
-> **⚠️ HISTORICAL SNAPSHOT (2026-08-05).** This plan records the layered
-> remediation that was executed against the `remediation/spec-reconciliation`
-> branch. It is kept for history only. **Current source of truth:** the code
-> itself, plus [`docs/architecture.md`](../architecture.md),
-> [`docs/TOOLS.md`](../TOOLS.md) and [`docs/CONFIGURATION.md`](../CONFIGURATION.md).
+> **⚠️ HISTORICAL PLAN WITH A CURRENT-STATE FOOTER (reconciled 2026-11-02).** The layers
+> A–F below record the remediation executed on the `remediation/spec-reconciliation`
+> branch in July–August 2026; the numbers quoted in them (365-line PMS, 120 tools,
+> `Jest`, etc.) are as of that date. The last section, "2026-11 remediation pass",
+> records the later state. **Current source of truth:** the code itself, plus
+> [`docs/architecture.md`](../architecture.md), [`docs/TOOLS.md`](../TOOLS.md) and
+> [`docs/CONFIGURATION.md`](../CONFIGURATION.md).
 
-> **Status (2026-08-05):** All layers (A through F) and D1 completed. PMS decomposed to 365 lines, 14 injected services. Post-remediation doc reconciliation in progress.
+> **Status:** all layers (A through F) and D1 completed. Later passes: G9–G13 (agent orchestration) and G14 (2026-11); see [GAP-TRACKER.md](./GAP-TRACKER.md).
 
 **Branch:** `remediation/spec-reconciliation`
 **Strategy:** Option A (structural). Durable architectural alignment over patching.
@@ -101,7 +103,7 @@ Presented for go/no-go **before** any build. Not scheduled until approved.
 
 **Impact (GitNexus):** HIGH — 22 impacted, 17 direct callers (index.ts tool handlers, container, tests), 3 flows.
 **Safe approach — extract-and-delegate:** keep every PMS public method signature identical so the 17 callers are untouched; move implementations into new focused services; PMS delegates (same pattern as existing milestoneService/subIssueService). Neutralizes the HIGH rating (zero API-surface change).
-**PMS today:** 365 lines (reduced from 1,696), facade-only — all methods delegate to injected services.
+**PMS today:** 121 lines (was 365 when D1 closed, 1,696 before) — constructor-injected services behind typed getters, no behavior of its own.
 **Extraction targets (completed):**
 1. `IssueService` — createIssue, listIssues (sort logic), getIssue, updateIssue, comment ops (4), draft-issue GraphQL (2).
 2. `PullRequestService` — PR CRUD, reviews, merge, diff.
@@ -109,7 +111,7 @@ Presented for go/no-go **before** any build. Not scheduled until approved.
 4. `LabelService` — create/list labels.
 5. `IterationService` — iteration config, list, current, assign, date-based.
 
-## Remaining doc reconciliation (user-requested)
+## Doc reconciliation (user-requested) — COMPLETED
 - `.planning/STATUS.md` says phases 10-12 "Not Started" — reality: phase 10 partial (ProjectAutomationService exists), 11 absent, 12 shipped (v1.1.0). Reconcile.
 - `.planning/REQUIREMENTS.md` "99/99 complete" over-claims (DEBT-07 god-class not done until D1 lands). Reconcile.
 - Ensure PRD→FRD linkage is comprehensive across `.planning`.
@@ -135,6 +137,20 @@ GitHub API, then bottom-up remediation per domain, with the live-API e2e suite a
 
 **Gates at this point:** build 0 · typecheck 0 · lint 0 · unit 3147 pass / 36 skip · action sweep 164/164.
 
-**In flight:** the five native capabilities the platform emulated (native issue dependencies, native issue
+**Completed afterwards (G12-13 … G12-18):** the five native capabilities the platform emulated (native issue dependencies, native issue
 types, project roles/collaborators, views as server-side claiming pools, reverse issue→project membership)
-— beads `mcp-github-project-manager-5mf.35/.36/.38/.39/.40`.
+shipped — beads `mcp-github-project-manager-5mf.35/.36/.38/.39/.40`.
+
+## 2026-11 remediation pass
+
+**Method:** derive every fact from the code, then make the docs agree with it and with each other. Recorded as G14 in the tracker.
+
+- Domain entities carry behavior (ADR-005); tool executors self-construct through `createGitHubFactory()` as a documented composition-root exception (ADR-006).
+- Error contract: every tool failure is `isError` with `_meta.error`; JSON-RPC only for an unknown tool or protocol faults (ADR-007).
+- GitHub App auth outranks the PAT through `resolveGitHubAuth()` + `GitHubRepositoryFactory.fromAuth` (ADR-008).
+- One `GitHubRequestExecutor` (retry + proactive rate-limit budgeting against `RATE_LIMIT_FLOOR`) — the previously unused `RateLimitManager` is now consumed (IBF-4).
+- `idempotencyKey` on create actions, mutation audit log, additive `cursor`/`nextCursor` pagination (replacing the never-built `Pagination.ts`, IBF-8), per-tool `_meta.schemaVersion` with a snapshot test (ADR-009).
+- Opt-in OpenTelemetry and webhook hardening (`WEBHOOK_HOST`, `EVENTS_AUTH_TOKEN`, `WEBHOOK_TRUSTED_PROXIES`) (ADR-010).
+- `PromptRegistry` serves every AI prompt; `TokenBudgetManager` (`AI_SESSION_TOKEN_LIMIT`) is wired and distinct from the per-agent budget; `AIResponseCache` is wired in `TaskContextGenerationService` (ADR-011).
+- New `analytics` tool: 21 tools / 175 actions, enforced by `npm run check:docs`.
+- Dead modules deleted (`infrastructure/validation`, `infrastructure/resource`, `StructuredLogger`/`TracingLogger`, `project-types.ts`, `MCPErrorHandler`); test trees merged into `src/__tests__/` (ADR-012).

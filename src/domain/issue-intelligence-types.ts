@@ -287,7 +287,7 @@ export interface DuplicateDetectionConfig {
 /**
  * Type of relationship between issues.
  */
-export type RelationshipType = "semantic" | "dependency" | "component";
+export type IssueRelationshipKind = "semantic" | "dependency" | "component";
 
 /**
  * Sub-type for dependency relationships.
@@ -307,7 +307,7 @@ export interface IssueRelationship {
   /** Target issue title */
   targetIssueTitle: string;
   /** Type of relationship */
-  relationshipType: RelationshipType;
+  relationshipType: IssueRelationshipKind;
   /** Sub-type for dependency relationships */
   subType?: DependencySubType;
   /** Confidence in this relationship (0-1) */

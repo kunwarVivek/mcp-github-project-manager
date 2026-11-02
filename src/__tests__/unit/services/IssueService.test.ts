@@ -1,10 +1,11 @@
-import { beforeEach, describe, expect, it, type Mock, type Mocked, vi } from "vitest";
+import { beforeEach, describe, expect, it, type Mocked, vi } from "vitest";
 import { ResourceStatus } from "../../../domain/resource-types";
 import type { Issue } from "../../../domain/types";
 import type { GitHubRepositoryFactory } from "../../../infrastructure/github/GitHubRepositoryFactory";
+import type { GitHubDraftIssueRepository } from "../../../infrastructure/github/repositories/GitHubDraftIssueRepository";
+import type { GitHubIssueCommentRepository } from "../../../infrastructure/github/repositories/GitHubIssueCommentRepository";
 import type { GitHubIssueRepository } from "../../../infrastructure/github/repositories/GitHubIssueRepository";
 import { IssueService } from "../../../services/IssueService";
-import type { RestCallFn } from "../../helpers/mockTypes";
 
 // Mock tsyringe decorators
 vi.mock("tsyringe", () => ({
@@ -19,14 +20,8 @@ describe("IssueService", () => {
   let service: IssueService;
   let mockFactory: Mocked<GitHubRepositoryFactory>;
   let mockIssueRepo: Mocked<GitHubIssueRepository>;
-  let mockOctokit: {
-    rest: {
-      issues: Record<
-        "createComment" | "updateComment" | "deleteComment" | "listComments",
-        Mock<RestCallFn>
-      >;
-    };
-  };
+  let mockCommentRepo: Mocked<GitHubIssueCommentRepository>;
+  let mockDraftRepo: Mocked<GitHubDraftIssueRepository>;
 
   const mockIssue: Issue = {
     id: "issue-1",
@@ -64,27 +59,25 @@ describe("IssueService", () => {
       delete: vi.fn(),
     } as unknown as Mocked<GitHubIssueRepository>;
 
-    // Create mock Octokit
-    mockOctokit = {
-      rest: {
-        issues: {
-          createComment: vi.fn<RestCallFn>(),
-          updateComment: vi.fn<RestCallFn>(),
-          deleteComment: vi.fn<RestCallFn>(),
-          listComments: vi.fn<RestCallFn>(),
-        },
-      },
-    };
+    mockCommentRepo = {
+      create: vi.fn(),
+      update: vi.fn(),
+      delete: vi.fn(),
+      list: vi.fn(),
+    } as unknown as Mocked<GitHubIssueCommentRepository>;
 
-    // Create mock factory
+    mockDraftRepo = {
+      create: vi.fn(),
+      update: vi.fn(),
+      delete: vi.fn(),
+    } as unknown as Mocked<GitHubDraftIssueRepository>;
+
     mockFactory = {
       createIssueRepository: vi.fn().mockReturnValue(mockIssueRepo),
-      getConfig: vi.fn().mockReturnValue({ owner: "test-owner", repo: "test-repo" }),
-      getOctokit: vi.fn().mockReturnValue(mockOctokit),
-      graphql: vi.fn(),
+      createIssueCommentRepository: vi.fn().mockReturnValue(mockCommentRepo),
+      createDraftIssueRepository: vi.fn().mockReturnValue(mockDraftRepo),
     } as unknown as Mocked<GitHubRepositoryFactory>;
 
-    // Create service with mock factory
     service = new IssueService(mockFactory);
   });
 
@@ -238,132 +231,71 @@ describe("IssueService", () => {
     });
   });
 
-  describe("createIssueComment", () => {
-    it("should create a comment and return IssueComment", async () => {
-      const mockComment = {
-        id: 1,
-        body: "Test comment",
-        user: { login: "user1" },
-        created_at: "2024-01-01T00:00:00Z",
-        updated_at: "2024-01-01T00:00:00Z",
-      };
+  describe("issue comments", () => {
+    const comment = {
+      id: 1,
+      body: "Test comment",
+      user: "user1",
+      createdAt: "2024-01-01T00:00:00Z",
+      updatedAt: "2024-01-01T00:00:00Z",
+    };
 
-      mockOctokit.rest.issues.createComment.mockResolvedValue({ data: mockComment });
+    it("creates, updates and lists comments through the repository", async () => {
+      mockCommentRepo.create.mockResolvedValue(comment);
+      mockCommentRepo.update.mockResolvedValue(comment);
+      mockCommentRepo.list.mockResolvedValue([comment]);
 
-      const result = await service.createIssueComment({
-        issueNumber: 1,
-        body: "Test comment",
-      });
+      expect(await service.createIssueComment({ issueNumber: 1, body: "Test comment" })).toEqual(
+        comment
+      );
+      expect(mockCommentRepo.create).toHaveBeenCalledWith(1, "Test comment");
 
-      expect(result).toEqual({
-        id: 1,
-        body: "Test comment",
-        user: "user1",
-        createdAt: "2024-01-01T00:00:00Z",
-        updatedAt: "2024-01-01T00:00:00Z",
-      });
+      expect(await service.updateIssueComment({ commentId: 1, body: "Test comment" })).toEqual(
+        comment
+      );
+      expect(mockCommentRepo.update).toHaveBeenCalledWith(1, "Test comment");
+
+      expect(await service.listIssueComments({ issueNumber: 1 })).toEqual([comment]);
+      expect(mockCommentRepo.list).toHaveBeenLastCalledWith(1, 30);
+      await service.listIssueComments({ issueNumber: 1, limit: 10 });
+      expect(mockCommentRepo.list).toHaveBeenLastCalledWith(1, 10);
     });
-  });
 
-  describe("listIssueComments", () => {
-    it("should return array of IssueComment", async () => {
-      const mockComments = [
-        {
-          id: 1,
-          body: "Comment 1",
-          user: { login: "user1" },
-          created_at: "2024-01-01T00:00:00Z",
-          updated_at: "2024-01-01T00:00:00Z",
-        },
-        {
-          id: 2,
-          body: "Comment 2",
-          user: { login: "user2" },
-          created_at: "2024-01-02T00:00:00Z",
-          updated_at: "2024-01-02T00:00:00Z",
-        },
-      ];
+    it("confirms comment deletion", async () => {
+      mockCommentRepo.delete.mockResolvedValue();
 
-      mockOctokit.rest.issues.listComments.mockResolvedValue({ data: mockComments });
-
-      const result = await service.listIssueComments({
-        issueNumber: 1,
-        limit: 10,
+      expect(await service.deleteIssueComment({ commentId: 4 })).toEqual({
+        success: true,
+        message: "Comment 4 deleted successfully",
       });
-
-      expect(result).toHaveLength(2);
-      expect(result[0].user).toBe("user1");
-      expect(result[1].user).toBe("user2");
+      expect(mockCommentRepo.delete).toHaveBeenCalledWith(4);
     });
   });
 
   describe("Draft Issues", () => {
-    it("should create a draft issue", async () => {
-      const mockResponse = {
-        addProjectV2DraftIssue: {
-          projectV2Item: {
-            id: "item-1",
-            content: {
-              id: "draft-1",
-              title: "Draft Issue",
-              body: "Draft body",
-            },
-          },
-        },
-      };
+    const draft = { id: "draft-1", title: "Draft Issue", body: "Draft body" };
 
-      mockFactory.graphql.mockResolvedValue(mockResponse);
+    it("creates and updates a draft issue through the repository", async () => {
+      mockDraftRepo.create.mockResolvedValue(draft);
+      mockDraftRepo.update.mockResolvedValue(draft);
 
-      const result = await service.createDraftIssue({
-        projectId: "project-1",
-        title: "Draft Issue",
-        body: "Draft body",
-      });
+      const createData = { projectId: "project-1", title: "Draft Issue", body: "Draft body" };
+      expect(await service.createDraftIssue(createData)).toEqual(draft);
+      expect(mockDraftRepo.create).toHaveBeenCalledWith(createData);
 
-      expect(result).toEqual({
-        id: "draft-1",
-        title: "Draft Issue",
-        body: "Draft body",
-      });
+      const updateData = { draftIssueId: "draft-1", title: "Draft Issue" };
+      expect(await service.updateDraftIssue(updateData)).toEqual(draft);
+      expect(mockDraftRepo.update).toHaveBeenCalledWith(updateData);
     });
 
-    it("should update a draft issue", async () => {
-      const mockResponse = {
-        updateProjectV2DraftIssue: {
-          draftIssue: {
-            id: "draft-1",
-            title: "Updated Draft",
-            body: "Updated body",
-          },
-        },
-      };
+    it("confirms draft issue deletion", async () => {
+      mockDraftRepo.delete.mockResolvedValue();
 
-      mockFactory.graphql.mockResolvedValue(mockResponse);
-
-      const result = await service.updateDraftIssue({
-        draftIssueId: "draft-1",
-        title: "Updated Draft",
-        body: "Updated body",
-      });
-
-      expect(result).toEqual({
-        id: "draft-1",
-        title: "Updated Draft",
-        body: "Updated body",
-      });
-    });
-
-    it("should delete a draft issue", async () => {
-      mockFactory.graphql.mockResolvedValue({});
-
-      const result = await service.deleteDraftIssue({
-        draftIssueId: "draft-1",
-      });
-
-      expect(result).toEqual({
+      expect(await service.deleteDraftIssue({ draftIssueId: "draft-1" })).toEqual({
         success: true,
         message: "Draft issue draft-1 deleted successfully",
       });
+      expect(mockDraftRepo.delete).toHaveBeenCalledWith("draft-1");
     });
   });
 });

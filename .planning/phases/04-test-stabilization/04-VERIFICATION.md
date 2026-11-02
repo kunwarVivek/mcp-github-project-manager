@@ -1,5 +1,7 @@
 # Phase 4: Test Stabilization - Verification Report
 
+> **Superseded note (2026-11-02):** historical record (Jest era, 515 tests). The project is now on Vitest 5 with a single `src/__tests__/` tree; coverage thresholds live in `vitest.config.ts` and results are in CI. See `.planning/codebase/TESTING.md`.
+
 **Status:** PHASE COMPLETE
 **Date:** 2026-01-31
 **Verified by:** Claude Opus 4.5

@@ -45,7 +45,7 @@ describe("tool registration surface", () => {
   it("exposes a stable compound tool surface", () => {
     const tools = ToolRegistry.getInstance().getToolsForMCP();
 
-    expect(tools.length).toBe(20);
+    expect(tools.length).toBe(21);
 
     const names = tools.map((t) => t.name);
     expect(new Set(names).size).toBe(names.length);

@@ -1,137 +1,158 @@
-import type { Octokit } from "@octokit/rest";
+import { z } from "zod";
+import { RateLimitError } from "../../domain/errors";
+import { RATE_LIMIT_FLOOR } from "../../env";
 
-export interface RateLimitInfo {
-  limit: number;
+/** GitHub rate-limit pools tracked separately: the GraphQL points budget and the REST (core) budget. */
+export type RateLimitKind = "graphql" | "rest";
+
+/** Last known quota for one pool. */
+export interface RateLimitBudget {
   remaining: number;
-  reset: Date;
-  used: number;
+  resetAt: Date;
 }
 
-export interface RateLimitStatus {
-  core: RateLimitInfo;
-  graphql: RateLimitInfo;
-  search: RateLimitInfo;
-  /** remaining < 10% of limit across core/graphql */
-  isLow: boolean;
-  /** remaining < 5% of limit across core/graphql */
-  isCritical: boolean;
-  /** ms until core reset */
-  resetIn: number;
+export interface RateLimitManagerOptions {
+  /** Wait for the reset once `remaining` falls below this. Defaults to `RATE_LIMIT_FLOOR`. */
+  floor?: number;
+  /** Longest wait `acquire` accepts; a longer reset throws `RateLimitError`. Default 60s. */
+  maxWaitMs?: number;
+}
+
+/** The `rateLimit { remaining resetAt }` object GraphQL responses may carry. */
+export interface GraphQLRateLimitField {
+  remaining: number;
+  resetAt: string;
+}
+
+/** Minimal shape of an Octokit instance's hook collection that we need. */
+interface HookableOctokit {
+  hook: {
+    after(name: "request", fn: (response: { headers?: Record<string, unknown> }) => void): void;
+    error(name: "request", fn: (error: unknown) => never): void;
+  };
+}
+
+const DEFAULT_MAX_WAIT_MS = 60_000;
+
+const ErrorWithHeaders = z.object({
+  response: z.object({ headers: z.record(z.string(), z.unknown()) }),
+});
+
+function headerValue(headers: Record<string, unknown>, name: string): string | undefined {
+  const value = headers[name];
+  return typeof value === "string" || typeof value === "number" ? String(value) : undefined;
+}
+
+/** Pull `response.headers` out of an Octokit request error, if present. */
+function errorHeaders(error: unknown): Record<string, unknown> | undefined {
+  const parsed = ErrorWithHeaders.safeParse(error);
+  return parsed.success ? parsed.data.response.headers : undefined;
 }
 
 /**
- * Monitors GitHub API rate limits and provides backoff recommendations.
- * Caches rate limit info to avoid extra API calls.
+ * Tracks GitHub rate-limit quota per pool from response headers and the GraphQL
+ * `rateLimit` field, and gates every outgoing request on it: once a pool's
+ * remaining quota drops below the floor, `acquire` waits for the reset (bounded
+ * by `maxWaitMs`) instead of firing the request and eating a 403.
+ *
+ * No API calls of its own: quota is learned from the traffic already flowing.
  */
 export class RateLimitManager {
-  private cachedStatus: RateLimitStatus | null = null;
-  private cacheExpiry = 0;
-  private readonly cacheTtlMs = 30_000; // 30s cache
-  private readonly octokit: Octokit;
+  private readonly budgets = new Map<RateLimitKind, RateLimitBudget>();
+  private readonly floor: number;
+  private readonly maxWaitMs: number;
 
-  constructor(octokit: Octokit) {
-    this.octokit = octokit;
+  constructor(options: RateLimitManagerOptions = {}) {
+    this.floor = options.floor ?? RATE_LIMIT_FLOOR;
+    this.maxWaitMs = options.maxWaitMs ?? DEFAULT_MAX_WAIT_MS;
+  }
+
+  /** Last known quota for a pool, or undefined when nothing was observed yet. */
+  getBudget(kind: RateLimitKind): RateLimitBudget | undefined {
+    const budget = this.budgets.get(kind);
+    return budget && { remaining: budget.remaining, resetAt: new Date(budget.resetAt) };
+  }
+
+  /** Record an authoritative quota reading for a pool. */
+  record(kind: RateLimitKind, budget: RateLimitBudget): void {
+    if (Number.isNaN(budget.resetAt.getTime()) || !Number.isFinite(budget.remaining)) return;
+    this.budgets.set(kind, { remaining: budget.remaining, resetAt: budget.resetAt });
   }
 
   /**
-   * Get current rate limit status. Caches for 30s.
+   * Record quota from response headers. The pool comes from `x-ratelimit-resource`
+   * (`graphql` or `core`); other resources (search, ...) are not tracked.
    */
-  async getStatus(): Promise<RateLimitStatus> {
-    if (this.cachedStatus && Date.now() < this.cacheExpiry) {
-      return this.cachedStatus;
-    }
-
-    const { data } = await this.octokit.rest.rateLimit.get();
-
-    const toInfo = (r: {
-      limit: number;
-      remaining: number;
-      reset: number;
-      used: number;
-    }): RateLimitInfo => ({
-      limit: r.limit,
-      remaining: r.remaining,
-      reset: new Date(r.reset * 1000),
-      used: r.used,
+  recordHeaders(headers: Record<string, unknown> | undefined): void {
+    if (!headers) return;
+    const resource = headerValue(headers, "x-ratelimit-resource");
+    const kind: RateLimitKind | undefined =
+      resource === "graphql" ? "graphql" : resource === "core" ? "rest" : undefined;
+    const remaining = headerValue(headers, "x-ratelimit-remaining");
+    const reset = headerValue(headers, "x-ratelimit-reset");
+    if (!kind || remaining === undefined || reset === undefined) return;
+    this.record(kind, {
+      remaining: Number.parseInt(remaining, 10),
+      resetAt: new Date(Number.parseInt(reset, 10) * 1000),
     });
+  }
 
-    const defaultResource = { limit: 5000, remaining: 5000, reset: 0, used: 0 };
-    const core = toInfo(data.resources.core);
-    const graphql = toInfo(data.resources.graphql ?? defaultResource);
-    const search = toInfo(data.resources.search ?? defaultResource);
-
-    const minRatio = Math.min(core.remaining / core.limit, graphql.remaining / graphql.limit);
-
-    this.cachedStatus = {
-      core,
-      graphql,
-      search,
-      isLow: minRatio < 0.1,
-      isCritical: minRatio < 0.05,
-      resetIn: Math.max(0, core.reset.getTime() - Date.now()),
-    };
-    this.cacheExpiry = Date.now() + this.cacheTtlMs;
-    return this.cachedStatus;
+  /** Record quota from a GraphQL response's `rateLimit` field. */
+  recordGraphQLRateLimit(rateLimit: GraphQLRateLimitField): void {
+    this.record("graphql", {
+      remaining: rateLimit.remaining,
+      resetAt: new Date(rateLimit.resetAt),
+    });
   }
 
   /**
-   * Calculate backoff delay based on current rate limit status.
-   * Returns 0 if no backoff needed.
+   * Learn quota from every request an Octokit instance makes (REST and GraphQL,
+   * successes and failures) by hooking its request pipeline.
    */
-  async getBackoffMs(): Promise<number> {
-    const status = await this.getStatus();
-    if (status.isCritical) {
-      // Back off until reset + small buffer, capped at 60s
-      return Math.min(status.resetIn + 1000, 60_000);
-    }
-    if (status.isLow) {
-      // Slow down proportionally to remaining quota
-      const minRemaining = Math.min(status.core.remaining, status.graphql.remaining);
-      return Math.max(100, Math.floor(1000 / (minRemaining + 1)));
-    }
-    return 0;
+  observe(octokit: HookableOctokit): void {
+    octokit.hook.after("request", (response) => {
+      this.recordHeaders(response.headers);
+    });
+    octokit.hook.error("request", (error) => {
+      this.recordHeaders(errorHeaders(error));
+      throw error;
+    });
   }
 
   /**
-   * Wait if rate-limited. Call before making API requests.
+   * Call before a request costing `cost` points/requests. Returns immediately when
+   * the pool is unknown or above the floor; otherwise waits for the reset.
+   *
+   * @throws RateLimitError when the reset is further away than `maxWaitMs`.
    */
-  async waitIfNeeded(): Promise<void> {
-    const backoff = await this.getBackoffMs();
-    if (backoff > 0) {
-      await new Promise<void>((r) => setTimeout(r, backoff));
+  async acquire(kind: RateLimitKind, cost = 1): Promise<void> {
+    const budget = this.budgets.get(kind);
+    if (!budget) return;
+
+    const waitMs = budget.resetAt.getTime() - Date.now();
+    if (waitMs <= 0) {
+      // The window rolled over; the stored reading is stale.
+      this.budgets.delete(kind);
+      return;
     }
-  }
 
-  /**
-   * Update cached status from response headers.
-   * Call this after every GitHub API response to stay up-to-date
-   * without extra API calls.
-   */
-  updateFromHeaders(headers: Record<string, string | undefined>): void {
-    const remaining = headers["x-ratelimit-remaining"];
-    const limit = headers["x-ratelimit-limit"];
-    const reset = headers["x-ratelimit-reset"];
+    if (budget.remaining >= this.floor) {
+      // Account for in-flight spend until the next authoritative reading arrives.
+      budget.remaining -= cost;
+      return;
+    }
 
-    if (remaining && limit && reset && this.cachedStatus) {
-      this.cachedStatus.core = {
-        limit: parseInt(limit, 10),
-        remaining: parseInt(remaining, 10),
-        reset: new Date(parseInt(reset, 10) * 1000),
-        used: parseInt(limit, 10) - parseInt(remaining, 10),
-      };
-      const minRatio = Math.min(
-        this.cachedStatus.core.remaining / this.cachedStatus.core.limit,
-        this.cachedStatus.graphql.remaining / this.cachedStatus.graphql.limit
+    if (waitMs > this.maxWaitMs) {
+      throw new RateLimitError(
+        `GitHub ${kind} rate limit nearly exhausted (${budget.remaining} remaining, floor ${this.floor}); ` +
+          `reset in ${Math.ceil(waitMs / 1000)}s exceeds the ${Math.round(this.maxWaitMs / 1000)}s maximum wait`,
+        budget.resetAt,
+        { kind, remaining: budget.remaining, floor: this.floor }
       );
-      this.cachedStatus.isLow = minRatio < 0.1;
-      this.cachedStatus.isCritical = minRatio < 0.05;
-      this.cachedStatus.resetIn = Math.max(0, this.cachedStatus.core.reset.getTime() - Date.now());
     }
-  }
 
-  /** Invalidate cached status. */
-  invalidateCache(): void {
-    this.cachedStatus = null;
-    this.cacheExpiry = 0;
+    await new Promise<void>((resolve) => setTimeout(resolve, waitMs));
+    // Only discard the reading if nobody refreshed it while we slept.
+    if (this.budgets.get(kind) === budget) this.budgets.delete(kind);
   }
 }

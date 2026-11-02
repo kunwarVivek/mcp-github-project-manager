@@ -5,6 +5,7 @@ import { AgentBudgetService } from "../../../services/agent/AgentBudgetService";
 import type { AgentContextService } from "../../../services/agent/AgentContextService";
 import { TaskCheckoutService } from "../../../services/agent/TaskCheckoutService";
 import type { AIServiceFactory } from "../../../services/ai/AIServiceFactory";
+import { partialFake } from "../../helpers/aiFakes";
 import { FakeGitHub } from "../../helpers/FakeGitHub";
 
 /**
@@ -53,8 +54,8 @@ function checkoutServiceOver(github: FakeGitHub): TaskCheckoutService {
   return new TaskCheckoutService(
     github.asFactory(),
     store,
-    {} as unknown as AgentContextService,
-    {} as unknown as AIServiceFactory,
+    partialFake<AgentContextService>({}),
+    partialFake<AIServiceFactory>({}),
     new AgentBudgetService(store)
   );
 }

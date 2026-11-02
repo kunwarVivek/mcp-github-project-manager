@@ -32,6 +32,7 @@ vitest.config.ts
 .agents/
 .codex/
 .mcp-cache/
+.mcp-audit/
 .planning/
 .gitnexus/
 .beads/

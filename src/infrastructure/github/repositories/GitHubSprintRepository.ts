@@ -1,11 +1,22 @@
-import { ResourceStatus } from "../../../domain/resource-types";
+import { IntegrationError } from "../../../domain/errors";
+import {
+  ResourceNotFoundError,
+  ResourceStatus,
+  ResourceType,
+} from "../../../domain/resource-types";
 import type { Issue, IssueId, Sprint, SprintId, SprintRepository } from "../../../domain/types";
-import { logger } from "../../logger";
 import type { GitHubConfig } from "../GitHubConfig"; // Import the class, not the interface
 import { projectFieldUnionSelection } from "../project-field-fragments";
 import type { OctokitInstance } from "../types";
 import { BaseGitHubRepository } from "./BaseRepository";
 import { GitHubIssueRepository } from "./GitHubIssueRepository";
+
+interface IterationNode {
+  id: string;
+  title: string;
+  startDate: string;
+  duration: number;
+}
 
 interface IterationProjectNode {
   id: string;
@@ -14,12 +25,7 @@ interface IterationProjectNode {
       id?: string;
       name?: string;
       configuration?: {
-        iterations: Array<{
-          id: string;
-          title: string;
-          startDate: string;
-          duration: number;
-        }>;
+        iterations: IterationNode[];
       };
     }>;
   };
@@ -367,28 +373,97 @@ export class GitHubSprintRepository extends BaseGitHubRepository implements Spri
     return updatedSprint;
   }
 
+  /**
+   * Remove an iteration from its field. GitHub has no `deleteIteration`
+   * mutation: `updateProjectV2Field` REPLACES the iteration list, so deleting
+   * is writing the list back without the target. Items assigned to the
+   * iteration lose that field value. The response is verified, because GitHub
+   * drops iterations silently - success is never reported without effect.
+   */
   async delete(id: SprintId): Promise<void> {
-    // GitHub Projects V2 doesn't support deleting individual iterations via API
-    // Iterations are managed through the project's iteration field configuration
-    // For now, this is a no-op
-    // MUST NOT be console.log: this server speaks JSON-RPC over stdout, so any
-    // stray stdout write corrupts the protocol stream and drops the client.
-    logger.warn(`Sprint ${id} deletion requested - not supported by GitHub Projects V2 API`);
+    const fields = await this.loadIterationFields();
+    const owner = fields.find((field) => field.iterations.some((iteration) => iteration.id === id));
+    if (!owner) {
+      throw new ResourceNotFoundError(ResourceType.SPRINT, id);
+    }
+
+    const target = owner.iterations.find((iteration) => iteration.id === id);
+    const remaining = owner.iterations.filter((iteration) => iteration.id !== id);
+    const anchor = remaining[0] ?? target;
+    if (!anchor) {
+      throw new ResourceNotFoundError(ResourceType.SPRINT, id);
+    }
+
+    const mutation = `
+      mutation($input: UpdateProjectV2FieldInput!) {
+        updateProjectV2Field(input: $input) {
+          projectV2Field {
+            ... on ProjectV2IterationField {
+              id
+              configuration {
+                ... on ProjectV2IterationFieldConfiguration {
+                  iterations { id title startDate duration }
+                }
+              }
+            }
+          }
+        }
+      }
+    `;
+
+    const response = await this.graphql<{
+      updateProjectV2Field: {
+        projectV2Field: {
+          configuration?: { iterations: Array<{ id: string }> };
+        } | null;
+      } | null;
+    }>(mutation, {
+      input: {
+        fieldId: owner.fieldId,
+        iterationConfiguration: {
+          startDate: anchor.startDate,
+          duration: anchor.duration,
+          iterations: remaining.map((iteration) => ({
+            id: iteration.id,
+            title: iteration.title,
+            startDate: iteration.startDate,
+            duration: iteration.duration,
+          })),
+        },
+      },
+    });
+
+    const after = response.updateProjectV2Field?.projectV2Field?.configuration?.iterations;
+    if (!after || after.some((iteration) => iteration.id === id)) {
+      throw new IntegrationError(
+        `Sprint ${id} was not deleted: GitHub still lists the iteration after updating the field`,
+        "github"
+      );
+    }
   }
 
   async findById(id: SprintId): Promise<Sprint | null> {
-    // GitHub Projects V2 doesn't support querying individual iterations by ID
-    // For now, we'll search through all sprints to find the matching one
-    const allSprints = await this.findAll();
-    return allSprints.find((sprint) => sprint.id === id) || null;
+    // Iteration ids are not node ids, so there is no direct node lookup; the
+    // iteration field configuration (one query) is the source of truth.
+    for (const field of await this.loadIterationFields()) {
+      const iteration = field.iterations.find((candidate) => candidate.id === id);
+      if (iteration) {
+        return this.toSprint(iteration);
+      }
+    }
+    return null;
   }
 
-  async findAll(options?: { status?: ResourceStatus }): Promise<Sprint[]> {
+  /** Iteration fields of the repository's first project, in a single query. */
+  private async loadIterationFields(): Promise<
+    Array<{ fieldId: string; projectId: string; iterations: IterationNode[] }>
+  > {
     const query = `
       query($owner: String!, $repo: String!) {
         repository(owner: $owner, name: $repo) {
           projectsV2(first: 1) {
             nodes {
+              id
               fields(first: 100) {
                 nodes {
                   ${projectFieldUnionSelection({
@@ -416,34 +491,43 @@ export class GitHubSprintRepository extends BaseGitHubRepository implements Spri
       repo: this.repo,
     });
 
-    if (!response.repository?.projectsV2?.nodes?.[0]?.fields?.nodes) {
-      return [];
-    }
-
-    const sprints: Sprint[] = [];
-
-    // Find iteration fields and extract their iterations
-    for (const field of response.repository.projectsV2.nodes[0].fields.nodes) {
-      if (field.configuration?.iterations) {
-        for (const iteration of field.configuration.iterations) {
-          const startDate = new Date(iteration.startDate);
-          const endDate = new Date(startDate);
-          endDate.setDate(endDate.getDate() + iteration.duration * 7);
-
-          sprints.push({
-            id: iteration.id,
-            title: iteration.title,
-            description: "Sprint created from GitHub Projects iteration", // Default description
-            startDate: startDate.toISOString(),
-            endDate: endDate.toISOString(),
-            status: this.determineSprintStatus(startDate, endDate),
-            issues: [], // Issues would need separate query
-            createdAt: startDate.toISOString(),
-            updatedAt: new Date().toISOString(),
-          });
-        }
+    const project = response.repository?.projectsV2?.nodes?.[0];
+    const result: Array<{ fieldId: string; projectId: string; iterations: IterationNode[] }> = [];
+    for (const field of project?.fields?.nodes ?? []) {
+      if (field.configuration?.iterations && field.id) {
+        result.push({
+          fieldId: field.id,
+          projectId: project?.id ?? "",
+          iterations: field.configuration.iterations,
+        });
       }
     }
+    return result;
+  }
+
+  private toSprint(iteration: IterationNode): Sprint {
+    const startDate = new Date(iteration.startDate);
+    const endDate = new Date(startDate);
+    endDate.setDate(endDate.getDate() + iteration.duration);
+
+    return {
+      id: iteration.id,
+      title: iteration.title,
+      description: "Sprint created from GitHub Projects iteration", // Default description
+      startDate: startDate.toISOString(),
+      endDate: endDate.toISOString(),
+      status: this.determineSprintStatus(startDate, endDate),
+      issues: [], // Issues would need separate query
+      createdAt: startDate.toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+  }
+
+  async findAll(options?: { status?: ResourceStatus }): Promise<Sprint[]> {
+    const fields = await this.loadIterationFields();
+    const sprints = fields.flatMap((field) =>
+      field.iterations.map((iteration) => this.toSprint(iteration))
+    );
 
     if (options?.status) {
       return sprints.filter((sprint) => sprint.status === options.status);

@@ -2,7 +2,7 @@ import { z } from "zod";
 import {
   type AITask,
   type FeatureRequirement,
-  type MockPRD,
+  type PRDSummary,
   TaskPriority,
   type TraceabilityMatrix,
 } from "../../../domain/ai-types.js";
@@ -13,7 +13,7 @@ import { TaskGenerationService } from "../../../services/TaskGenerationService.j
 import { ANNOTATION_PATTERNS } from "../annotations/tool-annotations.js";
 import { PRDParseOutputSchema } from "../schemas/ai-schemas.js";
 import { ToolResultFormatter } from "../ToolResultFormatter.js";
-import type { ToolDefinition, ToolSchema } from "../ToolValidator.js";
+import { type ToolDefinition, type ToolSchema, ToolValidator } from "../ToolValidator.js";
 
 // Schema for parse_prd tool
 const parsePRDSchema = z.object({
@@ -83,7 +83,12 @@ export type ParsePRDArgs = z.infer<typeof parsePRDSchema>;
 /**
  * Implementation function for parse_prd tool (similar to claude-task-master)
  */
-async function executeParsePRD(args: ParsePRDArgs): Promise<MCPResponse> {
+async function executeParsePRD(rawArgs: unknown): Promise<MCPResponse> {
+  const args = ToolValidator.validate(
+    "parse_prd",
+    rawArgs,
+    parsePRDSchema as unknown as ToolSchema<ParsePRDArgs>
+  );
   const taskService = new TaskGenerationService();
   const prdService = new PRDGenerationService();
   const traceabilityService = new RequirementsTraceabilityService();
@@ -133,8 +138,8 @@ async function executeParsePRD(args: ParsePRDArgs): Promise<MCPResponse> {
     // Create traceability matrix if requested
     let traceabilityMatrix: TraceabilityMatrix | undefined;
     if (args.createTraceabilityMatrix) {
-      // Create mock PRD for traceability
-      const mockPRD: MockPRD = {
+      // Summarise the supplied PRD content for traceability
+      const prdSummary: PRDSummary = {
         id: args.projectId || `prd-${Date.now()}`,
         title: "Parsed PRD",
         overview: args.prdContent.substring(0, 500),
@@ -156,7 +161,7 @@ async function executeParsePRD(args: ParsePRDArgs): Promise<MCPResponse> {
 
       traceabilityMatrix = traceabilityService.createTraceabilityMatrix(
         args.projectId || "parsed-project",
-        mockPRD,
+        prdSummary,
         features,
         filteredTasks
       );

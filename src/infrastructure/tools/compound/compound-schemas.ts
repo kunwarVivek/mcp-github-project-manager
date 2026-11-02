@@ -32,6 +32,22 @@ import {
 } from "../schemas/agent-orchestration-schemas";
 import { projectCollaboratorSchema } from "../schemas/project-role-schemas";
 
+/** Optional retry-safety key for create actions: a repeat with the same key and arguments replays the first result. */
+const idempotencyKeySchema = z
+  .string()
+  .min(1)
+  .max(128)
+  .optional()
+  .describe(
+    "Idempotency key (1-128 chars) for create actions: retrying with the same key and arguments returns the first result instead of creating a duplicate; reusing it with different arguments is an error. Kept for 24 hours."
+  );
+
+/** Optional page cursor for list actions that return `nextCursor`. */
+const cursorSchema = z
+  .string()
+  .optional()
+  .describe("Cursor from a previous page's `nextCursor`; omit for the first page");
+
 // ============================================================================
 // 1. manage_project — 22+ granular project tools
 // ============================================================================
@@ -80,6 +96,9 @@ export const manageProjectSchema = z
         "set_collaborators",
       ])
       .describe("The project operation to perform"),
+    idempotencyKey: idempotencyKeySchema,
+    cursor: cursorSchema,
+    closed: z.boolean().optional().describe("update: true closes the project, false reopens it"),
     // Common
     projectId: z.string().optional(),
     // Create / Update
@@ -188,6 +207,8 @@ export const manageIssuesSchema = z
         "list_issue_types",
       ])
       .describe("The issue operation to perform"),
+    idempotencyKey: idempotencyKeySchema,
+    cursor: cursorSchema,
     // Common
     issueId: z.string().optional(),
     // Create / Update
@@ -297,6 +318,7 @@ export const manageMilestonesSchema = z
     action: z
       .enum(["create", "list", "update", "delete", "get_metrics", "get_overdue", "get_upcoming"])
       .describe("The milestone operation to perform"),
+    idempotencyKey: idempotencyKeySchema,
     // Common
     milestoneId: z.string().optional(),
     // Create / Update
@@ -334,8 +356,16 @@ export const manageSprintsSchema = z
         "remove_issues",
         "get_metrics",
         "plan",
+        "delete",
       ])
       .describe("The sprint operation to perform"),
+    idempotencyKey: idempotencyKeySchema,
+    confirm: z
+      .boolean()
+      .optional()
+      .describe(
+        "delete: must be true. Deleting a sprint removes the iteration from its project and clears it from every assigned item; it cannot be undone"
+      ),
     // Common
     sprintId: z.string().optional(),
     projectId: z
@@ -475,6 +505,7 @@ export type ManageEventsArgs = z.infer<typeof manageEventsSchema>;
 export const manageStatusUpdatesSchema = z
   .object({
     action: z.enum(["create", "list", "get"]).describe("The status update operation to perform"),
+    cursor: cursorSchema,
     // Common
     projectId: z.string().optional(),
     // Create
@@ -558,7 +589,6 @@ export const aiGenerateSchema = z
     // add_feature
     featureIdea: z.string().optional(),
     description: z.string().optional(),
-    targetPRD: z.string().optional(),
     targetProject: z.string().optional(),
     businessJustification: z.string().optional(),
     requestedBy: z.string().optional(),
@@ -991,9 +1021,6 @@ export const agentManageSchema = z
     setAgentBudgetSchema.omit({ warningFraction: true }).extend({
       action: z.literal("set_budget"),
       warningFraction: fractionSchema.optional().describe("Warning threshold as a 0-1 fraction"),
-      warningThreshold: fractionSchema
-        .optional()
-        .describe("Compatibility alias for warningFraction (0-1 warning threshold)"),
     }),
     reclaimStaleTasksSchema.extend({ action: z.literal("reclaim_stale") }),
     recordUsageSchema.extend({ action: z.literal("record_usage") }),
@@ -1105,6 +1132,7 @@ export const discoverToolsSchema = z
         "iterations",
         "events",
         "status_updates",
+        "analytics",
         "ai_generation",
         "ai_analysis",
         "ai_planning",
@@ -1118,6 +1146,41 @@ export const discoverToolsSchema = z
   .describe("Discover available tool actions by domain or search query");
 
 export type DiscoverToolsArgs = z.infer<typeof discoverToolsSchema>;
+
+// ============================================================================
+// 21. analytics — read-only reporting over project items
+// ============================================================================
+
+export const analyticsSchema = z
+  .object({
+    action: z
+      .enum(["sprint_velocity", "sprint_burndown", "cycle_time", "throughput", "project_summary"])
+      .describe("The analytics report to produce"),
+    projectId: z.string().optional().describe("Project node ID (required)"),
+    lastN: z
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe("sprint_velocity: how many recent iterations to report (default 6)"),
+    sprintId: z
+      .string()
+      .optional()
+      .describe("sprint_burndown: iteration ID (default: the current iteration)"),
+    sinceDays: z
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe("cycle_time / throughput: look-back window in days (default 30)"),
+    bucket: z
+      .enum(["day", "week", "month"])
+      .optional()
+      .describe("throughput: bucket size (default week)"),
+  })
+  .describe("Analytics — sprint velocity and burndown, cycle time, throughput, project summary");
+
+export type AnalyticsArgs = z.infer<typeof analyticsSchema>;
 
 // ============================================================================
 // Schema map — for programmatic access by compound tool name
@@ -1141,6 +1204,7 @@ export const compoundSchemas = {
   agent_manage: agentManageSchema,
   system: systemSchema,
   discover_tools: discoverToolsSchema,
+  analytics: analyticsSchema,
 } as const;
 
 export type CompoundToolName = keyof typeof compoundSchemas;

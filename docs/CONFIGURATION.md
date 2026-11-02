@@ -211,6 +211,11 @@ overrides falls back to the global key and its model-prefix-detected provider.
 |----------|---------|-------------|
 | `AUTO_CREATE_PROJECT_FIELDS` | `true` | Auto-create project fields |
 | `AI_BATCH_SIZE` | `10` | Batch size for AI operations |
+| `AI_SESSION_TOKEN_LIMIT` | `0` | Per-operation (correlation id) token budget for AI task generation; `0` = unlimited. When exhausted, optional AI steps fall back instead of erroring. Distinct from the per-agent budget |
+| `AI_EMBEDDING_MODEL` | `text-embedding-3-small` | Embedding model for semantic duplicate detection |
+| `AI_EMBEDDING_API_KEY` | _(falls back to `OPENAI_API_KEY`)_ | Embedding key; resolved through the secret chain (`SECRETS_DIR`). With no key, embedding-based features are unavailable |
+| `AI_EMBEDDING_BASE_URL` | _(unset)_ | OpenAI-compatible endpoint for embeddings |
+| `AGENT_AI_CONTEXT` | _(enabled)_ | Set to `false` to skip AI enrichment in `agent_work get_task_context` (latency/cost opt-out); the GitHub-derived context is always returned |
 
 ### Server Configuration
 
@@ -225,7 +230,7 @@ overrides falls back to the global key and its model-prefix-detected provider.
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `MCP_TOOL_GROUPS` | `all` | Comma-separated list of **group names** to expose to MCP clients. Set to `all` to expose all 20 tools. Valid group names: `core`, `ai`, `agents`, `events`, `system`. |
+| `MCP_TOOL_GROUPS` | `all` | Comma-separated list of **group names** to expose to MCP clients. Set to `all` to expose all <!-- count:tools -->21<!-- /count --> tools. Valid group names: `core`, `ai`, `agents`, `events`, `system`. |
 
 > `MCP_TOOL_GROUPS` filters by **group name**, not by tool name. A tool name
 > (e.g. `manage_issues`) exposes **nothing** — only the group names below match.
@@ -234,7 +239,7 @@ overrides falls back to the global key and its model-prefix-detected provider.
 
 | Group | Tools included |
 |-------|---------------|
-| `core` | `manage_project`, `manage_issues`, `manage_prs`, `manage_milestones`, `manage_sprints`, `manage_labels`, `manage_automation`, `manage_iterations`, `manage_status_updates`, `manage_branches`, `manage_releases`, `manage_workflows` |
+| `core` | `manage_project`, `manage_issues`, `manage_prs`, `manage_milestones`, `manage_sprints`, `manage_labels`, `manage_automation`, `manage_iterations`, `manage_status_updates`, `manage_branches`, `manage_releases`, `manage_workflows`, `analytics` |
 | `ai` | `ai_generate`, `ai_analyze`, `ai_plan` |
 | `agents` | `agent_work`, `agent_manage` |
 | `events` | `manage_events` |
@@ -284,6 +289,10 @@ in `src/infrastructure/secrets/` and add it to the resolver chain.
 | `WEBHOOK_SECRET` | _(unset)_ | HMAC secret for GitHub webhook signature validation |
 | `WEBHOOK_ALLOW_UNSIGNED` | `false` | **Security:** when no `WEBHOOK_SECRET` is set, webhooks are rejected (fail closed). Set `true` only in trusted dev to accept unsigned webhooks. |
 | `WEBHOOK_PORT` | `3001` | Port for the webhook HTTP listener |
+| `WEBHOOK_HOST` | `127.0.0.1` | Interface the HTTP server binds. Loopback by default; set `0.0.0.0` (or a specific interface) explicitly to accept external traffic — required inside containers that publish `WEBHOOK_PORT`. |
+| `WEBHOOK_TRUSTED_PROXIES` | _(unset)_ | Comma-separated exact IPs of reverse proxies. `X-Forwarded-For` is used for rate-limit keying only when the socket peer is in this list; otherwise it is ignored and the socket address is used. |
+| `EVENTS_AUTH_TOKEN` | _(unset)_ | Bearer token required on every `/events/*` route (SSE stream, subscribe/unsubscribe, replay, recent). Resolved via `getSecret()` (so `SECRETS_DIR` works) on each request. With no token the routes fail closed (HTTP 503). `/webhooks/github` (HMAC) and `/health` are unaffected. |
+| `EVENTS_ALLOW_UNAUTHENTICATED` | `false` | **Security:** set `true` only in trusted dev to serve `/events/*` without a token; a warning is logged at startup. |
 | `WEBHOOK_TIMEOUT_MS` | `5000` | Webhook request timeout (ms) |
 | `WEBHOOK_ALLOWED_ORIGINS` | `""` | Comma-separated list of allowed CORS origins |
 | `WEBHOOK_RATE_LIMIT` | `100` | Max webhook requests per window |
@@ -291,6 +300,16 @@ in `src/infrastructure/secrets/` and add it to the resolver chain.
 | `SSE_ENABLED` | `true` | Enable server-sent events streaming |
 | `EVENT_RETENTION_DAYS` | `7` | Days to retain stored events |
 | `MAX_EVENTS_IN_MEMORY` | `1000` | Max events held in memory |
+
+### Audit, Telemetry and Rate Limiting
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `AUDIT_LOG_ENABLED` | `false` | Write a JSONL record of every mutating tool call |
+| `AUDIT_LOG_PATH` | `.mcp-audit/mutations.jsonl` | Audit log file path |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | _(unset)_ | OTLP endpoint for trace export; export is active only when set |
+| `OTEL_SERVICE_NAME` | `mcp-github-project-manager` | Service name reported to OpenTelemetry |
+| `RATE_LIMIT_FLOOR` | `100` | Remaining GitHub GraphQL points below which callers back off |
 
 ### Cache
 
@@ -574,6 +593,8 @@ services:
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
       - AI_MAIN_MODEL=${AI_MAIN_MODEL:-}
       - WEBHOOK_PORT=${WEBHOOK_PORT:-3000}
+      - WEBHOOK_HOST=${WEBHOOK_HOST:-0.0.0.0}
+      - EVENTS_AUTH_TOKEN=${EVENTS_AUTH_TOKEN:-}
       - LOG_FORMAT=${LOG_FORMAT:-json}
       - LOG_LEVEL=${LOG_LEVEL:-info}
     ports:
@@ -790,6 +811,15 @@ LOG_FORMAT=text
 # WEBHOOK_SECRET=your_webhook_secret
 # WEBHOOK_ALLOW_UNSIGNED=false
 # WEBHOOK_PORT=3001
+# WEBHOOK_HOST=127.0.0.1          # set 0.0.0.0 to expose externally
+# WEBHOOK_TRUSTED_PROXIES=        # comma-separated proxy IPs whose X-Forwarded-For is trusted
+# EVENTS_AUTH_TOKEN=change_me     # bearer token for /events/*; unset => 503 (fail closed)
+# EVENTS_ALLOW_UNAUTHENTICATED=false
+# AUDIT_LOG_ENABLED=false
+# AUDIT_LOG_PATH=.mcp-audit/mutations.jsonl
+# OTEL_EXPORTER_OTLP_ENDPOINT=
+# OTEL_SERVICE_NAME=mcp-github-project-manager
+# RATE_LIMIT_FLOOR=100
 # SYNC_ENABLED=true
 # SSE_ENABLED=true
 # CACHE_DIRECTORY=.mcp-cache
@@ -809,7 +839,7 @@ MCP_TOOL_GROUPS=all
 ## See Also
 
 - [Troubleshooting Guide](TROUBLESHOOTING.md) - Common issues and solutions
-- [Tool Reference](TOOLS.md) - 20 compound tools (169 actions) documented
+- [Tool Reference](TOOLS.md) - <!-- count:tools -->21<!-- /count --> compound tools (<!-- count:actions -->175<!-- /count --> actions) documented
 - [API Reference](API.md) - Service and infrastructure APIs
 - [User Guide](user-guide.md) - Getting started guide
 - [Deployment Guide](deployment.md) - Docker and client installation

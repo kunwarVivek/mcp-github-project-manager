@@ -45,7 +45,7 @@ function makeRepository(handler: GraphQLHandler) {
 
   const repository = new GitHubIssueRepository(
     octokit,
-    new GitHubConfig("test-owner", "test-repo", "test-token")
+    new GitHubConfig("test-owner", "test-repo", { kind: "pat", token: "test-token" })
   );
 
   return { repository, calls, octokit };
@@ -585,5 +585,137 @@ describe("GitHubIssueRepository — reverse project membership", () => {
     const issue = await repository.findById("7");
 
     expect(issue?.projectIds).toEqual(["PVT_1"]);
+  });
+});
+
+describe("GitHubIssueRepository — connection pagination", () => {
+  it("follows pageInfo to read every project membership", async () => {
+    const { repository, calls } = makeRepository((query, variables) => {
+      if (query.includes("query GetIssueProjectMembership")) {
+        const second = variables.after === "CURSOR_1";
+        return {
+          node: {
+            id: "I_7",
+            number: 7,
+            projectItems: {
+              nodes: [
+                {
+                  id: second ? "PVTI_2" : "PVTI_1",
+                  project: {
+                    id: second ? "PVT_2" : "PVT_1",
+                    number: second ? 13 : 12,
+                    title: second ? "Second" : "Roadmap",
+                  },
+                },
+              ],
+              pageInfo: { hasNextPage: !second, endCursor: second ? null : "CURSOR_1" },
+            },
+          },
+        };
+      }
+      return issueRead(variables);
+    });
+
+    const membership = await repository.getProjectMembership("7");
+
+    expect(membership.projectIds).toEqual(["PVT_1", "PVT_2"]);
+    expect(membership.itemIds).toEqual(["PVTI_1", "PVTI_2"]);
+    expect(
+      calls.filter((call) => call.query.includes("query GetIssueProjectMembership"))
+    ).toHaveLength(2);
+  });
+
+  it("finds an existing label on a later repository label page instead of recreating it", async () => {
+    const { repository, calls, octokit } = makeRepository((query, variables) => {
+      if (query.includes("mutation AddBlockedBy")) {
+        throw missingFieldError("addBlockedBy", "Mutation");
+      }
+      if (query.includes("query GetIssueLabels")) {
+        return { node: { id: "I_7", labels: { nodes: [] } } };
+      }
+      if (query.includes("query GetRepositoryLabels")) {
+        return variables.after === "CURSOR_1"
+          ? {
+              repository: {
+                labels: {
+                  nodes: [{ id: "LA_page2", name: "blocked-by:#3" }],
+                  pageInfo: { hasNextPage: false, endCursor: null },
+                },
+              },
+            }
+          : {
+              repository: {
+                labels: {
+                  nodes: [{ id: "LA_page1", name: "bug" }],
+                  pageInfo: { hasNextPage: true, endCursor: "CURSOR_1" },
+                },
+              },
+            };
+      }
+      if (query.includes("mutation UpdateIssueLabels")) {
+        return { updateIssue: { issue: { id: "I_7", number: 7 } } };
+      }
+      return issueRead(variables);
+    });
+
+    await repository.addBlocker("7", "3");
+
+    const update = calls.find((call) => call.query.includes("mutation UpdateIssueLabels"));
+    expect(update?.variables.input).toEqual({ id: "I_7", labelIds: ["LA_page2"] });
+    expect(octokit.rest.issues.createLabel).not.toHaveBeenCalled();
+  });
+
+  it("keeps the existing labels of an issue that has more than one page of them", async () => {
+    const { repository, calls } = makeRepository((query, variables) => {
+      if (query.includes("mutation AddBlockedBy")) {
+        throw missingFieldError("addBlockedBy", "Mutation");
+      }
+      if (query.includes("query GetIssueLabels")) {
+        return variables.after === "CURSOR_1"
+          ? {
+              node: {
+                id: "I_7",
+                labels: {
+                  nodes: [{ name: "second-page" }],
+                  pageInfo: { hasNextPage: false, endCursor: null },
+                },
+              },
+            }
+          : {
+              node: {
+                id: "I_7",
+                labels: {
+                  nodes: [{ name: "first-page" }],
+                  pageInfo: { hasNextPage: true, endCursor: "CURSOR_1" },
+                },
+              },
+            };
+      }
+      if (query.includes("query GetRepositoryLabels")) {
+        return {
+          repository: {
+            labels: {
+              nodes: [
+                { id: "LA_1", name: "first-page" },
+                { id: "LA_2", name: "second-page" },
+                { id: "LA_3", name: "blocked-by:#3" },
+              ],
+            },
+          },
+        };
+      }
+      if (query.includes("mutation UpdateIssueLabels")) {
+        return { updateIssue: { issue: { id: "I_7", number: 7 } } };
+      }
+      return issueRead(variables);
+    });
+
+    await repository.addBlocker("7", "3");
+
+    const update = calls.find((call) => call.query.includes("mutation UpdateIssueLabels"));
+    expect(update?.variables.input).toEqual({
+      id: "I_7",
+      labelIds: ["LA_1", "LA_2", "LA_3"],
+    });
   });
 });

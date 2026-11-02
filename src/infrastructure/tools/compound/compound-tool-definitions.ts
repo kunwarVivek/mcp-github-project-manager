@@ -9,6 +9,7 @@ import {
   aiAnalyzeSchema,
   aiGenerateSchema,
   aiPlanSchema,
+  analyticsSchema,
   discoverToolsSchema,
   manageAutomationSchema,
   manageEventsSchema,
@@ -22,6 +23,7 @@ import {
   manageStatusUpdatesSchema,
   systemSchema,
 } from "./compound-schemas";
+import { schemaVersionOf } from "./schema-version";
 
 /**
  * The public (compound) tool surface, kept free of any executor or service
@@ -229,11 +231,11 @@ export const compoundToolDefinitions: CompoundToolDef[] = [
     name: "manage_sprints",
     title: "Manage Sprints",
     description:
-      "Manage Sprints: create, list, update sprints; get current sprint; add/remove issues; get metrics and plan. Use the `action` field to select the operation.",
+      "Manage Sprints: create, list, update, delete sprints (delete requires confirm: true); get current sprint; add/remove issues; get metrics and plan. Use the `action` field to select the operation.",
     schema: manageSprintsSchema,
     annotations: {
       readOnlyHint: false,
-      destructiveHint: false,
+      destructiveHint: true,
       idempotentHint: false,
       openWorldHint: true,
     },
@@ -369,7 +371,7 @@ export const compoundToolDefinitions: CompoundToolDef[] = [
     name: "agent_manage",
     title: "Agent Management",
     description:
-      "Agent management: list/deregister agents, activity, work products, budgets (warningFraction or warningThreshold), stale reclaim, smart assignment, workload rebalancing, convergence, and registry cleanup. Use the `action` field to select the operation.",
+      "Agent management: list/deregister agents, activity, work products, budgets (warningFraction), stale reclaim, smart assignment, workload rebalancing, convergence, and registry cleanup. Use the `action` field to select the operation.",
     schema: agentManageSchema,
     annotations: {
       readOnlyHint: false,
@@ -449,6 +451,20 @@ export const compoundToolDefinitions: CompoundToolDef[] = [
     },
     group: "core",
   },
+  {
+    name: "analytics",
+    title: "Analytics",
+    description:
+      "Read-only project analytics: sprint velocity and burndown, cycle time, throughput, and a project summary. Use the `action` field to select the report.",
+    schema: analyticsSchema,
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
+    group: "core",
+  },
 ];
 
 /** The shape of one entry of the MCP `tools/list` response. */
@@ -459,6 +475,8 @@ export interface McpToolListing {
   inputSchema: Record<string, unknown>;
   outputSchema?: Record<string, unknown>;
   annotations?: ToolAnnotations;
+  /** `{ schemaVersion }`: semver of the tool's input contract (see schema-version.ts). */
+  _meta: { schemaVersion: string };
 }
 
 /** Convert a compound tool definition to its `tools/list` entry. */
@@ -472,5 +490,6 @@ export function toMcpTool(tool: CompoundToolDef): McpToolListing {
     // value it returns carries the defaults, so they are required there.
     outputSchema: tool.outputSchema ? toJsonSchema(tool.outputSchema, "output") : undefined,
     annotations: tool.annotations,
+    _meta: { schemaVersion: schemaVersionOf(tool.name) },
   };
 }

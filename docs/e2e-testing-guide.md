@@ -8,7 +8,7 @@ The test runner is **Vitest 5** — there is no Jest config in this project. See
 ## Overview
 
 The E2E test suite provides comprehensive testing for:
-- **The public compound tool surface** — all 20 tools / 169 actions (see [TOOLS.md](TOOLS.md))
+- **The public compound tool surface** — all <!-- count:tools -->21<!-- /count --> tools / <!-- count:actions -->175<!-- /count --> actions (see [TOOLS.md](TOOLS.md))
 - **Complex Workflow Integration** — Multi-tool workflows and real-world scenarios
 - **Platform Validation** — Full platform capability testing
 - **Real API Testing** - Optional testing with actual GitHub and AI APIs
@@ -27,7 +27,7 @@ npm run test:e2e:coverage  # the coverage matrix + the gate
 It drives the same registry and the same compound executors the server uses,
 with the GitHub API stubbed at the HTTP boundary, and asserts per action that
 it is routed and that it fails gracefully rather than crashing. The catalog
-is derived from the registry at runtime - 20 tools, 169 actions - so the
+is derived from the registry at runtime - <!-- count:tools -->21<!-- /count --> tools, <!-- count:actions -->175<!-- /count --> actions - so the
 numbers the README publishes are checked, not assumed.
 
 ## Test Structure
@@ -153,7 +153,7 @@ Comprehensive validation of the full platform capabilities:
 - Sprint creation and listing
 
 **Platform Integration:**
-- All 20 compound tools accessible
+- All <!-- count:tools -->21<!-- /count --> compound tools accessible
 - Domain entities created during test
 
 ## Running Tests
@@ -257,7 +257,7 @@ For real API testing, your GitHub token needs these permissions:
 ## Test Features
 
 ### Comprehensive Tool Coverage
-- ✅ **The 20 compound tools** - complete CRUD and workflow coverage
+- ✅ **The <!-- count:tools -->21<!-- /count --> compound tools** - complete CRUD and workflow coverage
 - ✅ **Schema Validation** - Argument validation for all tools
 - ✅ **Error Handling** - Graceful error handling and recovery
 - ✅ **Real API Integration** - Optional real API testing
@@ -292,13 +292,13 @@ The platform validation tests verify:
 | Budget Enforcement | Set, check, record usage |
 | Review Workflow | Submit → Approve cycle |
 | Sprint Planning | Create and list sprints |
-| Tool Accessibility | All 20 compound tools available |
+| Tool Accessibility | All <!-- count:tools -->21<!-- /count --> compound tools available |
 
 ## Test Configuration
 
 ### Vitest Configuration (`vitest.config.ts`)
 - **Test Timeout:** 10 seconds by default; E2E suites raise it per-suite where a real server process is spawned
-- **Include:** `src/__tests__/**` (`*.test.ts`, `*.spec.ts`, `*.e2e.ts`) and the legacy root `tests/**` tree
+- **Include:** `src/__tests__/**` (`*.test.ts`, `*.spec.ts`, `*.e2e.ts`) — the only test tree (the root `tests/` tree was merged into it, ADR-012)
 - **Environment:** `node`
 - **Setup files:** `reflect-metadata`, `src/__tests__/e2e/setup.ts`
 - **Coverage:** disabled for E2E runs — E2E focuses on integration, not line coverage

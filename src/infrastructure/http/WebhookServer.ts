@@ -1,13 +1,16 @@
+import { createHash, timingSafeEqual } from "node:crypto";
 import * as http from "node:http";
-import type { ParsedUrlQuery } from "node:querystring";
-import * as url from "node:url";
 import {
+  EVENTS_ALLOW_UNAUTHENTICATED,
+  getSecret,
   SSE_ENABLED,
   WEBHOOK_ALLOWED_ORIGINS,
+  WEBHOOK_HOST,
   WEBHOOK_PORT,
   WEBHOOK_RATE_LIMIT,
   WEBHOOK_RATE_WINDOW_MS,
   WEBHOOK_TIMEOUT_MS,
+  WEBHOOK_TRUSTED_PROXIES,
 } from "../../env";
 import type { EventStore } from "../events/EventStore";
 import type {
@@ -29,8 +32,14 @@ export interface SSEConnection {
 
 export interface WebhookServerOptions {
   port: number;
+  /** Interface to bind. Defaults to loopback; set 0.0.0.0 explicitly to expose externally. */
+  host: string;
   enableSSE: boolean;
   timeout: number;
+  /** Exact socket IPs of reverse proxies whose X-Forwarded-For is honored. */
+  trustedProxies: string[];
+  /** Allow /events/* without a bearer token (trusted dev only). */
+  allowUnauthenticatedEvents: boolean;
 }
 
 export class WebhookServer {
@@ -44,6 +53,8 @@ export class WebhookServer {
   private sseConnections = new Map<string, SSEConnection>();
   private isRunning = false;
   private readonly rateLimitMap = new Map<string, { count: number; windowStart: number }>();
+  private rateLimitSweepTimer?: NodeJS.Timeout;
+  private static readonly MAX_RATE_LIMIT_ENTRIES = 10_000;
   private readonly securityLog: SecurityAuditLog;
   private readonly processedDeliveries = new Set<string>();
   private readonly processedDeliveriesOrder: string[] = [];
@@ -62,9 +73,23 @@ export class WebhookServer {
     this.securityLog = securityLog ?? new SecurityAuditLog(this.logger);
     this.options = {
       port: options?.port || WEBHOOK_PORT,
+      host: options?.host || WEBHOOK_HOST,
       enableSSE: options?.enableSSE ?? SSE_ENABLED,
       timeout: options?.timeout || WEBHOOK_TIMEOUT_MS,
+      trustedProxies:
+        options?.trustedProxies ??
+        WEBHOOK_TRUSTED_PROXIES.split(",")
+          .map((ip) => ip.trim())
+          .filter(Boolean),
+      allowUnauthenticatedEvents:
+        options?.allowUnauthenticatedEvents ?? EVENTS_ALLOW_UNAUTHENTICATED,
     };
+
+    if (this.options.allowUnauthenticatedEvents) {
+      this.logger.warn(
+        "EVENTS_ALLOW_UNAUTHENTICATED=true: /events/* is open without a bearer token. Use only in trusted dev environments."
+      );
+    }
 
     this.webhookHandler = webhookHandler;
     this.subscriptionManager = subscriptionManager;
@@ -91,9 +116,10 @@ export class WebhookServer {
 
       this.server.setTimeout(this.options.timeout);
 
-      this.server.listen(this.options.port, () => {
+      this.server.listen(this.options.port, this.options.host, () => {
         this.isRunning = true;
-        this.logger.info(`Webhook server started on port ${this.options.port}`);
+        this.startRateLimitSweep();
+        this.logger.info(`Webhook server started on ${this.options.host}:${this.options.port}`);
         resolve();
       });
 
@@ -114,6 +140,8 @@ export class WebhookServer {
     }
 
     return new Promise((resolve) => {
+      this.stopRateLimitSweep();
+      this.rateLimitMap.clear();
       // Close all SSE connections
       for (const connection of this.sseConnections.values()) {
         connection.response.end();
@@ -131,9 +159,10 @@ export class WebhookServer {
   /**
    * Get server status
    */
-  getStatus(): { running: boolean; port: number; connections: number } {
+  getStatus(): { running: boolean; host: string; port: number; connections: number } {
     return {
       running: this.isRunning,
+      host: this.options.host,
       port: this.options.port,
       connections: this.sseConnections.size,
     };
@@ -143,8 +172,8 @@ export class WebhookServer {
    * Handle incoming HTTP requests
    */
   private async handleRequest(req: http.IncomingMessage, res: http.ServerResponse): Promise<void> {
-    const parsedUrl = url.parse(req.url || "", true);
-    const pathname = parsedUrl.pathname || "";
+    const parsedUrl = new URL(req.url || "/", "http://localhost");
+    const pathname = parsedUrl.pathname;
     const method = req.method || "GET";
 
     // Security headers on every response
@@ -161,10 +190,7 @@ export class WebhookServer {
     }
 
     // Rate limiting
-    const clientIp =
-      (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() ||
-      req.socket.remoteAddress ||
-      "unknown";
+    const clientIp = this.resolveClientIp(req);
     if (this.isRateLimited(clientIp)) {
       this.securityLog.record({
         type: "rate_limit_exceeded",
@@ -173,6 +199,14 @@ export class WebhookServer {
         severity: "medium",
       });
       this.sendErrorResponse(res, 429, "Too Many Requests");
+      return;
+    }
+
+    // Everything under /events/* exposes or mutates event data and requires a bearer token.
+    if (
+      pathname.startsWith("/events/") &&
+      !this.authorizeEventsRequest(req, res, clientIp, pathname)
+    ) {
       return;
     }
 
@@ -194,7 +228,7 @@ export class WebhookServer {
           await this.handleEventReplay(req, res, pathname);
           break;
         case pathname === "/events/recent" && method === "GET":
-          await this.handleRecentEvents(req, res, parsedUrl.query);
+          await this.handleRecentEvents(req, res, parsedUrl.searchParams);
           break;
         case pathname === "/health" && method === "GET":
           await this.handleHealthCheck(req, res);
@@ -338,8 +372,9 @@ export class WebhookServer {
       return;
     }
 
-    const parsedUrl = url.parse(req.url || "", true);
-    const clientId = (parsedUrl.query.clientId as string) || `client-${Date.now()}`;
+    const clientId =
+      new URL(req.url || "/", "http://localhost").searchParams.get("clientId") ||
+      `client-${Date.now()}`;
     const lastEventId = req.headers["last-event-id"] as string;
 
     // Set SSE headers
@@ -484,9 +519,9 @@ export class WebhookServer {
   private async handleRecentEvents(
     _req: http.IncomingMessage,
     res: http.ServerResponse,
-    query: ParsedUrlQuery
+    query: URLSearchParams
   ): Promise<void> {
-    const limit = parseInt(String(query.limit), 10) || 100;
+    const limit = parseInt(query.get("limit") ?? "", 10) || 100;
 
     try {
       const events = await this.eventStore.getRecentEvents(limit);
@@ -586,7 +621,7 @@ export class WebhookServer {
       res.setHeader("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS");
       res.setHeader(
         "Access-Control-Allow-Headers",
-        "Content-Type, X-Hub-Signature-256, X-GitHub-Event, X-GitHub-Delivery"
+        "Content-Type, Authorization, X-Hub-Signature-256, X-GitHub-Event, X-GitHub-Delivery"
       );
       res.setHeader("Vary", "Origin");
     } else if (req.headers.origin) {
@@ -626,7 +661,71 @@ export class WebhookServer {
   }
 
   /**
-   * Simple in-memory per-IP rate limiter (sliding window).
+   * Resolve the client address used for rate limiting. The socket address is
+   * authoritative; X-Forwarded-For is honored only when the socket peer is a
+   * configured trusted proxy, and then the right-most entry that is not itself a
+   * trusted proxy is used (left-most entries are client-controlled).
+   */
+  private resolveClientIp(req: http.IncomingMessage): string {
+    const socketIp = req.socket.remoteAddress || "unknown";
+    const trusted = this.options.trustedProxies;
+    if (!trusted.includes(socketIp)) return socketIp;
+    const forwarded = req.headers["x-forwarded-for"];
+    const header = Array.isArray(forwarded) ? forwarded.join(",") : forwarded;
+    if (!header) return socketIp;
+    const hops = header
+      .split(",")
+      .map((h) => h.trim())
+      .filter(Boolean);
+    for (let i = hops.length - 1; i >= 0; i--) {
+      if (!trusted.includes(hops[i])) return hops[i];
+    }
+    return socketIp;
+  }
+
+  /**
+   * Bearer-token gate for /events/*. Fails closed: 503 when no token is configured
+   * (unless explicitly opted out), 401 on a missing or wrong token.
+   * Returns true when the request may proceed.
+   */
+  private authorizeEventsRequest(
+    req: http.IncomingMessage,
+    res: http.ServerResponse,
+    clientIp: string,
+    pathname: string
+  ): boolean {
+    if (this.options.allowUnauthenticatedEvents) return true;
+
+    const expected = getSecret("EVENTS_AUTH_TOKEN");
+    if (!expected) {
+      this.sendErrorResponse(res, 503, "Events API disabled: EVENTS_AUTH_TOKEN is not configured");
+      return false;
+    }
+
+    const header = req.headers.authorization ?? "";
+    const match = /^Bearer\s+(.+)$/i.exec(header);
+    const provided = match?.[1]?.trim() ?? "";
+    // Hash both sides so the comparison is constant-time regardless of length.
+    const a = createHash("sha256").update(provided).digest();
+    const b = createHash("sha256").update(expected).digest();
+    if (provided === "" || !timingSafeEqual(a, b)) {
+      this.securityLog.record({
+        type: "unauthorized_access",
+        source: clientIp,
+        details: { path: pathname, reason: provided === "" ? "missing_token" : "invalid_token" },
+        severity: "medium",
+      });
+      res.setHeader("WWW-Authenticate", "Bearer");
+      this.sendErrorResponse(res, 401, "Unauthorized");
+      return false;
+    }
+    return true;
+  }
+
+  /**
+   * Fixed-window per-IP rate limiter. Expired windows are evicted by a periodic
+   * sweep while running, and the map is hard-capped so spoofed keys cannot grow it
+   * without bound.
    */
   private isRateLimited(ip: string): boolean {
     const now = Date.now();
@@ -634,11 +733,43 @@ export class WebhookServer {
     const window = WEBHOOK_RATE_WINDOW_MS;
     const entry = this.rateLimitMap.get(ip);
     if (!entry || now - entry.windowStart >= window) {
+      if (!entry && this.rateLimitMap.size >= WebhookServer.MAX_RATE_LIMIT_ENTRIES) {
+        this.evictExpiredRateLimits(now);
+        if (this.rateLimitMap.size >= WebhookServer.MAX_RATE_LIMIT_ENTRIES) {
+          const oldest = this.rateLimitMap.keys().next().value;
+          if (oldest !== undefined) this.rateLimitMap.delete(oldest);
+        }
+      }
       this.rateLimitMap.set(ip, { count: 1, windowStart: now });
       return false;
     }
     entry.count++;
     return entry.count > limit;
+  }
+
+  /** Drop every rate-limit window that has already expired. */
+  private evictExpiredRateLimits(now = Date.now()): void {
+    for (const [ip, entry] of this.rateLimitMap) {
+      if (now - entry.windowStart >= WEBHOOK_RATE_WINDOW_MS) {
+        this.rateLimitMap.delete(ip);
+      }
+    }
+  }
+
+  private startRateLimitSweep(): void {
+    this.stopRateLimitSweep();
+    this.rateLimitSweepTimer = setInterval(
+      () => this.evictExpiredRateLimits(),
+      WEBHOOK_RATE_WINDOW_MS
+    );
+    this.rateLimitSweepTimer.unref();
+  }
+
+  private stopRateLimitSweep(): void {
+    if (this.rateLimitSweepTimer) {
+      clearInterval(this.rateLimitSweepTimer);
+      this.rateLimitSweepTimer = undefined;
+    }
   }
 
   /**

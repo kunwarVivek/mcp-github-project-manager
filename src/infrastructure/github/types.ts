@@ -1,12 +1,5 @@
 import type { Octokit } from "@octokit/rest";
 
-export interface GitHubConfig {
-  owner: string;
-  repo: string;
-  token: string;
-  projectId?: string; // Adding the missing projectId property
-}
-
 export interface GitHubError extends Error {
   status?: number;
   response?: {
@@ -81,7 +74,7 @@ export interface RequestError extends GitHubError {
   headers: Record<string, string>;
 }
 
-export interface RateLimitError extends GitHubError {
+export interface RateLimitRequestError extends GitHubError {
   status: 403;
   headers: {
     "x-ratelimit-limit": string;
@@ -194,7 +187,7 @@ export function isRequestError(error: unknown): error is RequestError {
   );
 }
 
-export function isRateLimitError(error: unknown): error is RateLimitError {
+export function isRateLimitError(error: unknown): error is RateLimitRequestError {
   return (
     isGitHubError(error) &&
     error.status === 403 &&

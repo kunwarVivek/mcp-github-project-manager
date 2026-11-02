@@ -7,6 +7,7 @@ import {
   TaskPriority,
   TaskStatus,
 } from "../../domain/ai-types";
+import type { AIServiceFactory } from "../../services/ai/AIServiceFactory";
 import { TaskContextGenerationService } from "../../services/TaskContextGenerationService";
 import { must } from "../helpers/must";
 
@@ -64,7 +65,11 @@ describe("TaskContextGenerationService", () => {
   };
 
   beforeEach(() => {
-    service = new TaskContextGenerationService();
+    // No model available: exercises the deterministic fallbacks without any network call.
+    const unavailableFactory = {
+      getBestAvailableModel: () => null,
+    } as unknown as AIServiceFactory;
+    service = new TaskContextGenerationService(unavailableFactory);
   });
 
   describe("generateTaskContext", () => {

@@ -200,6 +200,13 @@ await webhookServer.start(); // Listens on port 3001
 // GET /events/replay/:timestamp - Replay events from timestamp
 ```
 
+All `/events/*` routes require `Authorization: Bearer $EVENTS_AUTH_TOKEN`; with no
+token configured they fail closed with HTTP 503 (`EVENTS_ALLOW_UNAUTHENTICATED=true`
+disables the check for trusted local development only). `/webhooks/github` is
+authenticated by its HMAC signature and `/health` is open. The listener binds
+`127.0.0.1` unless `WEBHOOK_HOST` is set, and honors `X-Forwarded-For` only from
+`WEBHOOK_TRUSTED_PROXIES`.
+
 ## Configuration
 
 ### Environment Variables
@@ -427,7 +434,7 @@ MAX_EVENTS_IN_MEMORY=500 mcp-github-project-manager
 ls -la .mcp-cache/
 
 # View recent events
-curl http://localhost:3001/events/recent?limit=10
+curl -H "Authorization: Bearer $EVENTS_AUTH_TOKEN" http://localhost:3001/events/recent?limit=10
 
 # Check subscription status
 curl http://localhost:3001/health | jq '.subscriptions'

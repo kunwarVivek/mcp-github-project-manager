@@ -1,4 +1,9 @@
-import { MCPContentType, type MCPResponse } from "../../domain/mcp-types";
+import type { CallToolResult } from "@modelcontextprotocol/server";
+import {
+  MCPContentType,
+  type MCPErrorResponse,
+  type MCPSuccessResponse,
+} from "../../domain/mcp-types";
 import { MCPResponseFormatter } from "../mcp/MCPResponseFormatter";
 
 export interface FormattingOptions {
@@ -11,7 +16,11 @@ export const ToolResultFormatter = {
   /**
    * Format a tool result as a successful MCP response
    */
-  formatSuccess<T>(toolName: string, result: T, options: FormattingOptions = {}): MCPResponse {
+  formatSuccess<T>(
+    toolName: string,
+    result: T,
+    options: FormattingOptions = {}
+  ): MCPSuccessResponse {
     const contentType = options.contentType || MCPContentType.JSON;
 
     // Determine the right content format based on the result type and requested content type
@@ -29,12 +38,39 @@ export const ToolResultFormatter = {
         return formatAsJson(toolName, result, options);
     }
   },
+
+  /**
+   * Format a failed tool call as an MCP tool result with `isError: true`.
+   *
+   * The text names the failure and spells out the actionable detail (invalid
+   * fields, retry-after, documentation link); `_meta.error` carries the stable
+   * code and structured context for programmatic callers.
+   */
+  formatError(response: MCPErrorResponse): CallToolResult {
+    const { code, message, data } = response.error;
+    const lines = [message];
+    for (const issue of data?.validation ?? []) {
+      lines.push(`- ${issue.path ? `${issue.path}: ` : ""}${issue.message}`);
+    }
+    if (data?.github?.documentation_url) {
+      lines.push(`See ${data.github.documentation_url}`);
+    }
+    return {
+      content: [{ type: "text", text: lines.join("\n") }],
+      isError: true,
+      _meta: { error: { code, ...(data ? { data } : {}) } },
+    };
+  },
 };
 
 /**
  * Format result as JSON
  */
-function formatAsJson<T>(toolName: string, result: T, options: FormattingOptions): MCPResponse {
+function formatAsJson<T>(
+  toolName: string,
+  result: T,
+  options: FormattingOptions
+): MCPSuccessResponse {
   // Add metadata specific to tool results
   const metadata = {
     tool: toolName,
@@ -48,7 +84,11 @@ function formatAsJson<T>(toolName: string, result: T, options: FormattingOptions
 /**
  * Format result as Markdown
  */
-function formatAsMarkdown<T>(toolName: string, result: T, options: FormattingOptions): MCPResponse {
+function formatAsMarkdown<T>(
+  toolName: string,
+  result: T,
+  options: FormattingOptions
+): MCPSuccessResponse {
   // Add a title based on the tool name
   let markdown = `# ${formatToolName(toolName)} Result\n\n`;
 
@@ -99,7 +139,11 @@ function formatAsMarkdown<T>(toolName: string, result: T, options: FormattingOpt
 /**
  * Format result as HTML
  */
-function formatAsHtml<T>(toolName: string, result: T, options: FormattingOptions): MCPResponse {
+function formatAsHtml<T>(
+  toolName: string,
+  result: T,
+  options: FormattingOptions
+): MCPSuccessResponse {
   // Generate HTML template based on the result type
   const htmlTemplate = (data: T) => {
     let html = `
@@ -196,7 +240,11 @@ function formatAsHtml<T>(toolName: string, result: T, options: FormattingOptions
 /**
  * Format result as plain text
  */
-function formatAsText<T>(toolName: string, result: T, options: FormattingOptions): MCPResponse {
+function formatAsText<T>(
+  toolName: string,
+  result: T,
+  options: FormattingOptions
+): MCPSuccessResponse {
   // Format as simple text representation
   let text = `${formatToolName(toolName)} Result:\n\n`;
 

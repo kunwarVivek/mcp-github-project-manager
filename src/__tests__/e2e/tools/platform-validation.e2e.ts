@@ -499,7 +499,7 @@ describe("Platform Validation E2E", () => {
           action: "set_budget",
           agentId,
           totalTokens: 500000,
-          warningThreshold: 0.8,
+          warningFraction: 0.8,
           hardStop: true,
         })
       );

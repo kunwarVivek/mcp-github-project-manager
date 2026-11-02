@@ -2,26 +2,34 @@ import { createAnthropic } from "@ai-sdk/anthropic";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { createOpenAI } from "@ai-sdk/openai";
 import { createPerplexity } from "@ai-sdk/perplexity";
-import { type LanguageModel, type LanguageModelMiddleware, wrapLanguageModel } from "ai";
+import type { LanguageModelV4StreamPart } from "@ai-sdk/provider";
 import {
-  AI_FALLBACK_MODEL,
-  AI_MAIN_MODEL,
-  AI_PRD_MODEL,
-  AI_RESEARCH_MODEL,
-  ANTHROPIC_API_KEY,
-  GOOGLE_API_KEY,
-  getOptionalConfigValue,
-  OPENAI_API_KEY,
-  PERPLEXITY_API_KEY,
-} from "../../env";
+  type EmbeddingModel,
+  generateText,
+  type LanguageModel,
+  type LanguageModelMiddleware,
+  wrapLanguageModel,
+} from "ai";
+import { getOptionalConfigValue } from "../../env";
 import { type ILogger, Logger } from "../../infrastructure/logger";
 import { getTraceContext } from "../../infrastructure/observability/CorrelationContext";
 import {
   AIResiliencePolicy,
   type DegradedResult,
-} from "../../infrastructure/resilience/AIResiliencePolicy.js";
+} from "../../infrastructure/resilience/AIResiliencePolicy";
 import type { SamplingRequestFn } from "./SamplingLanguageModel";
 import { SamplingLanguageModel } from "./SamplingLanguageModel";
+
+/**
+ * Sum provider-reported usage. `inputTokens`/`outputTokens` are objects with a
+ * `total`, not numbers — reading them as numbers yields NaN and silently
+ * poisons the budget.
+ */
+function totalTokens(
+  usage: { inputTokens?: { total?: number }; outputTokens?: { total?: number } } | undefined
+): number {
+  return (usage?.inputTokens?.total ?? 0) + (usage?.outputTokens?.total ?? 0);
+}
 
 /**
  * Middleware that meters token spend and applies resilience protection.
@@ -46,13 +54,7 @@ export const usageMeteringMiddleware: LanguageModelMiddleware = {
     const doGenerateWithMetering = async () => {
       const result = await doGenerate();
       const sink = getTraceContext()?.usage;
-      if (sink) {
-        // `inputTokens`/`outputTokens` are objects with a `total`, not numbers —
-        // reading them as numbers yields NaN and silently poisons the budget.
-        const input = result.usage?.inputTokens?.total ?? 0;
-        const output = result.usage?.outputTokens?.total ?? 0;
-        sink.tokens += input + output;
-      }
+      if (sink) sink.tokens += totalTokens(result.usage);
       return result;
     };
 
@@ -60,13 +62,40 @@ export const usageMeteringMiddleware: LanguageModelMiddleware = {
     // Failures throw (no fallback here) — each service's existing try/catch
     // provides the fallback. This is transparent: all 31 generateObject/
     // generateText call sites get resilience without code changes.
-    const factory = AIServiceFactory.getInstance();
-    const policy = factory.getResiliencePolicy();
+    const policy = AIServiceFactory.getInstance().getResiliencePolicy();
     if (policy) {
       return policy.executeRaw(doGenerateWithMetering);
     }
 
     return doGenerateWithMetering();
+  },
+
+  wrapStream: async ({ doStream }) => {
+    const doStreamWithMetering = async () => {
+      const result = await doStream();
+      // Capture the sink now: the transform callback runs wherever the
+      // consumer pulls the stream, which need not be inside this trace's
+      // AsyncLocalStorage scope.
+      const sink = getTraceContext()?.usage;
+      if (!sink) return result;
+      // Usage is only reported on the terminal `finish` part.
+      const metered = result.stream.pipeThrough(
+        new TransformStream<LanguageModelV4StreamPart, LanguageModelV4StreamPart>({
+          transform(chunk, controller) {
+            if (chunk.type === "finish") sink.tokens += totalTokens(chunk.usage);
+            controller.enqueue(chunk);
+          },
+        })
+      );
+      return { ...result, stream: metered };
+    };
+
+    const policy = AIServiceFactory.getInstance().getResiliencePolicy();
+    if (policy) {
+      return policy.executeRaw(doStreamWithMetering);
+    }
+
+    return doStreamWithMetering();
   },
 };
 
@@ -90,14 +119,34 @@ export const SUPPORTED_PROVIDERS: readonly AIProvider[] = [
  * API key accessors, read at call time so a rotated secret is picked up.
  */
 const PROVIDER_API_KEYS: Record<AIProvider, () => string> = {
-  anthropic: () => ANTHROPIC_API_KEY,
-  openai: () => OPENAI_API_KEY,
-  google: () => GOOGLE_API_KEY,
-  perplexity: () => PERPLEXITY_API_KEY,
+  anthropic: () => getOptionalConfigValue("ANTHROPIC_API_KEY", ""),
+  openai: () => getOptionalConfigValue("OPENAI_API_KEY", ""),
+  google: () => getOptionalConfigValue("GOOGLE_API_KEY", ""),
+  perplexity: () => getOptionalConfigValue("PERPLEXITY_API_KEY", ""),
   // No single global key for generic OpenAI-compatible endpoints — always
   // resolved per-role (AI_<ROLE>_API_KEY); this entry is never invoked.
   "openai-compatible": () => "",
 };
+
+/** Global key variable per provider, for the "missing" report. */
+const PROVIDER_KEY_NAMES: Record<Exclude<AIProvider, "openai-compatible">, string> = {
+  anthropic: "ANTHROPIC_API_KEY",
+  openai: "OPENAI_API_KEY",
+  google: "GOOGLE_API_KEY",
+  perplexity: "PERPLEXITY_API_KEY",
+};
+
+const MODEL_ROLES: readonly AIModelRole[] = ["main", "research", "fallback", "prd"];
+
+/** Env var naming the model for each role — read at call time. */
+const ROLE_MODEL_ENV: Record<AIModelRole, string> = {
+  main: "AI_MAIN_MODEL",
+  research: "AI_RESEARCH_MODEL",
+  fallback: "AI_FALLBACK_MODEL",
+  prd: "AI_PRD_MODEL",
+};
+
+const DEFAULT_EMBEDDING_MODEL = "text-embedding-3-small";
 
 /** Model-name prefixes used only as a fallback hint when no provider is set. */
 const PROVIDER_HINTS: ReadonlyArray<[AIProvider, (m: string) => boolean]> = [
@@ -183,19 +232,23 @@ export interface AIServiceConfig {
   prd: AIModelConfig | null;
 }
 
+// Typed off wrapLanguageModel's own parameter: `LanguageModel` also admits the
+// plain model-id string, which is not a wrappable model instance.
+type WrappableModel = Parameters<typeof wrapLanguageModel>[0]["model"];
+
 /**
  * Factory for creating AI service instances with Vercel AI SDK
  */
 export class AIServiceFactory {
   private static instance: AIServiceFactory;
-  private config: AIServiceConfig;
   private resiliencePolicy?: AIResiliencePolicy;
   private samplingModel: LanguageModel | null = null;
+  /** Built models keyed by role; rebuilt when the resolved config changes. */
+  private readonly modelCache = new Map<AIModelRole, { signature: string; model: LanguageModel }>();
   private readonly logger: ILogger;
 
   private constructor(logger?: ILogger) {
     this.logger = logger ?? Logger.getInstance();
-    this.config = this.buildConfiguration();
   }
 
   /**
@@ -209,128 +262,133 @@ export class AIServiceFactory {
   }
 
   /**
-   * Build AI service configuration from environment variables
+   * Resolve the effective configuration for a role from the live secret chain.
+   * Nothing is snapshotted: a rotated key or changed model is seen on the next
+   * call. On failure the result carries the actual cause.
    */
-  private buildConfiguration(): AIServiceConfig {
-    return {
-      main: this.parseModelConfig(AI_MAIN_MODEL, "main"),
-      research: this.parseModelConfig(AI_RESEARCH_MODEL, "research"),
-      fallback: this.parseModelConfig(AI_FALLBACK_MODEL, "fallback"),
-      prd: this.parseModelConfig(AI_PRD_MODEL, "prd"),
-    };
-  }
-
-  /**
-   * Parse model configuration from model string
-   */
-  private parseModelConfig(modelString: string, role?: AIModelRole): AIModelConfig | null {
+  private resolveRole(
+    role: AIModelRole
+  ): { config: AIModelConfig } | { reason: string; configured: boolean } {
+    const modelString = getOptionalConfigValue(ROLE_MODEL_ENV[role], "");
     if (!modelString) {
-      // No model configured for this role — skip silently
-      return null;
+      return { reason: `no model configured (set ${ROLE_MODEL_ENV[role]})`, configured: false };
     }
 
     const provider = resolveProvider(modelString, role);
-
     if (!provider) {
-      this.logger.warn(
-        `AI Model Warning: cannot determine a provider for model "${modelString}". ` +
-          `Set AI_${(role ?? "MAIN").toUpperCase()}_PROVIDER to one of ` +
-          `${SUPPORTED_PROVIDERS.join(", ")}.`
-      );
-      return null;
+      return {
+        reason:
+          `cannot determine a provider for model "${modelString}"; set ` +
+          `AI_${role.toUpperCase()}_PROVIDER to one of ${SUPPORTED_PROVIDERS.join(", ")}`,
+        configured: true,
+      };
     }
 
-    // Resolve API key: per-role key overrides global provider key
-    let apiKey = "";
-    let baseURL: string | undefined;
-    if (role) {
-      const roleConfig = PER_ROLE_CONFIG[role];
-      apiKey = roleConfig.apiKey();
-      const url = roleConfig.baseURL();
-      if (url) baseURL = url;
-    }
-    // Fall back to global provider key
+    // Per-role key overrides the global provider key.
+    const roleConfig = PER_ROLE_CONFIG[role];
+    let apiKey = roleConfig.apiKey();
+    const baseURL = roleConfig.baseURL() || undefined;
     if (!apiKey && provider !== "openai-compatible") {
       apiKey = PROVIDER_API_KEYS[provider]();
     }
 
     if (!apiKey) {
-      this.logger.warn(
-        `AI Provider Warning: No API key for ${provider} (role: ${role ?? "unknown"}). ` +
-          `Set AI_${(role ?? "MAIN").toUpperCase()}_API_KEY or the global provider key.`
-      );
-      return null;
+      return {
+        reason:
+          `no API key for provider ${provider}; set AI_${role.toUpperCase()}_API_KEY ` +
+          `or the global provider key`,
+        configured: true,
+      };
     }
 
-    return { provider, model: modelString, apiKey, baseURL };
+    return { config: { provider, model: modelString, apiKey, baseURL } };
   }
 
-  /**
-   * Get AI model instance for specific use case
-   */
-  public getModel(type: "main" | "research" | "fallback" | "prd"): LanguageModel | null {
-    // Typed off wrapLanguageModel's own parameter: `LanguageModel` also admits
-    // the plain model-id string, which is not a wrappable model instance.
-    type WrappableModel = Parameters<typeof wrapLanguageModel>[0]["model"];
-    const meter = (model: WrappableModel): LanguageModel =>
-      wrapLanguageModel({ model, middleware: usageMeteringMiddleware });
-
-    const config = this.config[type];
-
-    if (!config) {
-      this.logger.warn(`AI Model Warning: ${type} model is not available due to missing API key.`);
-      return null;
+  /** Resolved config for every role (null where unavailable). */
+  private resolveAllRoles(): Record<AIModelRole, AIModelConfig | null> {
+    const out = {} as Record<AIModelRole, AIModelConfig | null>;
+    for (const role of MODEL_ROLES) {
+      const r = this.resolveRole(role);
+      out[role] = "config" in r ? r.config : null;
     }
+    return out;
+  }
 
-    // Build a provider client bound to the resolved key. The default
-    // `anthropic(...)` / `openai(...)` singletons read process.env themselves,
-    // which meant a key supplied via CLI flag or SECRETS_DIR was resolved,
-    // stored, used as a truthiness gate — and then silently ignored.
+  /** Provider client bound to the resolved key, without metering. */
+  private createProviderModel(config: AIModelConfig): WrappableModel {
+    // The default `anthropic(...)` / `openai(...)` singletons read process.env
+    // themselves, which would silently ignore a key supplied via CLI flag or
+    // SECRETS_DIR — so every client is built from the resolved key.
+    const options = {
+      apiKey: config.apiKey,
+      ...(config.baseURL && { baseURL: config.baseURL }),
+    };
     switch (config.provider) {
       case "anthropic":
-        return meter(
-          createAnthropic({
-            apiKey: config.apiKey,
-            ...(config.baseURL && { baseURL: config.baseURL }),
-          })(config.model)
-        );
-
+        return createAnthropic(options)(config.model);
       case "openai":
-        return meter(
-          createOpenAI({
-            apiKey: config.apiKey,
-            ...(config.baseURL && { baseURL: config.baseURL }),
-          })(config.model)
-        );
-
-      case "google":
-        return meter(
-          createGoogleGenerativeAI({
-            apiKey: config.apiKey,
-            ...(config.baseURL && { baseURL: config.baseURL }),
-          })(config.model)
-        );
-
-      case "perplexity":
-        return meter(
-          createPerplexity({
-            apiKey: config.apiKey,
-            ...(config.baseURL && { baseURL: config.baseURL }),
-          })(config.model)
-        );
-
       case "openai-compatible":
-        // Any OpenAI-protocol endpoint: OpenRouter, Together, Groq, Ollama, Azure, etc.
-        return meter(
-          createOpenAI({
-            apiKey: config.apiKey,
-            ...(config.baseURL && { baseURL: config.baseURL }),
-          })(config.model)
-        );
-
+        // openai-compatible: any OpenAI-protocol endpoint (OpenRouter, Together,
+        // Groq, Ollama, Azure, ...).
+        return createOpenAI(options)(config.model);
+      case "google":
+        return createGoogleGenerativeAI(options)(config.model);
+      case "perplexity":
+        return createPerplexity(options)(config.model);
       default:
         throw new Error(`Unsupported AI provider: ${config.provider}`);
     }
+  }
+
+  /**
+   * Get AI model instance for specific use case.
+   *
+   * Config is resolved on every call; the built model is cached per role and
+   * rebuilt when the resolved provider/model/key/base URL changes.
+   */
+  public getModel(type: AIModelRole): LanguageModel | null {
+    const resolved = this.resolveRole(type);
+
+    if (!("config" in resolved)) {
+      const message = `AI Model Warning: ${type} model is not available: ${resolved.reason}.`;
+      if (resolved.configured) this.logger.warn(message);
+      else this.logger.debug(message);
+      this.modelCache.delete(type);
+      return null;
+    }
+
+    const { config } = resolved;
+    const signature = JSON.stringify([
+      config.provider,
+      config.model,
+      config.apiKey,
+      config.baseURL ?? "",
+    ]);
+    const cached = this.modelCache.get(type);
+    if (cached && cached.signature === signature) return cached.model;
+
+    const model = wrapLanguageModel({
+      model: this.createProviderModel(config),
+      middleware: usageMeteringMiddleware,
+    });
+    this.modelCache.set(type, { signature, model });
+    return model;
+  }
+
+  /**
+   * Embedding model for the duplicate-detection / related-issue services.
+   *
+   * Resolved at call time. Key: `AI_EMBEDDING_API_KEY`, else `OPENAI_API_KEY`.
+   * Optional `AI_EMBEDDING_BASE_URL` targets an OpenAI-compatible endpoint;
+   * model from `AI_EMBEDDING_MODEL`, default `text-embedding-3-small`.
+   * Returns null when no key is configured.
+   */
+  public getEmbeddingModel(): EmbeddingModel | null {
+    const apiKey = getOptionalConfigValue("AI_EMBEDDING_API_KEY", "") || PROVIDER_API_KEYS.openai();
+    if (!apiKey) return null;
+    const baseURL = getOptionalConfigValue("AI_EMBEDDING_BASE_URL", "");
+    const modelId = getOptionalConfigValue("AI_EMBEDDING_MODEL", DEFAULT_EMBEDDING_MODEL);
+    return createOpenAI({ apiKey, ...(baseURL && { baseURL }) }).embedding(modelId);
   }
 
   /**
@@ -391,7 +449,11 @@ export class AIServiceFactory {
    * (Claude, Codex, Pi) IS the model.
    */
   public setSamplingProvider(samplingFn: SamplingRequestFn): void {
-    this.samplingModel = new SamplingLanguageModel(samplingFn) as unknown as LanguageModel;
+    // Metered like every other model so sampling spend reaches the agent budget.
+    this.samplingModel = wrapLanguageModel({
+      model: new SamplingLanguageModel(samplingFn),
+      middleware: usageMeteringMiddleware,
+    });
     this.logger.info("🔗 MCP sampling registered as zero-config AI fallback (client LLM)");
   }
 
@@ -410,12 +472,29 @@ export class AIServiceFactory {
     // `logger.debug(factory.getConfiguration())` away from printing every key.
     const strip = (c: AIModelConfig | null): AIModelConfig | null =>
       c ? { ...c, apiKey: c.apiKey ? "[REDACTED]" : "" } : null;
+    const roles = this.resolveAllRoles();
     return {
-      main: strip(this.config.main),
-      research: strip(this.config.research),
-      fallback: strip(this.config.fallback),
-      prd: strip(this.config.prd),
+      main: strip(roles.main),
+      research: strip(roles.research),
+      fallback: strip(roles.fallback),
+      prd: strip(roles.prd),
     };
+  }
+
+  /**
+   * Providers with a usable key: the global key, or a per-role config that
+   * resolved to that provider with its own key (AI_<ROLE>_API_KEY).
+   */
+  private configuredProviders(roles: Record<AIModelRole, AIModelConfig | null>): Set<AIProvider> {
+    const out = new Set<AIProvider>();
+    for (const provider of SUPPORTED_PROVIDERS) {
+      if (provider !== "openai-compatible" && PROVIDER_API_KEYS[provider]()) out.add(provider);
+    }
+    for (const role of MODEL_ROLES) {
+      const c = roles[role];
+      if (c) out.add(c.provider);
+    }
+    return out;
   }
 
   /**
@@ -428,45 +507,14 @@ export class AIServiceFactory {
     availableModels: string[];
     unavailableModels: string[];
   } {
-    const missing: string[] = [];
-    const available: string[] = [];
-    const availableModels: string[] = [];
-    const unavailableModels: string[] = [];
-
-    // Check each provider
-    if (!ANTHROPIC_API_KEY) {
-      missing.push("ANTHROPIC_API_KEY");
-    } else {
-      available.push("anthropic");
-    }
-
-    if (!OPENAI_API_KEY) {
-      missing.push("OPENAI_API_KEY");
-    } else {
-      available.push("openai");
-    }
-
-    if (!GOOGLE_API_KEY) {
-      missing.push("GOOGLE_API_KEY");
-    } else {
-      available.push("google");
-    }
-
-    if (!PERPLEXITY_API_KEY) {
-      missing.push("PERPLEXITY_API_KEY");
-    } else {
-      available.push("perplexity");
-    }
-
-    // Check which models are available
-    if (this.config.main) availableModels.push("main");
-    else unavailableModels.push("main");
-    if (this.config.research) availableModels.push("research");
-    else unavailableModels.push("research");
-    if (this.config.fallback) availableModels.push("fallback");
-    else unavailableModels.push("fallback");
-    if (this.config.prd) availableModels.push("prd");
-    else unavailableModels.push("prd");
+    const roles = this.resolveAllRoles();
+    const configured = this.configuredProviders(roles);
+    const available: string[] = SUPPORTED_PROVIDERS.filter((p) => configured.has(p));
+    const missing = (Object.keys(PROVIDER_KEY_NAMES) as Array<keyof typeof PROVIDER_KEY_NAMES>)
+      .filter((p) => !configured.has(p))
+      .map((p) => PROVIDER_KEY_NAMES[p]);
+    const availableModels: string[] = MODEL_ROLES.filter((r) => roles[r]);
+    const unavailableModels: string[] = MODEL_ROLES.filter((r) => !roles[r]);
 
     return {
       hasAnyProvider: available.length > 0,
@@ -535,12 +583,12 @@ export class AIServiceFactory {
     const circuitState = this.getCircuitState();
     const circuitHealthy = circuitState === "closed" || circuitState === "disabled";
 
-    const providers: Array<{ name: string; configured: boolean; healthy: boolean }> = (
-      ["anthropic", "openai", "google", "perplexity"] as const
-    ).map((name) => {
-      const configured = !!PROVIDER_API_KEYS[name]();
-      return { name, configured, healthy: configured && circuitHealthy };
-    });
+    const configuredSet = this.configuredProviders(this.resolveAllRoles());
+    const providers: Array<{ name: string; configured: boolean; healthy: boolean }> =
+      SUPPORTED_PROVIDERS.map((name) => {
+        const configured = configuredSet.has(name);
+        return { name, configured, healthy: configured && circuitHealthy };
+      });
 
     return {
       available: this.isAIAvailable(),
@@ -590,37 +638,36 @@ export class AIServiceFactory {
   }
 
   /**
-   * Test connection to AI providers
+   * Probe every configured provider with a minimal request.
+   *
+   * A provider is probed through the first role whose effective config resolves
+   * to it (so per-role keys and base URLs are exercised). Providers no role
+   * uses report `false`. Probes use the unmetered client — a health check must
+   * not debit an agent budget — and run concurrently.
    */
-  public async testConnections(): Promise<{ [key in AIProvider]: boolean }> {
-    const results: { [key in AIProvider]: boolean } = {
-      anthropic: false,
-      openai: false,
-      google: false,
-      perplexity: false,
-      "openai-compatible": false,
-    };
+  public async testConnections(): Promise<Record<AIProvider, boolean>> {
+    const roles = this.resolveAllRoles();
+    const results = Object.fromEntries(SUPPORTED_PROVIDERS.map((p) => [p, false])) as Record<
+      AIProvider,
+      boolean
+    >;
 
-    // Test each provider if API key is available
-    if (ANTHROPIC_API_KEY) {
-      try {
-        const model = this.getModel("main");
-        if (model) {
-          // Simple test generation using generateText from ai package
-          const { generateText } = await import("ai");
+    await Promise.all(
+      SUPPORTED_PROVIDERS.map(async (provider) => {
+        const config = MODEL_ROLES.map((r) => roles[r]).find((c) => c?.provider === provider);
+        if (!config) return;
+        try {
           await generateText({
-            model,
-            prompt: "Test connection",
-            maxOutputTokens: 10,
+            model: this.createProviderModel(config),
+            prompt: "Reply with OK.",
+            maxOutputTokens: 16,
           });
-          results.anthropic = true;
+          results[provider] = true;
+        } catch (error) {
+          this.logger.error(`${provider} connection test failed`, error);
         }
-      } catch (error) {
-        this.logger.error("Anthropic connection test failed", error);
-      }
-    }
-
-    // Add similar tests for other providers as needed
+      })
+    );
 
     return results;
   }

@@ -1,14 +1,14 @@
 # Testing Patterns
 
-**Analysis Date:** 2026-10-21
+**Analysis Date:** 2026-11-02
 
-**Updated:** 2026-10-21 — rewritten for Vitest 5 (`vitest.config.ts`). The previous snapshot described the pre-migration runner, its config files, and its global setup file; those no longer exist.
+**Updated:** 2026-11-02 — single test tree (`src/__tests__/`; the legacy root `tests/` tree was merged and removed), coverage thresholds described neutrally, live-API suites registered with `describe.skipIf`.
 
 ## Test Framework
 
 **Runner:**
 - Vitest ^5.0.5
-- Config: `vitest.config.ts` (single config for every suite — unit, integration, E2E, and the legacy root `tests/` tree)
+- Config: `vitest.config.ts` (single config for every suite — unit, integration, E2E; `include` is `src/__tests__/**` only)
 
 **Assertion Library:**
 - Vitest built-in (`expect`), with `globals: true` so `describe`/`it`/`expect` are available without importing them
@@ -25,13 +25,13 @@ npm run test:core           # Non-AI tests only
 npm run test:all            # All test suites
 ```
 
-**Filtering:** Vitest rejects the pre-migration runner's CLI flags outright — `--testPathPattern` / `--testPathIgnorePatterns` exit with `CACError: Unknown option`. Filter with a **positional pattern** (`vitest run ai-services`) and exclude with `--exclude='**/tests/ai-services/**'`. The `test:core` script uses exactly that form.
+**Filtering:** Vitest rejects the pre-migration runner's CLI flags outright — `--testPathPattern` / `--testPathIgnorePatterns` exit with `CACError: Unknown option`. Filter with a **positional pattern** (`vitest run ai-services`) and exclude with `--exclude='**/unit/services/ai/**'`. The `test:core` script uses exactly that form.
 
 ## Test File Organization
 
-**Location — two live trees:**
-- `src/__tests__/` — primary tree: unit, integration, and E2E suites (~79 files)
-- `tests/` — legacy root tree, still live and still executed (48 test files). These are **not** duplicates of `src/__tests__/` and are **not** removable; `vitest.config.ts` includes them.
+**Location — one tree:**
+- `src/__tests__/` holds every unit, integration, and E2E suite. There is no root `tests/` directory
+- Test counts and measured results: see CI (not recorded here)
 
 **Naming:**
 - Pattern: `*.test.ts` (also accepts `*.spec.ts` and `*.e2e.ts`)
@@ -63,15 +63,9 @@ src/__tests__/
 ├── infrastructure/          # Tool-level suites
 ├── services/                # Service-level suites
 ├── tools/                   # Tool suites
+├── helpers/                 # Shared fakes (FakeGitHub, InMemoryAgentStore, aiFakes, mockTypes)
 ├── setup.ts                 # Shared fixture module (imported, not a setup file)
 └── test-utils.ts            # Shared test utilities
-
-tests/                      # Legacy root tree — still live, 48 files
-├── ai-services/             # AI service integration tests
-├── ai-tools/                # AI tool tests
-├── cache/
-├── infrastructure/          # resilience/, github/, observability/, health/, cache/, tools/
-└── services/                # ai/, feature/
 ```
 
 ## Test Structure
@@ -313,20 +307,8 @@ export class TestFactory {
 ## Coverage
 
 **Requirements (from `vitest.config.ts`):**
-```typescript
-coverage: {
-  provider: "v8",
-  include: ["src/**/*.ts"],
-  exclude: ["src/**/*.d.ts", "src/**/*.test.ts", "src/**/*.spec.ts", "src/__tests__/**"],
-  reporter: ["text", "lcov", "clover"],
-  thresholds: {
-    lines: 55,
-    functions: 57,
-    branches: 45,
-    statements: 54,
-  },
-},
-```
+- Provider `v8`; `include: ["src/**/*.ts"]`, excluding declaration files and `src/__tests__/**`; reporters `text`, `lcov`, `clover`
+- Thresholds for lines, functions, branches and statements are enforced by `coverage.thresholds` in `vitest.config.ts`; `npm run test:coverage` fails below them. Measured coverage: see CI
 
 **View Coverage:**
 ```bash
@@ -338,7 +320,7 @@ npm run test:coverage
 ## Test Types
 
 **Unit Tests:**
-- Location: `src/__tests__/unit/` and `src/__tests__/services/`
+- Location: `src/__tests__/unit/` (plus `src/__tests__/services/` and `src/__tests__/tools/`)
 - Scope: Single class/function in isolation
 - Mocks: All external dependencies
 - Speed: Fast
@@ -355,13 +337,8 @@ npm run test:coverage
 - Mocks: Optional (controlled by `E2E_REAL_API` env var)
 - Timeout: 10s default (`testTimeout: 10000`); pipeline scripts raise it to 120s
 
-**Legacy root tree:**
-- Location: `tests/`
-- Scope: AI services/AI tools, infrastructure (resilience, GitHub repositories, observability, health, cache), tool suites, service suites
-- Executed by the same `vitest run`; included by `vitest.config.ts`
-
 **AI Tests:**
-- Location: `src/__tests__/unit/services/ai/`, `tests/ai-services/`, `tests/ai-tools/`
+- Location: `src/__tests__/unit/services/ai/`, `src/__tests__/unit/infrastructure/tools/` (AI tool suites)
 - Scope: AI service integrations
 - Run separately: `npm run test:ai`
 - Mocks: AI providers mocked unless `E2E_REAL_API=true`
@@ -412,7 +389,7 @@ expect(mockFn).toHaveBeenNthCalledWith(2, secondCallArg);
 it('should create a project', async () => {
   const projectData = MCPTestHelpers.createTestData.project();
 
-  const response = await utils.callTool('create_project', projectData);
+  const response = await utils.callTool('manage_project', { action: 'create', ...projectData });
 
   MCPTestHelpers.validateToolResponse(response, ['id', 'title', 'url']);
   expect(response.title).toBe(projectData.title);
@@ -425,12 +402,12 @@ it('should create a project', async () => {
 expect(result.isError).toBe(true);
 ```
 
-**Skip Conditionally:**
+**Skip Conditionally (live-API suites):**
 ```typescript
-beforeEach(() => {
-  if (MCPToolTestUtils.shouldSkipTest('github')) {
-    test.skip('Skipping test - missing credentials', () => {});
-  }
+// Registered with describe.skipIf so Vitest reports the suite as SKIPPED,
+// not PASSED, when real credentials are absent.
+describe.skipIf(MCPToolTestUtils.shouldSkipTest('github'))('Suite', () => {
+  // ...
 });
 ```
 
@@ -459,4 +436,4 @@ npm run test:e2e:tools:ai
 
 ---
 
-*Testing analysis: 2026-10-21*
+*Testing analysis: 2026-11-02*

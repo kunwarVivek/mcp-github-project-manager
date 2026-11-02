@@ -1,7 +1,7 @@
 # Get Milestone Metrics Tool
 
 > **Scope note.** `get_milestone_metrics` is a service-layer operation, not a
-> public MCP tool name. The public surface is the 20 compound tools in
+> public MCP tool name. The public surface is the <!-- count:tools -->21<!-- /count --> compound tools in
 > [TOOLS.md](../TOOLS.md) — milestone metrics are read through
 > `manage_milestones` (action `get_metrics`), with `get_overdue` and
 > `get_upcoming` for the list views.

@@ -1,18 +1,25 @@
 import type { McpServer } from "@modelcontextprotocol/server";
 import { INTERNAL_ERROR, ProtocolError } from "@modelcontextprotocol/server";
-import { GITHUB_OWNER, GITHUB_REPO, GITHUB_TOKEN } from "../../env";
+import { GITHUB_OWNER, GITHUB_REPO } from "../../env";
 import type { AIServiceFactory } from "../../services/ai/AIServiceFactory";
 import type { ProjectManagementService } from "../../services/ProjectManagementService";
 import type { AgentStore } from "../agent/AgentStore";
+import { resolveGitHubAuth } from "../github/GitHubAuthResolver";
 import type { ILogger } from "../logger/index";
 import type { ToolRegistry } from "../tools/ToolRegistry";
 
-/**
- * v2 compatibility aliases (McpError -> ProtocolError, ErrorCode enum ->
- * constants). See `src/index.ts` for the full explanation.
- */
+/** v2 SDK: `McpError` is `ProtocolError`; error codes are plain numeric constants. */
 const McpError = ProtocolError;
 const ErrorCode = { InternalError: INTERNAL_ERROR } as const;
+
+/** How the server authenticates to GitHub, without exposing any credential. */
+function githubAuthMode(): "app" | "pat" | "none" {
+  try {
+    return resolveGitHubAuth().kind;
+  } catch {
+    return "none";
+  }
+}
 
 /** Dependencies the resource read callbacks need. */
 export interface RegisterResourcesDeps {
@@ -53,7 +60,7 @@ export function registerResources(server: McpServer, deps: RegisterResourcesDeps
     "github://config",
     {
       title: "Server Configuration",
-      description: "Target repository, GitHub token status, and AI provider availability.",
+      description: "Target repository, GitHub auth mode, and AI provider availability.",
       mimeType: "application/json",
     },
     async (uri) => {
@@ -63,7 +70,7 @@ export function registerResources(server: McpServer, deps: RegisterResourcesDeps
         return jsonResource(uri, {
           owner: GITHUB_OWNER,
           repo: GITHUB_REPO,
-          tokenConfigured: Boolean(GITHUB_TOKEN),
+          auth: githubAuthMode(),
           serverVersion,
           ai: {
             available: ai.hasAnyProvider,
@@ -93,7 +100,7 @@ export function registerResources(server: McpServer, deps: RegisterResourcesDeps
     async (uri) => {
       logger.debug(`Resource read: ${uri.href}`);
       try {
-        const projects = await service.listProjects();
+        const projects = await service.projects.listProjects();
         return jsonResource(uri, projects);
       } catch (error) {
         logger.error("Failed to read github://projects resource", error);
@@ -116,7 +123,7 @@ export function registerResources(server: McpServer, deps: RegisterResourcesDeps
     async (uri) => {
       logger.debug(`Resource read: ${uri.href}`);
       try {
-        const sprint = await service.getCurrentSprint();
+        const sprint = await service.sprints.getCurrentSprint();
         return jsonResource(uri, sprint);
       } catch (error) {
         logger.error("Failed to read github://sprints/current resource", error);
@@ -139,7 +146,7 @@ export function registerResources(server: McpServer, deps: RegisterResourcesDeps
     async (uri) => {
       logger.debug(`Resource read: ${uri.href}`);
       try {
-        const milestones = await service.listMilestones("open");
+        const milestones = await service.milestones.listMilestones("open", "due_on", "asc");
         return jsonResource(uri, milestones);
       } catch (error) {
         logger.error("Failed to read github://milestones resource", error);

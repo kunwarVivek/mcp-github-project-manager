@@ -1,6 +1,6 @@
 import { generateObject } from "ai";
 import { z } from "zod";
-import { type ILogger, Logger } from "../infrastructure/logger";
+import { getLogger, type ILogger } from "../infrastructure/logger";
 import type { AIServiceFactory } from "./ai/AIServiceFactory";
 import type { ProjectManagementService } from "./ProjectManagementService";
 import { InputSanitizer } from "./utils/InputSanitizer";
@@ -31,7 +31,7 @@ export class IssueTriagingService {
     private projectService: ProjectManagementService,
     logger?: ILogger
   ) {
-    this.logger = logger ?? Logger.getInstance();
+    this.logger = logger ?? getLogger("IssueTriagingService");
   }
 
   async triageIssue(params: {
@@ -102,7 +102,7 @@ export class IssueTriagingService {
     projectContext?: string;
   }): Promise<{ triaged: number; results: TriageResult[] }> {
     const results: TriageResult[] = [];
-    const issues = await this.projectService.listIssues({
+    const issues = await this.projectService.issues.listIssues({
       status: "open",
       limit: params.onlyUntriaged ? 100 : 50,
     });
@@ -129,14 +129,16 @@ export class IssueTriagingService {
             try {
               if (action.type === "label") {
                 const updatedLabels = [...new Set([...issue.labels, action.value])];
-                await this.projectService.updateIssue(issue.id, { labels: updatedLabels });
+                await this.projectService.issues.updateIssue(issue.id, { labels: updatedLabels });
                 action.applied = true;
               } else if (action.type === "assignee") {
                 const updatedAssignees = [...new Set([...issue.assignees, action.value])];
-                await this.projectService.updateIssue(issue.id, { assignees: updatedAssignees });
+                await this.projectService.issues.updateIssue(issue.id, {
+                  assignees: updatedAssignees,
+                });
                 action.applied = true;
               } else if (action.type === "status") {
-                await this.projectService.updateIssue(issue.id, { status: action.value });
+                await this.projectService.issues.updateIssue(issue.id, { status: action.value });
                 action.applied = true;
               }
             } catch (applyError) {
@@ -150,7 +152,7 @@ export class IssueTriagingService {
 
         // Mark as triaged so re-runs skip this issue
         const labelsWithTriaged = [...new Set([...issue.labels, "triaged"])];
-        await this.projectService
+        await this.projectService.issues
           .updateIssue(issue.id, { labels: labelsWithTriaged })
           .catch((err) => {
             this.logger.warn(`Could not add 'triaged' label to issue #${issue.number}`, err);
@@ -163,7 +165,7 @@ export class IssueTriagingService {
             appliedActions.length > 0
               ? `\n\n**Actions applied:**\n${appliedActions.map((a) => `- ${a.type}: ${a.value}`).join("\n")}`
               : "";
-          await this.projectService
+          await this.projectService.issues
             .createIssueComment({
               issueNumber: issue.number,
               body: `<!-- auto-triage -->\n## Auto-Triage Result\n\n**Classification:** ${triageResult.classification.category} (${triageResult.classification.priority})\n**Reasoning:** ${triageResult.reasoning}${actionSummary}`,

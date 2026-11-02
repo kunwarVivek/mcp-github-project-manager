@@ -1,3 +1,5 @@
+import type { PromptRegistry, PromptVariables } from "./PromptRegistry";
+
 /**
  * Sprint Planning AI Prompt Templates
  *
@@ -6,6 +8,9 @@
  * - Backlog prioritization
  * - Risk assessment
  * - Sprint composition suggestions
+ *
+ * Templates are registered in the PromptRegistry; the `*PromptVariables` builders
+ * compute the values that fill their {{variable}} placeholders.
  */
 
 // ============================================================================
@@ -16,7 +21,7 @@
  * System prompt for sprint capacity analysis.
  * Used by SprintCapacityAnalyzer for velocity-based capacity planning.
  */
-export const SPRINT_CAPACITY_SYSTEM_PROMPT = `You are an expert sprint planning assistant specializing in capacity analysis.
+const SPRINT_CAPACITY_SYSTEM_PROMPT = `You are an expert sprint planning assistant specializing in capacity analysis.
 
 Your role is to help teams calculate realistic sprint capacity by considering:
 - Historical velocity data and trends
@@ -35,32 +40,40 @@ Output requirements:
 - Flag uncertainty when historical data is limited
 - Suggest confidence levels based on data quality`;
 
-/**
- * User prompt template for capacity calculation.
- */
-export function formatCapacityPrompt(params: {
-  velocity: number;
-  sprintDurationDays: number;
-  teamSize: number;
-  availabilityFactor: number;
-  historicalSprintsCount: number;
-}): string {
-  return `Calculate sprint capacity for the following parameters:
+const SPRINT_CAPACITY_USER_PROMPT = `Calculate sprint capacity for the following parameters:
 
 Team Configuration:
-- Team size: ${params.teamSize} members
-- Sprint duration: ${params.sprintDurationDays} days
-- Average availability: ${Math.round(params.availabilityFactor * 100)}%
+- Team size: {{teamSize}} members
+- Sprint duration: {{sprintDurationDays}} days
+- Average availability: {{availabilityPercent}}%
 
 Velocity Data:
-- Current velocity: ${params.velocity} points/sprint
-- Historical sprints available: ${params.historicalSprintsCount}
+- Current velocity: {{velocity}} points/sprint
+- Historical sprints available: {{historicalSprintsCount}}
 
 Please provide:
 1. Recommended sprint capacity in story points
 2. Suggested buffer percentage with reasoning
 3. Confidence level in the recommendation
 4. Any flags or concerns`;
+
+/**
+ * Variables for the capacity calculation user prompt.
+ */
+export function capacityPromptVariables(params: {
+  velocity: number;
+  sprintDurationDays: number;
+  teamSize: number;
+  availabilityFactor: number;
+  historicalSprintsCount: number;
+}): PromptVariables {
+  return {
+    teamSize: String(params.teamSize),
+    sprintDurationDays: String(params.sprintDurationDays),
+    availabilityPercent: String(Math.round(params.availabilityFactor * 100)),
+    velocity: String(params.velocity),
+    historicalSprintsCount: String(params.historicalSprintsCount),
+  };
 }
 
 // ============================================================================
@@ -71,7 +84,7 @@ Please provide:
  * System prompt for backlog prioritization.
  * Used by BacklogPrioritizer for multi-factor scoring.
  */
-export const SPRINT_PRIORITIZATION_SYSTEM_PROMPT = `You are an expert product prioritization assistant.
+const SPRINT_PRIORITIZATION_SYSTEM_PROMPT = `You are an expert product prioritization assistant.
 
 Your role is to assess business value of backlog items by considering:
 - Strategic alignment with business goals
@@ -92,10 +105,22 @@ Output requirements:
 - Identify key tradeoffs between competing priorities
 - Flag items that should be grouped or split`;
 
+const SPRINT_PRIORITIZATION_USER_PROMPT = `Score the business value of each backlog item.
+{{goalsSection}}
+
+Backlog Items:
+{{itemsList}}
+
+For each item, provide:
+1. Business value score (0.0 to 1.0)
+2. Brief reasoning for the score
+
+Also identify any key tradeoffs between items.`;
+
 /**
- * User prompt template for business value scoring.
+ * Variables for the business value scoring user prompt.
  */
-export function formatPrioritizationPrompt(
+export function prioritizationPromptVariables(
   items: Array<{
     id: string;
     title: string;
@@ -104,7 +129,7 @@ export function formatPrioritizationPrompt(
     labels?: string[];
   }>,
   businessGoals: string[]
-): string {
+): PromptVariables {
   const itemsList = items
     .map(
       (item, i) =>
@@ -117,17 +142,7 @@ export function formatPrioritizationPrompt(
       ? `\nBusiness Goals:\n${businessGoals.map((g, i) => `${i + 1}. ${g}`).join("\n")}`
       : "";
 
-  return `Score the business value of each backlog item.
-${goalsSection}
-
-Backlog Items:
-${itemsList}
-
-For each item, provide:
-1. Business value score (0.0 to 1.0)
-2. Brief reasoning for the score
-
-Also identify any key tradeoffs between items.`;
+  return { goalsSection, itemsList };
 }
 
 // ============================================================================
@@ -138,7 +153,7 @@ Also identify any key tradeoffs between items.`;
  * System prompt for sprint risk assessment.
  * Used by SprintRiskAssessor for identifying and mitigating risks.
  */
-export const SPRINT_RISK_SYSTEM_PROMPT = `You are an expert sprint risk assessment assistant.
+const SPRINT_RISK_SYSTEM_PROMPT = `You are an expert sprint risk assessment assistant.
 
 Your role is to identify and assess risks in sprint planning by considering:
 - Scope risks: overcommitment, unclear requirements, scope creep
@@ -165,15 +180,32 @@ Output requirements:
 - Suggest practical mitigation actions
 - Rate overall sprint risk level`;
 
+const SPRINT_RISK_USER_PROMPT = `Assess risks for this sprint composition:
+
+Sprint Metrics:
+- Total points: {{totalPoints}}
+- Recommended capacity: {{recommendedCapacity}}
+- Utilization: {{utilizationPercent}}%
+- Items with dependencies: {{dependencyCount}}
+
+Sprint Items:
+{{itemsList}}
+
+Please identify:
+1. Key risks (scope, dependency, capacity, technical, external)
+2. Probability and impact for each risk
+3. Specific mitigation strategies
+4. Overall sprint risk level`;
+
 /**
- * User prompt template for risk assessment.
+ * Variables for the risk assessment user prompt.
  */
-export function formatRiskPrompt(params: {
+export function riskPromptVariables(params: {
   sprintItems: Array<{ id: string; title: string; points?: number; dependencies?: string[] }>;
   totalPoints: number;
   recommendedCapacity: number;
   dependencyCount: number;
-}): string {
+}): PromptVariables {
   const itemsList = params.sprintItems
     .map(
       (item, i) =>
@@ -183,22 +215,13 @@ export function formatRiskPrompt(params: {
 
   const utilizationPercent = Math.round((params.totalPoints / params.recommendedCapacity) * 100);
 
-  return `Assess risks for this sprint composition:
-
-Sprint Metrics:
-- Total points: ${params.totalPoints}
-- Recommended capacity: ${params.recommendedCapacity}
-- Utilization: ${utilizationPercent}%
-- Items with dependencies: ${params.dependencyCount}
-
-Sprint Items:
-${itemsList}
-
-Please identify:
-1. Key risks (scope, dependency, capacity, technical, external)
-2. Probability and impact for each risk
-3. Specific mitigation strategies
-4. Overall sprint risk level`;
+  return {
+    totalPoints: String(params.totalPoints),
+    recommendedCapacity: String(params.recommendedCapacity),
+    utilizationPercent: String(utilizationPercent),
+    dependencyCount: String(params.dependencyCount),
+    itemsList,
+  };
 }
 
 // ============================================================================
@@ -209,7 +232,7 @@ Please identify:
  * System prompt for sprint composition suggestions.
  * Used by SprintSuggestionService for AI-driven sprint planning.
  */
-export const SPRINT_SUGGESTION_SYSTEM_PROMPT = `You are an expert sprint planning assistant.
+const SPRINT_SUGGESTION_SYSTEM_PROMPT = `You are an expert sprint planning assistant.
 
 Your role is to suggest optimal sprint composition by balancing:
 - Business value delivery
@@ -232,15 +255,31 @@ Output requirements:
 - Provide overall sprint goal/theme
 - Identify risks and mitigations`;
 
+const SPRINT_SUGGESTION_USER_PROMPT = `Suggest optimal sprint composition:
+
+Capacity: {{capacity}} story points
+Risk tolerance: {{riskTolerance}}
+{{goalsSection}}
+
+Available Backlog Items:
+{{itemsList}}
+
+Please suggest:
+1. Items to include in the sprint (respecting capacity)
+2. Reasoning for each inclusion
+3. Key items excluded and why
+4. Overall sprint theme/goal
+5. Risks and recommended mitigations`;
+
 /**
- * User prompt template for sprint composition.
+ * Variables for the sprint composition user prompt.
  */
-export function formatSprintSuggestionPrompt(params: {
+export function sprintSuggestionPromptVariables(params: {
   availableItems: Array<{ id: string; title: string; points?: number; priority?: string }>;
   capacity: number;
   businessGoals?: string[];
   riskTolerance: "low" | "medium" | "high";
-}): string {
+}): PromptVariables {
   const itemsList = params.availableItems
     .map(
       (item, i) =>
@@ -252,38 +291,45 @@ export function formatSprintSuggestionPrompt(params: {
     ? `\nBusiness Goals:\n${params.businessGoals.map((g, i) => `${i + 1}. ${g}`).join("\n")}`
     : "";
 
-  return `Suggest optimal sprint composition:
-
-Capacity: ${params.capacity} story points
-Risk tolerance: ${params.riskTolerance}
-${goalsSection}
-
-Available Backlog Items:
-${itemsList}
-
-Please suggest:
-1. Items to include in the sprint (respecting capacity)
-2. Reasoning for each inclusion
-3. Key items excluded and why
-4. Overall sprint theme/goal
-5. Risks and recommended mitigations`;
+  return {
+    capacity: String(params.capacity),
+    riskTolerance: params.riskTolerance,
+    goalsSection,
+    itemsList,
+  };
 }
 
 // ============================================================================
-// Shared Utility Prompts
+// Registration
 // ============================================================================
 
-/**
- * Prompt fragment for requesting structured JSON output.
- */
-export const JSON_OUTPUT_INSTRUCTION = `
-IMPORTANT: Respond with valid JSON only. Do not include markdown code blocks or any other formatting.`;
+export const SPRINT_PROMPT_IDS = {
+  capacitySystem: "sprint.capacity.system",
+  capacityUser: "sprint.capacity.user",
+  prioritizationSystem: "sprint.prioritization.system",
+  prioritizationUser: "sprint.prioritization.user",
+  riskSystem: "sprint.risk.system",
+  riskUser: "sprint.risk.user",
+  suggestionSystem: "sprint.suggestion.system",
+  suggestionUser: "sprint.suggestion.user",
+} as const;
 
-/**
- * Prompt fragment for confidence scoring.
- */
-export const CONFIDENCE_INSTRUCTION = `
-Include a self-assessment of your confidence in each recommendation:
-- HIGH (0.8-1.0): Clear data, well-defined requirements
-- MEDIUM (0.5-0.7): Some uncertainty, assumptions made
-- LOW (0.0-0.4): Limited data, significant assumptions`;
+/** Register every sprint-planning prompt (version 1.0.0). */
+export function registerSprintPrompts(registry: PromptRegistry): void {
+  registry.register(SPRINT_PROMPT_IDS.capacitySystem, "1.0.0", SPRINT_CAPACITY_SYSTEM_PROMPT);
+  registry.register(SPRINT_PROMPT_IDS.capacityUser, "1.0.0", SPRINT_CAPACITY_USER_PROMPT);
+  registry.register(
+    SPRINT_PROMPT_IDS.prioritizationSystem,
+    "1.0.0",
+    SPRINT_PRIORITIZATION_SYSTEM_PROMPT
+  );
+  registry.register(
+    SPRINT_PROMPT_IDS.prioritizationUser,
+    "1.0.0",
+    SPRINT_PRIORITIZATION_USER_PROMPT
+  );
+  registry.register(SPRINT_PROMPT_IDS.riskSystem, "1.0.0", SPRINT_RISK_SYSTEM_PROMPT);
+  registry.register(SPRINT_PROMPT_IDS.riskUser, "1.0.0", SPRINT_RISK_USER_PROMPT);
+  registry.register(SPRINT_PROMPT_IDS.suggestionSystem, "1.0.0", SPRINT_SUGGESTION_SYSTEM_PROMPT);
+  registry.register(SPRINT_PROMPT_IDS.suggestionUser, "1.0.0", SPRINT_SUGGESTION_USER_PROMPT);
+}

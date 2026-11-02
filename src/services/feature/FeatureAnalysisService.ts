@@ -1,12 +1,10 @@
 import { generateObject } from "ai";
 import { z } from "zod";
-import { type PRDDocument, type TaskComplexity, TaskPriority } from "../../domain/ai-types.js";
-import { type ILogger, Logger } from "../../infrastructure/logger";
-import { AIServiceFactory } from "../ai/AIServiceFactory.js";
-import {
-  FEATURE_PROMPT_CONFIGS,
-  formatFeaturePrompt,
-} from "../ai/prompts/FeatureAdditionPrompts.js";
+import { type PRDDocument, type TaskComplexity, TaskPriority } from "../../domain/ai-types";
+import { getLogger, type ILogger } from "../../infrastructure/logger";
+import { AIServiceFactory } from "../ai/AIServiceFactory";
+import { defaultPromptRegistry } from "../ai/prompts";
+import { FEATURE_PROMPT_CONFIGS } from "../ai/prompts/FeatureAdditionPrompts";
 import { InputSanitizer } from "../utils/InputSanitizer";
 import { safeCall } from "../utils/safeCall";
 
@@ -36,11 +34,11 @@ export class FeatureAnalysisService {
    * @param aiFactory - AI service factory for model access. When omitted (DI mode),
    *   defaults to the global singleton via `AIServiceFactory.getInstance()`.
    * @param logger - Logger instance for diagnostics. When omitted, defaults to
-   *   the global singleton via `Logger.getInstance()`.
+   *   a prefixed console logger via `getLogger()`.
    */
   constructor(aiFactory?: AIServiceFactory, logger?: ILogger) {
     this.aiFactory = aiFactory ?? AIServiceFactory.getInstance();
-    this.logger = logger ?? Logger.getInstance();
+    this.logger = logger ?? getLogger("FeatureAnalysisService");
   }
 
   /**
@@ -76,7 +74,7 @@ export class FeatureAnalysisService {
         );
       }
 
-      const prompt = formatFeaturePrompt(config.userPrompt, {
+      const prompt = defaultPromptRegistry.render(config.userPromptId, {
         featureIdea: InputSanitizer.sanitizeText(params.featureIdea),
         description: InputSanitizer.sanitizeIssueContent(params.description),
         existingPRD: params.existingPRD
@@ -93,7 +91,7 @@ export class FeatureAnalysisService {
 
       const result = await generateObject({
         model,
-        system: config.systemPrompt,
+        system: defaultPromptRegistry.render(config.systemPromptId),
         prompt,
         schema: FeatureAnalysisSchema,
         maxOutputTokens: config.maxTokens,

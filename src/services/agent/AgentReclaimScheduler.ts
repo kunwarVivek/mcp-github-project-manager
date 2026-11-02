@@ -107,25 +107,24 @@ export class AgentReclaimScheduler {
 
     this.sweeping = true;
     const timeoutMs = this.config.sweepTimeoutMs ?? 60_000;
-    // Timer handle is cleared when the race settles so a winning sweep does not
-    // leak a pending timeout (important under test timers / graceful shutdown).
-    let timeout: NodeJS.Timeout | undefined;
-    try {
-      // Race the sweep against a time budget so a hung GitHub call cannot park
-      // `sweeping` forever (every later sweep would become a no-op).
-      const result = await Promise.race([
-        this.checkoutService.reclaimStaleTasks(this.config.staleAfterMinutes),
-        new Promise<{ reclaimed: number; details: Array<{ agentId: string; taskId: string }> }>(
-          (_, reject) => {
-            timeout = setTimeout(
-              () => reject(new Error(`sweep timed out after ${timeoutMs}ms`)),
-              timeoutMs
-            );
-          }
-        ),
-      ]).finally(() => {
-        if (timeout) clearTimeout(timeout);
+    // The guard is released only when the underlying sweep settles — the timeout
+    // merely bounds how long this call waits and what it logs, so a slow sweep
+    // can never be overlapped by the next interval's sweep.
+    const sweep = this.checkoutService.reclaimStaleTasks(this.config.staleAfterMinutes);
+    void sweep
+      .catch(() => undefined)
+      .then(() => {
+        this.sweeping = false;
       });
+    let timeout: NodeJS.Timeout | undefined;
+    const deadline = new Promise<never>((_, reject) => {
+      timeout = setTimeout(
+        () => reject(new Error(`sweep timed out after ${timeoutMs}ms`)),
+        timeoutMs
+      );
+    });
+    try {
+      const result = await Promise.race([sweep, deadline]);
       if (result.reclaimed > 0) {
         this.logger.info(
           `[AgentReclaim] reclaimed ${result.reclaimed} stale task(s)`,
@@ -138,7 +137,7 @@ export class AgentReclaimScheduler {
       this.logger.warn("[AgentReclaim] sweep failed (will retry next interval)", error);
       return { reclaimed: 0 };
     } finally {
-      this.sweeping = false;
+      clearTimeout(timeout);
     }
   }
 }

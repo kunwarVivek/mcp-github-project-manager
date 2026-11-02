@@ -1,13 +1,24 @@
 import { createAppAuth } from "@octokit/auth-app";
 import { Octokit } from "@octokit/rest";
-import { GitHubConfig } from "./GitHubConfig";
+import { type GitHubAuth, GitHubConfig } from "./GitHubConfig";
 import { GitHubErrorHandler } from "./GitHubErrorHandler";
-import { RateLimitManager } from "./RateLimitManager";
+import { GitHubRequestExecutor } from "./GitHubRequestExecutor";
+import type { RateLimitManager } from "./RateLimitManager";
 import type { IGitHubRepository } from "./repositories/BaseRepository";
+import { GitHubDraftIssueRepository } from "./repositories/GitHubDraftIssueRepository";
+import { GitHubFieldValueRepository } from "./repositories/GitHubFieldValueRepository";
+import { GitHubIssueCommentRepository } from "./repositories/GitHubIssueCommentRepository";
 import { GitHubIssueRepository } from "./repositories/GitHubIssueRepository";
+import { GitHubLabelRepository } from "./repositories/GitHubLabelRepository";
 import { GitHubMilestoneRepository } from "./repositories/GitHubMilestoneRepository";
+import { GitHubProjectAnalyticsRepository } from "./repositories/GitHubProjectAnalyticsRepository";
+import { GitHubProjectItemRepository } from "./repositories/GitHubProjectItemRepository";
+import { GitHubProjectLinkingRepository } from "./repositories/GitHubProjectLinkingRepository";
 import { GitHubProjectRepository } from "./repositories/GitHubProjectRepository";
+import { GitHubProjectSearchRepository } from "./repositories/GitHubProjectSearchRepository";
+import { GitHubProjectTemplateRepository } from "./repositories/GitHubProjectTemplateRepository";
 import { GitHubProjectWorkflowRepository } from "./repositories/GitHubProjectWorkflowRepository";
+import { GitHubPullRequestRepository } from "./repositories/GitHubPullRequestRepository";
 import { GitHubSprintRepository } from "./repositories/GitHubSprintRepository";
 import { GitHubStatusUpdateRepository } from "./repositories/GitHubStatusUpdateRepository";
 import { GitHubSubIssueRepository } from "./repositories/GitHubSubIssueRepository";
@@ -16,52 +27,46 @@ import type { OctokitInstance } from "./types";
 export interface RepositoryFactoryOptions {
   baseUrl?: string;
   previews?: string[];
-  /**
-   * GitHub App installation credentials. When supplied, the factory
-   * authenticates as the App installation instead of using `token` as a PAT.
-   * A PAT remains the default and documented path.
-   */
-  app?: GitHubAppCredentials;
-}
-
-/** Credentials for authenticating as a GitHub App installation. */
-export interface GitHubAppCredentials {
-  appId: string | number;
-  privateKey: string;
-  installationId: string | number;
 }
 
 export class GitHubRepositoryFactory {
   private readonly octokit: OctokitInstance;
   private readonly errorHandler: GitHubErrorHandler;
   private readonly config: GitHubConfig;
-  private readonly rateLimitManager: RateLimitManager;
+  private readonly executor: GitHubRequestExecutor;
 
-  constructor(token: string, owner: string, repo: string, options: RepositoryFactoryOptions = {}) {
-    this.config = GitHubConfig.create(owner, repo, token);
+  private constructor(
+    auth: GitHubAuth,
+    owner: string,
+    repo: string,
+    options: RepositoryFactoryOptions
+  ) {
+    this.config = new GitHubConfig(owner, repo, auth);
     this.errorHandler = new GitHubErrorHandler();
 
-    // GitHub App installation auth when configured, otherwise a PAT. This is
-    // the single Octokit construction site in the codebase, so the branch here
-    // covers every repository the factory hands out.
+    // GitHub App installation auth or a PAT, per the descriptor. This is the
+    // single Octokit construction site in the codebase, so the branch here
+    // covers every repository the factory hands out. `createAppAuth` mints the
+    // installation token on first use and refreshes it before it expires.
     const baseOptions = {
       baseUrl: options.baseUrl || "https://api.github.com",
       previews: options.previews || ["inertia-preview"],
     };
 
-    this.octokit = options.app
-      ? new Octokit({
-          ...baseOptions,
-          authStrategy: createAppAuth,
-          auth: {
-            appId: options.app.appId,
-            privateKey: options.app.privateKey,
-            installationId: options.app.installationId,
-          },
-        })
-      : new Octokit({ ...baseOptions, auth: token });
+    this.octokit =
+      auth.kind === "app"
+        ? new Octokit({
+            ...baseOptions,
+            authStrategy: createAppAuth,
+            auth: {
+              appId: auth.appId,
+              privateKey: auth.privateKey,
+              installationId: auth.installationId,
+            },
+          })
+        : new Octokit({ ...baseOptions, auth: auth.token });
 
-    this.rateLimitManager = new RateLimitManager(this.octokit as Octokit);
+    this.executor = GitHubRequestExecutor.for(this.octokit);
   }
 
   getErrorHandler(): GitHubErrorHandler {
@@ -72,7 +77,7 @@ export class GitHubRepositoryFactory {
    * Returns the rate limit manager for proactive monitoring and backoff.
    */
   getRateLimitManager(): RateLimitManager {
-    return this.rateLimitManager;
+    return this.executor.rateLimiter;
   }
 
   /**
@@ -93,15 +98,12 @@ export class GitHubRepositoryFactory {
    * Execute a GraphQL query directly
    */
   public async graphql<T>(query: string, variables: Record<string, unknown> = {}): Promise<T> {
-    try {
-      return await this.octokit.graphql<T>(query, {
-        ...variables,
-        owner: this.config.owner,
-        repo: this.config.repo,
-      });
-    } catch (error) {
-      throw this.errorHandler.handleError(error, "GraphQL operation");
-    }
+    return this.executor.graphql<T>(
+      this.octokit,
+      query,
+      { owner: this.config.owner, repo: this.config.repo, ...variables },
+      "executing GraphQL operation"
+    );
   }
 
   /**
@@ -160,6 +162,56 @@ export class GitHubRepositoryFactory {
     return new GitHubStatusUpdateRepository(this.octokit, this.config);
   }
 
+  /** Creates an instance of a Pull Request Repository */
+  createPullRequestRepository(): GitHubPullRequestRepository {
+    return new GitHubPullRequestRepository(this.octokit, this.config);
+  }
+
+  /** Creates an instance of a Label Repository */
+  createLabelRepository(): GitHubLabelRepository {
+    return new GitHubLabelRepository(this.octokit, this.config);
+  }
+
+  /** Creates an instance of an Issue Comment Repository */
+  createIssueCommentRepository(): GitHubIssueCommentRepository {
+    return new GitHubIssueCommentRepository(this.octokit, this.config);
+  }
+
+  /** Creates an instance of a Projects v2 Draft Issue Repository */
+  createDraftIssueRepository(): GitHubDraftIssueRepository {
+    return new GitHubDraftIssueRepository(this.octokit, this.config);
+  }
+
+  /** Creates an instance of a Projects v2 Field Value Repository */
+  createFieldValueRepository(): GitHubFieldValueRepository {
+    return new GitHubFieldValueRepository(this.octokit, this.config);
+  }
+
+  /** Creates an instance of a Project Item Repository (draft conversion, item position) */
+  createProjectItemRepository(): GitHubProjectItemRepository {
+    return new GitHubProjectItemRepository(this.octokit, this.config);
+  }
+
+  /** Creates an instance of a Project Search Repository (issue search, project item listing) */
+  createProjectSearchRepository(): GitHubProjectSearchRepository {
+    return new GitHubProjectSearchRepository(this.octokit, this.config);
+  }
+
+  /** Creates an instance of a Project Template Repository (README, templates) */
+  createProjectTemplateRepository(): GitHubProjectTemplateRepository {
+    return new GitHubProjectTemplateRepository(this.octokit, this.config);
+  }
+
+  /** Creates an instance of a Project Linking Repository (items, repository/team links) */
+  createProjectLinkingRepository(): GitHubProjectLinkingRepository {
+    return new GitHubProjectLinkingRepository(this.octokit, this.config);
+  }
+
+  /** Creates an instance of a Project Analytics Repository (paginated item read for metrics) */
+  createProjectAnalyticsRepository(): GitHubProjectAnalyticsRepository {
+    return new GitHubProjectAnalyticsRepository(this.octokit, this.config);
+  }
+
   /**
    * Creates an instance of any GitHub repository implementation
    * @param RepositoryClass The repository class to instantiate
@@ -171,25 +223,15 @@ export class GitHubRepositoryFactory {
   }
 
   /**
-   * Creates a new factory instance from environment variables
+   * Create the factory for the given credentials. This is the only way to
+   * construct one; resolve credentials with `resolveGitHubAuth()`.
    */
-  static create(
-    env: {
-      GITHUB_TOKEN: string;
-      GITHUB_OWNER: string;
-      GITHUB_REPO: string;
-    },
-    options?: RepositoryFactoryOptions
+  static fromAuth(
+    auth: GitHubAuth,
+    owner: string,
+    repo: string,
+    options: RepositoryFactoryOptions = {}
   ): GitHubRepositoryFactory {
-    if (!env.GITHUB_TOKEN || !env.GITHUB_OWNER || !env.GITHUB_REPO) {
-      throw new Error("Missing required GitHub configuration");
-    }
-
-    return new GitHubRepositoryFactory(
-      env.GITHUB_TOKEN,
-      env.GITHUB_OWNER,
-      env.GITHUB_REPO,
-      options
-    );
+    return new GitHubRepositoryFactory(auth, owner, repo, options);
   }
 }
