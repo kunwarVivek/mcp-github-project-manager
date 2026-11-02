@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+No unreleased changes.
+
+## [4.0.0] - 2026-11-02
+
 ### Added
 - **`analytics` tool** (read-only, 5 actions: `sprint_velocity`, `sprint_burndown`, `cycle_time`, `throughput`, `project_summary`) backed by `AnalyticsService` — the surface is now 21 tools / 175 actions.
 - **`idempotencyKey` on create actions** (`manage_issues` `create`/`add_sub_issue`/`create_draft`/`create_comment`, `manage_milestones` `create`, `manage_project` `create_field`, `manage_sprints` `create`): a repeat with the same key and arguments within 24 h replays the first result (`replayed: true`); the same key with different arguments is refused. A result that aged out of memory is recovered from the audit log.

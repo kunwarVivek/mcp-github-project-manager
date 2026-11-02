@@ -1,6 +1,6 @@
 {
   "name": "mcp-github-project-manager",
-  "version": "3.0.0",
+  "version": "4.0.0",
   "description": "MCP server for AI-powered GitHub project management — 21 tools (175 actions), agent swarm orchestration, GitHub Actions/Releases/Branches, MCP Resources & Prompts, PRD-to-issues pipeline",
   "type": "module",
   "exports": "./build/index.js",
