@@ -98,3 +98,6 @@ bun.lockb
 # NOTE: package-lock.json AND pnpm-lock.yaml are both committed on purpose.
 # The project supports npm and pnpm, and CI builds under both - do not
 # ignore either lockfile.
+
+# Beads / Dolt files (added by bd init)
+*.gate.lock*
