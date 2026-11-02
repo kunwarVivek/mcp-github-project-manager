@@ -38,7 +38,7 @@ jobs:
             *) echo "::error::run this workflow on a v* tag, not $GITHUB_REF"; exit 1 ;;
           esac
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
