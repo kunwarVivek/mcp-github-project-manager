@@ -34,6 +34,8 @@ services:
     volumes:
       # Persistent cache directory
       - mcp-cache:/app/cache
+      # OAuth token store (`docker compose run --rm mcp-server auth login`)
+      - mcp-data:/data
     # stdio transport — MCP clients connect via docker attach or exec
     stdin_open: true
     tty: false
@@ -46,4 +48,6 @@ services:
 
 volumes:
   mcp-cache:
+    driver: local
+  mcp-data:
     driver: local

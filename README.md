@@ -69,7 +69,13 @@ claude mcp add github-project-manager -- npx -y mcp-github-project-manager
 
 # Docker
 docker compose up --build
+
+# Docker + OAuth sign-in (token persists in the gpm-data volume at /data)
+docker run -it --rm -v gpm-data:/data -e GITHUB_OAUTH_CLIENT_ID=<id> mcp-github-project-manager auth login
+docker run -i --rm -v gpm-data:/data -e GITHUB_OAUTH_CLIENT_ID=<id> mcp-github-project-manager
 ```
+
+Bind-mounting a host directory at `/data` requires it to be owned by uid `10001` (the container user). For headless/CI use a GitHub App or PAT instead — see the [Deployment Guide](docs/deployment.md#docker).
 
 Install paths: `npm install -g mcp-github-project-manager`, `npx -y mcp-github-project-manager`, `pnpm dlx mcp-github-project-manager`, or `docker compose up --build`.
 

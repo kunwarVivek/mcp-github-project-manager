@@ -24,7 +24,17 @@ FROM node:24-slim
 WORKDIR /app
 
 # Run as non-root
-RUN groupadd -r mcpuser && useradd -r -g mcpuser -d /app mcpuser
+# The uid/gid are pinned so bind-mounted host directories can be chowned to a
+# known id (see docs/deployment.md#docker).
+RUN groupadd -r -g 10001 mcpuser && useradd -r -u 10001 -g mcpuser -d /app mcpuser
+
+# Persistent OAuth token store (`auth login`). A named volume mounted here
+# inherits this ownership/mode on first use; bind mounts do not.
+RUN mkdir /data && chown mcpuser:mcpuser /data && chmod 0700 /data
+# A file path, not a secret.
+# hadolint ignore=DL3064
+ENV GITHUB_OAUTH_TOKEN_FILE=/data/github-oauth.json
+VOLUME /data
 
 # Production dependencies only
 COPY package.json package-lock.json ./

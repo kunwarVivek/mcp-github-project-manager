@@ -56,18 +56,30 @@ the container (`docker run ... mcp-github-project-manager auth status`).
 
 **Credentials in containers / Kubernetes**
 
-- *Interactive:* run `auth login` once with a persistent, `mcpuser`-writable
-  location for the token store (`GITHUB_OAUTH_TOKEN_FILE`), then start the
-  server with the same mount:
+- *Interactive:* the image declares `VOLUME /data` and defaults
+  `GITHUB_OAUTH_TOKEN_FILE=/data/github-oauth.json`, so the token store is
+  persistent as soon as you mount a volume there. Log in once, then run the
+  server with the same volume (tokens refresh in place):
   ```bash
-  docker run -it --rm \
+  docker run -it --rm -v gpm-data:/data \
     -e GITHUB_OAUTH_CLIENT_ID=<client id> \
-    -e GITHUB_OAUTH_TOKEN_FILE=/data/github-oauth.json \
-    -v /path/writable-by-mcpuser:/data \
     mcp-github-project-manager auth login
+
+  docker run -i --rm -v gpm-data:/data \
+    -e GITHUB_OAUTH_CLIENT_ID=<client id> \
+    -e GITHUB_OWNER=your_org -e GITHUB_REPO=your_repo \
+    mcp-github-project-manager
   ```
   The verification URL and code are printed to stderr; open the URL on any
-  device.
+  device. `auth status` shows the store path and login state. Without a mounted
+  volume the token lives in an anonymous volume and is lost with the container.
+  With Docker Compose, use `docker compose run --rm mcp-server auth login`;
+  the `mcp-data` volume is mounted at `/data`.
+- *Bind mounts:* `/data` is owned by `mcpuser` (uid/gid `10001`, mode `0700`).
+  Named volumes inherit that on first use; **bind mounts do not**. If you use
+  `-v /host/dir:/data`, the host directory must be writable by uid `10001`
+  (`sudo chown 10001:10001 /host/dir && chmod 0700 /host/dir`). The token file
+  itself is created `0600`.
 - *Mounted token file:* mount a pre-authorised store and point
   `GITHUB_OAUTH_TOKEN_FILE` at it. The file MUST be mode `0600` — a store
   readable by group/other is ignored.
