@@ -300,6 +300,30 @@ export const WEBHOOK_ALLOWED_ORIGINS = getOptionalConfigValue("WEBHOOK_ALLOWED_O
 export const WEBHOOK_RATE_LIMIT = getNumericConfigValue("WEBHOOK_RATE_LIMIT", 100);
 export const WEBHOOK_RATE_WINDOW_MS = getNumericConfigValue("WEBHOOK_RATE_WINDOW_MS", 60000);
 
+// --- Inbound HTTP authentication (/events/*) -------------------------------
+// The events surface fails closed: with neither EVENTS_AUTH_TOKEN nor an OAuth
+// issuer configured, every /events/* request is rejected with 401 unless
+// EVENTS_ALLOW_UNAUTHENTICATED=true (trusted local/dev only; logs a warning).
+// POST /webhooks/github is unaffected: it is authenticated by its HMAC signature.
+//   EVENTS_AUTH_TOKEN      static shared bearer token (compared in constant time)
+//   OAUTH_ISSUER           authorization server issuer; enables OAuth 2.1 resource-server mode
+//   OAUTH_AUDIENCE         resource identifier tokens must be minted for (required with OAUTH_ISSUER)
+//   OAUTH_JWKS_URI         optional JWKS endpoint; discovered from the issuer when unset
+//   OAUTH_REQUIRED_SCOPES  space-separated scopes every token must carry
+//   OAUTH_RESOURCE_URL     public URL of this server, published as RFC 9728 `resource`
+//                          (defaults to OAUTH_AUDIENCE when that is a URL)
+export const EVENTS_AUTH_TOKEN = getOptionalConfigValue("EVENTS_AUTH_TOKEN", "");
+export const EVENTS_ALLOW_UNAUTHENTICATED = getBooleanConfigValue(
+  "EVENTS_ALLOW_UNAUTHENTICATED",
+  false
+);
+export const OAUTH_ISSUER = getOptionalConfigValue("OAUTH_ISSUER", "");
+export const OAUTH_AUDIENCE = getOptionalConfigValue("OAUTH_AUDIENCE", "");
+export const OAUTH_JWKS_URI = getOptionalConfigValue("OAUTH_JWKS_URI", "");
+export const OAUTH_REQUIRED_SCOPES = getOptionalConfigValue("OAUTH_REQUIRED_SCOPES", "");
+export const OAUTH_RESOURCE_URL = getOptionalConfigValue("OAUTH_RESOURCE_URL", "");
+// --- end inbound HTTP authentication ----------------------------------------
+
 // AI Provider configuration
 export const ANTHROPIC_API_KEY = getOptionalConfigValue("ANTHROPIC_API_KEY", "");
 export const OPENAI_API_KEY = getOptionalConfigValue("OPENAI_API_KEY", "");

@@ -41,8 +41,15 @@ import {
   AGENT_STALE_AFTER_MINUTES,
   CACHE_DIRECTORY,
   CLI_OPTIONS,
+  EVENTS_ALLOW_UNAUTHENTICATED,
+  EVENTS_AUTH_TOKEN,
   GITHUB_OWNER,
   GITHUB_REPO,
+  OAUTH_AUDIENCE,
+  OAUTH_ISSUER,
+  OAUTH_JWKS_URI,
+  OAUTH_REQUIRED_SCOPES,
+  OAUTH_RESOURCE_URL,
   SSE_ENABLED,
   SYNC_ENABLED,
   SYNC_TIMEOUT_MS,
@@ -58,6 +65,7 @@ import {
 } from "./infrastructure/events/GitHubWebhookHandler";
 import { GitHubAuthUnavailableError } from "./infrastructure/github/auth/GitHubAuth";
 import { resolveGitHubAuth } from "./infrastructure/github/auth/resolveGitHubAuth";
+import { createInboundAuthenticator } from "./infrastructure/http/auth/createInboundAuthenticator";
 import { WebhookServer } from "./infrastructure/http/WebhookServer";
 import { GracefulShutdown } from "./infrastructure/lifecycle/GracefulShutdown";
 import { type ILogger, logger } from "./infrastructure/logger/index";
@@ -570,6 +578,25 @@ class GitHubProjectManagerServer {
       return;
     }
 
+    // Built outside the try/catch below on purpose: an invalid auth config must
+    // abort startup, not degrade to "continuing without webhook server".
+    const inboundAuth = createInboundAuthenticator(
+      {
+        sharedToken: EVENTS_AUTH_TOKEN || undefined,
+        allowUnauthenticated: EVENTS_ALLOW_UNAUTHENTICATED,
+        oauth: OAUTH_ISSUER
+          ? {
+              issuer: OAUTH_ISSUER,
+              audience: OAUTH_AUDIENCE,
+              jwksUri: OAUTH_JWKS_URI || undefined,
+              requiredScopes: OAUTH_REQUIRED_SCOPES.split(/\s+/).filter(Boolean),
+              resourceUrl: OAUTH_RESOURCE_URL || undefined,
+            }
+          : undefined,
+      },
+      this.logger
+    );
+
     try {
       this.webhookServer = new WebhookServer(
         this.webhookHandler,
@@ -578,7 +605,10 @@ class GitHubProjectManagerServer {
         {
           port: WEBHOOK_PORT,
           enableSSE: SSE_ENABLED,
-        }
+        },
+        this.logger,
+        undefined,
+        inboundAuth
       );
 
       await this.webhookServer.start();
