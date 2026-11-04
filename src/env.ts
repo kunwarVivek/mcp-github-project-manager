@@ -330,6 +330,18 @@ export const OPENAI_API_KEY = getOptionalConfigValue("OPENAI_API_KEY", "");
 export const GOOGLE_API_KEY = getOptionalConfigValue("GOOGLE_API_KEY", "");
 export const PERPLEXITY_API_KEY = getOptionalConfigValue("PERPLEXITY_API_KEY", "");
 
+// Google Vertex AI (Gemini via Application Default Credentials).
+// No key material lives in our config: the SDK discovers credentials through
+// google-auth-library ADC (GOOGLE_APPLICATION_CREDENTIALS file, gcloud user
+// ADC, or the metadata server / workload identity). Read at call time so the
+// project can be set or rotated without re-importing this module.
+export const DEFAULT_GOOGLE_VERTEX_LOCATION = "us-central1";
+export const getGoogleVertexProject = (): string =>
+  getOptionalConfigValue("GOOGLE_VERTEX_PROJECT", "").trim();
+export const getGoogleVertexLocation = (): string =>
+  getOptionalConfigValue("GOOGLE_VERTEX_LOCATION", DEFAULT_GOOGLE_VERTEX_LOCATION).trim() ||
+  DEFAULT_GOOGLE_VERTEX_LOCATION;
+
 // AI Model configuration
 export const AI_MAIN_MODEL = getOptionalConfigValue("AI_MAIN_MODEL", "");
 export const AI_RESEARCH_MODEL = getOptionalConfigValue("AI_RESEARCH_MODEL", "");

@@ -119,6 +119,10 @@ ${errorMessage}
    # Google Gemini (Alternative)
    export GOOGLE_API_KEY="your_google_api_key_here"
 
+   # Google Gemini via Vertex AI (Application Default Credentials, no API key)
+   export GOOGLE_VERTEX_PROJECT="your_gcp_project_id"
+   export GOOGLE_VERTEX_LOCATION="us-central1"
+
    # Perplexity (For research)
    export PERPLEXITY_API_KEY="your_perplexity_api_key_here"
    \`\`\`

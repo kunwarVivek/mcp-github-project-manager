@@ -225,6 +225,7 @@ class GitHubProjectManagerServer {
         this.logger.info("   - ANTHROPIC_API_KEY (recommended)");
         this.logger.info("   - OPENAI_API_KEY");
         this.logger.info("   - GOOGLE_API_KEY");
+        this.logger.info("   - GOOGLE_VERTEX_PROJECT (Gemini via Vertex AI + Google ADC)");
         this.logger.info("   - PERPLEXITY_API_KEY");
         this.logger.info("🚀 Non-AI GitHub project management features remain fully functional");
       }

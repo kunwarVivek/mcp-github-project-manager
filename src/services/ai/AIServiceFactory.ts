@@ -1,5 +1,6 @@
 import { createAnthropic } from "@ai-sdk/anthropic";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
+import { createVertex } from "@ai-sdk/google-vertex";
 import { createOpenAI } from "@ai-sdk/openai";
 import { createPerplexity } from "@ai-sdk/perplexity";
 import { type LanguageModel, type LanguageModelMiddleware, wrapLanguageModel } from "ai";
@@ -10,6 +11,8 @@ import {
   AI_RESEARCH_MODEL,
   ANTHROPIC_API_KEY,
   GOOGLE_API_KEY,
+  getGoogleVertexLocation,
+  getGoogleVertexProject,
   getOptionalConfigValue,
   OPENAI_API_KEY,
   PERPLEXITY_API_KEY,
@@ -73,7 +76,13 @@ export const usageMeteringMiddleware: LanguageModelMiddleware = {
 /**
  * AI Provider Types
  */
-export type AIProvider = "anthropic" | "openai" | "google" | "perplexity" | "openai-compatible";
+export type AIProvider =
+  | "anthropic"
+  | "openai"
+  | "google"
+  | "google-vertex"
+  | "perplexity"
+  | "openai-compatible";
 
 /** The four model roles the server configures independently. */
 export type AIModelRole = "main" | "research" | "fallback" | "prd";
@@ -82,6 +91,7 @@ export const SUPPORTED_PROVIDERS: readonly AIProvider[] = [
   "anthropic",
   "openai",
   "google",
+  "google-vertex",
   "perplexity",
   "openai-compatible",
 ] as const;
@@ -93,18 +103,36 @@ const PROVIDER_API_KEYS: Record<AIProvider, () => string> = {
   anthropic: () => ANTHROPIC_API_KEY,
   openai: () => OPENAI_API_KEY,
   google: () => GOOGLE_API_KEY,
+  // Vertex authenticates with Application Default Credentials, not a key —
+  // never invoked (see usesApiKey).
+  "google-vertex": () => "",
   perplexity: () => PERPLEXITY_API_KEY,
   // No single global key for generic OpenAI-compatible endpoints — always
   // resolved per-role (AI_<ROLE>_API_KEY); this entry is never invoked.
   "openai-compatible": () => "",
 };
 
+/** Providers that authenticate without an API key (Application Default Credentials). */
+const usesApiKey = (provider: AIProvider): boolean =>
+  provider !== "openai-compatible" && provider !== "google-vertex";
+
+/**
+ * Which backend serves a `gemini-*` model when no provider is set explicitly:
+ * Vertex AI when `GOOGLE_VERTEX_PROJECT` is configured, otherwise the
+ * `google` API-key provider. Vertex wins when both are configured because ADC
+ * credentials are the stronger identity (no long-lived key to leak).
+ */
+const geminiProvider = (): AIProvider => (getGoogleVertexProject() ? "google-vertex" : "google");
+
 /** Model-name prefixes used only as a fallback hint when no provider is set. */
-const PROVIDER_HINTS: ReadonlyArray<[AIProvider, (m: string) => boolean]> = [
-  ["anthropic", (m) => m.startsWith("claude-")],
-  ["openai", (m) => m.startsWith("gpt-") || m.startsWith("o1") || m.startsWith("o3")],
-  ["google", (m) => m.startsWith("gemini-")],
-  ["perplexity", (m) => m.includes("perplexity") || m.includes("sonar") || m.includes("llama")],
+const PROVIDER_HINTS: ReadonlyArray<[() => AIProvider, (m: string) => boolean]> = [
+  [() => "anthropic", (m) => m.startsWith("claude-")],
+  [() => "openai", (m) => m.startsWith("gpt-") || m.startsWith("o1") || m.startsWith("o3")],
+  [geminiProvider, (m) => m.startsWith("gemini-")],
+  [
+    () => "perplexity",
+    (m) => m.includes("perplexity") || m.includes("sonar") || m.includes("llama"),
+  ],
 ];
 
 /** Per-role configuration accessors — read at call time so tests and rotation work. */
@@ -160,7 +188,7 @@ export function resolveProvider(modelString: string, role?: AIModelRole): AIProv
   // 2. Legacy: AI_<ROLE>_PROVIDER via getOptionalConfigValue (already checked above)
   // 3. Model-name prefix detection
   if (!modelString) return undefined;
-  return PROVIDER_HINTS.find(([, matches]) => matches(modelString))?.[0];
+  return PROVIDER_HINTS.find(([, matches]) => matches(modelString))?.[0]();
 }
 
 /**
@@ -249,8 +277,23 @@ export class AIServiceFactory {
       const url = roleConfig.baseURL();
       if (url) baseURL = url;
     }
+    // Vertex is keyless: it needs a project, and credentials come from ADC at
+    // request time (never at construction, so no network I/O here).
+    if (provider === "google-vertex") {
+      if (!getGoogleVertexProject()) {
+        this.logger.warn(
+          `AI Provider Warning: provider google-vertex (role: ${role ?? "unknown"}) requires ` +
+            "GOOGLE_VERTEX_PROJECT. Set it (optionally GOOGLE_VERTEX_LOCATION) and provide " +
+            "Application Default Credentials (GOOGLE_APPLICATION_CREDENTIALS, " +
+            "`gcloud auth application-default login`, or workload identity)."
+        );
+        return null;
+      }
+      return { provider, model: modelString, apiKey: "", baseURL };
+    }
+
     // Fall back to global provider key
-    if (!apiKey && provider !== "openai-compatible") {
+    if (!apiKey && usesApiKey(provider)) {
       apiKey = PROVIDER_API_KEYS[provider]();
     }
 
@@ -278,7 +321,9 @@ export class AIServiceFactory {
     const config = this.config[type];
 
     if (!config) {
-      this.logger.warn(`AI Model Warning: ${type} model is not available due to missing API key.`);
+      this.logger.warn(
+        `AI Model Warning: ${type} model is not available (no model, unknown provider, or missing provider credentials).`
+      );
       return null;
     }
 
@@ -307,6 +352,18 @@ export class AIServiceFactory {
         return meter(
           createGoogleGenerativeAI({
             apiKey: config.apiKey,
+            ...(config.baseURL && { baseURL: config.baseURL }),
+          })(config.model)
+        );
+
+      case "google-vertex":
+        // Credentials come from google-auth-library ADC at request time.
+        // Project/location are passed explicitly so the SDK's own
+        // GOOGLE_VERTEX_* env fallbacks cannot disagree with our config.
+        return meter(
+          createVertex({
+            project: getGoogleVertexProject(),
+            location: getGoogleVertexLocation(),
             ...(config.baseURL && { baseURL: config.baseURL }),
           })(config.model)
         );
@@ -450,6 +507,12 @@ export class AIServiceFactory {
       missing.push("GOOGLE_API_KEY");
     } else {
       available.push("google");
+    }
+
+    if (!getGoogleVertexProject()) {
+      missing.push("GOOGLE_VERTEX_PROJECT");
+    } else {
+      available.push("google-vertex");
     }
 
     if (!PERPLEXITY_API_KEY) {
@@ -597,6 +660,7 @@ export class AIServiceFactory {
       anthropic: false,
       openai: false,
       google: false,
+      "google-vertex": false,
       perplexity: false,
       "openai-compatible": false,
     };

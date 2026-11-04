@@ -22,11 +22,12 @@ describe("resolveProvider", () => {
     expect(resolveProvider("typo-cluade-opus")).toBeUndefined();
   });
 
-  it("exposes the five supported providers", () => {
+  it("exposes the six supported providers", () => {
     expect([...SUPPORTED_PROVIDERS]).toEqual([
       "anthropic",
       "openai",
       "google",
+      "google-vertex",
       "perplexity",
       "openai-compatible",
     ]);
