@@ -354,7 +354,7 @@ export const listOrganizationTemplatesTool: ToolDefinition<
  *
  * @param args - Validated input arguments
  * @returns The marked template project
- * @throws Error if GITHUB_TOKEN is not set or API call fails
+ * @throws Error if no GitHub credential is available or the API call fails
  */
 export async function executeMarkProjectAsTemplate(args: MarkProjectAsTemplateInput): Promise<{
   content: Array<{ type: "text"; text: string }>;
@@ -398,7 +398,7 @@ export async function executeMarkProjectAsTemplate(args: MarkProjectAsTemplateIn
  *
  * @param args - Validated input arguments
  * @returns The unmarked project
- * @throws Error if GITHUB_TOKEN is not set or API call fails
+ * @throws Error if no GitHub credential is available or the API call fails
  */
 export async function executeUnmarkProjectAsTemplate(args: UnmarkProjectAsTemplateInput): Promise<{
   content: Array<{ type: "text"; text: string }>;
@@ -442,7 +442,7 @@ export async function executeUnmarkProjectAsTemplate(args: UnmarkProjectAsTempla
  *
  * @param args - Validated input arguments
  * @returns The newly created project
- * @throws Error if GITHUB_TOKEN is not set or API call fails
+ * @throws Error if no GitHub credential is available or the API call fails
  */
 export async function executeCopyProjectFromTemplate(args: CopyProjectFromTemplateInput): Promise<{
   content: Array<{ type: "text"; text: string }>;
@@ -491,7 +491,7 @@ export async function executeCopyProjectFromTemplate(args: CopyProjectFromTempla
  *
  * @param args - Validated input arguments
  * @returns Paginated list of template projects
- * @throws Error if GITHUB_TOKEN is not set or API call fails
+ * @throws Error if no GitHub credential is available or the API call fails
  */
 export async function executeListOrganizationTemplates(
   args: ListOrganizationTemplatesInput

@@ -6,6 +6,8 @@ import {
   createDefaultSecretResolver,
   EnvSecretProvider,
   FileSecretProvider,
+  isGhCliFallbackAllowed,
+  resolveSecretWithSource,
   SecretResolver,
 } from "../../../../infrastructure/secrets/SecretProvider";
 
@@ -102,6 +104,57 @@ describe("SecretProvider", () => {
       } finally {
         rmSync(dir, { recursive: true, force: true });
       }
+    });
+  });
+
+  describe("resolveSecretWithSource", () => {
+    it("reports the secrets-dir tier when a mounted file answers", () => {
+      const dir = mkdtempSync(join(tmpdir(), "secrets-"));
+      try {
+        writeFileSync(join(dir, "FOO"), "file-value\n");
+        expect(
+          resolveSecretWithSource("FOO", {
+            SECRETS_DIR: dir,
+            FOO: "env-value",
+          } as NodeJS.ProcessEnv)
+        ).toEqual({ value: "file-value", source: "secrets-dir" });
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
+    });
+
+    it("falls to the env tier when the mounted file is absent", () => {
+      const dir = mkdtempSync(join(tmpdir(), "secrets-"));
+      try {
+        expect(
+          resolveSecretWithSource("FOO", {
+            SECRETS_DIR: dir,
+            FOO: "env-value",
+          } as NodeJS.ProcessEnv)
+        ).toEqual({ value: "env-value", source: "env" });
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
+    });
+
+    it("treats an empty value as absent and returns undefined when nothing answers", () => {
+      expect(resolveSecretWithSource("FOO", { FOO: "" } as NodeJS.ProcessEnv)).toBeUndefined();
+    });
+  });
+
+  describe("isGhCliFallbackAllowed", () => {
+    it("is on by default", () => {
+      expect(isGhCliFallbackAllowed({} as NodeJS.ProcessEnv)).toBe(true);
+    });
+
+    it.each(["false", "FALSE"])("is off when GH_CLI_TOKEN_FALLBACK=%s", (value) => {
+      expect(isGhCliFallbackAllowed({ GH_CLI_TOKEN_FALLBACK: value } as NodeJS.ProcessEnv)).toBe(
+        false
+      );
+    });
+
+    it("is always off under NODE_ENV=test", () => {
+      expect(isGhCliFallbackAllowed({ NODE_ENV: "test" } as NodeJS.ProcessEnv)).toBe(false);
     });
   });
 });

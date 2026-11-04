@@ -36,10 +36,6 @@ export abstract class BaseGitHubRepository implements IGitHubRepository {
     return this.config.repo;
   }
 
-  protected get token(): string {
-    return this.config.token;
-  }
-
   /**
    * Execute operation with automatic retries and rate limit handling
    */

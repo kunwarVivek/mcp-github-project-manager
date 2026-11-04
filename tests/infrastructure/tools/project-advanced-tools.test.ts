@@ -13,6 +13,8 @@ import { type Mock, type MockedClass, vi } from "vitest";
  */
 
 import { partialFake } from "../../../src/__tests__/helpers/aiFakes.js";
+import { GitHubAuthUnavailableError } from "../../../src/infrastructure/github/auth/GitHubAuth.js";
+import { resolveGitHubAuth } from "../../../src/infrastructure/github/auth/resolveGitHubAuth.js";
 import { GitHubRepositoryFactory } from "../../../src/infrastructure/github/GitHubRepositoryFactory.js";
 import {
   executeFilterProjectItems,
@@ -29,6 +31,16 @@ import {
 } from "../../../src/infrastructure/tools/schemas/project-lifecycle-schemas.js";
 
 // Mock the repository factory
+// Wrap the real resolver so tests can simulate "no credential available"; by
+// default it behaves exactly like the real (hermetic under NODE_ENV=test) one.
+vi.mock("../../../src/infrastructure/github/auth/resolveGitHubAuth.js", async (importOriginal) => {
+  const actual =
+    await importOriginal<
+      typeof import("../../../src/infrastructure/github/auth/resolveGitHubAuth.js")
+    >();
+  return { ...actual, resolveGitHubAuth: vi.fn(actual.resolveGitHubAuth) };
+});
+
 vi.mock("../../../src/infrastructure/github/GitHubRepositoryFactory.js", () => {
   return {
     GitHubRepositoryFactory: vi.fn().mockImplementation(function () {
@@ -415,7 +427,6 @@ describe("Project Advanced Tools", () => {
 
     beforeEach(() => {
       vi.resetAllMocks();
-      vi.stubEnv("GITHUB_TOKEN", "test-token");
 
       mockGraphql = vi.fn();
 
@@ -425,10 +436,6 @@ describe("Project Advanced Tools", () => {
           getConfig: vi.fn().mockReturnValue({ owner: "placeholder", repo: "placeholder" }),
         });
       });
-    });
-
-    afterEach(() => {
-      vi.unstubAllEnvs();
     });
 
     describe("executeUpdateItemPosition", () => {
@@ -520,15 +527,19 @@ describe("Project Advanced Tools", () => {
         });
       });
 
-      it("throws error when GITHUB_TOKEN is missing", async () => {
-        vi.stubEnv("GITHUB_TOKEN", undefined);
+      it("throws error when no GitHub credential is available", async () => {
+        vi.mocked(resolveGitHubAuth).mockImplementation(() => {
+          throw new GitHubAuthUnavailableError();
+        });
 
         const input = UpdateItemPositionInputSchema.parse({
           projectId: "PVT_kwDOTest123",
           itemId: "PVTI_lADOTest456",
         });
 
-        await expect(executeUpdateItemPosition(input)).rejects.toThrow(/No GitHub token available/);
+        await expect(executeUpdateItemPosition(input)).rejects.toThrow(
+          /No GitHub credential available/
+        );
       });
 
       it("propagates GraphQL errors", async () => {
@@ -693,15 +704,17 @@ describe("Project Advanced Tools", () => {
         expect(result.content[0].text).toContain("Found 0 issue(s)");
       });
 
-      it("throws error when GITHUB_TOKEN is missing", async () => {
-        vi.stubEnv("GITHUB_TOKEN", undefined);
+      it("throws error when no GitHub credential is available", async () => {
+        vi.mocked(resolveGitHubAuth).mockImplementation(() => {
+          throw new GitHubAuthUnavailableError();
+        });
 
         const input = SearchIssuesAdvancedInputSchema.parse({
           query: "is:issue",
         });
 
         await expect(executeSearchIssuesAdvanced(input)).rejects.toThrow(
-          /No GitHub token available/
+          /No GitHub credential available/
         );
       });
     });
@@ -1089,15 +1102,19 @@ describe("Project Advanced Tools", () => {
         );
       });
 
-      it("throws error when GITHUB_TOKEN is missing", async () => {
-        vi.stubEnv("GITHUB_TOKEN", undefined);
+      it("throws error when no GitHub credential is available", async () => {
+        vi.mocked(resolveGitHubAuth).mockImplementation(() => {
+          throw new GitHubAuthUnavailableError();
+        });
 
         const input = FilterProjectItemsInputSchema.parse({
           projectId: "PVT_kwDOTest123",
           filter: {},
         });
 
-        await expect(executeFilterProjectItems(input)).rejects.toThrow(/No GitHub token available/);
+        await expect(executeFilterProjectItems(input)).rejects.toThrow(
+          /No GitHub credential available/
+        );
       });
 
       it("handles items with null content correctly", async () => {

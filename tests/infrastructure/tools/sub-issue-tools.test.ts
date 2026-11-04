@@ -10,6 +10,8 @@ import { type Mock, type MockedClass, vi } from "vitest";
  */
 
 import { partialFake } from "../../../src/__tests__/helpers/aiFakes.js";
+import { GitHubAuthUnavailableError } from "../../../src/infrastructure/github/auth/GitHubAuth.js";
+import { resolveGitHubAuth } from "../../../src/infrastructure/github/auth/resolveGitHubAuth.js";
 import { GitHubRepositoryFactory } from "../../../src/infrastructure/github/GitHubRepositoryFactory.js";
 import {
   AddSubIssueInputSchema,
@@ -32,6 +34,16 @@ import {
 } from "../../../src/infrastructure/tools/sub-issue-tools.js";
 
 // Mock the repository factory
+// Wrap the real resolver so tests can simulate "no credential available"; by
+// default it behaves exactly like the real (hermetic under NODE_ENV=test) one.
+vi.mock("../../../src/infrastructure/github/auth/resolveGitHubAuth.js", async (importOriginal) => {
+  const actual =
+    await importOriginal<
+      typeof import("../../../src/infrastructure/github/auth/resolveGitHubAuth.js")
+    >();
+  return { ...actual, resolveGitHubAuth: vi.fn(actual.resolveGitHubAuth) };
+});
+
 vi.mock("../../../src/infrastructure/github/GitHubRepositoryFactory.js", () => {
   return {
     GitHubRepositoryFactory: vi.fn().mockImplementation(function () {
@@ -284,7 +296,6 @@ describe("Sub-issue Tools", () => {
 
     beforeEach(() => {
       vi.resetAllMocks();
-      vi.stubEnv("GITHUB_TOKEN", "test-token");
 
       mockSubIssueRepo = {
         addSubIssue: vi.fn(),
@@ -303,10 +314,6 @@ describe("Sub-issue Tools", () => {
           getConfig: vi.fn().mockReturnValue({ owner: "octocat", repo: "hello-world" }),
         });
       });
-    });
-
-    afterEach(() => {
-      vi.unstubAllEnvs();
     });
 
     describe("executeAddSubIssue", () => {
@@ -342,7 +349,9 @@ describe("Sub-issue Tools", () => {
       });
 
       it("returns error when token is missing", async () => {
-        vi.stubEnv("GITHUB_TOKEN", undefined);
+        vi.mocked(resolveGitHubAuth).mockImplementation(() => {
+          throw new GitHubAuthUnavailableError();
+        });
 
         const input = AddSubIssueInputSchema.parse({
           owner: "octocat",
@@ -351,7 +360,7 @@ describe("Sub-issue Tools", () => {
           subIssueNumber: 456,
         });
 
-        await expect(executeAddSubIssue(input)).rejects.toThrow(/No GitHub token available/);
+        await expect(executeAddSubIssue(input)).rejects.toThrow(/No GitHub credential available/);
       });
     });
 

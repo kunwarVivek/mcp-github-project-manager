@@ -1,5 +1,5 @@
-import { createAppAuth } from "@octokit/auth-app";
 import { Octokit } from "@octokit/rest";
+import type { GitHubAuth } from "./auth/GitHubAuth";
 import { GitHubConfig } from "./GitHubConfig";
 import { GitHubErrorHandler } from "./GitHubErrorHandler";
 import { RateLimitManager } from "./RateLimitManager";
@@ -16,19 +16,6 @@ import type { OctokitInstance } from "./types";
 export interface RepositoryFactoryOptions {
   baseUrl?: string;
   previews?: string[];
-  /**
-   * GitHub App installation credentials. When supplied, the factory
-   * authenticates as the App installation instead of using `token` as a PAT.
-   * A PAT remains the default and documented path.
-   */
-  app?: GitHubAppCredentials;
-}
-
-/** Credentials for authenticating as a GitHub App installation. */
-export interface GitHubAppCredentials {
-  appId: string | number;
-  privateKey: string;
-  installationId: string | number;
 }
 
 export class GitHubRepositoryFactory {
@@ -37,29 +24,23 @@ export class GitHubRepositoryFactory {
   private readonly config: GitHubConfig;
   private readonly rateLimitManager: RateLimitManager;
 
-  constructor(token: string, owner: string, repo: string, options: RepositoryFactoryOptions = {}) {
-    this.config = GitHubConfig.create(owner, repo, token);
+  constructor(
+    auth: GitHubAuth,
+    owner: string,
+    repo: string,
+    options: RepositoryFactoryOptions = {}
+  ) {
+    this.config = GitHubConfig.create(owner, repo);
     this.errorHandler = new GitHubErrorHandler();
 
-    // GitHub App installation auth when configured, otherwise a PAT. This is
-    // the single Octokit construction site in the codebase, so the branch here
-    // covers every repository the factory hands out.
-    const baseOptions = {
+    // The single Octokit construction site in the codebase. How requests are
+    // authenticated (static token, OAuth user token, App installation) is the
+    // auth object's concern, so this covers every repository the factory hands out.
+    this.octokit = new Octokit({
       baseUrl: options.baseUrl || "https://api.github.com",
       previews: options.previews || ["inertia-preview"],
-    };
-
-    this.octokit = options.app
-      ? new Octokit({
-          ...baseOptions,
-          authStrategy: createAppAuth,
-          auth: {
-            appId: options.app.appId,
-            privateKey: options.app.privateKey,
-            installationId: options.app.installationId,
-          },
-        })
-      : new Octokit({ ...baseOptions, auth: token });
+      ...auth.octokitAuth(),
+    });
 
     this.rateLimitManager = new RateLimitManager(this.octokit as Octokit);
   }
@@ -171,25 +152,17 @@ export class GitHubRepositoryFactory {
   }
 
   /**
-   * Creates a new factory instance from environment variables
+   * Creates a new factory instance for the given repository
    */
   static create(
-    env: {
-      GITHUB_TOKEN: string;
-      GITHUB_OWNER: string;
-      GITHUB_REPO: string;
-    },
+    auth: GitHubAuth,
+    target: { owner: string; repo: string },
     options?: RepositoryFactoryOptions
   ): GitHubRepositoryFactory {
-    if (!env.GITHUB_TOKEN || !env.GITHUB_OWNER || !env.GITHUB_REPO) {
+    if (!target.owner || !target.repo) {
       throw new Error("Missing required GitHub configuration");
     }
 
-    return new GitHubRepositoryFactory(
-      env.GITHUB_TOKEN,
-      env.GITHUB_OWNER,
-      env.GITHUB_REPO,
-      options
-    );
+    return new GitHubRepositoryFactory(auth, target.owner, target.repo, options);
   }
 }

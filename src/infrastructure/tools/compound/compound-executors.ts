@@ -8,9 +8,10 @@
  */
 
 import { createProjectManagementService } from "../../../container";
-import { CACHE_DIRECTORY, GITHUB_OWNER, GITHUB_REPO, GITHUB_TOKEN } from "../../../env";
+import { CACHE_DIRECTORY, GITHUB_OWNER, GITHUB_REPO } from "../../../env";
 import type { ProjectManagementService } from "../../../services/ProjectManagementService";
 import { ProjectFieldSetup } from "../../agent/ProjectFieldSetup";
+import { resolveGitHubAuth } from "../../github/auth/resolveGitHubAuth";
 import type { GitHubRepositoryFactory } from "../../github/GitHubRepositoryFactory";
 import { projectFieldUnionSelection } from "../../github/project-field-fragments";
 import { Logger } from "../../logger";
@@ -225,36 +226,23 @@ function toPlain<T>(value: T): T {
 // Lazy Service Singletons
 // ============================================================================
 
-let _pms: ProjectManagementService | null = null;
+// The GitHub-backed services are deliberately NOT memoized: each call resolves the
+// GitHub credential afresh (see resolveGitHubAuth), so a rotated token or an
+// `auth login` performed after start is honoured. They hold no state of their own.
 function getPMS(): ProjectManagementService {
-  if (!_pms) {
-    _pms = createProjectManagementService(GITHUB_OWNER, GITHUB_REPO, GITHUB_TOKEN);
-  }
-  return _pms;
+  return createProjectManagementService(GITHUB_OWNER, GITHUB_REPO, resolveGitHubAuth());
 }
 
-let _enrichmentService: IssueEnrichmentService | null = null;
 function getEnrichmentService(): IssueEnrichmentService {
-  if (!_enrichmentService) {
-    _enrichmentService = new IssueEnrichmentService(AIServiceFactory.getInstance(), getPMS());
-  }
-  return _enrichmentService;
+  return new IssueEnrichmentService(AIServiceFactory.getInstance(), getPMS());
 }
 
-let _roadmapPlanningService: RoadmapPlanningService | null = null;
 function getRoadmapPlanningService(): RoadmapPlanningService {
-  if (!_roadmapPlanningService) {
-    _roadmapPlanningService = new RoadmapPlanningService(AIServiceFactory.getInstance(), getPMS());
-  }
-  return _roadmapPlanningService;
+  return new RoadmapPlanningService(AIServiceFactory.getInstance(), getPMS());
 }
 
-let _triagingService: IssueTriagingService | null = null;
 function getTriagingService(): IssueTriagingService {
-  if (!_triagingService) {
-    _triagingService = new IssueTriagingService(AIServiceFactory.getInstance(), getPMS());
-  }
-  return _triagingService;
+  return new IssueTriagingService(AIServiceFactory.getInstance(), getPMS());
 }
 
 let _eventSubMgr: EventSubscriptionManager | null = null;

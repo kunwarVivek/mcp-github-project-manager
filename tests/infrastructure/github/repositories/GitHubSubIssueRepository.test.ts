@@ -21,7 +21,7 @@ const mockGraphql = vi.fn();
 const mockOctokit = octokitWithGraphql(mockGraphql);
 
 // Create a real GitHubConfig instance
-const mockConfig = GitHubConfig.create("test-owner", "test-repo", "test-token");
+const mockConfig = GitHubConfig.create("test-owner", "test-repo");
 
 describe("GitHubSubIssueRepository", () => {
   let repository: GitHubSubIssueRepository;

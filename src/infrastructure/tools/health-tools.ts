@@ -6,9 +6,11 @@
  */
 
 import { z } from "zod";
-import { GITHUB_OWNER, GITHUB_REPO, GITHUB_TOKEN } from "../../env.js";
+import { GITHUB_OWNER, GITHUB_REPO } from "../../env.js";
 import { AIServiceFactory } from "../../services/ai/AIServiceFactory.js";
 import { ResourceCache } from "../cache/ResourceCache.js";
+import { GitHubAuthUnavailableError } from "../github/auth/GitHubAuth.js";
+import { resolveGitHubAuth } from "../github/auth/resolveGitHubAuth.js";
 import { GitHubRepositoryFactory } from "../github/GitHubRepositoryFactory.js";
 import { HealthService } from "../health/index.js";
 import { ToolTelemetry } from "./ToolTelemetry.js";
@@ -97,6 +99,20 @@ export const healthCheckTool: ToolDefinition<HealthCheckArgs, HealthStatusOutput
 };
 
 /**
+ * The GitHub factory used to probe connectivity, or undefined when no
+ * credential is available (e.g. the user has not run `auth login` yet): the
+ * health check then reports GitHub as disconnected instead of failing outright.
+ */
+function createHealthGitHubFactory(): GitHubRepositoryFactory | undefined {
+  try {
+    return new GitHubRepositoryFactory(resolveGitHubAuth(), GITHUB_OWNER, GITHUB_REPO);
+  } catch (error) {
+    if (error instanceof GitHubAuthUnavailableError) return undefined;
+    throw error;
+  }
+}
+
+/**
  * Execute the health_check tool.
  *
  * Creates a HealthService with available dependencies and returns
@@ -108,7 +124,7 @@ export async function executeHealthCheck(): Promise<HealthStatusOutput> {
   const healthService = new HealthService({
     aiFactory: AIServiceFactory.getInstance(),
     cache: ResourceCache.getInstance(),
-    githubFactory: new GitHubRepositoryFactory(GITHUB_TOKEN, GITHUB_OWNER, GITHUB_REPO),
+    githubFactory: createHealthGitHubFactory(),
   });
 
   const baseHealth = await healthService.check();

@@ -159,7 +159,7 @@ export const getStatusUpdateTool: ToolDefinition<GetStatusUpdateInput, StatusUpd
  *
  * @param args - Validated input arguments
  * @returns The created status update
- * @throws Error if GITHUB_TOKEN is not set or API call fails
+ * @throws Error if no GitHub credential is available or the API call fails
  */
 export async function executeCreateStatusUpdate(args: CreateStatusUpdateInput): Promise<{
   content: Array<{ type: "text"; text: string }>;
@@ -206,7 +206,7 @@ export async function executeCreateStatusUpdate(args: CreateStatusUpdateInput): 
  *
  * @param args - Validated input arguments
  * @returns Paginated list of status updates
- * @throws Error if GITHUB_TOKEN is not set or API call fails
+ * @throws Error if no GitHub credential is available or the API call fails
  */
 export async function executeListStatusUpdates(args: ListStatusUpdatesInput): Promise<{
   content: Array<{ type: "text"; text: string }>;
@@ -260,7 +260,7 @@ export async function executeListStatusUpdates(args: ListStatusUpdatesInput): Pr
  *
  * @param args - Validated input arguments
  * @returns The status update or null if not found
- * @throws Error if GITHUB_TOKEN is not set or API call fails
+ * @throws Error if no GitHub credential is available or the API call fails
  */
 export async function executeGetStatusUpdate(args: GetStatusUpdateInput): Promise<{
   content: Array<{ type: "text"; text: string }>;

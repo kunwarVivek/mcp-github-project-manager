@@ -170,7 +170,9 @@ describe("registerResources", () => {
       if (data && typeof data === "object") {
         expect("owner" in data && typeof data.owner === "string").toBe(true);
         expect("repo" in data && typeof data.repo === "string").toBe(true);
-        expect("tokenConfigured" in data && typeof data.tokenConfigured === "boolean").toBe(true);
+        // Mode and source only: the credential itself must never be exposed.
+        expect(data).toMatchObject({ auth: { configured: true, mode: "token", source: "test" } });
+        expect(JSON.stringify(data)).not.toContain("test-token");
       } else {
         throw new Error("expected config resource payload to be an object");
       }

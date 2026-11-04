@@ -2,7 +2,13 @@ import { join, resolve } from "node:path";
 import * as dotenv from "dotenv";
 import { parseCommandLineArgs } from "./cli";
 import { validateConfig, validateConfigWarnings } from "./domain/config-schema";
-import { createDefaultSecretResolver } from "./infrastructure/secrets/SecretProvider";
+import { GhCliSecretProvider } from "./infrastructure/secrets/GhCliSecretProvider";
+import {
+  createDefaultSecretResolver,
+  isGhCliFallbackAllowed,
+  readSecretFromTier,
+  resolveSecretWithSource,
+} from "./infrastructure/secrets/SecretProvider";
 
 // Parse command line arguments only if not in test environment
 const cliOptions =
@@ -34,7 +40,6 @@ const secretResolver = createDefaultSecretResolver();
  * SECRETS_DIR file → environment variable).
  */
 const RESOLVED_CONFIG_KEYS = [
-  "GITHUB_TOKEN",
   "GITHUB_OWNER",
   "GITHUB_REPO",
   "GITHUB_APP_ID",
@@ -68,7 +73,6 @@ function buildResolvedEnv(): Record<string, string | undefined> {
     }
   }
   // CLI flags outrank both file-mounted secrets and environment variables.
-  if (cliOptions.token) resolved.GITHUB_TOKEN = cliOptions.token;
   if (cliOptions.owner) resolved.GITHUB_OWNER = cliOptions.owner;
   if (cliOptions.repo) resolved.GITHUB_REPO = cliOptions.repo;
   return resolved;
@@ -181,11 +185,6 @@ export function getNumericConfigValue(name: string, defaultValue: number): numbe
 // so live E2E suites that spawn the server as a subprocess can pass real credentials.
 const isTestEnv = process.env.NODE_ENV === "test";
 const isRealE2E = process.env.E2E_REAL_API === "true";
-export const GITHUB_TOKEN = isTestEnv
-  ? isRealE2E
-    ? process.env.GITHUB_TOKEN || "test-token"
-    : "test-token"
-  : getConfigValue("GITHUB_TOKEN", cliOptions.token);
 export const GITHUB_OWNER = isTestEnv
   ? isRealE2E
     ? process.env.GITHUB_OWNER || "test-owner"
@@ -196,6 +195,45 @@ export const GITHUB_REPO = isTestEnv
     ? process.env.GITHUB_REPO || "test-repo"
     : "test-repo"
   : getConfigValue("GITHUB_REPO", cliOptions.repo);
+
+// GitHub credential inputs. The credential itself is never exported as a module
+// constant: it is resolved on demand by `resolveGitHubAuth()` so a token rotated
+// on disk or an `auth login` performed after start is picked up. These accessors
+// expose the individual tiers so the resolver can report the true source.
+
+/** The `--token` CLI flag, when supplied. */
+export function getCliGitHubToken(): string | undefined {
+  return cliOptions.token || undefined;
+}
+
+/** A GitHub token found in `SECRETS_DIR` or the environment, bound to that tier. */
+export interface ConfiguredGitHubToken {
+  source: "secrets-dir" | "env";
+  /** Re-reads the same tier; undefined once that tier no longer has a token. */
+  read(): string | undefined;
+}
+
+/**
+ * The tier currently supplying `GITHUB_TOKEN` (`SECRETS_DIR` file, then env var).
+ * Its `read()` goes back to that tier on every call, so rotation is observed.
+ */
+export function getConfiguredGitHubToken(): ConfiguredGitHubToken | undefined {
+  const found = resolveSecretWithSource("GITHUB_TOKEN");
+  if (!found) return undefined;
+  const { source } = found;
+  return { source, read: () => readSecretFromTier("GITHUB_TOKEN", source) };
+}
+
+const ghCliProvider = new GhCliSecretProvider();
+
+/**
+ * The token of an authenticated `gh` CLI, or undefined when `gh` is absent,
+ * logged out, or disabled (GH_CLI_TOKEN_FALLBACK=false, NODE_ENV=test).
+ */
+export function getGhCliGitHubToken(): string | undefined {
+  if (!isGhCliFallbackAllowed()) return undefined;
+  return ghCliProvider.get("GITHUB_TOKEN");
+}
 
 // GitHub App installation auth (optional). When all three are present the
 // server authenticates as the App installation instead of using a PAT.

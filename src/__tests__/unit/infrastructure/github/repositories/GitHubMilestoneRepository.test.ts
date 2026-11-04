@@ -48,7 +48,7 @@ describe("GitHubMilestoneRepository", () => {
     (Octokit as MockedClass<typeof Octokit>).mockImplementation(() => asOctokit(mockOctokit));
 
     // Create configuration
-    config = new GitHubConfig("test-owner", "test-repo", "test-token");
+    config = new GitHubConfig("test-owner", "test-repo");
 
     // Create repository instance with both octokit and config
     repository = new GitHubMilestoneRepository(asOctokit(mockOctokit), config);

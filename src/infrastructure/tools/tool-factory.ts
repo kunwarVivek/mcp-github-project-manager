@@ -1,4 +1,5 @@
-import { getGitHubAppCredentials, getSecret } from "../../env";
+import { getSecret } from "../../env";
+import { resolveGitHubAuth } from "../github/auth/resolveGitHubAuth";
 import { GitHubRepositoryFactory } from "../github/GitHubRepositoryFactory";
 
 /**
@@ -11,28 +12,6 @@ import { GitHubRepositoryFactory } from "../github/GitHubRepositoryFactory";
  * the intent explicit.
  */
 const UNUSED_REPO_CONTEXT = "placeholder";
-
-/**
- * Resolve the GitHub token through the full credential chain
- * (CLI flag -> SECRETS_DIR file -> env var -> `gh auth token`).
- *
- * This used to read `process.env.GITHUB_TOKEN` directly, which meant a token
- * supplied by any mechanism other than an environment variable never reached
- * the tool layer at all.
- *
- * Exported so the handful of tool modules that build their own Octokit share
- * one accessor rather than re-reading the environment.
- */
-export function requireToken(): string {
-  const token = getSecret("GITHUB_TOKEN");
-  if (!token) {
-    throw new Error(
-      "No GitHub token available. Provide one via --token, GITHUB_TOKEN, " +
-        "a SECRETS_DIR-mounted file, or an authenticated `gh` CLI."
-    );
-  }
-  return token;
-}
 
 /** Resolve the configured repository owner, or undefined when unset. */
 export function resolveOwner(): string | undefined {
@@ -56,13 +35,11 @@ export function resolveRepo(): string | undefined {
  * @param repo  Explicit repository name (optional).
  */
 export function createGitHubFactory(owner?: string, repo?: string): GitHubRepositoryFactory {
-  // A fully configured GitHub App outranks the PAT. When the App is configured
-  // the token is unused, so an App-only deployment needs no PAT at all.
-  const app = getGitHubAppCredentials();
+  // Resolved per construction (not once at boot) so a token rotated on disk or
+  // an `auth login` performed after start is picked up by the next tool call.
   return new GitHubRepositoryFactory(
-    app ? "" : requireToken(),
+    resolveGitHubAuth(),
     owner || resolveOwner() || UNUSED_REPO_CONTEXT,
-    repo || resolveRepo() || UNUSED_REPO_CONTEXT,
-    app ? { app } : {}
+    repo || resolveRepo() || UNUSED_REPO_CONTEXT
   );
 }

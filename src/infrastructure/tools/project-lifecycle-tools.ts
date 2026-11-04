@@ -230,7 +230,7 @@ export const convertDraftIssueTool: ToolDefinition<ConvertDraftIssueInput, Conve
  *
  * @param args - Validated input arguments
  * @returns The closed project details
- * @throws Error if GITHUB_TOKEN is not set or API call fails
+ * @throws Error if no GitHub credential is available or the API call fails
  */
 export async function executeCloseProject(args: CloseProjectInput): Promise<{
   content: Array<{ type: "text"; text: string }>;
@@ -272,7 +272,7 @@ export async function executeCloseProject(args: CloseProjectInput): Promise<{
  *
  * @param args - Validated input arguments
  * @returns The reopened project details
- * @throws Error if GITHUB_TOKEN is not set or API call fails
+ * @throws Error if no GitHub credential is available or the API call fails
  */
 export async function executeReopenProject(args: ReopenProjectInput): Promise<{
   content: Array<{ type: "text"; text: string }>;
@@ -314,7 +314,7 @@ export async function executeReopenProject(args: ReopenProjectInput): Promise<{
  *
  * @param args - Validated input arguments
  * @returns The converted issue details
- * @throws Error if GITHUB_TOKEN is not set, repository not found, or API call fails
+ * @throws Error if no GitHub credential is available, the repository is not found, or the API call fails
  */
 export async function executeConvertDraftIssue(args: ConvertDraftIssueInput): Promise<{
   content: Array<{ type: "text"; text: string }>;

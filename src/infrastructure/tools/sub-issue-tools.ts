@@ -12,7 +12,7 @@
  * Node ID resolution is handled internally.
  */
 
-import { GitHubRepositoryFactory } from "../github/GitHubRepositoryFactory";
+import type { GitHubRepositoryFactory } from "../github/GitHubRepositoryFactory";
 import { ANNOTATION_PATTERNS } from "./annotations/tool-annotations";
 import {
   type AddSubIssueInput,
@@ -35,22 +35,11 @@ import {
   SubIssueOperationOutputSchema,
 } from "./schemas/sub-issue-schemas";
 import type { ToolDefinition, ToolSchema } from "./ToolValidator";
-import { requireToken } from "./tool-factory";
+import { createGitHubFactory } from "./tool-factory";
 
 // ============================================================================
 // Helper Functions
 // ============================================================================
-
-/**
- * Creates a repository factory with the given credentials.
- */
-function createFactory(owner: string, repo: string): GitHubRepositoryFactory {
-  const token = requireToken();
-  if (!token) {
-    throw new Error("GITHUB_TOKEN environment variable is required");
-  }
-  return new GitHubRepositoryFactory(token, owner, repo);
-}
 
 /**
  * Resolves an issue number to its GitHub node ID.
@@ -264,7 +253,7 @@ export const removeSubIssueTool: ToolDefinition<RemoveSubIssueInput, RemoveSubIs
  * Resolves issue numbers to node IDs and calls the repository.
  */
 export async function executeAddSubIssue(args: AddSubIssueInput): Promise<SubIssueOperationOutput> {
-  const factory = createFactory(args.owner, args.repo);
+  const factory = createGitHubFactory(args.owner, args.repo);
   const repository = factory.createSubIssueRepository();
 
   // Resolve issue numbers to node IDs
@@ -300,7 +289,7 @@ export async function executeAddSubIssue(args: AddSubIssueInput): Promise<SubIss
  * Resolves parent issue number to node ID and lists sub-issues.
  */
 export async function executeListSubIssues(args: ListSubIssuesInput): Promise<SubIssueListOutput> {
-  const factory = createFactory(args.owner, args.repo);
+  const factory = createGitHubFactory(args.owner, args.repo);
   const repository = factory.createSubIssueRepository();
 
   // Resolve issue number to node ID
@@ -336,7 +325,7 @@ export async function executeListSubIssues(args: ListSubIssuesInput): Promise<Su
  * Resolves issue number to node ID and gets parent.
  */
 export async function executeGetParentIssue(args: GetParentIssueInput): Promise<ParentIssueOutput> {
-  const factory = createFactory(args.owner, args.repo);
+  const factory = createGitHubFactory(args.owner, args.repo);
   const repository = factory.createSubIssueRepository();
 
   // Resolve issue number to node ID
@@ -367,7 +356,7 @@ export async function executeGetParentIssue(args: GetParentIssueInput): Promise<
 export async function executeReprioritizeSubIssue(
   args: ReprioritizeSubIssueInput
 ): Promise<SubIssueOperationOutput> {
-  const factory = createFactory(args.owner, args.repo);
+  const factory = createGitHubFactory(args.owner, args.repo);
   const repository = factory.createSubIssueRepository();
 
   // Resolve issue numbers to node IDs
@@ -409,7 +398,7 @@ export async function executeReprioritizeSubIssue(
 export async function executeRemoveSubIssue(
   args: RemoveSubIssueInput
 ): Promise<RemoveSubIssueOutput> {
-  const factory = createFactory(args.owner, args.repo);
+  const factory = createGitHubFactory(args.owner, args.repo);
   const repository = factory.createSubIssueRepository();
 
   // Resolve issue numbers to node IDs

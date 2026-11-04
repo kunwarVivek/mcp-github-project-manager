@@ -6,6 +6,7 @@ import {
   ProtocolError,
 } from "@modelcontextprotocol/server";
 import { createProjectManagementService } from "../../container";
+import { resolveGitHubAuth } from "../../infrastructure/github/auth/resolveGitHubAuth";
 import { ToolRegistry } from "../../infrastructure/tools/ToolRegistry";
 
 // MCP SDK v2 renamed `McpError` to `ProtocolError` (same (code, message, data)
@@ -23,11 +24,10 @@ describe("MCP Server E2E Tests", () => {
   let toolRegistry: ToolRegistry;
 
   beforeAll(() => {
-    const token = process.env.GITHUB_TOKEN || "test-token";
     const owner = process.env.GITHUB_OWNER || "test-owner";
     const repo = process.env.GITHUB_REPO || "test-repo";
 
-    createProjectManagementService(owner, repo, token);
+    createProjectManagementService(owner, repo, resolveGitHubAuth());
     toolRegistry = ToolRegistry.getInstance();
   });
 

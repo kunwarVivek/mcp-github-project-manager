@@ -22,9 +22,14 @@ const booleanFlag = (defaultValue: boolean) =>
       return normalized === "true" || normalized === "1";
     });
 
-/** GitHub configuration — required for all operations. */
+/**
+ * GitHub repository target — required for all operations.
+ *
+ * The credential is intentionally absent: it can come from a GitHub App, a
+ * token, a stored OAuth login or the `gh` CLI, and is resolved (and rejected
+ * when missing) by `resolveGitHubAuth()`, not by static config validation.
+ */
 export const GitHubConfigSchema = z.object({
-  GITHUB_TOKEN: nonEmptyString,
   GITHUB_OWNER: nonEmptyString,
   GITHUB_REPO: nonEmptyString,
 });
@@ -105,7 +110,6 @@ export type ServerConfig = z.infer<typeof ServerConfigSchema>;
 export function validateConfig(env: Record<string, string | undefined>): ServerConfig {
   const result = ServerConfigSchema.safeParse({
     github: {
-      GITHUB_TOKEN: env.GITHUB_TOKEN,
       GITHUB_OWNER: env.GITHUB_OWNER,
       GITHUB_REPO: env.GITHUB_REPO,
     },

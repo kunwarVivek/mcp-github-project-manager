@@ -45,7 +45,7 @@ function makeRepository(handler: GraphQLHandler) {
 
   const repository = new GitHubIssueRepository(
     octokit,
-    new GitHubConfig("test-owner", "test-repo", "test-token")
+    new GitHubConfig("test-owner", "test-repo")
   );
 
   return { repository, calls, octokit };
