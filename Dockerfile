@@ -42,4 +42,4 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
 
 USER mcpuser
 
-ENTRYPOINT ["node", "build/index.js"]
+ENTRYPOINT ["node", "build/bin.js"]
