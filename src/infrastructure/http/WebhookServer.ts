@@ -2,7 +2,10 @@ import * as http from "node:http";
 import type { ParsedUrlQuery } from "node:querystring";
 import * as url from "node:url";
 import {
+  EVENTS_AUTH_TOKEN,
+  OAUTH_ISSUER,
   SSE_ENABLED,
+  TRUST_PROXY,
   WEBHOOK_ALLOWED_ORIGINS,
   WEBHOOK_PORT,
   WEBHOOK_RATE_LIMIT,
@@ -23,6 +26,7 @@ import {
   type InboundAuthenticator,
   type InboundAuthRejected,
 } from "./auth/InboundAuthenticator";
+import { parseTrustProxy, resolveClientAddress } from "./clientAddress";
 
 export interface SSEConnection {
   id: string;
@@ -37,11 +41,22 @@ export interface WebhookServerOptions {
   port: number;
   enableSSE: boolean;
   timeout: number;
+  /** Raw `TRUST_PROXY` value; see `parseTrustProxy`. Defaults to the env setting. */
+  trustProxy: string;
+  /** Raw `WEBHOOK_ALLOWED_ORIGINS` value. Defaults to the env setting. */
+  allowedOrigins: string;
+  /**
+   * Whether inbound credentials (EVENTS_AUTH_TOKEN or OAUTH_ISSUER) are
+   * configured. Defaults to the env settings. A wildcard CORS origin is
+   * refused when true.
+   */
+  credentialsConfigured: boolean;
 }
 
 export class WebhookServer {
   private readonly logger: ILogger;
   private readonly options: WebhookServerOptions;
+  private readonly trustedProxyHops: number;
   private readonly webhookHandler: GitHubWebhookHandler;
   private readonly subscriptionManager: EventSubscriptionManager;
   private readonly eventStore: EventStore;
@@ -76,7 +91,28 @@ export class WebhookServer {
       port: options?.port ?? WEBHOOK_PORT,
       enableSSE: options?.enableSSE ?? SSE_ENABLED,
       timeout: options?.timeout || WEBHOOK_TIMEOUT_MS,
+      trustProxy: options?.trustProxy ?? TRUST_PROXY,
+      allowedOrigins: options?.allowedOrigins ?? WEBHOOK_ALLOWED_ORIGINS,
+      credentialsConfigured:
+        options?.credentialsConfigured ?? Boolean(EVENTS_AUTH_TOKEN || OAUTH_ISSUER),
     };
+
+    // Fail fast on misconfiguration that would silently weaken security.
+    this.trustedProxyHops = parseTrustProxy(this.options.trustProxy);
+    if (this.options.allowedOrigins.trim() === "*") {
+      if (this.options.credentialsConfigured) {
+        throw new Error(
+          'WEBHOOK_ALLOWED_ORIGINS="*" is not allowed while inbound authentication ' +
+            "(EVENTS_AUTH_TOKEN or OAUTH_ISSUER) is configured: a wildcard origin combined " +
+            "with credentials lets any website call the authenticated API. " +
+            "List the exact origins instead (comma-separated)."
+        );
+      }
+      this.logger.warn(
+        'WEBHOOK_ALLOWED_ORIGINS="*" allows every website to call this server from a browser. ' +
+          "Acceptable only for trusted local/dev use; list exact origins in production."
+      );
+    }
 
     this.webhookHandler = webhookHandler;
     this.subscriptionManager = subscriptionManager;
@@ -175,10 +211,7 @@ export class WebhookServer {
     }
 
     // Rate limiting
-    const clientIp =
-      (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() ||
-      req.socket.remoteAddress ||
-      "unknown";
+    const clientIp = this.clientAddress(req);
     if (this.isRateLimited(clientIp)) {
       this.securityLog.record({
         type: "rate_limit_exceeded",
@@ -268,7 +301,7 @@ export class WebhookServer {
     if (!contentType.startsWith("application/json")) {
       this.securityLog.record({
         type: "content_type_invalid",
-        source: req.socket.remoteAddress ?? "unknown",
+        source: this.clientAddress(req),
         details: { contentType },
         severity: "low",
       });
@@ -297,7 +330,7 @@ export class WebhookServer {
     if (!isValidSignature) {
       this.securityLog.record({
         type: signature ? "webhook_signature_invalid" : "webhook_signature_missing",
-        source: req.socket.remoteAddress ?? "unknown",
+        source: this.clientAddress(req),
         details: { eventType, delivery },
         severity: "high",
       });
@@ -695,7 +728,7 @@ export class WebhookServer {
     } else if (req.headers.origin) {
       this.securityLog.record({
         type: "cors_origin_rejected",
-        source: req.socket.remoteAddress ?? "unknown",
+        source: this.clientAddress(req),
         details: { origin: req.headers.origin },
         severity: "medium",
       });
@@ -707,7 +740,7 @@ export class WebhookServer {
    * Returns the reflected origin, '*', or undefined (no CORS headers).
    */
   private resolveAllowedOrigin(req: http.IncomingMessage): string | undefined {
-    const cfg = WEBHOOK_ALLOWED_ORIGINS;
+    const cfg = this.options.allowedOrigins.trim();
     if (!cfg) return undefined; // empty = reject cross-origin
     if (cfg === "*") return "*";
     const allowed = cfg
@@ -717,6 +750,18 @@ export class WebhookServer {
     const origin = req.headers.origin;
     if (origin && allowed.includes(origin)) return origin;
     return undefined;
+  }
+
+  /**
+   * Client address for rate limiting and audit records: the socket peer unless
+   * TRUST_PROXY opts in to forwarded headers.
+   */
+  private clientAddress(req: http.IncomingMessage): string {
+    return resolveClientAddress(
+      req.socket.remoteAddress,
+      req.headers["x-forwarded-for"],
+      this.trustedProxyHops
+    );
   }
 
   /**

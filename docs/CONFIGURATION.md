@@ -362,7 +362,8 @@ in `src/infrastructure/secrets/` and add it to the resolver chain.
 | `WEBHOOK_ALLOW_UNSIGNED` | `false` | **Security:** when no `WEBHOOK_SECRET` is set, webhooks are rejected (fail closed). Set `true` only in trusted dev to accept unsigned webhooks. |
 | `WEBHOOK_PORT` | `3001` | Port for the webhook HTTP listener |
 | `WEBHOOK_TIMEOUT_MS` | `5000` | Webhook request timeout (ms) |
-| `WEBHOOK_ALLOWED_ORIGINS` | `""` | Comma-separated list of allowed CORS origins |
+| `WEBHOOK_ALLOWED_ORIGINS` | `""` | Comma-separated list of exact allowed CORS origins. `*` is **refused at startup** when `EVENTS_AUTH_TOKEN` or `OAUTH_ISSUER` is set (wildcard + credentials); it is accepted, with a warning, only without inbound credentials (trusted dev). |
+| `TRUST_PROXY` | _(unset)_ | Client-address source for the rate limiter and security audit log. Unset/`false`/`0`: the socket peer address is used and `X-Forwarded-For` is **ignored**. Positive integer `N`: trust `N` proxy hops and use the address `N`-from-the-right in `X-Forwarded-For` (Express `trust proxy` hop semantics; `1` = one load balancer). `true` and any other value abort startup (ambiguous and spoofable). IPv4-mapped IPv6 (`::ffff:1.2.3.4`) is normalised. |
 | `WEBHOOK_RATE_LIMIT` | `100` | Max webhook requests per window |
 | `WEBHOOK_RATE_WINDOW_MS` | `60000` | Webhook rate-limit window (ms) |
 | `SSE_ENABLED` | `true` | Enable server-sent events streaming |
@@ -418,6 +419,18 @@ audience) aborts boot.
 metadata (public; only when a resource URL is known). SSE streams end at the
 token's `exp` with a final `event: auth_expired` (`{"reason":"token_expired"}`).
 Logs record reason codes only (`[SECURITY] unauthorized_access`), never tokens.
+
+**Behind a reverse proxy.** The per-IP rate limit that throttles bearer-token
+guessing is keyed on the socket peer address. Behind a load balancer every
+request would then share the proxy's address, so set `TRUST_PROXY` to the exact
+number of proxies in front of the server. With `TRUST_PROXY=1` and
+`X-Forwarded-For: <client-supplied>, 203.0.113.9`, the key is `203.0.113.9` (the
+entry your proxy appended); with `TRUST_PROXY=2` it is the second entry from
+the right. Never set a hop count larger than the real proxy chain: entries
+left of your outermost proxy are client-controlled.
+
+`WEBHOOK_ALLOWED_ORIGINS=*` is rejected at startup while `EVENTS_AUTH_TOKEN` or
+`OAUTH_ISSUER` is configured; list exact origins instead.
 
 | Variable | Default | Description |
 |----------|---------|-------------|

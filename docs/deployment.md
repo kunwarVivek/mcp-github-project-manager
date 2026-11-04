@@ -267,6 +267,15 @@ GitHub API has rate limits:
   the `OAUTH_ISSUER` + `OAUTH_AUDIENCE` resource-server settings; with neither,
   they return `401`. `EVENTS_ALLOW_UNAUTHENTICATED=true` opts out (trusted dev
   only). `POST /webhooks/github` is unchanged (HMAC only).
+- **Behind a reverse proxy / load balancer:** set `TRUST_PROXY` to the number
+  of proxies in front of the server (e.g. `TRUST_PROXY=1`). The rate limiter
+  and security audit log otherwise key on the socket peer address and ignore
+  `X-Forwarded-For`, so all clients would share the proxy's bucket. With `N`
+  hops the address `N`-from-the-right in `X-Forwarded-For` is used; `true` and
+  other non-integer values abort startup. Do not over-count hops: entries left
+  of your outermost proxy are client-controlled.
+- `WEBHOOK_ALLOWED_ORIGINS=*` aborts startup while `EVENTS_AUTH_TOKEN` or
+  `OAUTH_ISSUER` is set; list exact origins.
 - **Breaking:** anonymous `/health` now returns only `{"status":"healthy"}`;
   full stats need a bearer token. Probes that only check status are unaffected.
   See [CONFIGURATION.md](CONFIGURATION.md#inbound-http-authentication-events).

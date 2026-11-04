@@ -299,6 +299,12 @@ export const WEBHOOK_TIMEOUT_MS = getNumericConfigValue("WEBHOOK_TIMEOUT_MS", 50
 export const WEBHOOK_ALLOWED_ORIGINS = getOptionalConfigValue("WEBHOOK_ALLOWED_ORIGINS", "");
 export const WEBHOOK_RATE_LIMIT = getNumericConfigValue("WEBHOOK_RATE_LIMIT", 100);
 export const WEBHOOK_RATE_WINDOW_MS = getNumericConfigValue("WEBHOOK_RATE_WINDOW_MS", 60000);
+// Reverse-proxy trust for client-address resolution (rate limiting, audit log).
+// Unset/false: ignore X-Forwarded-For and use the socket peer address.
+// Positive integer N: trust N proxy hops and take the address N-from-the-right
+// in X-Forwarded-For (Express `trust proxy` hop semantics). `true` is rejected
+// at startup: it is ambiguous and lets clients spoof their address.
+export const TRUST_PROXY = getOptionalConfigValue("TRUST_PROXY", "");
 
 // --- Inbound HTTP authentication (/events/*) -------------------------------
 // The events surface fails closed: with neither EVENTS_AUTH_TOKEN nor an OAuth

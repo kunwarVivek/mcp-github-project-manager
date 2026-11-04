@@ -598,20 +598,22 @@ class GitHubProjectManagerServer {
       this.logger
     );
 
-    try {
-      this.webhookServer = new WebhookServer(
-        this.webhookHandler,
-        this.subscriptionManager,
-        this.eventStore,
-        {
-          port: WEBHOOK_PORT,
-          enableSSE: SSE_ENABLED,
-        },
-        this.logger,
-        undefined,
-        inboundAuth
-      );
+    // Also outside the try/catch: an invalid TRUST_PROXY or a wildcard
+    // WEBHOOK_ALLOWED_ORIGINS combined with credentials must abort startup.
+    this.webhookServer = new WebhookServer(
+      this.webhookHandler,
+      this.subscriptionManager,
+      this.eventStore,
+      {
+        port: WEBHOOK_PORT,
+        enableSSE: SSE_ENABLED,
+      },
+      this.logger,
+      undefined,
+      inboundAuth
+    );
 
+    try {
       await this.webhookServer.start();
       this.logger.info(`Webhook server started on port ${WEBHOOK_PORT}`);
     } catch (error) {
