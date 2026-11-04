@@ -1,4 +1,4 @@
-import { redactSecrets } from "./index.js";
+import { redactSecretPatterns, redactSecrets } from "./index.js";
 
 export enum LogLevel {
   DEBUG = 0,
@@ -79,16 +79,24 @@ export class StructuredLogger {
       const entry: LogEntry = {
         timestamp: new Date().toISOString(),
         level: levelName,
-        message,
+        message: redactSecretPatterns(message),
         ...(context && { context: redactSecrets(context) as Record<string, unknown> }),
-        ...(error && { error: { name: error.name, message: error.message, stack: error.stack } }),
+        ...(error && {
+          error: {
+            name: error.name,
+            message: redactSecretPatterns(error.message),
+            stack: error.stack === undefined ? undefined : redactSecretPatterns(error.stack),
+          },
+        }),
       };
       process.stderr.write(`${JSON.stringify(entry)}\n`);
     } else {
       // Delegate to existing Logger (text format)
       const contextStr = context ? ` ${JSON.stringify(redactSecrets(context))}` : "";
-      const errorStr = error ? ` ${error.message}` : "";
-      process.stderr.write(`[${levelName}] ${message}${contextStr}${errorStr}\n`);
+      const errorStr = error ? ` ${redactSecretPatterns(error.message)}` : "";
+      process.stderr.write(
+        `[${levelName}] ${redactSecretPatterns(message)}${contextStr}${errorStr}\n`
+      );
     }
   }
 

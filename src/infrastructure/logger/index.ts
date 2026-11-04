@@ -31,6 +31,65 @@ const SECRET_KEY_FRAGMENTS = [
 
 const REDACTED = "[REDACTED]";
 
+/**
+ * Value-shaped secret patterns, applied to free text (messages, string args,
+ * Error messages/stacks) where no key name is available. Each replacement keeps
+ * the credential *kind* (`ghp_[REDACTED]`) so a log line stays diagnosable.
+ *
+ * Formats (GitHub): identifiable `ghp|gho|ghu|ghs|ghr` + `_` prefixes followed
+ * by base62 (30 random + 6 checksum chars) per
+ * https://github.blog/engineering/platform-security/behind-githubs-new-authentication-token-formats/
+ * and fine-grained PATs `github_pat_` + `[A-Za-z0-9_]` per
+ * https://docs.github.com/en/organizations/managing-programmatic-access-to-your-organization/github-credential-types
+ *
+ * Every pattern is a flat character-class run with no nested quantifiers or
+ * overlapping alternation, so matching is linear in input length. Patterns that
+ * start mid-word use a one-character lookbehind so `task-...` / `desk-...` slugs
+ * are not mistaken for `sk-` keys. Compiled once at module load. Order matters:
+ * `sk-ant-` runs before the generic `sk-` rule.
+ */
+const TOKEN_BOUNDARY = "(?<![A-Za-z0-9_-])";
+const VALUE_PATTERNS: ReadonlyArray<readonly [RegExp, string]> = [
+  // PEM private keys; an unterminated block redacts to end of input (linear).
+  [
+    /-----BEGIN (?:[A-Z]+ )*PRIVATE KEY-----[\s\S]*?(?:-----END (?:[A-Z]+ )*PRIVATE KEY-----|$)/g,
+    "[REDACTED PRIVATE KEY BLOCK]",
+  ],
+  // Authorization header values, any length: `Authorization: Bearer x`.
+  [/(Authorization["']?\s*[:=]\s*["']?)(Bearer|Basic)\s+[^\s"',;]+/gi, "$1$2 [REDACTED]"],
+  // Bare scheme values; length floors keep prose ("Basic usage") intact.
+  [/\b(Bearer)\s+[A-Za-z0-9\-._~+/]{16,}=*/gi, "$1 [REDACTED]"],
+  [/\b(Basic)\s+[A-Za-z0-9+/]{20,}={0,2}/gi, "$1 [REDACTED]"],
+  [new RegExp(`${TOKEN_BOUNDARY}github_pat_[A-Za-z0-9_]{22,}`, "g"), "github_pat_[REDACTED]"],
+  [new RegExp(`${TOKEN_BOUNDARY}(gh[pousr])_[A-Za-z0-9]{30,}`, "g"), "$1_[REDACTED]"],
+  [
+    new RegExp(
+      `${TOKEN_BOUNDARY}eyJ[A-Za-z0-9_-]{5,}\\.[A-Za-z0-9_-]{5,}\\.[A-Za-z0-9_-]{5,}`,
+      "g"
+    ),
+    "eyJ[REDACTED JWT]",
+  ],
+  [new RegExp(`${TOKEN_BOUNDARY}sk-ant-[A-Za-z0-9_-]{20,}`, "g"), "sk-ant-[REDACTED]"],
+  [
+    new RegExp(`${TOKEN_BOUNDARY}sk-((?:proj|svcacct|admin)-)?[A-Za-z0-9_-]{32,}`, "g"),
+    "sk-$1[REDACTED]",
+  ],
+  [new RegExp(`${TOKEN_BOUNDARY}AIza[A-Za-z0-9_-]{35}(?![A-Za-z0-9_-])`, "g"), "AIza[REDACTED]"],
+];
+
+/**
+ * Replace credential-shaped substrings (GitHub, Anthropic, OpenAI, Google keys,
+ * JWTs, Authorization values, PEM private keys) in free text. Exported so every
+ * sink — loggers and direct `process.stderr.write` sites — shares one pattern set.
+ */
+export function redactSecretPatterns(text: string): string {
+  let result = text;
+  for (const [pattern, replacement] of VALUE_PATTERNS) {
+    result = result.replace(pattern, replacement);
+  }
+  return result;
+}
+
 function isSecretKey(key: string): boolean {
   const normalized = key.replace(/[^a-z0-9]/gi, "").toLowerCase();
   return SECRET_KEY_FRAGMENTS.some((fragment) => normalized.includes(fragment));
@@ -45,6 +104,9 @@ function isSecretKey(key: string): boolean {
  * server, and Errors are flattened (their own fields are non-enumerable).
  */
 export function redactSecrets(value: unknown, seen: WeakSet<object> = new WeakSet()): unknown {
+  if (typeof value === "string") {
+    return redactSecretPatterns(value);
+  }
   if (value === null || typeof value !== "object") {
     return value;
   }
@@ -57,7 +119,11 @@ export function redactSecrets(value: unknown, seen: WeakSet<object> = new WeakSe
     return value.map((entry) => redactSecrets(entry, seen));
   }
   if (value instanceof Error) {
-    return { name: value.name, message: value.message, stack: value.stack };
+    return {
+      name: value.name,
+      message: redactSecretPatterns(value.message),
+      stack: value.stack === undefined ? undefined : redactSecretPatterns(value.stack),
+    };
   }
 
   const result: Record<string, unknown> = {};
@@ -84,32 +150,25 @@ export class ConsoleLogger implements ILogger {
   }
 
   debug(message: string, ...args: unknown[]): void {
-    // Write to stderr to avoid interfering with MCP protocol
-    process.stderr.write(`${this.prefix}${message}\n`);
-    if (args.length > 0) {
-      process.stderr.write(`${formatArgs(args)}\n`);
-    }
+    this.write(message, args);
   }
 
   info(message: string, ...args: unknown[]): void {
-    // Write to stderr to avoid interfering with MCP protocol
-    process.stderr.write(`${this.prefix}${message}\n`);
-    if (args.length > 0) {
-      process.stderr.write(`${formatArgs(args)}\n`);
-    }
+    this.write(message, args);
   }
 
   warn(message: string, ...args: unknown[]): void {
-    // Write to stderr to avoid interfering with MCP protocol
-    process.stderr.write(`${this.prefix}${message}\n`);
-    if (args.length > 0) {
-      process.stderr.write(`${formatArgs(args)}\n`);
-    }
+    this.write(message, args);
   }
 
   error(message: string, ...args: unknown[]): void {
+    this.write(message, args);
+  }
+
+  /** Single sink path: message and varargs are both redacted before stderr. */
+  private write(message: string, args: unknown[]): void {
     // Write to stderr to avoid interfering with MCP protocol
-    process.stderr.write(`${this.prefix}${message}\n`);
+    process.stderr.write(`${this.prefix}${redactSecretPatterns(message)}\n`);
     if (args.length > 0) {
       process.stderr.write(`${formatArgs(args)}\n`);
     }

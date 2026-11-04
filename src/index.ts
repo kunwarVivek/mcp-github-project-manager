@@ -68,7 +68,7 @@ import { resolveGitHubAuth } from "./infrastructure/github/auth/resolveGitHubAut
 import { createInboundAuthenticator } from "./infrastructure/http/auth/createInboundAuthenticator";
 import { WebhookServer } from "./infrastructure/http/WebhookServer";
 import { GracefulShutdown } from "./infrastructure/lifecycle/GracefulShutdown";
-import { type ILogger, logger } from "./infrastructure/logger/index";
+import { type ILogger, logger, redactSecretPatterns } from "./infrastructure/logger/index";
 import { withBudgetDebitFailure } from "./infrastructure/mcp/budget-debit-meta";
 import { registerPrompts as registerPromptTemplates } from "./infrastructure/mcp/prompts";
 import { registerResources as registerResourceHandlers } from "./infrastructure/mcp/resources";
@@ -754,12 +754,12 @@ export { GitHubProjectManagerServer };
 try {
   const server = new GitHubProjectManagerServer();
   server.run().catch((error) => {
-    process.stderr.write(`Failed to start server: ${error}\n`);
+    process.stderr.write(`Failed to start server: ${redactSecretPatterns(String(error))}\n`);
     process.exit(1);
   });
 } catch (error) {
   if (error instanceof Error) {
-    process.stderr.write(`Error initializing server: ${error.message}\n`);
+    process.stderr.write(`Error initializing server: ${redactSecretPatterns(error.message)}\n`);
 
     // Provide helpful instructions for common errors
     if (error instanceof GitHubAuthUnavailableError) {
@@ -783,7 +783,7 @@ try {
 
     process.stderr.write("\nFor more information, run: mcp-github-project-manager --help\n");
   } else {
-    process.stderr.write(`Unknown error: ${error}\n`);
+    process.stderr.write(`Unknown error: ${redactSecretPatterns(String(error))}\n`);
   }
   process.exit(1);
 }

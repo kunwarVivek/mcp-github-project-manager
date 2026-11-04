@@ -105,6 +105,9 @@ exactly like `pnpm run <script>`, and `npm test` like `pnpm test`.
   token/secret/password/apiKey/authorization-shaped keys from anything the logger
   stringifies, and `GitHubConfig.token` is non-enumerable so `JSON.stringify`
   cannot emit the PAT.
+  `redactSecretPatterns()` additionally scrubs credential-shaped *values* (GitHub
+  `ghp_`/`github_pat_`, JWT, Bearer/Basic, `sk-`/`sk-ant-`, `AIza`, PEM keys) from
+  messages, string args and Error text in every log sink and startup error write.
 
 ## Gotchas
 
