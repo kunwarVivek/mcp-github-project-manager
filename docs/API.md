@@ -947,7 +947,7 @@ type ResourceType =
 
 | Variable | Description | Required |
 |----------|-------------|----------|
-| GITHUB_TOKEN | GitHub personal access token | Yes |
+| GITHUB_TOKEN | GitHub personal access token (one of several credential options — see CONFIGURATION.md) | No |
 | GITHUB_OWNER | Repository owner | Yes |
 | GITHUB_REPO | Repository name | Yes |
 | ANTHROPIC_API_KEY | Anthropic API key for Claude models | No* |

@@ -548,7 +548,7 @@ secrets (`SECRETS_DIR`) override both.
 
 | Variable | Default | Purpose |
 |----------|---------|---------|
-| `GITHUB_TOKEN` | — | GitHub API authentication |
+| `GITHUB_TOKEN` | — | Optional GitHub PAT; one of six credential-chain tiers (App, `--token`, secrets file, env, OAuth `auth login`, `gh`) |
 | `GITHUB_OWNER` | — | Repository owner |
 | `GITHUB_REPO` | — | Repository name |
 

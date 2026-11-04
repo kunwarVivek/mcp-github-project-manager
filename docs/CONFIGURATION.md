@@ -25,30 +25,39 @@ Configuration sources are applied in this order of precedence (highest first):
 
 ### GitHub Configuration
 
-These variables are **required** for the MCP server to function:
+Only the repository coordinates are required. **`GITHUB_TOKEN` is no longer
+required** — App-only, OAuth-only and `gh`-only setups boot fine.
 
 | Variable | Description | Example |
 |----------|-------------|---------|
-| `GITHUB_TOKEN` | GitHub personal access token | `ghp_xxxxxxxxxxxxxxxxxxxx` |
 | `GITHUB_OWNER` | GitHub username or organization | `your-username` |
 | `GITHUB_REPO` | Repository name | `my-project` |
 
-#### Credential Chain
+#### GitHub Credential Chain
 
-`GITHUB_TOKEN` is resolved through a chain — the first hit wins:
+Credentials are resolved per tool call; the first hit wins:
 
-1. `--token` CLI flag
-2. `$SECRETS_DIR/GITHUB_TOKEN` file (when `SECRETS_DIR` is set)
-3. `GITHUB_TOKEN` environment variable
-4. `gh auth token` — a working `gh` CLI login means **no configuration at all**
+1. **GitHub App installation** — `GITHUB_APP_ID` + `GITHUB_APP_PRIVATE_KEY` + `GITHUB_APP_INSTALLATION_ID` (a partial config falls through to the next tier)
+2. `--token` CLI flag
+3. `$SECRETS_DIR/GITHUB_TOKEN` file (when `SECRETS_DIR` is set)
+4. `GITHUB_TOKEN` environment variable
+5. Stored OAuth token from `mcp-github-project-manager auth login` (see [OAuth device flow](#oauth-device-flow-auth-login))
+6. `gh auth token` — a working `gh` CLI login means **no configuration at all**
 
-The `gh` fallback can be disabled with `GH_CLI_TOKEN_FALLBACK=false`. It is also
-switched off automatically under `NODE_ENV=test`, so tests never shell out.
+If nothing resolves, startup fails fast and lists all methods. The `gh`
+fallback can be disabled with `GH_CLI_TOKEN_FALLBACK=false`; it is also off
+under `NODE_ENV=test`, so tests never shell out.
 
-#### GitHub App Authentication (optional)
+Static tokens are rotation-aware: a `SECRETS_DIR` file or env token rewritten
+while the server runs is used on the next request (only the tier that won is
+re-read). `--token` and `gh` results are constant for the process.
 
-When all three of these are set, the server authenticates as a GitHub App
-installation instead of using the PAT:
+With `--verbose` the banner prints `auth: <mode> (<source>)` and never token
+characters. Modes: `app-installation`, `token`, `oauth-user`. Sources:
+`github-app`, `cli-flag`, `secrets-dir`, `env`, `oauth-store`, `gh-cli`, `test`.
+The `github://config` MCP resource reports `auth: {configured, mode, source}`.
+
+#### GitHub App Authentication (tier 1)
 
 | Variable | Description |
 |----------|-------------|
@@ -56,10 +65,55 @@ installation instead of using the PAT:
 | `GITHUB_APP_PRIVATE_KEY` | App private key (literal `\n` escapes are converted to newlines) |
 | `GITHUB_APP_INSTALLATION_ID` | Installation ID |
 
-A **partial** App configuration falls back to the PAT rather than failing, so a
-half-set environment cannot lock the server out.
+A **partial** App configuration falls through to the remaining tiers rather
+than failing, so a half-set environment cannot lock the server out.
 
-#### GITHUB_TOKEN
+#### OAuth device flow (`auth login`)
+
+Sign in with your own GitHub account — no PAT to create or paste.
+
+```bash
+export GITHUB_OAUTH_CLIENT_ID=<client id>
+mcp-github-project-manager auth login [--client-id <id>] [--scopes "<s>"] [-e <env-file>]
+mcp-github-project-manager auth status
+mcp-github-project-manager auth logout
+```
+
+**Setup:** create an OAuth App (Settings → Developer settings → OAuth Apps) or
+a GitHub App, enable **Device Flow**, and copy its Client ID.
+
+- `auth login` prints the verification URL and user code to **stderr**, polls at GitHub's interval (honouring `slow_down`), then saves the token and the `GET /user` login.
+- `auth status` prints to stdout: store path, mode, login, client id, scopes, token kind (non-expiring vs expiring + refresh), expiry and a permission check. It exits non-zero when not logged in or unusable, and never prints the token.
+- `auth logout` revokes via `DELETE /applications/{client_id}/token` when `GITHUB_OAUTH_CLIENT_SECRET` is set; otherwise it prints the manual revocation URL `https://github.com/settings/connections/applications/<client_id>`. The local file is always deleted.
+- Exit codes: `0` ok, `1` failure, `2` usage error. Auth commands need no `GITHUB_TOKEN`/`GITHUB_OWNER`/`GITHUB_REPO`.
+- The `auth` subcommands live in `build/bin.js` (the package `bin`, `npm start`, Docker ENTRYPOINT). `node build/index.js` still starts the server but has no `auth` subcommands.
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `GITHUB_OAUTH_CLIENT_ID` | _(unset)_ | **Required** for login and for using a stored token (a token stored for a different client id is ignored) |
+| `GITHUB_OAUTH_CLIENT_SECRET` | _(unset)_ | Optional; only used to revoke on logout. Device-flow refresh does not need it |
+| `GITHUB_OAUTH_SCOPES` | `repo project read:org` | Requested scopes (ignored by GitHub Apps, which use App permissions) |
+| `GITHUB_OAUTH_TOKEN_FILE` | `$XDG_CONFIG_HOME/mcp-github-project-manager/github-oauth.json` (fallback `~/.config/...`) | Token store location |
+
+These are resolved via `SECRETS_DIR` then environment.
+
+**Store security:** directory `0700`, file `0600`, atomic writes. A store file
+readable by group/other is **ignored** (`auth status` shows `INSECURE`; fix with
+`chmod 600` or log in again).
+
+**Client types (auto-detected):**
+
+- *OAuth App* → non-expiring token.
+- *GitHub App* (user-to-server, expiring tokens enabled) → 8 h access token plus a ~6-month single-use refresh token, refreshed lazily (single-flight), persisted back to the store; another process's rotation is picked up. Expired and unrefreshable → an error telling you to run `auth login`.
+
+> **Caveat [inference]:** GitHub's Projects API docs list only classic PATs and
+> installation tokens, so GitHub App *user* tokens may not reach user-owned
+> Projects v2. Use an OAuth App with the `project` scope for user-owned projects.
+
+References: [device flow](https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/authorizing-oauth-apps#device-flow),
+[refreshing user access tokens](https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/refreshing-user-access-tokens).
+
+#### Personal access token (`GITHUB_TOKEN`) — one option
 
 A GitHub personal access token with the following scopes:
 
@@ -127,7 +181,7 @@ The pattern is `AI_<ROLE>_<SETTING>`, where `<ROLE>` is one of `MAIN`,
 
 | Variable | Description |
 |----------|-------------|
-| `AI_MAIN_PROVIDER` / `AI_RESEARCH_PROVIDER` / `AI_FALLBACK_PROVIDER` / `AI_PRD_PROVIDER` | Provider for this role: `anthropic`, `openai`, `google`, `perplexity`, or `openai-compatible` |
+| `AI_MAIN_PROVIDER` / `AI_RESEARCH_PROVIDER` / `AI_FALLBACK_PROVIDER` / `AI_PRD_PROVIDER` | Provider for this role: `anthropic`, `openai`, `google`, `google-vertex` (see [Gemini via Vertex AI](#gemini-via-vertex-ai-google-adc)), `perplexity`, or `openai-compatible` |
 | `AI_MAIN_API_KEY` / `AI_RESEARCH_API_KEY` / `AI_FALLBACK_API_KEY` / `AI_PRD_API_KEY` | API key for this role, overrides the global `*_API_KEY` |
 | `AI_MAIN_BASE_URL` / `AI_RESEARCH_BASE_URL` / `AI_FALLBACK_BASE_URL` / `AI_PRD_BASE_URL` | Custom endpoint for this role (required for `openai-compatible`) |
 | `AI_MAIN_MODEL` / `AI_RESEARCH_MODEL` / `AI_FALLBACK_MODEL` / `AI_PRD_MODEL` | Model name for this role |
@@ -178,6 +232,29 @@ AI_FALLBACK_MODEL=llama3.1
 ANTHROPIC_API_KEY=sk-ant-your-anthropic-key
 AI_MAIN_MODEL=claude-opus-5
 ```
+
+### Gemini via Vertex AI (Google ADC)
+
+Provider id `google-vertex` (set via `AI_<ROLE>_PROVIDER`, case-insensitive).
+Authentication uses Google Application Default Credentials — there is no key in
+this server's configuration.
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `GOOGLE_VERTEX_PROJECT` | _(unset)_ | GCP project; setting it enables Vertex |
+| `GOOGLE_VERTEX_LOCATION` | `us-central1` | Vertex region |
+| `GOOGLE_APPLICATION_CREDENTIALS` | _(unset)_ | Standard ADC service-account key path (alternatives: `gcloud auth application-default login`, or metadata server / workload identity) |
+
+ADC is resolved lazily on the first request. **Precedence:** an explicit
+`AI_<ROLE>_PROVIDER` wins; otherwise `gemini-*` models use `google-vertex` when
+`GOOGLE_VERTEX_PROJECT` is set, else `google` (API key). If both are configured,
+Vertex wins. Forcing `google-vertex` without a project logs a warning naming
+`GOOGLE_VERTEX_PROJECT`/ADC and leaves the role's model unconfigured (no silent
+fallback). Caveat: if `GOOGLE_VERTEX_API_KEY` is set in the environment, the SDK
+uses Vertex express mode with that key instead of ADC. Usage is metered by the
+same budget middleware as other providers. Anthropic, OpenAI and Perplexity
+remain API-key only (no third-party OAuth).
+
 
 No per-role variables are required — every role that has no `AI_<ROLE>_*`
 overrides falls back to the global key and its model-prefix-detected provider.
@@ -292,6 +369,60 @@ in `src/infrastructure/secrets/` and add it to the resolver chain.
 | `EVENT_RETENTION_DAYS` | `7` | Days to retain stored events |
 | `MAX_EVENTS_IN_MEMORY` | `1000` | Max events held in memory |
 
+### Inbound HTTP Authentication (`/events/*`)
+
+The webhook listener (`WEBHOOK_PORT`, default `3001`) protects its event
+endpoints with bearer authentication. **Breaking change:** with nothing
+configured these endpoints now return `401`.
+
+Protected: `GET /events/stream`, `POST /events/subscribe`,
+`DELETE /events/subscribe/:id`, `GET /events/replay/:id`, `GET /events/recent`.
+The token is accepted from the `Authorization: Bearer` header **only** — never
+from the query string. `POST /webhooks/github` is unchanged (HMAC signature
+only). CORS preflight stays open and `Authorization` is an allowed header.
+
+`/health` returns only `{"status":"healthy"}` to anonymous callers; authenticated
+callers receive full stats (anything scraping stats anonymously must now send a
+bearer token).
+
+Two modes; if both are configured, either is accepted.
+
+**Shared bearer token**
+
+| Variable | Description |
+|----------|-------------|
+| `EVENTS_AUTH_TOKEN` | Shared secret clients send as `Authorization: Bearer <token>` (compared via SHA-256 + `timingSafeEqual`) |
+
+**OAuth 2.1 resource server** (MCP authorization spec 2025-06-18; RFC 9728 / 6750 / 8707 / 8414)
+
+| Variable | Description |
+|----------|-------------|
+| `OAUTH_ISSUER` | Authorization server issuer (`https`, or `http` on loopback only) |
+| `OAUTH_AUDIENCE` | **Required with `OAUTH_ISSUER`.** Tokens minted for other audiences are rejected |
+| `OAUTH_JWKS_URI` | Optional. Otherwise discovered from `<issuer>/.well-known/oauth-authorization-server`, then `/.well-known/openid-configuration`; the discovered issuer must match |
+| `OAUTH_REQUIRED_SCOPES` | Space-separated scopes the token must carry (`scope` string or `scp` array) |
+| `OAUTH_RESOURCE_URL` | Canonical resource URL for RFC 9728 metadata; defaults to `OAUTH_AUDIENCE` when that is a URL |
+
+JWTs must use asymmetric algorithms (no `HS*`, no `none`), carry `exp`, and are
+checked with 30 s clock tolerance. Invalid OAuth config (e.g. issuer without
+audience) aborts boot.
+
+| Response | When |
+|----------|------|
+| `401` + `WWW-Authenticate: Bearer realm="github-project-manager-events"` | No/invalid credentials (`error="invalid_token"` and `resource_metadata` added when relevant) |
+| `403` `insufficient_scope` | Token lacks required scopes (named in the response) |
+| `400` `invalid_request` | Malformed `Bearer` header |
+| `503` | JWKS/discovery unreachable (retried on the next request) |
+
+`GET /.well-known/oauth-protected-resource[/<resource path>]` serves RFC 9728
+metadata (public; only when a resource URL is known). SSE streams end at the
+token's `exp` with a final `event: auth_expired` (`{"reason":"token_expired"}`).
+Logs record reason codes only (`[SECURITY] unauthorized_access`), never tokens.
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `EVENTS_ALLOW_UNAUTHENTICATED` | `false` | Opt out of `/events/*` auth (trusted dev only; logs a startup warning). Ignored when any credentials are configured |
+
 ### Cache
 
 | Variable | Default | Description |
@@ -367,7 +498,7 @@ mcp-github-project-manager
 Create a `.env` file in your project root:
 
 ```env
-# GitHub Configuration (Required)
+# GitHub Configuration (GITHUB_OWNER/GITHUB_REPO required; GITHUB_TOKEN is one of several credential options)
 GITHUB_TOKEN=ghp_xxxxxxxxxxxxxxxxxxxx
 GITHUB_OWNER=your-username
 GITHUB_REPO=your-repository
@@ -676,7 +807,7 @@ The server validates configuration on startup. Common validation errors:
 
 | Error | Cause | Solution |
 |-------|-------|----------|
-| `GITHUB_TOKEN is required` | Token not set | Set GITHUB_TOKEN |
+| `No GitHub credentials found` | None of the six credential-chain methods resolved | Set `GITHUB_TOKEN`, run `mcp-github-project-manager auth login`, log in with `gh`, or configure a GitHub App |
 | `Invalid GitHub token format` | Malformed token | Check token starts with `ghp_`, `gho_`, or `github_pat_` |
 | `GITHUB_OWNER is required` | Owner not set | Set GITHUB_OWNER |
 | `GITHUB_REPO is required` | Repo not set | Set GITHUB_REPO |
@@ -702,9 +833,10 @@ env | grep -E "GITHUB_|ANTHROPIC_|OPENAI_|AI_"
 
 ```env
 # ===========================
-# Required: GitHub Configuration
+# Required: Repository (+ optional token)
 # ===========================
-GITHUB_TOKEN=ghp_xxxxxxxxxxxxxxxxxxxx
+# GITHUB_TOKEN is optional — see "GitHub Credential Chain" (App, OAuth `auth login`, gh CLI also work)
+# GITHUB_TOKEN=ghp_xxxxxxxxxxxxxxxxxxxx
 GITHUB_OWNER=your-username
 GITHUB_REPO=your-repository
 
