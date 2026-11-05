@@ -141,3 +141,40 @@ jobs:
       # Fails on any high or critical advisory in the resolved tree.
       - name: Audit dependencies
         run: npm audit --audit-level=high
+
+  # The Dockerfile is not part of the npm package, so nothing else exercises
+  # it. Build the image and check the runtime contract the docs promise:
+  # non-root uid 10001, an owner-only /data volume as the OAuth token store,
+  # the bin entry, and a token that persists across containers.
+  docker-smoke:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Build image
+        run: docker build -t gpm-smoke:ci .
+
+      - name: Runtime user, /data volume and version
+        run: |
+          set -euo pipefail
+          test "$(docker run --rm --entrypoint id gpm-smoke:ci -u)" = "10001"
+          test "$(docker run --rm --entrypoint stat gpm-smoke:ci -c '%a %U' /data)" = "700 mcpuser"
+          test "$(docker run --rm gpm-smoke:ci --version)" = "$(node -p "require('./package.json').version")"
+
+      - name: OAuth token store persists in the volume
+        run: |
+          set -euo pipefail
+          docker volume create gpm-smoke-data
+          run() { docker run --rm -v gpm-smoke-data:/data -e GITHUB_OAUTH_CLIENT_ID=Iv1.ci "$@"; }
+          # Not logged in: exit 1, store under /data.
+          if run gpm-smoke:ci auth status > status.txt; then exit 1; fi
+          grep -q 'Store: /data/github-oauth.json' status.txt
+          # A 0600 token written by mcpuser is read by a later container.
+          run --entrypoint sh gpm-smoke:ci -c "umask 077; printf '%s' '{\"clientId\":\"Iv1.ci\",\"token\":\"gho_ciplaceholderciplaceholderciplace0\",\"tokenType\":\"bearer\",\"scopes\":[\"repo\"],\"login\":\"ci-user\",\"createdAt\":\"2026-01-01T00:00:00.000Z\"}' > /data/github-oauth.json"
+          run gpm-smoke:ci auth status | tee status.txt
+          grep -q 'Status: logged in' status.txt
+          grep -q 'Permissions: ok (owner-only)' status.txt
+          # logout always deletes the local file.
+          run gpm-smoke:ci auth logout
+          test "$(run --entrypoint sh gpm-smoke:ci -c 'ls -A /data | wc -l')" = "0"
