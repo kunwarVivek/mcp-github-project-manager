@@ -111,10 +111,10 @@
   "dependencies": {
     "@ai-sdk/anthropic": "^4.0.85",
     "@ai-sdk/google": "^4.0.102",
-    "@ai-sdk/google-vertex": "5.0.119",
+    "@ai-sdk/google-vertex": "5.0.129",
     "@ai-sdk/openai": "^4.0.99",
     "@ai-sdk/perplexity": "^5.0.17",
-    "@ai-sdk/provider": "4.0.31",
+    "@ai-sdk/provider": "4.0.35",
     "@modelcontextprotocol/server": "^2.3.1",
     "@octokit/auth-app": "^8.3.1",
     "@octokit/auth-oauth-user": "^6.0.4",
