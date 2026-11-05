@@ -105,7 +105,7 @@ describe("Issue Tools", () => {
         }
       });
 
-      it("accepts valid input with required fields", () => {
+      it("accepts a minimal valid input", () => {
         const result = createIssueSchema.safeParse({
           title: "Test Issue",
           description: "Test description",
