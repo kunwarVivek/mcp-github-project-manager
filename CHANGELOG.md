@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+No unreleased changes.
+
+## [5.0.1] - 2026-11-05
+
 ### Fixed
 - **Issue assignees** — `manage_issues` `create`/`update` resolve assignee logins to user node IDs (`user(login:)`); GitHub previously rejected any call with assignees. Node IDs pass through; an unknown login fails before the mutation with `GitHub user(s) not found: …`. Ports the remaining part of [#27](https://github.com/kunwarVivek/mcp-github-project-manager/pull/27) (thanks @netztaucher; fixes #26).
 - **`update` no longer clears labels** — an issue update that omits `labels` left `labelIds: []` in the mutation, wiping every label (present since 4.0.0). Omitted labels/assignees are now left untouched; an explicit `[]` still clears.
