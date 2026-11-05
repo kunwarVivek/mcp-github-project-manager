@@ -385,14 +385,16 @@ export class GitHubIssueRepository extends BaseGitHubRepository implements Issue
     // (e.g. 'bug', 'priority:medium'); the mutation requires label node IDs,
     // so resolve each name to its ID and skip labels that don't exist.
     const repositoryId = await this.resolveRepositoryNodeId(this.owner, this.repo);
-    const labelIds = await this.resolveLabelNodeIds(data.labels);
+    const labelIds = data.labels ? await this.resolveLabelNodeIds(data.labels) : undefined;
+    // assigneeIds are user node IDs too — resolve logins; undefined stays undefined.
+    const assigneeIds = data.assignees ? await this.resolveUserNodeIds(data.assignees) : undefined;
 
     const response = await this.graphql<CreateIssueResponse>(mutation, {
       input: {
         repositoryId,
         title: data.title,
         body: data.description,
-        assigneeIds: data.assignees,
+        assigneeIds,
         labelIds,
         milestoneId: data.milestoneId,
       },
@@ -420,7 +422,10 @@ export class GitHubIssueRepository extends BaseGitHubRepository implements Issue
     `;
 
     // updateIssue accepts labelIds (node IDs); resolve label names first
-    const labelIds = await this.resolveLabelNodeIds(data.labels);
+    // Undefined must stay undefined: an empty list would clear all labels.
+    const labelIds = data.labels ? await this.resolveLabelNodeIds(data.labels) : undefined;
+    // Undefined must stay undefined: an empty list would clear all assignees.
+    const assigneeIds = data.assignees ? await this.resolveUserNodeIds(data.assignees) : undefined;
 
     const response = await this.withNativeFallback<UpdateIssueResponse>(mutation, {
       input: {
@@ -428,7 +433,7 @@ export class GitHubIssueRepository extends BaseGitHubRepository implements Issue
         title: data.title,
         body: data.description,
         state: toStatusString(data.status || ResourceStatus.ACTIVE, "githubIssue"),
-        assigneeIds: data.assignees,
+        assigneeIds,
         labelIds,
         milestoneId: data.milestoneId,
       },

@@ -262,6 +262,60 @@ export abstract class BaseGitHubRepository implements IGitHubRepository {
   }
 
   /**
+   * Resolve user logins to their GitHub node IDs.
+   *
+   * `assigneeIds` on createIssue/updateIssue takes user node IDs, but callers
+   * pass logins (e.g. 'octocat'). Values that already look like user node IDs
+   * (`U_…`, `BOT_…`, or legacy base64 `04:User<n>` / `03:Bot<n>`) are passed through untouched. Logins
+   * are looked up with `user(login:)` (one query each, in parallel).
+   *
+   * Unlike labels, an unknown login is an error, not a skip: labels are
+   * frequently defaulted by the server (e.g. 'priority:medium'), whereas an
+   * assignee is always an explicit caller choice, and silently creating an
+   * issue with nobody assigned hides the typo.
+   *
+   * @param logins - Logins (or node IDs) to resolve
+   * @returns Node IDs in the caller's order
+   * @throws Error naming every login that does not exist
+   */
+  protected async resolveUserNodeIds(logins: string[] = []): Promise<string[]> {
+    if (logins.length === 0) return [];
+
+    const query = `
+      query GetUserNodeId($login: String!) {
+        user(login: $login) {
+          id
+        }
+      }
+    `;
+
+    interface UserNodeIdResponse {
+      user: { id: string } | null;
+    }
+
+    // Legacy IDs are base64("04:User<n>") / base64("03:Bot<n>"); bare "MDQ6" is not
+    // distinctive enough, since it could be a real login.
+    const nodeIdPattern =
+      /^(?:(?:U_|BOT_)[A-Za-z0-9_-]+|MDQ6VXNlcj[A-Za-z0-9+/=]+|MDM6Qm90[A-Za-z0-9+/=]*)$/;
+    const missing: string[] = [];
+
+    const ids = await Promise.all(
+      logins.map(async (login) => {
+        if (nodeIdPattern.test(login)) return login;
+        const response = await this.graphql<UserNodeIdResponse>(query, { login });
+        if (!response.user) missing.push(login);
+        return response.user?.id;
+      })
+    );
+
+    if (missing.length > 0) {
+      throw new Error(`GitHub user(s) not found: ${missing.join(", ")}`);
+    }
+
+    return ids.filter((id): id is string => id !== undefined);
+  }
+
+  /**
    * Handle GraphQL errors consistently
    */
   protected handleGraphQLError(error: unknown): Error {
