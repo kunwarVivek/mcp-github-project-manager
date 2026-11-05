@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+No unreleased changes.
+
+## [5.1.0] - 2026-11-05
+
 ### Added
 - `auth login --gh`: zero-registration setup through the GitHub CLI. Ensures `gh` is logged in with `repo`, `project` and `read:org` (runs `gh auth login` / `gh auth refresh` interactively), verifies the resulting scopes and warns when a higher-priority credential would shadow gh. Mutually exclusive with `--client-id`/`--scopes`.
 - `auth status` reports the GitHub CLI account, scopes, missing scopes with the fix command, and the effective credential (noting when a higher tier shadows gh).
