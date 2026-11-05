@@ -1,10 +1,5 @@
-import { type ChildProcess, spawn } from "node:child_process";
-import { existsSync } from "node:fs";
-import { join } from "node:path";
-import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import type { WireMessage } from "./utils/payload";
-
-const projectRoot = process.cwd();
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { STDIO_TEST_TIMEOUT_MS, StdioServer } from "./utils/StdioServer";
 
 /**
  * E2E tests specifically for MCP protocol compliance
@@ -12,401 +7,106 @@ const projectRoot = process.cwd();
  * by spawning the actual server process and testing the stdio transport layer
  */
 describe("MCP Protocol Compliance E2E Tests", () => {
-  // These tests spawn real child processes and need real timers for polling.
-  // setup.ts sets vi.useFakeTimers() in beforeEach, which freezes setTimeout
-  // and breaks the inline polling loops used to wait for server startup/responses.
-  // Use beforeEach (not beforeAll) to override setup.ts's fake timers
-  // which runs before each test and freezes setTimeout.
+  let server: StdioServer | undefined;
+
+  // setup.ts sets vi.useFakeTimers() in every e2e beforeEach, which freezes
+  // the setTimeout the harness waits on. Override it after setup.ts runs.
   beforeEach(() => {
     vi.useRealTimers();
   });
-  const serverPath = join(projectRoot, "build/index.js");
-  let serverProcess: ChildProcess;
-  const testTimeout = 10000;
 
-  beforeAll(() => {
-    // Ensure build exists
-    if (!existsSync(serverPath)) {
-      throw new Error("Server build not found. Run `npm run build` first.");
-    }
-  });
-
-  afterEach(() => {
-    if (serverProcess) {
-      serverProcess.kill("SIGTERM");
-    }
+  afterEach(async () => {
+    await server?.stop();
+    server = undefined;
   });
 
   describe("Stdio Transport Protocol Compliance", () => {
     it(
       "should only output JSON messages to stdout, logs to stderr",
       async () => {
-        let stderrData = "";
-        const stdoutMessages: WireMessage[] = [];
-        const jsonParseErrors: string[] = [];
-        let receivedInitResponse = false;
+        server = StdioServer.start();
 
-        // Spawn the server process
-        serverProcess = spawn("node", [serverPath], {
-          env: {
-            ...process.env,
-            // stdio suites don't test webhooks; without this every spawned
-            // server binds WEBHOOK_PORT 3001 and parallel files collide.
-            SSE_ENABLED: "false",
-            GITHUB_TOKEN: "test-token",
-            GITHUB_OWNER: "test-owner",
-            GITHUB_REPO: "test-repo",
-          },
-          stdio: ["pipe", "pipe", "pipe"],
+        const initResponse = await server.initialize({
+          protocolVersion: "2024-11-05",
+          clientName: "test-client",
         });
-
-        // Collect stdout data (should be JSON only)
-        serverProcess.stdout?.on("data", (data) => {
-          const chunk = data.toString();
-
-          // Try to parse each line as JSON
-          const lines = chunk.split("\n").filter((line: string) => line.trim());
-          for (const line of lines) {
-            try {
-              const parsed = JSON.parse(line);
-              stdoutMessages.push(parsed);
-              // Check if this is the init response
-              if (parsed.id === 1 && parsed.result) {
-                receivedInitResponse = true;
-              }
-            } catch {
-              if (line.trim()) {
-                jsonParseErrors.push(`Non-JSON on stdout: "${line.trim()}"`);
-              }
-            }
-          }
-        });
-
-        // Collect stderr data (logs should go here)
-        serverProcess.stderr?.on("data", (data) => {
-          stderrData += data.toString();
-        });
-
-        // Wait for server to start (look for startup message in stderr)
-        await new Promise<void>((resolve) => {
-          const checkStartup = () => {
-            if (stderrData.includes("GitHub Project Manager MCP server running on stdio")) {
-              resolve();
-            } else {
-              setTimeout(checkStartup, 100);
-            }
-          };
-          setTimeout(checkStartup, 100);
-          // Fallback timeout
-          setTimeout(resolve, 5000);
-        });
-
-        // Send an MCP initialize request
-        const initRequest = {
-          jsonrpc: "2.0",
-          id: 1,
-          method: "initialize",
-          params: {
-            protocolVersion: "2024-11-05",
-            capabilities: {},
-            clientInfo: {
-              name: "test-client",
-              version: "1.0.0",
-            },
-          },
-        };
-
-        // Send the request
-        serverProcess.stdin?.write(`${JSON.stringify(initRequest)}\n`);
-
-        // Wait for response with proper timeout
-        await new Promise<void>((resolve) => {
-          const checkResponse = () => {
-            if (receivedInitResponse) {
-              resolve();
-            } else {
-              setTimeout(checkResponse, 100);
-            }
-          };
-          setTimeout(checkResponse, 100);
-          // Fallback timeout
-          setTimeout(resolve, 3000);
-        });
-
-        // Send notifications/initialized
-        const initializedNotification = {
-          jsonrpc: "2.0",
-          method: "notifications/initialized",
-        };
-        serverProcess.stdin?.write(`${JSON.stringify(initializedNotification)}\n`);
-
-        // Wait a bit more for any additional processing
-        await new Promise((resolve) => setTimeout(resolve, 500));
 
         // Verify protocol compliance
-        expect(jsonParseErrors).toEqual([]);
-        expect(stderrData).toContain("GitHub Project Manager MCP server running on stdio");
+        expect(server.nonJsonLines).toEqual([]);
+        expect(server.stderr).toContain("GitHub Project Manager MCP server running on stdio");
 
         // Verify at least one valid MCP response was received
-        expect(stdoutMessages.length).toBeGreaterThan(0);
-        expect(receivedInitResponse).toBe(true);
+        expect(server.messages.length).toBeGreaterThan(0);
+        expect(initResponse.result).toBeDefined();
 
         // Verify all stdout messages are valid MCP protocol messages
-        for (const message of stdoutMessages) {
+        for (const message of server.messages) {
           expect(message).toHaveProperty("jsonrpc");
           expect(message.jsonrpc).toBe("2.0");
           // Should have either id (for responses) or method (for notifications)
           expect(message.id !== undefined || message.method !== undefined).toBe(true);
         }
       },
-      testTimeout
+      STDIO_TEST_TIMEOUT_MS
     );
 
     it(
       "should handle list_tools request without stdout pollution",
       async () => {
-        let stdoutData = "";
-        let stderrData = "";
-        let receivedInitResponse = false;
-        let receivedToolsResponse = false;
+        server = StdioServer.start();
 
-        serverProcess = spawn("node", [serverPath], {
-          env: {
-            ...process.env,
-            // stdio suites don't test webhooks; without this every spawned
-            // server binds WEBHOOK_PORT 3001 and parallel files collide.
-            SSE_ENABLED: "false",
-            GITHUB_TOKEN: "test-token",
-            GITHUB_OWNER: "test-owner",
-            GITHUB_REPO: "test-repo",
-          },
-          stdio: ["pipe", "pipe", "pipe"],
-        });
-
-        serverProcess.stdout?.on("data", (data) => {
-          const chunk = data.toString();
-          stdoutData += chunk;
-
-          // Check for responses
-          const lines = chunk.split("\n").filter((line: string) => line.trim());
-          for (const line of lines) {
-            try {
-              const parsed = JSON.parse(line);
-              if (parsed.id === 1 && parsed.result) {
-                receivedInitResponse = true;
-              }
-              if (parsed.id === 2 && parsed.result && parsed.result.tools) {
-                receivedToolsResponse = true;
-              }
-            } catch {
-              // Ignore parse errors for this test
-            }
-          }
-        });
-
-        serverProcess.stderr?.on("data", (data) => {
-          stderrData += data.toString();
-        });
-
-        // Wait for server initialization
-        await new Promise<void>((resolve) => {
-          const checkStartup = () => {
-            if (stderrData.includes("GitHub Project Manager MCP server running on stdio")) {
-              resolve();
-            } else {
-              setTimeout(checkStartup, 100);
-            }
-          };
-          setTimeout(checkStartup, 100);
-          setTimeout(resolve, 5000);
-        });
-
-        // Send initialize request
-        const initRequest = {
-          jsonrpc: "2.0",
-          id: 1,
-          method: "initialize",
-          params: {
-            protocolVersion: "2024-11-05",
-            capabilities: {},
-            clientInfo: { name: "test-client", version: "1.0.0" },
-          },
-        };
-        serverProcess.stdin?.write(`${JSON.stringify(initRequest)}\n`);
-
-        // Wait for init response
-        await new Promise<void>((resolve) => {
-          const checkResponse = () => {
-            if (receivedInitResponse) {
-              resolve();
-            } else {
-              setTimeout(checkResponse, 100);
-            }
-          };
-          setTimeout(checkResponse, 100);
-          setTimeout(resolve, 3000);
-        });
-
-        // Send initialized notification
-        serverProcess.stdin?.write(
-          `${JSON.stringify({
-            jsonrpc: "2.0",
-            method: "notifications/initialized",
-          })}\n`
-        );
-
-        await new Promise((resolve) => setTimeout(resolve, 200));
-
-        // Send list_tools request
-        const listToolsRequest = {
+        await server.initialize({ protocolVersion: "2024-11-05", clientName: "test-client" });
+        const tools = await server.request({
           jsonrpc: "2.0",
           id: 2,
           method: "tools/list",
           params: {},
-        };
-        serverProcess.stdin?.write(`${JSON.stringify(listToolsRequest)}\n`);
-
-        // Wait for tools response
-        await new Promise<void>((resolve) => {
-          const checkResponse = () => {
-            if (receivedToolsResponse) {
-              resolve();
-            } else {
-              setTimeout(checkResponse, 100);
-            }
-          };
-          setTimeout(checkResponse, 100);
-          setTimeout(resolve, 3000);
         });
+        expect(tools.result?.tools).toBeDefined();
 
-        // Parse all stdout messages
-        const stdoutLines = stdoutData.split("\n").filter((line: string) => line.trim());
-        const validJsonMessages = stdoutLines.filter((line) => {
-          try {
-            JSON.parse(line);
-            return true;
-          } catch {
-            return false;
-          }
-        });
-
-        // Should have received valid JSON responses
-        expect(validJsonMessages.length).toBeGreaterThan(0);
-
-        // All stdout should be valid JSON (no log messages)
-        expect(validJsonMessages.length).toBe(stdoutLines.length);
+        // Should have received valid JSON responses, and nothing else on stdout
+        expect(server.stdoutLines.length).toBeGreaterThan(0);
+        expect(server.nonJsonLines).toEqual([]);
 
         // Stderr should contain initialization logs
-        expect(stderrData).toContain("GitHub Project Manager MCP server running on stdio");
+        expect(server.stderr).toContain("GitHub Project Manager MCP server running on stdio");
 
         // Should not contain any log messages in stdout
-        expect(stdoutData).not.toContain("🤖 AI");
-        expect(stdoutData).not.toContain("[MCP]");
-        expect(stdoutData).not.toContain("GitHub Project Manager");
+        expect(server.stdout).not.toContain("🤖 AI");
+        expect(server.stdout).not.toContain("[MCP]");
+        expect(server.stdout).not.toContain("GitHub Project Manager");
       },
-      testTimeout
+      STDIO_TEST_TIMEOUT_MS
     );
 
     it(
       "should handle tool execution without stderr pollution in JSON responses",
       async () => {
-        const responseMessages: WireMessage[] = [];
-        let stderrData = "";
+        server = StdioServer.start();
 
-        serverProcess = spawn("node", [serverPath], {
-          env: {
-            ...process.env,
-            // stdio suites don't test webhooks; without this every spawned
-            // server binds WEBHOOK_PORT 3001 and parallel files collide.
-            SSE_ENABLED: "false",
-            GITHUB_TOKEN: "test-token",
-            GITHUB_OWNER: "test-owner",
-            GITHUB_REPO: "test-repo",
-          },
-          stdio: ["pipe", "pipe", "pipe"],
-        });
-
-        serverProcess.stdout?.on("data", (data) => {
-          const lines = data
-            .toString()
-            .split("\n")
-            .filter((line: string) => line.trim());
-          for (const line of lines) {
-            try {
-              const parsed = JSON.parse(line);
-              responseMessages.push(parsed);
-            } catch {
-              // Ignore parse errors for this test
-            }
-          }
-        });
-
-        serverProcess.stderr?.on("data", (data) => {
-          stderrData += data.toString();
-        });
-
-        // Wait for server initialization
-        await new Promise((resolve) => setTimeout(resolve, 2000));
-
-        // Initialize the server
-        serverProcess.stdin?.write(
-          `${JSON.stringify({
-            jsonrpc: "2.0",
-            id: 1,
-            method: "initialize",
-            params: {
-              protocolVersion: "2024-11-05",
-              capabilities: {},
-              clientInfo: { name: "test-client", version: "1.0.0" },
-            },
-          })}\n`
-        );
-
-        await new Promise((resolve) => setTimeout(resolve, 500));
-
-        serverProcess.stdin?.write(
-          `${JSON.stringify({
-            jsonrpc: "2.0",
-            method: "notifications/initialized",
-          })}\n`
-        );
-
-        await new Promise((resolve) => setTimeout(resolve, 500));
+        await server.initialize({ protocolVersion: "2024-11-05", clientName: "test-client" });
 
         // Call a tool (this might trigger AI service warnings)
-        const callToolRequest = {
+        const toolResponse = await server.request({
           jsonrpc: "2.0",
           id: 3,
           method: "tools/call",
-          params: {
-            name: "get_milestone_metrics",
-            arguments: {
-              milestoneId: "test-milestone",
-            },
-          },
-        };
-        serverProcess.stdin?.write(`${JSON.stringify(callToolRequest)}\n`);
+          params: { name: "get_milestone_metrics", arguments: { milestoneId: "test-milestone" } },
+        });
+        expect(toolResponse.jsonrpc).toBe("2.0");
 
-        // Wait for tool execution
-        await new Promise((resolve) => setTimeout(resolve, 2000));
-
-        // Find the tool response
-        const toolResponse = responseMessages.find((msg) => msg.id === 3 && msg.jsonrpc === "2.0");
-
-        if (toolResponse) {
-          // Verify the response doesn't contain log messages
-          if (toolResponse.result) {
-            const resultString = JSON.stringify(toolResponse.result);
-            expect(resultString).not.toContain("🤖 AI");
-            expect(resultString).not.toContain("[MCP]");
-            expect(resultString).not.toContain("Warning:");
-          }
+        // Verify the response doesn't contain log messages
+        if (toolResponse.result) {
+          const resultString = JSON.stringify(toolResponse.result);
+          expect(resultString).not.toContain("🤖 AI");
+          expect(resultString).not.toContain("[MCP]");
+          expect(resultString).not.toContain("Warning:");
         }
 
         // AI service warnings should be in stderr, not in the JSON response
-        expect(stderrData).toContain("GitHub Project Manager MCP server running on stdio");
+        expect(server.stderr).toContain("GitHub Project Manager MCP server running on stdio");
       },
-      testTimeout
+      STDIO_TEST_TIMEOUT_MS
     );
   });
 
@@ -414,245 +114,81 @@ describe("MCP Protocol Compliance E2E Tests", () => {
     it(
       "should return proper MCP error responses for invalid requests",
       async () => {
-        const responseMessages: WireMessage[] = [];
-
-        serverProcess = spawn("node", [serverPath], {
-          env: {
-            ...process.env,
-            // stdio suites don't test webhooks; without this every spawned
-            // server binds WEBHOOK_PORT 3001 and parallel files collide.
-            SSE_ENABLED: "false",
-            GITHUB_TOKEN: "test-token",
-            GITHUB_OWNER: "test-owner",
-            GITHUB_REPO: "test-repo",
-          },
-          stdio: ["pipe", "pipe", "pipe"],
-        });
-
-        serverProcess.stdout?.on("data", (data) => {
-          const lines = data
-            .toString()
-            .split("\n")
-            .filter((line: string) => line.trim());
-          for (const line of lines) {
-            try {
-              const parsed = JSON.parse(line);
-              responseMessages.push(parsed);
-            } catch {
-              // Ignore parse errors for this test
-            }
-          }
-        });
-
-        // Wait for server initialization
-        await new Promise((resolve) => setTimeout(resolve, 2000));
+        server = StdioServer.start();
 
         // MCP v2 requires the initialize handshake before any tools/* call.
         // v1 tolerated calling straight in; without this the server never answers
-        // the request below and the assertion sees undefined.
-        serverProcess.stdin?.write(
-          `${JSON.stringify({
-            jsonrpc: "2.0",
-            id: 0,
-            method: "initialize",
-            params: {
-              protocolVersion: "2025-06-18",
-              capabilities: {},
-              clientInfo: { name: "compliance-probe", version: "1" },
-            },
-          })}\n`
-        );
-        await new Promise((resolve) => setTimeout(resolve, 500));
-        serverProcess.stdin?.write(
-          `${JSON.stringify({ jsonrpc: "2.0", method: "notifications/initialized" })}\n`
-        );
-        await new Promise((resolve) => setTimeout(resolve, 200));
+        // the request below.
+        await server.initialize({
+          id: 0,
+          protocolVersion: "2025-06-18",
+          clientName: "compliance-probe",
+        });
 
         // Now an invalid request: a tool that does not exist.
-        const invalidRequest = {
+        const errorResponse = await server.request({
           jsonrpc: "2.0",
           id: 1,
           method: "tools/call",
-          params: {
-            name: "invalid_tool",
-            arguments: {},
-          },
-        };
-        serverProcess.stdin?.write(`${JSON.stringify(invalidRequest)}\n`);
+          params: { name: "invalid_tool", arguments: {} },
+        });
 
-        // Wait for error response
-        await new Promise((resolve) => setTimeout(resolve, 1000));
-
-        // Should receive an error response
-        const errorResponse = responseMessages.find((msg) => msg.id === 1 && msg.error);
-
-        expect(errorResponse).toBeDefined();
-        expect(errorResponse?.jsonrpc).toBe("2.0");
-        expect(errorResponse?.error).toBeDefined();
-        expect(errorResponse?.error?.code).toBeDefined();
-        expect(errorResponse?.error?.message).toBeDefined();
+        expect(errorResponse.jsonrpc).toBe("2.0");
+        expect(errorResponse.error).toBeDefined();
+        expect(errorResponse.error?.code).toBeDefined();
+        expect(errorResponse.error?.message).toBeDefined();
       },
-      testTimeout
+      STDIO_TEST_TIMEOUT_MS
     );
   });
 
   describe("MCP Inspector Compatibility", () => {
-    it("should be compatible with MCP Inspector connection flow", async () => {
-      const responses: { initialize?: WireMessage; toolsList?: WireMessage } = {};
+    it(
+      "should be compatible with MCP Inspector connection flow",
+      async () => {
+        server = StdioServer.start();
+        await server.waitForReady();
 
-      serverProcess = spawn("node", [serverPath], {
-        env: {
-          ...process.env,
-          // stdio suites don't test webhooks; without this every spawned
-          // server binds WEBHOOK_PORT 3001 and parallel files collide.
-          SSE_ENABLED: "false",
-          GITHUB_TOKEN: "test-token",
-          GITHUB_OWNER: "test-owner",
-          GITHUB_REPO: "test-repo",
-        },
-        stdio: ["pipe", "pipe", "pipe"],
-      });
-
-      let stdoutBuffer = "";
-      serverProcess.stdout?.on("data", (data) => {
-        stdoutBuffer += data.toString();
-
-        // Try to extract complete JSON messages
-        const lines = stdoutBuffer.split("\n");
-        stdoutBuffer = lines.pop() || ""; // Keep the last incomplete line in buffer
-
-        for (const line of lines) {
-          const trimmed = line.trim();
-          if (trimmed) {
-            try {
-              const parsed = JSON.parse(trimmed);
-              if (parsed.id === 1 && parsed.result) {
-                responses.initialize = parsed;
-              } else if (parsed.id === 2 && parsed.result) {
-                responses.toolsList = parsed;
-              }
-            } catch {
-              // For debugging: log parse errors for potential responses
-              if (trimmed.includes('"jsonrpc"') || trimmed.includes('"result"')) {
-                console.warn(
-                  "JSON parse error for potential response:",
-                  `${trimmed.substring(0, 100)}...`
-                );
-              }
-            }
-          }
-        }
-      });
-
-      // Wait for server startup
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-
-      // Step 1: Initialize (exactly like MCP Inspector would)
-      serverProcess.stdin?.write(
-        `${JSON.stringify({
+        // Step 1: Initialize (exactly like MCP Inspector would)
+        const initialize = await server.request({
           jsonrpc: "2.0",
           id: 1,
           method: "initialize",
           params: {
             protocolVersion: "2024-11-05",
-            capabilities: {
-              roots: {
-                listChanged: true,
-              },
-              sampling: {},
-            },
-            clientInfo: {
-              name: "MCP Inspector",
-              version: "1.0.0",
-            },
+            capabilities: { roots: { listChanged: true }, sampling: {} },
+            clientInfo: { name: "MCP Inspector", version: "1.0.0" },
           },
-        })}\n`
-      );
+        });
 
-      // Wait for initialize response with timeout
-      await new Promise((resolve, reject) => {
-        const startTime = Date.now();
-        const checkResponse = () => {
-          if (responses.initialize) {
-            resolve(undefined);
-          } else if (Date.now() - startTime > 10000) {
-            reject(new Error("Timeout waiting for initialize response"));
-          } else {
-            setTimeout(checkResponse, 100);
-          }
-        };
-        checkResponse();
-      });
+        // Verify initialize response
+        expect(initialize.jsonrpc).toBe("2.0");
+        expect(initialize.result).toBeDefined();
+        expect(initialize.result?.capabilities).toBeDefined();
 
-      // Verify initialize response
-      expect(responses.initialize).toBeDefined();
-      expect(responses.initialize?.jsonrpc).toBe("2.0");
-      expect(responses.initialize?.result).toBeDefined();
-      expect(responses.initialize?.result?.capabilities).toBeDefined();
+        // Step 2: Send initialized notification
+        server.send({ jsonrpc: "2.0", method: "notifications/initialized" });
 
-      // Step 2: Send initialized notification
-      serverProcess.stdin?.write(
-        `${JSON.stringify({
-          jsonrpc: "2.0",
-          method: "notifications/initialized",
-        })}\n`
-      );
-
-      await new Promise((resolve) => setTimeout(resolve, 500));
-
-      // Step 3: List tools
-      serverProcess.stdin?.write(
-        `${JSON.stringify({
+        // Step 3: List tools
+        const toolsList = await server.request({
           jsonrpc: "2.0",
           id: 2,
           method: "tools/list",
           params: {},
-        })}\n`
-      );
+        });
 
-      // Wait for tools response with timeout
-      await new Promise((resolve, reject) => {
-        const startTime = Date.now();
-        const checkResponse = () => {
-          if (responses.toolsList) {
-            resolve(undefined);
-          } else if (Date.now() - startTime > 10000) {
-            // Before timing out, try to process any remaining buffer content
-            if (stdoutBuffer.trim()) {
-              try {
-                const parsed = JSON.parse(stdoutBuffer.trim());
-                if (parsed.id === 2 && parsed.result) {
-                  responses.toolsList = parsed;
-                  resolve(undefined);
-                  return;
-                }
-              } catch {
-                console.warn(
-                  "Failed to parse remaining buffer as JSON:",
-                  `${stdoutBuffer.substring(0, 200)}...`
-                );
-              }
-            }
-            reject(new Error("Timeout waiting for tools list response"));
-          } else {
-            setTimeout(checkResponse, 100);
-          }
-        };
-        checkResponse();
-      });
+        // Verify tools list response
+        expect(toolsList.result).toBeDefined();
+        expect(Array.isArray(toolsList.result?.tools)).toBe(true);
+        expect(toolsList.result?.tools?.length).toBeGreaterThan(0);
 
-      // Verify tools list response
-      expect(responses.toolsList).toBeDefined();
-      expect(responses.toolsList?.result).toBeDefined();
-      expect(responses.toolsList?.result?.tools).toBeDefined();
-      expect(Array.isArray(responses.toolsList?.result?.tools)).toBe(true);
-      expect(responses.toolsList?.result?.tools?.length).toBeGreaterThan(0);
-
-      // Verify tool structure matches MCP specification
-      const firstTool = responses.toolsList?.result?.tools?.[0];
-      expect(firstTool?.name).toBeDefined();
-      expect(firstTool?.description).toBeDefined();
-      expect(firstTool?.inputSchema).toBeDefined();
-    }, 30000); // Increase timeout for MCP Inspector test
+        // Verify tool structure matches MCP specification
+        const firstTool = toolsList.result?.tools?.[0];
+        expect(firstTool?.name).toBeDefined();
+        expect(firstTool?.description).toBeDefined();
+        expect(firstTool?.inputSchema).toBeDefined();
+      },
+      STDIO_TEST_TIMEOUT_MS
+    );
   });
 });

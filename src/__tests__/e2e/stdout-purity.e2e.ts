@@ -1,20 +1,5 @@
-import { spawn } from "node:child_process";
-import { existsSync } from "node:fs";
-import { resolve } from "node:path";
-import { describe, expect, it } from "vitest";
-
-const SERVER = resolve(process.cwd(), "build/index.js");
-
-const INITIALIZE = JSON.stringify({
-  jsonrpc: "2.0",
-  id: 1,
-  method: "initialize",
-  params: {
-    protocolVersion: "2025-03-26",
-    capabilities: {},
-    clientInfo: { name: "stdout-purity-probe", version: "1" },
-  },
-});
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { STDIO_TEST_TIMEOUT_MS, StdioServer } from "./utils/StdioServer";
 
 /**
  * A stdio MCP server speaks JSON-RPC over stdout. ANY other stdout write —
@@ -26,47 +11,33 @@ const INITIALIZE = JSON.stringify({
  *   - dotenv v17 prints an "injected env" banner to stdout by default.
  */
 describe("stdio transport: stdout purity", () => {
-  it.runIf(existsSync(SERVER))(
+  let server: StdioServer | undefined;
+
+  // setup.ts installs fake timers in every e2e beforeEach; the harness waits
+  // on real timers.
+  beforeEach(() => {
+    vi.useRealTimers();
+  });
+
+  afterEach(async () => {
+    await server?.stop();
+    server = undefined;
+  });
+
+  it(
     "emits only JSON-RPC on stdout",
     async () => {
-      const child = spawn(process.execPath, [SERVER], {
-        env: {
-          ...process.env,
-          // stdio suites don't test webhooks; without this every spawned
-          // server binds WEBHOOK_PORT 3001 and parallel files collide.
-          SSE_ENABLED: "false",
-          NODE_ENV: "production",
-          GITHUB_OWNER: "probe-owner",
-          GITHUB_REPO: "probe-repo",
-          GITHUB_TOKEN: "ghp_probe",
-          GH_CLI_TOKEN_FALLBACK: "false",
-        },
-        stdio: ["pipe", "pipe", "ignore"],
+      server = StdioServer.start({
+        env: { NODE_ENV: "production", GITHUB_TOKEN: "ghp_probe" },
       });
 
-      let stdout = "";
-      const firstResponse = new Promise<void>((done) => {
-        child.stdout.on("data", (chunk) => {
-          stdout += String(chunk);
-          if (stdout.includes("\n")) done();
-        });
-        child.on("exit", () => done());
-      });
+      await server.initialize({ protocolVersion: "2025-03-26", clientName: "stdout-purity-probe" });
 
-      child.stdin.write(`${INITIALIZE}\n`);
-      await firstResponse;
-      child.kill();
-
-      const lines = stdout.split("\n").filter((l) => l.trim().length > 0);
-      expect(lines.length).toBeGreaterThan(0);
-
-      for (const line of lines) {
-        expect(
-          () => JSON.parse(line),
-          `non-JSON on stdout would corrupt the protocol stream: ${line}`
-        ).not.toThrow();
-      }
+      expect(server.messages.length).toBeGreaterThan(0);
+      expect(server.nonJsonLines, "non-JSON on stdout would corrupt the protocol stream").toEqual(
+        []
+      );
     },
-    15_000
+    STDIO_TEST_TIMEOUT_MS
   );
 });
