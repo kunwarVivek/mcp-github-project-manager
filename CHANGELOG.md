@@ -7,7 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-No unreleased changes.
+### Fixed
+- **Issue assignees** — `manage_issues` `create`/`update` resolve assignee logins to user node IDs (`user(login:)`); GitHub previously rejected any call with assignees. Node IDs pass through; an unknown login fails before the mutation with `GitHub user(s) not found: …`. Ports the remaining part of [#27](https://github.com/kunwarVivek/mcp-github-project-manager/pull/27) (thanks @netztaucher; fixes #26).
+- **`update` no longer clears labels** — an issue update that omits `labels` left `labelIds: []` in the mutation, wiping every label (present since 4.0.0). Omitted labels/assignees are now left untouched; an explicit `[]` still clears.
+
+### Security
+- `minimatch` 10.2.6 → 11.0.4 (transitive, via `rimraf` 6.1.4): glob-pattern denial of service (Dependabot alerts #147, #149).
+
+### Changed
+- Dependencies: `ai` 7.0.162, `@ai-sdk/provider` 4.0.35 with `@ai-sdk/google-vertex` 5.0.129 (one provider copy), `@ai-sdk/anthropic|google|openai|perplexity` latest 4.x/5.x, `@modelcontextprotocol/server|client` 2.4.0, `@biomejs/biome` 2.6.4 (Markdown/YAML formatting kept off), `vitest` 5.1.0, `vite` 8.3.5.
+- CI: `actions/checkout` v7, `actions/setup-node` v7, `pnpm/action-setup` v6, `softprops/action-gh-release` v3, `github/codeql-action` v4 (Node 24 runtimes). The release job no longer restores a dependency cache before publishing with OIDC.
+- README: MseeP.ai security-assessment badge ([#21](https://github.com/kunwarVivek/mcp-github-project-manager/pull/21), thanks @lwsinclair).
 
 ## [5.0.0] - 2026-11-05
 
