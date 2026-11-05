@@ -7,7 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-No unreleased changes.
+### Fixed
+- E2E stdio tests share one event-driven `StdioServer` harness (`src/__tests__/e2e/utils/StdioServer.ts`) that waits on protocol responses instead of fixed sleeps, removing load-dependent flakes in the protocol-compliance, stdio-transport and stdout-purity suites. No runtime change.
 
 ## [5.1.0] - 2026-11-05
 
