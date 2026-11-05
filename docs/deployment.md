@@ -51,6 +51,35 @@ docker run -it \
 The MCP server speaks stdio, so `docker run` without `-i` will look like it
 hangs — it is waiting for the client to talk to it.
 
+The image `ENTRYPOINT` is `build/bin.js`, so the CLI subcommands work inside
+the container (`docker run ... mcp-github-project-manager auth status`).
+
+**Credentials in containers / Kubernetes**
+
+- *Interactive:* run `auth login` once with a persistent, `mcpuser`-writable
+  location for the token store (`GITHUB_OAUTH_TOKEN_FILE`), then start the
+  server with the same mount:
+  ```bash
+  docker run -it --rm \
+    -e GITHUB_OAUTH_CLIENT_ID=<client id> \
+    -e GITHUB_OAUTH_TOKEN_FILE=/data/github-oauth.json \
+    -v /path/writable-by-mcpuser:/data \
+    mcp-github-project-manager auth login
+  ```
+  The verification URL and code are printed to stderr; open the URL on any
+  device.
+- *Mounted token file:* mount a pre-authorised store and point
+  `GITHUB_OAUTH_TOKEN_FILE` at it. The file MUST be mode `0600` — a store
+  readable by group/other is ignored.
+- *Headless / CI / k8s:* prefer a GitHub App (`GITHUB_APP_*`) or a PAT via
+  `SECRETS_DIR` (e.g. a mounted Secret at `/run/secrets/GITHUB_TOKEN`) over the
+  device flow, which needs a human to approve a code.
+- *Vertex AI Gemini:* set `GOOGLE_VERTEX_PROJECT`; credentials come from Google
+  ADC — workload identity / the metadata server on GCP, or a mounted service
+  account key referenced by `GOOGLE_APPLICATION_CREDENTIALS`.
+- *`/events/*`:* publishing port `3001` now also needs `EVENTS_AUTH_TOKEN` or
+  `OAUTH_*` (see Security below).
+
 ### Docker Compose
 
 A `docker-compose.yml` is provided at the repository root:
@@ -116,24 +145,25 @@ for per-provider overrides.
 
 | Variable | Description |
 |----------|-------------|
-| `GITHUB_TOKEN` | GitHub Personal Access Token with `repo` and `project` scopes |
 | `GITHUB_OWNER` | GitHub username or organization |
 | `GITHUB_REPO` | Repository name |
 
-`GITHUB_TOKEN` is resolved through a chain: `--token` CLI flag →
-`$SECRETS_DIR/GITHUB_TOKEN` file → `GITHUB_TOKEN` env var → `gh auth token`.
-A working `gh` login therefore needs no configuration at all; disable the
-fallback with `GH_CLI_TOKEN_FALLBACK=false`.
+`GITHUB_TOKEN` is **not** required. Credentials resolve per tool call, first hit
+wins: GitHub App installation (`GITHUB_APP_*`) → `--token` CLI flag →
+`$SECRETS_DIR/GITHUB_TOKEN` file → `GITHUB_TOKEN` env var → stored OAuth token
+(`auth login`) → `gh auth token`. A working `gh` login needs no configuration at
+all; disable that fallback with `GH_CLI_TOKEN_FALLBACK=false`. With none
+available the server fails fast at startup.
 
 ### Optional (GitHub App auth)
 
 | Variable | Description |
 |----------|-------------|
-| `GITHUB_APP_ID` | App ID — used instead of the PAT when all three App values are set |
+| `GITHUB_APP_ID` | App ID — highest-priority credential when all three App values are set |
 | `GITHUB_APP_PRIVATE_KEY` | App private key |
 | `GITHUB_APP_INSTALLATION_ID` | Installation ID |
 
-A partial App configuration falls back to the PAT rather than failing.
+A partial App configuration falls through to the next credential rather than failing.
 
 ### Optional (AI Features)
 
@@ -164,9 +194,35 @@ A partial App configuration falls back to the PAT rather than failing.
 
 The full list lives in [CONFIGURATION.md](CONFIGURATION.md).
 
+### Optional (OAuth device flow)
+
+| Variable | Description |
+|----------|-------------|
+| `GITHUB_OAUTH_CLIENT_ID` | Client ID of an OAuth App / GitHub App with Device Flow enabled (required for `auth login` and for using a stored token) |
+| `GITHUB_OAUTH_CLIENT_SECRET` | Only used to revoke the token on `auth logout` |
+| `GITHUB_OAUTH_SCOPES` | Requested scopes (default `repo project read:org`) |
+| `GITHUB_OAUTH_TOKEN_FILE` | Token store path (default `$XDG_CONFIG_HOME/mcp-github-project-manager/github-oauth.json`; file must be `0600`) |
+
+### Optional (inbound `/events/*` auth)
+
+| Variable | Description |
+|----------|-------------|
+| `EVENTS_AUTH_TOKEN` | Shared bearer token for `/events/*` |
+| `OAUTH_ISSUER` / `OAUTH_AUDIENCE` | OAuth 2.1 resource server (audience required with issuer) |
+| `OAUTH_JWKS_URI` / `OAUTH_REQUIRED_SCOPES` / `OAUTH_RESOURCE_URL` | Optional JWKS override, required scopes, RFC 9728 resource URL |
+| `EVENTS_ALLOW_UNAUTHENTICATED` | Opt out of `/events/*` auth (trusted dev only) |
+
+### Optional (Gemini via Vertex AI)
+
+| Variable | Description |
+|----------|-------------|
+| `GOOGLE_VERTEX_PROJECT` | GCP project; enables the `google-vertex` provider |
+| `GOOGLE_VERTEX_LOCATION` | Region (default `us-central1`) |
+| `GOOGLE_APPLICATION_CREDENTIALS` | ADC service-account key path; on GKE/Cloud Run prefer workload identity / the metadata server and leave it unset |
+
 ## GitHub Token Scopes
 
-Required scopes for your Personal Access Token:
+Required scopes if you use a Personal Access Token (one option among several):
 
 - `repo` - Full repository access
 - `project` - Project board access
@@ -206,6 +262,14 @@ GitHub API has rate limits:
 - Logs are redacted — token/secret-shaped keys are stripped, and the token is
   not enumerable on the GitHub config object.
 - The Docker image runs as the non-root user `mcpuser`.
+- **Breaking:** `/events/stream`, `/events/subscribe`, `/events/replay/:id` and
+  `/events/recent` require `Authorization: Bearer`. Set `EVENTS_AUTH_TOKEN` or
+  the `OAUTH_ISSUER` + `OAUTH_AUDIENCE` resource-server settings; with neither,
+  they return `401`. `EVENTS_ALLOW_UNAUTHENTICATED=true` opts out (trusted dev
+  only). `POST /webhooks/github` is unchanged (HMAC only).
+- **Breaking:** anonymous `/health` now returns only `{"status":"healthy"}`;
+  full stats need a bearer token. Probes that only check status are unaffected.
+  See [CONFIGURATION.md](CONFIGURATION.md#inbound-http-authentication-events).
 
 ## Troubleshooting
 

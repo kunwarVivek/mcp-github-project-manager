@@ -2,7 +2,13 @@ import { join, resolve } from "node:path";
 import * as dotenv from "dotenv";
 import { parseCommandLineArgs } from "./cli";
 import { validateConfig, validateConfigWarnings } from "./domain/config-schema";
-import { createDefaultSecretResolver } from "./infrastructure/secrets/SecretProvider";
+import { GhCliSecretProvider } from "./infrastructure/secrets/GhCliSecretProvider";
+import {
+  createDefaultSecretResolver,
+  isGhCliFallbackAllowed,
+  readSecretFromTier,
+  resolveSecretWithSource,
+} from "./infrastructure/secrets/SecretProvider";
 
 // Parse command line arguments only if not in test environment
 const cliOptions =
@@ -34,7 +40,6 @@ const secretResolver = createDefaultSecretResolver();
  * SECRETS_DIR file → environment variable).
  */
 const RESOLVED_CONFIG_KEYS = [
-  "GITHUB_TOKEN",
   "GITHUB_OWNER",
   "GITHUB_REPO",
   "GITHUB_APP_ID",
@@ -68,7 +73,6 @@ function buildResolvedEnv(): Record<string, string | undefined> {
     }
   }
   // CLI flags outrank both file-mounted secrets and environment variables.
-  if (cliOptions.token) resolved.GITHUB_TOKEN = cliOptions.token;
   if (cliOptions.owner) resolved.GITHUB_OWNER = cliOptions.owner;
   if (cliOptions.repo) resolved.GITHUB_REPO = cliOptions.repo;
   return resolved;
@@ -181,11 +185,6 @@ export function getNumericConfigValue(name: string, defaultValue: number): numbe
 // so live E2E suites that spawn the server as a subprocess can pass real credentials.
 const isTestEnv = process.env.NODE_ENV === "test";
 const isRealE2E = process.env.E2E_REAL_API === "true";
-export const GITHUB_TOKEN = isTestEnv
-  ? isRealE2E
-    ? process.env.GITHUB_TOKEN || "test-token"
-    : "test-token"
-  : getConfigValue("GITHUB_TOKEN", cliOptions.token);
 export const GITHUB_OWNER = isTestEnv
   ? isRealE2E
     ? process.env.GITHUB_OWNER || "test-owner"
@@ -196,6 +195,45 @@ export const GITHUB_REPO = isTestEnv
     ? process.env.GITHUB_REPO || "test-repo"
     : "test-repo"
   : getConfigValue("GITHUB_REPO", cliOptions.repo);
+
+// GitHub credential inputs. The credential itself is never exported as a module
+// constant: it is resolved on demand by `resolveGitHubAuth()` so a token rotated
+// on disk or an `auth login` performed after start is picked up. These accessors
+// expose the individual tiers so the resolver can report the true source.
+
+/** The `--token` CLI flag, when supplied. */
+export function getCliGitHubToken(): string | undefined {
+  return cliOptions.token || undefined;
+}
+
+/** A GitHub token found in `SECRETS_DIR` or the environment, bound to that tier. */
+export interface ConfiguredGitHubToken {
+  source: "secrets-dir" | "env";
+  /** Re-reads the same tier; undefined once that tier no longer has a token. */
+  read(): string | undefined;
+}
+
+/**
+ * The tier currently supplying `GITHUB_TOKEN` (`SECRETS_DIR` file, then env var).
+ * Its `read()` goes back to that tier on every call, so rotation is observed.
+ */
+export function getConfiguredGitHubToken(): ConfiguredGitHubToken | undefined {
+  const found = resolveSecretWithSource("GITHUB_TOKEN");
+  if (!found) return undefined;
+  const { source } = found;
+  return { source, read: () => readSecretFromTier("GITHUB_TOKEN", source) };
+}
+
+const ghCliProvider = new GhCliSecretProvider();
+
+/**
+ * The token of an authenticated `gh` CLI, or undefined when `gh` is absent,
+ * logged out, or disabled (GH_CLI_TOKEN_FALLBACK=false, NODE_ENV=test).
+ */
+export function getGhCliGitHubToken(): string | undefined {
+  if (!isGhCliFallbackAllowed()) return undefined;
+  return ghCliProvider.get("GITHUB_TOKEN");
+}
 
 // GitHub App installation auth (optional). When all three are present the
 // server authenticates as the App installation instead of using a PAT.
@@ -262,11 +300,47 @@ export const WEBHOOK_ALLOWED_ORIGINS = getOptionalConfigValue("WEBHOOK_ALLOWED_O
 export const WEBHOOK_RATE_LIMIT = getNumericConfigValue("WEBHOOK_RATE_LIMIT", 100);
 export const WEBHOOK_RATE_WINDOW_MS = getNumericConfigValue("WEBHOOK_RATE_WINDOW_MS", 60000);
 
+// --- Inbound HTTP authentication (/events/*) -------------------------------
+// The events surface fails closed: with neither EVENTS_AUTH_TOKEN nor an OAuth
+// issuer configured, every /events/* request is rejected with 401 unless
+// EVENTS_ALLOW_UNAUTHENTICATED=true (trusted local/dev only; logs a warning).
+// POST /webhooks/github is unaffected: it is authenticated by its HMAC signature.
+//   EVENTS_AUTH_TOKEN      static shared bearer token (compared in constant time)
+//   OAUTH_ISSUER           authorization server issuer; enables OAuth 2.1 resource-server mode
+//   OAUTH_AUDIENCE         resource identifier tokens must be minted for (required with OAUTH_ISSUER)
+//   OAUTH_JWKS_URI         optional JWKS endpoint; discovered from the issuer when unset
+//   OAUTH_REQUIRED_SCOPES  space-separated scopes every token must carry
+//   OAUTH_RESOURCE_URL     public URL of this server, published as RFC 9728 `resource`
+//                          (defaults to OAUTH_AUDIENCE when that is a URL)
+export const EVENTS_AUTH_TOKEN = getOptionalConfigValue("EVENTS_AUTH_TOKEN", "");
+export const EVENTS_ALLOW_UNAUTHENTICATED = getBooleanConfigValue(
+  "EVENTS_ALLOW_UNAUTHENTICATED",
+  false
+);
+export const OAUTH_ISSUER = getOptionalConfigValue("OAUTH_ISSUER", "");
+export const OAUTH_AUDIENCE = getOptionalConfigValue("OAUTH_AUDIENCE", "");
+export const OAUTH_JWKS_URI = getOptionalConfigValue("OAUTH_JWKS_URI", "");
+export const OAUTH_REQUIRED_SCOPES = getOptionalConfigValue("OAUTH_REQUIRED_SCOPES", "");
+export const OAUTH_RESOURCE_URL = getOptionalConfigValue("OAUTH_RESOURCE_URL", "");
+// --- end inbound HTTP authentication ----------------------------------------
+
 // AI Provider configuration
 export const ANTHROPIC_API_KEY = getOptionalConfigValue("ANTHROPIC_API_KEY", "");
 export const OPENAI_API_KEY = getOptionalConfigValue("OPENAI_API_KEY", "");
 export const GOOGLE_API_KEY = getOptionalConfigValue("GOOGLE_API_KEY", "");
 export const PERPLEXITY_API_KEY = getOptionalConfigValue("PERPLEXITY_API_KEY", "");
+
+// Google Vertex AI (Gemini via Application Default Credentials).
+// No key material lives in our config: the SDK discovers credentials through
+// google-auth-library ADC (GOOGLE_APPLICATION_CREDENTIALS file, gcloud user
+// ADC, or the metadata server / workload identity). Read at call time so the
+// project can be set or rotated without re-importing this module.
+export const DEFAULT_GOOGLE_VERTEX_LOCATION = "us-central1";
+export const getGoogleVertexProject = (): string =>
+  getOptionalConfigValue("GOOGLE_VERTEX_PROJECT", "").trim();
+export const getGoogleVertexLocation = (): string =>
+  getOptionalConfigValue("GOOGLE_VERTEX_LOCATION", DEFAULT_GOOGLE_VERTEX_LOCATION).trim() ||
+  DEFAULT_GOOGLE_VERTEX_LOCATION;
 
 // AI Model configuration
 export const AI_MAIN_MODEL = getOptionalConfigValue("AI_MAIN_MODEL", "");

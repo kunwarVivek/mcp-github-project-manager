@@ -39,7 +39,7 @@ import {
   UnlinkProjectFromTeamInputSchema,
 } from "./schemas/project-template-linking-schemas";
 import type { ToolDefinition, ToolSchema } from "./ToolValidator";
-import { createGitHubFactory, requireToken } from "./tool-factory";
+import { createGitHubFactory } from "./tool-factory";
 
 // ============================================================================
 // Helper Functions
@@ -552,11 +552,6 @@ export async function executeListLinkedRepositories(args: ListLinkedRepositories
   content: Array<{ type: "text"; text: string }>;
   structuredContent: LinkedRepositoriesListOutput;
 }> {
-  const token = requireToken();
-  if (!token) {
-    throw new Error("GITHUB_TOKEN environment variable is required");
-  }
-
   // Use placeholder owner/repo since we query by project ID
   const factory = createGitHubFactory();
 
@@ -653,11 +648,6 @@ export async function executeListLinkedTeams(args: ListLinkedTeamsInput): Promis
   content: Array<{ type: "text"; text: string }>;
   structuredContent: LinkedTeamsListOutput;
 }> {
-  const token = requireToken();
-  if (!token) {
-    throw new Error("GITHUB_TOKEN environment variable is required");
-  }
-
   // Use placeholder owner/repo since we query by project ID
   const factory = createGitHubFactory();
 

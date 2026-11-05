@@ -17,6 +17,12 @@ import type {
 import type { GitHubWebhookHandler, ResourceEvent } from "../events/GitHubWebhookHandler";
 import { type ILogger, Logger } from "../logger/index";
 import { SecurityAuditLog } from "../observability/SecurityAuditLog";
+import { RejectAllAuthenticator } from "./auth/createInboundAuthenticator";
+import {
+  buildWwwAuthenticate,
+  type InboundAuthenticator,
+  type InboundAuthRejected,
+} from "./auth/InboundAuthenticator";
 
 export interface SSEConnection {
   id: string;
@@ -43,12 +49,15 @@ export class WebhookServer {
   private server?: http.Server;
   private sseConnections = new Map<string, SSEConnection>();
   private isRunning = false;
+  private boundPort?: number;
   private readonly rateLimitMap = new Map<string, { count: number; windowStart: number }>();
   private readonly securityLog: SecurityAuditLog;
+  private readonly inboundAuth: InboundAuthenticator;
   private readonly processedDeliveries = new Set<string>();
   private readonly processedDeliveriesOrder: string[] = [];
   private static readonly MAX_DELIVERY_CACHE = 10_000;
   private static readonly MAX_WEBHOOK_BODY_SIZE = 1_048_576; // 1 MB
+  private static readonly MAX_TIMER_MS = 2 ** 31 - 1; // setTimeout's delay ceiling
 
   constructor(
     webhookHandler: GitHubWebhookHandler,
@@ -56,12 +65,15 @@ export class WebhookServer {
     eventStore: EventStore,
     options?: Partial<WebhookServerOptions>,
     logger?: ILogger,
-    securityLog?: SecurityAuditLog
+    securityLog?: SecurityAuditLog,
+    inboundAuth?: InboundAuthenticator
   ) {
     this.logger = logger ?? Logger.getInstance();
     this.securityLog = securityLog ?? new SecurityAuditLog(this.logger);
+    // Fail closed: a server built without an explicit authenticator rejects /events/*.
+    this.inboundAuth = inboundAuth ?? new RejectAllAuthenticator();
     this.options = {
-      port: options?.port || WEBHOOK_PORT,
+      port: options?.port ?? WEBHOOK_PORT,
       enableSSE: options?.enableSSE ?? SSE_ENABLED,
       timeout: options?.timeout || WEBHOOK_TIMEOUT_MS,
     };
@@ -92,8 +104,10 @@ export class WebhookServer {
       this.server.setTimeout(this.options.timeout);
 
       this.server.listen(this.options.port, () => {
+        const address = this.server?.address();
+        this.boundPort = typeof address === "object" && address ? address.port : this.options.port;
         this.isRunning = true;
-        this.logger.info(`Webhook server started on port ${this.options.port}`);
+        this.logger.info(`Webhook server started on port ${this.boundPort}`);
         resolve();
       });
 
@@ -134,7 +148,7 @@ export class WebhookServer {
   getStatus(): { running: boolean; port: number; connections: number } {
     return {
       running: this.isRunning,
-      port: this.options.port,
+      port: this.boundPort ?? this.options.port,
       connections: this.sseConnections.size,
     };
   }
@@ -176,13 +190,32 @@ export class WebhookServer {
       return;
     }
 
+    // RFC 9728 Protected Resource Metadata: public by design, it only tells
+    // clients which authorization server to use.
+    const protectedResource = this.inboundAuth.protectedResource;
+    if (protectedResource && method === "GET" && pathname === protectedResource.path) {
+      this.sendJSONResponse(res, 200, protectedResource.metadata);
+      return;
+    }
+
+    // Everything under /events/ requires authentication. /webhooks/github is
+    // authenticated by its HMAC signature and /health is handled below.
+    let credentialExpiresAt: number | null = null;
+    if (pathname.startsWith("/events/")) {
+      const accepted = await this.authorize(req, res, clientIp);
+      if (!accepted) {
+        return;
+      }
+      credentialExpiresAt = accepted.expiresAt;
+    }
+
     try {
       switch (true) {
         case pathname === "/webhooks/github" && method === "POST":
           await this.handleGitHubWebhook(req, res);
           break;
         case pathname === "/events/stream" && method === "GET":
-          await this.handleSSEConnection(req, res);
+          await this.handleSSEConnection(req, res, credentialExpiresAt);
           break;
         case pathname === "/events/subscribe" && method === "POST":
           await this.handleCreateSubscription(req, res);
@@ -331,7 +364,8 @@ export class WebhookServer {
    */
   private async handleSSEConnection(
     req: http.IncomingMessage,
-    res: http.ServerResponse
+    res: http.ServerResponse,
+    expiresAt: number | null
   ): Promise<void> {
     if (!this.options.enableSSE) {
       this.sendErrorResponse(res, 503, "SSE not enabled");
@@ -372,10 +406,28 @@ export class WebhookServer {
     this.sendSSEEvent(res, "connected", { connectionId, clientId });
 
     // Handle connection close
+    let expiryTimer: NodeJS.Timeout | undefined;
     req.on("close", () => {
+      clearTimeout(expiryTimer);
       this.sseConnections.delete(connectionId);
       this.logger.debug(`SSE connection ${connectionId} closed`);
     });
+
+    // A stream must not outlive the credential that opened it: at `exp`, tell the
+    // client why and end the response so it re-authenticates.
+    if (expiresAt !== null) {
+      const armExpiry = (): void => {
+        const remainingMs = expiresAt * 1000 - Date.now();
+        if (remainingMs <= 0) {
+          this.sendSSEEvent(res, "auth_expired", { reason: "token_expired" });
+          res.end();
+          return;
+        }
+        expiryTimer = setTimeout(armExpiry, Math.min(remainingMs, WebhookServer.MAX_TIMER_MS));
+        expiryTimer.unref();
+      };
+      armExpiry();
+    }
 
     // Send missed events if lastEventId is provided
     if (lastEventId) {
@@ -498,12 +550,63 @@ export class WebhookServer {
   }
 
   /**
-   * Handle health check
+   * Authenticate a request to the events surface. On failure, writes the
+   * RFC 6750 / RFC 9728 challenge response and returns undefined. Only reason
+   * codes are logged - never the presented credential. On success returns the
+   * credential's expiry (epoch seconds) or null when it does not expire.
+   */
+  private async authorize(
+    req: http.IncomingMessage,
+    res: http.ServerResponse,
+    clientIp: string
+  ): Promise<{ expiresAt: number | null } | undefined> {
+    const result = await this.inboundAuth.authenticate(req.headers.authorization);
+    if (result.ok) {
+      return { expiresAt: result.expiresAt ?? null };
+    }
+    this.securityLog.record({
+      type: "unauthorized_access",
+      source: clientIp,
+      details: {
+        path: url.parse(req.url || "").pathname,
+        method: req.method,
+        reason: result.reason,
+      },
+      severity: result.error === "invalid_token" ? "high" : "medium",
+    });
+    this.sendAuthRejection(res, result);
+    return undefined;
+  }
+
+  private sendAuthRejection(res: http.ServerResponse, rejection: InboundAuthRejected): void {
+    const challenge = buildWwwAuthenticate(rejection, this.inboundAuth.protectedResource?.url);
+    res.setHeader("WWW-Authenticate", challenge);
+    res.setHeader("Cache-Control", "no-store");
+    const message: Record<InboundAuthRejected["status"], string> = {
+      400: "Bad Request",
+      401: "Unauthorized",
+      403: "Forbidden",
+      503: "Authorization server keys unavailable",
+    };
+    this.sendErrorResponse(res, rejection.status, message[rejection.status]);
+  }
+
+  /**
+   * Health check. Liveness (`status`) is public so orchestrators can probe it
+   * without credentials; the event-store and subscription statistics (storage
+   * size, event timestamps, subscriber counts by transport/resource type) are
+   * operational metadata and are only returned to authenticated callers.
    */
   private async handleHealthCheck(
-    _req: http.IncomingMessage,
+    req: http.IncomingMessage,
     res: http.ServerResponse
   ): Promise<void> {
+    const caller = await this.inboundAuth.authenticate(req.headers.authorization);
+    if (!caller.ok) {
+      this.sendJSONResponse(res, 200, { status: "healthy" });
+      return;
+    }
+
     const stats = await this.eventStore.getStats();
     const subscriptionStats = this.subscriptionManager.getStats();
 
@@ -586,7 +689,7 @@ export class WebhookServer {
       res.setHeader("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS");
       res.setHeader(
         "Access-Control-Allow-Headers",
-        "Content-Type, X-Hub-Signature-256, X-GitHub-Event, X-GitHub-Delivery"
+        "Content-Type, Authorization, X-Hub-Signature-256, X-GitHub-Event, X-GitHub-Delivery"
       );
       res.setHeader("Vary", "Origin");
     } else if (req.headers.origin) {

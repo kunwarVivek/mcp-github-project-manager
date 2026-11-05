@@ -10,6 +10,8 @@ import { type Mock, type MockedClass, vi } from "vitest";
  */
 
 import { partialFake } from "../../../src/__tests__/helpers/aiFakes.js";
+import { GitHubAuthUnavailableError } from "../../../src/infrastructure/github/auth/GitHubAuth.js";
+import { resolveGitHubAuth } from "../../../src/infrastructure/github/auth/resolveGitHubAuth.js";
 import { GitHubRepositoryFactory } from "../../../src/infrastructure/github/GitHubRepositoryFactory.js";
 import {
   closeProjectTool,
@@ -26,6 +28,16 @@ import {
 } from "../../../src/infrastructure/tools/schemas/project-lifecycle-schemas.js";
 
 // Mock the repository factory
+// Wrap the real resolver so tests can simulate "no credential available"; by
+// default it behaves exactly like the real (hermetic under NODE_ENV=test) one.
+vi.mock("../../../src/infrastructure/github/auth/resolveGitHubAuth.js", async (importOriginal) => {
+  const actual =
+    await importOriginal<
+      typeof import("../../../src/infrastructure/github/auth/resolveGitHubAuth.js")
+    >();
+  return { ...actual, resolveGitHubAuth: vi.fn(actual.resolveGitHubAuth) };
+});
+
 vi.mock("../../../src/infrastructure/github/GitHubRepositoryFactory.js", () => {
   return {
     GitHubRepositoryFactory: vi.fn().mockImplementation(function () {
@@ -275,7 +287,6 @@ describe("Project Lifecycle Tools", () => {
 
     beforeEach(() => {
       vi.resetAllMocks();
-      vi.stubEnv("GITHUB_TOKEN", "test-token");
 
       mockGraphql = vi.fn();
 
@@ -285,10 +296,6 @@ describe("Project Lifecycle Tools", () => {
           getConfig: vi.fn().mockReturnValue({ owner: "placeholder", repo: "placeholder" }),
         });
       });
-    });
-
-    afterEach(() => {
-      vi.unstubAllEnvs();
     });
 
     describe("executeCloseProject", () => {
@@ -342,14 +349,16 @@ describe("Project Lifecycle Tools", () => {
         });
       });
 
-      it("throws error when GITHUB_TOKEN is missing", async () => {
-        vi.stubEnv("GITHUB_TOKEN", undefined);
+      it("throws error when no GitHub credential is available", async () => {
+        vi.mocked(resolveGitHubAuth).mockImplementation(() => {
+          throw new GitHubAuthUnavailableError();
+        });
 
         const input = CloseProjectInputSchema.parse({
           projectId: "PVT_kwDOTest123",
         });
 
-        await expect(executeCloseProject(input)).rejects.toThrow(/No GitHub token available/);
+        await expect(executeCloseProject(input)).rejects.toThrow(/No GitHub credential available/);
       });
 
       it("propagates GraphQL errors", async () => {
@@ -414,14 +423,16 @@ describe("Project Lifecycle Tools", () => {
         });
       });
 
-      it("throws error when GITHUB_TOKEN is missing", async () => {
-        vi.stubEnv("GITHUB_TOKEN", undefined);
+      it("throws error when no GitHub credential is available", async () => {
+        vi.mocked(resolveGitHubAuth).mockImplementation(() => {
+          throw new GitHubAuthUnavailableError();
+        });
 
         const input = ReopenProjectInputSchema.parse({
           projectId: "PVT_kwDOTest456",
         });
 
-        await expect(executeReopenProject(input)).rejects.toThrow(/No GitHub token available/);
+        await expect(executeReopenProject(input)).rejects.toThrow(/No GitHub credential available/);
       });
 
       it("propagates GraphQL errors", async () => {
@@ -533,8 +544,10 @@ describe("Project Lifecycle Tools", () => {
         );
       });
 
-      it("throws error when GITHUB_TOKEN is missing", async () => {
-        vi.stubEnv("GITHUB_TOKEN", undefined);
+      it("throws error when no GitHub credential is available", async () => {
+        vi.mocked(resolveGitHubAuth).mockImplementation(() => {
+          throw new GitHubAuthUnavailableError();
+        });
 
         const input = ConvertDraftIssueInputSchema.parse({
           itemId: "PVTI_lADOTest123",
@@ -542,7 +555,9 @@ describe("Project Lifecycle Tools", () => {
           repo: "my-repo",
         });
 
-        await expect(executeConvertDraftIssue(input)).rejects.toThrow(/No GitHub token available/);
+        await expect(executeConvertDraftIssue(input)).rejects.toThrow(
+          /No GitHub credential available/
+        );
       });
 
       it("propagates conversion mutation errors", async () => {

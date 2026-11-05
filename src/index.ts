@@ -41,9 +41,15 @@ import {
   AGENT_STALE_AFTER_MINUTES,
   CACHE_DIRECTORY,
   CLI_OPTIONS,
+  EVENTS_ALLOW_UNAUTHENTICATED,
+  EVENTS_AUTH_TOKEN,
   GITHUB_OWNER,
   GITHUB_REPO,
-  GITHUB_TOKEN,
+  OAUTH_AUDIENCE,
+  OAUTH_ISSUER,
+  OAUTH_JWKS_URI,
+  OAUTH_REQUIRED_SCOPES,
+  OAUTH_RESOURCE_URL,
   SSE_ENABLED,
   SYNC_ENABLED,
   SYNC_TIMEOUT_MS,
@@ -57,6 +63,9 @@ import {
   GitHubWebhookHandler,
   type ResourceEvent,
 } from "./infrastructure/events/GitHubWebhookHandler";
+import { GitHubAuthUnavailableError } from "./infrastructure/github/auth/GitHubAuth";
+import { resolveGitHubAuth } from "./infrastructure/github/auth/resolveGitHubAuth";
+import { createInboundAuthenticator } from "./infrastructure/http/auth/createInboundAuthenticator";
 import { WebhookServer } from "./infrastructure/http/WebhookServer";
 import { GracefulShutdown } from "./infrastructure/lifecycle/GracefulShutdown";
 import { type ILogger, logger } from "./infrastructure/logger/index";
@@ -83,6 +92,8 @@ class GitHubProjectManagerServer {
   /** Built lazily — only the agents resource needs a registry reader. */
   private _agentStore?: AgentStore;
   private service: ProjectManagementService;
+  /** `<mode> (<source>)` of the GitHub credential resolved at startup; never a token. */
+  private authDescription: string;
   private toolRegistry: ToolRegistry;
   private logger: ILogger;
 
@@ -143,7 +154,12 @@ class GitHubProjectManagerServer {
     });
 
     // Initialize all services via DI container
-    const di = configureContainer(GITHUB_TOKEN, GITHUB_OWNER, GITHUB_REPO);
+    // Resolve the credential up front so a missing one fails fast with the full
+    // list of supported methods (GitHubAuthUnavailableError). Only mode/source
+    // are retained: nothing here ever handles token characters.
+    const auth = resolveGitHubAuth();
+    this.authDescription = `${auth.mode} (${auth.source})`;
+    const di = configureContainer(auth, GITHUB_OWNER, GITHUB_REPO);
     this.service = di.resolve("ProjectManagementService");
     this.aiFactory = di.resolve("AIServiceFactory");
     this.unpaidDebits = di.resolve("UnpaidDebitLedger");
@@ -209,6 +225,7 @@ class GitHubProjectManagerServer {
         this.logger.info("   - ANTHROPIC_API_KEY (recommended)");
         this.logger.info("   - OPENAI_API_KEY");
         this.logger.info("   - GOOGLE_API_KEY");
+        this.logger.info("   - GOOGLE_VERTEX_PROJECT (Gemini via Vertex AI + Google ADC)");
         this.logger.info("   - PERPLEXITY_API_KEY");
         this.logger.info("🚀 Non-AI GitHub project management features remain fully functional");
       }
@@ -562,6 +579,25 @@ class GitHubProjectManagerServer {
       return;
     }
 
+    // Built outside the try/catch below on purpose: an invalid auth config must
+    // abort startup, not degrade to "continuing without webhook server".
+    const inboundAuth = createInboundAuthenticator(
+      {
+        sharedToken: EVENTS_AUTH_TOKEN || undefined,
+        allowUnauthenticated: EVENTS_ALLOW_UNAUTHENTICATED,
+        oauth: OAUTH_ISSUER
+          ? {
+              issuer: OAUTH_ISSUER,
+              audience: OAUTH_AUDIENCE,
+              jwksUri: OAUTH_JWKS_URI || undefined,
+              requiredScopes: OAUTH_REQUIRED_SCOPES.split(/\s+/).filter(Boolean),
+              resourceUrl: OAUTH_RESOURCE_URL || undefined,
+            }
+          : undefined,
+      },
+      this.logger
+    );
+
     try {
       this.webhookServer = new WebhookServer(
         this.webhookHandler,
@@ -570,7 +606,10 @@ class GitHubProjectManagerServer {
         {
           port: WEBHOOK_PORT,
           enableSSE: SSE_ENABLED,
-        }
+        },
+        this.logger,
+        undefined,
+        inboundAuth
       );
 
       await this.webhookServer.start();
@@ -688,9 +727,7 @@ class GitHubProjectManagerServer {
         process.stderr.write("GitHub Project Manager MCP server configuration:\n");
         process.stderr.write(`- Owner: ${GITHUB_OWNER}\n`);
         process.stderr.write(`- Repository: ${GITHUB_REPO}\n`);
-        process.stderr.write(
-          `- Token: ${GITHUB_TOKEN.substring(0, 4)}...${GITHUB_TOKEN.substring(GITHUB_TOKEN.length - 4)}\n`
-        );
+        process.stderr.write(`- auth: ${this.authDescription}\n`);
         process.stderr.write(`- Environment file: ${CLI_OPTIONS.envFile || ".env (default)"}\n`);
         process.stderr.write(`- Sync enabled: ${SYNC_ENABLED}\n`);
         process.stderr.write(`- Cache directory: ${CACHE_DIRECTORY}\n`);
@@ -723,11 +760,16 @@ try {
     process.stderr.write(`Error initializing server: ${error.message}\n`);
 
     // Provide helpful instructions for common errors
-    if (error.message.includes("GITHUB_TOKEN")) {
-      process.stderr.write("\nPlease provide a GitHub token using one of these methods:\n");
+    if (error instanceof GitHubAuthUnavailableError) {
+      process.stderr.write("\nProvide GitHub credentials using one of these methods:\n");
+      process.stderr.write("  - Run: mcp-github-project-manager auth login\n");
       process.stderr.write("  - Set the GITHUB_TOKEN environment variable\n");
       process.stderr.write("  - Use the --token command line argument\n");
-      process.stderr.write("\nExample: mcp-github-project-manager --token=your_token\n");
+      process.stderr.write("  - Mount a GITHUB_TOKEN file under SECRETS_DIR\n");
+      process.stderr.write(
+        "  - Configure a GitHub App (GITHUB_APP_ID, GITHUB_APP_PRIVATE_KEY, GITHUB_APP_INSTALLATION_ID)\n"
+      );
+      process.stderr.write("  - Log in with the GitHub CLI: gh auth login\n");
     } else if (error.message.includes("GITHUB_OWNER") || error.message.includes("GITHUB_REPO")) {
       process.stderr.write("\nPlease provide the required GitHub repository information:\n");
       process.stderr.write("  - Set the GITHUB_OWNER and GITHUB_REPO environment variables\n");

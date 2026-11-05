@@ -55,24 +55,43 @@ exactly like `pnpm run <script>`, and `npm test` like `pnpm test`.
 
 ## Environment (`.env` or CLI flags; CLI wins)
 
-- Required: `GITHUB_TOKEN`, `GITHUB_OWNER`, `GITHUB_REPO`.
-- GitHub credential chain, first hit wins:
-  `--token` CLI flag → `$SECRETS_DIR/GITHUB_TOKEN` file → `GITHUB_TOKEN` env →
-  `gh auth token`. The `gh` fallback means a developer with a working `gh` login
-  needs no configuration at all; disable it with `GH_CLI_TOKEN_FALLBACK=false`
-  (it is also off automatically under `NODE_ENV=test`, so tests never shell out).
-- GitHub App installation auth (optional, outranks the PAT when all three are
-  set): `GITHUB_APP_ID`, `GITHUB_APP_PRIVATE_KEY`, `GITHUB_APP_INSTALLATION_ID`.
-  A partial App config falls back to the PAT rather than failing, so a half-set
-  environment cannot lock the server out.
-- Every credential read goes through `getSecret()`/`requireToken()`. Do NOT read
-  `process.env.GITHUB_TOKEN` directly — that bypasses the whole chain, which is
-  exactly how `SECRETS_DIR` and `--token` were silently broken before.
+- Required: `GITHUB_OWNER`, `GITHUB_REPO`. `GITHUB_TOKEN` is NOT required.
+- GitHub credential chain, first hit wins, re-resolved per tool call:
+  1. GitHub App installation (`GITHUB_APP_ID` + `GITHUB_APP_PRIVATE_KEY` +
+     `GITHUB_APP_INSTALLATION_ID`; a partial config falls through)
+  2. `--token` CLI flag
+  3. `$SECRETS_DIR/GITHUB_TOKEN` file
+  4. `GITHUB_TOKEN` env
+  5. stored OAuth token from `mcp-github-project-manager auth login`
+  6. `gh auth token` (disable with `GH_CLI_TOKEN_FALLBACK=false`; off under
+     `NODE_ENV=test`, so tests never shell out)
+  None → boot fails listing all methods. Static tokens are rotation-aware.
+- OAuth device flow (`build/bin.js auth login|status|logout`):
+  `GITHUB_OAUTH_CLIENT_ID` (required), `GITHUB_OAUTH_CLIENT_SECRET` (only for
+  revoke on logout), `GITHUB_OAUTH_SCOPES` (default `repo project read:org`),
+  `GITHUB_OAUTH_TOKEN_FILE` (default
+  `$XDG_CONFIG_HOME/mcp-github-project-manager/github-oauth.json`, 0600).
+  Entry is `build/bin.js`; `build/index.js` has no `auth` subcommands.
+- `GitHubAuth` / `resolveGitHubAuth()` (`src/infrastructure/github/auth/`) is
+  the ONLY credential seam. Never pass raw token strings around and never read
+  `process.env.GITHUB_TOKEN` directly; build factories from a `GitHubAuth`
+  (`GitHubRepositoryFactory(auth, owner, repo)`, `configureContainer(auth, ...)`).
+  `requireToken` and the module-level `GITHUB_TOKEN` export are gone. Other
+  config/secrets still go through `getSecret()`.
 - AI (optional, unlocks AI tools): `ANTHROPIC_API_KEY`, `GOOGLE_API_KEY`,
   `OPENAI_API_KEY`, `PERPLEXITY_API_KEY`; model overrides `AI_MAIN_MODEL`,
   `AI_PRD_MODEL`, `AI_RESEARCH_MODEL`, `AI_FALLBACK_MODEL`.
 - Optional: `SYNC_ENABLED`, `SYNC_TIMEOUT_MS`, `CACHE_DIRECTORY`,
   `WEBHOOK_SECRET`, `WEBHOOK_PORT`, `SSE_ENABLED`.
+- Inbound `/events/*` auth (bearer header only): `EVENTS_AUTH_TOKEN` (shared
+  secret) and/or OAuth 2.1 resource server `OAUTH_ISSUER` + `OAUTH_AUDIENCE`
+  (required together), `OAUTH_JWKS_URI`, `OAUTH_REQUIRED_SCOPES`,
+  `OAUTH_RESOURCE_URL`. Nothing configured → 401; opt out with
+  `EVENTS_ALLOW_UNAUTHENTICATED=true`. Anonymous `/health` returns status only.
+- Vertex AI Gemini (provider `google-vertex`, Google ADC, no key in our
+  config): `GOOGLE_VERTEX_PROJECT` (enables it), `GOOGLE_VERTEX_LOCATION`
+  (default `us-central1`); creds via `GOOGLE_APPLICATION_CREDENTIALS` / gcloud
+  ADC / workload identity.
 - Webhook security: signature validation fails closed. With no `WEBHOOK_SECRET`,
   webhooks are rejected unless `WEBHOOK_ALLOW_UNSIGNED=true` (trusted dev only).
 - Secrets: set `SECRETS_DIR` (e.g. `/run/secrets`) to load any config/secret from
@@ -123,6 +142,10 @@ exactly like `pnpm run <script>`, and `npm test` like `pnpm test`.
   emit a real runtime import that then fails to resolve. Use `export type` /
   `import type` — including for **decorated constructor params**, whose types
   `emitDecoratorMetadata` references at runtime.
+- Unit tests that start a loopback HTTP server (OAuth/inbound-auth/webhook
+  tests) must call `nock.enableNetConnect(<loopback matcher>)` — the global
+  setup `src/__tests__/e2e/setup.ts` disables net connect for every file, so
+  real `127.0.0.1` requests otherwise fail.
 - Agent token budgets are metered server-side: `AIServiceFactory.getModel`
   wraps every model with middleware that accumulates provider-reported usage
   into `CorrelationContext`'s AsyncLocalStorage, and `dispatchTool` debits the

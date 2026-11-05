@@ -47,6 +47,7 @@ import { AGENT_RECLAIM_ENABLED, AGENT_RECLAIM_INTERVAL_MS, AGENT_STALE_AFTER_MIN
 import { AgentStore } from "./infrastructure/agent/AgentStore";
 import { ProjectFieldSetup } from "./infrastructure/agent/ProjectFieldSetup";
 import { WorkProductStore } from "./infrastructure/agent/WorkProductStore";
+import type { GitHubAuth } from "./infrastructure/github/auth/GitHubAuth";
 import { GitHubRepositoryFactory } from "./infrastructure/github/GitHubRepositoryFactory";
 import { type ILogger, Logger, logger } from "./infrastructure/logger";
 import { AgentBudgetService } from "./services/agent/AgentBudgetService";
@@ -91,13 +92,13 @@ import { TaskGenerationService } from "./services/TaskGenerationService";
  * - Extracted services depend on the factory
  * - ProjectManagementService (facade) depends on all extracted services
  *
- * @param token - GitHub API token
+ * @param auth - Resolved GitHub credential
  * @param owner - Repository owner
  * @param repo - Repository name
  * @returns Configured dependency container
  */
 export function configureContainer(
-  token: string,
+  auth: GitHubAuth,
   owner: string,
   repo: string
 ): DependencyContainer {
@@ -105,7 +106,7 @@ export function configureContainer(
   container.clearInstances();
 
   // Register factory instance - root of dependency tree
-  const factory = new GitHubRepositoryFactory(token, owner, repo);
+  const factory = new GitHubRepositoryFactory(auth, owner, repo);
   container.registerInstance("GitHubRepositoryFactory", factory);
 
   // Register Logger as ILogger for dependency injection
@@ -347,19 +348,19 @@ export function configureContainer(
  * Create a ProjectManagementService instance directly without DI container.
  *
  * This provides backward compatibility for code that instantiates the service
- * directly using owner/repo/token parameters.
+ * directly using owner/repo/auth parameters.
  *
  * @param owner - Repository owner
  * @param repo - Repository name
- * @param token - GitHub API token
+ * @param auth - Resolved GitHub credential
  * @returns Fully wired ProjectManagementService instance
  */
 export function createProjectManagementService(
   owner: string,
   repo: string,
-  token: string
+  auth: GitHubAuth
 ): ProjectManagementService {
-  const factory = new GitHubRepositoryFactory(token, owner, repo);
+  const factory = new GitHubRepositoryFactory(auth, owner, repo);
   const logger = Logger.getInstance();
   const templateService = new ProjectTemplateService(factory);
   const linkingService = new ProjectLinkingService(factory);

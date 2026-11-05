@@ -35,10 +35,16 @@ Examples:
   $ mcp-github-project-manager --env-file=.env.production
   $ GITHUB_TOKEN=your_token mcp-github-project-manager
 
+OAuth login (no token needed; see GITHUB_OAUTH_CLIENT_ID):
+  $ mcp-github-project-manager auth login
+  $ mcp-github-project-manager auth status
+  $ mcp-github-project-manager auth logout
+
 Environment variables:
   GITHUB_TOKEN     GitHub personal access token
   GITHUB_OWNER     GitHub repository owner
   GITHUB_REPO      GitHub repository name
+  GITHUB_OAUTH_CLIENT_ID  Client id used by \`auth login\` and token refresh
 `
     );
 

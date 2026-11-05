@@ -36,7 +36,7 @@ describe("creatable project field types", () => {
     graphql = vi.fn();
     // The Octokit instance is a partial stand-in: only `graphql` is used here.
     const octokit = { graphql } as unknown as Octokit;
-    repository = new GitHubProjectRepository(octokit, new GitHubConfig("owner", "repo", "token"));
+    repository = new GitHubProjectRepository(octokit, new GitHubConfig("owner", "repo"));
   });
 
   /** The variables of the last GraphQL call that carried a `dataType`. */

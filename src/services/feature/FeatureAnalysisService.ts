@@ -72,7 +72,7 @@ export class FeatureAnalysisService {
       if (!model) {
         this.logger.error("Feature analysis failed: AI service is not available");
         throw new Error(
-          "AI service is not available. Please configure at least one AI provider (ANTHROPIC_API_KEY, OPENAI_API_KEY, GOOGLE_API_KEY, or PERPLEXITY_API_KEY)."
+          "AI service is not available. Please configure at least one AI provider (ANTHROPIC_API_KEY, OPENAI_API_KEY, GOOGLE_API_KEY, PERPLEXITY_API_KEY, or GOOGLE_VERTEX_PROJECT with Application Default Credentials)."
         );
       }
 

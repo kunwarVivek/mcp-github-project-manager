@@ -5,7 +5,7 @@
   "type": "module",
   "exports": "./build/index.js",
   "bin": {
-    "mcp-github-project-manager": "build/index.js"
+    "mcp-github-project-manager": "build/bin.js"
   },
   "main": "./build/index.js",
   "types": "./build/index.d.ts",
@@ -61,8 +61,8 @@
     "prebuild": "rimraf build",
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc -p tsconfig.typecheck.json && tsc -p tsconfig.test.json",
-    "postbuild": "chmod +x build/index.js && node scripts/fix-imports.js",
-    "start": "node build/index.js",
+    "postbuild": "chmod +x build/bin.js build/index.js && node scripts/fix-imports.js",
+    "start": "node build/bin.js",
     "dev": "tsx watch src/index.ts",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -103,17 +103,19 @@
     "examples": "tsx examples/basic/create-simple-project.ts",
     "prepublishOnly": "npm run build",
     "release": "node scripts/release.js",
-    "inspect": "npx --yes @modelcontextprotocol/inspector node build/index.js",
+    "inspect": "npx --yes @modelcontextprotocol/inspector node build/bin.js",
     "lint:fix": "biome check --write ."
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^4.0.85",
     "@ai-sdk/google": "^4.0.102",
+    "@ai-sdk/google-vertex": "5.0.119",
     "@ai-sdk/openai": "^4.0.99",
     "@ai-sdk/perplexity": "^5.0.17",
     "@ai-sdk/provider": "4.0.31",
     "@modelcontextprotocol/server": "^2.3.1",
     "@octokit/auth-app": "^8.3.1",
+    "@octokit/auth-oauth-user": "^6.0.4",
     "@octokit/rest": "^22.0.1",
     "@types/graphlib": "^2.1.12",
     "ai": "^7.0.148",
@@ -122,6 +124,7 @@
     "dotenv": "^18.0.8",
     "graphlib": "^2.1.8",
     "handlebars": "^4.7.10",
+    "jose": "^6.2.15",
     "reflect-metadata": "^0.2.2",
     "tsyringe": "^4.10.0",
     "uuid": "^14.0.3",

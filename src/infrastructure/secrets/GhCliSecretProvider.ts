@@ -12,9 +12,9 @@ const GH_TIMEOUT_MS = 5_000;
  * (`gh auth token`).
  *
  * This exists so a developer with a working `gh` login can run the server with
- * no explicit configuration at all. It sits at the **end** of the resolver
- * chain, so an explicit CLI flag, a mounted secret, or an environment variable
- * always wins.
+ * no explicit configuration at all. It is consulted last by GitHub credential
+ * resolution, so an explicit CLI flag, a mounted secret, an environment
+ * variable, or a stored OAuth token always wins.
  *
  * Safety properties:
  * - `execFileSync` with an argument array — never a shell string, so nothing

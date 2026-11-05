@@ -1,5 +1,6 @@
 import { createProjectManagementService } from "../../container";
 import { ResourceStatus } from "../../domain/resource-types";
+import { resolveGitHubAuth } from "../../infrastructure/github/auth/resolveGitHubAuth";
 import { GitHubTypeConverter } from "../../infrastructure/github/util/conversion";
 import type { ProjectManagementService } from "../../services/ProjectManagementService";
 import { TestFactory } from "../test-utils";
@@ -12,11 +13,10 @@ describe.skip("Metrics and Reporting E2E Tests", () => {
   let testSprintId: string;
 
   beforeAll(async () => {
-    const token = process.env.GITHUB_TOKEN || "test-token";
     const owner = process.env.GITHUB_OWNER || "test-owner";
     const repo = process.env.GITHUB_REPO || "test-repo";
 
-    service = createProjectManagementService(owner, repo, token);
+    service = createProjectManagementService(owner, repo, resolveGitHubAuth());
 
     // Create a test milestone with issues for metrics testing
     const milestone = await service.createMilestone(

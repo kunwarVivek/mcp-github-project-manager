@@ -10,6 +10,8 @@ import { type Mock, type MockedClass, vi } from "vitest";
  */
 
 import { partialFake } from "../../../src/__tests__/helpers/aiFakes.js";
+import { GitHubAuthUnavailableError } from "../../../src/infrastructure/github/auth/GitHubAuth.js";
+import { resolveGitHubAuth } from "../../../src/infrastructure/github/auth/resolveGitHubAuth.js";
 import { GitHubRepositoryFactory } from "../../../src/infrastructure/github/GitHubRepositoryFactory.js";
 import { StatusUpdateStatus } from "../../../src/infrastructure/github/repositories/types.js";
 import {
@@ -27,6 +29,16 @@ import {
 } from "../../../src/infrastructure/tools/status-update-tools.js";
 
 // Mock the repository factory
+// Wrap the real resolver so tests can simulate "no credential available"; by
+// default it behaves exactly like the real (hermetic under NODE_ENV=test) one.
+vi.mock("../../../src/infrastructure/github/auth/resolveGitHubAuth.js", async (importOriginal) => {
+  const actual =
+    await importOriginal<
+      typeof import("../../../src/infrastructure/github/auth/resolveGitHubAuth.js")
+    >();
+  return { ...actual, resolveGitHubAuth: vi.fn(actual.resolveGitHubAuth) };
+});
+
 vi.mock("../../../src/infrastructure/github/GitHubRepositoryFactory.js", () => {
   return {
     GitHubRepositoryFactory: vi.fn().mockImplementation(function () {
@@ -236,7 +248,6 @@ describe("Status Update Tools", () => {
 
     beforeEach(() => {
       vi.resetAllMocks();
-      vi.stubEnv("GITHUB_TOKEN", "test-token");
 
       mockStatusUpdateRepo = {
         createStatusUpdate: vi.fn(),
@@ -249,10 +260,6 @@ describe("Status Update Tools", () => {
           createStatusUpdateRepository: vi.fn().mockReturnValue(mockStatusUpdateRepo),
         });
       });
-    });
-
-    afterEach(() => {
-      vi.unstubAllEnvs();
     });
 
     describe("executeCreateStatusUpdate", () => {
@@ -305,14 +312,16 @@ describe("Status Update Tools", () => {
       });
 
       it("returns error when token is missing", async () => {
-        vi.stubEnv("GITHUB_TOKEN", undefined);
+        vi.mocked(resolveGitHubAuth).mockImplementation(() => {
+          throw new GitHubAuthUnavailableError();
+        });
 
         await expect(
           executeCreateStatusUpdate({
             projectId: "PVT_123",
             body: "Test",
           })
-        ).rejects.toThrow(/No GitHub token available/);
+        ).rejects.toThrow(/No GitHub credential available/);
       });
     });
 

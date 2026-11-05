@@ -1,6 +1,5 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { GhCliSecretProvider } from "./GhCliSecretProvider";
 
 /**
  * A source of secret/config values. Implementations must be synchronous so the
@@ -100,34 +99,85 @@ export class SecretResolver {
   }
 }
 
+/** Which tier of the default secret chain supplied a value. */
+export type SecretTierSource = "secrets-dir" | "env";
+
+interface SecretTier {
+  source: SecretTierSource;
+  provider: SecretProvider;
+}
+
+/**
+ * The ordered tiers of the default chain: `SECRETS_DIR` files (when configured)
+ * ahead of environment variables. Single definition shared by the resolver and
+ * by callers that must know *which* tier answered.
+ */
+function defaultSecretTiers(env?: NodeJS.ProcessEnv): SecretTier[] {
+  // Read config off the live env when no explicit one is supplied, for the same
+  // reason EnvSecretProvider does (see its constructor docs).
+  const config = env ?? process.env;
+  const tiers: SecretTier[] = [];
+  const secretsDir = config.SECRETS_DIR;
+  if (secretsDir) {
+    tiers.push({ source: "secrets-dir", provider: new FileSecretProvider(secretsDir) });
+  }
+  tiers.push({ source: "env", provider: new EnvSecretProvider(env) }); // undefined -> live process.env
+  return tiers;
+}
+
 /**
  * Build the default resolver from environment configuration.
  * - `SECRETS_DIR` (e.g. `/run/secrets`): enables the file provider, checked
  *   before env vars.
  * - Environment variables are the standard fallback provider.
- * - `gh auth token` is consulted last (GITHUB_TOKEN only), unless
- *   GH_CLI_TOKEN_FALLBACK=false.
+ *
+ * The `gh` CLI is deliberately NOT part of this chain: it is a credential
+ * source in its own right that ranks below a stored OAuth token, so GitHub
+ * credential resolution consults it separately (see `isGhCliFallbackAllowed`).
  */
 export function createDefaultSecretResolver(env?: NodeJS.ProcessEnv): SecretResolver {
-  // Read config off the live env when no explicit one is supplied, for the same
-  // reason EnvSecretProvider does (see its constructor docs).
-  const config = env ?? process.env;
-  const providers: SecretProvider[] = [];
-  const secretsDir = config.SECRETS_DIR;
-  if (secretsDir) {
-    providers.push(new FileSecretProvider(secretsDir));
-  }
-  providers.push(new EnvSecretProvider(env)); // undefined -> live process.env
+  return new SecretResolver(defaultSecretTiers(env).map((tier) => tier.provider));
+}
 
-  // Last resort: borrow the token from an authenticated `gh` CLI so local
-  // development needs no explicit configuration. Everything above wins over it.
-  // Opt out with GH_CLI_TOKEN_FALLBACK=false where shelling out is unwanted.
-  const ghFallbackAllowed =
-    config.NODE_ENV !== "test" &&
-    (config.GH_CLI_TOKEN_FALLBACK ?? "true").toLowerCase() !== "false";
-  if (ghFallbackAllowed) {
-    providers.push(new GhCliSecretProvider());
+/**
+ * Resolve a secret and report which tier of the default chain supplied it, or
+ * undefined when neither tier has a non-empty value. The value is never part of
+ * the source label.
+ */
+export function resolveSecretWithSource(
+  name: string,
+  env?: NodeJS.ProcessEnv
+): { value: string; source: SecretTierSource } | undefined {
+  for (const { source, provider } of defaultSecretTiers(env)) {
+    const value = provider.get(name);
+    if (value !== undefined && value !== "") {
+      return { value, source };
+    }
   }
+  return undefined;
+}
 
-  return new SecretResolver(providers);
+/**
+ * Read a secret from one specific tier of the default chain, ignoring the
+ * others. Lets a credential stay bound to the tier that supplied it: if that
+ * tier loses the value the caller sees `undefined` rather than silently
+ * switching to a different source.
+ */
+export function readSecretFromTier(
+  name: string,
+  source: SecretTierSource,
+  env?: NodeJS.ProcessEnv
+): string | undefined {
+  const tier = defaultSecretTiers(env).find((candidate) => candidate.source === source);
+  const value = tier?.provider.get(name);
+  return value === "" ? undefined : value;
+}
+
+/**
+ * Whether borrowing a token from an authenticated `gh` CLI is permitted.
+ * Opt out with GH_CLI_TOKEN_FALLBACK=false where shelling out is unwanted; it is
+ * always off under NODE_ENV=test.
+ */
+export function isGhCliFallbackAllowed(env: NodeJS.ProcessEnv = process.env): boolean {
+  return env.NODE_ENV !== "test" && (env.GH_CLI_TOKEN_FALLBACK ?? "true").toLowerCase() !== "false";
 }

@@ -38,16 +38,19 @@ echo "GITHUB_REPO: $GITHUB_REPO"
 
 ### Which Token Is Actually Being Used?
 
-`GITHUB_TOKEN` is resolved through a chain — first hit wins:
+GitHub credentials are resolved through a chain, per tool call — first hit wins:
 
-1. `--token` CLI flag
-2. `$SECRETS_DIR/GITHUB_TOKEN` file (when `SECRETS_DIR` is set)
-3. `GITHUB_TOKEN` environment variable
-4. `gh auth token` — a working `gh` CLI login means no configuration is needed
+1. GitHub App installation (`GITHUB_APP_ID` + `GITHUB_APP_PRIVATE_KEY` + `GITHUB_APP_INSTALLATION_ID`)
+2. `--token` CLI flag
+3. `$SECRETS_DIR/GITHUB_TOKEN` file (when `SECRETS_DIR` is set)
+4. `GITHUB_TOKEN` environment variable
+5. Stored OAuth token from `mcp-github-project-manager auth login` (check with `auth status`)
+6. `gh auth token` — a working `gh` CLI login means no configuration is needed
 
-If the server authenticates with a token you did not expect, check for a
-`$SECRETS_DIR/GITHUB_TOKEN` file and for an active `gh` login. Disable the
-fallback with `GH_CLI_TOKEN_FALLBACK=false`.
+If the server authenticates with a credential you did not expect, check the
+higher tiers (App config, a `$SECRETS_DIR/GITHUB_TOKEN` file) and verify with
+`--verbose` (`auth: <mode> (<source>)`). Disable the `gh` fallback with
+`GH_CLI_TOKEN_FALLBACK=false`.
 
 ---
 

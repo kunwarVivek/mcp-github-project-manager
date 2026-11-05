@@ -10,6 +10,8 @@ import { type Mock, type MockedClass, vi } from "vitest";
  */
 
 import { partialFake } from "../../../src/__tests__/helpers/aiFakes.js";
+import { GitHubAuthUnavailableError } from "../../../src/infrastructure/github/auth/GitHubAuth.js";
+import { resolveGitHubAuth } from "../../../src/infrastructure/github/auth/resolveGitHubAuth.js";
 import { GitHubRepositoryFactory } from "../../../src/infrastructure/github/GitHubRepositoryFactory.js";
 import {
   executeLinkProjectToRepository,
@@ -35,6 +37,16 @@ import {
 } from "../../../src/infrastructure/tools/schemas/project-template-linking-schemas.js";
 
 // Mock the repository factory
+// Wrap the real resolver so tests can simulate "no credential available"; by
+// default it behaves exactly like the real (hermetic under NODE_ENV=test) one.
+vi.mock("../../../src/infrastructure/github/auth/resolveGitHubAuth.js", async (importOriginal) => {
+  const actual =
+    await importOriginal<
+      typeof import("../../../src/infrastructure/github/auth/resolveGitHubAuth.js")
+    >();
+  return { ...actual, resolveGitHubAuth: vi.fn(actual.resolveGitHubAuth) };
+});
+
 vi.mock("../../../src/infrastructure/github/GitHubRepositoryFactory.js", () => {
   return {
     GitHubRepositoryFactory: vi.fn().mockImplementation(function () {
@@ -381,7 +393,6 @@ describe("Project Linking Tools", () => {
 
     beforeEach(() => {
       vi.resetAllMocks();
-      vi.stubEnv("GITHUB_TOKEN", "test-token");
 
       mockGraphql = vi.fn();
 
@@ -391,10 +402,6 @@ describe("Project Linking Tools", () => {
           getConfig: vi.fn().mockReturnValue({ owner: "placeholder", repo: "placeholder" }),
         });
       });
-    });
-
-    afterEach(() => {
-      vi.unstubAllEnvs();
     });
 
     describe("executeLinkProjectToRepository", () => {
@@ -449,8 +456,10 @@ describe("Project Linking Tools", () => {
         );
       });
 
-      it("returns error when GITHUB_TOKEN is missing", async () => {
-        vi.stubEnv("GITHUB_TOKEN", undefined);
+      it("returns error when no GitHub credential is available", async () => {
+        vi.mocked(resolveGitHubAuth).mockImplementation(() => {
+          throw new GitHubAuthUnavailableError();
+        });
 
         const input = LinkProjectToRepositoryInputSchema.parse({
           projectId: "PVT_kwDOTest123",
@@ -459,7 +468,7 @@ describe("Project Linking Tools", () => {
         });
 
         await expect(executeLinkProjectToRepository(input)).rejects.toThrow(
-          /No GitHub token available/
+          /No GitHub credential available/
         );
       });
     });
@@ -491,8 +500,10 @@ describe("Project Linking Tools", () => {
         expect(result.content[0].text).toContain("Successfully unlinked");
       });
 
-      it("returns error when GITHUB_TOKEN is missing", async () => {
-        vi.stubEnv("GITHUB_TOKEN", undefined);
+      it("returns error when no GitHub credential is available", async () => {
+        vi.mocked(resolveGitHubAuth).mockImplementation(() => {
+          throw new GitHubAuthUnavailableError();
+        });
 
         const input = UnlinkProjectFromRepositoryInputSchema.parse({
           projectId: "PVT_kwDOTest123",
@@ -501,7 +512,7 @@ describe("Project Linking Tools", () => {
         });
 
         await expect(executeUnlinkProjectFromRepository(input)).rejects.toThrow(
-          /No GitHub token available/
+          /No GitHub credential available/
         );
       });
     });
@@ -576,8 +587,10 @@ describe("Project Linking Tools", () => {
         );
       });
 
-      it("returns error when GITHUB_TOKEN is missing", async () => {
-        vi.stubEnv("GITHUB_TOKEN", undefined);
+      it("returns error when no GitHub credential is available", async () => {
+        vi.mocked(resolveGitHubAuth).mockImplementation(() => {
+          throw new GitHubAuthUnavailableError();
+        });
 
         const input = LinkProjectToTeamInputSchema.parse({
           projectId: "PVT_kwDOTest123",
@@ -585,7 +598,9 @@ describe("Project Linking Tools", () => {
           teamSlug: "engineering",
         });
 
-        await expect(executeLinkProjectToTeam(input)).rejects.toThrow(/No GitHub token available/);
+        await expect(executeLinkProjectToTeam(input)).rejects.toThrow(
+          /No GitHub credential available/
+        );
       });
     });
 
@@ -618,8 +633,10 @@ describe("Project Linking Tools", () => {
         expect(result.content[0].text).toContain("Successfully unlinked");
       });
 
-      it("returns error when GITHUB_TOKEN is missing", async () => {
-        vi.stubEnv("GITHUB_TOKEN", undefined);
+      it("returns error when no GitHub credential is available", async () => {
+        vi.mocked(resolveGitHubAuth).mockImplementation(() => {
+          throw new GitHubAuthUnavailableError();
+        });
 
         const input = UnlinkProjectFromTeamInputSchema.parse({
           projectId: "PVT_kwDOTest123",
@@ -628,7 +645,7 @@ describe("Project Linking Tools", () => {
         });
 
         await expect(executeUnlinkProjectFromTeam(input)).rejects.toThrow(
-          /No GitHub token available/
+          /No GitHub credential available/
         );
       });
     });
@@ -750,15 +767,17 @@ describe("Project Linking Tools", () => {
         );
       });
 
-      it("returns error when GITHUB_TOKEN is missing", async () => {
-        vi.stubEnv("GITHUB_TOKEN", undefined);
+      it("returns error when no GitHub credential is available", async () => {
+        vi.mocked(resolveGitHubAuth).mockImplementation(() => {
+          throw new GitHubAuthUnavailableError();
+        });
 
         const input = ListLinkedRepositoriesInputSchema.parse({
           projectId: "PVT_kwDOTest123",
         });
 
         await expect(executeListLinkedRepositories(input)).rejects.toThrow(
-          /No GitHub token available/
+          /No GitHub credential available/
         );
       });
     });
@@ -878,14 +897,18 @@ describe("Project Linking Tools", () => {
         );
       });
 
-      it("returns error when GITHUB_TOKEN is missing", async () => {
-        vi.stubEnv("GITHUB_TOKEN", undefined);
+      it("returns error when no GitHub credential is available", async () => {
+        vi.mocked(resolveGitHubAuth).mockImplementation(() => {
+          throw new GitHubAuthUnavailableError();
+        });
 
         const input = ListLinkedTeamsInputSchema.parse({
           projectId: "PVT_kwDOTest123",
         });
 
-        await expect(executeListLinkedTeams(input)).rejects.toThrow(/No GitHub token available/);
+        await expect(executeListLinkedTeams(input)).rejects.toThrow(
+          /No GitHub credential available/
+        );
       });
     });
   });

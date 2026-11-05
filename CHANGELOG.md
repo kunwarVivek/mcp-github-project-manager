@@ -7,7 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-No unreleased changes.
+### Added
+- **GitHub OAuth device flow** — `mcp-github-project-manager auth login | status | logout` signs in with a GitHub OAuth App or GitHub App (`GITHUB_OAUTH_CLIENT_ID`, `GITHUB_OAUTH_CLIENT_SECRET`, `GITHUB_OAUTH_SCOPES`, `GITHUB_OAUTH_TOKEN_FILE`). Tokens are stored `0600`, expiring GitHub App user tokens are refreshed automatically, and the stored token is a new tier in the credential chain.
+- **Six-tier GitHub credential chain** — GitHub App installation → `--token` → `$SECRETS_DIR/GITHUB_TOKEN` → `GITHUB_TOKEN` → stored OAuth token → `gh auth token`, re-resolved per tool call. `GITHUB_TOKEN` is no longer required.
+- **Inbound HTTP authentication for `/events/*`** — shared bearer (`EVENTS_AUTH_TOKEN`) and/or OAuth 2.1 resource-server mode (`OAUTH_ISSUER`, `OAUTH_AUDIENCE`, `OAUTH_JWKS_URI`, `OAUTH_REQUIRED_SCOPES`, `OAUTH_RESOURCE_URL`) with RFC 9728 protected-resource metadata and SSE expiry at token `exp`.
+- **Gemini via Vertex AI** — provider `google-vertex` using Google Application Default Credentials (`GOOGLE_VERTEX_PROJECT`, `GOOGLE_VERTEX_LOCATION`).
+
+### Breaking changes
+- **`/events/*` requires authentication** — `/events/stream`, `/events/subscribe`, `/events/replay/:id` and `/events/recent` return `401` unless `EVENTS_AUTH_TOKEN` or `OAUTH_*` is configured; `EVENTS_ALLOW_UNAUTHENTICATED=true` restores the old behaviour.
+- **`/health` anonymous output reduced** — unauthenticated callers receive only `{"status":"healthy"}`; full stats need a bearer token.
+- **`github://config` resource** — the `tokenConfigured` field is replaced by `auth: {configured, mode, source}`.
+- **Bin entry is `build/bin.js`** (package `bin`, `start`, `inspect`, Docker ENTRYPOINT). `node build/index.js` still starts the server but has no `auth` subcommands.
 
 ## [3.0.0] - 2026-10-28
 

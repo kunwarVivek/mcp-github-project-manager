@@ -12,15 +12,12 @@ const shouldSkip = process.env.GITHUB_TOKEN === undefined;
     // Use environment variables or default test values
     const owner = process.env.GITHUB_OWNER || "test-owner";
     const repo = process.env.GITHUB_REPO || "test-repo";
-    const token = process.env.GITHUB_TOKEN || "test-token";
-
-    config = new GitHubConfig(owner, repo, token);
+    config = new GitHubConfig(owner, repo);
   });
 
   it("should create proper config from environment variables", () => {
     expect(config).toBeDefined();
     expect(config.owner).toBeDefined();
     expect(config.repo).toBeDefined();
-    expect(config.token).toBeDefined();
   });
 });

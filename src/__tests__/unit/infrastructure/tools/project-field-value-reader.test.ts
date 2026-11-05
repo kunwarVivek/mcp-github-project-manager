@@ -52,7 +52,6 @@ describe("project item field value reader", () => {
 
   beforeEach(() => {
     vi.resetAllMocks();
-    vi.stubEnv("GITHUB_TOKEN", "test-token");
 
     graphql = vi.fn().mockResolvedValue({
       node: {

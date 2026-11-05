@@ -45,7 +45,6 @@ describe("check_work_status review handling", () => {
 
   beforeEach(() => {
     vi.resetAllMocks();
-    vi.stubEnv("GITHUB_TOKEN", "test-token");
 
     listReviews = vi.fn();
 

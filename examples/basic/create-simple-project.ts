@@ -15,12 +15,13 @@
 
 import dotenv from "dotenv";
 import { createProjectManagementService } from "../../src/container.js";
+import { resolveGitHubAuth } from "../../src/infrastructure/github/auth/resolveGitHubAuth.js";
 
 // Load environment variables
 dotenv.config();
 
 // Validate environment variables
-const requiredEnvVars = ["GITHUB_TOKEN", "GITHUB_OWNER", "GITHUB_REPO"];
+const requiredEnvVars = ["GITHUB_OWNER", "GITHUB_REPO"];
 for (const envVar of requiredEnvVars) {
   if (!process.env[envVar]) {
     process.stderr.write(`Error: ${envVar} environment variable is required`);
@@ -34,7 +35,7 @@ async function createSimpleProject() {
     const service = createProjectManagementService(
       process.env.GITHUB_OWNER ?? "",
       process.env.GITHUB_REPO ?? "",
-      process.env.GITHUB_TOKEN ?? ""
+      resolveGitHubAuth()
     );
 
     console.log("Creating a simple project...");

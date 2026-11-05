@@ -1,9 +1,11 @@
 import type { McpServer } from "@modelcontextprotocol/server";
 import { INTERNAL_ERROR, ProtocolError } from "@modelcontextprotocol/server";
-import { GITHUB_OWNER, GITHUB_REPO, GITHUB_TOKEN } from "../../env";
+import { GITHUB_OWNER, GITHUB_REPO } from "../../env";
 import type { AIServiceFactory } from "../../services/ai/AIServiceFactory";
 import type { ProjectManagementService } from "../../services/ProjectManagementService";
 import type { AgentStore } from "../agent/AgentStore";
+import { GitHubAuthUnavailableError } from "../github/auth/GitHubAuth";
+import { resolveGitHubAuth } from "../github/auth/resolveGitHubAuth";
 import type { ILogger } from "../logger/index";
 import type { ToolRegistry } from "../tools/ToolRegistry";
 
@@ -45,6 +47,22 @@ function jsonResource(uri: URL, data: unknown) {
  * re-thrown as a McpError so the client sees a clean message instead of a
  * raw stack trace.
  */
+/**
+ * How the server currently authenticates to GitHub: mode and source only, never
+ * any token material. `configured: false` when no credential is available.
+ */
+function describeGitHubAuth():
+  | { configured: true; mode: string; source: string }
+  | { configured: false } {
+  try {
+    const { mode, source } = resolveGitHubAuth();
+    return { configured: true, mode, source };
+  } catch (error) {
+    if (error instanceof GitHubAuthUnavailableError) return { configured: false };
+    throw error;
+  }
+}
+
 export function registerResources(server: McpServer, deps: RegisterResourcesDeps): void {
   const { service, toolRegistry, agentStore, aiFactory, logger, serverVersion } = deps;
 
@@ -53,7 +71,7 @@ export function registerResources(server: McpServer, deps: RegisterResourcesDeps
     "github://config",
     {
       title: "Server Configuration",
-      description: "Target repository, GitHub token status, and AI provider availability.",
+      description: "Target repository, GitHub auth mode, and AI provider availability.",
       mimeType: "application/json",
     },
     async (uri) => {
@@ -63,7 +81,7 @@ export function registerResources(server: McpServer, deps: RegisterResourcesDeps
         return jsonResource(uri, {
           owner: GITHUB_OWNER,
           repo: GITHUB_REPO,
-          tokenConfigured: Boolean(GITHUB_TOKEN),
+          auth: describeGitHubAuth(),
           serverVersion,
           ai: {
             available: ai.hasAnyProvider,

@@ -9,6 +9,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { configureContainer, container, createProjectManagementService } from "../../container";
 import { ProjectManagementService } from "../../services/ProjectManagementService";
+import { tokenAuth } from "../helpers/githubAuth";
 
 describe("Facade Wiring Integration", () => {
   beforeEach(() => {
@@ -18,18 +19,18 @@ describe("Facade Wiring Integration", () => {
 
   describe("Container Configuration", () => {
     it("should configure container with test credentials", () => {
-      const configured = configureContainer("test-token", "test-owner", "test-repo");
+      const configured = configureContainer(tokenAuth(), "test-owner", "test-repo");
       expect(configured).toBeDefined();
     });
 
     it("should resolve GitHubRepositoryFactory from container", () => {
-      configureContainer("test-token", "test-owner", "test-repo");
+      configureContainer(tokenAuth(), "test-owner", "test-repo");
       const factory = container.resolve("GitHubRepositoryFactory");
       expect(factory).toBeDefined();
     });
 
     it("should resolve all extracted services from container", () => {
-      configureContainer("test-token", "test-owner", "test-repo");
+      configureContainer(tokenAuth(), "test-owner", "test-repo");
 
       expect(container.resolve("SubIssueService")).toBeDefined();
       expect(container.resolve("MilestoneService")).toBeDefined();
@@ -40,7 +41,7 @@ describe("Facade Wiring Integration", () => {
     });
 
     it("should resolve ProjectManagementService from container", () => {
-      configureContainer("test-token", "test-owner", "test-repo");
+      configureContainer(tokenAuth(), "test-owner", "test-repo");
       const service = container.resolve("ProjectManagementService");
       expect(service).toBeDefined();
       expect(service).toBeInstanceOf(ProjectManagementService);
@@ -49,13 +50,13 @@ describe("Facade Wiring Integration", () => {
 
   describe("Direct Instantiation Helper", () => {
     it("should create ProjectManagementService via helper function", () => {
-      const service = createProjectManagementService("test-owner", "test-repo", "test-token");
+      const service = createProjectManagementService("test-owner", "test-repo", tokenAuth());
       expect(service).toBeDefined();
       expect(service).toBeInstanceOf(ProjectManagementService);
     });
 
     it("should have all expected methods on the facade", () => {
-      const service = createProjectManagementService("test-owner", "test-repo", "test-token");
+      const service = createProjectManagementService("test-owner", "test-repo", tokenAuth());
 
       // SubIssue delegations
       expect(typeof service.updateIssueStatus).toBe("function");
@@ -110,14 +111,14 @@ describe("Facade Wiring Integration", () => {
 
   describe("Delegation Verification", () => {
     it("should return factory from getRepositoryFactory", () => {
-      const service = createProjectManagementService("test-owner", "test-repo", "test-token");
+      const service = createProjectManagementService("test-owner", "test-repo", tokenAuth());
       const factory = service.getRepositoryFactory();
       expect(factory).toBeDefined();
       expect(factory.getConfig).toBeDefined();
     });
 
     it("should have factory configured with correct owner and repo", () => {
-      const service = createProjectManagementService("my-owner", "my-repo", "my-token");
+      const service = createProjectManagementService("my-owner", "my-repo", tokenAuth("my-token"));
       const factory = service.getRepositoryFactory();
       const config = factory.getConfig();
       expect(config.owner).toBe("my-owner");
@@ -127,8 +128,8 @@ describe("Facade Wiring Integration", () => {
 
   describe("Service Independence", () => {
     it("should create independent service instances", () => {
-      const service1 = createProjectManagementService("owner1", "repo1", "token1");
-      const service2 = createProjectManagementService("owner2", "repo2", "token2");
+      const service1 = createProjectManagementService("owner1", "repo1", tokenAuth("token1"));
+      const service2 = createProjectManagementService("owner2", "repo2", tokenAuth("token2"));
 
       const config1 = service1.getRepositoryFactory().getConfig();
       const config2 = service2.getRepositoryFactory().getConfig();
@@ -143,7 +144,7 @@ describe("Facade Wiring Integration", () => {
   describe("Type Exports", () => {
     it("should re-export types from extracted services", () => {
       // Types are re-exported at compile time, verify the module loads correctly
-      const service = createProjectManagementService("test-owner", "test-repo", "test-token");
+      const service = createProjectManagementService("test-owner", "test-repo", tokenAuth());
       // If getMilestoneMetrics exists, MilestoneMetrics type is usable
       expect(typeof service.getMilestoneMetrics).toBe("function");
       // If getSprintMetrics exists, SprintMetrics type is usable

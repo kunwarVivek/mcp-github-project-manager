@@ -642,7 +642,7 @@ export const filterProjectItemsTool: ToolDefinition<
  *
  * @param args - Validated input arguments
  * @returns Success status and position description
- * @throws Error if GITHUB_TOKEN is not set or API call fails
+ * @throws Error if no GitHub credential is available or the API call fails
  */
 export async function executeUpdateItemPosition(args: UpdateItemPositionInput): Promise<{
   content: Array<{ type: "text"; text: string }>;
@@ -692,7 +692,7 @@ export async function executeUpdateItemPosition(args: UpdateItemPositionInput): 
  *
  * @param args - Validated input arguments
  * @returns Paginated list of matching issues
- * @throws Error if GITHUB_TOKEN is not set or API call fails
+ * @throws Error if no GitHub credential is available or the API call fails
  */
 export async function executeSearchIssuesAdvanced(args: SearchIssuesAdvancedInput): Promise<{
   content: Array<{ type: "text"; text: string }>;
@@ -752,7 +752,7 @@ export async function executeSearchIssuesAdvanced(args: SearchIssuesAdvancedInpu
  *
  * @param args - Validated input arguments
  * @returns Filtered list of project items with counts
- * @throws Error if GITHUB_TOKEN is not set or API call fails
+ * @throws Error if no GitHub credential is available or the API call fails
  */
 export async function executeFilterProjectItems(args: FilterProjectItemsInput): Promise<{
   content: Array<{ type: "text"; text: string }>;

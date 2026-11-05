@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import { validateConfig } from "../../../domain/config-schema";
 
 const requiredGithub = {
-  GITHUB_TOKEN: "ghp_test",
   GITHUB_OWNER: "owner",
   GITHUB_REPO: "repo",
 };
@@ -39,7 +38,15 @@ describe("config-schema boolean flags", () => {
     expect(cfg.sync?.SYNC_ENABLED).toBe(true);
   });
 
-  it("still rejects a missing GitHub token", () => {
-    expect(() => validateConfig({ GITHUB_OWNER: "o", GITHUB_REPO: "r" })).toThrow(/GITHUB_TOKEN/);
+  it("does not require a GitHub token (App, OAuth login and gh CLI are valid credentials)", () => {
+    const cfg = validateConfig({ GITHUB_OWNER: "o", GITHUB_REPO: "r" });
+    expect(cfg.github).toEqual({ GITHUB_OWNER: "o", GITHUB_REPO: "r" });
+  });
+
+  it.each([
+    ["GITHUB_OWNER", { GITHUB_REPO: "r" }],
+    ["GITHUB_REPO", { GITHUB_OWNER: "o" }],
+  ])("still requires %s", (name, env) => {
+    expect(() => validateConfig(env)).toThrow(new RegExp(name));
   });
 });

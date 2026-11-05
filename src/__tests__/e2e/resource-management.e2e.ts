@@ -1,6 +1,7 @@
 import { createProjectManagementService } from "../../container";
 import { ResourceStatus } from "../../domain/resource-types";
 import type { Issue, Milestone } from "../../domain/types";
+import { createTokenAuth } from "../../infrastructure/github/auth/credentials";
 import type { ProjectManagementService } from "../../services/ProjectManagementService";
 import { TestFactory } from "../test-utils";
 
@@ -22,7 +23,11 @@ describe.skip("Resource Management E2E Tests", () => {
       return;
     }
 
-    service = createProjectManagementService(owner, repo, token);
+    service = createProjectManagementService(
+      owner,
+      repo,
+      createTokenAuth(() => token, "env")
+    );
   });
 
   describe("Issue Relationship Management", () => {

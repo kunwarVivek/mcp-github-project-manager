@@ -32,7 +32,7 @@ describe("GitHubProjectRepository", () => {
     (Octokit as MockedClass<typeof Octokit>).mockImplementation(() => mockOctokit);
 
     // Create configuration
-    config = new GitHubConfig("test-owner", "test-repo", "test-token");
+    config = new GitHubConfig("test-owner", "test-repo");
 
     // Create repository instance with octokit
     repository = new GitHubProjectRepository(mockOctokit, config);

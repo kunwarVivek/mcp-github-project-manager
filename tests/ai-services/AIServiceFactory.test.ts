@@ -93,6 +93,7 @@ describe("AIServiceFactory", () => {
         "anthropic",
         "openai",
         "google",
+        "google-vertex",
         "perplexity",
         "openai-compatible",
       ]);
@@ -182,7 +183,8 @@ describe("AIServiceFactory", () => {
       const validation = factory.validateConfiguration();
 
       expect(validation.hasAnyProvider).toBe(true);
-      expect(validation.missing).toHaveLength(0);
+      // Every API-key provider is configured; Vertex (ADC, GOOGLE_VERTEX_PROJECT) is not.
+      expect(validation.missing).toEqual(["GOOGLE_VERTEX_PROJECT"]);
       expect(validation.available.length).toBeGreaterThan(0);
       expect(validation.availableModels).toContain("main");
     });
@@ -196,7 +198,8 @@ describe("AIServiceFactory", () => {
       expect(validation.available).toContain("openai");
       expect(validation.available).toContain("google");
       expect(validation.available).toContain("perplexity");
-      expect(validation.missing).toHaveLength(0);
+      expect(validation.available).not.toContain("google-vertex");
+      expect(validation.missing).toEqual(["GOOGLE_VERTEX_PROJECT"]);
       expect(validation.availableModels).toContain("main");
       expect(validation.availableModels).toContain("fallback");
       expect(validation.availableModels).toContain("research");
