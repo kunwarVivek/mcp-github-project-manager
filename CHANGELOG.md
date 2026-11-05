@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+No unreleased changes.
+
+## [5.0.2] - 2026-11-05
+
 ### Security
 - **No unredacted error sinks left** — every remaining `console.*` / raw stderr path in production code now goes through the redacting logger or `redactSecretPatterns`: AI task tools (stderr *and* the error text returned to the MCP client), AI services (backlog prioritizer, issue enrichment, label suggestion, sprint risk), the AI fallback policy, trace events, graceful shutdown, cache persistence, config warnings/errors, the stored-OAuth warning, and the `tool`/`action`/`target`/`idempotencyKey` fields of the mutation audit log.
 
