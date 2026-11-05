@@ -1,7 +1,7 @@
 # Plan Sprint Tool
 
 > **Scope note.** `plan_sprint` is a service-layer operation, not a public MCP
-> tool name. The public surface is the 20 compound tools in
+> tool name. The public surface is the <!-- count:tools -->21<!-- /count --> compound tools in
 > [TOOLS.md](../TOOLS.md) — sprints are managed through `manage_sprints`
 > (actions `create`, `update`, `add_issues`, `remove_issues`, `plan`).
 

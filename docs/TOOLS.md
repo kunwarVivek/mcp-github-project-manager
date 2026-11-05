@@ -1,6 +1,6 @@
 # MCP Tools Reference
 
-This document provides comprehensive documentation for the 20 compound MCP tools exposed by the MCP GitHub Project Manager. Each compound tool groups related actions behind a single `action` parameter, reducing tool-selection overhead for AI agents while preserving full access to all 169 underlying operations.
+This document provides comprehensive documentation for the <!-- count:tools -->21<!-- /count --> compound MCP tools exposed by the MCP GitHub Project Manager. Each compound tool groups related actions behind a single `action` parameter, reducing tool-selection overhead for AI agents while preserving full access to all <!-- count:actions -->175<!-- /count --> underlying operations.
 
 > This file is the **reference** for the tool surface. The README links here rather
 > than duplicating it.
@@ -9,14 +9,14 @@ This document provides comprehensive documentation for the 20 compound MCP tools
 
 | Metric | Value |
 |--------|-------|
-| Compound Tools | 20 |
-| Total Actions | 169 |
+| Compound Tools | <!-- count:tools -->21<!-- /count --> |
+| Total Actions | <!-- count:actions -->175<!-- /count --> |
 | MCP SDK | `@modelcontextprotocol/server` v2 (2026-07-28 spec) |
 | All tools have | Behavior annotations, an `action` parameter, and a JSON Schema input |
 
 ### Design: Progressive Disclosure
 
-MCP clients see 20 tools. Each tool accepts an `action` string that routes to the appropriate internal executor. Use `discover_tools` to explore available actions at runtime.
+MCP clients see <!-- count:tools -->21<!-- /count --> tools. Each tool accepts an `action` string that routes to the appropriate internal executor. Use `discover_tools` to explore available actions at runtime.
 
 ### Behavior Annotations
 
@@ -25,18 +25,31 @@ and writes is annotated for the strongest behaviour it allows.
 
 | Annotation | Meaning | Tools |
 |------------|---------|-------|
-| `readOnlyHint: true` | The tool only reads | `discover_tools` |
+| `readOnlyHint: true` | The tool only reads | `discover_tools`, `analytics` |
 | `destructiveHint: true` | The tool can permanently delete data | `manage_project`, `manage_issues`, `manage_milestones`, `manage_automation`, `manage_branches`, `manage_releases`, `manage_workflows`, `agent_manage` |
-| `idempotentHint: true` | Safe to retry | `discover_tools`, `system` |
+| `idempotentHint: true` | Safe to retry | `discover_tools`, `system`, `analytics` |
 | `openWorldHint: true` | Makes external calls | every tool that talks to GitHub or an AI provider |
 
 ### Error Semantics
 
 A tool that runs and fails returns `{ content, isError: true }` — the model sees
-the failure and can recover from it. A JSON-RPC error is reserved for protocol
-faults, such as calling a tool that does not exist. Under MCP v2 the server
-validates arguments against the declared `inputSchema` **before** the handler
-runs, so a malformed call never reaches business logic.
+the failure and can recover from it. The stable error code is carried in
+`_meta.error`. This covers invalid arguments (field-level messages), GitHub API
+errors (401/403/404/422/rate-limit/5xx mapped to actionable text) and an
+exhausted agent token budget (`BudgetExhausted`, with remaining/limit). A
+JSON-RPC error is reserved for protocol faults — calling a tool that does not
+exist. Under MCP v2 the server validates arguments against the declared
+`inputSchema` **before** the handler runs, so a malformed call never reaches
+business logic.
+
+### Cross-Cutting Parameters
+
+| Parameter | Where | Behaviour |
+|-----------|-------|-----------|
+| `idempotencyKey` | create actions: `manage_issues` (`create`, `add_sub_issue`, `create_draft`, `create_comment`), `manage_milestones` (`create`), `manage_project` (`create_field`), `manage_sprints` (`create`) | A repeat with the same key and the same arguments within 24 h returns the original result flagged `replayed: true` instead of creating a duplicate. The same key with different arguments is rejected. A result that has aged out of memory is recovered from the mutation audit log as a summary. Ignored by every other action. |
+| `cursor` / `nextCursor` | list actions that page: `manage_project` (`list_templates`, `list_linked_repos`, `list_linked_teams`, `filter_items`), `manage_issues` (`search_advanced`, `list_sub_issues`), `manage_status_updates` (`list`) | Pagination is additive: the response keeps `pageInfo` and gains `nextCursor` (`null` on the last page). Pass it back as `cursor` to fetch the next page. |
+| `confirm` | `manage_sprints` `delete` | Required to be `true`; without it the delete is refused with an explanatory error. |
+| `_meta.schemaVersion` | every tool in `tools/list` | Semver of the tool's input contract (all `1.0.0`). Pinned by a snapshot test, so a schema change must bump the version. |
 
 ### Tool Selection via `MCP_TOOL_GROUPS`
 
@@ -60,7 +73,7 @@ tool — including the `system` tool — is subject to the filter.
 
 | Group | Tools in the group |
 |-------|--------------------|
-| `core` | `manage_project`, `manage_issues`, `manage_prs`, `manage_milestones`, `manage_sprints`, `manage_labels`, `manage_automation`, `manage_iterations`, `manage_status_updates`, `manage_branches`, `manage_releases`, `manage_workflows` |
+| `core` | `manage_project`, `manage_issues`, `manage_prs`, `manage_milestones`, `manage_sprints`, `manage_labels`, `manage_automation`, `manage_iterations`, `manage_status_updates`, `manage_branches`, `manage_releases`, `manage_workflows`, `analytics` |
 | `ai` | `ai_generate`, `ai_analyze`, `ai_plan` |
 | `agents` | `agent_work`, `agent_manage` |
 | `events` | `manage_events` |
@@ -74,7 +87,7 @@ tool — including the `system` tool — is subject to the filter.
 2. [manage_issues](#manage_issues) (22 actions)
 3. [manage_prs](#manage_prs) (7 actions)
 4. [manage_milestones](#manage_milestones) (7 actions)
-5. [manage_sprints](#manage_sprints) (8 actions)
+5. [manage_sprints](#manage_sprints) (9 actions)
 6. [manage_labels](#manage_labels) (2 actions)
 7. [manage_automation](#manage_automation) (3 actions)
 8. [manage_iterations](#manage_iterations) (5 actions)
@@ -90,6 +103,7 @@ tool — including the `system` tool — is subject to the filter.
 18. [manage_workflows](#manage_workflows) (6 actions)
 19. [manage_releases](#manage_releases) (6 actions)
 20. [manage_branches](#manage_branches) (4 actions)
+21. [analytics](#analytics) (5 actions)
 
 ---
 
@@ -113,7 +127,7 @@ Manage GitHub Projects v2: create, configure, and organize projects with fields,
 | `create` | `title` (req), `owner` (req), `shortDescription`, `visibility` | Create a new project |
 | `list` | `status`, `limit` | List projects |
 | `get` | `projectId` (req) | Get project details |
-| `update` | `projectId` (req), `title`, `shortDescription`, `visibility`, `closed` | Update project |
+| `update` | `projectId` (req), `title`, `shortDescription`, `visibility`, `closed` (`true` closes, `false` reopens) or `status` (`"closed"` closes; `"active"`/`"open"` reopens; anything else is an error) | Update project |
 | `delete` | `projectId` (req) | Delete project (destructive) |
 | `get_readme` | `projectId` (req) | Get project README |
 | `update_readme` | `projectId` (req), `readme` (req) | Update project README |
@@ -137,15 +151,15 @@ Manage GitHub Projects v2: create, configure, and organize projects with fields,
 | `mark_as_template` | `projectId` (req) | Mark as template |
 | `unmark_as_template` | `projectId` (req) | Unmark as template |
 | `copy_from_template` | `templateProjectId` (req), `title` (req), `owner` (req) | Copy from template |
-| `list_templates` | — | List available templates |
+| `list_templates` | `cursor` | List available templates |
 | `link_to_repo` | `projectId` (req), `repoId` (req) | Link project to repo |
 | `unlink_from_repo` | `projectId` (req), `repoId` (req) | Unlink from repo |
 | `link_to_team` | `projectId` (req), `teamId` (req) | Link to team |
 | `unlink_from_team` | `projectId` (req), `teamId` (req) | Unlink from team |
-| `list_linked_repos` | `projectId` (req) | List linked repos |
-| `list_linked_teams` | `projectId` (req) | List linked teams |
+| `list_linked_repos` | `projectId` (req), `cursor` | List linked repos |
+| `list_linked_teams` | `projectId` (req), `cursor` | List linked teams |
 | `update_item_position` | `projectId` (req), `itemId` (req), `position` (req) | Reorder item |
-| `filter_items` | `projectId` (req), `filterQuery` (req) | Filter items |
+| `filter_items` | `projectId` (req), `filterQuery` (req), `cursor` | Filter items |
 | `setup_agent_fields` | `projectId` (req) | Provision agent orchestration fields |
 | `set_collaborators` | `projectId` (req), `collaborators` (req), `org` | Set the roles of a project's collaborators — one entry per user or team |
 
@@ -237,7 +251,7 @@ one view.
 
 Manage GitHub issues: CRUD, comments, draft issues, advanced search, and sub-issue hierarchy.
 
-**Action enum:** `create` | `list` | `get` | `update` | `create_comment` | `update_comment` | `delete_comment` | `list_comments` | `create_draft` | `update_draft` | `delete_draft` | `convert_draft` | `search_advanced` | `add_sub_issue` | `list_sub_issues` | `get_parent_issue` | `reprioritize_sub_issue` | `remove_sub_issue`
+**Action enum:** `create` | `list` | `get` | `update` | `create_comment` | `update_comment` | `delete_comment` | `list_comments` | `create_draft` | `update_draft` | `delete_draft` | `convert_draft` | `search_advanced` | `add_sub_issue` | `list_sub_issues` | `get_parent_issue` | `reprioritize_sub_issue` | `remove_sub_issue` | `list_dependencies` | `add_blocker` | `remove_blocker` | `list_issue_types`
 
 ### Common Parameters
 
@@ -251,7 +265,7 @@ Manage GitHub issues: CRUD, comments, draft issues, advanced search, and sub-iss
 
 | Action | Additional Parameters | Description |
 |--------|----------------------|-------------|
-| `create` | `title` (req), `body`, `labels`, `assignees`, `milestone` | Create issue |
+| `create` | `title` (req), `body`, `labels`, `assignees`, `milestone`, `idempotencyKey` | Create issue |
 | `list` | `state`, `labels`, `milestone`, `assignee`, `limit` | List issues |
 | `get` | `issueNumber` (req) | Get issue details |
 | `update` | `issueNumber` (req), `title`, `body`, `state`, `labels`, `assignees`, `milestone` | Update issue |
@@ -263,9 +277,9 @@ Manage GitHub issues: CRUD, comments, draft issues, advanced search, and sub-iss
 | `update_draft` | `projectId` (req), `draftId` (req), `title`, `body` | Update draft |
 | `delete_draft` | `projectId` (req), `draftId` (req) | Delete draft |
 | `convert_draft` | `projectId` (req), `draftId` (req), `repositoryId` (req) | Convert draft to issue |
-| `search_advanced` | `query` (req), `limit` | Advanced search |
-| `add_sub_issue` | `issueNumber` (req), `subIssueNumber` (req) | Add sub-issue |
-| `list_sub_issues` | `issueNumber` (req) | List sub-issues |
+| `search_advanced` | `query` (req), `limit`, `cursor` | Advanced search |
+| `add_sub_issue` | `issueNumber` (req), `subIssueNumber` (req), `idempotencyKey` | Add sub-issue |
+| `list_sub_issues` | `issueNumber` (req), `cursor` | List sub-issues |
 | `get_parent_issue` | `issueNumber` (req) | Get parent issue |
 | `reprioritize_sub_issue` | `issueNumber` (req), `subIssueNumber` (req), `position` (req) | Reorder sub-issue |
 | `remove_sub_issue` | `issueNumber` (req), `subIssueNumber` (req) | Remove sub-issue |
@@ -332,7 +346,7 @@ Manage milestones: CRUD, metrics, and deadline tracking.
 
 | Action | Additional Parameters | Description |
 |--------|----------------------|-------------|
-| `create` | `title` (req), `description`, `dueDate`, `state` | Create milestone |
+| `create` | `title` (req), `description`, `dueDate`, `state`, `idempotencyKey` | Create milestone |
 | `list` | `state`, `limit` | List milestones |
 | `update` | `milestoneNumber` (req), `title`, `description`, `dueDate`, `state` | Update milestone |
 | `delete` | `milestoneNumber` (req) | Delete milestone (destructive) |
@@ -359,13 +373,13 @@ Manage milestones: CRUD, metrics, and deadline tracking.
 
 Manage sprints: create, plan, track progress, and analyze velocity.
 
-**Action enum:** `create` | `list` | `get_current` | `update` | `add_issues` | `remove_issues` | `get_metrics` | `plan`
+**Action enum:** `create` | `list` | `get_current` | `update` | `add_issues` | `remove_issues` | `get_metrics` | `plan` | `delete`
 
 ### Per-Action Parameters
 
 | Action | Additional Parameters | Description |
 |--------|----------------------|-------------|
-| `create` | `title` (req), `startDate` (req), `endDate` (req), `goals` | Create sprint |
+| `create` | `title` (req), `startDate` (req), `endDate` (req), `goals`, `idempotencyKey` | Create sprint |
 | `list` | `status`, `limit` | List sprints |
 | `get_current` | — | Get the current active sprint |
 | `update` | `sprintId` (req), `title`, `status`, `goals` | Update sprint |
@@ -373,6 +387,7 @@ Manage sprints: create, plan, track progress, and analyze velocity.
 | `remove_issues` | `sprintId` (req), `issueNumbers` (req) | Remove issues from sprint |
 | `get_metrics` | `sprintId` (req) | Get sprint metrics (velocity, burndown) |
 | `plan` | `sprintId` (req), `capacity`, `teamSkills` | AI-assisted sprint planning |
+| `delete` | `sprintId` (req), `confirm` (req, must be `true`) | Delete a sprint from its project and clear it from every assigned item (destructive, irreversible) |
 
 ### Examples
 
@@ -517,7 +532,7 @@ Create and manage project status updates.
 | Action | Additional Parameters | Description |
 |--------|----------------------|-------------|
 | `create` | `projectId` (req), `status` (req), `body` (req), `startDate`, `targetDate` | Create status update |
-| `list` | `projectId` (req), `limit` | List status updates |
+| `list` | `projectId` (req), `limit`, `cursor` | List status updates |
 | `get` | `statusUpdateId` (req) | Get status update |
 
 ### Examples
@@ -716,7 +731,7 @@ Agent administration: list agents, manage budgets, view activity, submit work pr
 | `reclaim_stale` | `timeoutMinutes` | Reclaim tasks from agents with stale heartbeats (default 30 min). Also run automatically by the server-side **auto-reclaim scheduler** (see below). |
 | `record_usage` | `agentId` (req), `tokensUsed` (req) | Report token usage against an agent's budget |
 | `get_metrics` | `staleAfterMinutes` | Aggregate + per-agent metrics (throughput, cycle time, budget burn, staleness) |
-| `setup_fields` | `projectId` (req) | Idempotently provision the agent orchestration fields (`agent_claimed_by`, `agent_claimed_at`, `agent_status`, `agent_work_branch`, `agent_pr_number`) on a project |
+| `setup_fields` | `projectId` (req) | Idempotently provision the agent orchestration fields (`agent_claimed_by`, `agent_claimed_at`, `agent_status`, `agent_work_branch`, `agent_pr_number`, `agent_heartbeat_at`, `agent_progress`) on a project |
 | `assign_task` | `agentId` (req), `projectId` (req), `issueNumber` (req) | PM assigns a specific issue to a specific agent, bypassing self-service checkout |
 | `get_swarm_status` | `staleAfterMinutes` | Dashboard of all agents: tasks, heartbeats, budgets, blocked/stale detection |
 | `rebalance_workload` | `projectId` (req), `staleAfterMinutes`, `agentIds`, `roleFilter`, `maxAssignments` | Reclaim stale work, then redistribute available project tasks to eligible idle agents via smart assignment |
@@ -830,6 +845,32 @@ Manage GitHub Actions workflows: list, trigger, monitor runs, and download logs.
 
 ---
 
+## analytics
+
+Read-only reporting over a project's items and iterations. Every action requires `projectId`; none writes to GitHub.
+
+**Action enum:** `sprint_velocity` | `sprint_burndown` | `cycle_time` | `throughput` | `project_summary`
+
+### Per-Action Parameters
+
+| Action | Additional Parameters | Description |
+|--------|----------------------|-------------|
+| `sprint_velocity` | `projectId` (req), `lastN` (default 6) | Velocity of the most recent iterations |
+| `sprint_burndown` | `projectId` (req), `sprintId` (iteration ID; default: the current iteration) | Burndown of one iteration |
+| `cycle_time` | `projectId` (req), `sinceDays` (default 30) | Cycle time of items completed in the look-back window |
+| `throughput` | `projectId` (req), `sinceDays` (default 30), `bucket` (`day` \| `week` \| `month`, default `week`) | Completed items per bucket |
+| `project_summary` | `projectId` (req) | Totals and status breakdown for the project |
+
+### Examples
+
+```json
+{"tool": "analytics", "arguments": {"action": "sprint_velocity", "projectId": "PVT_kwDOAB...", "lastN": 4}}
+{"tool": "analytics", "arguments": {"action": "throughput", "projectId": "PVT_kwDOAB...", "sinceDays": 60, "bucket": "week"}}
+```
+
+
+---
+
 ## manage_releases
 
 Manage GitHub releases: create, update, delete, and query releases.
@@ -916,12 +957,12 @@ Infrastructure operations exposed by the `system` group.
 ## Granular Tools (Internal)
 
 The compound API is the recommended interface for MCP clients:
-- **Fewer tools** — 20 tools covering 169 actions, instead of one tool per operation
+- **Fewer tools** — <!-- count:tools -->21<!-- /count --> tools covering <!-- count:actions -->175<!-- /count --> actions, instead of one tool per operation
 - **Progressive disclosure** — `discover_tools` lets agents explore capabilities at runtime
 - **Same underlying operations** — compound tools delegate directly to the same internal executors
 - **Configurable exposure** — `MCP_TOOL_GROUPS` (group names: `core`, `ai`, `agents`, `events`, `system`) lets you limit which tool groups are visible
 
-To restore granular tool exposure (not recommended), consult the `ToolRegistry` source in `src/infrastructure/tools/`.
+Granular (per-operation) tools remain registered in `ToolRegistry` as internal implementation contracts for the compound executors; they are **not** listed over MCP and a client cannot call them. See `src/infrastructure/tools/`.
 
 ---
 

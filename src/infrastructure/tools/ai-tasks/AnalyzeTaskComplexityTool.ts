@@ -5,7 +5,7 @@ import { TaskGenerationService } from "../../../services/TaskGenerationService.j
 import { ANNOTATION_PATTERNS } from "../annotations/tool-annotations.js";
 import { TaskComplexityOutputSchema } from "../schemas/ai-schemas.js";
 import { ToolResultFormatter } from "../ToolResultFormatter.js";
-import type { ToolDefinition, ToolSchema } from "../ToolValidator.js";
+import { type ToolDefinition, type ToolSchema, ToolValidator } from "../ToolValidator.js";
 
 // Schema for analyze_task_complexity tool
 const analyzeTaskComplexitySchema = z.object({
@@ -27,7 +27,12 @@ export type AnalyzeTaskComplexityArgs = z.infer<typeof analyzeTaskComplexitySche
 /**
  * Implementation function for analyze_task_complexity tool
  */
-async function executeAnalyzeTaskComplexity(args: AnalyzeTaskComplexityArgs): Promise<MCPResponse> {
+async function executeAnalyzeTaskComplexity(rawArgs: unknown): Promise<MCPResponse> {
+  const args = ToolValidator.validate(
+    "analyze_task_complexity",
+    rawArgs,
+    analyzeTaskComplexitySchema as unknown as ToolSchema<AnalyzeTaskComplexityArgs>
+  );
   const taskService = new TaskGenerationService();
 
   try {

@@ -452,9 +452,11 @@ Warning: 15 orphaned tasks detected
 ### Performance Optimization
 
 1. **Use appropriate task limits**: Don't generate more tasks than needed
-2. **Enable caching**: AI responses are cached to improve performance
+2. **Enable caching**: `TaskContextGenerationService` caches AI generation results (`AIResponseCache`, TTL-based) so repeated builds for the same inputs are served from memory
 3. **Batch operations**: Use traceability matrix creation for bulk operations
 4. **Monitor API usage**: Track AI provider usage to avoid unexpected costs
+5. **Bound a run's cost**: `AI_SESSION_TOKEN_LIMIT` caps the tokens one task-generation run may use (0 = unlimited); when exhausted, optional AI steps fall back instead of failing. This is separate from the per-agent budget (`agent_manage set_budget`)
+6. **Prompts are versioned**: every AI prompt is a `{{var}}` template served by `PromptRegistry` (`src/services/ai/prompts/`)
 
 ### Debugging
 

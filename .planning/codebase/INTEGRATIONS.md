@@ -1,8 +1,8 @@
 # External Integrations
 
-**Analysis Date:** 2026-10-21
+**Analysis Date:** 2026-11-02
 
-**Updated:** 2026-10-21 — dependency versions, MCP transport, credential chain, and CI section updated to the current stack (MCP SDK v2, `ai`@7 with `@ai-sdk/*` v4, Octokit with App auth, npm+pnpm CI matrix).
+**Updated:** 2026-11-02 — reconciled with code: dependency versions from `package.json`, one `GitHubRequestExecutor` with proactive rate-limit budgeting, mutation audit log + opt-in OpenTelemetry, webhook hardening, CI supply-chain gates; removed deleted modules (`MCPErrorHandler`, `TracingLogger`).
 
 ## APIs & External Services
 
@@ -14,7 +14,7 @@
 - Scopes required: repo, project, workflow, write:org
 - Factory: `src/infrastructure/github/GitHubRepositoryFactory.ts` (infrastructure) and `createGitHubFactory()` in `src/infrastructure/tools/tool-factory.ts` (tool layer)
 - Config: `src/infrastructure/github/GitHubConfig.ts` — `token` is non-enumerable so `JSON.stringify` cannot emit the PAT
-- Rate limiting: `src/infrastructure/github/RateLimitManager.ts`
+- Rate limiting: every REST/GraphQL call goes through `src/infrastructure/github/GitHubRequestExecutor.ts`, which gates on `RateLimitManager` (`RATE_LIMIT_FLOOR`, default 100: backs off before the budget is exhausted) and retries retryable failures
 
 **MCP (Model Context Protocol):**
 - SDK: `@modelcontextprotocol/server` ^2.3.1 — MCP **v2**, 2026-07-28 spec
@@ -25,30 +25,30 @@
 
 **Anthropic (Claude):**
 - AI model provider for task generation, PRD parsing, and analysis
-- SDK/Client: `@ai-sdk/anthropic` ^4.0.84
+- SDK/Client: `@ai-sdk/anthropic` ^4.0.85
 - Auth: `ANTHROPIC_API_KEY` environment variable
 - Factory: `src/services/ai/AIServiceFactory.ts`
 
 **OpenAI:**
 - AI model provider (fallback)
-- SDK/Client: `@ai-sdk/openai` ^4.0.98
+- SDK/Client: `@ai-sdk/openai` ^4.0.99
 - Auth: `OPENAI_API_KEY` environment variable
 - Factory: `src/services/ai/AIServiceFactory.ts`
 
 **Google AI:**
 - AI model provider (alternative)
-- SDK/Client: `@ai-sdk/google` ^4.0.101
+- SDK/Client: `@ai-sdk/google` ^4.0.102
 - Auth: `GOOGLE_API_KEY` environment variable
 - Factory: `src/services/ai/AIServiceFactory.ts`
 
 **Perplexity:**
 - AI model provider specialized for research/web search
-- SDK/Client: `@ai-sdk/perplexity` ^5.0.16
+- SDK/Client: `@ai-sdk/perplexity` ^5.0.17
 - Auth: `PERPLEXITY_API_KEY` environment variable
 - Factory: `src/services/ai/AIServiceFactory.ts`
 
 **AI SDK core:**
-- `ai` ^7.0.146 — unified model interface, streaming, structured output
+- `ai` ^7.0.148 — unified model interface, streaming, structured output
 - `@ai-sdk/provider` `4.0.31` — pinned exact, a **direct** dependency (type imports only; `ai`@7 does not re-export `LanguageModelV4*` and pnpm does not hoist transitives)
 - Usage is reported as **objects**: `usage.inputTokens.total` / `usage.outputTokens.total` — reading them as numbers yields `NaN`
 
@@ -71,18 +71,20 @@
 
 ## Authentication & Identity
 
-**GitHub credential chain (first hit wins):**
-1. `--token` CLI flag
-2. `$SECRETS_DIR/GITHUB_TOKEN` file (Docker/Kubernetes secret convention)
-3. `GITHUB_TOKEN` environment variable
-4. `gh auth token` (an authenticated GitHub CLI) — disable with `GH_CLI_TOKEN_FALLBACK=false`; it is off automatically under `NODE_ENV=test`, so tests never shell out
+**GitHub credential chain (first hit wins; `resolveGitHubAuth()`):**
+1. GitHub App installation auth (`GITHUB_APP_ID`, `GITHUB_APP_PRIVATE_KEY`, `GITHUB_APP_INSTALLATION_ID`; see below)
+2. `--token` CLI flag
+3. `$SECRETS_DIR/GITHUB_TOKEN` file (Docker/Kubernetes secret convention)
+4. `GITHUB_TOKEN` environment variable
+5. Stored OAuth login (`auth login`)
+6. `gh auth token` (an authenticated GitHub CLI) — disable with `GH_CLI_TOKEN_FALLBACK=false`; it is off automatically under `NODE_ENV=test`, so tests never shell out
 
-All credential reads go through `getSecret()` / `requireToken()` in `src/env.ts` (and `src/infrastructure/tools/tool-factory.ts`). Reading `process.env.GITHUB_TOKEN` directly bypasses the chain and is the reason `SECRETS_DIR` and `--token` were previously broken.
+GitHub credentials resolve only through `resolveGitHubAuth()` (`src/infrastructure/github/auth/`), which returns a `GitHubAuth`; `createGitHubFactory()` (`src/infrastructure/tools/tool-factory.ts`) resolves one per call. Other secrets go through `getSecret()` in `src/env.ts`. Reading `process.env.GITHUB_TOKEN` directly bypasses the chain and is the reason `SECRETS_DIR` and `--token` were previously broken.
 
 **GitHub App auth (optional):**
 - `GITHUB_APP_ID`, `GITHUB_APP_PRIVATE_KEY`, `GITHUB_APP_INSTALLATION_ID`
 - When all three are set, App installation auth **outranks** the PAT and no PAT is needed
-- A partial App configuration falls back to the PAT rather than failing, so a half-set environment cannot lock the server out
+- A partial App configuration falls through to the next credential tier rather than failing, so a half-set environment cannot lock the server out
 
 **Secret providers:**
 - `SecretProvider` interface (`src/infrastructure/secrets/SecretProvider.ts`) with `EnvSecretProvider`, `FileSecretProvider`, and `GhCliSecretProvider`
@@ -98,14 +100,15 @@ All credential reads go through `getSecret()` / `requireToken()` in `src/env.ts`
 
 **Error Tracking:**
 - None (external service)
-- Internal error handling via `src/infrastructure/github/GitHubErrorHandler.ts`
-- MCP errors via `src/infrastructure/mcp/MCPErrorHandler.ts`
+- Internal error handling via `src/infrastructure/github/GitHubErrorHandler.ts` and `src/services/utils/ErrorMapper.ts`
+- Tool failures are returned as `isError` results by `ToolDispatcher` (`src/infrastructure/mcp/ToolDispatcher.ts`)
 - Per-tool latency/error telemetry via `src/infrastructure/tools/ToolTelemetry.ts`
 
 **Correlation & Tracing:**
 - `src/infrastructure/observability/CorrelationContext.ts` — correlation id + `AsyncLocalStorage` scope
-- `src/infrastructure/observability/TracingLogger.ts`
 - `src/infrastructure/observability/SecurityAuditLog.ts`
+- `src/infrastructure/observability/MutationAuditLog.ts` — opt-in (`AUDIT_LOG_ENABLED`) append-only redacted JSONL of state-changing tool calls (`AUDIT_LOG_PATH`, default `.mcp-audit/mutations.jsonl`)
+- `src/infrastructure/observability/otel.ts` — opt-in OpenTelemetry: when `OTEL_EXPORTER_OTLP_ENDPOINT` is set, one `tool.<name>` span per tool call is exported over OTLP/HTTP (`OTEL_SERVICE_NAME`); flushed in graceful shutdown
 
 **Logs:**
 - Custom logger to stderr (avoids MCP protocol on stdout)
@@ -121,10 +124,12 @@ All credential reads go through `getSecret()` / `requireToken()` in `src/env.ts`
 - Package name: `mcp-github-project-manager`
 
 **CI Pipeline:**
-- GitHub Actions: `.github/workflows/ci.yml` (plus `bump-version.yml` and `release.yml`)
-- Matrix: Node `22.x` and `24.x` × package manager `npm` and `pnpm` — the npm×pnpm matrix is what catches a dependency that only resolves under one of them
-- Steps per job: install → `build` → `typecheck` → `test`
-- Separate `lint` job runs `pnpm run lint` on Node 24
+- GitHub Actions: `.github/workflows/ci.yml` (plus `bump-version.yml`, `release.yml`, `codeql.yml`); `.github/dependabot.yml` (weekly npm + github-actions updates)
+- `test` job: Node `22.x` and `24.x` × package manager `npm` and `pnpm` — the npm×pnpm matrix is what catches a dependency that only resolves under one of them; steps: install → `build` → `typecheck` → `test`
+- `action-sweep` job: every action of every tool without credentials (`test:e2e:sweep`, `test:e2e:coverage`)
+- `lint` job (Node 24): `pnpm run lint`, `check:lockfiles` (lockfiles resolve the same direct-dependency versions), `check:docs` (published tool/action counts equal the `ToolRegistry`)
+- `audit` job: `npm audit --audit-level=high`; `codeql.yml` runs CodeQL analysis
+- `release.yml` publishes a CycloneDX SBOM (`sbom.cdx.json`) as a release asset
 - pnpm is pinned to version 12 in CI; `package.json` deliberately has no `packageManager` field
 
 **Docker:**
@@ -155,10 +160,16 @@ All credential reads go through `getSecret()` / `requireToken()` in `src/env.ts`
 **Webhook env vars:**
 - `WEBHOOK_SECRET` - GitHub webhook secret
 - `WEBHOOK_ALLOW_UNSIGNED` - Accept unsigned webhooks (default: `false`; signature validation fails closed)
+- `WEBHOOK_HOST` - Bind address (default `127.0.0.1`; `0.0.0.0` to expose)
 - `WEBHOOK_PORT` - Webhook server port (default: 3001)
+- `EVENTS_AUTH_TOKEN` - bearer token required on `/events/*` (or `EVENTS_ALLOW_UNAUTHENTICATED=true`, dev only)
+- `WEBHOOK_TRUSTED_PROXIES` - exact proxy IPs whose `X-Forwarded-For` is trusted for rate-limit keying (default: none)
 - `WEBHOOK_TIMEOUT_MS`, `WEBHOOK_ALLOWED_ORIGINS`, `WEBHOOK_RATE_LIMIT`, `WEBHOOK_RATE_WINDOW_MS`
 - `SSE_ENABLED` - Server-Sent Events (default: true)
 - `EVENT_RETENTION_DAYS` (default: 7), `MAX_EVENTS_IN_MEMORY` (default: 1000)
+
+**Observability / limits env vars:**
+- `RATE_LIMIT_FLOOR` (default 100), `AUDIT_LOG_ENABLED` (default false), `AUDIT_LOG_PATH`, `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_SERVICE_NAME`, `LOG_LEVEL`, `LOG_FORMAT`, `AI_SESSION_TOKEN_LIMIT`
 
 **Agent env vars:**
 - `AGENT_RECLAIM_ENABLED` (default: true), `AGENT_RECLAIM_INTERVAL_MS` (default: 300000), `AGENT_STALE_AFTER_MINUTES` (default: 30)
@@ -184,7 +195,7 @@ All credential reads go through `getSecret()` / `requireToken()` in `src/env.ts`
 - Implementation: `src/infrastructure/http/WebhookServer.ts`, backed by `src/infrastructure/health/HealthService.ts`
 
 **Outgoing:**
-- None detected (no outbound webhook calls)
+- OpenTelemetry OTLP/HTTP trace export to `OTEL_EXPORTER_OTLP_ENDPOINT`, only when configured
 
 ## MCP Protocol Integration
 
@@ -237,4 +248,4 @@ All credential reads go through `getSecret()` / `requireToken()` in `src/env.ts`
 
 ---
 
-*Integration audit: 2026-10-21*
+*Integration audit: 2026-11-02*

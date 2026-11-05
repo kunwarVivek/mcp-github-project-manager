@@ -29,9 +29,9 @@ This document details how the MCP server interfaces with GitHub's Projects API (
    - GitHubSprintRepository: Sprint planning
 
 2. **Service Layer**
-   - ProjectManagementService: Business logic coordination
-   - ResourceManager: Resource state management
-   - OptimisticLockManager: Concurrency control
+   - ProjectManagementService: thin facade of typed per-feature service getters
+   - Per-feature services (IssueService, SprintPlanningService, ...): business logic
+   - GitHubRequestExecutor: the one retry + rate-limit path for every GitHub call
 
 3. **MCP Layer**
    - Tool definitions
@@ -179,91 +179,35 @@ const manageProjectItemSchema = z.object({
 The full surface is documented in [TOOLS.md](../TOOLS.md), and
 `discover_tools` returns the live schemas at runtime.
 
-### Resource Management
+### Concurrency and Idempotency
 
-1. **Version Control**
-```typescript
-class ResourceManager {
-  async trackVersion(resource: Resource): Promise<Version> {
-    const version = await this.createVersion(resource);
-    await this.cache.set(`${resource.id}:version`, version);
-    return version;
-  }
+There is no in-process resource versioning or lock manager. Concurrency is
+handled with GitHub's own primitives and two server-side mechanisms:
 
-  async validateVersion(resource: Resource, version: Version): Promise<boolean> {
-    const currentVersion = await this.cache.get(`${resource.id}:version`);
-    return currentVersion?.number === version.number;
-  }
-}
-```
-
-2. **Locking Mechanism**
-```typescript
-class OptimisticLockManager {
-  async acquireLock(resourceId: string): Promise<Lock> {
-    const lock = await this.createLock(resourceId);
-    await this.cache.set(`${resourceId}:lock`, lock);
-    return lock;
-  }
-
-  async validateLock(resourceId: string, lockId: string): Promise<boolean> {
-    const lock = await this.cache.get(`${resourceId}:lock`);
-    return lock?.id === lockId && !lock.expired;
-  }
-}
-```
+1. **Compare-and-swap** — the agent registry is a file written through the
+   Contents API with the blob sha it read; GitHub answers 409 on a stale write
+   and the store re-applies its mutation on the fresh record.
+2. **Idempotency keys** — create actions accept `idempotencyKey`; a repeat with
+   the same key and arguments within 24 h replays the first result instead of
+   creating a duplicate (see [TOOLS.md](../TOOLS.md#cross-cutting-parameters)).
 
 ## Error Handling
 
 ### API Error Mapping
 
-```typescript
-class GitHubErrorHandler {
-  mapToMCPError(error: any): MCPError {
-    if (error instanceof RequestError) {
-      return this.mapRequestError(error);
-    }
-    if (error instanceof ValidationError) {
-      return this.mapValidationError(error);
-    }
-    return new MCPError('UNKNOWN_ERROR', error.message);
-  }
-
-  private mapRequestError(error: RequestError): MCPError {
-    switch (error.status) {
-      case 404:
-        return new MCPError('RESOURCE_NOT_FOUND', error.message);
-      case 429:
-        return new MCPError('RATE_LIMIT_EXCEEDED', error.message);
-      default:
-        return new MCPError('API_ERROR', error.message);
-    }
-  }
-}
-```
+`GitHubErrorHandler` (`infrastructure/github/GitHubErrorHandler.ts`) converts
+Octokit failures into structured domain errors, and `ToolValidator.mapGitHubError`
+turns them into actionable tool-error text (401/403/404/422/rate-limit/5xx). A tool
+that fails returns `{ content, isError: true }` with a stable code in `_meta.error`;
+a JSON-RPC error is reserved for an unknown tool. See
+[response-handling.md](response-handling.md).
 
 ### Retry Strategy
 
-```typescript
-class RetryManager {
-  async executeWithRetry<T>(
-    operation: () => Promise<T>,
-    options: RetryOptions = defaultOptions
-  ): Promise<T> {
-    for (let attempt = 1; attempt <= options.maxAttempts; attempt++) {
-      try {
-        return await operation();
-      } catch (error) {
-        if (!this.shouldRetry(error) || attempt === options.maxAttempts) {
-          throw error;
-        }
-        await this.delay(this.calculateBackoff(attempt));
-      }
-    }
-    throw new Error('Max retry attempts exceeded');
-  }
-}
-```
+Retries live in one place, `GitHubRequestExecutor`: before each attempt it
+acquires budget from the shared `RateLimitManager` (backing off once the remaining
+GraphQL points fall below `RATE_LIMIT_FLOOR`), then runs the operation and retries
+retryable failures (up to 3 attempts) using GitHub's rate-limit headers for the delay.
 
 ## Best Practices
 
@@ -273,11 +217,10 @@ class RetryManager {
    - Handle API errors gracefully
    - Validate inputs before API calls
 
-2. **Resource Management**
-   - Always use version tracking
-   - Implement proper locking mechanisms
-   - Handle concurrent modifications
-   - Cache frequently accessed data
+2. **Concurrency**
+   - Use `idempotencyKey` on create actions that may be retried
+   - Use the registry's compare-and-swap; never read-modify-write from a stale copy
+   - Cache frequently accessed data (`ResourceCache`)
 
 3. **Error Handling**
    - Map API errors to MCP errors
@@ -310,27 +253,13 @@ async function createProjectWithItems(
 }
 ```
 
-### Handling Field Updates
+### Retrying a Create Safely
 
-```typescript
-// Example field update with retry
-async function updateFieldValue(
-  projectId: string,
-  itemId: string,
-  fieldId: string,
-  value: any
-): Promise<void> {
-  await retryManager.executeWithRetry(async () => {
-    const lock = await lockManager.acquireLock(itemId);
-    try {
-      await fieldManager.validateValue(fieldId, value);
-      await projectRepo.updateFieldValue(projectId, itemId, fieldId, value);
-    } finally {
-      await lockManager.releaseLock(itemId, lock.id);
-    }
-  });
-}
+```json
+{"tool": "manage_issues", "arguments": {"action": "create", "title": "Fix login", "idempotencyKey": "req-2026-11-02-001"}}
 ```
+
+Sending the same call again with the same key returns the first result flagged `replayed: true`.
 
 ## Testing
 
@@ -351,7 +280,7 @@ async function updateFieldValue(
 
 ## References
 
-- [Tool Reference](../TOOLS.md) — the 20 compound tools and their 169 actions
+- [Tool Reference](../TOOLS.md) — the <!-- count:tools -->21<!-- /count --> compound tools and their <!-- count:actions -->175<!-- /count --> actions
 - [GitHub Projects API Documentation](https://docs.github.com/en/rest/projects)
 - [MCP Specification](https://modelcontextprotocol.io)
 - [Architecture Documentation](../architecture.md)

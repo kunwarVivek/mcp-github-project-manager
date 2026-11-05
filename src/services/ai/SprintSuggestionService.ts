@@ -35,9 +35,10 @@ import { InputSanitizer } from "../utils/InputSanitizer";
 import { AIServiceFactory } from "./AIServiceFactory";
 import { BacklogPrioritizer } from "./BacklogPrioritizer";
 import { calculateWeightedScore, getConfidenceTier } from "./ConfidenceScorer";
+import { defaultPromptRegistry } from "./prompts";
 import {
-  formatSprintSuggestionPrompt,
-  SPRINT_SUGGESTION_SYSTEM_PROMPT,
+  SPRINT_PROMPT_IDS,
+  sprintSuggestionPromptVariables,
 } from "./prompts/SprintPlanningPrompts";
 import { SprintCapacityAnalyzer } from "./SprintCapacityAnalyzer";
 import { SprintRiskAssessor } from "./SprintRiskAssessor";
@@ -521,18 +522,21 @@ export class SprintSuggestionService {
 
       const result = await generateObject({
         model,
-        system: SPRINT_SUGGESTION_SYSTEM_PROMPT,
-        prompt: formatSprintSuggestionPrompt({
-          availableItems: params.backlogItems.map((item) => ({
-            id: item.id,
-            title: InputSanitizer.sanitizeText(item.title),
-            points: item.points,
-            priority: item.priority,
-          })),
-          capacity: capacity.recommendedLoad,
-          businessGoals: params.businessGoals?.map((g) => InputSanitizer.sanitizeText(g)),
-          riskTolerance: params.riskTolerance || "medium",
-        }),
+        system: defaultPromptRegistry.render(SPRINT_PROMPT_IDS.suggestionSystem),
+        prompt: defaultPromptRegistry.render(
+          SPRINT_PROMPT_IDS.suggestionUser,
+          sprintSuggestionPromptVariables({
+            availableItems: params.backlogItems.map((item) => ({
+              id: item.id,
+              title: InputSanitizer.sanitizeText(item.title),
+              points: item.points,
+              priority: item.priority,
+            })),
+            capacity: capacity.recommendedLoad,
+            businessGoals: params.businessGoals?.map((g) => InputSanitizer.sanitizeText(g)),
+            riskTolerance: params.riskTolerance || "medium",
+          })
+        ),
         schema: SprintSuggestionSchema,
         temperature: 0.4,
       });

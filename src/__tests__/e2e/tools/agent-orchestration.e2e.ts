@@ -138,7 +138,7 @@ interface Dependency {
   blockingIssueNumber: number;
   state: string;
 }
-interface ProjectView {
+interface ViewSummary {
   id: string;
   sortBy?: unknown[];
 }
@@ -925,7 +925,7 @@ describe("Agent Orchestration Tools E2E", () => {
         action: "set_budget",
         agentId: engineerAgentId,
         totalTokens: 100000,
-        warningThreshold: 0.8,
+        warningFraction: 0.8,
         hardStop: true,
       })
     );
@@ -992,7 +992,7 @@ describe("Agent Orchestration Tools E2E", () => {
       action: "set_budget",
       agentId: budgetAgentId,
       totalTokens: 1000,
-      warningThreshold: 0.8,
+      warningFraction: 0.8,
       hardStop: true,
     });
     const exhausted = data(
@@ -2644,7 +2644,7 @@ describe("Agent Orchestration Tools E2E", () => {
       expect(created.id).toBeDefined();
       expect(created.name).toBe(viewName);
 
-      const views = data<ProjectView[]>(
+      const views = data<ViewSummary[]>(
         await utils.callTool("manage_project", {
           action: "list_views",
           projectId: viewProjectId,

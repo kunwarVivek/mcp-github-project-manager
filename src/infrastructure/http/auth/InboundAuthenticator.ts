@@ -41,6 +41,13 @@ export interface InboundAuthRejected {
 
 export type InboundAuthResult = InboundAuthAccepted | InboundAuthRejected;
 
+/**
+ * `reason` of the 503 returned when nothing is configured to authenticate callers
+ * (no EVENTS_AUTH_TOKEN, no OAuth issuer, no explicit opt-out): the events API is
+ * disabled rather than the caller being unauthorized.
+ */
+export const NO_AUTHENTICATOR_REASON = "no_authenticator_configured";
+
 /** RFC 9728 §2 Protected Resource Metadata document (the subset we publish). */
 export interface ProtectedResourceMetadata {
   resource: string;

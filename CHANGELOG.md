@@ -8,16 +8,67 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- **GitHub OAuth device flow** — `mcp-github-project-manager auth login | status | logout` signs in with a GitHub OAuth App or GitHub App (`GITHUB_OAUTH_CLIENT_ID`, `GITHUB_OAUTH_CLIENT_SECRET`, `GITHUB_OAUTH_SCOPES`, `GITHUB_OAUTH_TOKEN_FILE`). Tokens are stored `0600`, expiring GitHub App user tokens are refreshed automatically, and the stored token is a new tier in the credential chain.
-- **Six-tier GitHub credential chain** — GitHub App installation → `--token` → `$SECRETS_DIR/GITHUB_TOKEN` → `GITHUB_TOKEN` → stored OAuth token → `gh auth token`, re-resolved per tool call. `GITHUB_TOKEN` is no longer required.
-- **Inbound HTTP authentication for `/events/*`** — shared bearer (`EVENTS_AUTH_TOKEN`) and/or OAuth 2.1 resource-server mode (`OAUTH_ISSUER`, `OAUTH_AUDIENCE`, `OAUTH_JWKS_URI`, `OAUTH_REQUIRED_SCOPES`, `OAUTH_RESOURCE_URL`) with RFC 9728 protected-resource metadata and SSE expiry at token `exp`.
-- **Gemini via Vertex AI** — provider `google-vertex` using Google Application Default Credentials (`GOOGLE_VERTEX_PROJECT`, `GOOGLE_VERTEX_LOCATION`).
+- **GitHub OAuth device flow** — `mcp-github-project-manager auth login | status | logout` signs in with a GitHub OAuth App or GitHub App (`GITHUB_OAUTH_CLIENT_ID`, `GITHUB_OAUTH_CLIENT_SECRET`, `GITHUB_OAUTH_SCOPES`, `GITHUB_OAUTH_TOKEN_FILE`). Tokens are stored `0600` (a group/other-readable file is refused), expiring GitHub App user tokens are refreshed automatically (single-flight, persisted), and the stored token is a new tier in the credential chain.
+- **Six-tier GitHub credential chain** — GitHub App installation → `--token` → `$SECRETS_DIR/GITHUB_TOKEN` → `GITHUB_TOKEN` → stored OAuth token → `gh auth token`, behind one `GitHubAuth` seam (`resolveGitHubAuth()` in `src/infrastructure/github/auth/`). Static tokens are rotation-aware: a token rewritten in its tier is used on the next request.
+- **OAuth 2.1 resource-server mode for `/events/*`** — alongside `EVENTS_AUTH_TOKEN`: `OAUTH_ISSUER`, `OAUTH_AUDIENCE`, `OAUTH_JWKS_URI`, `OAUTH_REQUIRED_SCOPES`, `OAUTH_RESOURCE_URL`; JWT validation (issuer, audience, exp, asymmetric algorithms, scopes), RFC 9728 metadata at `/.well-known/oauth-protected-resource`, RFC 6750 challenges, and SSE streams closed with `event: auth_expired` at token `exp`.
+- **Gemini via Vertex AI** — provider `google-vertex` using Google Application Default Credentials (`GOOGLE_VERTEX_PROJECT`, `GOOGLE_VERTEX_LOCATION`); `gemini-*` models route to Vertex when it is configured.
+- **Value-pattern log redaction** — credential-shaped values (GitHub tokens, JWTs, `Bearer`/`Basic` values, Anthropic/OpenAI/Google keys, PEM private keys) are scrubbed from log messages, string arguments, JSON output, error messages/stacks, the mutation audit log and startup errors.
+- **Docker `/data` volume** — the image declares `VOLUME /data` and defaults `GITHUB_OAUTH_TOKEN_FILE=/data/github-oauth.json`; `mcpuser` is pinned to uid/gid `10001`.
+
+### Changed
+- **`GITHUB_TOKEN` is no longer required** — App-only, OAuth-only and `gh`-only deployments boot; with no credential at all, startup fails listing every method.
+- **Package `bin` is `build/bin.js`** (also `start`, `inspect`, Docker `ENTRYPOINT`) so `auth` subcommands never boot the MCP server; `npx mcp-github-project-manager` is unchanged and `node build/index.js` still starts the server.
+- **`EVENTS_ALLOW_UNAUTHENTICATED` no longer overrides configured credentials** — when `EVENTS_AUTH_TOKEN` or `OAUTH_ISSUER` is set, a token is always required. The 401 challenge now carries `realm="github-project-manager-events"`.
+- **`WEBHOOK_ALLOWED_ORIGINS=*` is refused at startup when inbound auth is configured** (warning only in unauthenticated dev mode).
+- **Redaction markers keep the credential kind** (`ghp_[REDACTED]`, `sk-ant-[REDACTED]`, …) instead of a bare `[REDACTED]`.
+- The "no AI provider" startup warning counts `GOOGLE_VERTEX_PROJECT`.
+
+### Removed
+- The verbose startup banner no longer prints any token characters (it shows `auth: <mode> (<source>)`).
 
 ### Breaking changes
-- **`/events/*` requires authentication** — `/events/stream`, `/events/subscribe`, `/events/replay/:id` and `/events/recent` return `401` unless `EVENTS_AUTH_TOKEN` or `OAUTH_*` is configured; `EVENTS_ALLOW_UNAUTHENTICATED=true` restores the old behaviour.
-- **`/health` anonymous output reduced** — unauthenticated callers receive only `{"status":"healthy"}`; full stats need a bearer token.
-- **`github://config` resource** — the `tokenConfigured` field is replaced by `auth: {configured, mode, source}`.
-- **Bin entry is `build/bin.js`** (package `bin`, `start`, `inspect`, Docker ENTRYPOINT). `node build/index.js` still starts the server but has no `auth` subcommands.
+- **`github://config` resource** — `auth` changes from the string `"app" | "pat" | "none"` to `{configured, mode, source}` (`mode`: `app-installation` | `token` | `oauth-user`; `source`: `github-app` | `cli-flag` | `secrets-dir` | `env` | `oauth-store` | `gh-cli`).
+- **`/health` anonymous output reduced** — unauthenticated callers receive only `{"status":"healthy"}`; server/event/subscription stats require a valid events credential.
+
+## [4.0.0] - 2026-11-02
+
+### Added
+- **`analytics` tool** (read-only, 5 actions: `sprint_velocity`, `sprint_burndown`, `cycle_time`, `throughput`, `project_summary`) backed by `AnalyticsService` — the surface is now 21 tools / 175 actions.
+- **`idempotencyKey` on create actions** (`manage_issues` `create`/`add_sub_issue`/`create_draft`/`create_comment`, `manage_milestones` `create`, `manage_project` `create_field`, `manage_sprints` `create`): a repeat with the same key and arguments within 24 h replays the first result (`replayed: true`); the same key with different arguments is refused. A result that aged out of memory is recovered from the audit log.
+- **Additive pagination** — paged list actions accept `cursor` and return `nextCursor` next to `pageInfo` (`manage_project` `list_templates`/`list_linked_repos`/`list_linked_teams`/`filter_items`, `manage_issues` `search_advanced`/`list_sub_issues`, `manage_status_updates` `list`).
+- **Per-tool `_meta.schemaVersion`** (all `1.0.0`) on every `tools/list` entry and tool result, pinned by a schema snapshot test.
+- **Mutation audit log** — append-only, redacted JSONL of every state-changing tool call (`AUDIT_LOG_ENABLED`, `AUDIT_LOG_PATH`, default `.mcp-audit/mutations.jsonl`; actor = agent id or `token`).
+- **Opt-in OpenTelemetry tracing** — `OTEL_EXPORTER_OTLP_ENDPOINT` / `OTEL_SERVICE_NAME` enable `tool.<name>` spans; both audit log and telemetry flush on graceful shutdown.
+- **GitHub App installation auth** outranks the PAT through `resolveGitHubAuth()` + `GitHubRepositoryFactory.fromAuth` (a partial App config falls back to the PAT).
+- **One `GitHubRequestExecutor`** — every GitHub call is gated on the shared `RateLimitManager` budget (`RATE_LIMIT_FLOOR`, default 100) and retried (3 attempts) through a single path.
+- **Webhook hardening** — `WEBHOOK_HOST` (loopback by default), `EVENTS_AUTH_TOKEN` for `/events/*`, `WEBHOOK_ALLOWED_ORIGINS`, `WEBHOOK_RATE_LIMIT` / `WEBHOOK_RATE_WINDOW_MS`, `WEBHOOK_TIMEOUT_MS`, `WEBHOOK_TRUSTED_PROXIES`.
+- **`AI_SESSION_TOKEN_LIMIT`** — per-operation token budget for AI task generation (`TokenBudgetManager`), distinct from the per-agent budget.
+- **CI/supply chain** — lockfile (`check:lockfiles`) and doc-count (`check:docs`) checks, CodeQL, Dependabot, CycloneDX SBOM attached to releases.
+- **ADR-005 … ADR-012** recording rich entities, the composition-root exception, the tool error contract, App-auth precedence, idempotency + audit, observability, PromptRegistry/TokenBudgetManager, and the test-tree consolidation.
+
+### Changed
+- **Error contract** — every tool failure (invalid arguments, GitHub errors, exhausted budget, executor errors) is `{content, isError: true}` with a stable code in `_meta.error`; a JSON-RPC error is reserved for an unknown tool or protocol faults.
+- **Hard-stop agent budgets gate AI tools** — an exhausted budget refuses with `BudgetExhausted` (remaining/limit in `_meta.error`).
+- **`manage_sprints delete` requires `confirm: true`.**
+- **`manage_project update`** accepts `closed` (true closes, false reopens) or `status` (`closed` / `active` / `open`).
+- **`ProjectManagementService`** is a 121-line facade of typed service getters; it has no behavior of its own.
+- **Tool executors** self-construct through `createGitHubFactory()` (documented composition-root exception); the container registers the components `index.ts` owns and `index.ts` constructs none by hand.
+- **`PromptRegistry` now serves every AI prompt** (versioned `{{var}}` templates); `AIResponseCache` is wired into `TaskContextGenerationService`; `TokenBudgetManager` is consumed by the task-generation services.
+- **The logger honors `LOG_LEVEL` and `LOG_FORMAT=json`** (one JSON line per entry with the correlation id) and redacts secrets.
+- **Domain entities carry behavior** (rich entities); the domain layer imports nothing from `services/` or `infrastructure/`.
+- **Test trees merged** into `src/__tests__/` (the root `tests/` directory is gone).
+- **Docs reconciled to the code** — `npm run check:docs` now also covers `AGENTS.md` / `CLAUDE.md`; `docs/TOOLS.md` tables, `architecture.md`, the remediation tracker and ADRs agree with the registry.
+
+### Removed
+- Dead modules: `infrastructure/validation`, `infrastructure/resource` (`ResourceManager`, `OptimisticLockManager`), `StructuredLogger` / `TracingLogger`, `project-types.ts`, `MCPErrorHandler`.
+- The never-built `Pagination.ts` claim (superseded by `cursor` / `nextCursor`).
+
+### Security
+- The webhook/SSE server binds `127.0.0.1` by default and `/events/*` fails closed (503) without `EVENTS_AUTH_TOKEN`; `X-Forwarded-For` is honored only from `WEBHOOK_TRUSTED_PROXIES`; webhook signatures fail closed.
+- Audit records and logs are redacted; CodeQL scanning and Dependabot are enabled.
+
+### Fixed
+- Documentation that contradicted the code: tool/action counts (21 / 175), the `manage_project` / `manage_issues` / `manage_sprints` / `manage_automation` / `ai_analyze` action tables, references to deleted modules, and the agent field list (seven `agent_*` fields).
 
 ## [3.0.0] - 2026-10-28
 

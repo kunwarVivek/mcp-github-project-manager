@@ -1,4 +1,5 @@
 import type { GitHubRepositoryFactory } from "../infrastructure/github/GitHubRepositoryFactory";
+import type { GitHubPullRequestRepository } from "../infrastructure/github/repositories/GitHubPullRequestRepository";
 import { safeCall } from "./utils/safeCall";
 
 /**
@@ -21,6 +22,10 @@ export class PullRequestService {
     this.factory = factory;
   }
 
+  private get pullRequestRepo(): GitHubPullRequestRepository {
+    return this.factory.createPullRequestRepository();
+  }
+
   async createPullRequest(data: {
     title: string;
     body?: string;
@@ -28,28 +33,7 @@ export class PullRequestService {
     base: string;
     draft?: boolean;
   }): Promise<{ number: number; id: number; title: string; state: string; url: string }> {
-    return safeCall(async () => {
-      const octokit = this.factory.getOctokit();
-      const config = this.factory.getConfig();
-
-      const response = await octokit.rest.pulls.create({
-        owner: config.owner,
-        repo: config.repo,
-        title: data.title,
-        body: data.body || "",
-        head: data.head,
-        base: data.base,
-        draft: data.draft || false,
-      });
-
-      return {
-        number: response.data.number,
-        id: response.data.id,
-        title: response.data.title,
-        state: response.data.state,
-        url: response.data.html_url,
-      };
-    });
+    return safeCall(async () => this.pullRequestRepo.create(data));
   }
 
   async getPullRequest(data: { pullNumber: number }): Promise<{
@@ -63,53 +47,14 @@ export class PullRequestService {
     merged: boolean;
     url: string;
   }> {
-    return safeCall(async () => {
-      const octokit = this.factory.getOctokit();
-      const config = this.factory.getConfig();
-
-      const response = await octokit.rest.pulls.get({
-        owner: config.owner,
-        repo: config.repo,
-        pull_number: data.pullNumber,
-      });
-
-      return {
-        number: response.data.number,
-        title: response.data.title,
-        state: response.data.state,
-        body: response.data.body || "",
-        head: response.data.head.ref,
-        base: response.data.base.ref,
-        user: response.data.user?.login || "unknown",
-        merged: response.data.merged,
-        url: response.data.html_url,
-      };
-    });
+    return safeCall(async () => this.pullRequestRepo.get(data.pullNumber));
   }
 
   async listPullRequests(data: {
     state?: "open" | "closed" | "all";
     limit?: number;
   }): Promise<Array<{ number: number; title: string; state: string; user: string; url: string }>> {
-    return safeCall(async () => {
-      const octokit = this.factory.getOctokit();
-      const config = this.factory.getConfig();
-
-      const response = await octokit.rest.pulls.list({
-        owner: config.owner,
-        repo: config.repo,
-        state: data.state || "open",
-        per_page: data.limit || 30,
-      });
-
-      return response.data.map((pr) => ({
-        number: pr.number,
-        title: pr.title,
-        state: pr.state,
-        user: pr.user?.login || "unknown",
-        url: pr.html_url,
-      }));
-    });
+    return safeCall(async () => this.pullRequestRepo.list(data.state || "open", data.limit || 30));
   }
 
   async updatePullRequest(data: {
@@ -118,26 +63,7 @@ export class PullRequestService {
     body?: string;
     state?: "open" | "closed";
   }): Promise<{ number: number; title: string; state: string; url: string }> {
-    return safeCall(async () => {
-      const octokit = this.factory.getOctokit();
-      const config = this.factory.getConfig();
-
-      const response = await octokit.rest.pulls.update({
-        owner: config.owner,
-        repo: config.repo,
-        pull_number: data.pullNumber,
-        title: data.title,
-        body: data.body,
-        state: data.state,
-      });
-
-      return {
-        number: response.data.number,
-        title: response.data.title,
-        state: response.data.state,
-        url: response.data.html_url,
-      };
-    });
+    return safeCall(async () => this.pullRequestRepo.update(data.pullNumber, data));
   }
 
   async mergePullRequest(data: {
@@ -146,25 +72,7 @@ export class PullRequestService {
     commitTitle?: string;
     commitMessage?: string;
   }): Promise<{ merged: boolean; message: string; sha: string }> {
-    return safeCall(async () => {
-      const octokit = this.factory.getOctokit();
-      const config = this.factory.getConfig();
-
-      const response = await octokit.rest.pulls.merge({
-        owner: config.owner,
-        repo: config.repo,
-        pull_number: data.pullNumber,
-        merge_method: data.mergeMethod || "merge",
-        commit_title: data.commitTitle,
-        commit_message: data.commitMessage,
-      });
-
-      return {
-        merged: response.data.merged,
-        message: response.data.message,
-        sha: response.data.sha,
-      };
-    });
+    return safeCall(async () => this.pullRequestRepo.merge(data.pullNumber, data));
   }
 
   async listPullRequestReviews(data: { pullNumber: number }): Promise<
@@ -175,23 +83,7 @@ export class PullRequestService {
       body: string;
     }>
   > {
-    return safeCall(async () => {
-      const octokit = this.factory.getOctokit();
-      const config = this.factory.getConfig();
-
-      const response = await octokit.rest.pulls.listReviews({
-        owner: config.owner,
-        repo: config.repo,
-        pull_number: data.pullNumber,
-      });
-
-      return response.data.map((review) => ({
-        id: review.id,
-        user: review.user?.login || "unknown",
-        state: review.state,
-        body: review.body || "",
-      }));
-    });
+    return safeCall(async () => this.pullRequestRepo.listReviews(data.pullNumber));
   }
 
   async createPullRequestReview(data: {
@@ -200,25 +92,6 @@ export class PullRequestService {
     event: "APPROVE" | "REQUEST_CHANGES" | "COMMENT";
     comments?: Array<{ path: string; position?: number; body: string }>;
   }): Promise<{ id: number; user: string; state: string; body: string }> {
-    return safeCall(async () => {
-      const octokit = this.factory.getOctokit();
-      const config = this.factory.getConfig();
-
-      const response = await octokit.rest.pulls.createReview({
-        owner: config.owner,
-        repo: config.repo,
-        pull_number: data.pullNumber,
-        body: data.body,
-        event: data.event,
-        comments: data.comments,
-      });
-
-      return {
-        id: response.data.id,
-        user: response.data.user?.login || "unknown",
-        state: response.data.state,
-        body: response.data.body || "",
-      };
-    });
+    return safeCall(async () => this.pullRequestRepo.createReview(data.pullNumber, data));
   }
 }

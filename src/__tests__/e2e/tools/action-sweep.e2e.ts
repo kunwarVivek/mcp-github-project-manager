@@ -1,30 +1,38 @@
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 import nock from "nock";
-import { afterAll, describe, expect, it } from "vitest";
+import { afterAll, describe, expect, it, vi } from "vitest";
 import { registerCompoundExecutors } from "../../../infrastructure/tools/compound/register-executors";
 import { ToolRegistry } from "../../../infrastructure/tools/ToolRegistry";
 import { getActionCatalog, getToolCatalog, PUBLISHED_SURFACE } from "../utils/action-catalog";
 
 /**
- * Action sweep: every action of every public tool, called for real.
+ * Action sweep: every action of every public tool, invoked with NO arguments
+ * beyond `action`.
+ *
+ * What this verifies is ROUTING and ARGUMENT VALIDATION, not business
+ * correctness: each advertised action reaches a handler, and a handler that
+ * is missing its required arguments fails gracefully instead of crashing or
+ * hanging. Whether an action does the right thing with valid input is the job
+ * of the unit and service suites.
  *
  * The tool e2e suites need live GitHub credentials and skip without them, so
- * in CI most of the MCP surface was never executed - a suite that does
- * nothing still reported "passed". This sweep closes that gap without any
- * credentials: it drives the same registry and the same compound executors
- * the server uses, with the GitHub API stubbed at the HTTP boundary.
+ * in CI most of the MCP surface was never executed. This sweep closes that gap
+ * without any credentials: it drives the same registry and the same compound
+ * executors the server uses, with the GitHub API stubbed at the HTTP boundary.
  *
- * What it asserts, per action:
+ * It fails on, per action:
  *
- *  1. The action is ROUTED. A schema that advertises an action with no
- *     handler is a real defect: the client would call it and get
- *     "Unknown <tool> action".
- *  2. The action does not CRASH before it talks to GitHub. An unguarded
- *     access on a missing argument (TypeError / ReferenceError) is the bug
- *     class this sweep exists to surface; a failure AFTER a request was made
- *     is reported separately, because there the shape of the stubbed
- *     response - not the product - decides the outcome.
+ *  1. UNROUTED: the schema advertises an action with no handler (the client
+ *     would get "Unknown <tool> action").
+ *  2. CRASH BEFORE ANY REQUEST: an unguarded access on a missing argument
+ *     (TypeError / ReferenceError / RangeError). A failure AFTER a request was
+ *     made is only reported, because there the shape of the stubbed response -
+ *     not the product - decides the outcome.
+ *  3. TIMEOUT: the call did not settle within the per-action budget.
+ *
+ * Tools with no `action` enum (`discover_tools`) are executed by a separate
+ * explicit test.
  */
 
 type Status =
@@ -83,7 +91,7 @@ function genericGraphQLResponse() {
 const CRASH_TYPES = new Set(["TypeError", "ReferenceError", "RangeError"]);
 
 /** Per-action budget. A call that exceeds it is reported, not waited on. */
-const ACTION_TIMEOUT_MS = 8000;
+const ACTION_TIMEOUT_MS = 30000;
 
 class TimeoutError extends Error {
   public override name = "TimeoutError";
@@ -113,6 +121,10 @@ describe("MCP action sweep", () => {
   // the test body runs - which is why the first sweep run hit "disallowed net
   // connect" on every call.
   beforeEach(() => {
+    // e2e/setup.ts freezes the clock for every e2e file. Under fake timers the per-action
+    // timeout below can never fire and AI retry back-off never elapses, so one slow action would
+    // hang the whole sweep instead of being reported as a timeout.
+    vi.useRealTimers();
     nock.cleanAll();
     nock.disableNetConnect();
 
@@ -184,7 +196,7 @@ describe("MCP action sweep", () => {
     );
   });
 
-  it("publishes a surface of 20 tools and 169 actions", () => {
+  it("publishes a surface of 21 tools and 175 actions", () => {
     const tools = getToolCatalog();
     const actions = getActionCatalog();
 
@@ -197,12 +209,13 @@ describe("MCP action sweep", () => {
     ).toBe(PUBLISHED_SURFACE.actions);
   });
 
-  it("routes every advertised action and never crashes on missing arguments", async () => {
+  it("routes every advertised action and validates missing arguments without crashing", async () => {
     const registry = ToolRegistry.getInstance();
     const catalog = getActionCatalog();
 
     const unrouted: ActionOutcome[] = [];
     const crashedBeforeRequest: ActionOutcome[] = [];
+    const timedOut: ActionOutcome[] = [];
 
     for (const entry of catalog) {
       const before = githubRequests;
@@ -238,6 +251,7 @@ describe("MCP action sweep", () => {
             errorType,
             requestedGitHub: githubRequests > before,
           };
+          timedOut.push(outcome);
         } else if (/Unknown .* action/i.test(message)) {
           outcome = {
             tool: entry.tool,
@@ -286,7 +300,39 @@ describe("MCP action sweep", () => {
       "actions that crash on a missing argument instead of failing gracefully"
     ).toEqual([]);
 
+    // A call that never settles is a hang the client would see; it must fail the sweep, not just
+    // be reported.
+    expect(
+      timedOut.map((o) => `${o.tool}/${o.action} (${o.error})`),
+      "actions that exceeded the per-action budget"
+    ).toEqual([]);
+
     // The sweep must have attempted every action in the catalog.
     expect(outcomes.length).toBe(catalog.length);
   }, 900000);
+
+  // Tools without an `action` discriminator are invisible to the action sweep above, so each one
+  // is executed here explicitly. Today that is `discover_tools`, which takes `domain` / `query`.
+  it("executes every tool that has no action enum", async () => {
+    const registry = ToolRegistry.getInstance();
+    const actionless = getToolCatalog().filter((entry) => entry.actions.length === 0);
+
+    expect(actionless.map((entry) => entry.tool)).toEqual(["discover_tools"]);
+
+    const everything = (await registry.execute("discover_tools", {})) as Record<string, unknown>;
+    expect(everything).toHaveProperty("issues");
+
+    const issues = (await registry.execute("discover_tools", { domain: "issues" })) as {
+      tool: string;
+      actions: string[];
+    };
+    expect(issues.tool).toBe("manage_issues");
+    expect(issues.actions).toContain("create");
+
+    const search = (await registry.execute("discover_tools", { query: "milestone" })) as Record<
+      string,
+      unknown
+    >;
+    expect(Object.keys(search)).toContain("milestones");
+  });
 });

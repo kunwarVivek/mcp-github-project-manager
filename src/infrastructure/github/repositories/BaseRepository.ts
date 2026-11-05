@@ -2,8 +2,9 @@ import { ResourceStatus } from "../../../domain/resource-types";
 import { getLogger, type ILogger } from "../../logger";
 import type { GitHubConfig } from "../GitHubConfig"; // Fixed import path
 import { GitHubErrorHandler } from "../GitHubErrorHandler";
-import type { GitHubError, OctokitInstance } from "../types";
-import { GitHubApiUtil } from "../util/GitHubApiUtil";
+import { GitHubRequestExecutor } from "../GitHubRequestExecutor";
+import type { OctokitInstance } from "../types";
+import { type ConnectionPage, collectConnection } from "../util/paginate";
 
 /** Parameters every repository-scoped REST endpoint takes; `rest()` fills them in. */
 type RepoScopedParams = { owner: string; repo: string };
@@ -15,8 +16,8 @@ export interface IGitHubRepository {
 
 export abstract class BaseGitHubRepository implements IGitHubRepository {
   private readonly errorHandler: GitHubErrorHandler;
-  protected readonly retryAttempts: number = 3;
-  protected readonly apiUtil: GitHubApiUtil;
+  /** Shared with every other repository (and the factory) built on the same Octokit. */
+  protected readonly executor: GitHubRequestExecutor;
   protected readonly logger: ILogger;
 
   constructor(
@@ -24,7 +25,7 @@ export abstract class BaseGitHubRepository implements IGitHubRepository {
     public readonly config: GitHubConfig
   ) {
     this.errorHandler = new GitHubErrorHandler();
-    this.apiUtil = GitHubApiUtil.getInstance();
+    this.executor = GitHubRequestExecutor.for(octokit);
     this.logger = getLogger(this.constructor.name);
   }
 
@@ -37,55 +38,13 @@ export abstract class BaseGitHubRepository implements IGitHubRepository {
   }
 
   /**
-   * Execute operation with automatic retries and rate limit handling
-   */
-  protected async withRetry<T>(operation: () => Promise<T>, context?: string): Promise<T> {
-    let lastError: unknown;
-    let error: unknown;
-
-    for (let attempt = 0; attempt < this.retryAttempts; attempt++) {
-      try {
-        // Check if we should throttle due to rate limits
-        if (await this.apiUtil.shouldThrottle(this.octokit)) {
-          const delay = await this.apiUtil.calculateRequestDelay(this.octokit);
-          await new Promise((resolve) => setTimeout(resolve, delay));
-        }
-
-        return await operation();
-      } catch (e) {
-        error = e;
-        lastError = e;
-
-        const isRetryable = this.errorHandler.isRetryableError(error);
-        const isLastAttempt = attempt === this.retryAttempts - 1;
-
-        if (!isRetryable || isLastAttempt) {
-          throw this.errorHandler.handleError(
-            error,
-            isLastAttempt ? `${context} (max retries exceeded)` : context
-          );
-        }
-
-        const headers = (error as GitHubError)?.response?.headers || {};
-        const delay = this.errorHandler.calculateRetryDelay(headers);
-        await new Promise((resolve) => setTimeout(resolve, delay));
-      }
-    }
-
-    throw this.errorHandler.handleError(lastError, context);
-  }
-
-  /**
-   * Execute GraphQL query with rate limiting support
+   * Execute GraphQL query through the shared throttle/retry path
    */
   protected async graphql<T>(query: string, variables: Record<string, unknown> = {}): Promise<T> {
-    return this.withRetry(
-      () =>
-        this.octokit.graphql<T>(query, {
-          ...variables,
-          owner: this.owner,
-          repo: this.repo,
-        }),
+    return this.executor.graphql<T>(
+      this.octokit,
+      query,
+      { owner: this.owner, repo: this.repo, ...variables },
       "executing GraphQL query"
     );
   }
@@ -111,14 +70,10 @@ export abstract class BaseGitHubRepository implements IGitHubRepository {
       headers["GraphQL-Features"] = features.join(",");
     }
 
-    return this.withRetry(
-      () =>
-        this.octokit.graphql<T>(query, {
-          ...variables,
-          owner: this.owner,
-          repo: this.repo,
-          headers,
-        }),
+    return this.executor.graphql<T>(
+      this.octokit,
+      query,
+      { owner: this.owner, repo: this.repo, ...variables, headers },
       `executing GraphQL query with features: ${features.join(",")}`
     );
   }
@@ -265,12 +220,16 @@ export abstract class BaseGitHubRepository implements IGitHubRepository {
     if (names.length === 0) return [];
 
     const query = `
-      query($owner: String!, $repo: String!, $first: Int!) {
+      query($owner: String!, $repo: String!, $first: Int!, $after: String) {
         repository(owner: $owner, name: $repo) {
-          labels(first: $first) {
+          labels(first: $first, after: $after) {
             nodes {
               id
               name
+            }
+            pageInfo {
+              hasNextPage
+              endCursor
             }
           }
         }
@@ -279,21 +238,25 @@ export abstract class BaseGitHubRepository implements IGitHubRepository {
 
     interface LabelsResponse {
       repository: {
-        labels: {
-          nodes: Array<{ id: string; name: string }>;
-        };
+        labels: ConnectionPage<{ id: string; name: string }>;
       } | null;
     }
 
-    const response = await this.graphql<LabelsResponse>(query, {
-      owner: this.owner,
-      repo: this.repo,
-      first: 100,
-    });
-
-    const nameToId = new Map(
-      (response.repository?.labels.nodes ?? []).map((label) => [label.name, label.id])
+    const labels = await collectConnection<{ id: string; name: string }>(
+      async (after) => {
+        const response = await this.graphql<LabelsResponse>(query, {
+          owner: this.owner,
+          repo: this.repo,
+          first: 100,
+          after,
+        });
+        return response.repository?.labels;
+      },
+      this.logger,
+      `Labels of ${this.owner}/${this.repo}`
     );
+
+    const nameToId = new Map(labels.map((label) => [label.name, label.id]));
 
     return names.map((name) => nameToId.get(name)).filter((id): id is string => id != null);
   }
@@ -314,15 +277,12 @@ export abstract class BaseGitHubRepository implements IGitHubRepository {
     params?: Omit<P, keyof RepoScopedParams>
   ): Promise<T> {
     const scoped = { owner: this.owner, repo: this.repo, ...params } as P;
-    const result = await this.withRetry(() => operation(scoped), "executing REST API call");
+    const result = await this.executor.run(
+      "rest",
+      () => operation(scoped),
+      "executing REST API call"
+    );
     return result.data;
-  }
-
-  /**
-   * Get rate limit information
-   */
-  protected async getRateLimit() {
-    return this.apiUtil.getRateLimit(this.octokit);
   }
 
   protected toISOString(date: string | Date): string {

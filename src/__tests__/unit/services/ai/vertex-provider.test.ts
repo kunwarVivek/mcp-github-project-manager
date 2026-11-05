@@ -16,30 +16,39 @@ interface Scenario {
   models?: Partial<Record<"main" | "research" | "fallback" | "prd", string>>;
 }
 
-const VERTEX_ENV = ["GOOGLE_VERTEX_PROJECT", "GOOGLE_VERTEX_LOCATION"] as const;
-const PROVIDER_ENV = ["AI_MAIN_PROVIDER", "AI_RESEARCH_PROVIDER"] as const;
+/** Every variable the factory resolves at call time; scenarios set only what they need. */
+const SCENARIO_ENV = [
+  "ANTHROPIC_API_KEY",
+  "OPENAI_API_KEY",
+  "GOOGLE_API_KEY",
+  "PERPLEXITY_API_KEY",
+  "GOOGLE_VERTEX_PROJECT",
+  "GOOGLE_VERTEX_LOCATION",
+  "AI_MAIN_PROVIDER",
+  "AI_RESEARCH_PROVIDER",
+  "AI_MAIN_MODEL",
+  "AI_RESEARCH_MODEL",
+  "AI_FALLBACK_MODEL",
+  "AI_PRD_MODEL",
+] as const;
 
-/** Fresh module graph per scenario: env.ts exports model/key constants at import time. */
+/** Fresh module graph per scenario; the factory reads configuration from the environment at call time. */
 async function load(s: Scenario) {
   vi.resetModules();
-  vi.doMock("../../../../env", async () => {
-    const actual = await vi.importActual<Record<string, unknown>>("../../../../env");
-    return {
-      ...actual,
-      ANTHROPIC_API_KEY: s.anthropicApiKey ?? "",
-      OPENAI_API_KEY: "",
-      GOOGLE_API_KEY: s.googleApiKey ?? "",
-      PERPLEXITY_API_KEY: "",
-      AI_MAIN_MODEL: s.models?.main ?? "",
-      AI_RESEARCH_MODEL: s.models?.research ?? "",
-      AI_FALLBACK_MODEL: s.models?.fallback ?? "",
-      AI_PRD_MODEL: s.models?.prd ?? "",
-    };
-  });
-  if (s.vertexProject) process.env.GOOGLE_VERTEX_PROJECT = s.vertexProject;
-  if (s.vertexLocation) process.env.GOOGLE_VERTEX_LOCATION = s.vertexLocation;
-  if (s.mainProvider) process.env.AI_MAIN_PROVIDER = s.mainProvider;
-  if (s.researchProvider) process.env.AI_RESEARCH_PROVIDER = s.researchProvider;
+  for (const k of SCENARIO_ENV) delete process.env[k];
+  const set = (key: (typeof SCENARIO_ENV)[number], value: string | undefined) => {
+    if (value) process.env[key] = value;
+  };
+  set("ANTHROPIC_API_KEY", s.anthropicApiKey);
+  set("GOOGLE_API_KEY", s.googleApiKey);
+  set("GOOGLE_VERTEX_PROJECT", s.vertexProject);
+  set("GOOGLE_VERTEX_LOCATION", s.vertexLocation);
+  set("AI_MAIN_PROVIDER", s.mainProvider);
+  set("AI_RESEARCH_PROVIDER", s.researchProvider);
+  set("AI_MAIN_MODEL", s.models?.main);
+  set("AI_RESEARCH_MODEL", s.models?.research);
+  set("AI_FALLBACK_MODEL", s.models?.fallback);
+  set("AI_PRD_MODEL", s.models?.prd);
 
   const factoryModule = await import("../../../../services/ai/AIServiceFactory");
   const { traceContext } = await import(
@@ -79,7 +88,7 @@ describe("Gemini via Vertex AI (Application Default Credentials)", () => {
   });
 
   afterEach(() => {
-    for (const k of [...VERTEX_ENV, ...PROVIDER_ENV]) delete process.env[k];
+    for (const k of SCENARIO_ENV) delete process.env[k];
   });
 
   describe("provider selection for a Gemini model", () => {
@@ -143,12 +152,12 @@ describe("Gemini via Vertex AI (Application Default Credentials)", () => {
         models: { main: "gemini-2.5-flash" },
       });
       expect(factory.isAIAvailable()).toBe(true);
-      // isAIAvailable() itself resolves a model; count only the explicit call below.
+      // The per-role model cache means isAIAvailable() and getModel() share one build.
       createVertex.mockClear();
 
       const model = factory.getModel("main");
       expect(model).not.toBeNull();
-      expect(createVertex).toHaveBeenCalledTimes(1);
+      expect(createVertex).not.toHaveBeenCalled();
       expect(createGoogle).not.toHaveBeenCalled();
       expect((model as unknown as { modelId: string }).modelId).toBe("vertex:gemini-2.5-flash");
     });

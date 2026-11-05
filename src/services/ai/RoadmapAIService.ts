@@ -27,11 +27,11 @@ import type {
 import { InputSanitizer } from "../utils/InputSanitizer";
 import { AIServiceFactory } from "./AIServiceFactory";
 import { calculateWeightedScore, getConfidenceTier } from "./ConfidenceScorer";
+import { defaultPromptRegistry } from "./prompts";
 import {
   formatConstraintsForPrompt,
   formatRequirementsForPrompt,
-  REQUIREMENTS_PARSING_PROMPT,
-  ROADMAP_GENERATION_SYSTEM_PROMPT,
+  ROADMAP_PROMPT_IDS,
 } from "./prompts/RoadmapPrompts";
 
 // ============================================================================
@@ -227,7 +227,7 @@ export class RoadmapAIService {
     try {
       const result = await generateObject({
         model,
-        system: REQUIREMENTS_PARSING_PROMPT,
+        system: defaultPromptRegistry.render(ROADMAP_PROMPT_IDS.requirementsParsing),
         prompt: InputSanitizer.sanitizeText(text, InputSanitizer.MAX_ISSUE_CONTENT_LENGTH),
         schema: RequirementParseSchema,
         temperature: 0.3,
@@ -329,7 +329,7 @@ IMPORTANT: Follow phase sequencing rules - foundation first, then core, then adv
 
       const result = await generateObject({
         model,
-        system: ROADMAP_GENERATION_SYSTEM_PROMPT,
+        system: defaultPromptRegistry.render(ROADMAP_PROMPT_IDS.generationSystem),
         prompt,
         schema: RoadmapStructureSchema,
         temperature: 0.5,

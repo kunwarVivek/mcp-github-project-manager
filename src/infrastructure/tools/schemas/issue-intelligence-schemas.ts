@@ -365,9 +365,7 @@ export type DetectDuplicatesOutput = z.infer<typeof DetectDuplicatesOutputSchema
 /**
  * Schema for relationship types.
  */
-export const RelationshipTypeSchema = z.enum(["semantic", "dependency", "component"]);
-
-export type RelationshipType = z.infer<typeof RelationshipTypeSchema>;
+export const IssueRelationshipKindSchema = z.enum(["semantic", "dependency", "component"]);
 
 /**
  * Schema for dependency sub-types.
@@ -443,7 +441,7 @@ export const IssueRelationshipSchema = z.object({
   /** Target issue title */
   targetIssueTitle: z.string(),
   /** Type of relationship */
-  relationshipType: RelationshipTypeSchema,
+  relationshipType: IssueRelationshipKindSchema,
   /** Sub-type for dependency relationships */
   subType: DependencySubTypeSchema.optional(),
   /** Confidence in this relationship (0-1) */

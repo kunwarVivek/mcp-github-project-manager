@@ -1,6 +1,6 @@
 # Requirements: MCP GitHub Project Manager
 
-**Defined:** 2026-01-30
+**Defined:** 2026-01-30 · **Reconciled with code:** 2026-11-02
 **Core Value:** Comprehensive AI-enabled GitHub-based project management from 0-100
 
 ## v1 Requirements
@@ -52,9 +52,9 @@ Requirements for this milestone. Each maps to roadmap phases.
 ### MCP Protocol Compliance (MCP)
 
 **SDK Upgrade:**
-- [x] **MCP-01**: Upgrade SDK from 1.12.0 to 1.25.2
-- [x] **MCP-02**: Update all imports for new SDK structure
-- [x] **MCP-03**: Verify all 71 tools work after upgrade
+- [x] **MCP-01**: Upgrade the MCP SDK off 1.12.0 (delivered on 1.25.x at v1.0; superseded by the v2 migration, MCP-16)
+- [x] **MCP-02**: Update all imports for the new SDK structure
+- [x] **MCP-03**: Verify every registered tool works after the upgrade (tool counts are derived from the `ToolRegistry`, see MCP-16/PROD-18)
 - [x] **MCP-04**: Update protocol version negotiation
 
 **Tool Annotations:**
@@ -70,9 +70,9 @@ Requirements for this milestone. Each maps to roadmap phases.
 - [x] **MCP-12**: Define output schemas for all automation tools
 
 **Error Handling:**
-- [x] **MCP-13**: Implement MCP-compliant error codes
-- [x] **MCP-14**: Add proper error data payloads
-- [x] **MCP-15**: Handle protocol version mismatches gracefully
+- [x] **MCP-13**: Implement MCP-compliant error codes (protocol faults use JSON-RPC errors; see MCP-17 for the tool-failure contract)
+- [x] **MCP-14**: Add proper error data payloads (stable code in `_meta.error`)
+- [x] **MCP-15**: Handle protocol version mismatches gracefully (negotiated per connection by `serveStdio`)
 
 ### Tech Debt Resolution (DEBT)
 
@@ -84,10 +84,10 @@ Requirements for this milestone. Each maps to roadmap phases.
 - [x] **DEBT-05**: Extract SprintPlanningService from ProjectManagementService
 - [x] **DEBT-06**: Extract MilestoneService from ProjectManagementService
 - [x] **DEBT-07**: Reduce ProjectManagementService to coordination only
-  <!-- Was over-claimed at v1.0 (PMS was still 1,696 lines). Actually completed
-       in the 2026-07-15 remediation: extracted IssueService + RoadmapService and
-       delegated automation to ProjectAutomationService. PMS now 1,338 lines,
-       a near-pure facade. See docs/remediation/GAP-TRACKER.md (G3-01). -->
+  <!-- Over-claimed at v1.0 (PMS was still 1,696 lines); completed in the 2026-07-15
+       remediation by extracting IssueService/RoadmapService and delegating
+       automation. Today `ProjectManagementService` is a 121-line facade of thin
+       getters over the extracted services. -->
 
 **Type Safety:**
 - [x] **DEBT-08**: Define interfaces for all AI response objects
@@ -104,13 +104,13 @@ Requirements for this milestone. Each maps to roadmap phases.
 - [x] **DEBT-17**: Add unit tests for DependencyContextGenerator
 - [x] **DEBT-18**: Add unit tests for ContextQualityValidator
 - [x] **DEBT-19**: Add integration tests for new GitHub features
-- [x] **DEBT-20**: Achieve 80%+ code coverage
+- [x] **DEBT-20**: Enforce a coverage floor (thresholds in `vitest.config.ts`; the original "80%+" target is not what the config enforces — see CI for measured results)
 
 **Resilience:**
 - [x] **DEBT-21**: Implement circuit breaker for AI services
-- [x] **DEBT-22**: Add health check endpoint
-- [x] **DEBT-23**: Add request tracing with correlation IDs
-- [x] **DEBT-24**: Implement cache persistence option
+- [x] **DEBT-22**: Add health check endpoint (`/health` on the webhook server and the `system` tool's health action, backed by `HealthService`, which probes GitHub live via `rateLimit.get()` and reports `connected: false` on failure)
+- [x] **DEBT-23**: Add request tracing with correlation IDs (`CorrelationContext`, AsyncLocalStorage; logger emits the id in `LOG_FORMAT=json`)
+- [x] **DEBT-24**: Implement cache persistence option (`CachePersistence`: versioned JSON snapshot `cache-snapshot.json` in `CACHE_DIRECTORY`, atomic temp-file + rename, expired entries dropped on restore)
 - [x] **DEBT-25**: Add graceful degradation for AI service failures
 
 **Documentation:**
@@ -156,7 +156,7 @@ Requirements for this milestone. Each maps to roadmap phases.
 - [x] **PROD-01**: All unit tests passing
 - [x] **PROD-02**: All integration tests passing
 - [x] **PROD-03**: All E2E tests passing
-- [x] **PROD-04**: No skipped tests (4 E2E suites skipped with documented justification)
+- [x] **PROD-04**: No unconditionally skipped tests (live-API suites are registered with `describe.skipIf` on missing credentials and are reported as skipped by Vitest; `E2E_REAL_API=true` runs them)
 
 **Documentation:**
 - [x] **PROD-05**: Complete README with quick start
@@ -167,12 +167,53 @@ Requirements for this milestone. Each maps to roadmap phases.
 **Package:**
 - [x] **PROD-09**: Update package.json version
 - [x] **PROD-10**: Verify npm publish configuration
-- [x] **PROD-11**: Add changelog
+- [x] **PROD-11**: Add changelog (`CHANGELOG.md`, Keep a Changelog format)
 - [x] **PROD-12**: Publish to npm
+
+### Post-v1.0 Requirements (remediation and platform hardening)
+
+Added after the v1.0 milestone; every item below was verified against code on 2026-11-02. IDs continue the existing scheme; analytics gets its own `ANLY` prefix because it is not AI-specific.
+
+**GitHub API:**
+- [x] **GHAPI-25**: GitHub App installation auth outranks the PAT when `GITHUB_APP_ID`, `GITHUB_APP_PRIVATE_KEY`, `GITHUB_APP_INSTALLATION_ID` are all set; a partial config falls through to the next credential tier (`resolveGitHubAuth()` + `GitHubRepositoryFactory.fromAuth()`)
+
+**MCP Protocol:**
+- [x] **MCP-16**: Run on `@modelcontextprotocol/server` v2 (`McpServer.registerTool`, `serveStdio`), every tool sharing one `dispatchTool`
+- [x] **MCP-17**: Tool-failure contract — every tool failure returns `{content, isError: true}` with the code in `_meta.error`; JSON-RPC errors only for an unknown tool or protocol faults
+- [x] **MCP-18**: Optional `idempotencyKey` on create actions: same key + same arguments within 24h replays the first result (`IdempotencyStore`, audit-log replay); same key with different arguments is a conflict
+- [x] **MCP-19**: Additive cursor pagination on list actions (`cursor` in, `nextCursor` out, alongside `pageInfo`)
+- [x] **MCP-20**: Per-tool `_meta.schemaVersion` on every result (all tools at 1.0.0), pinned by a schema snapshot test
+- [x] **MCP-21**: Destructive `manage_sprints` delete requires `confirm: true`
+
+**Analytics (delivered minimally as the `analytics` tool):**
+- [x] **ANLY-01**: `sprint_velocity` report
+- [x] **ANLY-02**: `sprint_burndown` report
+- [x] **ANLY-03**: `cycle_time` report
+- [x] **ANLY-04**: `throughput` report
+- [x] **ANLY-05**: `project_summary` report
+
+**AI:**
+- [x] **AI-21**: All AI prompts served through the versioned `PromptRegistry` (`{{var}}` templates)
+- [x] **AI-22**: Per-session `TokenBudgetManager` (`AI_SESSION_TOKEN_LIMIT`, 0 = unlimited), distinct from the agent budget
+- [x] **AI-23**: Agent budget `hardStop` gates AI tools (`BudgetExhausted`, `isError`)
+- [x] **AI-24**: `AIResponseCache` wired into `TaskContextGenerationService`
+
+**Tech debt:**
+- [x] **DEBT-29**: Dead modules deleted (`infrastructure/validation`, `infrastructure/resource`, `StructuredLogger`/`TracingLogger`, `project-types.ts`, `MCPErrorHandler`)
+- [x] **DEBT-30**: Single test tree under `src/__tests__/` (the legacy root `tests/` tree is gone)
+- [x] **DEBT-31**: Domain entities carry behavior (rich entities, domain imports nothing from services/infrastructure); composition root registers the services and the `index.ts`-owned components, with tool executors self-constructing through `createGitHubFactory()` as the documented exception
+
+**Production readiness:**
+- [x] **PROD-13**: Proactive rate-limit budgeting — one `GitHubRequestExecutor` (retry + `RateLimitManager`) backs off below `RATE_LIMIT_FLOOR` (default 100) instead of burning the budget and hitting a 403
+- [x] **PROD-14**: Append-only, redacted mutation audit log (`AUDIT_LOG_ENABLED`, `AUDIT_LOG_PATH`, default `.mcp-audit/mutations.jsonl`)
+- [x] **PROD-15**: Opt-in OpenTelemetry tracing (`OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_SERVICE_NAME`; `tool.<name>` spans)
+- [x] **PROD-16**: Webhook/SSE hardening — loopback bind by default (`WEBHOOK_HOST`), `/events/*` bearer auth (`EVENTS_AUTH_TOKEN`), signature validation fails closed, CORS allow-list, rate limit, `WEBHOOK_TRUSTED_PROXIES` for `X-Forwarded-For`
+- [x] **PROD-17**: Supply-chain CI gates — lockfile sync check (`check:lockfiles`), `npm audit --audit-level=high`, CodeQL workflow, Dependabot (weekly npm + github-actions), CycloneDX SBOM attached to releases
+- [x] **PROD-18**: Doc-count CI check (`check:docs`) fails when published tool/action counts differ from the `ToolRegistry`
 
 ## v2 Requirements
 
-Deferred to future release. Tracked but not in current roadmap.
+Deferred to a future release. Tracked but not in the current roadmap.
 
 ### Advanced Features
 
@@ -184,8 +225,8 @@ Deferred to future release. Tracked but not in current roadmap.
 - **V2-06**: MCP Tasks primitive for long-running operations
 - **V2-07**: MCP Elicitation for interactive tools
 - **V2-08**: Redis cache backend option
-- **V2-09**: Metrics and observability (OpenTelemetry)
-- **V2-10**: Rate limit handling improvements
+- **V2-09**: Metrics and observability (Prometheus-style metrics; OTLP tracing is delivered as PROD-15)
+- **V2-10**: Further rate-limit handling (proactive budgeting is delivered as PROD-13)
 
 ## Out of Scope
 
@@ -193,9 +234,9 @@ Explicitly excluded. Documented to prevent scope creep.
 
 | Feature | Reason |
 |---------|--------|
-| GitHub Insights/Charts API | No programmatic API available (UI-only) |
-| Fine-grained PAT support | GitHub GraphQL doesn't support it |
-| Self-hosted GitHub Enterprise | Focus on github.com for v1 |
+| GitHub Insights/Charts API | No programmatic API available (UI-only); the `analytics` tool computes its own reports |
+| Fine-grained PAT support | GitHub GraphQL doesn't support it (use a classic PAT or a GitHub App) |
+| Self-hosted GitHub Enterprise | Focus on github.com |
 | Real-time collaboration | Complex, defer to v2 |
 | Mobile app | CLI/MCP focus |
 | UI dashboard | MCP server is API-only |
@@ -305,21 +346,47 @@ Which phases cover which requirements.
 | PROD-10 | Phase 12 | Complete |
 | PROD-11 | Phase 12 | Complete |
 | PROD-12 | Phase 12 | Complete |
+| GHAPI-25 | Remediation | Complete |
+| MCP-16 | Remediation | Complete |
+| MCP-17 | Remediation | Complete |
+| MCP-18 | Remediation | Complete |
+| MCP-19 | Remediation | Complete |
+| MCP-20 | Remediation | Complete |
+| MCP-21 | Remediation | Complete |
+| ANLY-01 | Phase 11 (original scope; delivered post-v1.0 as the `analytics` tool) | Complete |
+| ANLY-02 | Phase 11 (original scope; delivered post-v1.0) | Complete |
+| ANLY-03 | Phase 11 (original scope; delivered post-v1.0) | Complete |
+| ANLY-04 | Phase 11 (original scope; delivered post-v1.0) | Complete |
+| ANLY-05 | Phase 11 (original scope; delivered post-v1.0) | Complete |
+| AI-21 | Remediation | Complete |
+| AI-22 | Remediation | Complete |
+| AI-23 | Remediation | Complete |
+| AI-24 | Remediation | Complete |
+| DEBT-29 | Remediation | Complete |
+| DEBT-30 | Remediation | Complete |
+| DEBT-31 | Remediation | Complete |
+| PROD-13 | Remediation | Complete |
+| PROD-14 | Remediation | Complete |
+| PROD-15 | Remediation | Complete |
+| PROD-16 | Remediation | Complete |
+| PROD-17 | Remediation | Complete |
+| PROD-18 | Remediation | Complete |
 
 **Coverage:**
-- v1 requirements: 99 total
-- Mapped to phases: 99
+- v1 requirements: 99 total, all mapped to phases 1-12
+- Post-v1.0 requirements: 25 (GHAPI-25, MCP-16–21, ANLY-01–05, AI-21–24, DEBT-29–31, PROD-13–18), all mapped to the remediation work
 - Unmapped: 0
 
 ---
 *Requirements defined: 2026-01-30*
-*Last updated: 2026-02-01 - All 99 requirements complete*
+*Last updated: 2026-11-02 — reconciled with code; post-v1.0 requirements added*
 
-<!-- Reconciliation 2026-07-15: the "99/99 complete" claim was partly aspirational
-     at v1.0. Code-verified corrections from the remediation branch:
-     - DEBT-07 (PMS decomposition) was NOT done at v1.0; completed 2026-07-15.
-     - DEBT-09..12 (replace `as any`) were over-claimed — real production casts
-       were 2 (fixed); most were tests/false-positives.
-     - Phase 11 (Analytics & Reporting, would map to a future AI-21..) is absent.
+<!-- Reconciliation history:
+     - 2026-07-15: "99/99 complete" was partly aspirational at v1.0. DEBT-07 (PMS
+       decomposition) was not done at v1.0 and was completed then; DEBT-09..12
+       (replace `as any`) were over-claimed (real production casts were 2, fixed).
+     - 2026-11-02: Phase 11's original "Analytics & Reporting" scope is now delivered
+       minimally as the `analytics` tool (ANLY-01..05); Phase 11 keeps AI Issue
+       Intelligence (AI-17..20). Production code contains no real `as any`.
      Live status: docs/remediation/GAP-TRACKER.md. -->
 

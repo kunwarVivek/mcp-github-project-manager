@@ -1,0 +1,86 @@
+{
+  "manage_project": {
+    "version": "1.0.0",
+    "hash": "48cebd68afcb24b81181c73c9ef2bf8d445d2b515cc6b3462c543c52e33256b9"
+  },
+  "manage_issues": {
+    "version": "1.0.0",
+    "hash": "0f3c8ebfcf366549fa4e35ae0338ab0bd94cf9be425bb4348746836f6cb3a6eb"
+  },
+  "manage_prs": {
+    "version": "1.0.0",
+    "hash": "c3847d46069b3015547317712e0548546696220e29c97afd23a804846f3510ab"
+  },
+  "manage_milestones": {
+    "version": "1.0.0",
+    "hash": "8816979dc31af6070efe65cd67c3a8258f26aef15eccbc66b02130060376b75f"
+  },
+  "manage_sprints": {
+    "version": "1.0.0",
+    "hash": "0d841fa5161207976392633dd3eba3e32f1c71cb4cda878edd8ee2fe225b8d24"
+  },
+  "manage_labels": {
+    "version": "1.0.0",
+    "hash": "900af2e7858f6381e8e8fa2695f3d987155c14df2861ab73bb4e365739bc570e"
+  },
+  "manage_automation": {
+    "version": "1.0.0",
+    "hash": "07b972243f2769fbeff2df4f0af11f95059020d5ac28f64f81fa7ad48446c8ee"
+  },
+  "manage_iterations": {
+    "version": "1.0.0",
+    "hash": "64b3a75df648c6ba139e64eee85e26f64a1097430f55fb0ba179e6206eb5d863"
+  },
+  "manage_events": {
+    "version": "1.0.0",
+    "hash": "47472bb6c51ac175389c6778463907218b091199f7615ad210607c6b044f3e07"
+  },
+  "manage_status_updates": {
+    "version": "1.0.0",
+    "hash": "bdbfa7b2a40409da6bfb59bed4b28865516c7d73ea4f34841292164175361fab"
+  },
+  "ai_generate": {
+    "version": "1.0.0",
+    "hash": "517e4de890bf06dd916e0d73b0c43217967aaf8530d9acc6714787bc931ed2cf"
+  },
+  "ai_analyze": {
+    "version": "1.0.0",
+    "hash": "c082efb57b14e5403566165c7fd626016bc3730877cea29118e094f6fbffa0c4"
+  },
+  "ai_plan": {
+    "version": "1.0.0",
+    "hash": "c42cde13c378cddcb78599c767d0274db5dbe3b702ace2dde9a14e9bcc432dc8"
+  },
+  "agent_work": {
+    "version": "1.0.0",
+    "hash": "f606fb64ca6f98277a93eac592e9adf25bb20f82fc399881bf0fe78c2959d324"
+  },
+  "agent_manage": {
+    "version": "1.0.0",
+    "hash": "e63cea4039bd80c255a00d3a052f62e4ce6f2d5bc463b88254af0710e094c8f9"
+  },
+  "system": {
+    "version": "1.0.0",
+    "hash": "4bd6d785354675db36706368b9d045bdea9b7cecd98ff7ee3e64bff1021de394"
+  },
+  "discover_tools": {
+    "version": "1.0.0",
+    "hash": "cdba98492260d863ddf063f2872c06ac1b078c807e0df506955f51cd0d875c0d"
+  },
+  "manage_branches": {
+    "version": "1.0.0",
+    "hash": "b43f0afa52863f40630bb708b4a68c65cfa829a22543c48b38768b766e4eedb2"
+  },
+  "manage_releases": {
+    "version": "1.0.0",
+    "hash": "f058a0c76e3d793fe26fd157c43ad137213a10b7797ef0d87a1f22748796e327"
+  },
+  "manage_workflows": {
+    "version": "1.0.0",
+    "hash": "b3a592385afa5e71822fb8475cfb5ae11f1a92b72685d13adf4ef53b798ce468"
+  },
+  "analytics": {
+    "version": "1.0.0",
+    "hash": "7031b6b4c64ee3b2ea827b0b499ab30d5ed54f5e3bba32db0a2d9a176246c601"
+  }
+}

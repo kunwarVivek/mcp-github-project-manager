@@ -11,13 +11,12 @@ import { FeatureManagementService } from "../../../services/FeatureManagementSer
 import { ANNOTATION_PATTERNS } from "../annotations/tool-annotations.js";
 import { AddFeatureOutputSchema } from "../schemas/ai-schemas.js";
 import { ToolResultFormatter } from "../ToolResultFormatter.js";
-import type { ToolDefinition, ToolSchema } from "../ToolValidator.js";
+import { type ToolDefinition, type ToolSchema, ToolValidator } from "../ToolValidator.js";
 
 // Schema for add_feature tool
 const addFeatureSchema = z.object({
   featureIdea: z.string().min(10).describe("The feature idea or title"),
   description: z.string().min(20).describe("Detailed description of the feature"),
-  targetPRD: z.string().optional().describe("ID of the PRD to add the feature to"),
   targetProject: z.string().optional().describe("GitHub project ID to add tasks to"),
   businessJustification: z.string().optional().describe("Business justification for the feature"),
   targetUsers: z.array(z.string()).optional().describe("Target user groups for this feature"),
@@ -41,18 +40,22 @@ export type AddFeatureArgs = z.infer<typeof addFeatureSchema>;
 /**
  * Implementation function for add_feature tool
  */
-async function executeAddFeature(args: AddFeatureArgs): Promise<MCPResponse> {
+async function executeAddFeature(rawArgs: unknown): Promise<MCPResponse> {
+  const args = ToolValidator.validate(
+    "add_feature",
+    rawArgs,
+    addFeatureSchema as unknown as ToolSchema<AddFeatureArgs>
+  );
   const featureService = new FeatureManagementService();
 
   try {
-    // For now, we'll create a simplified implementation
-    // In a full implementation, you'd integrate with ResourceManager
+    // PRDs are not persisted anywhere (no PRD store exists), so there is no PRD to
+    // look up or update: the feature is analysed, expanded and tracked on its own.
 
     // Create complete feature lifecycle
     const result = await featureService.createCompleteFeatureLifecycle({
       featureIdea: args.featureIdea,
       description: args.description,
-      targetPRD: undefined, // Would get from ResourceManager
       targetProject: args.targetProject,
       requestedBy: args.requestedBy,
       businessJustification: args.businessJustification,

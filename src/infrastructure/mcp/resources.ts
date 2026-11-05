@@ -9,10 +9,7 @@ import { resolveGitHubAuth } from "../github/auth/resolveGitHubAuth";
 import type { ILogger } from "../logger/index";
 import type { ToolRegistry } from "../tools/ToolRegistry";
 
-/**
- * v2 compatibility aliases (McpError -> ProtocolError, ErrorCode enum ->
- * constants). See `src/index.ts` for the full explanation.
- */
+/** v2 SDK: `McpError` is `ProtocolError`; error codes are plain numeric constants. */
 const McpError = ProtocolError;
 const ErrorCode = { InternalError: INTERNAL_ERROR } as const;
 
@@ -39,15 +36,6 @@ function jsonResource(uri: URL, data: unknown) {
 }
 
 /**
- * Registers the six `github://…` MCP resources.
- *
- * Resources are read-only, addressable state snapshots — unlike tools, a
- * client lists and reads them directly for "what's the current state"
- * queries instead of shaping a tool call. Read failures are logged and
- * re-thrown as a McpError so the client sees a clean message instead of a
- * raw stack trace.
- */
-/**
  * How the server currently authenticates to GitHub: mode and source only, never
  * any token material. `configured: false` when no credential is available.
  */
@@ -63,6 +51,15 @@ function describeGitHubAuth():
   }
 }
 
+/**
+ * Registers the six `github://…` MCP resources.
+ *
+ * Resources are read-only, addressable state snapshots — unlike tools, a
+ * client lists and reads them directly for "what's the current state"
+ * queries instead of shaping a tool call. Read failures are logged and
+ * re-thrown as a McpError so the client sees a clean message instead of a
+ * raw stack trace.
+ */
 export function registerResources(server: McpServer, deps: RegisterResourcesDeps): void {
   const { service, toolRegistry, agentStore, aiFactory, logger, serverVersion } = deps;
 
@@ -111,7 +108,7 @@ export function registerResources(server: McpServer, deps: RegisterResourcesDeps
     async (uri) => {
       logger.debug(`Resource read: ${uri.href}`);
       try {
-        const projects = await service.listProjects();
+        const projects = await service.projects.listProjects();
         return jsonResource(uri, projects);
       } catch (error) {
         logger.error("Failed to read github://projects resource", error);
@@ -134,7 +131,7 @@ export function registerResources(server: McpServer, deps: RegisterResourcesDeps
     async (uri) => {
       logger.debug(`Resource read: ${uri.href}`);
       try {
-        const sprint = await service.getCurrentSprint();
+        const sprint = await service.sprints.getCurrentSprint();
         return jsonResource(uri, sprint);
       } catch (error) {
         logger.error("Failed to read github://sprints/current resource", error);
@@ -157,7 +154,7 @@ export function registerResources(server: McpServer, deps: RegisterResourcesDeps
     async (uri) => {
       logger.debug(`Resource read: ${uri.href}`);
       try {
-        const milestones = await service.listMilestones("open");
+        const milestones = await service.milestones.listMilestones("open", "due_on", "asc");
         return jsonResource(uri, milestones);
       } catch (error) {
         logger.error("Failed to read github://milestones resource", error);

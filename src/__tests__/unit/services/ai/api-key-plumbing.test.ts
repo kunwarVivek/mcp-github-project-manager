@@ -27,18 +27,24 @@ vi.mock("@ai-sdk/openai", () => ({ createOpenAI }));
 vi.mock("@ai-sdk/google", () => ({ createGoogleGenerativeAI: createGoogle }));
 vi.mock("@ai-sdk/perplexity", () => ({ createPerplexity }));
 
+const resolvedConfig = vi.hoisted<Record<string, string>>(() => ({
+  ANTHROPIC_API_KEY: "sk-ant-RESOLVED",
+  OPENAI_API_KEY: "sk-oai-RESOLVED",
+  GOOGLE_API_KEY: "",
+  PERPLEXITY_API_KEY: "",
+  AI_MAIN_MODEL: "claude-opus-5",
+  AI_RESEARCH_MODEL: "sonar-pro",
+  AI_FALLBACK_MODEL: "gpt-4o",
+  AI_PRD_MODEL: "claude-opus-5",
+}));
+
+// The factory resolves provider keys and models at call time.
 vi.mock("../../../../env", async () => {
   const actual = await vi.importActual<Record<string, unknown>>("../../../../env");
   return {
     ...actual,
-    ANTHROPIC_API_KEY: "sk-ant-RESOLVED",
-    OPENAI_API_KEY: "sk-oai-RESOLVED",
-    GOOGLE_API_KEY: "",
-    PERPLEXITY_API_KEY: "",
-    AI_MAIN_MODEL: "claude-opus-5",
-    AI_RESEARCH_MODEL: "sonar-pro",
-    AI_FALLBACK_MODEL: "gpt-4o",
-    AI_PRD_MODEL: "claude-opus-5",
+    getOptionalConfigValue: (name: string, defaultValue: string) =>
+      resolvedConfig[name] ?? defaultValue,
   };
 });
 

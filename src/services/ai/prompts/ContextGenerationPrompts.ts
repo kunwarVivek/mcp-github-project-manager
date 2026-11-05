@@ -1,14 +1,16 @@
 import { z } from "zod";
+import type { PromptRegistry } from "./PromptRegistry";
 
 /**
- * AI Prompts for Task Context Generation
+ * AI Prompts for Task Context Generation.
+ * Templates use {{variable}} placeholders and are served through the PromptRegistry.
  */
 
 // ============================================================================
 // Business Context Generation
 // ============================================================================
 
-export const BUSINESS_CONTEXT_PROMPT = {
+const BUSINESS_CONTEXT_PROMPT = {
   systemPrompt: `You are an expert business analyst specializing in extracting business context for software development tasks.
 
 Your role is to analyze PRD content and individual tasks to extract comprehensive business context that helps developers understand:
@@ -22,12 +24,12 @@ Focus on creating actionable business context that connects technical implementa
   userPrompt: `Given the following PRD content and specific task, extract comprehensive business context:
 
 **PRD Content:**
-{prdContent}
+{{prdContent}}
 
 **Task Details:**
-- Title: {taskTitle}
-- Description: {taskDescription}
-- Priority: {taskPriority}
+- Title: {{taskTitle}}
+- Description: {{taskDescription}}
+- Priority: {{taskPriority}}
 
 **Extract the following business context:**
 
@@ -68,7 +70,7 @@ export const BusinessContextSchema = z.object({
 
 export type BusinessContext = z.infer<typeof BusinessContextSchema>;
 
-export const TECHNICAL_CONTEXT_PROMPT = {
+const TECHNICAL_CONTEXT_PROMPT = {
   systemPrompt: `You are a senior software architect specializing in extracting technical context for development tasks.
 
 Your role is to analyze PRD content and tasks to identify:
@@ -83,12 +85,12 @@ Focus on providing technical context that helps developers make informed impleme
   userPrompt: `Given the following PRD content and task, extract comprehensive technical context:
 
 **PRD Content:**
-{prdContent}
+{{prdContent}}
 
 **Task Details:**
-- Title: {taskTitle}
-- Description: {taskDescription}
-- Complexity: {taskComplexity}
+- Title: {{taskTitle}}
+- Description: {{taskDescription}}
+- Complexity: {{taskComplexity}}
 
 **Extract the following technical context:**
 
@@ -157,7 +159,7 @@ export const TechnicalContextSchema = z.object({
 
 export type TechnicalContext = z.infer<typeof TechnicalContextSchema>;
 
-export const IMPLEMENTATION_GUIDANCE_PROMPT = {
+const IMPLEMENTATION_GUIDANCE_PROMPT = {
   systemPrompt: `You are a senior software engineer and technical mentor specializing in providing implementation guidance.
 
 Your role is to analyze tasks and provide practical, step-by-step implementation guidance including:
@@ -172,16 +174,16 @@ Focus on actionable guidance that helps developers implement tasks efficiently a
   userPrompt: `Given the following task details, provide comprehensive implementation guidance:
 
 **Task Details:**
-- Title: {taskTitle}
-- Description: {taskDescription}
-- Complexity: {taskComplexity}
-- Priority: {taskPriority}
+- Title: {{taskTitle}}
+- Description: {{taskDescription}}
+- Complexity: {{taskComplexity}}
+- Priority: {{taskPriority}}
 
 **Business Context:**
-{businessContext}
+{{businessContext}}
 
 **Technical Context:**
-{technicalContext}
+{{technicalContext}}
 
 **Provide the following implementation guidance:**
 
@@ -250,7 +252,7 @@ export const ImplementationGuidanceSchema = z.object({
 
 export type GeneratedImplementationGuidance = z.infer<typeof ImplementationGuidanceSchema>;
 
-export const CONTEXTUAL_REFERENCES_PROMPT = {
+const CONTEXTUAL_REFERENCES_PROMPT = {
   systemPrompt: `You are a technical documentation specialist who excels at creating contextual references for development tasks.
 
 Your role is to analyze PRD content and tasks to create comprehensive reference materials including:
@@ -264,11 +266,11 @@ Focus on creating references that provide immediate value and reduce context-swi
   userPrompt: `Given the following PRD content and task, create comprehensive contextual references:
 
 **PRD Content:**
-{prdContent}
+{{prdContent}}
 
 **Task Details:**
-- Title: {taskTitle}
-- Description: {taskDescription}
+- Title: {{taskTitle}}
+- Description: {{taskDescription}}
 
 **Create the following contextual references:**
 
@@ -345,7 +347,7 @@ export const ContextualReferencesSchema = z.object({
 // Enhanced Acceptance Criteria Generation
 // ============================================================================
 
-export const ENHANCED_ACCEPTANCE_CRITERIA_PROMPT = {
+const ENHANCED_ACCEPTANCE_CRITERIA_PROMPT = {
   systemPrompt: `You are a quality assurance expert specializing in creating comprehensive, testable acceptance criteria.
 
 Your role is to analyze tasks and create detailed acceptance criteria that:
@@ -359,15 +361,15 @@ Focus on creating criteria that ensure complete and correct task implementation.
   userPrompt: `Given the following task details and context, create enhanced acceptance criteria:
 
 **Task Details:**
-- Title: {taskTitle}
-- Description: {taskDescription}
-- Priority: {taskPriority}
+- Title: {{taskTitle}}
+- Description: {{taskDescription}}
+- Priority: {{taskPriority}}
 
 **Business Context:**
-{businessContext}
+{{businessContext}}
 
 **Technical Context:**
-{technicalContext}
+{{technicalContext}}
 
 **Create enhanced acceptance criteria covering:**
 
@@ -420,52 +422,103 @@ export const EnhancedAcceptanceCriteriaSchema = z.object({
 });
 
 // ============================================================================
-// Prompt Configuration
+// Prompt Registration & Configuration
 // ============================================================================
 
+export const CONTEXT_PROMPT_IDS = {
+  businessSystem: "context.business.system",
+  businessUser: "context.business.user",
+  technicalSystem: "context.technical.system",
+  technicalUser: "context.technical.user",
+  implementationGuidanceSystem: "context.implementation-guidance.system",
+  implementationGuidanceUser: "context.implementation-guidance.user",
+  referencesSystem: "context.references.system",
+  referencesUser: "context.references.user",
+  acceptanceCriteriaSystem: "context.acceptance-criteria.system",
+  acceptanceCriteriaUser: "context.acceptance-criteria.user",
+} as const;
+
+/** Register every context-generation prompt (version 1.0.0). */
+export function registerContextPrompts(registry: PromptRegistry): void {
+  registry.register(
+    CONTEXT_PROMPT_IDS.businessSystem,
+    "1.0.0",
+    BUSINESS_CONTEXT_PROMPT.systemPrompt
+  );
+  registry.register(CONTEXT_PROMPT_IDS.businessUser, "1.0.0", BUSINESS_CONTEXT_PROMPT.userPrompt);
+  registry.register(
+    CONTEXT_PROMPT_IDS.technicalSystem,
+    "1.0.0",
+    TECHNICAL_CONTEXT_PROMPT.systemPrompt
+  );
+  registry.register(CONTEXT_PROMPT_IDS.technicalUser, "1.0.0", TECHNICAL_CONTEXT_PROMPT.userPrompt);
+  registry.register(
+    CONTEXT_PROMPT_IDS.implementationGuidanceSystem,
+    "1.0.0",
+    IMPLEMENTATION_GUIDANCE_PROMPT.systemPrompt
+  );
+  registry.register(
+    CONTEXT_PROMPT_IDS.implementationGuidanceUser,
+    "1.0.0",
+    IMPLEMENTATION_GUIDANCE_PROMPT.userPrompt
+  );
+  registry.register(
+    CONTEXT_PROMPT_IDS.referencesSystem,
+    "1.0.0",
+    CONTEXTUAL_REFERENCES_PROMPT.systemPrompt
+  );
+  registry.register(
+    CONTEXT_PROMPT_IDS.referencesUser,
+    "1.0.0",
+    CONTEXTUAL_REFERENCES_PROMPT.userPrompt
+  );
+  registry.register(
+    CONTEXT_PROMPT_IDS.acceptanceCriteriaSystem,
+    "1.0.0",
+    ENHANCED_ACCEPTANCE_CRITERIA_PROMPT.systemPrompt
+  );
+  registry.register(
+    CONTEXT_PROMPT_IDS.acceptanceCriteriaUser,
+    "1.0.0",
+    ENHANCED_ACCEPTANCE_CRITERIA_PROMPT.userPrompt
+  );
+}
+
+/** Context generation configurations: registry ids, generation settings and output schema. */
 export const CONTEXT_GENERATION_CONFIGS = {
   businessContext: {
-    systemPrompt: BUSINESS_CONTEXT_PROMPT.systemPrompt,
-    userPrompt: BUSINESS_CONTEXT_PROMPT.userPrompt,
+    systemPromptId: CONTEXT_PROMPT_IDS.businessSystem,
+    userPromptId: CONTEXT_PROMPT_IDS.businessUser,
     maxTokens: BUSINESS_CONTEXT_PROMPT.maxTokens,
     temperature: BUSINESS_CONTEXT_PROMPT.temperature,
     schema: BusinessContextSchema,
   },
   technicalContext: {
-    systemPrompt: TECHNICAL_CONTEXT_PROMPT.systemPrompt,
-    userPrompt: TECHNICAL_CONTEXT_PROMPT.userPrompt,
+    systemPromptId: CONTEXT_PROMPT_IDS.technicalSystem,
+    userPromptId: CONTEXT_PROMPT_IDS.technicalUser,
     maxTokens: TECHNICAL_CONTEXT_PROMPT.maxTokens,
     temperature: TECHNICAL_CONTEXT_PROMPT.temperature,
     schema: TechnicalContextSchema,
   },
   implementationGuidance: {
-    systemPrompt: IMPLEMENTATION_GUIDANCE_PROMPT.systemPrompt,
-    userPrompt: IMPLEMENTATION_GUIDANCE_PROMPT.userPrompt,
+    systemPromptId: CONTEXT_PROMPT_IDS.implementationGuidanceSystem,
+    userPromptId: CONTEXT_PROMPT_IDS.implementationGuidanceUser,
     maxTokens: IMPLEMENTATION_GUIDANCE_PROMPT.maxTokens,
     temperature: IMPLEMENTATION_GUIDANCE_PROMPT.temperature,
     schema: ImplementationGuidanceSchema,
   },
   contextualReferences: {
-    systemPrompt: CONTEXTUAL_REFERENCES_PROMPT.systemPrompt,
-    userPrompt: CONTEXTUAL_REFERENCES_PROMPT.userPrompt,
+    systemPromptId: CONTEXT_PROMPT_IDS.referencesSystem,
+    userPromptId: CONTEXT_PROMPT_IDS.referencesUser,
     maxTokens: CONTEXTUAL_REFERENCES_PROMPT.maxTokens,
     temperature: CONTEXTUAL_REFERENCES_PROMPT.temperature,
     schema: ContextualReferencesSchema,
   },
   enhancedAcceptanceCriteria: {
-    systemPrompt: ENHANCED_ACCEPTANCE_CRITERIA_PROMPT.systemPrompt,
-    userPrompt: ENHANCED_ACCEPTANCE_CRITERIA_PROMPT.userPrompt,
+    systemPromptId: CONTEXT_PROMPT_IDS.acceptanceCriteriaSystem,
+    userPromptId: CONTEXT_PROMPT_IDS.acceptanceCriteriaUser,
     maxTokens: ENHANCED_ACCEPTANCE_CRITERIA_PROMPT.maxTokens,
     temperature: ENHANCED_ACCEPTANCE_CRITERIA_PROMPT.temperature,
     schema: EnhancedAcceptanceCriteriaSchema,
   },
 };
-
-/**
- * Helper function to format prompts with variables
- */
-export function formatContextPrompt(template: string, variables: Record<string, unknown>): string {
-  return template.replace(/\{(\w+)\}/g, (match, key) => {
-    return variables[key] !== undefined ? String(variables[key]) : match;
-  });
-}

@@ -1,299 +1,91 @@
-import { beforeEach, describe, expect, it, type Mock, type Mocked, vi } from "vitest";
+import { beforeEach, describe, expect, it, type Mocked, vi } from "vitest";
 import { DomainError } from "../../../domain/errors";
-import type { GitHubRepositoryFactory } from "../../../infrastructure/github/GitHubRepositoryFactory";
+import type { GitHubPullRequestRepository } from "../../../infrastructure/github/repositories/GitHubPullRequestRepository";
 import { PullRequestService } from "../../../services/PullRequestService";
-import type { RestCallFn } from "../../helpers/mockTypes";
-
-vi.mock("../../../infrastructure/github/GitHubRepositoryFactory");
+import { asFactory } from "../../helpers/mockTypes";
 
 describe("PullRequestService", () => {
   let service: PullRequestService;
-  let mockFactory: Mocked<GitHubRepositoryFactory>;
-  let mockOctokit: {
-    rest: {
-      pulls: {
-        create: Mock<RestCallFn>;
-        get: Mock<RestCallFn>;
-        list: Mock<RestCallFn>;
-        update: Mock<RestCallFn>;
-        merge: Mock<RestCallFn>;
-        listReviews: Mock<RestCallFn>;
-        createReview: Mock<RestCallFn>;
-      };
-    };
-  };
-
-  const config = { owner: "testOwner", repo: "testRepo" };
+  let prRepo: Mocked<GitHubPullRequestRepository>;
 
   beforeEach(() => {
-    vi.clearAllMocks();
+    prRepo = {
+      create: vi.fn(),
+      get: vi.fn(),
+      list: vi.fn(),
+      update: vi.fn(),
+      merge: vi.fn(),
+      listReviews: vi.fn(),
+      createReview: vi.fn(),
+    } as unknown as Mocked<GitHubPullRequestRepository>;
+    service = new PullRequestService(asFactory({ createPullRequestRepository: () => prRepo }));
+  });
 
-    mockOctokit = {
-      rest: {
-        pulls: {
-          create: vi.fn<RestCallFn>(),
-          get: vi.fn<RestCallFn>(),
-          list: vi.fn<RestCallFn>(),
-          update: vi.fn<RestCallFn>(),
-          merge: vi.fn<RestCallFn>(),
-          listReviews: vi.fn<RestCallFn>(),
-          createReview: vi.fn<RestCallFn>(),
-        },
-      },
+  it("creates a pull request through the repository", async () => {
+    const created = { number: 1, id: 100, title: "Feature", state: "open", url: "u" };
+    prRepo.create.mockResolvedValueOnce(created);
+
+    const data = { title: "Feature", head: "feature", base: "main" };
+    expect(await service.createPullRequest(data)).toEqual(created);
+    expect(prRepo.create).toHaveBeenCalledWith(data);
+  });
+
+  it("gets a pull request by number", async () => {
+    const pr = {
+      number: 1,
+      title: "PR",
+      state: "open",
+      body: "",
+      head: "f",
+      base: "m",
+      user: "alice",
+      merged: false,
+      url: "u",
     };
+    prRepo.get.mockResolvedValueOnce(pr);
 
-    mockFactory = {
-      getOctokit: vi.fn().mockReturnValue(mockOctokit),
-      getConfig: vi.fn().mockReturnValue(config),
-    } as unknown as Mocked<GitHubRepositoryFactory>;
-
-    service = new PullRequestService(mockFactory);
+    expect(await service.getPullRequest({ pullNumber: 1 })).toEqual(pr);
+    expect(prRepo.get).toHaveBeenCalledWith(1);
   });
 
-  describe("createPullRequest", () => {
-    it("should create a pull request with required fields", async () => {
-      mockOctokit.rest.pulls.create.mockResolvedValueOnce({
-        data: {
-          number: 1,
-          id: 100,
-          title: "Feature",
-          state: "open",
-          html_url: "https://github.com/pr/1",
-        },
-      });
+  it("lists with open/30 defaults and passes explicit state and limit", async () => {
+    prRepo.list.mockResolvedValue([]);
 
-      const result = await service.createPullRequest({
-        title: "Feature",
-        head: "feature-branch",
-        base: "main",
-      });
+    await service.listPullRequests({});
+    expect(prRepo.list).toHaveBeenLastCalledWith("open", 30);
 
-      expect(result).toEqual({
-        number: 1,
-        id: 100,
-        title: "Feature",
-        state: "open",
-        url: "https://github.com/pr/1",
-      });
-      expect(mockOctokit.rest.pulls.create).toHaveBeenCalledWith({
-        owner: "testOwner",
-        repo: "testRepo",
-        title: "Feature",
-        body: "",
-        head: "feature-branch",
-        base: "main",
-        draft: false,
-      });
-    });
-
-    it("should create a draft pull request", async () => {
-      mockOctokit.rest.pulls.create.mockResolvedValueOnce({
-        data: {
-          number: 2,
-          id: 101,
-          title: "WIP",
-          state: "open",
-          html_url: "https://github.com/pr/2",
-        },
-      });
-
-      const result = await service.createPullRequest({
-        title: "WIP",
-        head: "wip-branch",
-        base: "main",
-        draft: true,
-      });
-
-      expect(result.number).toBe(2);
-      expect(mockOctokit.rest.pulls.create).toHaveBeenCalledWith(
-        expect.objectContaining({ draft: true })
-      );
-    });
-
-    it("should throw mapped error on API failure", async () => {
-      mockOctokit.rest.pulls.create.mockRejectedValueOnce(new Error("Conflict"));
-
-      await expect(
-        service.createPullRequest({ title: "PR", head: "h", base: "b" })
-      ).rejects.toThrow(DomainError);
-    });
+    await service.listPullRequests({ state: "closed", limit: 5 });
+    expect(prRepo.list).toHaveBeenLastCalledWith("closed", 5);
   });
 
-  describe("getPullRequest", () => {
-    it("should return full PR details", async () => {
-      mockOctokit.rest.pulls.get.mockResolvedValueOnce({
-        data: {
-          number: 1,
-          title: "PR",
-          state: "open",
-          body: "desc",
-          head: { ref: "feature" },
-          base: { ref: "main" },
-          user: { login: "alice" },
-          merged: false,
-          html_url: "https://github.com/pr/1",
-        },
-      });
+  it("updates, merges and reviews by pull number", async () => {
+    prRepo.update.mockResolvedValueOnce({ number: 1, title: "T", state: "open", url: "u" });
+    prRepo.merge.mockResolvedValueOnce({ merged: true, message: "Merged", sha: "abc" });
+    prRepo.listReviews.mockResolvedValueOnce([]);
+    prRepo.createReview.mockResolvedValueOnce({ id: 1, user: "a", state: "APPROVED", body: "" });
 
-      const result = await service.getPullRequest({ pullNumber: 1 });
+    await service.updatePullRequest({ pullNumber: 1, title: "T" });
+    expect(prRepo.update).toHaveBeenCalledWith(1, expect.objectContaining({ title: "T" }));
 
-      expect(result).toEqual({
-        number: 1,
-        title: "PR",
-        state: "open",
-        body: "desc",
-        head: "feature",
-        base: "main",
-        user: "alice",
-        merged: false,
-        url: "https://github.com/pr/1",
-      });
-    });
+    await service.mergePullRequest({ pullNumber: 2, mergeMethod: "squash" });
+    expect(prRepo.merge).toHaveBeenCalledWith(
+      2,
+      expect.objectContaining({ mergeMethod: "squash" })
+    );
 
-    it("should default user to unknown when null", async () => {
-      mockOctokit.rest.pulls.get.mockResolvedValueOnce({
-        data: {
-          number: 1,
-          title: "PR",
-          state: "open",
-          body: null,
-          head: { ref: "f" },
-          base: { ref: "m" },
-          user: null,
-          merged: false,
-          html_url: "url",
-        },
-      });
+    await service.listPullRequestReviews({ pullNumber: 3 });
+    expect(prRepo.listReviews).toHaveBeenCalledWith(3);
 
-      const result = await service.getPullRequest({ pullNumber: 1 });
-      expect(result.user).toBe("unknown");
-      expect(result.body).toBe("");
-    });
+    await service.createPullRequestReview({ pullNumber: 4, event: "APPROVE" });
+    expect(prRepo.createReview).toHaveBeenCalledWith(
+      4,
+      expect.objectContaining({ event: "APPROVE" })
+    );
   });
 
-  describe("listPullRequests", () => {
-    it("should list PRs with defaults", async () => {
-      mockOctokit.rest.pulls.list.mockResolvedValueOnce({
-        data: [
-          { number: 1, title: "A", state: "open", user: { login: "bob" }, html_url: "url1" },
-          { number: 2, title: "B", state: "closed", user: null, html_url: "url2" },
-        ],
-      });
+  it("maps repository failures to domain errors", async () => {
+    prRepo.merge.mockRejectedValueOnce(new Error("Merge conflict"));
 
-      const result = await service.listPullRequests({});
-
-      expect(result).toHaveLength(2);
-      expect(result[1].user).toBe("unknown");
-      expect(mockOctokit.rest.pulls.list).toHaveBeenCalledWith(
-        expect.objectContaining({ state: "open", per_page: 30 })
-      );
-    });
-
-    it("should pass custom state and limit", async () => {
-      mockOctokit.rest.pulls.list.mockResolvedValueOnce({ data: [] });
-
-      const result = await service.listPullRequests({ state: "closed", limit: 5 });
-
-      expect(result).toEqual([]);
-      expect(mockOctokit.rest.pulls.list).toHaveBeenCalledWith(
-        expect.objectContaining({ state: "closed", per_page: 5 })
-      );
-    });
-  });
-
-  describe("updatePullRequest", () => {
-    it("should update PR fields", async () => {
-      mockOctokit.rest.pulls.update.mockResolvedValueOnce({
-        data: { number: 1, title: "Updated", state: "open", html_url: "url" },
-      });
-
-      const result = await service.updatePullRequest({
-        pullNumber: 1,
-        title: "Updated",
-        state: "open",
-      });
-
-      expect(result).toEqual({ number: 1, title: "Updated", state: "open", url: "url" });
-    });
-  });
-
-  describe("mergePullRequest", () => {
-    it("should merge with default method", async () => {
-      mockOctokit.rest.pulls.merge.mockResolvedValueOnce({
-        data: { merged: true, message: "Merged", sha: "abc123" },
-      });
-
-      const result = await service.mergePullRequest({ pullNumber: 1 });
-
-      expect(result).toEqual({ merged: true, message: "Merged", sha: "abc123" });
-      expect(mockOctokit.rest.pulls.merge).toHaveBeenCalledWith(
-        expect.objectContaining({ merge_method: "merge" })
-      );
-    });
-
-    it("should merge with squash method", async () => {
-      mockOctokit.rest.pulls.merge.mockResolvedValueOnce({
-        data: { merged: true, message: "Squashed", sha: "def456" },
-      });
-
-      const result = await service.mergePullRequest({
-        pullNumber: 2,
-        mergeMethod: "squash",
-        commitTitle: "feat: squash",
-      });
-
-      expect(result.merged).toBe(true);
-      expect(mockOctokit.rest.pulls.merge).toHaveBeenCalledWith(
-        expect.objectContaining({ merge_method: "squash", commit_title: "feat: squash" })
-      );
-    });
-
-    it("should throw mapped error on merge conflict", async () => {
-      mockOctokit.rest.pulls.merge.mockRejectedValueOnce(new Error("Merge conflict"));
-
-      await expect(service.mergePullRequest({ pullNumber: 1 })).rejects.toThrow(DomainError);
-    });
-  });
-
-  describe("listPullRequestReviews", () => {
-    it("should list reviews for a PR", async () => {
-      mockOctokit.rest.pulls.listReviews.mockResolvedValueOnce({
-        data: [
-          { id: 10, user: { login: "reviewer" }, state: "APPROVED", body: "LGTM" },
-          { id: 11, user: null, state: "COMMENTED", body: null },
-        ],
-      });
-
-      const result = await service.listPullRequestReviews({ pullNumber: 1 });
-
-      expect(result).toHaveLength(2);
-      expect(result[0]).toEqual({ id: 10, user: "reviewer", state: "APPROVED", body: "LGTM" });
-      expect(result[1].user).toBe("unknown");
-      expect(result[1].body).toBe("");
-    });
-  });
-
-  describe("createPullRequestReview", () => {
-    it("should create an approval review", async () => {
-      mockOctokit.rest.pulls.createReview.mockResolvedValueOnce({
-        data: { id: 20, user: { login: "alice" }, state: "APPROVED", body: "Looks good" },
-      });
-
-      const result = await service.createPullRequestReview({
-        pullNumber: 1,
-        event: "APPROVE",
-        body: "Looks good",
-      });
-
-      expect(result).toEqual({ id: 20, user: "alice", state: "APPROVED", body: "Looks good" });
-    });
-
-    it("should throw mapped error on review failure", async () => {
-      mockOctokit.rest.pulls.createReview.mockRejectedValueOnce(new Error("Forbidden"));
-
-      await expect(
-        service.createPullRequestReview({ pullNumber: 1, event: "APPROVE" })
-      ).rejects.toThrow(DomainError);
-    });
+    await expect(service.mergePullRequest({ pullNumber: 1 })).rejects.toThrow(DomainError);
   });
 });

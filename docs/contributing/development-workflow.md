@@ -382,7 +382,7 @@ CACError: Unknown option '--testPathPattern'
 ```
 
 Solution: Vitest does not accept Jest-only flags. Filter with a positional
-pattern (`npm test -- unit`) and exclude with `--exclude='**/tests/x/**'`.
+pattern (`npm test -- unit`) and exclude with `--exclude='**/e2e/**'`.
 
 ## Getting Help
 

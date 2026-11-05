@@ -1,18 +1,16 @@
 import { generateObject } from "ai";
 import { z } from "zod";
-import type { AITask } from "../../domain/ai-types.js";
+import type { AITask } from "../../domain/ai-types";
 import {
   isTaskPhaseStatus,
   type TaskBlocker,
   type TaskLifecycleState,
   type TaskPhaseInfo,
-} from "../../domain/feature-lifecycle-types.js";
-import { type ILogger, Logger } from "../../infrastructure/logger";
-import { AIServiceFactory } from "../ai/AIServiceFactory.js";
-import {
-  FEATURE_PROMPT_CONFIGS,
-  formatFeaturePrompt,
-} from "../ai/prompts/FeatureAdditionPrompts.js";
+} from "../../domain/feature-lifecycle-types";
+import { getLogger, type ILogger } from "../../infrastructure/logger";
+import { AIServiceFactory } from "../ai/AIServiceFactory";
+import { defaultPromptRegistry } from "../ai/prompts";
+import { FEATURE_PROMPT_CONFIGS } from "../ai/prompts/FeatureAdditionPrompts";
 import { InputSanitizer } from "../utils/InputSanitizer";
 import { safeCall } from "../utils/safeCall";
 
@@ -32,11 +30,11 @@ export class TaskLifecycleService {
    * @param aiFactory - AI service factory for model access. When omitted (DI mode),
    *   defaults to the global singleton via `AIServiceFactory.getInstance()`.
    * @param logger - Logger instance for diagnostics. When omitted, defaults to
-   *   the global singleton via `Logger.getInstance()`.
+   *   a prefixed console logger via `getLogger()`.
    */
   constructor(aiFactory?: AIServiceFactory, logger?: ILogger) {
     this.aiFactory = aiFactory ?? AIServiceFactory.getInstance();
-    this.logger = logger ?? Logger.getInstance();
+    this.logger = logger ?? getLogger("TaskLifecycleService");
   }
 
   // ---------------------------------------------------------------------------
@@ -151,9 +149,9 @@ export class TaskLifecycleService {
         );
       }
 
-      const prompt = formatFeaturePrompt(config.userPrompt, {
+      const prompt = defaultPromptRegistry.render(config.userPromptId, {
         taskTitle: InputSanitizer.sanitizeTaskContent(`Task ${taskLifecycle.taskId}`),
-        currentPhase: taskLifecycle.currentPhase,
+        currentPhase: String(taskLifecycle.currentPhase),
         progressData: JSON.stringify(taskLifecycle.phases),
         blockers: JSON.stringify(taskLifecycle.blockers),
         teamContext: "Standard development team",
@@ -166,7 +164,7 @@ export class TaskLifecycleService {
 
       const result = await generateObject({
         model,
-        system: config.systemPrompt,
+        system: defaultPromptRegistry.render(config.systemPromptId),
         prompt,
         schema: LifecycleAnalysisSchema,
         maxOutputTokens: config.maxTokens,

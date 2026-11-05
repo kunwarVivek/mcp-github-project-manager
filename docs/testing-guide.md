@@ -10,26 +10,16 @@ The test runner is **Vitest 5**. There is no Jest in this project — see
 
 ### Test Organization
 
-AI service and tool tests live in the legacy root `tests/` tree (still in the
-Vitest include list) alongside newer suites under `src/__tests__/`:
+AI service and tool tests live under `src/__tests__/` (the former root `tests/` tree was
+merged into it — see [ADR-012](adr/012-test-tree-consolidation.md)):
 
 ```
-tests/
-├── ai-services/                    # AI service layer tests
-│   ├── AIServiceFactory.test.ts   # AI provider management
-│   ├── PRDGenerationService.test.ts
-│   ├── TaskGenerationService.test.ts
-│   └── RequirementsTraceabilityService.test.ts
-├── ai-tools/                      # MCP tool tests
-│   ├── GeneratePRDTool.test.ts
-│   ├── ParsePRDTool.test.ts
-│   └── [other AI tool tests]
-├── services/ai/                   # AI-backed service tests
-└── infrastructure/                # Resilience, cache, observability tests
-
 src/__tests__/
-├── unit/services/ai/              # Provider resolution, usage metering, key plumbing
-├── services/                      # Task generation, context generation
+├── unit/services/ai/              # AI services: AIServiceFactory, PRD/Task generation,
+│                                  #   traceability, confidence, token budget, prompts, …
+├── unit/infrastructure/tools/     # AI and issue-intelligence tool tests (ai-tasks/, *-ai-tools.test.ts)
+├── unit/services/                 # Context generation (cache, budget, code examples), feature services
+├── services/                      # Task context generation
 └── e2e/tools/ai-task-tools.e2e.ts # Tool-level E2E
 ```
 
@@ -44,7 +34,7 @@ npm test
 
 ### AI-Specific Tests
 ```bash
-# Run only AI-related tests (vitest run ai-services ai-tools)
+# Run only AI-related tests (vitest run unit/services/ai/ ai-tools issue-intelligence-tools ai-tasks/)
 npm run test:ai
 
 # Watch mode for AI tests
@@ -371,4 +361,4 @@ Error: JavaScript heap out of memory
 - Use `console.log` for debugging test data
 - Enable debug logging for specific modules
 - Use Vitest's `--reporter=verbose` flag for detailed output
-- Use `--detectOpenHandles` to find resource leaks
+- Use the `hanging-process` reporter (`--reporter=hanging-process`) to find resource leaks; Vitest rejects Jest's `--detectOpenHandles`

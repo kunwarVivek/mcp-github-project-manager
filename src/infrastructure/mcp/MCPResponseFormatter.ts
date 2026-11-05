@@ -1,11 +1,5 @@
 import { z } from "zod";
-import {
-  MCPContentType,
-  type MCPErrorCode,
-  type MCPErrorResponse,
-  MCPErrorSchema,
-  type MCPSuccessResponse,
-} from "../../domain/mcp-types";
+import { MCPContentType, type MCPSuccessResponse } from "../../domain/mcp-types";
 
 export interface RichContent {
   type: "text" | "json" | "markdown" | "html";
@@ -233,37 +227,6 @@ export const MCPResponseFormatter = {
    */
   formatAsRichHtml<T>(data: T, template: (data: T) => string): string {
     return template(data);
-  },
-
-  /**
-   * Create error response with proper MCP error formatting
-   */
-  error(
-    code: MCPErrorCode,
-    message: string,
-    details?: Record<string, unknown>,
-    requestId?: string
-  ): MCPErrorResponse {
-    // Validate error data against the schema
-    const errorData = {
-      code,
-      message,
-      details,
-    };
-
-    MCPErrorSchema.parse(errorData);
-
-    // Create a properly formatted error response
-    return {
-      version: "1.0",
-      requestId: requestId || `req-${Date.now()}`,
-      status: "error",
-      error: {
-        code: code,
-        message: message,
-        details: details ? [{ code: "details", message: JSON.stringify(details) }] : undefined,
-      },
-    };
   },
 
   /**

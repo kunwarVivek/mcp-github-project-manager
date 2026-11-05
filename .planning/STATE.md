@@ -3,6 +3,8 @@
 **Project:** MCP GitHub Project Manager
 **Core Value:** Comprehensive AI-enabled GitHub-based project management from 0-100
 
+> **Current code state (reconciled 2026-11-02):** version 3.0.0; 21 MCP tools / 175 actions (derived from the `ToolRegistry`, enforced by `npm run check:docs`); `@modelcontextprotocol/server` ^2.3.1; TypeScript 7; Vitest 5; Node >= 22.12 (`.node-version` 24); `ProjectManagementService` is a 121-line getters-only facade. Everything below this block is the **v1.0 milestone log** (Jan–Feb 2026): its tool counts, versions, and Jest/SDK-1.25 remarks are historical snapshots and are not maintained. Post-v1.0 work is in `REQUIREMENTS.md` ("Post-v1.0 Requirements") and `docs/remediation/GAP-TRACKER.md`.
+
 ## Current Position
 
 **Phase:** 12 of 12 (Production Release)
@@ -17,7 +19,7 @@
 | Metric | Value |
 |--------|-------|
 | Phases Complete | 12/12 |
-| Requirements Done | 99/99 + PROD-01 to PROD-16 (all gaps closed) |
+| Requirements Done | 99/99 v1 requirements (PROD-01 to PROD-12) + 25 post-v1.0 requirements (see REQUIREMENTS.md) |
 | Current Phase Progress | Phase 12: 4/4 plans complete (DONE) |
 
 ## Performance Metrics
@@ -38,17 +40,17 @@
 | 12-phase roadmap | Comprehensive depth setting, requirements naturally cluster into 12 delivery boundaries | 2026-01-30 |
 | Tech debt first | Service decomposition enables cleaner work in subsequent phases | 2026-01-30 |
 | MCP upgrade phase 2 | Foundational protocol compliance before feature development | 2026-01-30 |
-| No tsyringe decorators | Matches existing pattern, avoids reflect-metadata in tests | 2026-01-30 |
+| No tsyringe decorators | Matches existing pattern, avoids reflect-metadata in tests (superseded: `container.ts` uses tsyringe with `reflect-metadata` loaded in the Vitest setup; services register via `useFactory`, tool executors self-construct through `createGitHubFactory()` as a documented exception) | 2026-01-30 |
 | Factory injection pattern | Services receive GitHubRepositoryFactory in constructor for flexibility | 2026-01-30 |
 | useFactory for non-decorated | SubIssue, Milestone, Template, Linking use plain constructors | 2026-01-30 |
 | Helper for backward compat | createProjectManagementService() provides simple 3-arg API | 2026-01-30 |
-| Partial facade reduction | 48% reduction (1691 lines); full 500 requires more extractions | 2026-01-30 |
+| Partial facade reduction | 48% reduction (1691 lines); full 500 requires more extractions (superseded: now 121 lines, thin getters only) | 2026-01-30 |
 | Direct mock injection for tests | Create mock factory BEFORE service instantiation; pass mockService directly | 2026-01-30 |
-| Type assertion for SDK generics | MCP SDK 1.25+ has deep type issues; use `as any` with explicit types | 2026-01-30 |
+| Type assertion for SDK generics | MCP SDK 1.25+ has deep type issues; use `as any` with explicit types (superseded: SDK v2 + `fromJsonSchema` removed the cast; production code has no real `as any`) | 2026-01-30 |
 | CallToolResult content format | SDK 1.25+ requires { content: [...] } not { output, tools, _meta } | 2026-01-30 |
 | TOutput generic defaults to unknown | Backward compatibility for existing ToolDefinition<T> usages | 2026-01-30 |
 | Mark deprecated vs remove | Keep old schema methods deprecated rather than removing | 2026-01-30 |
-| $refStrategy: none | Inline JSON Schema definitions for simpler MCP client consumption | 2026-01-30 |
+| $refStrategy: none | Inline JSON Schema definitions for simpler MCP client consumption (superseded: schemas now come from zod 4's native `z.toJSONSchema`; `zod-to-json-schema` is gone) | 2026-01-30 |
 | Output schemas per tool | Comprehensive Zod schemas for type-safe output validation | 2026-01-30 |
 | 84 tools annotated | 6 behavior patterns applied consistently across all tools | 2026-01-31 |
 | Consolidated schemas | Issue/PR schemas in project-schemas.ts rather than separate files | 2026-01-30 |
@@ -73,9 +75,9 @@
 | Composed resilience policy order | fallback(retry(circuitBreaker(timeout(op)))) - outer to inner | 2026-01-31 |
 | Cooperative timeout strategy | Graceful cancellation vs aggressive abort | 2026-01-31 |
 | Opt-in cache persistence | enablePersistence() call required; does not change existing behavior | 2026-01-31 |
-| GitHub health check placeholder | Structure in place, wiring to GitHubRepositoryFactory deferred | 2026-01-31 |
+| GitHub health check placeholder | Structure in place, wiring to GitHubRepositoryFactory deferred (superseded: `HealthService.checkGitHub` probes `rateLimit.get()` live) | 2026-01-31 |
 | Opt-in AI resilience | enableResilience() required before executeWithResilience() works | 2026-01-31 |
-| health_check tool readOnlyHint=true | Safe to call repeatedly, no external calls (placeholder) | 2026-01-31 |
+| health_check tool readOnlyHint=true | Safe to call repeatedly (now served by the `system` tool; makes one cheap GitHub rate-limit call) | 2026-01-31 |
 | 9 tool categories | Organize 85 tools logically (Project, Issue, PR, Sprint, Field, Automation, Events, AI, Health) | 2026-01-31 |
 | API doc scope | Focus on public APIs, not internal implementation | 2026-01-31 |
 | Mock factory pattern for tests | Create typed mocks for HealthService testing to avoid complex dependency setup | 2026-01-31 |
@@ -135,6 +137,8 @@
 
 ### Learnings
 
+> Test remarks below that mention `jest.*` date from the Jest era; the project is on Vitest 5 (`vi.*`, positional filters, no `--testPathPattern`). See `.planning/codebase/TESTING.md`.
+
 - Services should follow ProjectManagementService pattern: plain constructor injection with factory parameter
 - Direct `factory.graphql()` calls appropriate for complex GraphQL mutations not exposed via repositories
 - Test mocking simpler without DI container setup
@@ -164,12 +168,12 @@
 - CorrelationContext: startTrace() wraps operations with correlation ID propagation
 - CachePersistence: JSON file persistence with atomic writes and expired entry filtering
 - AIResiliencePolicy: composes fallback, retry, circuit breaker, timeout with Cockatiel
-- TracingLogger: ILogger with correlationId in every JSON log entry
+- TracingLogger: ILogger with correlationId in every JSON log entry (since removed; the logger emits the correlation id itself under `LOG_FORMAT=json`)
 - ResourceCache persistence: opt-in with enablePersistence(), periodic saves every 5 minutes
 - HealthService: aggregates GitHub/AI/cache health into overall status (healthy/degraded/unhealthy)
 - health_check MCP tool: returns structured HealthStatus with readOnly annotation
 - AIServiceFactory resilience: opt-in via enableResilience(), executeWithResilience() wraps AI calls
-- Infrastructure test location: tests/infrastructure/{domain}/ for resilience, observability, cache, health
+- Infrastructure test location: originally `tests/infrastructure/{domain}/`; all tests now live in the single tree `src/__tests__/` (`unit/infrastructure/{domain}/`)
 - TypeScript mock typing: Use `c[0] as string` cast when mapping mock call arrays to avoid type errors
 - graphqlWithFeatures enables preview header injection for sub-issues API
 - resolveIssueNodeId helper converts issue numbers to node IDs for GraphQL mutations
@@ -220,13 +224,13 @@
 - [x] Execute 04-05: Final Verification (0 failing tests, 515 passed)
 - [x] Plan Phase 5
 - [x] Execute 05-01: Infrastructure Foundation (CircuitBreakerService, CorrelationContext, CachePersistence)
-- [x] Execute 05-02: Integration Services (AIResiliencePolicy, TracingLogger, ResourceCache persistence)
+- [x] Execute 05-02: Integration Services (AIResiliencePolicy, TracingLogger [since removed], ResourceCache persistence)
 - [x] Execute 05-03: Health Check Service (HealthService, health_check tool, AIServiceFactory resilience)
 - [x] Execute 05-04: Documentation (STATUS.md, TOOLS.md, API.md)
 - [x] Execute 05-05: Integration and Testing (75 new tests, phase verified)
 - [x] Plan Phase 6
 - [x] Execute 06-01: Repository Infrastructure (GitHubSubIssueRepository, GitHubStatusUpdateRepository)
-- [ ] Execute 06-02: Sub-issue MCP Tools (5 tools)
+- [x] Execute 06-02: Sub-issue MCP Tools (5 tools)
 - [x] Execute 06-03: Status Update MCP Tools (3 tools)
 - [x] Execute 06-04: Testing and Verification
 - [x] Plan Phase 7
@@ -238,7 +242,7 @@
 - [x] Execute 08-02: Project Lifecycle Tools (3 tools: close/reopen/convert)
 - [x] Execute 08-03: Advanced Operations Tools (reorder items, search/filter)
 - [x] Execute 08-04: Testing and Verification (109 tests, documentation updates)
-- [ ] Consider future extraction: IssueService, PullRequestService, AutomationService
+- [x] Extract IssueService, RoadmapService (done in remediation); PullRequestService and ProjectAutomationService also exist
 
 ### Active Blockers
 
@@ -642,7 +646,7 @@
 | Plan | Name | Status | Key Results |
 |------|------|--------|-------------|
 | 12-01 | Fix E2E Test Failures | Complete | E2E tests passing, credential guards |
-| 12-02 | CI/CD and Publication Scripts | Complete | GitHub Actions workflows, publish scripts |
+| 12-02 | User Documentation | Complete | Configuration + troubleshooting guides, README quick start |
 | 12-03 | npm Publication | Complete | CHANGELOG v1.0.2, npm package published |
 | 12-04 | Gap Closure | Complete | Syntax fix, missing handlers, JSON.parse safety, resource cleanup |
 

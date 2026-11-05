@@ -1,6 +1,10 @@
-import { beforeEach, describe, expect, it, type Mock, type MockedClass, vi } from "vitest";
-import { GitHubRepositoryFactory } from "../../../../infrastructure/github/GitHubRepositoryFactory";
-import { executeFilterProjectItems } from "../../../../infrastructure/tools/project-advanced-tools";
+import { beforeEach, describe, expect, it, type Mock, vi } from "vitest";
+import { GitHubConfig } from "../../../../infrastructure/github/GitHubConfig";
+import type { GitHubRepositoryFactory } from "../../../../infrastructure/github/GitHubRepositoryFactory";
+import { GitHubProjectSearchRepository } from "../../../../infrastructure/github/repositories/GitHubProjectSearchRepository";
+import type { OctokitInstance } from "../../../../infrastructure/github/types";
+import { ProjectSearchService } from "../../../../services/ProjectSearchService";
+import { partialFake } from "../../../helpers/aiFakes";
 
 /**
  * The project item reader must see every field value a project item can carry.
@@ -10,17 +14,6 @@ import { executeFilterProjectItems } from "../../../../infrastructure/tools/proj
  * labels, milestones, repositories, reviewers, users, linked pull requests,
  * iterations, multi selects and issue fields - invisible to a client.
  */
-
-vi.mock("../../../../infrastructure/github/GitHubRepositoryFactory.js", () => ({
-  GitHubRepositoryFactory: vi.fn().mockImplementation(function () {
-    return {
-      graphql: vi.fn(),
-      getConfig: vi.fn(),
-    };
-  }),
-}));
-
-const MockedFactory = GitHubRepositoryFactory as MockedClass<typeof GitHubRepositoryFactory>;
 
 /** The members of the `ProjectV2ItemFieldValue` union. */
 const FIELD_VALUE_MEMBERS = [
@@ -49,10 +42,9 @@ const FIELD_CONFIGURATION_MEMBERS = [
 
 describe("project item field value reader", () => {
   let graphql: Mock;
+  let service: ProjectSearchService;
 
   beforeEach(() => {
-    vi.resetAllMocks();
-
     graphql = vi.fn().mockResolvedValue({
       node: {
         items: {
@@ -151,16 +143,17 @@ describe("project item field value reader", () => {
       },
     });
 
-    MockedFactory.mockImplementation(function () {
-      return {
-        graphql,
-        getConfig: vi.fn().mockReturnValue({ owner: "octocat", repo: "hello-world" }),
-      } as unknown as GitHubRepositoryFactory;
-    });
+    const octokit = partialFake<OctokitInstance>({ graphql: graphql as never });
+    const config = new GitHubConfig("octocat", "hello-world");
+    service = new ProjectSearchService(
+      partialFake<GitHubRepositoryFactory>({
+        createProjectSearchRepository: () => new GitHubProjectSearchRepository(octokit, config),
+      })
+    );
   });
 
   it("selects every member of the field value union", async () => {
-    await executeFilterProjectItems({ projectId: "PVT_test", filter: {}, first: 50 });
+    await service.filterProjectItems({ projectId: "PVT_test", filter: {}, first: 50 });
 
     const query = graphql.mock.calls[0][0] as string;
     for (const member of FIELD_VALUE_MEMBERS) {
@@ -170,7 +163,7 @@ describe("project item field value reader", () => {
   });
 
   it("selects the whole field configuration union for every field value", async () => {
-    await executeFilterProjectItems({ projectId: "PVT_test", filter: {}, first: 50 });
+    await service.filterProjectItems({ projectId: "PVT_test", filter: {}, first: 50 });
 
     const query = graphql.mock.calls[0][0] as string;
     for (const member of FIELD_CONFIGURATION_MEMBERS) {
@@ -179,13 +172,13 @@ describe("project item field value reader", () => {
   });
 
   it("renders every field value kind as a string", async () => {
-    const result = await executeFilterProjectItems({
+    const result = await service.filterProjectItems({
       projectId: "PVT_test",
       filter: {},
       first: 50,
     });
 
-    expect(result.structuredContent.items[0].fieldValues).toEqual({
+    expect(result.items[0].fieldValues).toEqual({
       Notes: "Some notes",
       Estimate: "42",
       Due: "2024-01-01",
@@ -203,12 +196,12 @@ describe("project item field value reader", () => {
   });
 
   it("keeps filtering by the value of the status field", async () => {
-    const result = await executeFilterProjectItems({
+    const result = await service.filterProjectItems({
       projectId: "PVT_test",
       filter: { status: "Done" },
       first: 50,
     });
 
-    expect(result.structuredContent.filteredCount).toBe(1);
+    expect(result.filteredCount).toBe(1);
   });
 });

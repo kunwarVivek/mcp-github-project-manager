@@ -1,40 +1,15 @@
 #!/usr/bin/env node
-import { randomUUID } from "node:crypto";
 import {
   type CallToolResult,
   fromJsonSchema,
   INTERNAL_ERROR,
-  INVALID_PARAMS,
   type JsonSchemaType,
   McpServer,
-  METHOD_NOT_FOUND,
   ProtocolError,
 } from "@modelcontextprotocol/server";
 import { serveStdio } from "@modelcontextprotocol/server/stdio";
-import { AgentStore } from "./infrastructure/agent/AgentStore";
-import { traceContext } from "./infrastructure/observability/CorrelationContext";
-import { createGitHubFactory } from "./infrastructure/tools/tool-factory";
-import { AgentBudgetService, type BudgetDebitFailure } from "./services/agent/AgentBudgetService";
-import type { UnpaidDebitLedger } from "./services/agent/UnpaidDebitLedger";
-import { PACKAGE_VERSION } from "./version";
-
-/**
- * v2 compatibility aliases.
- *
- * The v2 SDK renames `McpError` to `ProtocolError` (identical
- * `(code, message, data)` shape) and replaces the `ErrorCode` enum with plain
- * numeric constants. Aliasing keeps the ~20 existing throw sites intact rather
- * than churning them all in a migration commit.
- */
-const McpError = ProtocolError;
-const ErrorCode = {
-  InternalError: INTERNAL_ERROR,
-  MethodNotFound: METHOD_NOT_FOUND,
-  InvalidParams: INVALID_PARAMS,
-} as const;
-
+import type { DependencyContainer } from "tsyringe";
 import { configureContainer } from "./container";
-import { MCPContentType } from "./domain/mcp-types";
 import {
   AGENT_RECLAIM_ENABLED,
   AGENT_RECLAIM_INTERVAL_MS,
@@ -42,9 +17,9 @@ import {
   CACHE_DIRECTORY,
   CLI_OPTIONS,
   EVENTS_ALLOW_UNAUTHENTICATED,
-  EVENTS_AUTH_TOKEN,
   GITHUB_OWNER,
   GITHUB_REPO,
+  getSecret,
   OAUTH_AUDIENCE,
   OAUTH_ISSUER,
   OAUTH_JWKS_URI,
@@ -56,51 +31,57 @@ import {
   WEBHOOK_PORT,
   WEBHOOK_SECRET,
 } from "./env";
-import { ResourceCache } from "./infrastructure/cache/ResourceCache";
-import { EventStore } from "./infrastructure/events/EventStore";
-import { EventSubscriptionManager } from "./infrastructure/events/EventSubscriptionManager";
-import {
+import type { ResourceCache } from "./infrastructure/cache/ResourceCache";
+import type { EventStore } from "./infrastructure/events/EventStore";
+import type { EventSubscriptionManager } from "./infrastructure/events/EventSubscriptionManager";
+import type {
   GitHubWebhookHandler,
-  type ResourceEvent,
+  ResourceEvent,
 } from "./infrastructure/events/GitHubWebhookHandler";
 import { GitHubAuthUnavailableError } from "./infrastructure/github/auth/GitHubAuth";
 import { resolveGitHubAuth } from "./infrastructure/github/auth/resolveGitHubAuth";
+import type { GitHubRepositoryFactory } from "./infrastructure/github/GitHubRepositoryFactory";
 import { createInboundAuthenticator } from "./infrastructure/http/auth/createInboundAuthenticator";
 import { WebhookServer } from "./infrastructure/http/WebhookServer";
-import { GracefulShutdown } from "./infrastructure/lifecycle/GracefulShutdown";
+import { getIdempotencyStore } from "./infrastructure/idempotency/IdempotencyStore";
+import type { GracefulShutdown } from "./infrastructure/lifecycle/GracefulShutdown";
 import { type ILogger, logger, redactSecretPatterns } from "./infrastructure/logger/index";
-import { withBudgetDebitFailure } from "./infrastructure/mcp/budget-debit-meta";
 import { registerPrompts as registerPromptTemplates } from "./infrastructure/mcp/prompts";
 import { registerResources as registerResourceHandlers } from "./infrastructure/mcp/resources";
-import { FilePersistenceAdapter } from "./infrastructure/persistence/FilePersistenceAdapter";
+import { ToolDispatcher } from "./infrastructure/mcp/ToolDispatcher";
+import {
+  auditLogConfigFromEnv,
+  type MutationAuditLog,
+} from "./infrastructure/observability/MutationAuditLog";
+import {
+  initTelemetry,
+  shutdownTelemetry,
+  type TelemetryConfig,
+} from "./infrastructure/observability/otel";
+import type { FilePersistenceAdapter } from "./infrastructure/persistence/FilePersistenceAdapter";
 import { registerCompoundExecutors } from "./infrastructure/tools/compound/register-executors";
 import { ToolRegistry } from "./infrastructure/tools/ToolRegistry";
-import { ToolResultFormatter } from "./infrastructure/tools/ToolResultFormatter";
-import { ToolTelemetry } from "./infrastructure/tools/ToolTelemetry";
-import { ToolValidator } from "./infrastructure/tools/ToolValidator";
+import type { AgentBudgetService } from "./services/agent/AgentBudgetService";
 import type { AgentReclaimScheduler } from "./services/agent/AgentReclaimScheduler";
 import type { AIServiceFactory } from "./services/ai/AIServiceFactory";
 import { GitHubStateSyncService } from "./services/GitHubStateSyncService";
 import type { ProjectManagementService } from "./services/ProjectManagementService";
+import { PACKAGE_VERSION } from "./version";
 
 class GitHubProjectManagerServer {
   private server: McpServer;
   /** Handle from serveStdio; kept so shutdown can close the transport. */
   private stdioHandle?: ReturnType<typeof serveStdio>;
-  /** Built lazily — only tool calls that declare an agentId ever debit. */
-  private _agentBudgetService?: AgentBudgetService;
-  /** Built lazily — only the agents resource needs a registry reader. */
-  private _agentStore?: AgentStore;
+  private di: DependencyContainer;
   private service: ProjectManagementService;
   /** `<mode> (<source>)` of the GitHub credential resolved at startup; never a token. */
   private authDescription: string;
   private toolRegistry: ToolRegistry;
+  private dispatcher: ToolDispatcher;
   private logger: ILogger;
 
   // AI-powered automation services
   private aiFactory: AIServiceFactory;
-  /** Metered debits the registry refused; shared with the services through the container. */
-  private unpaidDebits: UnpaidDebitLedger;
 
   // Persistence and sync components
   private cache: ResourceCache;
@@ -114,14 +95,16 @@ class GitHubProjectManagerServer {
   private webhookServer?: WebhookServer;
   private gracefulShutdown: GracefulShutdown;
 
+  // Observability
+  private audit: MutationAuditLog;
+  private telemetryConfig: TelemetryConfig;
+
   // Agent orchestration
   private reclaimScheduler: AgentReclaimScheduler;
 
   constructor() {
     this.logger = logger;
 
-    // Handle returned by serveStdio; retained so shutdown can close the
-    // transport deterministically.
     this.server = new McpServer(
       {
         name: "github-project-manager",
@@ -136,33 +119,23 @@ class GitHubProjectManagerServer {
       }
     );
 
-    // Initialize persistence and cache
-    this.cache = ResourceCache.getInstance();
-    this.persistence = new FilePersistenceAdapter({
-      cacheDirectory: CACHE_DIRECTORY,
-      enableCompression: true,
-      maxBackups: 5,
-      atomicWrites: true,
-    });
-
-    // Initialize event system
-    this.webhookHandler = new GitHubWebhookHandler(WEBHOOK_SECRET);
-    this.subscriptionManager = new EventSubscriptionManager();
-    this.eventStore = new EventStore({
-      storageDirectory: `${CACHE_DIRECTORY}/events`,
-      enableCompression: true,
-    });
-
-    // Initialize all services via DI container
     // Resolve the credential up front so a missing one fails fast with the full
     // list of supported methods (GitHubAuthUnavailableError). Only mode/source
-    // are retained: nothing here ever handles token characters.
+    // are retained: nothing here ever handles token characters. Build every
+    // entry-point component through the DI container.
     const auth = resolveGitHubAuth();
     this.authDescription = `${auth.mode} (${auth.source})`;
-    const di = configureContainer(auth, GITHUB_OWNER, GITHUB_REPO);
-    this.service = di.resolve("ProjectManagementService");
-    this.aiFactory = di.resolve("AIServiceFactory");
-    this.unpaidDebits = di.resolve("UnpaidDebitLedger");
+    this.di = configureContainer(auth, GITHUB_OWNER, GITHUB_REPO);
+    this.service = this.di.resolve("ProjectManagementService");
+    this.aiFactory = this.di.resolve("AIServiceFactory");
+    this.cache = this.di.resolve("ResourceCache");
+    this.persistence = this.di.resolve("FilePersistenceAdapter");
+    this.webhookHandler = this.di.resolve("GitHubWebhookHandler");
+    this.subscriptionManager = this.di.resolve("EventSubscriptionManager");
+    this.eventStore = this.di.resolve("EventStore");
+    this.gracefulShutdown = this.di.resolve("GracefulShutdown");
+    this.audit = this.di.resolve("MutationAuditLog");
+    this.telemetryConfig = this.di.resolve("TelemetryConfig");
 
     // Enable AI resilience (circuit breaker + retry + timeout) for all
     // executeWithResilience() calls. Opt-in: existing direct generateText/
@@ -171,11 +144,18 @@ class GitHubProjectManagerServer {
     this.aiFactory.enableResilience();
 
     // Auto-reclaim scheduler: server-side self-healing for the agent swarm
-    this.reclaimScheduler = di.resolve("AgentReclaimScheduler");
+    this.reclaimScheduler = this.di.resolve("AgentReclaimScheduler");
     this.reclaimScheduler.start();
 
     // Get the tool registry instance
     this.toolRegistry = ToolRegistry.getInstance();
+    this.dispatcher = new ToolDispatcher({
+      registry: this.toolRegistry,
+      // Resolved lazily: only agent calls ever touch the budget registry.
+      budget: () => this.di.resolve<AgentBudgetService>("AgentBudgetService"),
+      audit: this.audit,
+      logger: this.logger,
+    });
     this.registerToolExecutors();
     this.setupToolHandlers();
     this.registerResources();
@@ -186,7 +166,6 @@ class GitHubProjectManagerServer {
     // Transport errors are reported via serveStdio's `onerror` callback in run().
 
     // Install graceful shutdown with in-flight draining
-    this.gracefulShutdown = new GracefulShutdown({ logger: this.logger });
     this.gracefulShutdown.installSignalHandlers(async () => {
       await this.shutdown();
     });
@@ -283,17 +262,16 @@ class GitHubProjectManagerServer {
   /**
    * Register the tool executors with the ToolRegistry.
    *
-   * Only the COMPOUND tools are reachable. `dispatchTool` looks the tool up
-   * by the name the MCP client called, and MCP clients only ever see the
-   * compound surface (`ToolRegistry.getToolsForMCP`). The granular tools are
-   * still DEFINED in the registry - they are the compound layer's
-   * implementation contract - but an executor registered under a granular
-   * name can never be dispatched, so registering one is dead weight.
+   * Only the COMPOUND tools get executors. `dispatchTool` looks the tool up by
+   * the name the MCP client called, and MCP clients only ever see the compound
+   * surface (`ToolRegistry.getToolsForMCP`). The granular tools stay DEFINED in
+   * the registry as internal implementation contracts (documented in
+   * docs/TOOLS.md); an executor registered under a granular name can never be
+   * dispatched, so registering one is dead weight.
    *
    * `src/__tests__/unit/infrastructure/tools/tool-registration.test.ts` pins
    * that invariant: every registered executor name must be a public tool name.
    */
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private registerToolExecutors(): void {
     registerCompoundExecutors(this.toolRegistry);
   }
@@ -347,7 +325,7 @@ class GitHubProjectManagerServer {
     registerResourceHandlers(this.server, {
       service: this.service,
       toolRegistry: this.toolRegistry,
-      agentStore: this.agentStore,
+      agentStore: this.di.resolve("AgentStore"),
       aiFactory: this.aiFactory,
       logger: this.logger,
       serverVersion: PACKAGE_VERSION,
@@ -367,137 +345,20 @@ class GitHubProjectManagerServer {
   }
 
   /**
-   * Execute one tool call and shape it into an MCP result.
+   * Execute one tool call under the shutdown gate and in-flight tracking.
    *
-   * Execution failures return `{ isError: true }` rather than throwing a
-   * protocol error. Per spec, a JSON-RPC error means the *request* was
-   * malformed; a tool that ran and failed is a successful call with a failed
-   * result, and only that form is visible to the model so it can recover.
+   * `ToolDispatcher` owns the error contract: an unknown tool is a protocol
+   * fault (JSON-RPC error); every other failure is a `{ isError: true }` result
+   * the model can read and recover from.
    */
-  private get agentBudgetService(): AgentBudgetService {
-    this._agentBudgetService ??= new AgentBudgetService(
-      new AgentStore(createGitHubFactory()),
-      this.unpaidDebits
-    );
-    return this._agentBudgetService;
-  }
-
-  private get agentStore(): AgentStore {
-    this._agentStore ??= new AgentStore(createGitHubFactory());
-    return this._agentStore;
-  }
-
   private async dispatchTool(toolName: string, args: unknown): Promise<CallToolResult> {
     if (this.gracefulShutdown.shuttingDown) {
-      throw new McpError(
-        ErrorCode.InternalError,
-        "Server is shutting down — no new requests accepted"
-      );
+      throw new ProtocolError(INTERNAL_ERROR, "Server is shutting down — no new requests accepted");
     }
 
     this.gracefulShutdown.trackStart();
-    const telemetryStart = Date.now();
     try {
-      const tool = this.toolRegistry.getTool(toolName);
-      if (!tool) {
-        // Unknown tool is a protocol-level fault, not a tool failure.
-        throw new McpError(ErrorCode.MethodNotFound, `Unknown tool: ${toolName}`);
-      }
-
-      const validatedArgs = ToolValidator.validate(toolName, args, tool.schema);
-
-      // Run the tool inside a trace context so AI middleware can attribute
-      // server-side token spend to the acting agent. `agentId` is present only
-      // on tools that declare one; otherwise there is simply nothing to debit.
-      const agentId =
-        typeof (validatedArgs as { agentId?: unknown })?.agentId === "string"
-          ? (validatedArgs as { agentId: string }).agentId
-          : undefined;
-      const usage = { tokens: 0 };
-      let budgetWarningLine: string | undefined;
-      let debitFailure: BudgetDebitFailure | undefined;
-
-      const result = await traceContext.run(
-        {
-          correlationId: randomUUID(),
-          startTime: Date.now(),
-          operation: toolName,
-          agentId,
-          usage,
-        },
-        () => this.toolRegistry.execute(toolName, validatedArgs)
-      );
-      const telemetryLatency = Date.now() - telemetryStart;
-      ToolTelemetry.getInstance().recordCall(toolName, telemetryLatency, false);
-
-      // Debit once per tool call, not per AI call: AgentStore is GitHub-backed,
-      // so every debit is a read plus a compare-and-swap commit, and per-call
-      // debits would pay that round trip (and contend on the registry) per LLM
-      // call.
-      // The debit is retried once. A debit that still cannot be written never
-      // fails the tool call that already ran: it is parked in the unpaid-debit
-      // ledger (settled, or the checkout refused, at the agent's next
-      // checkout_task), logged at error level, and reported in `_meta`.
-      if (agentId && usage.tokens > 0) {
-        const outcome = await this.agentBudgetService.debitMeteredWithRetry(agentId, usage.tokens);
-
-        if (outcome.ok) {
-          // Surface budget warnings inline so the model learns to slow down
-          if (outcome.status.isWarning) {
-            budgetWarningLine = `⚠️ Agent budget at ${outcome.status.usagePercent.toFixed(1)}% — consider wrapping up.`;
-          }
-        } else {
-          debitFailure = outcome.failure;
-          this.logger.error(
-            `Failed to debit ${outcome.failure.tokens} tokens to agent ${outcome.failure.agentId} after a retry; held as an unpaid debit: ${outcome.failure.error}`
-          );
-        }
-      }
-
-      const mcpResponse = ToolResultFormatter.formatSuccess(toolName, result, {
-        contentType: MCPContentType.JSON,
-      });
-      if (mcpResponse.status !== "success") {
-        throw new McpError(
-          ErrorCode.InternalError,
-          "Unexpected response format from tool execution"
-        );
-      }
-
-      // structuredContent is only meaningful against a declared outputSchema —
-      // emitting it without one gives clients data they cannot validate.
-      const structuredContent =
-        tool.outputSchema && result !== null && typeof result === "object" && !Array.isArray(result)
-          ? (JSON.parse(JSON.stringify(result)) as Record<string, unknown>)
-          : undefined;
-
-      const content: Array<{ type: "text"; text: string }> = [
-        {
-          type: "text" as const,
-          text: mcpResponse.output.content ?? JSON.stringify(result),
-        },
-      ];
-      if (budgetWarningLine) {
-        content.push({ type: "text" as const, text: budgetWarningLine });
-      }
-
-      const response: CallToolResult = {
-        content,
-        ...(structuredContent ? { structuredContent } : {}),
-      };
-      return debitFailure ? withBudgetDebitFailure(response, debitFailure) : response;
-    } catch (error) {
-      const telemetryCatchLatency = Date.now() - telemetryStart;
-      ToolTelemetry.getInstance().recordCall(toolName, telemetryCatchLatency, true);
-      if (error instanceof McpError) {
-        throw error;
-      }
-      this.logger.error(`Tool execution error (${toolName}):`, error);
-      const message = error instanceof Error ? error.message : "An unknown error occurred";
-      return {
-        content: [{ type: "text" as const, text: message }],
-        isError: true,
-      };
+      return await this.dispatcher.dispatch(toolName, args);
     } finally {
       this.gracefulShutdown.trackEnd();
     }
@@ -538,6 +399,23 @@ class GitHubProjectManagerServer {
   }
 
   /**
+   * Rebuild the create-idempotency store from the audit log so duplicate
+   * creates are still refused after a restart. Never fails startup.
+   */
+  private async hydrateIdempotency(): Promise<void> {
+    const config = auditLogConfigFromEnv();
+    if (!config.enabled || !config.path) {
+      return;
+    }
+    try {
+      const restored = await getIdempotencyStore().hydrateFromAuditLog(config.path);
+      this.logger.info(`Restored ${restored} idempotency key(s) from the audit log`);
+    } catch (error) {
+      this.logger.warn("Could not hydrate idempotency keys from the audit log:", error);
+    }
+  }
+
+  /**
    * Initialize sync service and perform initial sync
    */
   private async initializeSync(): Promise<void> {
@@ -548,7 +426,7 @@ class GitHubProjectManagerServer {
 
     try {
       // Initialize sync service
-      const factory = this.service.getRepositoryFactory();
+      const factory = this.di.resolve<GitHubRepositoryFactory>("GitHubRepositoryFactory");
       this.syncService = new GitHubStateSyncService(factory, this.cache, this.persistence);
 
       // Perform initial sync with timeout
@@ -581,9 +459,11 @@ class GitHubProjectManagerServer {
 
     // Built outside the try/catch below on purpose: an invalid auth config must
     // abort startup, not degrade to "continuing without webhook server".
+    // The shared token is read through getSecret() per request, so a rotated
+    // SECRETS_DIR file takes effect without a restart.
     const inboundAuth = createInboundAuthenticator(
       {
-        sharedToken: EVENTS_AUTH_TOKEN || undefined,
+        sharedToken: () => getSecret("EVENTS_AUTH_TOKEN"),
         allowUnauthenticated: EVENTS_ALLOW_UNAUTHENTICATED,
         oauth: OAUTH_ISSUER
           ? {
@@ -598,8 +478,8 @@ class GitHubProjectManagerServer {
       this.logger
     );
 
-    // Also outside the try/catch: an invalid TRUST_PROXY or a wildcard
-    // WEBHOOK_ALLOWED_ORIGINS combined with credentials must abort startup.
+    // Also outside the try/catch: a wildcard WEBHOOK_ALLOWED_ORIGINS combined
+    // with credentials must abort startup.
     this.webhookServer = new WebhookServer(
       this.webhookHandler,
       this.subscriptionManager,
@@ -657,6 +537,11 @@ class GitHubProjectManagerServer {
       // Close MCP server
       await this.server.close();
       this.logger.info("MCP server closed");
+
+      // Flush the audit log and pending spans last so everything the drained
+      // in-flight calls produced is recorded.
+      await this.audit.close();
+      await shutdownTelemetry();
     } catch (error) {
       this.logger.error("Error during shutdown:", error);
     }
@@ -664,6 +549,9 @@ class GitHubProjectManagerServer {
 
   async run() {
     try {
+      await initTelemetry(this.telemetryConfig);
+      await this.hydrateIdempotency();
+
       // Initialize sync service first
       await this.initializeSync();
 

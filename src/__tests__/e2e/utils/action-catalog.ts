@@ -3,7 +3,7 @@ import { ToolRegistry } from "../../../infrastructure/tools/ToolRegistry";
 /**
  * The catalog of the public MCP surface, derived at RUNTIME.
  *
- * The numbers the README and the docs publish (20 tools, 169 actions) are
+ * The numbers the README and the docs publish (21 tools, 175 actions) are
  * only worth anything if they are checked against the code that serves the
  * requests - so nothing here is hand-written. The registry is the single
  * source of truth: `getToolsForMCP()` returns exactly the tools an MCP
@@ -62,6 +62,6 @@ export function getToolCatalog(): ToolEntry[] {
  * catalog itself is derived from the registry.
  */
 export const PUBLISHED_SURFACE = {
-  tools: 20,
-  actions: 169,
+  tools: 21,
+  actions: 175,
 } as const;

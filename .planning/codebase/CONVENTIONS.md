@@ -1,8 +1,8 @@
 # Coding Conventions
 
-**Analysis Date:** 2026-10-21
+**Analysis Date:** 2026-11-02
 
-**Updated:** 2026-10-21 — the lint/format section now describes Biome 2.5 (the repo's single linter + formatter). The previous snapshot described a toolchain the project no longer uses.
+**Updated:** 2026-11-02 — reconciled with code: error mapping via `ErrorMapper` (the deleted `MCPErrorHandler` is gone), logger honors `LOG_LEVEL`/`LOG_FORMAT`, tool-contract conventions (idempotency, pagination, schema versions), prompts via `PromptRegistry`.
 
 ## Naming Patterns
 
@@ -113,13 +113,13 @@ export class ValidationError extends Error {
 ```
 
 **Error Mapping:**
-- Domain errors mapped to MCP error codes via `MCPErrorHandler`
-- Error codes defined in `MCPErrorCode` enum: `VALIDATION_ERROR`, `RESOURCE_NOT_FOUND`, `UNAUTHORIZED`, `RATE_LIMITED`, `INTERNAL_ERROR`
+- Domain errors mapped to MCP error codes via `mapErrorToMCPError()` (`src/services/utils/ErrorMapper.ts`; `safeCall` wraps a service method with it); tool-level GitHub errors via `ToolValidator.mapGitHubError`
+- Error codes defined in the `MCPErrorCode` enum (`src/domain/mcp-types.ts`): `VALIDATION_ERROR`, `RESOURCE_NOT_FOUND`, `UNAUTHORIZED`, `RATE_LIMITED`, `INTERNAL_ERROR`
 
 **MCP v2 tool failure convention:**
 - An execution failure returns `{content, isError: true}` so the model can see it and recover
 - A JSON-RPC error is reserved for **protocol faults** (e.g. unknown tool, malformed request). Per spec, a tool that ran and failed is a successful call with a failed result.
-- MCP SDK v2 renamed `McpError` to `ProtocolError` (identical `(code, message, data)` shape) and replaced the `ErrorCode` enum with plain numeric constants. `src/index.ts` keeps v2 compatibility aliases so the existing throw sites stay intact.
+- MCP SDK v2 renamed `McpError` to `ProtocolError` (identical `(code, message, data)` shape) and replaced the `ErrorCode` enum with plain numeric constants; `src/index.ts` imports those constants directly from `@modelcontextprotocol/server`
 
 **Try-Catch Pattern:**
 ```typescript
@@ -137,7 +137,7 @@ try {
 
 ## Configuration & Secrets
 
-- Every credential read goes through `getSecret()` / `requireToken()` (`src/env.ts`, `src/infrastructure/tools/tool-factory.ts`)
+- GitHub credentials resolve only through `resolveGitHubAuth()` (`src/infrastructure/github/auth/`), which returns a `GitHubAuth`; other secrets go through `getSecret()` (`src/env.ts`)
 - **Never** read `process.env.GITHUB_TOKEN` directly — that bypasses the CLI flag → `SECRETS_DIR` file → env var → `gh auth token` chain
 - `getSecret()` reads fresh (rotation-aware) rather than snapshotting at startup
 
@@ -151,14 +151,15 @@ try {
 - Singleton pattern: `Logger.getInstance()`
 - Prefix support: `createLogger('MCP')`
 - Secrets are redacted: `redactSecrets()` strips token/secret/password/apiKey/authorization-shaped keys from anything the logger stringifies, and `GitHubConfig.token` is non-enumerable so `JSON.stringify` cannot emit the PAT
+- Honors `LOG_LEVEL` (debug|info|warn|error) and `LOG_FORMAT` (`text` | `json`; JSON lines carry the active correlation id). Prefer `createLogger(prefix)` / `getLogger(prefix)` or an injected `ILogger`
 
 **Interface:**
 ```typescript
 interface ILogger {
-  debug(message: string, ...args: any[]): void;
-  info(message: string, ...args: any[]): void;
-  warn(message: string, ...args: any[]): void;
-  error(message: string, ...args: any[]): void;
+  debug(message: string, ...args: unknown[]): void;
+  info(message: string, ...args: unknown[]): void;
+  warn(message: string, ...args: unknown[]): void;
+  error(message: string, ...args: unknown[]): void;
 }
 ```
 
@@ -170,6 +171,17 @@ const logger = Logger.getInstance();
 logger.info("Starting operation");
 logger.error("Operation failed", error);
 ```
+
+## Tool Contract Conventions
+
+- Compound tools take an `action` enum; unknown tools are the only JSON-RPC error, every other failure is an `isError` result with the code in `_meta.error`
+- Create actions accept an optional `idempotencyKey` (same key + same arguments within 24h replays the first result)
+- List actions accept `cursor` and return `nextCursor` additively next to `pageInfo`
+- Every result carries `_meta.schemaVersion` (`compound/schema-version.ts`); bump per the rules there and refresh the snapshot with `npm run schema:snapshot`
+- Destructive actions require explicit confirmation (`manage_sprints` delete needs `confirm: true`)
+- All GitHub calls run through `GitHubRequestExecutor`; auth comes only from `resolveGitHubAuth()` and repositories only from `GitHubRepositoryFactory.fromAuth(...)`
+- AI prompts are registered in `PromptRegistry` (versioned, `{{var}}` placeholders) and rendered with `defaultPromptRegistry.render(id, vars)`; register new prompts there rather than inlining them
+- Tool/action counts in docs come from the `ToolRegistry` (`npm run check:docs`)
 
 ## Comments
 
@@ -283,4 +295,4 @@ const validatedData = CreateRoadmapSchema.parse(data);
 
 ---
 
-*Convention analysis: 2026-10-21*
+*Convention analysis: 2026-11-02*

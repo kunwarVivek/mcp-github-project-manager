@@ -242,50 +242,92 @@ describe("GitHubMilestoneRepository", () => {
     });
   });
 
-  describe("findByDueDate", () => {
-    it("should filter milestones by due date", async () => {
-      // Arrange
-      const mockMilestones = [
-        {
-          id: "milestone-1",
-          number: 1,
-          title: "Past Due",
-          description: "Should be included",
-          dueOn: "2023-01-01T00:00:00Z",
-          state: "open",
-          createdAt: "2023-01-01T00:00:00Z",
-          updatedAt: "2023-01-01T00:00:00Z",
-        },
-        {
-          id: "milestone-2",
-          number: 2,
-          title: "Future Due",
-          description: "Should be excluded",
-          dueOn: "2030-01-01T00:00:00Z",
-          state: "open",
-          createdAt: "2023-01-01T00:00:00Z",
-          updatedAt: "2023-01-01T00:00:00Z",
-        },
+  describe("due date queries", () => {
+    const restMilestone = (number: number, dueOn: string | null, state = "open") => ({
+      id: number,
+      number,
+      title: `Milestone ${number}`,
+      description: null,
+      due_on: dueOn,
+      state,
+      created_at: "2023-01-01T00:00:00Z",
+      updated_at: "2023-01-01T00:00:00Z",
+      open_issues: 0,
+      closed_issues: 0,
+      node_id: `MI_${number}`,
+    });
+    const restPage = (data: unknown[]) => ({ data, status: 200, url: "", headers: {} });
+
+    it("asks REST for due-date ordering and keeps only milestones due by the cutoff", async () => {
+      mockOctokit.rest.issues.listMilestones.mockResolvedValueOnce(
+        restPage([
+          restMilestone(1, "2023-01-01T00:00:00Z"),
+          restMilestone(2, null),
+          restMilestone(3, "2030-01-01T00:00:00Z"),
+        ])
+      );
+
+      const result = await repository.findByDueDate(new Date("2024-01-01T00:00:00.000Z"));
+
+      expect(result.map((m) => m.id)).toEqual(["MI_1"]);
+      expect(mockOctokit.rest.issues.listMilestones).toHaveBeenCalledWith({
+        owner: config.owner,
+        repo: config.repo,
+        state: "all",
+        sort: "due_on",
+        direction: "asc",
+        per_page: 100,
+        page: 1,
+      });
+      expect(mockOctokit.graphql).not.toHaveBeenCalled();
+    });
+
+    it("reads further pages while every milestone is still due", async () => {
+      const firstPage = Array.from({ length: 100 }, (_, i) =>
+        restMilestone(i + 1, "2023-01-01T00:00:00Z")
+      );
+      mockOctokit.rest.issues.listMilestones
+        .mockResolvedValueOnce(restPage(firstPage))
+        .mockResolvedValueOnce(
+          restPage([
+            restMilestone(101, "2023-06-01T00:00:00Z"),
+            restMilestone(102, "2030-01-01T00:00:00Z"),
+          ])
+        );
+
+      const result = await repository.findByDueDate(new Date("2024-01-01T00:00:00.000Z"));
+
+      expect(result).toHaveLength(101);
+      expect(mockOctokit.rest.issues.listMilestones).toHaveBeenCalledTimes(2);
+      expect(mockOctokit.rest.issues.listMilestones).toHaveBeenLastCalledWith(
+        expect.objectContaining({ page: 2 })
+      );
+    });
+
+    it("stops scanning at the first milestone due after the cutoff", async () => {
+      const firstPage = [
+        restMilestone(1, "2023-01-01T00:00:00Z"),
+        ...Array.from({ length: 99 }, (_, i) => restMilestone(i + 2, "2030-01-01T00:00:00Z")),
       ];
+      mockOctokit.rest.issues.listMilestones.mockResolvedValueOnce(restPage(firstPage));
 
-      // Mock the findAll method to return these milestones
-      const mockResponse = {
-        repository: {
-          milestones: {
-            nodes: mockMilestones,
-          },
-        },
-      };
+      const result = await repository.findByDueDate(new Date("2024-01-01T00:00:00.000Z"));
 
-      mockOctokit.graphql.mockResolvedValueOnce(mockResponse);
-
-      // Act
-      const cutoffDate = "2024-01-01T00:00:00.000Z";
-      const result = await repository.findByDueDate(new Date(cutoffDate));
-
-      // Assert
       expect(result).toHaveLength(1);
-      expect(result[0].id).toBe("milestone-1");
+      expect(mockOctokit.rest.issues.listMilestones).toHaveBeenCalledTimes(1);
+    });
+
+    it("getOverdue lists only open milestones", async () => {
+      mockOctokit.rest.issues.listMilestones.mockResolvedValueOnce(
+        restPage([restMilestone(1, "2020-01-01T00:00:00Z")])
+      );
+
+      const result = await repository.getOverdue();
+
+      expect(result).toHaveLength(1);
+      expect(mockOctokit.rest.issues.listMilestones).toHaveBeenCalledWith(
+        expect.objectContaining({ state: "open", sort: "due_on", direction: "asc" })
+      );
     });
   });
 });

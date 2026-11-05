@@ -13,7 +13,7 @@ import { Logger } from "../../logger/index.js";
 import { ANNOTATION_PATTERNS } from "../annotations/tool-annotations.js";
 import { TaskExpandOutputSchema } from "../schemas/ai-schemas.js";
 import { ToolResultFormatter } from "../ToolResultFormatter.js";
-import type { ToolDefinition, ToolSchema } from "../ToolValidator.js";
+import { type ToolDefinition, type ToolSchema, ToolValidator } from "../ToolValidator.js";
 
 const logger = Logger.getInstance();
 
@@ -82,7 +82,12 @@ interface SubtaskMetrics {
 /**
  * Implementation function for expand_task tool
  */
-async function executeExpandTask(args: ExpandTaskArgs): Promise<MCPResponse> {
+async function executeExpandTask(rawArgs: unknown): Promise<MCPResponse> {
+  const args = ToolValidator.validate(
+    "expand_task",
+    rawArgs,
+    expandTaskSchema as unknown as ToolSchema<ExpandTaskArgs>
+  );
   const taskService = new TaskGenerationService();
 
   try {

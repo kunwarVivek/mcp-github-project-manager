@@ -38,7 +38,7 @@ import { AgentMetricsService } from "../../services/agent/AgentMetricsService";
 import { TaskCheckoutService } from "../../services/agent/TaskCheckoutService";
 import { WorkProductService } from "../../services/agent/WorkProductService";
 import { mapErrorToMCPError } from "../../services/utils/ErrorMapper";
-import { AgentStore } from "../agent/AgentStore";
+import type { AgentStore } from "../agent/AgentStore";
 import { ItemHeartbeatStore } from "../agent/ItemHeartbeatStore";
 import { ProjectFieldSetup } from "../agent/ProjectFieldSetup";
 import { WorkProductStore } from "../agent/WorkProductStore";
@@ -89,6 +89,7 @@ import {
   submitWorkProductSchema,
 } from "./schemas/agent-orchestration-schemas";
 import { SuccessOutputSchema } from "./schemas/project-schemas";
+import { getSharedAgentStore } from "./shared-services";
 import type { ToolDefinition, ToolSchema } from "./ToolValidator";
 import { createGitHubFactory } from "./tool-factory";
 
@@ -700,8 +701,7 @@ export async function executeRegisterAgent(args: RegisterAgentArgs): Promise<{
   structuredContent: Agent;
 }> {
   try {
-    const factory = createGitHubFactory();
-    const store = new AgentStore(factory);
+    const store = getSharedAgentStore();
 
     // If registering as a child agent, verify the parent exists and that the
     // new agent stays inside the hierarchy's depth and fan-out limits. Without
@@ -789,8 +789,7 @@ export async function executeListAgents(args: ListAgentsArgs): Promise<{
   structuredContent: { agents: Agent[]; total: number };
 }> {
   try {
-    const factory = createGitHubFactory();
-    const store = new AgentStore(factory);
+    const store = getSharedAgentStore();
 
     let agents = await store.listAgents();
 
@@ -821,8 +820,7 @@ export async function executeDeregisterAgent(args: DeregisterAgentArgs): Promise
   structuredContent: { success: boolean; agentId: string; message: string };
 }> {
   try {
-    const factory = createGitHubFactory();
-    const store = new AgentStore(factory);
+    const store = getSharedAgentStore();
 
     const agent = await store.getAgent(args.agentId);
     const removedCount = await store.removeAgentCascade(args.agentId);
@@ -866,7 +864,7 @@ export async function executeCheckoutTask(args: CheckoutTaskArgs): Promise<{
 }> {
   try {
     const factory = createGitHubFactory();
-    const store = new AgentStore(factory);
+    const store = getSharedAgentStore();
     const contextService = new AgentContextService(factory);
     const service = new TaskCheckoutService(factory, store, contextService);
 
@@ -902,7 +900,7 @@ export async function executeReleaseTask(args: ReleaseTaskArgs): Promise<{
 }> {
   try {
     const factory = createGitHubFactory();
-    const store = new AgentStore(factory);
+    const store = getSharedAgentStore();
     const contextService = new AgentContextService(factory);
     const service = new TaskCheckoutService(factory, store, contextService);
 
@@ -927,7 +925,7 @@ export async function executeCompleteTask(args: CompleteTaskArgs): Promise<{
 }> {
   try {
     const factory = createGitHubFactory();
-    const store = new AgentStore(factory);
+    const store = getSharedAgentStore();
     const contextService = new AgentContextService(factory);
     const service = new TaskCheckoutService(factory, store, contextService);
 
@@ -987,7 +985,7 @@ export async function executeAgentHeartbeat(args: AgentHeartbeatArgs): Promise<{
 }> {
   try {
     const factory = createGitHubFactory();
-    const store = new AgentStore(factory);
+    const store = getSharedAgentStore();
     const contextService = new AgentContextService(factory);
     const service = new TaskCheckoutService(factory, store, contextService);
 
@@ -1065,7 +1063,7 @@ export async function executeGetAgentActivity(args: GetAgentActivityArgs): Promi
 }> {
   try {
     const factory = createGitHubFactory();
-    const store = new AgentStore(factory);
+    const store = getSharedAgentStore();
     const budgetService = new AgentBudgetService(store);
 
     const registry = await store.listAgents();
@@ -1151,8 +1149,7 @@ export async function executeGetBudgetStatus(args: GetBudgetStatusArgs): Promise
   structuredContent: BudgetStatus;
 }> {
   try {
-    const factory = createGitHubFactory();
-    const store = new AgentStore(factory);
+    const store = getSharedAgentStore();
     const service = new AgentBudgetService(store);
 
     const status = await service.getBudgetStatus(args.agentId);
@@ -1180,8 +1177,7 @@ export async function executeSetAgentBudget(args: SetAgentBudgetArgs): Promise<{
   structuredContent: BudgetStatus;
 }> {
   try {
-    const factory = createGitHubFactory();
-    const store = new AgentStore(factory);
+    const store = getSharedAgentStore();
     const service = new AgentBudgetService(store);
 
     await service.setBudget(
@@ -1212,9 +1208,11 @@ export async function executeSetAgentBudget(args: SetAgentBudgetArgs): Promise<{
 const REVIEWS_PER_PAGE = 100;
 
 /**
- * A pull request review, reduced to the fields this tool reads.
+ * A pull request review as the REST API returns it (snake_case wire shape),
+ * reduced to the fields this tool reads. Distinct from the domain
+ * `PullRequestReview`, which is the normalized entity form.
  */
-interface PullRequestReview {
+interface RestPullRequestReview {
   id: number;
   user?: { login?: string | null } | null;
   body?: string | null;
@@ -1236,8 +1234,8 @@ async function fetchPullRequestReviews(
   owner: string,
   repo: string,
   pullNumber: number
-): Promise<PullRequestReview[]> {
-  const reviews: PullRequestReview[] = [];
+): Promise<RestPullRequestReview[]> {
+  const reviews: RestPullRequestReview[] = [];
   let page = 1;
 
   while (true) {
@@ -1264,7 +1262,7 @@ async function fetchPullRequestReviews(
  * A review carries `submitted_at` once it is submitted; a draft review (state
  * PENDING) has none and never displaces a submitted review.
  */
-function isNewerReview(candidate: PullRequestReview, current: PullRequestReview): boolean {
+function isNewerReview(candidate: RestPullRequestReview, current: RestPullRequestReview): boolean {
   const candidateTime = candidate.submitted_at ? Date.parse(candidate.submitted_at) : NaN;
   const currentTime = current.submitted_at ? Date.parse(current.submitted_at) : NaN;
 
@@ -1287,8 +1285,8 @@ function isNewerReview(candidate: PullRequestReview, current: PullRequestReview)
  * carries a state but no body (a comment-only review) states no decision and
  * is skipped, so it cannot mask an approval.
  */
-function selectLatestReviews(reviews: PullRequestReview[]): Map<string, PullRequestReview> {
-  const latest = new Map<string, PullRequestReview>();
+function selectLatestReviews(reviews: RestPullRequestReview[]): Map<string, RestPullRequestReview> {
+  const latest = new Map<string, RestPullRequestReview>();
 
   for (const review of reviews) {
     if (review.state === "COMMENTED" && !review.body) continue;
@@ -1430,7 +1428,7 @@ export async function executeReclaimStaleTasks(args: ReclaimStaleTasksArgs): Pro
 }> {
   try {
     const factory = createGitHubFactory();
-    const store = new AgentStore(factory);
+    const store = getSharedAgentStore();
     const contextService = new AgentContextService(factory);
     const service = new TaskCheckoutService(factory, store, contextService);
 
@@ -1454,8 +1452,7 @@ export async function executeRecordUsage(args: RecordUsageArgs): Promise<{
   structuredContent: BudgetStatus;
 }> {
   try {
-    const factory = createGitHubFactory();
-    const store = new AgentStore(factory);
+    const store = getSharedAgentStore();
     const service = new AgentBudgetService(store);
 
     const status = await service.recordReportedUsage(args.agentId, args.tokensUsed);
@@ -1484,7 +1481,7 @@ export async function executeSubmitForReview(args: SubmitForReviewArgs): Promise
 }> {
   try {
     const factory = createGitHubFactory();
-    const store = new AgentStore(factory);
+    const store = getSharedAgentStore();
     const contextService = new AgentContextService(factory);
     const service = new TaskCheckoutService(factory, store, contextService);
 
@@ -1509,7 +1506,7 @@ export async function executeApproveTask(args: ApproveTaskArgs): Promise<{
 }> {
   try {
     const factory = createGitHubFactory();
-    const store = new AgentStore(factory);
+    const store = getSharedAgentStore();
     const contextService = new AgentContextService(factory);
     const service = new TaskCheckoutService(factory, store, contextService);
 
@@ -1534,7 +1531,7 @@ export async function executeRejectTask(args: RejectTaskArgs): Promise<{
 }> {
   try {
     const factory = createGitHubFactory();
-    const store = new AgentStore(factory);
+    const store = getSharedAgentStore();
     const contextService = new AgentContextService(factory);
     const service = new TaskCheckoutService(factory, store, contextService);
 
@@ -1587,7 +1584,7 @@ export async function executeGetAgentMetrics(args: GetAgentMetricsArgs): Promise
 }> {
   try {
     const factory = createGitHubFactory();
-    const store = new AgentStore(factory);
+    const store = getSharedAgentStore();
     const wpStore = new WorkProductStore(factory);
     const service = new AgentMetricsService(factory, store, wpStore);
 

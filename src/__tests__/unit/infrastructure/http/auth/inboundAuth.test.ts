@@ -174,7 +174,7 @@ describe("inbound HTTP authentication", () => {
   });
 
   describe("fail-closed default", () => {
-    it("rejects every /events/* route with a 401 and a Bearer challenge", async () => {
+    it("answers every /events/* route with 503 'Events API disabled' and no Bearer challenge", async () => {
       const { url } = await startServer();
       const routes: Array<[string, string]> = [
         ["GET", "/events/stream"],
@@ -186,25 +186,24 @@ describe("inbound HTTP authentication", () => {
 
       for (const [method, path] of routes) {
         const res = await fetch(`${url}${path}`, { method });
-        expect(res.status, `${method} ${path}`).toBe(401);
-        expect(res.headers.get("www-authenticate")).toBe(
-          'Bearer realm="github-project-manager-events"'
-        );
+        expect(res.status, `${method} ${path}`).toBe(503);
+        expect(res.headers.get("www-authenticate"), `${method} ${path}`).toBeNull();
+        expect(await res.text()).toContain("Events API disabled");
       }
     });
 
-    it("adds error=invalid_token when a token was presented but nothing is configured", async () => {
+    it("answers 503 even when a token was presented but nothing is configured", async () => {
       const { url } = await startServer();
       const res = await fetch(`${url}/events/recent`, bearer("whatever"));
-      expect(res.status).toBe(401);
-      expect(res.headers.get("www-authenticate")).toContain('error="invalid_token"');
+      expect(res.status).toBe(503);
+      expect(res.headers.get("www-authenticate")).toBeNull();
     });
 
-    it("rejects when createInboundAuthenticator has no credentials and no opt-out", async () => {
+    it("disables the events API when createInboundAuthenticator has no credentials and no opt-out", async () => {
       const authenticator = createInboundAuthenticator({ allowUnauthenticated: false }, logger);
       const { url } = await startServer(authenticator);
-      expect((await fetch(`${url}/events/recent`)).status).toBe(401);
-      expect(logger.warn).toHaveBeenCalledWith(expect.stringContaining("will reject all requests"));
+      expect((await fetch(`${url}/events/recent`)).status).toBe(503);
+      expect(logger.warn).toHaveBeenCalledWith(expect.stringContaining("will answer 503"));
     });
 
     it("serves /events/* when EVENTS_ALLOW_UNAUTHENTICATED is set, with a startup warning", async () => {
@@ -222,12 +221,30 @@ describe("inbound HTTP authentication", () => {
 
     it("still requires credentials when auth is configured even if the opt-out is set", async () => {
       const authenticator = createInboundAuthenticator(
-        { sharedToken: SHARED_TOKEN, allowUnauthenticated: true },
+        { sharedToken: () => SHARED_TOKEN, allowUnauthenticated: true },
         logger
       );
       const { url } = await startServer(authenticator);
       expect((await fetch(`${url}/events/recent`)).status).toBe(401);
       expect((await fetch(`${url}/events/recent`, bearer(SHARED_TOKEN))).status).toBe(200);
+    });
+
+    it("honors a shared token that is provisioned or rotated after startup", async () => {
+      let current: string | undefined;
+      const authenticator = createInboundAuthenticator(
+        { sharedToken: () => current, allowUnauthenticated: false },
+        logger
+      );
+      const { url } = await startServer(authenticator);
+
+      expect((await fetch(`${url}/events/recent`, bearer("first-token"))).status).toBe(503);
+
+      current = "first-token";
+      expect((await fetch(`${url}/events/recent`, bearer("first-token"))).status).toBe(200);
+
+      current = "second-token";
+      expect((await fetch(`${url}/events/recent`, bearer("first-token"))).status).toBe(401);
+      expect((await fetch(`${url}/events/recent`, bearer("second-token"))).status).toBe(200);
     });
   });
 
@@ -267,7 +284,7 @@ describe("inbound HTTP authentication", () => {
 
     it("exposes only liveness on /health to anonymous callers and full stats to authenticated ones", async () => {
       const authenticator = createInboundAuthenticator(
-        { sharedToken: SHARED_TOKEN, allowUnauthenticated: false },
+        { sharedToken: () => SHARED_TOKEN, allowUnauthenticated: false },
         logger
       );
       const { url } = await startServer(authenticator);
@@ -293,7 +310,7 @@ describe("inbound HTTP authentication", () => {
 
     beforeEach(async () => {
       const authenticator = createInboundAuthenticator(
-        { sharedToken: SHARED_TOKEN, allowUnauthenticated: false },
+        { sharedToken: () => SHARED_TOKEN, allowUnauthenticated: false },
         logger
       );
       ({ url } = await startServer(authenticator));
@@ -506,7 +523,7 @@ describe("inbound HTTP authentication", () => {
     });
 
     it("accepts either method when both are configured", async () => {
-      const config: InboundAuthConfig = { ...oauthConfig(), sharedToken: SHARED_TOKEN };
+      const config: InboundAuthConfig = { ...oauthConfig(), sharedToken: () => SHARED_TOKEN };
       const { url } = await startServer(createInboundAuthenticator(config, logger));
 
       expect((await fetch(`${url}/events/recent`, bearer(SHARED_TOKEN))).status).toBe(200);
@@ -536,7 +553,7 @@ describe("inbound HTTP authentication", () => {
 
     it("keeps an SSE stream open for credentials that never expire (shared bearer)", async () => {
       const authenticator = createInboundAuthenticator(
-        { sharedToken: SHARED_TOKEN, allowUnauthenticated: false },
+        { sharedToken: () => SHARED_TOKEN, allowUnauthenticated: false },
         logger
       );
       const { url } = await startServer(authenticator, { enableSSE: true });

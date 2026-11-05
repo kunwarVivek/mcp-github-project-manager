@@ -89,7 +89,7 @@ Add the server to your MCP client. For Claude Desktop
 
 ## Step 4: Discover the Tool Surface
 
-The server exposes **20 compound tools covering 169 actions**. Start with the
+The server exposes **<!-- count:tools -->21<!-- /count --> compound tools covering <!-- count:actions -->175<!-- /count --> actions**. Start with the
 `discover_tools` meta-tool — it lists the tools, their actions, and their
 parameter schemas at runtime:
 
@@ -219,7 +219,7 @@ Error: Resource not found: Issue with ID 123 not found
 
 Congratulations! You've completed the getting started tutorial. Here are some next steps:
 
-1. Explore the [Tool Reference](../TOOLS.md) for all 20 compound tools and their 169 actions
+1. Explore the [Tool Reference](../TOOLS.md) for all <!-- count:tools -->21<!-- /count --> compound tools and their <!-- count:actions -->175<!-- /count --> actions
 2. Check out the [Examples](../../examples/README.md) directory for more code samples
 3. Read the [Agent Harness Integration guide](../agent-harness-integration.md) for autonomous agent workflows
 4. Contribute to the project by following the [Contributing Guide](../contributing/index.md)

@@ -11,6 +11,7 @@ import type {
 import { parseResourceStatus, toStatusString } from "../../../domain/utils/StatusParser";
 import type { GitHubConfig } from "../GitHubConfig";
 import type { OctokitInstance } from "../types";
+import { MAX_CONNECTION_PAGES } from "../util/paginate";
 import { BaseGitHubRepository } from "./BaseRepository";
 import { GitHubIssueRepository } from "./GitHubIssueRepository";
 
@@ -18,6 +19,7 @@ type RestMilestonePayload = components["schemas"]["milestone"];
 type CreateMilestoneParams = RestEndpointMethodTypes["issues"]["createMilestone"]["parameters"];
 type UpdateMilestoneParams = RestEndpointMethodTypes["issues"]["updateMilestone"]["parameters"];
 type DeleteMilestoneParams = RestEndpointMethodTypes["issues"]["deleteMilestone"]["parameters"];
+type ListMilestonesParams = RestEndpointMethodTypes["issues"]["listMilestones"]["parameters"];
 
 interface GitHubMilestone {
   id: string;
@@ -253,16 +255,45 @@ export class GitHubMilestoneRepository extends BaseGitHubRepository implements M
     );
   }
 
+  /** Milestones (any state) due on or before `before`. */
   async findByDueDate(before: Date): Promise<Milestone[]> {
-    const all = await this.findAll();
-    return all.filter((milestone) => {
-      if (!milestone.dueDate) return false;
-      return new Date(milestone.dueDate) <= before;
-    });
+    return this.listDueBefore(before, "all");
   }
 
+  /** Open milestones whose due date has passed; a closed milestone is not overdue. */
   async getOverdue(): Promise<Milestone[]> {
-    return this.findByDueDate(new Date());
+    return this.listDueBefore(new Date(), "open");
+  }
+
+  /**
+   * Page through REST milestones ordered by due date (ascending) and stop at
+   * the first one due after `before`. REST cannot filter by due date, so the
+   * ordering is what bounds the scan; milestones without a due date are
+   * skipped wherever the API sorts them.
+   */
+  private async listDueBefore(before: Date, state: "open" | "all"): Promise<Milestone[]> {
+    const result: Milestone[] = [];
+    const perPage = 100;
+
+    for (let page = 1; page <= MAX_CONNECTION_PAGES; page++) {
+      const milestones = await this.rest(
+        (params: ListMilestonesParams) => this.octokit.rest.issues.listMilestones(params),
+        { state, sort: "due_on", direction: "asc", per_page: perPage, page }
+      );
+
+      for (const milestone of milestones) {
+        if (!milestone.due_on) continue;
+        if (new Date(milestone.due_on) > before) return result;
+        result.push(this.mapRestMilestoneToMilestone(milestone));
+      }
+
+      if (milestones.length < perPage) return result;
+    }
+
+    this.logger.warn(
+      `Milestone due-date scan truncated after ${MAX_CONNECTION_PAGES} pages; more milestones exist`
+    );
+    return result;
   }
 
   async getIssues(id: MilestoneId): Promise<Issue[]> {

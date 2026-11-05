@@ -19,17 +19,23 @@ import {
   INCLUDE_IMPLEMENTATION_GUIDANCE,
   INCLUDE_TECHNICAL_CONTEXT,
 } from "../env";
-import { type ILogger, Logger } from "../infrastructure/logger";
+import { getLogger, type ILogger } from "../infrastructure/logger";
+import { AIResponseCache } from "./ai/AIResponseCache";
 import { AIServiceFactory } from "./ai/AIServiceFactory";
+import { defaultPromptRegistry } from "./ai/prompts";
 import {
   type BusinessContext,
   BusinessContextSchema,
   CONTEXT_GENERATION_CONFIGS,
-  formatContextPrompt,
   type GeneratedImplementationGuidance,
   type TechnicalContext,
   TechnicalContextSchema,
 } from "./ai/prompts/ContextGenerationPrompts";
+import {
+  tokenBudgetManager as sharedTokenBudgetManager,
+  TokenBudgetExceededError,
+  type TokenBudgetManager,
+} from "./ai/TokenBudgetManager";
 import { TokenCounter } from "./ai/TokenCounter";
 // Import new context generation services
 import { CodeExampleGenerator } from "./context/CodeExampleGenerator";
@@ -38,13 +44,30 @@ import { DependencyContextGenerator } from "./context/DependencyContextGenerator
 import { InputSanitizer } from "./utils/InputSanitizer";
 import { ContextQualityValidator } from "./validation/ContextQualityValidator";
 
+/** Hit/miss counters for the AI generation calls of one context build. */
+interface AICacheStats {
+  calls: number;
+  hits: number;
+}
+
+/** Process-wide cache shared by default across service instances. */
+const sharedAIResponseCache = new AIResponseCache();
+
+/** Stable identity string for a language model (string id or provider/modelId object). */
+function describeModel(model: unknown): string {
+  if (typeof model === "string") return model;
+  if (model && typeof model === "object") {
+    const provider = "provider" in model ? model.provider : undefined;
+    const modelId = "modelId" in model ? model.modelId : undefined;
+    return `${String(provider ?? "")}:${String(modelId ?? "")}`;
+  }
+  return "unknown";
+}
+
 /**
- * Service for generating comprehensive task context using AI and traceability
- *
- * UPDATED: Now includes FR-4, FR-5, FR-6 implementations
- * - FR-4: Contextual References System
- * - FR-5: Enhanced Acceptance Criteria (integration)
- * - FR-6: Dependency Context Enhancement
+ * Service for generating comprehensive task context using AI and traceability.
+ * AI generation calls go through an injected {@link AIResponseCache}; `metrics.cacheHit`
+ * is true when every AI call of a context build was served from the cache.
  */
 export class TaskContextGenerationService {
   private aiFactory: AIServiceFactory;
@@ -53,20 +76,34 @@ export class TaskContextGenerationService {
   private dependencyContextGenerator: DependencyContextGenerator;
   private qualityValidator: ContextQualityValidator;
   private readonly logger: ILogger;
+  private readonly responseCache: AIResponseCache;
+  private readonly tokenBudget: TokenBudgetManager;
 
   /**
    * @param aiFactory - AI service factory for model access. When omitted (DI mode),
    *   defaults to the global singleton via `AIServiceFactory.getInstance()`.
    * @param logger - Logger instance for diagnostics. When omitted, defaults to
-   *   the global singleton via `Logger.getInstance()`.
+   *   a prefixed console logger via `getLogger()`.
+   * @param responseCache - Cache for AI generation results. When omitted, defaults to
+   *   a process-wide shared instance (default TTL from AIResponseCache).
+   * @param tokenBudget - Per-session AI token budget. When omitted, defaults to the
+   *   process-wide manager. An exhausted budget makes AI generation return nothing
+   *   (the traceability-only fallback) instead of throwing.
    */
-  constructor(aiFactory?: AIServiceFactory, logger?: ILogger) {
+  constructor(
+    aiFactory?: AIServiceFactory,
+    logger?: ILogger,
+    responseCache?: AIResponseCache,
+    tokenBudget?: TokenBudgetManager
+  ) {
     this.aiFactory = aiFactory ?? AIServiceFactory.getInstance();
     this.contextualRefGenerator = new ContextualReferenceGenerator(this.aiFactory);
     this.codeExampleGenerator = new CodeExampleGenerator(this.aiFactory, logger);
     this.dependencyContextGenerator = new DependencyContextGenerator(this.aiFactory);
     this.qualityValidator = new ContextQualityValidator();
-    this.logger = logger ?? Logger.getInstance();
+    this.logger = logger ?? getLogger("TaskContextGenerationService");
+    this.responseCache = responseCache ?? sharedAIResponseCache;
+    this.tokenBudget = tokenBudget ?? sharedTokenBudgetManager;
   }
 
   /**
@@ -93,6 +130,7 @@ export class TaskContextGenerationService {
       // Add AI-enhanced context if enabled and available
       let aiEnhancedContext = {};
       let aiEnhanced = false;
+      let cacheHit = false;
 
       if (config.enableEnhancedGeneration && this.aiFactory.getBestAvailableModel()) {
         try {
@@ -105,6 +143,7 @@ export class TaskContextGenerationService {
           );
           aiEnhancedContext = aiResult.context;
           estimatedTokens = aiResult.estimatedTokens;
+          cacheHit = aiResult.cacheHit;
           aiEnhanced = true;
         } catch (error) {
           errors.push(
@@ -125,7 +164,7 @@ export class TaskContextGenerationService {
         completenessScore: this.calculateContextCompleteness(context),
         generationTime,
         estimatedTokens,
-        cacheHit: false, // TODO: Implement caching
+        cacheHit,
         aiEnhanced,
         errors,
         warnings,
@@ -222,14 +261,19 @@ export class TaskContextGenerationService {
     config: EnhancedTaskGenerationConfig,
     allTasks?: AITask[],
     features?: FeatureRequirement[]
-  ): Promise<{ context: Partial<TaskExecutionContext>; estimatedTokens: number }> {
+  ): Promise<{
+    context: Partial<TaskExecutionContext>;
+    estimatedTokens: number;
+    cacheHit: boolean;
+  }> {
     const enhancedContext: Partial<TaskExecutionContext> = {};
     let totalTokens = 0;
+    const stats: AICacheStats = { calls: 0, hits: 0 };
 
     try {
       // FR-1: Generate business context if enabled
       if (config.includeBusinessContext) {
-        const businessContext = await this.generateBusinessContext(task, prdContent);
+        const businessContext = await this.generateBusinessContext(task, prdContent, stats);
         if (businessContext) {
           enhancedContext.businessObjective = businessContext.businessObjective;
           enhancedContext.userImpact = businessContext.userImpact;
@@ -241,7 +285,7 @@ export class TaskContextGenerationService {
       // FR-2: Generate technical context if enabled
       let technicalContext: TechnicalContext | null = null;
       if (config.includeTechnicalContext) {
-        technicalContext = await this.generateTechnicalContext(task, prdContent);
+        technicalContext = await this.generateTechnicalContext(task, prdContent, stats);
         if (technicalContext) {
           // Every field here comes from an LLM response, so a partial object is
           // routine rather than exceptional. Mapping unguarded threw
@@ -266,7 +310,8 @@ export class TaskContextGenerationService {
         const guidance = await this.generateImplementationGuidance(
           task,
           enhancedContext,
-          technicalContext
+          technicalContext,
+          stats
         );
         if (guidance) {
           enhancedContext.implementationGuidance = guidance;
@@ -323,11 +368,72 @@ export class TaskContextGenerationService {
       return {
         context: enhancedContext,
         estimatedTokens: totalTokens,
+        cacheHit: stats.calls > 0 && stats.hits === stats.calls,
       };
     } catch (error) {
       this.logger.error("Error generating AI-enhanced context", error);
-      return { context: {}, estimatedTokens: totalTokens };
+      return { context: {}, estimatedTokens: totalTokens, cacheHit: false };
     }
+  }
+
+  /**
+   * Run an AI object generation through the response cache and the session token
+   * budget. The cache key covers every prompt-affecting input (kind, system prompt,
+   * prompt, sampling settings) plus the model identity. Cache hits consume no
+   * budget. Only successful results are stored; a throwing `produce` propagates,
+   * releases its reservation and leaves the cache untouched. Returns null (after a
+   * warning) when the session budget cannot cover the call.
+   */
+  private async generateCachedObject<T>(
+    request: {
+      kind: string;
+      system: string;
+      prompt: string;
+      maxOutputTokens?: number;
+      temperature?: number;
+    },
+    model: unknown,
+    stats: AICacheStats | undefined,
+    produce: () => Promise<{ value: T; usage?: unknown }>
+  ): Promise<T | null> {
+    const modelId = describeModel(model);
+    const content = JSON.stringify(request);
+    const cached = this.responseCache.get(content, modelId);
+    if (stats) stats.calls += 1;
+    if (cached.hit) {
+      if (stats) stats.hits += 1;
+      return cached.response as T;
+    }
+
+    const estimated =
+      TokenCounter.estimate(request.system) +
+      TokenCounter.estimate(request.prompt) +
+      (request.maxOutputTokens ?? 0);
+    let sessionId: string | undefined;
+    try {
+      sessionId = this.tokenBudget.reserve(undefined, estimated);
+    } catch (error) {
+      if (error instanceof TokenBudgetExceededError) {
+        this.logger.warn(
+          `AI token budget exhausted; skipping ${request.kind} generation: ${error.message}`
+        );
+        return null;
+      }
+      throw error;
+    }
+
+    let produced: { value: T; usage?: unknown };
+    try {
+      produced = await produce();
+    } catch (error) {
+      this.tokenBudget.release(sessionId, estimated);
+      throw error;
+    }
+    this.tokenBudget.commit(sessionId, produced.usage, estimated);
+    // Responses are plain JSON; round-trip so later mutation of the returned
+    // object cannot corrupt the cached copy.
+    this.responseCache.set(content, JSON.parse(JSON.stringify(produced.value)), modelId);
+    return produced.value;
   }
 
   /**
@@ -335,30 +441,46 @@ export class TaskContextGenerationService {
    */
   private async generateBusinessContext(
     task: AITask,
-    prdContent: string
+    prdContent: string,
+    stats?: AICacheStats
   ): Promise<BusinessContext | null> {
     try {
       const model = this.aiFactory.getBestAvailableModel();
       if (!model) return null;
 
       const config = CONTEXT_GENERATION_CONFIGS.businessContext;
-      const prompt = formatContextPrompt(config.userPrompt, {
+      const system = defaultPromptRegistry.render(config.systemPromptId);
+      const prompt = defaultPromptRegistry.render(config.userPromptId, {
         prdContent: InputSanitizer.sanitizePRDContent(prdContent),
         taskTitle: InputSanitizer.sanitizeTaskContent(task.title),
         taskDescription: InputSanitizer.sanitizeTaskContent(task.description),
-        taskPriority: task.priority,
+        taskPriority: String(task.priority),
       });
 
-      const result = await generateObject({
+      const object = await this.generateCachedObject(
+        {
+          kind: "businessContext",
+          system,
+          prompt,
+          maxOutputTokens: config.maxTokens,
+          temperature: config.temperature,
+        },
         model,
-        system: config.systemPrompt,
-        prompt,
-        schema: BusinessContextSchema,
-        maxOutputTokens: config.maxTokens,
-        temperature: config.temperature,
-      });
+        stats,
+        async () => {
+          const result = await generateObject({
+            model,
+            system,
+            prompt,
+            schema: BusinessContextSchema,
+            maxOutputTokens: config.maxTokens,
+            temperature: config.temperature,
+          });
+          return { value: result.object, usage: result.usage };
+        }
+      );
 
-      return result.object;
+      return object;
     } catch (error) {
       this.logger.error("Error generating business context", error);
       return null;
@@ -370,30 +492,46 @@ export class TaskContextGenerationService {
    */
   private async generateTechnicalContext(
     task: AITask,
-    prdContent: string
+    prdContent: string,
+    stats?: AICacheStats
   ): Promise<TechnicalContext | null> {
     try {
       const model = this.aiFactory.getBestAvailableModel();
       if (!model) return null;
 
       const config = CONTEXT_GENERATION_CONFIGS.technicalContext;
-      const prompt = formatContextPrompt(config.userPrompt, {
+      const system = defaultPromptRegistry.render(config.systemPromptId);
+      const prompt = defaultPromptRegistry.render(config.userPromptId, {
         prdContent: InputSanitizer.sanitizePRDContent(prdContent),
         taskTitle: InputSanitizer.sanitizeTaskContent(task.title),
         taskDescription: InputSanitizer.sanitizeTaskContent(task.description),
-        taskComplexity: task.complexity,
+        taskComplexity: String(task.complexity),
       });
 
-      const result = await generateObject({
+      const object = await this.generateCachedObject(
+        {
+          kind: "technicalContext",
+          system,
+          prompt,
+          maxOutputTokens: config.maxTokens,
+          temperature: config.temperature,
+        },
         model,
-        system: config.systemPrompt,
-        prompt,
-        schema: TechnicalContextSchema,
-        maxOutputTokens: config.maxTokens,
-        temperature: config.temperature,
-      });
+        stats,
+        async () => {
+          const result = await generateObject({
+            model,
+            system,
+            prompt,
+            schema: TechnicalContextSchema,
+            maxOutputTokens: config.maxTokens,
+            temperature: config.temperature,
+          });
+          return { value: result.object, usage: result.usage };
+        }
+      );
 
-      return result.object;
+      return object;
     } catch (error) {
       this.logger.error("Error generating technical context", error);
       return null;
@@ -406,7 +544,8 @@ export class TaskContextGenerationService {
   async generateImplementationGuidance(
     task: AITask,
     businessContext?: Partial<TaskExecutionContext> | BusinessContext | null,
-    technicalContext?: TechnicalContext | null
+    technicalContext?: TechnicalContext | null,
+    stats?: AICacheStats
   ): Promise<ImplementationGuidance | null> {
     try {
       const model = this.aiFactory.getBestAvailableModel();
@@ -433,11 +572,12 @@ export class TaskContextGenerationService {
       }
 
       const config = CONTEXT_GENERATION_CONFIGS.implementationGuidance;
-      const prompt = formatContextPrompt(config.userPrompt, {
+      const system = defaultPromptRegistry.render(config.systemPromptId);
+      const prompt = defaultPromptRegistry.render(config.userPromptId, {
         taskTitle: InputSanitizer.sanitizeTaskContent(task.title),
         taskDescription: InputSanitizer.sanitizeTaskContent(task.description),
-        taskComplexity: task.complexity,
-        taskPriority: task.priority,
+        taskComplexity: String(task.complexity),
+        taskPriority: String(task.priority),
         businessContext: businessContext
           ? JSON.stringify(businessContext, null, 2)
           : "Not available",
@@ -446,17 +586,32 @@ export class TaskContextGenerationService {
           : "Not available",
       });
 
-      const result = await generateObject({
+      const object = await this.generateCachedObject(
+        {
+          kind: "implementationGuidance",
+          system,
+          prompt,
+          maxOutputTokens: config.maxTokens,
+          temperature: config.temperature,
+        },
         model,
-        system: config.systemPrompt,
-        prompt,
-        schema: config.schema,
-        maxOutputTokens: config.maxTokens,
-        temperature: config.temperature,
-      });
+        stats,
+        async () => {
+          const result = await generateObject({
+            model,
+            system,
+            prompt,
+            schema: config.schema,
+            maxOutputTokens: config.maxTokens,
+            temperature: config.temperature,
+          });
+          return { value: result.object, usage: result.usage };
+        }
+      );
 
+      if (!object) return null;
       // Merge with code examples
-      return this.transformImplementationGuidance(result.object);
+      return this.transformImplementationGuidance(object);
     } catch (error) {
       this.logger.error("Error generating implementation guidance", error);
       return null;

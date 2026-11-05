@@ -1,6 +1,6 @@
 # GitHub Project Manager MCP API Reference
 
-> **Scope note.** The public MCP surface is **20 compound tools covering 169
+> **Scope note.** The public MCP surface is **<!-- count:tools -->21<!-- /count --> compound tools covering <!-- count:actions -->175<!-- /count -->
 > actions** — see [TOOLS.md](../TOOLS.md). The pages in this folder document
 > individual *operations* (the granularity used inside the service layer), not
 > tool names a client can call. Use `discover_tools` at runtime to list the

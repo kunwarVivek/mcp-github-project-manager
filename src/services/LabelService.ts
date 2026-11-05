@@ -1,4 +1,5 @@
 import type { GitHubRepositoryFactory } from "../infrastructure/github/GitHubRepositoryFactory";
+import type { GitHubLabelRepository } from "../infrastructure/github/repositories/GitHubLabelRepository";
 import { safeCall } from "./utils/safeCall";
 
 /**
@@ -17,30 +18,16 @@ export class LabelService {
     this.factory = factory;
   }
 
+  private get labelRepo(): GitHubLabelRepository {
+    return this.factory.createLabelRepository();
+  }
+
   async createLabel(data: {
     name: string;
     color?: string;
     description?: string;
   }): Promise<{ id: number; name: string; color: string; description: string }> {
-    return safeCall(async () => {
-      const octokit = this.factory.getOctokit();
-      const config = this.factory.getConfig();
-
-      const response = await octokit.rest.issues.createLabel({
-        owner: config.owner,
-        repo: config.repo,
-        name: data.name,
-        color: data.color?.replace("#", "") || "ededed",
-        description: data.description || "",
-      });
-
-      return {
-        id: response.data.id,
-        name: response.data.name,
-        color: response.data.color,
-        description: response.data.description || "",
-      };
-    });
+    return safeCall(async () => this.labelRepo.create(data));
   }
 
   async listLabels(data: { limit?: number } = {}): Promise<
@@ -51,22 +38,6 @@ export class LabelService {
       description: string;
     }>
   > {
-    return safeCall(async () => {
-      const octokit = this.factory.getOctokit();
-      const config = this.factory.getConfig();
-
-      const response = await octokit.rest.issues.listLabelsForRepo({
-        owner: config.owner,
-        repo: config.repo,
-        per_page: data.limit || 100,
-      });
-
-      return response.data.map((label) => ({
-        id: label.id,
-        name: label.name,
-        color: label.color,
-        description: label.description || "",
-      }));
-    });
+    return safeCall(async () => this.labelRepo.list(data.limit || 100));
   }
 }

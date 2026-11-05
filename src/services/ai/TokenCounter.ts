@@ -31,4 +31,25 @@ export const TokenCounter = {
     const targetChars = Math.floor((limit / estimated) * text.length * 0.95);
     return `${text.substring(0, targetChars)}\n[...truncated to fit token limit]`;
   },
+
+  /**
+   * Total tokens from provider-reported usage, or undefined when none is reported.
+   * Accepts a plain number, the legacy flat shape (`inputTokens: number`) and the
+   * ai@7 shape (`inputTokens: { total }`, `outputTokens: { total }`).
+   */
+  fromUsage(usage: unknown): number | undefined {
+    const asCount = (value: unknown): number | undefined => {
+      if (typeof value === "number") {
+        return Number.isFinite(value) && value >= 0 ? value : undefined;
+      }
+      if (value && typeof value === "object" && "total" in value) return asCount(value.total);
+      return undefined;
+    };
+    if (!usage || typeof usage !== "object") return asCount(usage);
+    const input = "inputTokens" in usage ? asCount(usage.inputTokens) : undefined;
+    const output = "outputTokens" in usage ? asCount(usage.outputTokens) : undefined;
+    if (input !== undefined || output !== undefined) return (input ?? 0) + (output ?? 0);
+    if ("totalTokens" in usage) return asCount(usage.totalTokens);
+    return asCount(usage);
+  },
 };

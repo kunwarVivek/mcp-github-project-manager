@@ -26,6 +26,19 @@ export interface DebitSettlement {
   outstanding: UnpaidDebit[];
 }
 
+/** The agent's budget is exhausted (hard stop): AI-spending work is refused. */
+export class BudgetExhaustedError extends Error {
+  constructor(
+    readonly agentId: string,
+    readonly status: BudgetStatus
+  ) {
+    super(
+      `Token budget exhausted for agent ${agentId} (${status.usedTokens}/${status.totalTokens} tokens used on ${status.agentId}'s budget).`
+    );
+    this.name = "BudgetExhaustedError";
+  }
+}
+
 function errorText(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
@@ -190,19 +203,16 @@ export class AgentBudgetService {
     return { settledTokens, outstanding };
   }
 
-  /** Check whether the agent can afford an estimated number of tokens. Subagents check parent. */
-  async canAfford(agentId: string, estimatedTokens: number): Promise<boolean> {
-    return safeCall(async () => {
-      const agent = await this.agentStore.getAgent(agentId);
-      if (!agent) {
-        throw new Error(`Agent not found: ${agentId}`);
-      }
-
-      // Subagents check parent's budget
-      const budgetOwner = await this.resolveBudgetOwner(agent);
-      const status = await this.getBudgetStatus(budgetOwner.id);
-      return status.remainingTokens >= estimatedTokens;
-    });
+  /**
+   * Gate a spend: throws {@link BudgetExhaustedError} when the agent's budget
+   * (its root's, for subagents) is exhausted under a hard stop. Callers run it
+   * before tool calls that spend server-side AI tokens.
+   */
+  async assertCanSpend(agentId: string): Promise<void> {
+    const status = await this.getBudgetStatus(agentId);
+    if (status.isExhausted) {
+      throw new BudgetExhaustedError(agentId, status);
+    }
   }
 
   /** Reset the budget if the reset period has elapsed. Returns true if a reset occurred. */

@@ -1,6 +1,6 @@
 import { generateObject } from "ai";
 import { z } from "zod";
-import { type ILogger, Logger } from "../infrastructure/logger";
+import { getLogger, type ILogger } from "../infrastructure/logger";
 import type { AIServiceFactory } from "./ai/AIServiceFactory";
 import type { ProjectManagementService } from "./ProjectManagementService";
 import { InputSanitizer } from "./utils/InputSanitizer";
@@ -50,7 +50,7 @@ export class RoadmapPlanningService {
     private projectService: ProjectManagementService,
     logger?: ILogger
   ) {
-    this.logger = logger ?? Logger.getInstance();
+    this.logger = logger ?? getLogger("RoadmapPlanningService");
   }
 
   /**
@@ -67,7 +67,7 @@ export class RoadmapPlanningService {
       this.logger.info(`Generating roadmap for project ${params.projectId}`);
 
       // Fetch all issues for the project
-      const items = await this.projectService.listProjectItems({
+      const items = await this.projectService.linking.listProjectItems({
         projectId: params.projectId,
         limit: 200,
       });
@@ -179,7 +179,7 @@ REQUIREMENTS:
     // project item id -> issue node id
     const issueNodeIdByItemId = new Map<string, string>();
     try {
-      const items = await this.projectService.listProjectItems({
+      const items = await this.projectService.linking.listProjectItems({
         projectId: params.projectId,
         limit: 200,
       });
@@ -204,9 +204,9 @@ REQUIREMENTS:
     for (const milestone of milestones) {
       const title = milestone?.title ?? "Untitled milestone";
       try {
-        const created = await this.projectService.createMilestone({
+        const created = await this.projectService.milestones.createMilestone({
           title: milestone.title,
-          description: milestone.description,
+          description: milestone.description || "",
           dueDate: milestone.dueDate,
         });
         createdMilestones++;
@@ -222,7 +222,9 @@ REQUIREMENTS:
             continue;
           }
           try {
-            await this.projectService.updateIssue(issueNodeId, { milestoneId: created.id });
+            await this.projectService.issues.updateIssue(issueNodeId, {
+              milestoneId: created.id,
+            });
             updatedIssues++;
           } catch (error) {
             failures.push({

@@ -1,7 +1,7 @@
 # Create Roadmap Tool
 
 > **Scope note.** `create_roadmap` is a service-layer operation, not a public
-> MCP tool name. The public surface is the 20 compound tools in
+> MCP tool name. The public surface is the <!-- count:tools -->21<!-- /count --> compound tools in
 > [TOOLS.md](../TOOLS.md); use `discover_tools` to list the live actions and
 > schemas.
 

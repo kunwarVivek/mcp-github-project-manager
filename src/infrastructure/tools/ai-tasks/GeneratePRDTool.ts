@@ -6,7 +6,7 @@ import { Logger } from "../../logger/index.js";
 import { ANNOTATION_PATTERNS } from "../annotations/tool-annotations.js";
 import { PRDOutputSchema } from "../schemas/ai-schemas.js";
 import { ToolResultFormatter } from "../ToolResultFormatter.js";
-import type { ToolDefinition, ToolSchema } from "../ToolValidator.js";
+import { type ToolDefinition, type ToolSchema, ToolValidator } from "../ToolValidator.js";
 
 const logger = Logger.getInstance();
 
@@ -37,7 +37,12 @@ export type GeneratePRDArgs = z.infer<typeof generatePRDSchema>;
 /**
  * Implementation function for generate_prd tool
  */
-async function executeGeneratePRD(args: GeneratePRDArgs): Promise<MCPResponse> {
+async function executeGeneratePRD(rawArgs: unknown): Promise<MCPResponse> {
+  const args = ToolValidator.validate(
+    "generate_prd",
+    rawArgs,
+    generatePRDSchema as unknown as ToolSchema<GeneratePRDArgs>
+  );
   const prdService = new PRDGenerationService();
 
   try {

@@ -5,6 +5,7 @@ import {
   executeAiAnalyze,
   executeAiGenerate,
   executeAiPlan,
+  executeAnalytics,
   executeDiscoverTools,
   executeManageAutomation,
   executeManageBranches,
@@ -60,4 +61,5 @@ export function registerCompoundExecutors(r: ToolRegistry): void {
   r.registerExecutor("manage_branches", executeManageBranches);
   r.registerExecutor("manage_releases", executeManageReleases);
   r.registerExecutor("manage_workflows", executeManageWorkflows);
+  r.registerExecutor("analytics", executeAnalytics);
 }

@@ -4,7 +4,6 @@ import {
   redactSecretPatterns,
   redactSecrets,
 } from "../../../../infrastructure/logger/index";
-import { StructuredLogger } from "../../../../infrastructure/logger/StructuredLogger";
 
 const b62 = (n: number): string => "aZ09".repeat(Math.ceil(n / 4)).slice(0, n);
 
@@ -139,8 +138,6 @@ describe("log sinks", () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
-    vi.unstubAllEnvs();
-    StructuredLogger.resetInstance();
   });
 
   for (const { name, secret } of FAMILIES) {
@@ -152,24 +149,16 @@ describe("log sinks", () => {
       expect(written.join("")).toContain("[REDACTED");
     });
 
-    it(`StructuredLogger json format redacts ${name} in message, context and error`, () => {
-      vi.stubEnv("LOG_FORMAT", "json");
-      StructuredLogger.resetInstance();
-      StructuredLogger.getInstance().error(`failed with ${secret}`, new Error(`inner ${secret}`), {
+    it(`ConsoleLogger json format redacts ${name} in message, string vararg and nested value`, () => {
+      new ConsoleLogger("T", { format: "json" }).error(`failed with ${secret}`, `raw ${secret}`, {
         detail: `ctx ${secret}`,
+        err: new Error(`inner ${secret}`),
       });
       const output = written.join("");
       expect(output).not.toContain(secret);
-      const entry = JSON.parse(output) as { message: string; error: { message: string } };
+      const entry = JSON.parse(output) as { message: string; data: unknown[] };
       expect(entry.message).toContain("[REDACTED");
-      expect(entry.error.message).toContain("[REDACTED");
-    });
-
-    it(`StructuredLogger text format redacts ${name}`, () => {
-      vi.stubEnv("LOG_FORMAT", "text");
-      StructuredLogger.resetInstance();
-      StructuredLogger.getInstance().warn(`m ${secret}`, { c: secret });
-      expect(written.join("")).not.toContain(secret);
+      expect(JSON.stringify(entry.data)).toContain("[REDACTED");
     });
   }
 

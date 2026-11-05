@@ -169,9 +169,14 @@ describe("creatable project field types", () => {
           },
         });
       }
-      if (query.includes("fields(first: 100)")) {
+      if (query.includes("fields(first: 100")) {
         return Promise.resolve({
-          node: { fields: { nodes: [{ id: MULTI_SELECT_FIELD_ID, name: "Tags" }] } },
+          node: {
+            fields: {
+              nodes: [{ id: MULTI_SELECT_FIELD_ID, name: "Tags" }],
+              pageInfo: { hasNextPage: false, endCursor: null },
+            },
+          },
         });
       }
       return Promise.resolve({
@@ -216,9 +221,14 @@ describe("creatable project field types", () => {
           },
         });
       }
-      if (query.includes("fields(first: 100)")) {
+      if (query.includes("fields(first: 100")) {
         return Promise.resolve({
-          node: { fields: { nodes: [{ id: "PVTF_1", name: "Assignees" }] } },
+          node: {
+            fields: {
+              nodes: [{ id: "PVTF_1", name: "Assignees" }],
+              pageInfo: { hasNextPage: false, endCursor: null },
+            },
+          },
         });
       }
       return Promise.resolve({

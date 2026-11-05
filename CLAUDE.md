@@ -28,7 +28,7 @@ exactly like `pnpm run <script>`, and `npm test` like `pnpm test`.
 | E2E (mock) | `pnpm run test:e2e` · tools `pnpm run test:e2e:tools` |
 | E2E (live API) | `E2E_REAL_API=true pnpm run test:e2e:tools:real` · agent orchestration tiers: `pnpm run test:e2e:smoke` (~242 GraphQL pts) · `pnpm run test:e2e:full` (~4,500 of 5,000/h) |
 | E2E runner | `pnpm run e2e` — `--suite <name>`, `--real-api`, `--json <path>` (never `--testPathPattern`: Vitest 5 rejects it) |
-| Action sweep | `pnpm run test:e2e:sweep` · gate `pnpm run test:e2e:coverage` — every one of the 169 actions, no credentials needed |
+| Action sweep | `pnpm run test:e2e:sweep` · gate `pnpm run test:e2e:coverage` — every one of the <!-- count:actions -->175<!-- /count --> actions, no credentials needed |
 | Coverage | `pnpm run test:coverage` |
 | Lint / format | `pnpm run lint` (Biome) · `pnpm run format` |
 | Inspect MCP server | `pnpm run inspect` |
@@ -37,18 +37,36 @@ exactly like `pnpm run <script>`, and `npm test` like `pnpm test`.
 
 - `src/index.ts` — entry; boots an `McpServer` (`@modelcontextprotocol/server`
   v2, 2026-07-28 spec) via `serveStdio`, which negotiates the protocol revision
-  per connection. Each tool is registered with `registerTool`; all of them share
-  one `dispatchTool` carrying the shutdown gate, in-flight tracking and result
-  formatting. Wires `ToolRegistry` + `ProjectManagementService` through
-  `src/container.ts` (tsyringe DI).
-- Tool errors: an execution failure returns `{content, isError: true}` so the
-  model can see and recover from it. A JSON-RPC error is reserved for protocol
-  faults (unknown tool). Note v2 validates arguments against the declared
-  `inputSchema` *before* the handler runs, so `ToolValidator` never sees a
-  missing required field.
-- `src/domain/` — types, zod schemas, errors. No logic.
-- `src/services/` — business logic. `ProjectManagementService` orchestrates
-  per-feature services; `services/ai/` holds AI SDK providers.
+  per connection. Each of the <!-- count:tools -->21<!-- /count --> tools is registered with `registerTool`; all of them share
+  one `dispatchTool` carrying the shutdown gate and in-flight tracking, then
+  delegating to `ToolDispatcher` (`infrastructure/mcp/ToolDispatcher.ts`):
+  argument validation → budget gate → audited execution inside an OTel span →
+  budget debit → result formatting.
+- Composition root (`src/container.ts`, tsyringe): `configureContainer(auth,
+  owner, repo)` registers the components `index.ts` owns — `ResourceCache`,
+  `FilePersistenceAdapter`, `GitHubWebhookHandler`, `EventStore`,
+  `EventSubscriptionManager`, `GracefulShutdown`, `MutationAuditLog`,
+  `TelemetryConfig` — plus the services; `index.ts` resolves
+  them and constructs none by hand. **Documented exception:** tool executors
+  (`infrastructure/tools/**`) do NOT resolve from the container. They
+  self-construct through the one shared factory (`createGitHubFactory()` in
+  `tools/tool-factory.ts` / the shared-services accessor), which itself uses
+  `resolveGitHubAuth()`. Do not add a second construction path.
+- Tool errors: unknown tool is the only JSON-RPC error (`McpError`
+  MethodNotFound). Every other failure — invalid arguments (field-level
+  messages), GitHub API errors (`ToolValidator.mapGitHubError`: 401/403/404/422/
+  rate-limit/5xx with actionable text), exhausted agent budget (`BudgetExhausted`
+  with remaining/limit) — returns `{content, isError: true}` with the stable
+  code in `_meta.error`, so the model can recover. Note v2 validates arguments
+  against the declared `inputSchema` *before* the handler runs; `ToolValidator`
+  additionally applies parameter coercion and the zod schema.
+- Granular (per-operation) tools stay registered in `ToolRegistry` as internal
+  implementation contracts; only the compound tools are listed over MCP.
+- `src/domain/` — types, zod schemas, errors, and entity/value-object behavior
+  (rich entities). Imports nothing from `services/` or `infrastructure/`.
+- `src/services/` — business logic. `ProjectManagementService` is a thin
+  facade of typed per-feature service getters (no behavior of its own);
+  `services/ai/` holds AI SDK providers.
 - `src/infrastructure/` — `github/` (Octokit GraphQL/REST), `tools/` (MCP tool
   defs + registry + validators), plus cache, persistence, resilience, events.
 - `src/env.ts` + `src/cli.ts` — config. CLI flags override env vars.
@@ -74,26 +92,46 @@ exactly like `pnpm run <script>`, and `npm test` like `pnpm test`.
   Entry is `build/bin.js`; `build/index.js` has no `auth` subcommands.
 - `GitHubAuth` / `resolveGitHubAuth()` (`src/infrastructure/github/auth/`) is
   the ONLY credential seam. Never pass raw token strings around and never read
-  `process.env.GITHUB_TOKEN` directly; build factories from a `GitHubAuth`
-  (`GitHubRepositoryFactory(auth, owner, repo)`, `configureContainer(auth, ...)`).
-  `requireToken` and the module-level `GITHUB_TOKEN` export are gone. Other
-  config/secrets still go through `getSecret()`.
+  `process.env.GITHUB_TOKEN` directly; build repositories only from a
+  `GitHubAuth` via `GitHubRepositoryFactory.fromAuth(auth, owner, repo)`
+  (`configureContainer(auth, ...)`). `GitHubConfig` holds no token material;
+  `auth.mode` is `app-installation` or a token mode. `requireToken` and the
+  module-level `GITHUB_TOKEN` export are gone. Other config/secrets still go
+  through `getSecret()`.
 - AI (optional, unlocks AI tools): `ANTHROPIC_API_KEY`, `GOOGLE_API_KEY`,
   `OPENAI_API_KEY`, `PERPLEXITY_API_KEY`; model overrides `AI_MAIN_MODEL`,
-  `AI_PRD_MODEL`, `AI_RESEARCH_MODEL`, `AI_FALLBACK_MODEL`.
+  `AI_PRD_MODEL`, `AI_RESEARCH_MODEL`, `AI_FALLBACK_MODEL`. Embeddings (semantic
+  duplicate detection): `AI_EMBEDDING_MODEL` (default `text-embedding-3-small`),
+  `AI_EMBEDDING_API_KEY` (falls back to `OPENAI_API_KEY`; resolved through the
+  secret chain), `AI_EMBEDDING_BASE_URL` (OpenAI-compatible endpoint).
 - Optional: `SYNC_ENABLED`, `SYNC_TIMEOUT_MS`, `CACHE_DIRECTORY`,
   `WEBHOOK_SECRET`, `WEBHOOK_PORT`, `SSE_ENABLED`.
 - Inbound `/events/*` auth (bearer header only): `EVENTS_AUTH_TOKEN` (shared
-  secret) and/or OAuth 2.1 resource server `OAUTH_ISSUER` + `OAUTH_AUDIENCE`
-  (required together), `OAUTH_JWKS_URI`, `OAUTH_REQUIRED_SCOPES`,
-  `OAUTH_RESOURCE_URL`. Nothing configured → 401; opt out with
-  `EVENTS_ALLOW_UNAUTHENTICATED=true`. Anonymous `/health` returns status only.
+  secret, read via `getSecret()` per request) and/or OAuth 2.1 resource server
+  `OAUTH_ISSUER` + `OAUTH_AUDIENCE` (required together), `OAUTH_JWKS_URI`,
+  `OAUTH_REQUIRED_SCOPES`, `OAUTH_RESOURCE_URL`. Nothing configured → 503
+  ("Events API disabled"); bad/missing credentials when configured → 401; opt
+  out with `EVENTS_ALLOW_UNAUTHENTICATED=true`. Anonymous `/health` returns
+  status only.
 - Vertex AI Gemini (provider `google-vertex`, Google ADC, no key in our
   config): `GOOGLE_VERTEX_PROJECT` (enables it), `GOOGLE_VERTEX_LOCATION`
   (default `us-central1`); creds via `GOOGLE_APPLICATION_CREDENTIALS` / gcloud
   ADC / workload identity.
+- Rate limits: `RATE_LIMIT_FLOOR` (default 100) — below this many remaining
+  GraphQL points the client backs off proactively instead of burning the budget
+  and hitting a 403.
+- Observability: `AUDIT_LOG_ENABLED` / `AUDIT_LOG_PATH` write an append-only,
+  redacted JSONL record of every state-changing tool call (actor = agent id or
+  `token`); `OTEL_EXPORTER_OTLP_ENDPOINT` / `OTEL_SERVICE_NAME` enable OTLP
+  tracing (`tool.<name>` spans). Both flush in graceful shutdown.
 - Webhook security: signature validation fails closed. With no `WEBHOOK_SECRET`,
   webhooks are rejected unless `WEBHOOK_ALLOW_UNSIGNED=true` (trusted dev only).
+  The HTTP server is hardened by default, each with an opt-out/tuning var:
+  binds loopback (`WEBHOOK_HOST=0.0.0.0` to expose), `/events/*` needs
+  `EVENTS_AUTH_TOKEN` (or `EVENTS_ALLOW_UNAUTHENTICATED=true`, dev only; startup
+  warns when SSE is on with neither), CORS allow-list `WEBHOOK_ALLOWED_ORIGINS`,
+  rate limit `WEBHOOK_RATE_LIMIT` / `WEBHOOK_RATE_WINDOW_MS`, request timeout
+  `WEBHOOK_TIMEOUT_MS`, `X-Forwarded-For` only from `WEBHOOK_TRUSTED_PROXIES`.
 - Secrets: set `SECRETS_DIR` (e.g. `/run/secrets`) to load any config/secret from
   a file named after it (Docker/k8s secret convention), checked before env vars.
   `getSecret(name)` in `env.ts` reads fresh (rotation-aware). Vault/AWS SM are an
@@ -132,7 +170,7 @@ exactly like `pnpm run <script>`, and `npm test` like `pnpm test`.
   outright — `--testPathPattern` / `--testPathIgnorePatterns` exit with
   `CACError: Unknown option`, which silently broke 17 npm scripts. Filter by
   positional pattern (`vitest run ai-services`) and exclude with
-  `--exclude='**/tests/x/**'`.
+  `--exclude='**/e2e/**'`.
 - Test mocks must use `function`, not an arrow, wherever the code under test
   calls `new` — `mockImplementation(() => ({...}))` fails with
   "is not a constructor". Likewise a `beforeEach(() => x.mockReset())` with an
@@ -233,7 +271,7 @@ This project is indexed by GitNexus as **mcp-github-project-manager** (13683 sym
 <!-- gitnexus:end -->
 
 
-<!-- BEGIN BEADS INTEGRATION v:1 profile:minimal hash:6cd5cc61 -->
+<!-- BEGIN BEADS INTEGRATION v:1 profile:minimal hash:46cd31e7 -->
 ## Beads Issue Tracker
 
 This project uses **bd (beads)** for issue tracking. Run `bd prime` to see full workflow context and commands.
@@ -253,7 +291,7 @@ bd close <id>         # Complete work
 - Run `bd prime` for detailed command reference and session close protocol
 - Use `bd remember` for persistent knowledge — do NOT use MEMORY.md files
 
-**Architecture in one line:** issues live in a local Dolt DB; sync uses `refs/dolt/data` on your git remote; `.beads/issues.jsonl` is a passive export. See https://github.com/gastownhall/beads/blob/main/docs/SYNC_CONCEPTS.md for details and anti-patterns.
+**Architecture in one line:** issues live in a local Dolt DB; sync uses `refs/dolt/data` on your git remote; `.beads/issues.jsonl` is a passive export. See https://github.com/gastownhall/beads/blob/main/docs/core-concepts/sync-concepts.md for details and anti-patterns.
 
 ## Agent Context Profiles
 
@@ -277,6 +315,7 @@ This protocol applies when ending a Beads implementation workflow. It is subordi
 
    # Team-maintainer opt-in only, unless current instructions forbid it:
    git pull --rebase
+   bd dolt push
    git push
    git status
    ```
@@ -287,3 +326,27 @@ This protocol applies when ending a Beads implementation workflow. It is subordi
 - Do not commit or push without clear authority from the active profile or the current user request.
 - If a required sync or push is blocked, stop and report the exact command and error.
 <!-- END BEADS INTEGRATION -->
+
+<!-- BEGIN BEADS CODEX SETUP: generated by bd setup codex -->
+## Beads Issue Tracker
+
+Use Beads (`bd`) for durable task tracking in repositories that include it. Use the `beads` skill at `.agents/skills/beads/SKILL.md` (project install) or `~/.agents/skills/beads/SKILL.md` (global install) for Beads workflow guidance, then use the `bd` CLI for issue operations.
+
+### Quick Reference
+
+```bash
+bd ready                # Find available work
+bd show <id>            # View issue details
+bd update <id> --claim  # Claim work
+bd close <id>           # Complete work
+bd prime                # Refresh Beads context
+```
+
+### Rules
+
+- Use `bd` for all task tracking; do not create markdown TODO lists.
+- Run `bd prime` when Beads context is missing or stale. Codex 0.129.0+ can load Beads context automatically through native hooks; use `/hooks` to inspect or toggle them.
+- Keep persistent project memory in Beads via `bd remember`; do not create ad hoc memory files.
+
+**Architecture in one line:** issues live in a local Dolt DB; sync uses `refs/dolt/data` on your git remote; `.beads/issues.jsonl` is a passive export. See https://github.com/gastownhall/beads/blob/main/docs/core-concepts/sync-concepts.md for details and anti-patterns.
+<!-- END BEADS CODEX SETUP -->

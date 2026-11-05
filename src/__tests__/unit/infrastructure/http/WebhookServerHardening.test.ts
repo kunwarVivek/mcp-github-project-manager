@@ -13,11 +13,7 @@ import {
 import type { EventStore } from "../../../../infrastructure/events/EventStore";
 import type { EventSubscriptionManager } from "../../../../infrastructure/events/EventSubscriptionManager";
 import type { GitHubWebhookHandler } from "../../../../infrastructure/events/GitHubWebhookHandler";
-import {
-  normalizeIp,
-  parseTrustProxy,
-  resolveClientAddress,
-} from "../../../../infrastructure/http/clientAddress";
+import { RejectAllAuthenticator } from "../../../../infrastructure/http/auth/createInboundAuthenticator";
 import {
   WebhookServer,
   type WebhookServerOptions,
@@ -71,13 +67,14 @@ describe("WebhookServer hardening", () => {
       {
         port: 0,
         enableSSE: false,
-        trustProxy: "",
+        trustedProxies: [],
         allowedOrigins: "",
         credentialsConfigured: false,
         ...options,
       },
       logger,
-      { record } as unknown as SecurityAuditLog
+      { record } as unknown as SecurityAuditLog,
+      new RejectAllAuthenticator()
     );
   }
 
@@ -115,79 +112,35 @@ describe("WebhookServer hardening", () => {
       const result = await statuses(url, ["1.1.1.1", "2.2.2.2", "3.3.3.3", "4.4.4.4", "5.5.5.5"]);
 
       expect(result).toEqual([200, 200, 200, 429, 429]);
-      // Audit records the socket peer (IPv4-mapped form normalised), not the header.
+      // Audit records the socket peer, not the header.
       expect(rateLimitSources()).toEqual(["127.0.0.1", "127.0.0.1"]);
     });
 
-    it("TRUST_PROXY=1 buckets by the right-most X-Forwarded-For entry", async () => {
-      const url = await start({ trustProxy: "1" });
+    it("buckets by the right-most non-proxy X-Forwarded-For entry when the peer is a trusted proxy", async () => {
+      const url = await start({ trustedProxies: ["127.0.0.1", "10.0.0.7"] });
 
-      // Left-most entries are client-controlled and rotate; the right-most is
-      // what our single trusted proxy appended, so it is the bucket key.
-      const sameProxyAppended = await statuses(url, [
-        "9.9.9.1, 10.0.0.7",
-        "9.9.9.2, 10.0.0.7",
-        "9.9.9.3, 10.0.0.7",
-        "9.9.9.4, 10.0.0.7",
+      // Left-most entries are client-controlled and rotate; the right-most entry
+      // that is not itself a trusted proxy is the bucket key.
+      const sameClient = await statuses(url, [
+        "9.9.9.1, 203.0.113.5, 10.0.0.7",
+        "9.9.9.2, 203.0.113.5, 10.0.0.7",
+        "9.9.9.3, 203.0.113.5, 10.0.0.7",
+        "9.9.9.4, 203.0.113.5, 10.0.0.7",
       ]);
-      expect(sameProxyAppended).toEqual([200, 200, 200, 429]);
-      expect(rateLimitSources()).toEqual(["10.0.0.7"]);
-
-      // A different right-most address is a different bucket.
-      expect(await statuses(url, ["9.9.9.1, 10.0.0.8"])).toEqual([200]);
-    });
-
-    it("TRUST_PROXY=2 buckets by the second-from-right entry", async () => {
-      const url = await start({ trustProxy: "2" });
-
-      const result = await statuses(url, [
-        "7.7.7.7, 203.0.113.5, 10.0.0.1",
-        "8.8.8.8, 203.0.113.5, 10.0.0.2",
-        "6.6.6.6, 203.0.113.5, 10.0.0.3",
-        "5.5.5.5, 203.0.113.5, 10.0.0.4",
-      ]);
-
-      expect(result).toEqual([200, 200, 200, 429]);
+      expect(sameClient).toEqual([200, 200, 200, 429]);
       expect(rateLimitSources()).toEqual(["203.0.113.5"]);
+
+      // A different right-most client address is a different bucket.
+      expect(await statuses(url, ["9.9.9.1, 203.0.113.6, 10.0.0.7"])).toEqual([200]);
     });
 
     it("falls back to the socket peer when a trusted proxy sent no header", async () => {
-      const url = await start({ trustProxy: "1" });
+      const url = await start({ trustedProxies: ["127.0.0.1"] });
 
       expect(await statuses(url, [undefined, undefined, undefined, undefined])).toEqual([
         200, 200, 200, 429,
       ]);
       expect(rateLimitSources()).toEqual(["127.0.0.1"]);
-    });
-  });
-
-  describe("TRUST_PROXY validation (fail fast at startup)", () => {
-    it.each(["true", "-1", "abc", "1.5", "2 hops", "TRUE"])("rejects %j", (value) => {
-      expect(() => build({ trustProxy: value })).toThrow(/Invalid TRUST_PROXY/);
-    });
-
-    it.each(["", "false", "FALSE", "0", "1", "3"])("accepts %j", (value) => {
-      expect(() => build({ trustProxy: value })).not.toThrow();
-    });
-  });
-
-  describe("clientAddress helpers", () => {
-    it("normalises IPv4-mapped IPv6 and case", () => {
-      expect(normalizeIp("::ffff:1.2.3.4")).toBe("1.2.3.4");
-      expect(normalizeIp("::FFFF:10.0.0.1")).toBe("10.0.0.1");
-      expect(normalizeIp("2001:DB8::1")).toBe("2001:db8::1");
-    });
-
-    it("parses hop counts", () => {
-      expect(parseTrustProxy(undefined)).toBe(0);
-      expect(parseTrustProxy(" 2 ")).toBe(2);
-    });
-
-    it("follows Express semantics when the chain is shorter than the hop count", () => {
-      expect(resolveClientAddress("10.0.0.1", "1.1.1.1", 5)).toBe("1.1.1.1");
-      expect(resolveClientAddress("::ffff:10.0.0.1", "1.1.1.1, 2.2.2.2", 2)).toBe("1.1.1.1");
-      expect(resolveClientAddress(undefined, undefined, 1)).toBe("unknown");
-      expect(resolveClientAddress("10.0.0.1", ["1.1.1.1", "2.2.2.2"], 1)).toBe("2.2.2.2");
     });
   });
 

@@ -17,12 +17,22 @@
  *
  * - **AIServiceFactory** — singleton factory for AI model access.
  *
+ * ## Components owned by the entry point
+ *
+ * The singletons `src/index.ts` needs (ResourceCache, FilePersistenceAdapter,
+ * GitHubWebhookHandler, EventStore, EventSubscriptionManager,
+ * GracefulShutdown, MutationAuditLog, TelemetryConfig) are registered here and
+ * resolved by `index.ts`; it constructs none of them by hand.
+ *
  * ## Services intentionally outside DI
  *
- * The following services are NOT registered in the container by design:
+ * - **Tool executors** — compound executors build their own services per call
+ *   through the one shared factory (`createGitHubFactory`, `shared-services`);
+ *   they are not resolved from this container. See AGENTS.md ("Composition root").
  *
- * - **GitHubStateSyncService** — requires ResourceCache and FilePersistenceAdapter
- *   (infrastructure objects created at server startup in index.ts, not in the container).
+ * - **GitHubStateSyncService** — built by `index.ts` at sync time from the
+ *   container's ResourceCache, FilePersistenceAdapter and repository factory
+ *   (it only exists when SYNC_ENABLED).
  *
  * - **RequirementsTraceabilityService** — pure stateless utility with zero constructor
  *   dependencies. No benefit from container management.
@@ -42,14 +52,31 @@
  *   or value-object-like classes with optional config params. No DI deps.
  */
 import "reflect-metadata";
-import { container, type DependencyContainer } from "tsyringe";
-import { AGENT_RECLAIM_ENABLED, AGENT_RECLAIM_INTERVAL_MS, AGENT_STALE_AFTER_MINUTES } from "./env";
+import { container, type DependencyContainer, instanceCachingFactory } from "tsyringe";
+import {
+  AGENT_RECLAIM_ENABLED,
+  AGENT_RECLAIM_INTERVAL_MS,
+  AGENT_STALE_AFTER_MINUTES,
+  CACHE_DIRECTORY,
+  WEBHOOK_SECRET,
+} from "./env";
 import { AgentStore } from "./infrastructure/agent/AgentStore";
 import { ProjectFieldSetup } from "./infrastructure/agent/ProjectFieldSetup";
 import { WorkProductStore } from "./infrastructure/agent/WorkProductStore";
+import { ResourceCache } from "./infrastructure/cache/ResourceCache";
+import { EventStore } from "./infrastructure/events/EventStore";
+import { EventSubscriptionManager } from "./infrastructure/events/EventSubscriptionManager";
+import { GitHubWebhookHandler } from "./infrastructure/events/GitHubWebhookHandler";
 import type { GitHubAuth } from "./infrastructure/github/auth/GitHubAuth";
 import { GitHubRepositoryFactory } from "./infrastructure/github/GitHubRepositoryFactory";
+import { GracefulShutdown } from "./infrastructure/lifecycle/GracefulShutdown";
 import { type ILogger, Logger, logger } from "./infrastructure/logger";
+import {
+  auditLogConfigFromEnv,
+  createMutationAuditLog,
+  telemetryConfigFromEnv,
+} from "./infrastructure/observability";
+import { FilePersistenceAdapter } from "./infrastructure/persistence/FilePersistenceAdapter";
 import { AgentBudgetService } from "./services/agent/AgentBudgetService";
 import { AgentContextService } from "./services/agent/AgentContextService";
 import { AgentMetricsService } from "./services/agent/AgentMetricsService";
@@ -106,7 +133,7 @@ export function configureContainer(
   container.clearInstances();
 
   // Register factory instance - root of dependency tree
-  const factory = new GitHubRepositoryFactory(auth, owner, repo);
+  const factory = GitHubRepositoryFactory.fromAuth(auth, owner, repo);
   container.registerInstance("GitHubRepositoryFactory", factory);
 
   // Register Logger as ILogger for dependency injection
@@ -182,7 +209,6 @@ export function configureContainer(
   container.register("ProjectManagementService", {
     useFactory: (c) =>
       new ProjectManagementService(
-        c.resolve("GitHubRepositoryFactory"),
         c.resolve("SubIssueService"),
         c.resolve("MilestoneService"),
         c.resolve("SprintPlanningService"),
@@ -341,6 +367,49 @@ export function configureContainer(
       ),
   });
 
+  // Components owned by the entry point. Singletons per configured container.
+  container.register("ResourceCache", { useFactory: () => ResourceCache.getInstance() });
+
+  container.register("FilePersistenceAdapter", {
+    useFactory: instanceCachingFactory(
+      () =>
+        new FilePersistenceAdapter({
+          cacheDirectory: CACHE_DIRECTORY,
+          enableCompression: true,
+          maxBackups: 5,
+          atomicWrites: true,
+        })
+    ),
+  });
+
+  container.register("GitHubWebhookHandler", {
+    useFactory: instanceCachingFactory(() => new GitHubWebhookHandler(WEBHOOK_SECRET)),
+  });
+
+  container.register("EventSubscriptionManager", {
+    useFactory: instanceCachingFactory(() => new EventSubscriptionManager()),
+  });
+
+  container.register("EventStore", {
+    useFactory: instanceCachingFactory(
+      () =>
+        new EventStore({
+          storageDirectory: `${CACHE_DIRECTORY}/events`,
+          enableCompression: true,
+        })
+    ),
+  });
+
+  container.register("GracefulShutdown", {
+    useFactory: instanceCachingFactory(() => new GracefulShutdown({ logger })),
+  });
+
+  container.register("MutationAuditLog", {
+    useFactory: instanceCachingFactory(() => createMutationAuditLog(auditLogConfigFromEnv())),
+  });
+
+  container.registerInstance("TelemetryConfig", telemetryConfigFromEnv());
+
   return container;
 }
 
@@ -360,13 +429,12 @@ export function createProjectManagementService(
   repo: string,
   auth: GitHubAuth
 ): ProjectManagementService {
-  const factory = new GitHubRepositoryFactory(auth, owner, repo);
+  const factory = GitHubRepositoryFactory.fromAuth(auth, owner, repo);
   const logger = Logger.getInstance();
   const templateService = new ProjectTemplateService(factory);
   const linkingService = new ProjectLinkingService(factory);
   const fieldValueService = new FieldValueService(factory);
   return new ProjectManagementService(
-    factory,
     new SubIssueService(factory),
     new MilestoneService(factory),
     new SprintPlanningService(factory),

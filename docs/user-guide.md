@@ -4,7 +4,7 @@
 
 The GitHub Project Manager MCP Server provides a Model Context Protocol (MCP) interface for managing GitHub Projects. This guide explains how to set up, configure, and use the server effectively.
 
-The server exposes **20 compound tools covering 169 actions** to MCP clients.
+The server exposes **<!-- count:tools -->21<!-- /count --> compound tools covering <!-- count:actions -->175<!-- /count --> actions** to MCP clients.
 See [TOOLS.md](TOOLS.md) for the full reference.
 
 ## Getting Started
@@ -235,7 +235,7 @@ For issues and feature requests:
 
 ## References
 
-- [Tool Reference](TOOLS.md) - All 20 compound tools and their 169 actions
+- [Tool Reference](TOOLS.md) - All <!-- count:tools -->21<!-- /count --> compound tools and their <!-- count:actions -->175<!-- /count --> actions
 - [Configuration Guide](CONFIGURATION.md) - Environment variables and client setup
 - [GitHub Projects API Documentation](https://docs.github.com/en/rest/projects)
 - [MCP Specification](https://modelcontextprotocol.io)

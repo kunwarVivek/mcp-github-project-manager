@@ -9,23 +9,23 @@
  * Falls back to keyword/label matching when AI unavailable.
  */
 
-import { openai } from "@ai-sdk/openai";
-import { cosineSimilarity, embed, embedMany, generateObject } from "ai";
+import { cosineSimilarity, type EmbeddingModel, embed, embedMany, generateObject } from "ai";
 import { z } from "zod";
-import { EmbeddingCache } from "../../cache/EmbeddingCache.js";
-import type { ConfidenceFactors, SectionConfidence } from "../../domain/ai-types.js";
+import { EmbeddingCache } from "../../cache/EmbeddingCache";
+import type { ConfidenceFactors, SectionConfidence } from "../../domain/ai-types";
 import type {
   DependencySubType,
   IssueInput,
   IssueRelationship,
   RelatedIssueLinkingConfig,
   RelatedIssueResult,
-} from "../../domain/issue-intelligence-types.js";
+} from "../../domain/issue-intelligence-types";
 import { type ILogger, Logger } from "../../infrastructure/logger";
 import { InputSanitizer } from "../utils/InputSanitizer";
-import { AIServiceFactory } from "./AIServiceFactory.js";
-import { calculateWeightedScore, getConfidenceTier } from "./ConfidenceScorer.js";
-import { RELATED_ISSUE_SYSTEM_PROMPT } from "./prompts/IssueIntelligencePrompts.js";
+import { AIServiceFactory } from "./AIServiceFactory";
+import { calculateWeightedScore, getConfidenceTier } from "./ConfidenceScorer";
+import { defaultPromptRegistry } from "./prompts";
+import { ISSUE_PROMPT_IDS } from "./prompts/IssueIntelligencePrompts";
 
 // ============================================================================
 // Constants
@@ -237,7 +237,7 @@ export class RelatedIssueLinkingService {
     // Get embedding for source issue
     const sourceText = `${InputSanitizer.sanitizeIssueContent(sourceTitle)}\n\n${InputSanitizer.sanitizeIssueContent(sourceDescription || "")}`;
     const { embedding: sourceEmbedding } = await embed({
-      model: openai.embedding("text-embedding-3-small"),
+      model: this.requireEmbeddingModel(),
       value: sourceText,
     });
 
@@ -268,6 +268,13 @@ export class RelatedIssueLinkingService {
     return relationships;
   }
 
+  /** Embedding model resolved at call time; throws (logged, strategy skipped) without a key. */
+  private requireEmbeddingModel(): EmbeddingModel {
+    const model = this.aiFactory.getEmbeddingModel();
+    if (!model) throw new Error("No embedding API key configured");
+    return model;
+  }
+
   /**
    * Get or compute embeddings for candidate issues.
    */
@@ -294,7 +301,7 @@ export class RelatedIssueLinkingService {
     // Batch compute uncached
     if (uncachedTexts.length > 0) {
       const { embeddings } = await embedMany({
-        model: openai.embedding("text-embedding-3-small"),
+        model: this.requireEmbeddingModel(),
         values: uncachedTexts,
       });
 
@@ -430,7 +437,7 @@ export class RelatedIssueLinkingService {
 
       const result = await generateObject({
         model,
-        system: RELATED_ISSUE_SYSTEM_PROMPT,
+        system: defaultPromptRegistry.render(ISSUE_PROMPT_IDS.relatedSystem),
         prompt: this.formatDependencyAnalysisPrompt(sourceIssue, limitedCandidates),
         schema: AIDependencySchema,
         temperature: 0.3,

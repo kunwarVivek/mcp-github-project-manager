@@ -8,6 +8,7 @@ import type { AgentStore } from "../../../infrastructure/agent/AgentStore";
 import type { WorkProductStore } from "../../../infrastructure/agent/WorkProductStore";
 import type { GitHubRepositoryFactory } from "../../../infrastructure/github/GitHubRepositoryFactory";
 import { AgentMetricsService } from "../../../services/agent/AgentMetricsService";
+import { asFactory } from "../../helpers/mockTypes";
 
 function workProductComment(
   product: WorkProduct,
@@ -79,7 +80,7 @@ describe("AgentMetricsService", () => {
     mockWpStore = { listForIssue: vi.fn(async () => []) };
 
     service = new AgentMetricsService(
-      mockFactory as unknown as GitHubRepositoryFactory,
+      asFactory(mockFactory),
       mockStore as unknown as AgentStore,
       mockWpStore as unknown as WorkProductStore
     );

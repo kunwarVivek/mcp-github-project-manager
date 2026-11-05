@@ -16,8 +16,8 @@ import {
   type ConfidenceConfig,
   DEFAULT_CONFIDENCE_CONFIG,
   type EnhancedAcceptanceCriteria,
-  type MockPRD,
   type PRDDocument,
+  type PRDSummary,
   type SectionConfidence,
   type SubTask,
   type TaskComplexity,
@@ -39,14 +39,23 @@ import {
   MAX_SUBTASK_DEPTH,
   MAX_TASKS_PER_PRD,
 } from "../env";
-import { type ILogger, Logger } from "../infrastructure/logger";
+import { getLogger, type ILogger } from "../infrastructure/logger";
 import type { AIServiceFactory } from "./ai/AIServiceFactory";
 import { AITaskProcessor } from "./ai/AITaskProcessor";
 import { ConfidenceScorer } from "./ai/ConfidenceScorer";
+import {
+  tokenBudgetManager as sharedTokenBudgetManager,
+  TokenBudgetExceededError,
+  type TokenBudgetManager,
+} from "./ai/TokenBudgetManager";
+import { TokenCounter } from "./ai/TokenCounter";
 import { RequirementsTraceabilityService } from "./RequirementsTraceabilityService";
 import { TaskContextGenerationService } from "./TaskContextGenerationService";
 import { InputSanitizer } from "./utils/InputSanitizer";
 import { safeCall } from "./utils/safeCall";
+
+/** Output-token allowance added to the input estimate when reserving budget for one AI call. */
+const AI_OUTPUT_TOKEN_ALLOWANCE = 2000;
 
 /**
  * Task with effort estimate and dependency analysis
@@ -82,21 +91,68 @@ export class TaskGenerationService {
   private dependencyGraph: DependencyGraph;
   private estimationCalibrator: EstimationCalibrator;
   private readonly logger: ILogger;
+  private readonly tokenBudget: TokenBudgetManager;
 
   /**
    * @param aiFactory - AI service factory for model access. When omitted (DI mode),
    *   defaults to the global singleton via `AIServiceFactory.getInstance()`.
    *   Passed through to `AITaskProcessor` and `TaskContextGenerationService`.
    * @param logger - Logger instance for diagnostics. When omitted, defaults to
-   *   the global singleton via `Logger.getInstance()`.
+   *   a prefixed console logger via `getLogger()`.
+   * @param tokenBudget - Per-session AI token budget (default: process-wide manager).
    */
-  constructor(aiFactory?: AIServiceFactory, logger?: ILogger) {
+  constructor(aiFactory?: AIServiceFactory, logger?: ILogger, tokenBudget?: TokenBudgetManager) {
     this.aiProcessor = new AITaskProcessor(aiFactory);
     this.traceabilityService = new RequirementsTraceabilityService();
-    this.contextGenerationService = new TaskContextGenerationService(aiFactory);
+    this.contextGenerationService = new TaskContextGenerationService(
+      aiFactory,
+      undefined,
+      undefined,
+      tokenBudget
+    );
     this.dependencyGraph = new DependencyGraph();
     this.estimationCalibrator = new EstimationCalibrator();
-    this.logger = logger ?? Logger.getInstance();
+    this.logger = logger ?? getLogger("TaskGenerationService");
+    this.tokenBudget = tokenBudget ?? sharedTokenBudgetManager;
+  }
+
+  /**
+   * Run one AI call under the session token budget: reserve an estimate first,
+   * commit the estimated actual afterwards (AITaskProcessor does not surface
+   * provider usage), release on failure. When the budget is exhausted the optional
+   * `fallback` result is returned with a warning; without a fallback the typed
+   * TokenBudgetExceededError propagates because there is nothing to degrade to.
+   */
+  private async withTokenBudget<T>(
+    kind: string,
+    input: unknown,
+    call: () => Promise<T>,
+    fallback?: () => T
+  ): Promise<T> {
+    const inputTokens = TokenCounter.estimateFromObject(input);
+    const reserved = inputTokens + AI_OUTPUT_TOKEN_ALLOWANCE;
+    let sessionId: string | undefined;
+    try {
+      sessionId = this.tokenBudget.reserve(undefined, reserved);
+    } catch (error) {
+      if (fallback && error instanceof TokenBudgetExceededError) {
+        this.logger.warn(`AI token budget exhausted; using fallback for ${kind}: ${error.message}`);
+        return fallback();
+      }
+      throw error;
+    }
+    try {
+      const result = await call();
+      this.tokenBudget.commit(
+        sessionId,
+        inputTokens + TokenCounter.estimateFromObject(result),
+        reserved
+      );
+      return result;
+    } catch (error) {
+      this.tokenBudget.release(sessionId, reserved);
+      throw error;
+    }
   }
 
   /**
@@ -143,8 +199,8 @@ export class TaskGenerationService {
       // Create traceability matrix if enabled
       let traceabilityMatrix: TraceabilityMatrix | undefined;
       if (config.createTraceabilityMatrix) {
-        // Create mock PRD for traceability
-        const mockPRD: MockPRD = {
+        // Summarise the PRD content for traceability
+        const prdSummary: PRDSummary = {
           id: params.projectId || `prd-${Date.now()}`,
           title: "Generated PRD",
           overview: prdContent.substring(0, 500),
@@ -166,7 +222,7 @@ export class TaskGenerationService {
 
         traceabilityMatrix = this.traceabilityService.createTraceabilityMatrix(
           params.projectId || "enhanced-project",
-          mockPRD,
+          prdSummary,
           [], // Features will be extracted
           basicTasks
         );
@@ -224,12 +280,14 @@ export class TaskGenerationService {
       prdContent = InputSanitizer.sanitizePRDContent(prdContent);
 
       // Generate initial tasks using AI
-      let tasks = await this.aiProcessor.generateTasksFromPRD({
-        prdContent,
-        maxTasks: params.maxTasks || MAX_TASKS_PER_PRD,
-        includeSubtasks: params.includeSubtasks ?? true,
-        autoEstimate: params.autoEstimate ?? AUTO_EFFORT_ESTIMATION,
-      });
+      let tasks = await this.withTokenBudget("task generation", prdContent, () =>
+        this.aiProcessor.generateTasksFromPRD({
+          prdContent,
+          maxTasks: params.maxTasks || MAX_TASKS_PER_PRD,
+          includeSubtasks: params.includeSubtasks ?? true,
+          autoEstimate: params.autoEstimate ?? AUTO_EFFORT_ESTIMATION,
+        })
+      );
 
       // Auto-prioritize if requested
       if (params.autoPrioritize) {
@@ -278,8 +336,6 @@ export class TaskGenerationService {
 
         // Add execution context to the task
         enhancedTask.executionContext = executionContext;
-        // Store context quality metrics for monitoring (not in interface yet)
-        // TODO: Add contextQualityMetrics to EnhancedAITask interface
 
         // Generate implementation guidance if enabled
         if (config.includeImplementationGuidance) {
@@ -360,12 +416,18 @@ export class TaskGenerationService {
   }): Promise<SubTask[]> {
     return safeCall(async () => {
       // Use AI to break down the task
-      const subtasks = await this.aiProcessor.expandTaskIntoSubtasks({
-        taskTitle: params.task.title,
-        taskDescription: params.task.description,
-        currentComplexity: params.task.complexity,
-        maxDepth: params.maxDepth || MAX_SUBTASK_DEPTH,
-      });
+      const subtasks = await this.withTokenBudget(
+        "subtask expansion",
+        params.task,
+        () =>
+          this.aiProcessor.expandTaskIntoSubtasks({
+            taskTitle: params.task.title,
+            taskDescription: params.task.description,
+            currentComplexity: params.task.complexity,
+            maxDepth: params.maxDepth || MAX_SUBTASK_DEPTH,
+          }),
+        () => []
+      );
 
       // Convert to SubTask format and enrich with metadata
       return subtasks.map((subtask) => ({
@@ -392,11 +454,23 @@ export class TaskGenerationService {
     recommendations: string[];
   }> {
     return safeCall(async () => {
-      const analysis = await this.aiProcessor.analyzeTaskComplexity({
-        taskTitle: task.title,
-        taskDescription: task.description,
-        currentEstimate: task.estimatedHours,
-      });
+      const analysis = await this.withTokenBudget(
+        "complexity analysis",
+        task,
+        () =>
+          this.aiProcessor.analyzeTaskComplexity({
+            taskTitle: task.title,
+            taskDescription: task.description,
+            currentEstimate: task.estimatedHours,
+          }),
+        () => ({
+          complexity: task.complexity,
+          estimatedHours: task.estimatedHours ?? 0,
+          analysis: "Complexity analysis skipped: AI token budget exhausted",
+          riskFactors: [],
+          recommendations: [],
+        })
+      );
 
       return {
         originalComplexity: task.complexity,
@@ -418,12 +492,18 @@ export class TaskGenerationService {
     teamSize?: number;
   }): Promise<AITask[]> {
     return safeCall(async () => {
-      return await this.aiProcessor.prioritizeTasks({
-        tasks: params.tasks,
-        projectGoals: params.projectGoals,
-        timeline: params.timeline,
-        teamSize: params.teamSize,
-      });
+      return await this.withTokenBudget(
+        "task prioritization",
+        params,
+        () =>
+          this.aiProcessor.prioritizeTasks({
+            tasks: params.tasks,
+            projectGoals: params.projectGoals,
+            timeline: params.timeline,
+            teamSize: params.teamSize,
+          }),
+        () => params.tasks
+      );
     });
   }
 

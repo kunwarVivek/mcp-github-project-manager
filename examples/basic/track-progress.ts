@@ -46,7 +46,7 @@ async function trackSprintProgress() {
     const sprintId = "sprint_1";
 
     // Get sprint metrics with detailed issue information
-    const metrics = await service.getSprintMetrics(sprintId, true);
+    const metrics = await service.sprints.getSprintMetrics(sprintId, true);
 
     console.log("Sprint Metrics:");
     console.log("Sprint Title:", metrics.title);

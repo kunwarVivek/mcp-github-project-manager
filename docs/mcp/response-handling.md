@@ -37,22 +37,28 @@ Supported content types:
 - `text/markdown`
 - `text/html`
 
-## Error Semantics (MCP v2)
+## Error Contract (MCP v2)
 
 The server runs on `@modelcontextprotocol/server` v2. Two error shapes are
 distinct, and the difference matters when you write a client:
 
 | Situation | What the client sees |
 |-----------|----------------------|
-| A tool that runs and fails | `{ content, isError: true }` — a **successful** call with a failed result. The model sees the failure and can recover. |
-| A protocol fault (e.g. calling a tool that does not exist) | A JSON-RPC error |
+| A tool that runs and fails — invalid arguments, GitHub API error (401/403/404/422/rate-limit/5xx), exhausted agent budget (`BudgetExhausted`), executor error | `{ content, isError: true, _meta: { error: { code, data? } } }` — a **successful** call with a failed result. The text names the failure and spells out the actionable detail (invalid fields, retry-after); the model can recover. |
+| An unknown tool, or another protocol fault | A JSON-RPC error (`MethodNotFound`) |
 
 Arguments are validated against each tool's declared `inputSchema` **before**
 the handler runs, so a malformed call never reaches business logic — and
-`ToolValidator` never sees a missing required field.
+`ToolValidator` never sees a missing required field (it then applies parameter
+coercion and the zod schema for field-level messages). Every result, success
+or error, carries `_meta.schemaVersion` (the tool's contract version).
 
-`MCPResponseFormatter` and `MCPErrorHandler` shape the content of a tool
-result; they do not decide whether the result is an error.
+Tool failures are produced by `ToolValidator.handleToolError` /
+`ToolValidator.mapGitHubError` and shaped by `ToolResultFormatter.formatError`
+(`infrastructure/tools/`); `ToolDispatcher` is the single place that turns an
+executor exception into an `isError` result. `MCPResponseFormatter` shapes the
+content of successful results and resources; it does not decide whether a
+result is an error. See [ADR-007](../adr/007-tool-error-contract.md).
 
 ## Usage Examples
 
@@ -89,38 +95,35 @@ const paginatedResponse = MCPResponseFormatter.paginated(
 
 ### Error Handling
 
+Throw a domain error (`ValidationError`, `ResourceNotFoundError`,
+`UnauthorizedError`, … from `domain/errors.ts`) or let an Octokit error propagate:
+`ToolDispatcher` catches it and returns the `isError` result described above.
+
 ```typescript
-import { MCPErrorHandler } from "../infrastructure/mcp";
 import { ValidationError } from "../domain/errors";
 
-// Handle specific error types
-try {
-  // Some operation
-} catch (error) {
-  const errorResponse = MCPErrorHandler.handle(error);
+// Inside an executor
+if (!args.projectId) {
+  throw new ValidationError("projectId is required for this action");
 }
-
-// Create specific error types
-const validationError = MCPErrorHandler.validationError(
-  "Invalid input",
-  { field: "username" }
-);
-
-const notFoundError = MCPErrorHandler.notFoundError(
-  "Resource not found"
-);
 ```
 
 ## Error Codes
 
-| Code | Description | HTTP Status |
-|------|-------------|-------------|
-| MCP-001 | Internal Error | 500 |
-| MCP-002 | Validation Error | 400 |
-| MCP-003 | Resource Not Found | 404 |
-| MCP-004 | Invalid Request | 400 |
-| MCP-005 | Unauthorized | 401 |
-| MCP-006 | Rate Limited | 429 |
+`_meta.error.code` carries the stable `MCPErrorCode` (`src/domain/mcp-types.ts`):
+
+| Code | Meaning |
+|------|---------|
+| `-32602` (`INVALID_PARAMS` / `VALIDATION_ERROR`) | Parameter validation failed |
+| `-32603` (`INTERNAL_ERROR`) | Server-side error |
+| `-32000` (`TOOL_EXECUTION_FAILED`) | Tool execution failed |
+| `-32001` (`RESOURCE_NOT_FOUND`) | Resource not found |
+| `-32002` (`PERMISSION_DENIED`) | Permission denied |
+| `-31001`…`-31006` | GitHub rate-limited / not found / unauthorized / forbidden / validation / server error |
+
+An exhausted agent budget is reported with the code string `BudgetExhausted`
+and the agent id, remaining tokens and limit. The legacy string codes
+`MCP-001`…`MCP-006` survive only as `LegacyErrorCodeMap` aliases.
 
 ## Best Practices
 
@@ -132,20 +135,17 @@ const notFoundError = MCPErrorHandler.notFoundError(
 
 ## Testing
 
-The response handling system includes comprehensive unit tests:
-- `MCPResponseFormatter.test.ts`: Tests for response formatting
-- `MCPErrorHandler.test.ts`: Tests for error handling
-
-Run tests using:
+Formatter and dispatcher tests live under `src/__tests__/unit/infrastructure/`
+(`mcp/` and `tools/`). Run them with:
 ```bash
-npm test
+npm test -- mcp
 ```
 
 ## Adding New Error Types
 
 To add a new error type:
 
-1. Add the error code to `MCPErrorCode` enum in `mcp-types.ts`
+1. Add the code to the `MCPErrorCode` enum in `domain/mcp-types.ts`
 2. Create a new error class in `domain/errors.ts`
-3. Update the error handler to handle the new error type
+3. Map it in `ToolValidator.handleToolError`
 4. Add corresponding tests

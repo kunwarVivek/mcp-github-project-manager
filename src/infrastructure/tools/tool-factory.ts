@@ -37,7 +37,7 @@ export function resolveRepo(): string | undefined {
 export function createGitHubFactory(owner?: string, repo?: string): GitHubRepositoryFactory {
   // Resolved per construction (not once at boot) so a token rotated on disk or
   // an `auth login` performed after start is picked up by the next tool call.
-  return new GitHubRepositoryFactory(
+  return GitHubRepositoryFactory.fromAuth(
     resolveGitHubAuth(),
     owner || resolveOwner() || UNUSED_REPO_CONTEXT,
     repo || resolveRepo() || UNUSED_REPO_CONTEXT

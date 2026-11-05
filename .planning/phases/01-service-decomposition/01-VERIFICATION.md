@@ -17,6 +17,8 @@ notes:
   - "DEBT-07 satisfied: facade pattern established, coordination-only role achieved"
 ---
 
+> **Superseded note (2026-11-02):** `ProjectManagementService` is now a 121-line getters-only facade (the 1,691-line figure is the Phase 1 snapshot). Test paths under `tests/` were merged into `src/__tests__/`.
+
 # Phase 1: Service Decomposition Verification Report
 
 **Phase Goal:** ProjectManagementService god class is decomposed into focused, testable services.

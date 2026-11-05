@@ -27,7 +27,8 @@ import {
 import { InputSanitizer } from "../utils/InputSanitizer";
 import { AIServiceFactory } from "./AIServiceFactory";
 import { calculateWeightedScore, getConfidenceTier } from "./ConfidenceScorer";
-import { formatRiskPrompt, SPRINT_RISK_SYSTEM_PROMPT } from "./prompts/SprintPlanningPrompts";
+import { defaultPromptRegistry } from "./prompts";
+import { riskPromptVariables, SPRINT_PROMPT_IDS } from "./prompts/SprintPlanningPrompts";
 
 // ============================================================================
 // Zod Schemas for AI Response Validation
@@ -110,7 +111,7 @@ export class SprintRiskAssessor {
     try {
       const result = await generateObject({
         model,
-        system: SPRINT_RISK_SYSTEM_PROMPT,
+        system: defaultPromptRegistry.render(SPRINT_PROMPT_IDS.riskSystem),
         prompt: this.formatRiskPromptFromParams(params),
         schema: SprintRiskAssessmentSchema,
         temperature: 0.3,
@@ -156,17 +157,20 @@ export class SprintRiskAssessor {
       (i) => i.dependencies && i.dependencies.length > 0
     ).length;
 
-    return formatRiskPrompt({
-      sprintItems: params.sprintItems.map((item) => ({
-        id: item.id,
-        title: InputSanitizer.sanitizeText(item.title),
-        points: item.points,
-        dependencies: item.dependencies,
-      })),
-      totalPoints,
-      recommendedCapacity: params.sprintCapacity.recommendedLoad,
-      dependencyCount: itemsWithDeps,
-    });
+    return defaultPromptRegistry.render(
+      SPRINT_PROMPT_IDS.riskUser,
+      riskPromptVariables({
+        sprintItems: params.sprintItems.map((item) => ({
+          id: item.id,
+          title: InputSanitizer.sanitizeText(item.title),
+          points: item.points,
+          dependencies: item.dependencies,
+        })),
+        totalPoints,
+        recommendedCapacity: params.sprintCapacity.recommendedLoad,
+        dependencyCount: itemsWithDeps,
+      })
+    );
   }
 
   /**

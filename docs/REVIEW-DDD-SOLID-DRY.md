@@ -4,7 +4,10 @@
 > codebase on that date and is kept for history only — its counts (16 compound
 > tools / 134 actions, file sizes, service counts) are stale. **Current source of
 > truth:** [`docs/architecture.md`](architecture.md) for the DDD layout,
-> [`docs/TOOLS.md`](TOOLS.md) for the tool surface, and the code itself.
+> [`docs/TOOLS.md`](TOOLS.md) for the tool surface, and the code itself. Modules it
+> discusses may since have been deleted (`ResourceManager`, `OptimisticLockManager`,
+> the validation engine, `StructuredLogger`/`TracingLogger`, `MCPErrorHandler`) and
+> its "backward compatibility" framing no longer applies (the project is greenfield).
 
 **Date:** August 8, 2026  
 **Reviewer:** Buffy (AI Assistant)  

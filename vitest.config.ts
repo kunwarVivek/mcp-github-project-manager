@@ -8,8 +8,6 @@ export default defineConfig({
       "src/__tests__/**/*.test.ts",
       "src/__tests__/**/*.spec.ts",
       "src/__tests__/**/*.e2e.ts",
-      "tests/**/*.test.ts",
-      "tests/**/*.spec.ts",
     ],
     exclude: ["node_modules", "**/build/**"],
     setupFiles: [
@@ -23,10 +21,10 @@ export default defineConfig({
       exclude: ["src/**/*.d.ts", "src/**/*.test.ts", "src/**/*.spec.ts", "src/__tests__/**"],
       reporter: ["text", "lcov", "clover"],
       thresholds: {
-        lines: 55,
-        functions: 57,
-        branches: 45,
-        statements: 54,
+        lines: 67,
+        functions: 71,
+        branches: 56,
+        statements: 66,
       },
     },
     // Mock configuration

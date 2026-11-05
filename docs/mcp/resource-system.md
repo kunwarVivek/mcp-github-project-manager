@@ -1,13 +1,25 @@
 # MCP Resource System
 
-This document describes the Model Context Protocol (MCP) resource system implementation, which provides a standardized way to manage resources with caching, lifecycle management, and event handling.
+This document describes how the server models GitHub resources: their types and
+schemas, the in-memory `ResourceCache`, and how change events are produced and
+stored.
+
+> The earlier design of this document described a `ResourceManager` (lifecycle
+> and versioning) and an `OptimisticLockManager`. Neither exists in the code:
+> they were removed. Concurrency control is GitHub's own — the agent registry
+> uses sha compare-and-swap on the Contents API (see [architecture.md](../architecture.md))
+> — and change events flow through `EventStore` / `EventSubscriptionManager`.
 
 ## Overview
 
-The resource system consists of three main components:
-1. Resource Types - Define the structure and validation of resources
-2. Resource Cache - Handle caching and retrieval of resources
-3. Resource Manager - Manage resource lifecycle and events
+The resource system consists of three parts:
+1. **Resource types** — `ResourceType` / `ResourceStatus` and the Zod schemas that validate resources (`src/domain/resource-types.ts`, `src/domain/resource-schemas.ts`)
+2. **Resource cache** — `ResourceCache`, in-memory with TTL, tag/type/namespace indices and optional file persistence (`src/infrastructure/cache/`)
+3. **Events** — `GitHubWebhookHandler` → `EventStore` → `EventSubscriptionManager` (`src/infrastructure/events/`), exposed through the `manage_events` tool and the SSE endpoint
+
+The MCP-facing resources (`github://config`, `github://projects`,
+`github://sprints/current`, `github://milestones`, `github://agents`,
+`github://tools`) are registered in `src/infrastructure/mcp/resources.ts`.
 
 ## Resource Types
 
@@ -45,127 +57,62 @@ The canonical `ResourceType` and `ResourceStatus` enums live in
 ## Resource Cache
 
 The cache system provides:
-- In-memory caching with TTL support
-- Tag-based resource indexing
-- Pattern-based cache clearing
-- Error resilience
+- In-memory caching with TTL support and a capacity cap (oldest-first eviction)
+- Tag-, type- and namespace-based indexing
+- Pattern-based invalidation
+- Optional file persistence (`enablePersistence()`, `persist()`, `restore()`)
 
 ```typescript
-// Cache usage examples
 const cache = ResourceCache.getInstance();
 
-// Store with tags
-await cache.set(resource, {
-  ttl: 3600,
-  tags: ["active", "project"],
+// Store with tags (type, id, value, options)
+await cache.set(ResourceType.PROJECT, "123", projectData, {
+  ttl: 3600000,
+  tags: ["active"],
 });
 
 // Retrieve
-const resource = await cache.get(ResourceType.PROJECT, "123");
+const project = await cache.get(ResourceType.PROJECT, "123");
 
 // Get by tag
-const resources = await cache.getByTag("active", ResourceType.PROJECT);
+const active = await cache.getByTag("active", ResourceType.PROJECT);
 
 // Clear by type
 await cache.clearByType(ResourceType.PROJECT);
 ```
 
-## Resource Manager
+See [API.md](../API.md#resourcecache) for the full method list.
 
-Handles:
-- Resource lifecycle (create, read, update, delete, archive)
-- Version control and optimistic locking
-- Event emission for resource changes
-- Resource validation
+## Change Events
 
-```typescript
-const manager = ResourceManager.getInstance();
-
-// Create
-const project = await manager.create(ResourceType.PROJECT, {
-  name: "New Project",
-  description: "Project description",
-});
-
-// Update with optimistic locking
-await manager.update(
-  ResourceType.PROJECT,
-  "123",
-  { name: "Updated Name" },
-  { optimisticLock: true }
-);
-
-// Delete
-await manager.delete(ResourceType.PROJECT, "123");
-
-// Archive
-await manager.archive(ResourceType.PROJECT, "123");
-
-// Event handling
-manager.onEvent(async (event) => {
-  console.log(`Resource ${event.type}: ${event.resourceId}`);
-});
-```
-
-## Resource Events
-
-The system emits events for:
-- Resource creation
-- Resource updates
-- Resource deletion
-- Resource archival
-
-Each event includes:
-- Event ID
-- Event type
-- Resource ID and type
-- Timestamp
-- Actor information
-- Event-specific payload
+Resource changes arrive from GitHub webhooks. `GitHubWebhookHandler` verifies the
+HMAC signature (fail-closed), `EventStore` keeps recent events (with optional
+persistence and retention), and `EventSubscriptionManager` fans them out to
+subscribers. Clients read them through `manage_events` (`subscribe`,
+`get_recent`, `replay`) or the SSE endpoint, which requires `EVENTS_AUTH_TOKEN`.
 
 ## Best Practices
 
-1. Resource Creation
-   - Always validate required fields
-   - Use appropriate resource types
-   - Consider cache options based on usage patterns
-
-2. Resource Updates
-   - Use optimistic locking for concurrent updates
-   - Validate updates against resource schema
-   - Consider event handlers for updates
-
-3. Resource Deletion
-   - Consider soft deletion vs hard deletion
-   - Clear related cache entries
-   - Handle dependent resources
-
-4. Caching Strategy
-   - Set appropriate TTL values
+1. Caching strategy
+   - Set an appropriate TTL
    - Use tags for efficient querying
-   - Implement cache warming for critical resources
-
-5. Error Handling
+   - Invalidate by tag or pattern after a write
+2. Concurrent writes
+   - Rely on GitHub's own concurrency primitives (compare-and-swap on the
+     Contents API for the agent registry; field-level writes elsewhere)
+   - Never read-modify-write a shared record from a stale copy
+3. Error handling
    - Handle cache misses gracefully
-   - Implement retry mechanisms
    - Log cache errors for monitoring
 
 ## Testing
 
-The system includes comprehensive tests:
-- Unit tests for cache operations
-- Unit tests for resource lifecycle
-- Event handling tests
-- Error scenario tests
-
-Run tests using:
+Cache tests live under `src/__tests__/unit/infrastructure/cache/`. Run them with:
 ```bash
-npm test
+npm test -- cache
 ```
 
 ## Adding New Resource Types
-
-To add a new resource type:
 
 1. Define the resource schema:
 ```typescript
@@ -191,23 +138,12 @@ type CreateNewResourceData = Omit<NewResource, 'id' | 'type' | /* ... */>;
 type UpdateNewResourceData = Partial<CreateNewResourceData>;
 ```
 
-4. Implement validation and any specific resource handling in ResourceManager
-
-## Migration Guide
-
-When migrating existing resources to use this system:
-
-1. Define schemas for existing resources
-2. Create migration scripts to convert data
-3. Update cache keys and indices
-4. Test with production data volume
-5. Plan for cache warming
+4. Add the schema to `src/domain/resource-schemas.ts` and the repository / service that reads and writes it.
 
 ## Monitoring
 
 Consider monitoring:
-- Cache hit/miss rates
-- Resource operation latency
+- Cache hit/miss rates (`ResourceCache.getStats()`)
 - Event processing delays
 - Error rates by resource type
 - Cache memory usage

@@ -201,8 +201,16 @@ A partial App configuration falls through to the next credential rather than fai
 | `WEBHOOK_SECRET` | Webhook HMAC secret (signature validation fails closed) |
 | `WEBHOOK_ALLOW_UNSIGNED` | Accept unsigned webhooks when no secret is set — trusted dev only |
 | `WEBHOOK_PORT` | Webhook server port (default: 3001) |
+| `WEBHOOK_HOST` | Bind address (default: `127.0.0.1`). Set `0.0.0.0` explicitly to expose the listener; containers publishing the port need it |
+| `WEBHOOK_TRUSTED_PROXIES` | Comma-separated proxy IPs whose `X-Forwarded-For` is trusted for rate limiting (default: none) |
+| `EVENTS_AUTH_TOKEN` | Bearer token required on `/events/*`; unset => those routes return 503 |
+| `EVENTS_ALLOW_UNAUTHENTICATED` | Serve `/events/*` without a token — trusted dev only (default: `false`) |
 | `SSE_ENABLED` | Enable Server-Sent Events (default: `true`) |
 | `SYNC_ENABLED` | Enable background GitHub state sync (default: `true`) |
+| `GITHUB_APP_ID` / `GITHUB_APP_PRIVATE_KEY` / `GITHUB_APP_INSTALLATION_ID` | GitHub App installation auth; outranks the PAT when all three are set (`GITHUB_TOKEN` is then not required) |
+| `RATE_LIMIT_FLOOR` | Remaining GraphQL points below which the client backs off proactively (default: `100`) |
+| `AUDIT_LOG_ENABLED` / `AUDIT_LOG_PATH` | Append-only redacted JSONL audit of state-changing tool calls (default path: `.mcp-audit/mutations.jsonl`); mount the directory on a persistent volume if you want it to survive restarts |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` / `OTEL_SERVICE_NAME` | Opt-in OpenTelemetry tracing (`tool.<name>` spans); nothing is exported when the endpoint is unset |
 
 The full list lives in [CONFIGURATION.md](CONFIGURATION.md).
 
@@ -263,29 +271,36 @@ In-memory cache is used by default. For production:
 
 GitHub API has rate limits:
 
-- 5,000 requests/hour for authenticated requests
-- Circuit breaker protects against cascading failures
-- Retry policies handle transient failures
+- 5,000 requests/hour for authenticated requests (GraphQL is metered in points)
+- One `GitHubRequestExecutor` gates every call on the shared rate-limit budget and
+  waits for the reset once the remaining quota is below `RATE_LIMIT_FLOOR`
+- It retries transient failures (up to 3 attempts) with GitHub-aware backoff
+- A circuit breaker protects AI provider calls against cascading failures
 
 ### Security
 
 - Webhook signature validation **fails closed**: with no `WEBHOOK_SECRET`,
   webhooks are rejected unless `WEBHOOK_ALLOW_UNSIGNED=true` (trusted dev only).
-- Logs are redacted — token/secret-shaped keys are stripped, and the token is
-  not enumerable on the GitHub config object.
+- The HTTP listener binds `127.0.0.1` by default; `/events/*` requires
+  `Authorization: Bearer $EVENTS_AUTH_TOKEN` and returns 503 when no token is
+  configured (opt out with `EVENTS_ALLOW_UNAUTHENTICATED=true`, dev only).
+- `X-Forwarded-For` is ignored for rate limiting unless the socket peer is listed
+  in `WEBHOOK_TRUSTED_PROXIES`.
+- Logs are redacted — token/secret-shaped keys are stripped and credential-shaped
+  values (GitHub/API tokens, JWTs) are scrubbed from every log sink; the GitHub
+  config object holds no token material.
 - The Docker image runs as the non-root user `mcpuser`.
 - **Breaking:** `/events/stream`, `/events/subscribe`, `/events/replay/:id` and
   `/events/recent` require `Authorization: Bearer`. Set `EVENTS_AUTH_TOKEN` or
   the `OAUTH_ISSUER` + `OAUTH_AUDIENCE` resource-server settings; with neither,
-  they return `401`. `EVENTS_ALLOW_UNAUTHENTICATED=true` opts out (trusted dev
-  only). `POST /webhooks/github` is unchanged (HMAC only).
-- **Behind a reverse proxy / load balancer:** set `TRUST_PROXY` to the number
-  of proxies in front of the server (e.g. `TRUST_PROXY=1`). The rate limiter
-  and security audit log otherwise key on the socket peer address and ignore
-  `X-Forwarded-For`, so all clients would share the proxy's bucket. With `N`
-  hops the address `N`-from-the-right in `X-Forwarded-For` is used; `true` and
-  other non-integer values abort startup. Do not over-count hops: entries left
-  of your outermost proxy are client-controlled.
+  they return `503` ("Events API disabled"), and with an authenticator
+  configured missing/invalid credentials return `401`.
+  `EVENTS_ALLOW_UNAUTHENTICATED=true` opts out (trusted dev only).
+  `POST /webhooks/github` is unchanged (HMAC only).
+- **Behind a reverse proxy / load balancer:** list the proxy's exact IP(s) in
+  `WEBHOOK_TRUSTED_PROXIES`. The rate limiter otherwise keys on the socket peer
+  address and ignores `X-Forwarded-For`, so all clients would share the proxy's
+  bucket.
 - `WEBHOOK_ALLOWED_ORIGINS=*` aborts startup while `EVENTS_AUTH_TOKEN` or
   `OAUTH_ISSUER` is set; list exact origins.
 - **Breaking:** anonymous `/health` now returns only `{"status":"healthy"}`;

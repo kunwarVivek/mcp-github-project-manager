@@ -8,8 +8,8 @@ MCP GitHub Project Manager follows Clean Architecture principles with clear sepa
 ┌──────────────────────────────────────────────────────────────────┐
 │                         MCP Layer                                │
 │  ┌──────────────┐ ┌────────────┐ ┌──────────────┐ ┌───────────┐ │
-│  │ 20 Compound  │ │ Resources  │ │ Req Handling  │ │ Graceful  │ │
-│  │ Tools (169   │ │            │ │              │ │ Shutdown  │ │
+│  │ 21 Compound  │ │ Resources  │ │ Req Handling  │ │ Graceful  │ │
+│  │ Tools (175   │ │            │ │              │ │ Shutdown  │ │
 │  │ actions)     │ │            │ │              │ │           │ │
 │  └──────────────┘ └────────────┘ └──────────────┘ └───────────┘ │
 ├──────────────────────────────────────────────────────────────────┤
@@ -48,8 +48,7 @@ Core business entities, type definitions, validation schemas, and repository int
 | File | Purpose |
 |------|---------|
 | `types.ts` | Core entities (Issue, Milestone, Sprint, Project) and repository interfaces (`IssueRepository`, `MilestoneRepository`, `SprintRepository`, `ProjectRepository`) |
-| `errors.ts` | Domain-specific error types (`DomainError`, `ValidationError`, `NotFoundError`, `ConflictError`) |
-| `project-types.ts` | Extended project entity types and creation DTOs |
+| `errors.ts` | Domain-specific error types (`DomainError`, `ValidationError`, `ResourceNotFoundError`, `UnauthorizedError`, `GitHubApiError`, `RateLimitError`, `ConfigurationError`, …) |
 | `resource-types.ts` | Cached-resource metadata, staleness, and sync-state types |
 | `mcp-types.ts` | MCP tool/resource descriptor types and request/response shapes |
 
@@ -110,10 +109,10 @@ Core business entities, type definitions, validation schemas, and repository int
 
 ### Domain Entities Layer (`src/domain/entities/`)
 
-Rich domain models with behavior and business logic. These entities implement the existing interfaces for backward compatibility while adding computed properties and invariant enforcement.
+Rich domain models with behavior and business logic. Each entity implements the matching plain interface (`IssueEntity implements Issue`, etc.), so it can be handed anywhere the plain shape is expected, while adding computed properties and invariant enforcement. The domain layer holds types, zod schemas, errors, and this entity/value-object behavior; it imports nothing from `services/` or `infrastructure/`. See [ADR-005](adr/005-rich-domain-entities.md).
 
 **Design Principles:**
-- **Backward Compatibility**: All entities implement the original interfaces (`IssueEntity implements Issue`, etc.)
+- **Interface conformity**: All entities implement the plain interfaces (`IssueEntity implements Issue`, etc.)
 - **Factory Methods**: `fromData()` for creating from existing data, `create()` for new instances
 - **Computed Properties**: Derived values calculated from entity state (e.g., `isOpen`, `isOverdue`)
 - **Business Logic**: Methods that enforce invariants and encapsulate domain rules
@@ -145,33 +144,32 @@ const plainIssue = issue.toData();
 
 ### Infrastructure Layer (`src/infrastructure/`)
 
-External integrations and technical concerns. 16 subdirectories:
+External integrations and technical concerns. 15 subdirectories:
 
 | Directory | Purpose |
 |-----------|---------|
-| `github/` | GitHub REST/GraphQL API integration — repositories, `GitHubRepositoryFactory`, `RateLimitManager`, error handling |
-| `tools/` | MCP tool definitions: 20 compound tools (169 actions) exposed to MCP clients, with `CompoundExecutor` routing to internal granular executors. `compound/` holds the compound schemas and executors; `schemas/` holds the per-domain granular schemas. `ToolRegistry`, `ToolValidator` |
+| `github/` | GitHub REST/GraphQL API integration — repositories, `GitHubRepositoryFactory` (`fromAuth`), `auth/` (`GitHubAuth`, `resolveGitHubAuth`: six-tier chain, App outranks tokens; OAuth device flow), `GitHubRequestExecutor` (the one retry + rate-limit path), `RateLimitManager` (proactive budgeting against `RATE_LIMIT_FLOOR`), error handling |
+| `tools/` | MCP tool definitions: <!-- count:tools -->21<!-- /count --> compound tools (<!-- count:actions -->175<!-- /count --> actions) exposed to MCP clients. `compound/` holds the compound schemas (`compound-schemas.ts`), tool definitions, per-tool `_meta.schemaVersion` (`schema-version.ts`) and the executors (`compound-executors.ts`, wired by `register-executors.ts`); the granular per-operation tools (`*-tools.ts`, `schemas/`) stay registered in `ToolRegistry` as internal implementation contracts and are not listed over MCP. `ToolRegistry`, `ToolValidator`, `tool-factory.ts` (`createGitHubFactory`) and `shared-services.ts` |
 | `cache/` | In-memory caching with TTL and LRU eviction (`ResourceCache`), persistence adapter |
-| `resilience/` | Circuit breaker (`CircuitBreakerService`), retry policies, `AIResiliencePolicy` |
+| `resilience/` | `CircuitBreakerService` and `AIResiliencePolicy` (circuit breaker, timeout and retry around AI provider calls) — GitHub calls are retried by `GitHubRequestExecutor`, not here |
 | `events/` | Webhook handling (`GitHubWebhookHandler`), `EventStore` with persistence, `EventSubscriptionManager` |
 | `health/` | Health check endpoints (`HealthService`) |
 | `lifecycle/` | `GracefulShutdown` — tracks in-flight requests, drains on SIGTERM/SIGINT, force-exits after timeout |
-| `logger/` | `StructuredLogger` (JSON or text to stderr), log-level filtering |
+| `logger/` | `ConsoleLogger` / `Logger` (text or JSON lines to stderr; honors `LOG_LEVEL` and `LOG_FORMAT`, carries the active correlation id), `redactSecrets()` |
 | `persistence/` | `FilePersistenceAdapter` for durable cache/event state |
 | `secrets/` | `SecretProvider` — layered secret resolution (file-mounted → env var); Vault/AWS SM extension point |
-| `mcp/` | `MCPResponseFormatter`, `MCPErrorHandler` — MCP protocol response/error shaping |
-| `validation/` | `ValidationRuleEngine`, `PRDValidator`, pluggable rule definitions |
-| `resource/` | `ResourceFactory`, `ResourceManager`, `ResourceRelationshipManager`, `OptimisticLockManager` |
-| `observability/` | `CorrelationContext` (request tracing), `TracingLogger` |
+| `mcp/` | `ToolDispatcher` (argument validation → budget gate → audited execution in an OTel span → budget debit → result formatting), `MCPResponseFormatter`, `resources.ts`, `prompts.ts`, budget-debit metadata |
+| `observability/` | `CorrelationContext` (AsyncLocalStorage trace context), `MutationAuditLog` (append-only redacted JSONL of state-changing calls), `SecurityAuditLog`, `otel.ts` (opt-in OTLP tracing) |
 | `http/` | `WebhookServer` — HTTP server for incoming webhooks and SSE connections |
 | `agent/` | `AgentStore` (agent registry: `registry.json` on the `agent-registry` branch, Contents API with sha compare-and-swap), `LegacyAgentRegistry` (one-time import of the old registry issue), `WorkProductStore` (structured issue comments), `ProjectFieldSetup` (custom field provisioning for agent claims) |
+| `idempotency/` | `IdempotencyStore` — `idempotencyKey` replay for create actions (24 h TTL, request fingerprint, audit-log recovery) |
 
 ### Service Layer (`src/services/`)
 
 Business logic coordination, split into focused, independently-testable services.
 
-`ProjectManagementService` is a thin facade that delegates to focused,
-independently-testable services.
+`ProjectManagementService` is a thin facade: it holds the per-feature services and
+exposes each through a typed getter (`pms.issues`, `pms.sprints`, …). It adds no behavior of its own.
 
 **Services return plain interfaces** — CRUD services return plain domain interfaces
 (`Issue`, `Milestone`, `Sprint`, `Project`) for direct MCP serialization compatibility.
@@ -190,25 +188,25 @@ console.log(issue.labels);       // string[]
 
 | Service | Responsibility |
 |---------|----------------|
-| `ProjectManagementService` | Facade — delegates to all services below |
+| `ProjectManagementService` | Facade — typed getters over the services below; no behavior of its own |
 
 **Core CRUD**
 
 | Service | Returns | Responsibility |
 |---------|---------|----------------|
-| `IssueService` | `IssueEntity` | Issue CRUD, comments, Projects v2 draft issues |
+| `IssueService` | `Issue` | Issue CRUD, comments, Projects v2 draft issues, native blockers and issue types |
 | `PullRequestService` | PR types | PR listing with filtering |
-| `MilestoneService` | `MilestoneEntity` | Milestone CRUD and metrics |
+| `MilestoneService` | `Milestone` | Milestone CRUD and metrics |
 | `LabelService` | Label types | Label CRUD |
 
 **Project management**
 
 | Service | Returns | Responsibility |
 |---------|---------|----------------|
-| `ProjectStatusService` | `ProjectEntity` | Project CRUD |
+| `ProjectStatusService` | `Project` | Project CRUD (incl. close/reopen) |
 | `ProjectTemplateService` | Template types | Template + field/view management |
 | `ProjectLinkingService` | Linking types | Project item / repo / team linking |
-| `ProjectAutomationService` | Automation types | Automation-rule management |
+| `ProjectAutomationService` | Automation types | Project workflows (`ProjectV2Workflow`): list, get, delete |
 
 **Field / View / Item**
 
@@ -221,7 +219,7 @@ console.log(issue.labels);       // string[]
 
 | Service | Returns | Responsibility |
 |---------|---------|----------------|
-| `SprintPlanningService` | `SprintEntity` | Sprint planning and capacity |
+| `SprintPlanningService` | `Sprint` | Sprint planning and capacity (wraps `SprintEntity` for its invariants) |
 | `RoadmapService` | Roadmap types | Full-roadmap creation (project + milestones + issues) |
 | `RoadmapPlanningService` | Planning types | AI roadmap/milestone planning |
 
@@ -229,7 +227,13 @@ console.log(issue.labels);       // string[]
 
 | Service | Returns | Responsibility |
 |---------|---------|----------------|
-| `SubIssueService` | `IssueEntity` | Hierarchical issue dependencies |
+| `SubIssueService` | `Issue` | Hierarchical issue dependencies |
+
+**Analytics**
+
+| Service | Responsibility |
+|---------|----------------|
+| `AnalyticsService` | Read-only sprint velocity, burndown, cycle time, throughput and project summary over project items (backs the `analytics` tool) |
 
 **AI-powered**
 
@@ -263,7 +267,7 @@ console.log(issue.labels);       // string[]
 
 | Directory | Contents |
 |-----------|----------|
-| `ai/` | `AIServiceFactory`, `AITaskProcessor`, `TokenCounter`, `AIResponseCache`, `ConfidenceScorer`, `BacklogPrioritizer`, `LabelSuggestionService`, `DuplicateDetectionService`, `IssueEnrichmentAIService`, `RelatedIssueLinkingService`, `RoadmapAIService`, `SprintCapacityAnalyzer`, `SprintRiskAssessor`, `SprintSuggestionService`; plus `prompts/` (prompt templates and the `PromptRegistry`) |
+| `ai/` | `AIServiceFactory`, `AITaskProcessor`, `TokenCounter`, `TokenBudgetManager` (per-session AI token budget, `AI_SESSION_TOKEN_LIMIT`; distinct from the per-agent budget), `AIResponseCache` (consumed by `TaskContextGenerationService`), `ConfidenceScorer`, `BacklogPrioritizer`, `LabelSuggestionService`, `DuplicateDetectionService`, `IssueEnrichmentAIService`, `RelatedIssueLinkingService`, `RoadmapAIService`, `SprintCapacityAnalyzer`, `SprintRiskAssessor`, `SprintSuggestionService`; plus `prompts/` (versioned `{{var}}` templates served by the `PromptRegistry` — every AI prompt is registered there) |
 | `agent/` | `TaskCheckoutService`, `AgentContextService`, `WorkProductService`, `AgentBudgetService`, `AgentMetricsService`, `AgentReclaimScheduler` |
 | `context/` | `DependencyContextGenerator`, `CodeExampleGenerator`, `ContextualReferenceGenerator` |
 | `feature/` | `FeatureAnalysisService`, `FeaturePRDService`, `FeatureExpansionService`, `TaskLifecycleService` |
@@ -276,21 +280,23 @@ console.log(issue.labels);       // string[]
 Model Context Protocol integration, on `@modelcontextprotocol/server` v2
 (2026-07-28 spec):
 
-- **Compound tool API** — 20 compound tools (169 actions) registered via `ToolRegistry`; each routes through `CompoundExecutor` to internal granular executors
+- **Compound tool API** — <!-- count:tools -->21<!-- /count --> compound tools (<!-- count:actions -->175<!-- /count --> actions) registered via `ToolRegistry`; each routes by `action` to its executor in `compound/compound-executors.ts`
 - **Progressive disclosure** — `discover_tools` meta-tool lets agents explore available actions and schemas at runtime
 - **Capability profiles** — the `MCP_TOOL_GROUPS` env var selects which compound tool **groups** are exposed (default: `all`); only `discover_tools` is always exposed
 - **Resources** — 6 registered resources (github://config, github://projects, github://sprints/current, github://milestones, github://agents, github://tools)
 - **Prompts** — 6 registered prompts for consistent AI interaction templates
 - **Argument validation** — MCP v2 validates arguments against the declared `inputSchema` *before* the handler runs, so `ToolValidator` never sees a missing required field
-- **Error semantics** — a tool that runs and fails returns `{ content, isError: true }` so the model can see and recover from it; a JSON-RPC error is reserved for protocol faults (e.g. unknown tool)
-- **Request tracking and shutdown** — every tool call goes through one `dispatchTool` that carries the shutdown gate, in-flight tracking, telemetry, and result formatting; `GracefulShutdown` tracks in-flight requests, installs SIGTERM/SIGINT handlers, and drains active work before exit
+- **Error contract** — a tool that runs and fails returns `{ content, isError: true }` with a stable code in `_meta.error` so the model can see and recover from it: invalid arguments (field-level messages), GitHub API errors (`ToolValidator.mapGitHubError`: 401/403/404/422/rate-limit/5xx), and an exhausted agent budget (`BudgetExhausted`). A JSON-RPC error (`MethodNotFound`) is reserved for an unknown tool and protocol faults. See [ADR-007](adr/007-tool-error-contract.md)
+- **Request tracking and shutdown** — every tool call goes through one `dispatchTool` that carries the shutdown gate and in-flight tracking, then `ToolDispatcher`; `GracefulShutdown` tracks in-flight requests, installs SIGTERM/SIGINT handlers, drains active work, and flushes the audit log and telemetry before exit
+- **Contract versioning** — every tool advertises `_meta.schemaVersion` (all `1.0.0`, rolled up); a snapshot test fails when a tool's input schema changes without a version bump
+- **Idempotency and pagination** — create actions accept `idempotencyKey`; paged list actions accept `cursor` and return an additive `nextCursor` (see [TOOLS.md](TOOLS.md#cross-cutting-parameters))
 
 ### Entry Points and Composition
 
 | File | Role |
 |------|------|
 | `src/index.ts` | Entry point — boots the `McpServer` and serves it over stdio via `serveStdio`, which negotiates the protocol revision per connection |
-| `src/container.ts` | tsyringe DI container — registers the repository factory, services, and infrastructure (37 registrations) |
+| `src/container.ts` | tsyringe DI container — `configureContainer(auth, owner, repo)` registers the repository factory (`GitHubRepositoryFactory.fromAuth`), the services, and the components `index.ts` owns (`ResourceCache`, `FilePersistenceAdapter`, `GitHubWebhookHandler`, `EventStore`, `EventSubscriptionManager`, `GracefulShutdown`, `MutationAuditLog`, `TelemetryConfig`); `index.ts` resolves them and constructs none by hand. Tool executors are a documented exception (below) |
 | `src/env.ts` | Configuration resolution, secret chain, and startup validation against the *resolved* config |
 | `src/cli.ts` | Command-line flag parsing (`--token`, `--owner`, `--repo`, `--env-file`, `--verbose`); CLI flags override env vars |
 
@@ -387,25 +393,21 @@ The domain is organized into distinct bounded contexts, each with its own ubiqui
 │ AI → Issue | Enriching | AI services add metadata to Issues |
 │ AI → PRD | Generative | AI creates PRDs that spawn Issues |
 
-### Anti-Corruption Layer
+### Service Facade
 
-The `ProjectManagementService` facade acts as an anti-corruption layer between contexts:
-- Translates between context-specific language
-- Coordinates cross-context workflows
-- Prevents direct coupling between contexts
-
-Each context's services are independently testable and can evolve without affecting other contexts.
+`ProjectManagementService` is not an anti-corruption layer and does not coordinate cross-context workflows: it is a thin facade (typed getters only) so callers go straight to the owning service. Context boundaries are kept by the services themselves, each independently testable.
 
 ## Key Patterns
 
 ### Dependency Injection
 
-Uses `tsyringe` for IoC. A concrete `GitHubRepositoryFactory` is registered as a
-singleton instance; services receive it via `useFactory` registrations:
+Uses `tsyringe` for IoC. `configureContainer(auth, owner, repo)` builds the
+`GitHubRepositoryFactory` from the resolved credentials, registers it as an
+instance, and registers each service with a `useFactory`:
 
 ```typescript
 // src/container.ts
-const factory = new GitHubRepositoryFactory(token, owner, repo);
+const factory = GitHubRepositoryFactory.fromAuth(auth, owner, repo);
 container.registerInstance("GitHubRepositoryFactory", factory);
 
 container.register("IssueService", {
@@ -414,13 +416,28 @@ container.register("IssueService", {
 
 container.register("ProjectManagementService", {
   useFactory: (c) => new ProjectManagementService(
-    c.resolve("GitHubRepositoryFactory"),
     c.resolve("SubIssueService"),
     c.resolve("MilestoneService"),
-    // ... all extracted services
+    // ... the remaining feature services
   )
 });
 ```
+
+**Authentication.** Credentials come only from `resolveGitHubAuth()`
+(`infrastructure/github/auth/resolveGitHubAuth.ts`), which returns a
+`GitHubAuth` (`mode`, `source`, `octokitAuth()`, `getToken()`). Six tiers, first
+hit wins: a complete GitHub App config (`GITHUB_APP_ID`, `GITHUB_APP_PRIVATE_KEY`,
+`GITHUB_APP_INSTALLATION_ID`; a partial config falls through) → `--token` →
+`$SECRETS_DIR/GITHUB_TOKEN` → `GITHUB_TOKEN` → stored OAuth token
+(`auth login`) → `gh auth token`. Repositories are built only through
+`GitHubRepositoryFactory.fromAuth(auth, owner, repo)`.
+See [ADR-008](adr/008-app-auth-precedence.md).
+
+**Documented exception — tool executors.** Executors in `infrastructure/tools/**`
+do not resolve from the container. They self-construct through the one shared
+factory (`createGitHubFactory()` in `tools/tool-factory.ts` / the
+`shared-services` accessor), which itself uses `resolveGitHubAuth()`. Do not add
+a second construction path. See [ADR-006](adr/006-composition-root-exception.md).
 
 ### Repository Pattern
 
@@ -456,29 +473,57 @@ class GitHubRepositoryFactory {
 
 ### Circuit Breaker
 
-Resilience for external APIs:
+Resilience for AI provider calls (`AIResiliencePolicy` wraps `CircuitBreakerService`
+with timeout and retry):
 
 ```typescript
-// Wraps GitHub API calls
-const result = await circuitBreaker.execute(() =>
-  this.octokit.projects.get({ project_id })
-);
+const result = await resiliencePolicy.execute(() => generateText({ model, prompt }));
 ```
 
-### Rate Limit Management
+### Request Execution and Rate-Limit Budgeting
 
-`RateLimitManager` (`infrastructure/github/`) tracks GitHub API rate-limit headers
-and provides pre-call checks. It caches rate-limit status with a 30 s TTL and
-exposes remaining quota so callers can back off before hitting 403s.
+Every GitHub call — REST and GraphQL, from the factory and from every repository
+— goes through one `GitHubRequestExecutor` (shared per Octokit instance). It
+gates each call on the shared `RateLimitManager` budget, runs the operation,
+retries retryable failures (up to 3 attempts) with GitHub-aware backoff, and
+converts terminal failures to structured errors. `RateLimitManager` tracks the
+GraphQL points budget and the REST budget separately, learns from response
+headers and the `rateLimit` field of GraphQL results, and waits for the reset
+(or throws `RateLimitError` when the wait would exceed its cap) once the
+remaining quota falls below `RATE_LIMIT_FLOOR` (default 100) — so the server backs
+off proactively instead of burning the budget and hitting a 403.
 
-### Structured Logging
+### Logging
 
-`StructuredLogger` (`infrastructure/logger/`) supports two output modes controlled
-by `LOG_FORMAT`:
-- `text` (default) — human-readable output via the existing `Logger`
-- `json` — newline-delimited JSON to stderr for machine consumption
+`ConsoleLogger` (`infrastructure/logger/`) writes to stderr (stdout is the MCP
+channel) and honors two settings:
+- `LOG_LEVEL` (`debug`, `info`, `warn`, `error`) — minimum level emitted
+- `LOG_FORMAT` — `text` (default, human-readable) or `json` (one JSON object per
+  line, carrying the active trace's `correlationId`)
 
-Log level is controlled by `LOG_LEVEL` (`debug`, `info`, `warn`, `error`).
+Output passes through `redactSecrets()`, which strips token/secret/password/apiKey/
+authorization-shaped keys and token-shaped substrings.
+
+### Observability
+
+- **Mutation audit log** — `MutationAuditLog` appends a redacted JSONL record of every
+  state-changing tool call (actor = agent id or `token`) to `AUDIT_LOG_PATH`
+  (default `.mcp-audit/mutations.jsonl`) when `AUDIT_LOG_ENABLED=true`. The idempotency
+  store uses it to recover a replayed result that has aged out of memory.
+- **OpenTelemetry** — opt-in: set `OTEL_EXPORTER_OTLP_ENDPOINT` (and optionally
+  `OTEL_SERVICE_NAME`) and each dispatched call runs inside a `tool.<name>` span.
+  Unset, nothing is exported.
+- Both flush during graceful shutdown. See [ADR-010](adr/010-observability.md).
+
+### Idempotency and Pagination
+
+Create actions (`manage_issues` `create`/`add_sub_issue`/`create_draft`/`create_comment`,
+`manage_milestones` `create`, `manage_project` `create_field`, `manage_sprints` `create`)
+accept an `idempotencyKey`. `IdempotencyStore` fingerprints the request: a repeat with
+the same key and fingerprint within 24 h returns the first result flagged
+`replayed: true`; the same key with a different request is an error. Paged list
+actions accept `cursor` and add `nextCursor` beside the existing `pageInfo`. See
+[ADR-009](adr/009-idempotency-and-audit.md).
 
 ## Data Flow
 
@@ -487,26 +532,31 @@ MCP Client Request (e.g. manage_issues, action: "create")
        │
        ▼
 ┌─────────────────────┐
-│  Compound Tool      │  ← Validates action + input with Zod
-│  (CompoundExecutor)  │
+│  dispatchTool       │  ← shutdown gate, in-flight tracking
 └────────┬────────────┘
-         │  routes by action
          ▼
-┌─────────────────┐
-│  Granular        │  ← Internal executor (e.g. executeCreateIssue)
-│  Executor        │
-└────────┬────────┘
-         │
+┌─────────────────────┐
+│  ToolDispatcher     │  ← validate args (ToolValidator) → budget gate →
+│                     │    audited execution in an OTel span → budget debit
+└────────┬────────────┘
+         ▼
+┌─────────────────────┐
+│  Compound executor  │  ← routes by action (executeManageIssues …),
+│                     │    idempotencyKey / cursor handling
+└────────┬────────────┘
          ▼
 ┌─────────────────┐
 │    Service      │  ← Business logic
 └────────┬────────┘
-         │
          ▼
 ┌─────────────────┐
 │  Repository     │  ← Data access abstraction
 └────────┬────────┘
-         │
+         ▼
+┌─────────────────┐
+│ GitHubRequest-  │  ← rate-limit gate + retry
+│ Executor        │
+└────────┬────────┘
          ▼
 ┌─────────────────┐
 │  GitHub API     │  ← REST/GraphQL calls
@@ -538,6 +588,20 @@ Used for:
 - Backlog prioritisation
 - Confidence scoring
 
+### Prompts, Caching and Budgets
+
+- **`PromptRegistry`** (`services/ai/prompts/`) holds every AI prompt as a versioned
+  template with `{{var}}` placeholders; services render by id through
+  `defaultPromptRegistry`. Registering an existing id/version twice throws.
+- **`AIResponseCache`** is consumed by `TaskContextGenerationService` (TTL cache of AI
+  generation results; `metrics.cacheHit` reports a fully cached build).
+- **`TokenBudgetManager`** meters AI task generation per session (correlation id) against
+  `AI_SESSION_TOKEN_LIMIT` (0 = unlimited); an exhausted budget makes optional AI steps
+  fall back instead of throwing. It is **distinct from the per-agent budget**
+  (`AgentBudgetService`, `agent_manage set_budget`), which is debited once per tool call
+  by `ToolDispatcher` and can hard-stop AI tools with `BudgetExhausted`. See
+  [ADR-011](adr/011-prompt-registry-and-token-budgets.md).
+
 ## Configuration
 
 Environment-based configuration (`src/env.ts`), validated at startup by Zod schemas
@@ -551,6 +615,8 @@ secrets (`SECRETS_DIR`) override both.
 | `GITHUB_TOKEN` | — | Optional GitHub PAT; one of six credential-chain tiers (App, `--token`, secrets file, env, OAuth `auth login`, `gh`) |
 | `GITHUB_OWNER` | — | Repository owner |
 | `GITHUB_REPO` | — | Repository name |
+| `GITHUB_APP_ID`, `GITHUB_APP_PRIVATE_KEY`, `GITHUB_APP_INSTALLATION_ID` | — | Optional GitHub App installation auth; outranks the PAT when all three are set |
+| `RATE_LIMIT_FLOOR` | `100` | Remaining GraphQL points below which calls back off proactively |
 
 **AI Providers** (at least one recommended for AI features)
 
@@ -585,6 +651,7 @@ Each role also accepts `AI_<ROLE>_PROVIDER`, `AI_<ROLE>_API_KEY` and
 | `DEFAULT_COMPLEXITY_THRESHOLD` | `7` | Complexity threshold (1–10) for sub-task creation |
 | `MAX_SUBTASK_DEPTH` | `3` | Max nesting depth for sub-tasks |
 | `AI_BATCH_SIZE` | `10` | Batch size for parallel AI operations |
+| `AI_SESSION_TOKEN_LIMIT` | `0` | Per-session token budget for AI task generation (0 = unlimited) |
 
 **Sync / Cache**
 
@@ -603,6 +670,9 @@ Each role also accepts `AI_<ROLE>_PROVIDER`, `AI_<ROLE>_API_KEY` and
 | `WEBHOOK_SECRET` | `""` | Webhook HMAC secret |
 | `WEBHOOK_ALLOW_UNSIGNED` | `false` | Accept unsigned webhooks (dev only) |
 | `WEBHOOK_PORT` | `3001` | Webhook HTTP server port |
+| `WEBHOOK_HOST` | `127.0.0.1` | Interface the HTTP server binds (loopback by default) |
+| `EVENTS_AUTH_TOKEN` | — | Bearer token required on `/events/*` (503 when unset, unless `EVENTS_ALLOW_UNAUTHENTICATED=true`) |
+| `WEBHOOK_TRUSTED_PROXIES` | — | Comma-separated proxy IPs whose `X-Forwarded-For` is trusted |
 | `WEBHOOK_TIMEOUT_MS` | `5000` | Webhook processing timeout |
 | `SSE_ENABLED` | `true` | Enable Server-Sent Events endpoint |
 | `EVENT_RETENTION_DAYS` | `7` | Days to retain stored events |
@@ -620,6 +690,8 @@ Each role also accepts `AI_<ROLE>_PROVIDER`, `AI_<ROLE>_API_KEY` and
 |----------|---------|---------|
 | `LOG_FORMAT` | `text` | `text` or `json` — structured JSON logs to stderr |
 | `LOG_LEVEL` | `info` | Minimum log level: `debug`, `info`, `warn`, `error` |
+| `AUDIT_LOG_ENABLED` / `AUDIT_LOG_PATH` | `false` / `.mcp-audit/mutations.jsonl` | Append-only JSONL audit of state-changing tool calls |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` / `OTEL_SERVICE_NAME` | — / `mcp-github-project-manager` | Opt-in OpenTelemetry tracing |
 
 **Enhanced Features**
 
@@ -644,33 +716,33 @@ See [CONFIGURATION.md](CONFIGURATION.md) for full details.
 ## Compound Tool Architecture
 
 The MCP server uses progressive disclosure to reduce tool-selection overhead
-for AI agents: 169 actions are grouped into 20 compound tools, each accepting
+for AI agents: <!-- count:actions -->175<!-- /count --> actions are grouped into <!-- count:tools -->21<!-- /count --> compound tools, each accepting
 an `action` parameter.
 
 ```
 MCP Client (Claude/Codex/Cursor)
-  │  sees only 20 compound tools
+  │  sees only <!-- count:tools -->21<!-- /count --> compound tools
   ▼
 ToolRegistry.getToolsForMCP()
   │  returns compound tools filtered by MCP_TOOL_GROUPS (by group name)
   ▼
-CompoundExecutor.execute(action, args)
-  │  validates action, routes to internal executor
+executeManageIssues / executeAnalytics / … (compound-executors.ts)
+  │  validates action, routes to the service layer
   ▼
-Existing execute* functions (unchanged)
+Services → repositories → GitHubRequestExecutor
 ```
 
 ### Tool Groups
 
 | Compound Tool | Actions | Group | Domain |
 |---------------|---------|-------|--------|
-| `manage_project` | 37 | `core` | Project CRUD, fields, views, items, templates, linking |
-| `manage_issues` | 18 | `core` | Issue CRUD, comments, drafts, search, sub-issues |
+| `manage_project` | 38 | `core` | Project CRUD (incl. close/reopen), fields, views, items, templates, linking, collaborators |
+| `manage_issues` | 22 | `core` | Issue CRUD, comments, drafts, search, sub-issues, blockers, issue types |
 | `manage_prs` | 7 | `core` | PR CRUD, merge, reviews |
 | `manage_milestones` | 7 | `core` | Milestone CRUD, metrics, deadlines |
-| `manage_sprints` | 8 | `core` | Sprint planning, metrics, velocity |
+| `manage_sprints` | 9 | `core` | Sprint planning, metrics, velocity, delete (needs `confirm: true`) |
 | `manage_labels` | 2 | `core` | Label CRUD |
-| `manage_automation` | 7 | `core` | Automation rules |
+| `manage_automation` | 3 | `core` | Project workflows (list, get, delete) |
 | `manage_iterations` | 5 | `core` | Iteration field management |
 | `manage_status_updates` | 3 | `core` | Project status updates |
 | `manage_branches` | 4 | `core` | Branch protection rules, branch listing |
@@ -678,12 +750,13 @@ Existing execute* functions (unchanged)
 | `manage_workflows` | 6 | `core` | GitHub Actions workflows and runs |
 | `manage_events` | 3 | `events` | Event subscription, replay |
 | `ai_generate` | 9 | `ai` | PRD generation, task breakdown, traceability, task materialization |
-| `ai_analyze` | 9 | `ai` | Issue enrichment, triage, duplicates, label suggestions |
+| `ai_analyze` | 8 | `ai` | Issue enrichment, triage, duplicates, label suggestions |
 | `ai_plan` | 6 | `ai` | Capacity, backlog, risk, roadmap |
 | `agent_work` | 12 | `agents` | Agent registration, task lifecycle, review workflow |
 | `agent_manage` | 18 | `agents` | Agent admin, budgets, work products, reclaim, metrics, PM coordination |
 | `system` | 2 | `system` | Health check, agent field provisioning |
 | `discover_tools` | — | `system` | Runtime tool/action/schema discovery (meta-tool) |
+| `analytics` | 5 | `core` | Read-only sprint velocity, burndown, cycle time, throughput, project summary |
 
 ### Capability Profiles
 
@@ -693,7 +766,7 @@ name — a tool name in this variable exposes nothing.
 
 | Profile | `MCP_TOOL_GROUPS` value | Use case |
 |---------|------------------------|----------|
-| Full (default) | `all` | All 20 tools exposed |
+| Full (default) | `all` | All <!-- count:tools -->21<!-- /count --> tools exposed |
 | Project management | `core` | CRUD-only agents |
 | AI-powered | `core,ai` | Planning and analysis agents |
 | Agent orchestration | `agents` | Autonomous task agents |
@@ -763,7 +836,7 @@ GitHub project without human dispatch. All state is stored natively in GitHub
 
 ### GitHub-Native Data Model
 
-The orchestration layer uses five custom project fields (auto-provisioned by
+The orchestration layer uses seven custom project fields (auto-provisioned by
 `ProjectFieldSetup`):
 
 | Field | Type | Purpose |
@@ -773,6 +846,8 @@ The orchestration layer uses five custom project fields (auto-provisioned by
 | `agent_status` | SINGLE_SELECT | Task status: `unclaimed`, `in_progress`, `review`, `blocked`, `completed` |
 | `agent_work_branch` | TEXT | Git branch name the agent is working on |
 | `agent_pr_number` | TEXT | Pull request number for the submitted work |
+| `agent_heartbeat_at` | TEXT | ISO 8601 timestamp of the last heartbeat on the claimed item (hot state) |
+| `agent_progress` | TEXT | 0-100 progress of the claimed item as last reported |
 
 Agent records are stored as one file, `registry.json`, on a dedicated orphan
 branch `agent-registry` (`AGENT_REGISTRY_BRANCH` / `AGENT_REGISTRY_FILE`),
@@ -891,4 +966,4 @@ All types are defined in `src/domain/agent-orchestration-types.ts`:
 
 ---
 
-*Last updated: 2026-10-21 — tool surface, DDD layout and MCP v2 semantics refreshed against the code.*
+*Last updated: 2026-11-02 — reconciled against the code after the remediation (auth precedence, request executor, error contract, idempotency, audit log, OTel, analytics tool).*

@@ -1,5 +1,5 @@
 import { inject, injectable } from "tsyringe";
-import type { ResourceStatus } from "../domain/resource-types";
+import { ResourceStatus } from "../domain/resource-types";
 import type {
   CreateProject,
   Project,
@@ -9,6 +9,12 @@ import type {
 import { filterByStatus, parseResourceStatus } from "../domain/utils/StatusParser";
 import type { GitHubRepositoryFactory } from "../infrastructure/github/GitHubRepositoryFactory";
 import type { GitHubProjectRepository } from "../infrastructure/github/repositories/GitHubProjectRepository";
+import type { GitHubStatusUpdateRepository } from "../infrastructure/github/repositories/GitHubStatusUpdateRepository";
+import type {
+  StatusUpdate,
+  StatusUpdateListResult,
+  StatusUpdateOptions,
+} from "../infrastructure/github/repositories/types";
 import { safeCall } from "./utils/safeCall";
 
 /**
@@ -27,6 +33,10 @@ export class ProjectStatusService {
 
   private get projectRepo(): GitHubProjectRepository {
     return this.factory.createProjectRepository();
+  }
+
+  private get statusUpdateRepo(): GitHubStatusUpdateRepository {
+    return this.factory.createStatusUpdateRepository();
   }
 
   /**
@@ -145,6 +155,49 @@ export class ProjectStatusService {
         message: `Project ${data.projectId} has been deleted`,
       };
     });
+  }
+
+  /**
+   * Close a project (hidden from the active list, kept for reference).
+   */
+  async closeProject(projectId: string): Promise<Project> {
+    return safeCall(() => this.projectRepo.update(projectId, { status: ResourceStatus.CLOSED }));
+  }
+
+  /**
+   * Reopen a previously closed project.
+   */
+  async reopenProject(projectId: string): Promise<Project> {
+    return safeCall(() => this.projectRepo.update(projectId, { status: ResourceStatus.ACTIVE }));
+  }
+
+  /**
+   * Post a status update (ON_TRACK / AT_RISK / ...) on a project.
+   */
+  async createStatusUpdate(
+    projectId: string,
+    body: string,
+    options?: StatusUpdateOptions
+  ): Promise<StatusUpdate> {
+    return safeCall(() => this.statusUpdateRepo.createStatusUpdate(projectId, body, options));
+  }
+
+  /**
+   * List a project's status updates with pagination.
+   */
+  async listStatusUpdates(
+    projectId: string,
+    first = 10,
+    after?: string
+  ): Promise<StatusUpdateListResult> {
+    return safeCall(() => this.statusUpdateRepo.listStatusUpdates(projectId, first, after));
+  }
+
+  /**
+   * Get a single status update by node ID, or null when it does not exist.
+   */
+  async getStatusUpdate(statusUpdateId: string): Promise<StatusUpdate | null> {
+    return safeCall(() => this.statusUpdateRepo.getStatusUpdate(statusUpdateId));
   }
 
   /**

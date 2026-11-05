@@ -3,10 +3,10 @@ import type {
   FeatureAdditionRequest,
   FeatureRequirement,
   PRDDocument,
-} from "../../domain/ai-types.js";
-import { type ILogger, Logger } from "../../infrastructure/logger";
+} from "../../domain/ai-types";
+import { getLogger, type ILogger } from "../../infrastructure/logger";
 import { safeCall } from "../utils/safeCall";
-import { FeatureAnalysisService } from "./FeatureAnalysisService.js";
+import { FeatureAnalysisService } from "./FeatureAnalysisService";
 
 /**
  * Manages adding features to PRD documents.
@@ -22,13 +22,13 @@ export class FeaturePRDService {
    * @param analysisService - Injected feature-analysis service.
    *   Falls back to a new instance when omitted (backward-compatible mode).
    * @param logger - Logger instance for diagnostics. When omitted, defaults to
-   *   the global singleton via `Logger.getInstance()`.
+   *   a prefixed console logger via `getLogger()`.
    */
   constructor(
     private readonly analysisService: FeatureAnalysisService = new FeatureAnalysisService(),
     logger?: ILogger
   ) {
-    this.logger = logger ?? Logger.getInstance();
+    this.logger = logger ?? getLogger("FeaturePRDService");
   }
 
   /**

@@ -1,9 +1,11 @@
 # Remediation Gap Tracker — Living
 
-> **⚠️ HISTORICAL SNAPSHOT (2026-08-07).** This tracker records the state of
-> the remediation pass as of that date. It is kept for history only — its
-> counts and "current" claims are stale. **Current source of truth:** the code
-> itself, plus [`docs/architecture.md`](../architecture.md),
+> **⚠️ LIVING TRACKER WITH HISTORICAL ROWS (statuses reconciled to the code 2026-11-02).**
+> Each row's text describes the state *at the time the row was closed* (line counts,
+> tool counts such as "120 tools" or "13 tools", and module names are as of that
+> date and are NOT the current numbers). Where the code has since changed, the row
+> carries a "Since:" note and group **G14** records the later remediation.
+> **Current source of truth:** the code itself, plus [`docs/architecture.md`](../architecture.md),
 > [`docs/TOOLS.md`](../TOOLS.md) and [`docs/CONFIGURATION.md`](../CONFIGURATION.md).
 
 **Branch:** `remediation/spec-reconciliation`
@@ -13,7 +15,7 @@
 
 > This file is the single source of truth for remediation state. It supersedes the
 > conflicting claims in `.planning/STATUS.md`, `.planning/REQUIREMENTS.md`, and
-> `docs/GAP-ANALYSIS-LIVE.md`, which are time-layered and drifted (see G0 group).
+> `docs/GAP-ANALYSIS-LIVE.md` (a superseded 2026-05-02 snapshot, kept for history), which are time-layered and drifted (see G0 group).
 
 ---
 
@@ -29,7 +31,7 @@ Canonical docs contradict each other and the code. Truth column is code-verified
 | G0-04 | Dead README refs | links `STATUS.md`; docs `npm run test:integration`, `npm run type-check` | STATUS.md absent (real one `.planning/STATUS.md`); neither script in package.json | MEDIUM | DONE |
 | G0-05 | Stale graph stats | GAP-ANALYSIS-LIVE "513 nodes/347 edges" | GitNexus index 4697 symbols / 11535 rels | LOW | DONE (marked superseded; GitNexus context resource shows current stats) |
 | G0-06 | DEBT-09..12 overclaim | REQUIREMENTS: `as any` replaced (complete) | Was 38 `as any`, but 31 in tests + 3 template-string false-positives + 1 SDK cast + 1 comment. Real prod casts = 2 (SprintSuggestionService). Fixed Layer B. | MEDIUM | DONE |
-| G0-07 | DEBT-07 overclaim | REQUIREMENTS: "reduce PMS to coordination only" complete | Was 1,696 lines; now genuinely done | HIGH | DONE (REQUIREMENTS.md DEBT-07 annotated with the real completion date; PMS decomposed to 1,338-line facade — see G3-01) |
+| G0-07 | DEBT-07 overclaim | REQUIREMENTS: "reduce PMS to coordination only" complete | Was 1,696 lines; now genuinely done | HIGH | DONE (REQUIREMENTS.md DEBT-07 annotated with the real completion date; PMS decomposed to 1,338-line facade — see G3-01). **Since:** `ProjectManagementService.ts` is 121 lines — constructor-injected services behind typed getters, no behavior of its own |
 
 ## G1 — Domain Layer (`src/domain/`)
 
@@ -45,7 +47,7 @@ Canonical docs contradict each other and the code. Truth column is code-verified
 | G2-01 | **Circular dependency** | FilePersistenceAdapter ↔ GitHubStateSyncService | HIGH | DONE (root cause: `SyncMetadata` type defined in service but imported by 2 infra files. Moved to `domain/resource-types.ts`; repointed FilePersistenceAdapter + ResourceCache; service re-exports for compat. `check --cycles` = clean) |
 | G2-02 | `ToolSchemas.ts` god file (2,871 lines) | src/infrastructure/tools/ToolSchemas.ts | HIGH | DONE — split into 7 domain-specific schema files under `schemas/` (core-tool, issue-tool, pr-tool, sprint-milestone-tool, automation-iteration-tool, event-tool, ai-automation-tool). ToolSchemas.ts is now a 24-line barrel re-export. |
 | G2-03 | Dual dispatch: index.ts 120-case switch parallel to ToolRegistry | index.ts + ToolRegistry.ts | HIGH | DONE — added `registerExecutor`/`execute` to ToolRegistry; `registerToolExecutors()` in index.ts replaces the 407-line switch. ToolRegistry is now the single dispatch point. index.ts 1286→1023 lines. |
-| G2-04 | Placeholder-factory smell: `GitHubRepositoryFactory(token,"placeholder","placeholder")` | linking/lifecycle/template/status/advanced tools | MEDIUM | DONE (5 duplicated createFactory helpers → 1 shared `tool-factory.ts#createGitHubFactory(owner?,repo?)` with env fallback; sentinel centralized+documented; 231 tool tests pass) |
+| G2-04 | Placeholder-factory smell: `GitHubRepositoryFactory(token,"placeholder","placeholder")` | linking/lifecycle/template/status/advanced tools | MEDIUM | DONE (5 duplicated createFactory helpers → 1 shared `tool-factory.ts#createGitHubFactory(owner?,repo?)` with env fallback; sentinel centralized+documented; 231 tool tests pass). **Since:** the single factory builds repositories via `GitHubRepositoryFactory.fromAuth(resolveGitHubAuth(), owner, repo)`, so a GitHub App credential outranks the PAT; the sentinel `UNUSED_REPO_CONTEXT` remains (project-node-ID tools never resolve a repository). Tool executors self-constructing through this factory is a documented composition-root exception (ADR-006) |
 | G2-05 | Health check GitHub rate-limit is a stub (TODO) | HealthService.ts:161 | MEDIUM | DONE (checkGitHub now probes octokit.rest.rateLimit.get via injected GitHubRepositoryFactory; fails honest connected:false on missing factory/error; openWorldHint corrected to true; HealthService suite 16/16) |
 | G2-06 | Webhook signature validation fails OPEN when secret unset | GitHubWebhookHandler.ts:46-48 | HIGH (security) | DONE (now fails closed: rejects unsigned webhooks unless `WEBHOOK_ALLOW_UNSIGNED=true` explicit dev opt-in; 6 security regression tests pass) |
 | G2-07 | EventStore unbounded memory (no LRU eviction) | EventStore.ts | MEDIUM | NOT-A-GAP (verified: FIFO eviction at maxEventsInMemory via splice, `addToMemoryBuffer` L218-220, with correct `rebuildEventIndex` L232-237. CONCERNS claim stale. Minor: rebuild is O(n)/evict — perf-only, not a bug) |
@@ -56,12 +58,12 @@ Canonical docs contradict each other and the code. Truth column is code-verified
 
 | ID | Gap | Location | Severity | Status |
 |----|-----|----------|----------|--------|
-| G3-01 | **God class** ProjectManagementService (1,696 lines) | ProjectManagementService.ts | HIGH | DONE — extracted PullRequestService (223 lines), FieldValueService (238 lines, strategy pattern), LabelService (65 lines), IterationService (195 lines). PMS 1,696→365 lines, pure facade. All public method signatures unchanged. container.ts registers all 14 services. |
+| G3-01 | **God class** ProjectManagementService (1,696 lines) | ProjectManagementService.ts | HIGH | DONE — extracted PullRequestService (223 lines), FieldValueService (238 lines, strategy pattern), LabelService (65 lines), IterationService (195 lines). PMS 1,696→365 lines, pure facade. All public method signatures unchanged. container.ts registers all 14 services. **Since:** the facade was reduced further to 121 lines of typed getters over 13 services (callers use `pms.issues.…`, `pms.sprints.…`); the pass-through methods were removed |
 | G3-02 | Field-value update: fragile mega-switch, no strategy pattern | ProjectManagementService (field handlers) | MEDIUM | DONE — extracted to FieldValueService with `makeStrategy()` pattern (text, number, date, single_select, iteration). Each strategy encapsulates GraphQL mutation + variable formatting. |
 | G3-09 | **Duplicate/orphaned automation service**: `ProjectAutomationService` existed but wired to nothing; PMS duplicated it with inline automation methods | MEDIUM | DONE (Option A) — registered `ProjectAutomationService` in container (instantiated with factory repos + Logger); PMS's 7 automation methods now delegate to it (keep tool-shaped I/O mapping, drop duplicated findById checks + automationRepo getter). Orphaned service is now the single automation implementation. detect-changes MEDIUM/3 flows; 146 tests pass |
-| G3-03 | 38 `as any` across services | see G0-06 | MEDIUM | DONE — only 1 documented SDK cast remains (index.ts:321); all others are test mocking patterns (acceptable). |
+| G3-03 | 38 `as any` across services | see G0-06 | MEDIUM | DONE — only 1 documented SDK cast remained (then cited at index.ts:321); all others are test mocking patterns. **Since:** that SDK cast is gone too — `index.ts` registers tools through `fromJsonSchema`, where the handler argument is `unknown` and no cast is needed (the comments at `index.ts:282` and `:297` explain why none is used). Production code has no `as any` (the only three text hits are code-example strings in `CodeExampleGenerator`) |
 | G3-04 | Token estimation hardcoded (300/400/500), no real counting | TaskContextGenerationService.ts:207-256 | MEDIUM | DONE — created `TokenCounter` (word-based heuristic: 1.3 tokens/word) + `TokenBudgetManager`. Replaced all 5 hardcoded estimates with `TokenCounter.estimateFromObject()`. |
-| G3-05 | AI response caching stubbed (`cacheHit:false` TODO) | TaskContextGenerationService.ts:113 | MEDIUM | DONE — created `AIResponseCache` with SHA-256 content hashing, TTL expiry (default 1hr), LRU-style eviction (oldest-first), configurable maxEntries (500). |
+| G3-05 | AI response caching stubbed (`cacheHit:false` TODO) | TaskContextGenerationService.ts:113 | MEDIUM | DONE — created `AIResponseCache` with SHA-256 content hashing, TTL expiry (default 1hr), LRU-style eviction (oldest-first), configurable maxEntries (500). **Since:** the cache is wired — `TaskContextGenerationService` routes its AI generation calls through an injected `AIResponseCache` (process-wide shared default) and `metrics.cacheHit` is true when every AI call of a build was served from it |
 | G3-06 | `contextQualityMetrics` missing from EnhancedAITask | TaskGenerationService.ts:272 | LOW | DONE — added `contextQualityMetrics?: { completeness: number; relevance: number; clarity: number; overallScore: number }` to EnhancedAITask interface in traceability-types.ts. |
 | G3-07 | AIServiceFactory singleton — untestable, no reset | AIServiceFactory.ts | MEDIUM | DONE — registered in DI container (container.ts). index.ts resolves from container instead of direct `getInstance()`. All DI registrations standardized to useFactory pattern. |
 | G3-08 | No input sanitization on PRD content to AI | PRDGenerationService, TaskGenerationService | MEDIUM (security) | DONE — created `InputSanitizer` with size limits (PRD 100K, issue 50K, task 20K chars), control char stripping, length enforcement. Wired into PRDGenerationService, TaskGenerationService, IssueTriagingService, IssueEnrichmentService. |
@@ -70,7 +72,7 @@ Canonical docs contradict each other and the code. Truth column is code-verified
 
 | ID | Gap | Location | Severity | Status |
 |----|-----|----------|----------|--------|
-| G4-01 | index.ts 1,271 lines, monolithic dispatch (see G2-03) | index.ts | HIGH | DONE — collapsed to 1,023 lines via ToolRegistry single dispatch (see G2-03). |
+| G4-01 | index.ts 1,271 lines, monolithic dispatch (see G2-03) | index.ts | HIGH | DONE — collapsed to 1,023 lines via ToolRegistry single dispatch (see G2-03). **Since:** 641 lines; the 82 unreachable granular executor registrations were removed (only the compound tools are registered) and dispatch lives in `ToolDispatcher` |
 | G4-02 | Live "Tool handler not implemented" fallthrough path | index.ts:787 | LOW | DONE — ToolRegistry.execute() throws McpError(MethodNotFound) when no executor registered. |
 
 ## G5 — Testing
@@ -82,7 +84,7 @@ Canonical docs contradict each other and the code. Truth column is code-verified
 | G5-03 | ContextQualityValidator: pipeline integration untested | validation/ContextQualityValidator.ts | MEDIUM | DONE — pipeline integration tests added (in progress via subagent). |
 | G5-04 | Many services lack dedicated unit tests | src/services/* | HIGH | DONE — created FieldValueService.test.ts, PullRequestService.test.ts, LabelService.test.ts, IterationService.test.ts. 20+ test cases for newly extracted services. |
 | G5-05 | E2E logger stderr timing flake | e2e/stdio-transport.e2e.ts | LOW | DONE — fixed timing issue (in progress via subagent). |
-| G5-06 | **Test-infra blocker**: `tests/ai-services/*` fail to load — `@ai-sdk/anthropic` → `nanoid` ESM not transformed by Jest | jest.config.cjs | HIGH | DONE (moduleNameMapper maps nanoid + nanoid/non-secure to a CJS test stub; AI suites load — SprintRiskAssessor + SprintSuggestionService 61/61, retroactively validating Layer B) |
+| G5-06 | **Test-infra blocker** *(historical — Jest era)*: `tests/ai-services/*` fail to load — `@ai-sdk/anthropic` → `nanoid` ESM not transformed by Jest | jest.config.cjs | HIGH | DONE (moduleNameMapper maps nanoid + nanoid/non-secure to a CJS test stub; AI suites load — SprintRiskAssessor + SprintSuggestionService 61/61, retroactively validating Layer B). **Since:** the runner is Vitest and the root `tests/` tree no longer exists — every test lives under `src/__tests__/` (ADR-012); the AI suites are `src/__tests__/unit/services/ai/` |
 | G5-07 | **Test-infra**: real `ResourceCache` had no direct behavioural coverage (the old suite was a hand-rolled mock; the Jest CJS-interop blocker is gone — Vitest constructs `new ResourceCache()` fine) | src/__tests__/unit/infrastructure/cache/ResourceCache.test.ts / ResourceCache.ts | MEDIUM | DONE — replaced the mock stub with a real-cache suite (13 tests, fake timers): capacity cap with oldest-first eviction, TTL expiry/default TTL/refresh, and tag/type/namespace index consistency after eviction, expiry, delete, invalidateByTags, clearByType. **Defect found & fixed**: `set()` on an existing key left the previous entry's tag/namespace index rows behind, so `getByTag`/`getByNamespace` returned resources no longer carrying that tag/namespace; `set()` now calls `removeFromIndices` on the replaced entry. |
 
 ## G7 — Stack / SDK Review (dependency layer — the true bottom)
@@ -103,14 +105,14 @@ Audit 2026-07-15: `npm outdated` + `npm audit` (was 31 vulns: 1 critical, 8 high
 
 ## G6 — Feature Proposals (PROPOSED — require go-ahead before build)
 
-| ID | Feature | Rationale | Source |
-|----|---------|-----------|--------|
-| G6-01 | Analytics & Reporting tools (phase 11) | Roadmap phase, entirely absent; README "Identified Gap" | STATUS phase 11 |
-| G6-02 | Real-time webhook sync / SSE streaming | README identified gap; V2-01/04 | REQUIREMENTS v2 |
-| G6-03 | Redis / pluggable cache backend + eviction | scaling, multi-instance | V2-08, CONCERNS |
-| G6-04 | OpenTelemetry metrics/observability | production monitoring | V2-09 |
+| ID | Feature | Rationale | Source | Status |
+|----|---------|-----------|--------|--------|
+| G6-01 | Analytics & Reporting tools (phase 11) | Roadmap phase, entirely absent; README "Identified Gap" | STATUS phase 11 | **DONE (2026-11)** — the `analytics` tool (`sprint_velocity`, `sprint_burndown`, `cycle_time`, `throughput`, `project_summary`) backed by `AnalyticsService` |
+| G6-02 | Real-time webhook sync / SSE streaming | README identified gap; V2-01/04 | REQUIREMENTS v2 | PROPOSED |
+| G6-03 | Redis / pluggable cache backend + eviction | scaling, multi-instance | V2-08, CONCERNS | PROPOSED |
+| G6-04 | OpenTelemetry metrics/observability | production monitoring | V2-09 | **DONE (2026-11), traces only** — opt-in OTLP tracing (`OTEL_EXPORTER_OTLP_ENDPOINT`, `tool.<name>` spans) plus the mutation audit log; no metrics export |
 | G6-05 | Secret-manager support (Vault/AWS SM) + key rotation | secrets hygiene | CONCERNS — DONE (approved). Added `SecretProvider` abstraction (`src/infrastructure/secrets/`): Env + File providers (File = Docker/k8s `/run/secrets` convention, dependency-free, sync). `SECRETS_DIR` layers file secrets before env. env.ts routes config through the resolver; `getSecret(name)` reads fresh for rotation. Vault/AWS SM documented as async extension point. 10 unit tests pass; config consumers 5/5 |
-| G6-06 | Query batching / prefetch for related resources | perf | README gap |
+| G6-06 | Query batching / prefetch for related resources | perf | README gap | PROPOSED |
 
 ---
 
@@ -120,12 +122,12 @@ Audit 2026-07-15: `npm outdated` + `npm audit` (was 31 vulns: 1 critical, 8 high
 |----|---------|--------|
 | IBF-1 | Graceful shutdown with request draining | DONE — `GracefulShutdown` class tracks in-flight requests, drains on SIGINT/SIGTERM, force-exits after timeout. Wired into index.ts with shuttingDown rejection. |
 | IBF-2 | Startup config validation (Zod schemas) | DONE — `config-schema.ts` with 7 grouped schemas (GitHub, AI, Sync, Webhook, AIModel, AITask, Server). `env.ts` validates at startup, exits on invalid required config, warns on missing AI keys. |
-| IBF-3 | Structured JSON logging | DONE — `StructuredLogger` with JSON/text dual-mode (`LOG_FORMAT=json`). Level filtering via `LOG_LEVEL`. NDJSON to stderr in JSON mode. |
-| IBF-4 | Rate limit awareness + backoff | DONE — `RateLimitManager` monitors GitHub API limits (30s cached), calculates proportional backoff, updates from response headers. Wired into `GitHubRepositoryFactory`. |
+| IBF-3 | Structured JSON logging | DONE — originally a `StructuredLogger`/`TracingLogger` pair (since deleted as dead code; nothing consumed them). **Now:** the one logger, `ConsoleLogger` in `infrastructure/logger/`, honors `LOG_LEVEL` and `LOG_FORMAT=json` (one JSON line per entry carrying the active `correlationId`, stderr only) and redacts secrets. |
+| IBF-4 | Rate limit awareness + backoff | DONE — `RateLimitManager` tracks the GraphQL and REST budgets separately, learns from response headers and GraphQL `rateLimit` fields, and waits (or throws `RateLimitError` past its cap) once remaining quota is below `RATE_LIMIT_FLOOR` (default 100). It is consumed by the one `GitHubRequestExecutor` that every repository and the factory route REST/GraphQL calls through (also the single retry path, 3 attempts). An earlier version existed but nothing called it. |
 | IBF-5 | Request size limits | DONE — covered by InputSanitizer (see G3-08). |
-| IBF-6 | Token budget management | DONE — `TokenBudgetManager` with per-session budget tracking. See G3-04. |
-| IBF-7 | Prompt versioning | DONE — `PromptRegistry` with versioned templates, `{{variable}}` interpolation, getLatest/getVersion/render/list. |
-| IBF-8 | Tool pagination | DONE — `Pagination.ts` with cursor-based pagination (base64url-encoded offset cursors), configurable page size (max 100), `paginate()` and `parsePaginationParams()` utilities. |
+| IBF-6 | Token budget management | DONE — `TokenBudgetManager` (per-session budget keyed by correlation id, `AI_SESSION_TOKEN_LIMIT`, 0 = unlimited) is consumed by `TaskGenerationService` and `TaskContextGenerationService`; an exhausted budget makes optional AI steps fall back instead of throwing. Distinct from the per-agent budget (`AgentBudgetService`, debited once per tool call by `ToolDispatcher`; hard stop → `BudgetExhausted`). See G3-04, ADR-011. |
+| IBF-7 | Prompt versioning | DONE — `PromptRegistry` (versioned templates, `{{variable}}` interpolation, getLatest/getVersion/render/list). It is now the only source of AI prompts: every AI service (PRD, task, context, feature, issue-intelligence, sprint, roadmap, confidence) renders its prompts through `defaultPromptRegistry`. See ADR-011. |
+| IBF-8 | Tool pagination | **SUPERSEDED** — the originally recorded `Pagination.ts` (`paginate()` / `parsePaginationParams()`) never existed in the source tree; the row was an overclaim. Pagination is instead the additive `cursor` input / `nextCursor` output on the paged list actions (`routePaged` in `compound-executors.ts`), layered over the existing `pageInfo`. |
 
 
 ## G8 — Agent Orchestration (added 2026-08-05)
@@ -180,7 +182,7 @@ whole agent layer.
 | ID | Feature | Status |
 |----|---------|--------|
 | G10-01 | **Auto-reclaim scheduler** — `AgentReclaimScheduler` service runs a server-side sweep every `AGENT_RECLAIM_INTERVAL_MS` (default 5 min, enabled by default) reclaiming tasks from agents whose heartbeat exceeds `AGENT_STALE_AFTER_MINUTES` (default 30); marks agents `offline`; posts an `## Agent Task Auto-Reclaimed` audit comment per issue (added to `reclaimStaleTasks`); unref'd timer never blocks stdio shutdown; re-entrancy guard; sweep errors logged not thrown | DONE — wired in container.ts + index.ts lifecycle (start on boot, stop on graceful shutdown); env-configurable; 10 new unit tests |
-| G10-02 | **`setup_agent_fields` tool** — idempotently provisions the 5 agent orchestration fields on a project via `ProjectFieldSetup`; exposed as granular tool + `agent_manage/setup_fields` (was already reachable via `manage_project/setup_agent_fields` and `system/setup_project_fields`) | DONE — schema + tool def + executor + ToolRegistry + index.ts + compound routing |
+| G10-02 | **`setup_agent_fields` tool** — idempotently provisions the agent orchestration fields (5 when this row closed; 7 today, see G8-04) on a project via `ProjectFieldSetup`; exposed as granular tool + `agent_manage/setup_fields` (was already reachable via `manage_project/setup_agent_fields` and `system/setup_project_fields`) | DONE — schema + tool def + executor + ToolRegistry + index.ts + compound routing |
 | G10-03 | **Agent orchestration E2E suite (real GitHub)** — `src/__tests__/e2e/tools/agent-orchestration.e2e.ts`: tool presence/schema, invalid-enum validation, project + field provisioning (idempotency), register/list, full lifecycle (checkout → context → heartbeat → activity → work product → review → approve → release), double-claim rejection, budgets (set/status/record), crash-recovery reclaim (deterministic staleness via `timeoutMinutes: 0.01` + real-timer wait), metrics; agent cleanup in afterAll; graceful skip without real creds | DONE — run via `npm run test:e2e:tools:real:agent` or `node scripts/run-e2e-tests.js --agent-only --real-api`; runner gained `--agent-only` |
 
 ## G11 — Agentic Orchestration Product Audit (added 2026-10-21)
@@ -278,8 +280,29 @@ call the platform makes.
 | G13-02 | Hot/cold registry split: every heartbeat was a registry commit | DONE — heartbeat/progress/branch live on the claimed project item (`agent_heartbeat_at`, `agent_progress`); registry written only on cold change; reclaim/metrics/swarm status use the newer beat (`AgentHeartbeatResolver`); `get_activity` drops `heartbeatHistory`, adds `heartbeatSource`. Legacy projects are healed additively on first checkout/heartbeat per process (`AgentFieldProvisioner`, b8r.8): concurrent first calls share one provisioning, a type conflict stays a hard error, a permission failure returns the `setup_fields` / project-admin message. |
 | G13-03 | Per-call token debit failure was swallowed | DONE — retry once, park in in-memory `UnpaidDebitLedger`, log error, `_meta.budgetDebitFailed` on the result; settled (or checkout refused) at the next `checkout_task`. |
 
+## G14 — Remediation pass (2026-11)
+
+Code-verified 2026-11-02. Each row is what the code does now.
+
+| ID | Change | Status |
+|----|--------|--------|
+| G14-01 | Rich domain entities: `IssueEntity`, `MilestoneEntity`, `SprintEntity`, `ProjectEntity`, `PullRequestEntity` carry invariants and state transitions; the domain layer imports nothing from `services/` or `infrastructure/` (ADR-005) | DONE |
+| G14-02 | GitHub App installation auth outranks the PAT through `resolveGitHubAuth()` + `GitHubRepositoryFactory.fromAuth`; a partial App config falls through to the next credential tier (`--token`, `SECRETS_DIR`, `GITHUB_TOKEN`, stored OAuth login, `gh` CLI) (ADR-008) | DONE |
+| G14-03 | One `GitHubRequestExecutor` (retry + proactive rate-limit budgeting against `RATE_LIMIT_FLOOR`) for every GitHub call | DONE |
+| G14-04 | Webhook hardening: loopback bind (`WEBHOOK_HOST`), `EVENTS_AUTH_TOKEN` on `/events/*`, CORS allow-list, rate limit, `WEBHOOK_TRUSTED_PROXIES`, fail-closed signatures | DONE |
+| G14-05 | Mutation audit log (`.mcp-audit/mutations.jsonl`, `AUDIT_LOG_*`) and opt-in OpenTelemetry (`OTEL_*`), both flushed on shutdown (ADR-010) | DONE |
+| G14-06 | Error contract: every tool failure is `{content, isError:true}` with `_meta.error`; JSON-RPC errors only for an unknown tool or protocol faults; hard-stop budgets gate AI tools (`BudgetExhausted`) (ADR-007) | DONE |
+| G14-07 | `idempotencyKey` on create actions (24 h TTL, request fingerprint, audit-log replay) (ADR-009) | DONE |
+| G14-08 | Additive `cursor` / `nextCursor` pagination; per-tool `_meta.schemaVersion` (all `1.0.0`) with a snapshot test | DONE |
+| G14-09 | `manage_sprints delete` requires `confirm: true`; `manage_project update` accepts `closed` / `status` | DONE |
+| G14-10 | New `analytics` tool (5 actions) — now 21 tools / 175 actions, enforced by `npm run check:docs` | DONE |
+| G14-11 | Composition root: container registers the components `index.ts` owns; tool executors self-construct through `createGitHubFactory()` (documented exception, ADR-006) | DONE |
+| G14-12 | Dead modules deleted: `infrastructure/validation`, `infrastructure/resource` (`ResourceManager`, `OptimisticLockManager`), `StructuredLogger`/`TracingLogger`, `project-types.ts`, `MCPErrorHandler` | DONE |
+| G14-13 | Test trees merged into `src/__tests__/` (`tests/` removed) (ADR-012); lockfile + doc-count CI checks, CodeQL, Dependabot, SBOM | DONE |
+
 ---
 
 *Tracker initialized 2026-07-14. Updated 2026-08-07: full remediation pass — all OPEN gaps closed, 8 industry best features added, agent orchestration layer shipped, then waves G9-01..G9-13 (correctness, autonomy, intelligence, observability, harness DX) shipped with tests + docs, then G10-01..G10-03 (auto-reclaim scheduler, setup_agent_fields tool, agent E2E suite) closed the self-healing + verification loop.*
 *Updated 2026-10-21: G11 — product-level audit of the agentic orchestration platform (MCP control plane, GitHub as the data layer). 15 confirmed defects closed across the task lifecycle, the registry, work products, project fields, the compound MCP surface and the PM actions; 2 coverage rows still in flight.*
 *Updated 2026-10-21: G12 — live API conformance (12 confirmed mismatches, all 12 closed) and the adoption of seven native GitHub capabilities the platform was emulating or not using (issue dependencies, issue types, multi-select fields, project roles, views as claiming pools, reverse membership, title-based registry lookup).*
+*Updated 2026-11-02: reconciled to the code after the remediation pass (G14). Status corrections: IBF-4/6/7 are consumed by production code, IBF-8 (`Pagination.ts`) never existed and is superseded by `cursor`/`nextCursor`, G3-05 cache is wired, G6-01/G6-04 shipped, and the page counts/line counts quoted in older rows are historical.*

@@ -11,7 +11,7 @@
  * with views, custom fields, draft issues (optional), workflows, and insights.
  */
 
-import type { GitHubRepositoryFactory } from "../github/GitHubRepositoryFactory";
+import { ProjectTemplateService } from "../../services/ProjectTemplateService";
 import { ANNOTATION_PATTERNS } from "./annotations/tool-annotations";
 import {
   type CopiedProjectOutput,
@@ -31,179 +31,6 @@ import {
 } from "./schemas/project-template-linking-schemas";
 import type { ToolDefinition, ToolSchema } from "./ToolValidator";
 import { createGitHubFactory } from "./tool-factory";
-
-// ============================================================================
-// GraphQL Queries and Mutations
-// ============================================================================
-
-const MARK_PROJECT_AS_TEMPLATE_MUTATION = `
-  mutation MarkProjectV2AsTemplate($input: MarkProjectV2AsTemplateInput!) {
-    markProjectV2AsTemplate(input: $input) {
-      projectV2 {
-        id
-        title
-        url
-      }
-    }
-  }
-`;
-
-const UNMARK_PROJECT_AS_TEMPLATE_MUTATION = `
-  mutation UnmarkProjectV2AsTemplate($input: UnmarkProjectV2AsTemplateInput!) {
-    unmarkProjectV2AsTemplate(input: $input) {
-      projectV2 {
-        id
-        title
-        url
-      }
-    }
-  }
-`;
-
-const COPY_PROJECT_V2_MUTATION = `
-  mutation CopyProjectV2($input: CopyProjectV2Input!) {
-    copyProjectV2(input: $input) {
-      projectV2 {
-        id
-        title
-        number
-        url
-        createdAt
-      }
-    }
-  }
-`;
-
-const RESOLVE_ORG_ID_QUERY = `
-  query ResolveOrganizationId($login: String!) {
-    organization(login: $login) {
-      id
-    }
-  }
-`;
-
-const LIST_ORGANIZATION_PROJECTS_QUERY = `
-  query ListOrganizationTemplates($orgLogin: String!, $first: Int!, $after: String) {
-    organization(login: $orgLogin) {
-      projectsV2(first: $first, after: $after) {
-        nodes {
-          id
-          title
-          number
-          shortDescription
-          url
-          createdAt
-          updatedAt
-          template
-        }
-        pageInfo {
-          hasNextPage
-          endCursor
-        }
-        totalCount
-      }
-    }
-  }
-`;
-
-// ============================================================================
-// Helper Functions
-// ============================================================================
-
-/**
- * Create a GitHubRepositoryFactory from environment variables.
- *
- * Template operations work at the project level (via projectId), so owner/repo
- * are only needed for factory initialization. We use placeholders since template
- * operations don't actually require a specific repo context.
- */
-
-/**
- * Resolves an organization login to its GitHub node ID.
- *
- * This is needed because copyProjectV2 requires the target owner's node ID,
- * but users provide the organization login for convenience.
- */
-async function resolveOrganizationId(
-  factory: GitHubRepositoryFactory,
-  orgLogin: string
-): Promise<string> {
-  interface OrgIdResponse {
-    organization: {
-      id: string;
-    } | null;
-  }
-
-  const response = await factory.graphql<OrgIdResponse>(RESOLVE_ORG_ID_QUERY, {
-    login: orgLogin,
-  });
-
-  if (!response.organization) {
-    throw new Error(`Organization '${orgLogin}' not found`);
-  }
-
-  return response.organization.id;
-}
-
-// ============================================================================
-// GraphQL Response Types
-// ============================================================================
-
-interface MarkProjectAsTemplateResponse {
-  markProjectV2AsTemplate: {
-    projectV2: {
-      id: string;
-      title: string;
-      url: string;
-    };
-  };
-}
-
-interface UnmarkProjectAsTemplateResponse {
-  unmarkProjectV2AsTemplate: {
-    projectV2: {
-      id: string;
-      title: string;
-      url: string;
-    };
-  };
-}
-
-interface CopyProjectV2Response {
-  copyProjectV2: {
-    projectV2: {
-      id: string;
-      title: string;
-      number: number;
-      url: string;
-      createdAt: string;
-    };
-  };
-}
-
-interface ProjectNode {
-  id: string;
-  title: string;
-  number: number;
-  shortDescription: string | null;
-  url: string;
-  createdAt: string;
-  updatedAt: string;
-  template: boolean;
-}
-
-interface ListOrganizationProjectsResponse {
-  organization: {
-    projectsV2: {
-      nodes: ProjectNode[];
-      pageInfo: {
-        hasNextPage: boolean;
-        endCursor: string | null;
-      };
-      totalCount: number;
-    };
-  } | null;
-}
 
 // ============================================================================
 // Tool Definitions
@@ -347,10 +174,12 @@ export const listOrganizationTemplatesTool: ToolDefinition<
 // Executor Functions
 // ============================================================================
 
+function createTemplateService(): ProjectTemplateService {
+  return new ProjectTemplateService(createGitHubFactory());
+}
+
 /**
  * Execute the mark_project_as_template tool.
- *
- * Marks an organization project as a template via the GraphQL API.
  *
  * @param args - Validated input arguments
  * @returns The marked template project
@@ -360,18 +189,9 @@ export async function executeMarkProjectAsTemplate(args: MarkProjectAsTemplateIn
   content: Array<{ type: "text"; text: string }>;
   structuredContent: TemplateProjectOutput;
 }> {
-  const factory = createGitHubFactory();
-
-  const response = await factory.graphql<MarkProjectAsTemplateResponse>(
-    MARK_PROJECT_AS_TEMPLATE_MUTATION,
-    {
-      input: {
-        projectId: args.projectId,
-      },
-    }
-  );
-
-  const project = response.markProjectV2AsTemplate.projectV2;
+  const project = await createTemplateService().markProjectAsTemplate({
+    projectId: args.projectId,
+  });
 
   const result: TemplateProjectOutput = {
     id: project.id,
@@ -394,8 +214,6 @@ export async function executeMarkProjectAsTemplate(args: MarkProjectAsTemplateIn
 /**
  * Execute the unmark_project_as_template tool.
  *
- * Removes template status from a project via the GraphQL API.
- *
  * @param args - Validated input arguments
  * @returns The unmarked project
  * @throws Error if no GitHub credential is available or the API call fails
@@ -404,18 +222,9 @@ export async function executeUnmarkProjectAsTemplate(args: UnmarkProjectAsTempla
   content: Array<{ type: "text"; text: string }>;
   structuredContent: TemplateProjectOutput;
 }> {
-  const factory = createGitHubFactory();
-
-  const response = await factory.graphql<UnmarkProjectAsTemplateResponse>(
-    UNMARK_PROJECT_AS_TEMPLATE_MUTATION,
-    {
-      input: {
-        projectId: args.projectId,
-      },
-    }
-  );
-
-  const project = response.unmarkProjectV2AsTemplate.projectV2;
+  const project = await createTemplateService().unmarkProjectAsTemplate({
+    projectId: args.projectId,
+  });
 
   const result: TemplateProjectOutput = {
     id: project.id,
@@ -438,8 +247,6 @@ export async function executeUnmarkProjectAsTemplate(args: UnmarkProjectAsTempla
 /**
  * Execute the copy_project_from_template tool.
  *
- * Creates a new project by copying from a template via the GraphQL API.
- *
  * @param args - Validated input arguments
  * @returns The newly created project
  * @throws Error if no GitHub credential is available or the API call fails
@@ -448,21 +255,12 @@ export async function executeCopyProjectFromTemplate(args: CopyProjectFromTempla
   content: Array<{ type: "text"; text: string }>;
   structuredContent: CopiedProjectOutput;
 }> {
-  const factory = createGitHubFactory();
-
-  // Resolve the target owner (organization login) to its node ID
-  const ownerId = await resolveOrganizationId(factory, args.targetOwner);
-
-  const response = await factory.graphql<CopyProjectV2Response>(COPY_PROJECT_V2_MUTATION, {
-    input: {
-      projectId: args.projectId,
-      ownerId: ownerId,
-      title: args.title,
-      includeDraftIssues: args.includeDraftIssues ?? false,
-    },
+  const project = await createTemplateService().copyProjectFromTemplate({
+    projectId: args.projectId,
+    targetOwner: args.targetOwner,
+    title: args.title,
+    includeDraftIssues: args.includeDraftIssues,
   });
-
-  const project = response.copyProjectV2.projectV2;
 
   const result: CopiedProjectOutput = {
     id: project.id,
@@ -486,9 +284,6 @@ export async function executeCopyProjectFromTemplate(args: CopyProjectFromTempla
 /**
  * Execute the list_organization_templates tool.
  *
- * Lists template projects in an organization via the GraphQL API.
- * Filters to only return projects marked as templates.
- *
  * @param args - Validated input arguments
  * @returns Paginated list of template projects
  * @throws Error if no GitHub credential is available or the API call fails
@@ -499,44 +294,26 @@ export async function executeListOrganizationTemplates(
   content: Array<{ type: "text"; text: string }>;
   structuredContent: TemplateListOutput;
 }> {
-  const factory = createGitHubFactory();
-
-  const response = await factory.graphql<ListOrganizationProjectsResponse>(
-    LIST_ORGANIZATION_PROJECTS_QUERY,
-    {
-      orgLogin: args.org,
-      first: args.first ?? 20,
-      after: args.after,
-    }
-  );
-
-  if (!response.organization) {
-    throw new Error(`Organization '${args.org}' not found`);
-  }
-
-  const { projectsV2 } = response.organization;
-
-  // Filter to only include projects marked as templates
-  const templateNodes = projectsV2.nodes.filter((node) => node.template);
+  const page = await createTemplateService().listOrganizationTemplates({
+    org: args.org,
+    first: args.first,
+    after: args.after,
+  });
 
   const result: TemplateListOutput = {
-    templates: templateNodes.map((node) => ({
-      id: node.id,
-      title: node.title,
+    templates: page.templates.map((template) => ({
+      id: template.id,
+      title: template.title,
       isTemplate: true,
-      url: node.url,
-      number: node.number,
-      shortDescription: node.shortDescription,
-      createdAt: node.createdAt,
-      updatedAt: node.updatedAt,
+      url: template.url,
+      number: template.number,
+      shortDescription: template.shortDescription,
+      createdAt: template.createdAt,
+      updatedAt: template.updatedAt,
     })),
-    pageInfo: {
-      hasNextPage: projectsV2.pageInfo.hasNextPage,
-      endCursor: projectsV2.pageInfo.endCursor,
-    },
-    // totalCount is the count of templates, not all projects
-    // Since we're filtering client-side, we return the filtered count
-    totalCount: templateNodes.length,
+    pageInfo: page.pageInfo,
+    // Templates are filtered client-side, so the count is of this page's templates.
+    totalCount: page.templates.length,
   };
 
   return {

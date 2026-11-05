@@ -12,7 +12,7 @@
  * Node ID resolution is handled internally.
  */
 
-import type { GitHubRepositoryFactory } from "../github/GitHubRepositoryFactory";
+import { SubIssueService } from "../../services/SubIssueService";
 import { ANNOTATION_PATTERNS } from "./annotations/tool-annotations";
 import {
   type AddSubIssueInput,
@@ -41,46 +41,9 @@ import { createGitHubFactory } from "./tool-factory";
 // Helper Functions
 // ============================================================================
 
-/**
- * Resolves an issue number to its GitHub node ID.
- *
- * This is needed because sub-issue mutations require node IDs,
- * but users provide issue numbers for convenience.
- */
-async function resolveIssueNodeId(
-  factory: GitHubRepositoryFactory,
-  issueNumber: number
-): Promise<string> {
-  const query = `
-    query GetIssueNodeId($owner: String!, $repo: String!, $number: Int!) {
-      repository(owner: $owner, name: $repo) {
-        issue(number: $number) {
-          id
-        }
-      }
-    }
-  `;
-
-  interface IssueNodeIdResponse {
-    repository: {
-      issue: {
-        id: string;
-      } | null;
-    };
-  }
-
-  const config = factory.getConfig();
-  const response = await factory.graphql<IssueNodeIdResponse>(query, {
-    owner: config.owner,
-    repo: config.repo,
-    number: issueNumber,
-  });
-
-  if (!response.repository.issue) {
-    throw new Error(`Issue #${issueNumber} not found in ${config.owner}/${config.repo}`);
-  }
-
-  return response.repository.issue.id;
+/** Builds the sub-issue service bound to the given repository. */
+function subIssueService(owner: string, repo: string): SubIssueService {
+  return new SubIssueService(createGitHubFactory(owner, repo));
 }
 
 /**
@@ -249,22 +212,11 @@ export const removeSubIssueTool: ToolDefinition<RemoveSubIssueInput, RemoveSubIs
 
 /**
  * Execute add_sub_issue tool.
- *
- * Resolves issue numbers to node IDs and calls the repository.
  */
 export async function executeAddSubIssue(args: AddSubIssueInput): Promise<SubIssueOperationOutput> {
-  const factory = createGitHubFactory(args.owner, args.repo);
-  const repository = factory.createSubIssueRepository();
-
-  // Resolve issue numbers to node IDs
-  const [parentNodeId, subIssueNodeId] = await Promise.all([
-    resolveIssueNodeId(factory, args.parentIssueNumber),
-    resolveIssueNodeId(factory, args.subIssueNumber),
-  ]);
-
-  const result = await repository.addSubIssue(
-    parentNodeId,
-    subIssueNodeId,
+  const result = await subIssueService(args.owner, args.repo).addSubIssue(
+    args.parentIssueNumber,
+    args.subIssueNumber,
     args.replaceParent ?? false
   );
 
@@ -285,17 +237,13 @@ export async function executeAddSubIssue(args: AddSubIssueInput): Promise<SubIss
 
 /**
  * Execute list_sub_issues tool.
- *
- * Resolves parent issue number to node ID and lists sub-issues.
  */
 export async function executeListSubIssues(args: ListSubIssuesInput): Promise<SubIssueListOutput> {
-  const factory = createGitHubFactory(args.owner, args.repo);
-  const repository = factory.createSubIssueRepository();
-
-  // Resolve issue number to node ID
-  const issueNodeId = await resolveIssueNodeId(factory, args.issueNumber);
-
-  const result = await repository.listSubIssues(issueNodeId, args.first ?? 20, args.after);
+  const result = await subIssueService(args.owner, args.repo).listSubIssues(
+    args.issueNumber,
+    args.first ?? 20,
+    args.after
+  );
 
   return {
     subIssues: result.subIssues.map((item) => ({
@@ -321,17 +269,9 @@ export async function executeListSubIssues(args: ListSubIssuesInput): Promise<Su
 
 /**
  * Execute get_parent_issue tool.
- *
- * Resolves issue number to node ID and gets parent.
  */
 export async function executeGetParentIssue(args: GetParentIssueInput): Promise<ParentIssueOutput> {
-  const factory = createGitHubFactory(args.owner, args.repo);
-  const repository = factory.createSubIssueRepository();
-
-  // Resolve issue number to node ID
-  const issueNodeId = await resolveIssueNodeId(factory, args.issueNumber);
-
-  const result = await repository.getParentIssue(issueNodeId);
+  const result = await subIssueService(args.owner, args.repo).getParentIssue(args.issueNumber);
 
   if (!result) {
     return { parent: null };
@@ -350,30 +290,15 @@ export async function executeGetParentIssue(args: GetParentIssueInput): Promise<
 
 /**
  * Execute reprioritize_sub_issue tool.
- *
- * Resolves all issue numbers to node IDs and reprioritizes.
  */
 export async function executeReprioritizeSubIssue(
   args: ReprioritizeSubIssueInput
 ): Promise<SubIssueOperationOutput> {
-  const factory = createGitHubFactory(args.owner, args.repo);
-  const repository = factory.createSubIssueRepository();
-
-  // Resolve issue numbers to node IDs
-  const nodeIdPromises: Promise<string>[] = [
-    resolveIssueNodeId(factory, args.parentIssueNumber),
-    resolveIssueNodeId(factory, args.subIssueNumber),
-  ];
-
-  if (args.afterIssueNumber !== undefined) {
-    nodeIdPromises.push(resolveIssueNodeId(factory, args.afterIssueNumber));
-  }
-
-  const nodeIds = await Promise.all(nodeIdPromises);
-  const [parentNodeId, subIssueNodeId] = nodeIds;
-  const afterNodeId = nodeIds.length > 2 ? nodeIds[2] : undefined;
-
-  const result = await repository.reprioritizeSubIssue(parentNodeId, subIssueNodeId, afterNodeId);
+  const result = await subIssueService(args.owner, args.repo).reprioritizeSubIssue(
+    args.parentIssueNumber,
+    args.subIssueNumber,
+    args.afterIssueNumber
+  );
 
   return {
     parentIssue: {
@@ -392,22 +317,14 @@ export async function executeReprioritizeSubIssue(
 
 /**
  * Execute remove_sub_issue tool.
- *
- * Resolves issue numbers to node IDs and removes the relationship.
  */
 export async function executeRemoveSubIssue(
   args: RemoveSubIssueInput
 ): Promise<RemoveSubIssueOutput> {
-  const factory = createGitHubFactory(args.owner, args.repo);
-  const repository = factory.createSubIssueRepository();
-
-  // Resolve issue numbers to node IDs
-  const [parentNodeId, subIssueNodeId] = await Promise.all([
-    resolveIssueNodeId(factory, args.parentIssueNumber),
-    resolveIssueNodeId(factory, args.subIssueNumber),
-  ]);
-
-  await repository.removeSubIssue(parentNodeId, subIssueNodeId);
+  await subIssueService(args.owner, args.repo).removeSubIssue(
+    args.parentIssueNumber,
+    args.subIssueNumber
+  );
 
   return {
     success: true,

@@ -13,7 +13,10 @@ This document provides API reference documentation for the key services and infr
    - [AIResiliencePolicy](#airesiliencepolicy)
    - [CorrelationContext](#correlationcontext)
    - [ResourceCache](#resourcecache)
-   - [TracingLogger](#tracinglogger)
+   - [ConsoleLogger](#consolelogger)
+   - [GitHubRequestExecutor](#githubrequestexecutor)
+   - [IdempotencyStore](#idempotencystore)
+   - [MutationAuditLog](#mutationauditlog)
 3. [Types](#types)
 4. [Configuration](#configuration)
 
@@ -230,16 +233,14 @@ if ('degraded' in result) {
 
 ### ProjectManagementService
 
-Thin facade over all project management operations. Delegates to 14 injected
-specialized services.
+Thin composition facade (121 lines, getters only) over 13 injected per-feature services. It has no methods of its own: callers go straight to the owning service.
 
 **Location:** `src/services/ProjectManagementService.ts`
 
-#### Constructor (Facade Pattern)
+#### Constructor
 
 ```typescript
 constructor(
-  factory: GitHubRepositoryFactory,
   subIssueService: SubIssueService,
   milestoneService: MilestoneService,
   sprintPlanningService: SprintPlanningService,
@@ -256,65 +257,34 @@ constructor(
 )
 ```
 
-All methods delegate to the appropriate injected service. The PMS retains no inline business logic.
+#### Getters
 
-#### Key Methods
-
-##### createProject(params)
-
-Create a new GitHub project.
-
-```typescript
-async createProject(params: CreateProjectParams): Promise<Project>
-```
-
-##### getProject(projectId)
-
-Get project details.
-
-```typescript
-async getProject(projectId: string): Promise<Project | null>
-```
-
-##### updateProject(projectId, params)
-
-Update a project.
+| Getter | Service |
+|--------|---------|
+| `issues` | `IssueService` |
+| `subIssues` | `SubIssueService` |
+| `milestones` | `MilestoneService` |
+| `sprints` | `SprintPlanningService` |
+| `projects` | `ProjectStatusService` |
+| `templates` | `ProjectTemplateService` |
+| `linking` | `ProjectLinkingService` |
+| `roadmap` | `RoadmapService` |
+| `automation` | `ProjectAutomationService` |
+| `pullRequests` | `PullRequestService` |
+| `fieldValues` | `FieldValueService` |
+| `labels` | `LabelService` |
+| `iterations` | `IterationService` |
 
 ```typescript
-async updateProject(projectId: string, params: UpdateProjectParams): Promise<Project>
+const issue = await pms.issues.createIssue({ title: 'Bug' });
+const sprint = await pms.sprints.createSprint(params);
 ```
-
-##### createIssue(params)
-
-Create a new issue.
-
-```typescript
-async createIssue(params: CreateIssueParams): Promise<Issue>
-```
-
-##### createMilestone(params)
-
-Create a new milestone.
-
-```typescript
-async createMilestone(params: CreateMilestoneParams): Promise<Milestone>
-```
-
-##### createSprint(params)
-
-Create a new sprint.
-
-```typescript
-async createSprint(params: CreateSprintParams): Promise<Sprint>
-```
-
-**Note:** See `src/services/ProjectManagementService.ts` for the full list of delegated methods.
 
 ---
 
 ### Extracted Domain Services
 
-These services were extracted from ProjectManagementService and are injected via DI:
+These services are the per-feature building blocks behind the facade getters:
 
 #### PullRequestService
 
@@ -812,79 +782,78 @@ const activeProjects = await cache.getByTag('active', 'project');
 
 ---
 
-### TracingLogger
+### ConsoleLogger
 
-Logger with correlation ID in every JSON log entry.
+Stderr logger (stdout is the MCP channel). Honors `LOG_LEVEL` and `LOG_FORMAT`; arguments pass through `redactSecrets()`.
 
-**Location:** `src/infrastructure/observability/TracingLogger.ts`
+**Location:** `src/infrastructure/logger/index.ts`
 
-#### Constructor
-
-```typescript
-constructor(context?: string)
-```
-
-**Parameters:**
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| context | string | Logger context name (e.g., service name) |
-
-#### Methods
-
-##### info(message, data?)
-
-Log info level message.
+#### Interface
 
 ```typescript
-info(message: string, data?: Record<string, unknown>): void
+interface ILogger {
+  debug(message: string, ...args: unknown[]): void;
+  info(message: string, ...args: unknown[]): void;
+  warn(message: string, ...args: unknown[]): void;
+  error(message: string, ...args: unknown[]): void;
+}
 ```
 
-##### warn(message, data?)
+Obtain one with `getLogger('MyService')` / `createLogger(prefix?)`; `logger` is the shared default instance. `NoopLogger` discards everything.
 
-Log warning level message.
-
-```typescript
-warn(message: string, data?: Record<string, unknown>): void
-```
-
-##### error(message, error?, data?)
-
-Log error level message.
-
-```typescript
-error(message: string, error?: Error, data?: Record<string, unknown>): void
-```
-
-##### debug(message, data?)
-
-Log debug level message.
-
-```typescript
-debug(message: string, data?: Record<string, unknown>): void
-```
-
-**Log format:**
+**JSON format (`LOG_FORMAT=json`):** one object per line, `correlationId` is the active trace's id (or `no-trace`):
 ```json
 {
-  "timestamp": "2024-01-31T12:00:00.000Z",
+  "timestamp": "2026-11-02T12:00:00.000Z",
   "level": "info",
   "correlationId": "uuid-from-trace",
-  "context": "MyService",
+  "operation": "manage_issues",
   "message": "Operation completed",
-  "data": { "key": "value" }
+  "data": { "key": "value" },
+  "durationMs": 12
 }
 ```
 
 **Example:**
 ```typescript
-const logger = new TracingLogger('MyService');
+const log = getLogger('MyService');
 
 await startTrace('operation', async () => {
-  logger.info('Starting operation', { input: data });
-  // ...
-  logger.info('Operation complete', { result: output });
+  log.info('Starting operation', { input: data });
+  log.info('Operation complete', { result: output });
 });
 ```
+
+---
+
+### GitHubRequestExecutor
+
+The one retry and rate-limit path for every GitHub call (REST and GraphQL). Gates each call on the shared `RateLimitManager` budget (`RATE_LIMIT_FLOOR`), retries retryable failures up to 3 attempts with GitHub-aware backoff, and converts terminal failures to structured errors. Shared per Octokit instance via `GitHubRequestExecutor.for(octokit)`.
+
+**Location:** `src/infrastructure/github/GitHubRequestExecutor.ts`
+
+```typescript
+run<T>(kind: 'graphql' | 'rest', operation: () => Promise<T>, context: string, cost?: number): Promise<T>
+graphql<T>(octokit, query: string, variables: Record<string, unknown>, context: string): Promise<T>
+```
+
+Credentials come from `resolveGitHubAuth()` (`infrastructure/github/auth/resolveGitHubAuth.ts`; six-tier chain, a complete GitHub App config outranks every token) and repositories are built with `GitHubRepositoryFactory.fromAuth(auth, owner, repo)`.
+
+---
+
+### IdempotencyStore
+
+Replays the first result of a create action for a repeated `idempotencyKey` (same key + same request fingerprint within the TTL, default 24 h). The same key with a different request raises `IdempotencyConflictError`. Only the creates listed in `isIdempotentCreate` honour the key. A result recovered from the audit log is returned as its summary.
+
+**Location:** `src/infrastructure/idempotency/IdempotencyStore.ts` (`getIdempotencyStore()` returns the shared instance)
+
+---
+
+### MutationAuditLog
+
+Builds redacted records of state-changing tool calls and hands them to a sink (JSONL file at `AUDIT_LOG_PATH`, default `.mcp-audit/mutations.jsonl`, when `AUDIT_LOG_ENABLED=true`). Created with `createMutationAuditLog(config, sink?)`; the container registers it and `ToolDispatcher` writes to it.
+
+**Location:** `src/infrastructure/observability/MutationAuditLog.ts`
 
 ---
 
@@ -950,6 +919,7 @@ type ResourceType =
 | GITHUB_TOKEN | GitHub personal access token (one of several credential options — see CONFIGURATION.md) | No |
 | GITHUB_OWNER | Repository owner | Yes |
 | GITHUB_REPO | Repository name | Yes |
+| GITHUB_APP_ID, GITHUB_APP_PRIVATE_KEY, GITHUB_APP_INSTALLATION_ID | GitHub App installation auth (outranks the PAT when all three are set) | No |
 | ANTHROPIC_API_KEY | Anthropic API key for Claude models | No* |
 | OPENAI_API_KEY | OpenAI API key for GPT models | No* |
 | GOOGLE_API_KEY | Google API key for Gemini models | No* |
@@ -997,9 +967,12 @@ AI_FALLBACK_MODEL=gpt-4o-mini
 | AIResiliencePolicy | `src/infrastructure/resilience/AIResiliencePolicy.ts` |
 | CorrelationContext | `src/infrastructure/observability/CorrelationContext.ts` |
 | ResourceCache | `src/infrastructure/cache/ResourceCache.ts` |
-| TracingLogger | `src/infrastructure/observability/TracingLogger.ts` |
+| ConsoleLogger | `src/infrastructure/logger/index.ts` |
+| GitHubRequestExecutor | `src/infrastructure/github/GitHubRequestExecutor.ts` |
+| IdempotencyStore | `src/infrastructure/idempotency/IdempotencyStore.ts` |
+| MutationAuditLog | `src/infrastructure/observability/MutationAuditLog.ts` |
 | DI Container | `src/container.ts` |
 
 ---
 
-*Refreshed: 2026-10-21 — MCP GitHub Project Manager v3.0.0*
+*Refreshed: 2026-11-02 — MCP GitHub Project Manager v3.0.0*

@@ -1,34 +1,34 @@
+import type {
+  LinkedRepositoriesPage,
+  LinkedRepository,
+  LinkedTeam,
+  LinkedTeamsPage,
+  ProjectLinkingRepository,
+} from "../domain/project-template-linking-types";
 import { ResourceType } from "../domain/resource-types";
 import type { ProjectItem } from "../domain/types";
 import type { GitHubRepositoryFactory } from "../infrastructure/github/GitHubRepositoryFactory";
 import { safeCall } from "./utils/safeCall";
 
 /**
- * ProjectLinkingService handles project item operations:
+ * ProjectLinkingService handles project linking operations:
  * - Add issues/PRs to projects
  * - Remove items from projects
  * - Archive/unarchive items
  * - List project items
+ * - Link/unlink repositories and teams, list linked repositories/teams
  *
  * Extracted from ProjectManagementService for better separation of concerns.
  */
-interface AddProjectItemResponse {
-  addProjectV2ItemById: {
-    item: {
-      id: string;
-      content: {
-        id: string;
-        title: string;
-      };
-    };
-  };
-}
-
 export class ProjectLinkingService {
   private readonly factory: GitHubRepositoryFactory;
 
   constructor(factory: GitHubRepositoryFactory) {
     this.factory = factory;
+  }
+
+  private get linkingRepo(): ProjectLinkingRepository {
+    return this.factory.createProjectLinkingRepository();
   }
 
   // Project Item Operations
@@ -38,42 +38,14 @@ export class ProjectLinkingService {
     contentType: "issue" | "pull_request";
   }): Promise<ProjectItem> {
     return safeCall(async () => {
-      // GraphQL mutation to add an item to a project
-      const mutation = `
-        mutation($input: AddProjectV2ItemByIdInput!) {
-          addProjectV2ItemById(input: $input) {
-            item {
-              id
-              content {
-                ... on Issue {
-                  id
-                  title
-                }
-                ... on PullRequest {
-                  id
-                  title
-                }
-              }
-            }
-          }
-        }
-      `;
-
-      // GitHub intermittently returns "temporary conflict" when concurrent
-      // project mutations race (e.g. an item is being added/updated by the
-      // auto-reclaim scheduler or another client). Retry a few times with a
-      // short backoff before surfacing the error.
-      const response = await this.addProjectItemWithRetry(mutation, data);
-
-      const itemId = response.addProjectV2ItemById.item.id;
-      const contentId = response.addProjectV2ItemById.item.content.id;
+      const added = await this.linkingRepo.addItem(data.projectId, data.contentId);
 
       const resourceType =
         data.contentType === "issue" ? ResourceType.ISSUE : ResourceType.PULL_REQUEST;
 
       return {
-        id: itemId,
-        contentId,
+        id: added.itemId,
+        contentId: added.contentId,
         contentType: resourceType,
         projectId: data.projectId,
         fieldValues: {},
@@ -83,61 +55,12 @@ export class ProjectLinkingService {
     });
   }
 
-  /**
-   * Run the addProjectV2ItemById mutation with retries for GitHub's
-   * transient "temporary conflict" errors.
-   */
-  private async addProjectItemWithRetry(
-    mutation: string,
-    data: { projectId: string; contentId: string }
-  ): Promise<AddProjectItemResponse> {
-    let lastError: unknown;
-    for (let attempt = 0; attempt < 3; attempt++) {
-      try {
-        return await this.factory.graphql<AddProjectItemResponse>(mutation, {
-          input: {
-            projectId: data.projectId,
-            contentId: data.contentId,
-          },
-        });
-      } catch (error) {
-        lastError = error;
-        const message = String((error as Error)?.message ?? error);
-        if (!/temporary conflict/i.test(message) && !/try again/i.test(message)) {
-          throw error;
-        }
-        await new Promise((resolve) => setTimeout(resolve, 250 * (attempt + 1)));
-      }
-    }
-    throw lastError;
-  }
-
   async removeProjectItem(data: {
     projectId: string;
     itemId: string;
   }): Promise<{ success: boolean; message: string }> {
     return safeCall(async () => {
-      const mutation = `
-        mutation($input: DeleteProjectV2ItemInput!) {
-          deleteProjectV2Item(input: $input) {
-            deletedItemId
-          }
-        }
-      `;
-
-      interface DeleteProjectItemResponse {
-        deleteProjectV2Item: {
-          deletedItemId: string;
-        };
-      }
-
-      await this.factory.graphql<DeleteProjectItemResponse>(mutation, {
-        input: {
-          projectId: data.projectId,
-          itemId: data.itemId,
-        },
-      });
-
+      await this.linkingRepo.removeItem(data.projectId, data.itemId);
       return {
         success: true,
         message: `Item ${data.itemId} has been removed from project ${data.projectId}`,
@@ -150,33 +73,7 @@ export class ProjectLinkingService {
     itemId: string;
   }): Promise<{ success: boolean; message: string }> {
     return safeCall(async () => {
-      const mutation = `
-        mutation($input: ArchiveProjectV2ItemInput!) {
-          archiveProjectV2Item(input: $input) {
-            item {
-              id
-              isArchived
-            }
-          }
-        }
-      `;
-
-      interface ArchiveProjectItemResponse {
-        archiveProjectV2Item: {
-          item: {
-            id: string;
-            isArchived: boolean;
-          };
-        };
-      }
-
-      await this.factory.graphql<ArchiveProjectItemResponse>(mutation, {
-        input: {
-          projectId: data.projectId,
-          itemId: data.itemId,
-        },
-      });
-
+      await this.linkingRepo.archiveItem(data.projectId, data.itemId);
       return {
         success: true,
         message: `Item ${data.itemId} has been archived in project ${data.projectId}`,
@@ -189,33 +86,7 @@ export class ProjectLinkingService {
     itemId: string;
   }): Promise<{ success: boolean; message: string }> {
     return safeCall(async () => {
-      const mutation = `
-        mutation($input: UnarchiveProjectV2ItemInput!) {
-          unarchiveProjectV2Item(input: $input) {
-            item {
-              id
-              isArchived
-            }
-          }
-        }
-      `;
-
-      interface UnarchiveProjectItemResponse {
-        unarchiveProjectV2Item: {
-          item: {
-            id: string;
-            isArchived: boolean;
-          };
-        };
-      }
-
-      await this.factory.graphql<UnarchiveProjectItemResponse>(mutation, {
-        input: {
-          projectId: data.projectId,
-          itemId: data.itemId,
-        },
-      });
-
+      await this.linkingRepo.unarchiveItem(data.projectId, data.itemId);
       return {
         success: true,
         message: `Item ${data.itemId} has been unarchived in project ${data.projectId}`,
@@ -224,138 +95,79 @@ export class ProjectLinkingService {
   }
 
   async listProjectItems(data: { projectId: string; limit?: number }): Promise<ProjectItem[]> {
+    return safeCall(() => this.linkingRepo.listItems(data.projectId, data.limit || 50));
+  }
+
+  // Repository / team links
+  async linkProjectToRepository(data: {
+    projectId: string;
+    owner: string;
+    repo: string;
+  }): Promise<LinkedRepository> {
+    return safeCall(() => this.linkingRepo.linkRepository(data.projectId, data.owner, data.repo));
+  }
+
+  async unlinkProjectFromRepository(data: {
+    projectId: string;
+    owner: string;
+    repo: string;
+  }): Promise<{ success: boolean; message: string }> {
     return safeCall(async () => {
-      const limit = data.limit || 50;
-      const query = `
-        query($projectId: ID!, $limit: Int!) {
-          node(id: $projectId) {
-            ... on ProjectV2 {
-              items(first: $limit) {
-                nodes {
-                  id
-                  content {
-                    ... on Issue {
-                      id
-                      title
-                      __typename
-                    }
-                    ... on PullRequest {
-                      id
-                      title
-                      __typename
-                    }
-                  }
-                  fieldValues(first: 20) {
-                    nodes {
-                      ... on ProjectV2ItemFieldTextValue {
-                        text
-                        field {
-                          ... on ProjectV2Field {
-                            id
-                            name
-                          }
-                        }
-                      }
-                      ... on ProjectV2ItemFieldDateValue {
-                        date
-                        field {
-                          ... on ProjectV2Field {
-                            id
-                            name
-                          }
-                        }
-                      }
-                      ... on ProjectV2ItemFieldSingleSelectValue {
-                        name
-                        field {
-                          ... on ProjectV2SingleSelectField {
-                            id
-                            name
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      `;
-
-      interface ListProjectItemsResponse {
-        node: {
-          items: {
-            nodes: Array<{
-              id: string;
-              content?: {
-                id: string;
-                title: string;
-                __typename: string;
-              };
-              fieldValues: {
-                nodes: Array<{
-                  text?: string;
-                  date?: string;
-                  name?: string;
-                  field: {
-                    id: string;
-                    name: string;
-                  };
-                }>;
-              };
-            }>;
-          };
-        };
-      }
-
-      const response = await this.factory.graphql<ListProjectItemsResponse>(query, {
-        projectId: data.projectId,
-        limit,
-      });
-
-      // If project doesn't exist or has no items
-      if (!response.node?.items?.nodes) {
-        return [];
-      }
-
-      return response.node.items.nodes.map((item) => {
-        // Build field values map
-        const fieldValues: Record<string, unknown> = {};
-        if (item.fieldValues?.nodes) {
-          item.fieldValues.nodes.forEach((fieldValue) => {
-            if (!fieldValue?.field) return;
-
-            const fieldId = fieldValue.field.id;
-
-            if ("text" in fieldValue) {
-              fieldValues[fieldId] = fieldValue.text;
-            } else if ("date" in fieldValue) {
-              fieldValues[fieldId] = fieldValue.date;
-            } else if ("name" in fieldValue) {
-              fieldValues[fieldId] = fieldValue.name;
-            }
-          });
-        }
-
-        // Determine content type
-        let contentType = ResourceType.ISSUE; // Default
-        if (item.content?.__typename) {
-          contentType =
-            item.content.__typename === "Issue" ? ResourceType.ISSUE : ResourceType.PULL_REQUEST;
-        }
-
-        return {
-          id: item.id,
-          contentId: item.content?.id || "",
-          title: item.content?.title,
-          contentType,
-          projectId: data.projectId,
-          fieldValues,
-          createdAt: new Date().toISOString(), // GitHub API doesn't provide creation date for items
-          updatedAt: new Date().toISOString(),
-        };
-      });
+      await this.linkingRepo.unlinkRepository(data.projectId, data.owner, data.repo);
+      return {
+        success: true,
+        message: `Successfully unlinked repository ${data.owner}/${data.repo} from project`,
+      };
     });
+  }
+
+  async linkProjectToTeam(data: {
+    projectId: string;
+    org: string;
+    teamSlug: string;
+  }): Promise<LinkedTeam> {
+    return safeCall(() => this.linkingRepo.linkTeam(data.projectId, data.org, data.teamSlug));
+  }
+
+  async unlinkProjectFromTeam(data: {
+    projectId: string;
+    org: string;
+    teamSlug: string;
+  }): Promise<{ success: boolean; message: string }> {
+    return safeCall(async () => {
+      await this.linkingRepo.unlinkTeam(data.projectId, data.org, data.teamSlug);
+      return {
+        success: true,
+        message: `Successfully unlinked team ${data.teamSlug} from project`,
+      };
+    });
+  }
+
+  async listLinkedRepositories(data: {
+    projectId: string;
+    first?: number;
+    after?: string;
+  }): Promise<LinkedRepositoriesPage> {
+    return safeCall(() =>
+      this.linkingRepo.listRepositories({
+        projectId: data.projectId,
+        first: data.first ?? 20,
+        after: data.after,
+      })
+    );
+  }
+
+  async listLinkedTeams(data: {
+    projectId: string;
+    first?: number;
+    after?: string;
+  }): Promise<LinkedTeamsPage> {
+    return safeCall(() =>
+      this.linkingRepo.listTeams({
+        projectId: data.projectId,
+        first: data.first ?? 20,
+        after: data.after,
+      })
+    );
   }
 }

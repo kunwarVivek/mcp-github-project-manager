@@ -17,6 +17,7 @@ import type {
 } from "../../../domain/types";
 import { parseResourceStatus, toStatusString } from "../../../domain/utils/StatusParser";
 import { isMissingNativeCapability } from "../native-capability";
+import { type ConnectionPage, collectConnection } from "../util/paginate";
 import { BaseGitHubRepository } from "./BaseRepository";
 import {
   GitHubIssueDependencyRepository,
@@ -39,10 +40,16 @@ const ISSUE_CORE_FIELDS = `
     nodes {
       login
     }
+    pageInfo {
+      hasNextPage
+    }
   }
   labels(first: 100) {
     nodes {
       name
+    }
+    pageInfo {
+      hasNextPage
     }
   }
   milestone {
@@ -74,6 +81,9 @@ const ISSUE_NATIVE_FIELDS = `
       title
       state
     }
+    pageInfo {
+      hasNextPage
+    }
   }
   blocking(first: 100) {
     nodes {
@@ -81,6 +91,9 @@ const ISSUE_NATIVE_FIELDS = `
       number
       title
       state
+    }
+    pageInfo {
+      hasNextPage
     }
   }
   projectItems(includeArchived: true, first: 100) {
@@ -91,6 +104,9 @@ const ISSUE_NATIVE_FIELDS = `
         number
         title
       }
+    }
+    pageInfo {
+      hasNextPage
     }
   }
 `;
@@ -108,11 +124,13 @@ interface GitHubIssue {
     nodes: Array<{
       login: string;
     }>;
+    pageInfo?: { hasNextPage: boolean };
   };
   labels: {
     nodes: Array<{
       name: string;
     }>;
+    pageInfo?: { hasNextPage: boolean };
   };
   milestone: {
     id: string;
@@ -124,9 +142,11 @@ interface GitHubIssue {
   } | null;
   blockedBy?: {
     nodes: IssueEdgeNode[];
+    pageInfo?: { hasNextPage: boolean };
   } | null;
   blocking?: {
     nodes: IssueEdgeNode[];
+    pageInfo?: { hasNextPage: boolean };
   } | null;
   projectItems?: {
     nodes: Array<{
@@ -137,6 +157,7 @@ interface GitHubIssue {
         title: string;
       };
     }>;
+    pageInfo?: { hasNextPage: boolean };
   } | null;
 }
 
@@ -173,12 +194,12 @@ interface ListIssuesResponse {
  * membership: it answers "which projects is this issue in?".
  */
 const GET_PROJECT_MEMBERSHIP_QUERY = `
-  query GetIssueProjectMembership($issueId: ID!) {
+  query GetIssueProjectMembership($issueId: ID!, $after: String) {
     node(id: $issueId) {
       ... on Issue {
         id
         number
-        projectItems(includeArchived: true, first: 100) {
+        projectItems(includeArchived: true, first: 100, after: $after) {
           nodes {
             id
             project {
@@ -186,6 +207,10 @@ const GET_PROJECT_MEMBERSHIP_QUERY = `
               number
               title
             }
+          }
+          pageInfo {
+            hasNextPage
+            endCursor
           }
         }
       }
@@ -197,28 +222,30 @@ interface GetProjectMembershipResponse {
   node: {
     id: string;
     number: number;
-    projectItems: {
-      nodes: Array<{
+    projectItems: ConnectionPage<{
+      id: string;
+      project: {
         id: string;
-        project: {
-          id: string;
-          number: number;
-          title: string;
-        };
-      }>;
-    } | null;
+        number: number;
+        title: string;
+      };
+    }> | null;
   } | null;
 }
 
 /** The labels of an issue. */
 const GET_ISSUE_LABELS_QUERY = `
-  query GetIssueLabels($issueId: ID!) {
+  query GetIssueLabels($issueId: ID!, $after: String) {
     node(id: $issueId) {
       ... on Issue {
         id
-        labels(first: 100) {
+        labels(first: 100, after: $after) {
           nodes {
             name
+          }
+          pageInfo {
+            hasNextPage
+            endCursor
           }
         }
       }
@@ -229,18 +256,22 @@ const GET_ISSUE_LABELS_QUERY = `
 interface GetIssueLabelsResponse {
   node: {
     id: string;
-    labels: { nodes: Array<{ name: string }> };
+    labels: ConnectionPage<{ name: string }>;
   } | null;
 }
 
 /** The labels of the repository. */
 const GET_REPOSITORY_LABELS_QUERY = `
-  query GetRepositoryLabels($owner: String!, $repo: String!, $first: Int!) {
+  query GetRepositoryLabels($owner: String!, $repo: String!, $first: Int!, $after: String) {
     repository(owner: $owner, name: $repo) {
-      labels(first: $first) {
+      labels(first: $first, after: $after) {
         nodes {
           id
           name
+        }
+        pageInfo {
+          hasNextPage
+          endCursor
         }
       }
     }
@@ -249,7 +280,7 @@ const GET_REPOSITORY_LABELS_QUERY = `
 
 interface GetRepositoryLabelsResponse {
   repository: {
-    labels: { nodes: Array<{ id: string; name: string }> };
+    labels: ConnectionPage<{ id: string; name: string }>;
   } | null;
 }
 
@@ -282,6 +313,23 @@ export class GitHubIssueRepository extends BaseGitHubRepository implements Issue
   private readonly issueTypes = new GitHubIssueTypeRepository(this.octokit, this.config);
 
   private mapGitHubIssueToIssue(githubIssue: GitHubIssue): Issue {
+    const truncated = (
+      [
+        ["assignees", githubIssue.assignees],
+        ["labels", githubIssue.labels],
+        ["blockedBy", githubIssue.blockedBy],
+        ["blocking", githubIssue.blocking],
+        ["projectItems", githubIssue.projectItems],
+      ] as const
+    )
+      .filter(([, connection]) => connection?.pageInfo?.hasNextPage)
+      .map(([name]) => name);
+    if (truncated.length > 0) {
+      this.logger.warn(
+        `Issue #${githubIssue.number} has more than 100 ${truncated.join(", ")}; the result is truncated`
+      );
+    }
+
     return {
       id: githubIssue.id,
       number: parseInt(githubIssue.number.toString(), 10),
@@ -850,16 +898,25 @@ export class GitHubIssueRepository extends BaseGitHubRepository implements Issue
   async getProjectMembership(id: IssueId): Promise<IssueProjectMembership> {
     const issue = await this.resolveIssueRef(id);
 
-    const response = await this.graphql<GetProjectMembershipResponse>(
-      GET_PROJECT_MEMBERSHIP_QUERY,
-      { issueId: issue.nodeId }
+    let found = false;
+    const items = await collectConnection(
+      async (after) => {
+        const response = await this.graphql<GetProjectMembershipResponse>(
+          GET_PROJECT_MEMBERSHIP_QUERY,
+          { issueId: issue.nodeId, after }
+        );
+        if (!response.node) return null;
+        found = true;
+        return response.node.projectItems;
+      },
+      this.logger,
+      `Project items of issue ${id}`
     );
 
-    if (!response.node) {
+    if (!found) {
       throw new Error(`Issue not found: ${id}`);
     }
 
-    const items = response.node.projectItems?.nodes ?? [];
     return {
       issueId: issue.nodeId,
       projectIds: items.map((item) => item.project.id),
@@ -914,15 +971,26 @@ export class GitHubIssueRepository extends BaseGitHubRepository implements Issue
 
   /** The labels of an issue. */
   private async readIssueLabels(issueNodeId: string): Promise<string[]> {
-    const response = await this.graphql<GetIssueLabelsResponse>(GET_ISSUE_LABELS_QUERY, {
-      issueId: issueNodeId,
-    });
+    let found = false;
+    const labels = await collectConnection(
+      async (after) => {
+        const response = await this.graphql<GetIssueLabelsResponse>(GET_ISSUE_LABELS_QUERY, {
+          issueId: issueNodeId,
+          after,
+        });
+        if (!response.node) return null;
+        found = true;
+        return response.node.labels;
+      },
+      this.logger,
+      `Labels of issue ${issueNodeId}`
+    );
 
-    if (!response.node) {
+    if (!found) {
       throw new Error(`Issue with ID ${issueNodeId} not found`);
     }
 
-    return response.node.labels?.nodes?.map((node) => node.name) ?? [];
+    return labels.map((node) => node.name);
   }
 
   /**
@@ -946,15 +1014,21 @@ export class GitHubIssueRepository extends BaseGitHubRepository implements Issue
   private async resolveOrCreateLabelIds(names: string[]): Promise<string[]> {
     if (names.length === 0) return [];
 
-    const response = await this.graphql<GetRepositoryLabelsResponse>(GET_REPOSITORY_LABELS_QUERY, {
-      owner: this.owner,
-      repo: this.repo,
-      first: 100,
-    });
-
-    const existing = new Map(
-      (response.repository?.labels.nodes ?? []).map((label) => [label.name.toLowerCase(), label.id])
+    // Every page: a repository with more than 100 labels would otherwise look
+    // like it lacks the later ones, and createLabel would then fail on them.
+    const labels = await collectConnection(
+      async (after) => {
+        const response = await this.graphql<GetRepositoryLabelsResponse>(
+          GET_REPOSITORY_LABELS_QUERY,
+          { owner: this.owner, repo: this.repo, first: 100, after }
+        );
+        return response.repository?.labels;
+      },
+      this.logger,
+      "Repository labels"
     );
+
+    const existing = new Map(labels.map((label) => [label.name.toLowerCase(), label.id]));
 
     const ids: string[] = [];
     for (const name of names) {

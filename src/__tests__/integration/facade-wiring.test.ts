@@ -3,13 +3,34 @@
  *
  * Verifies that:
  * - DI container correctly resolves all services
- * - ProjectManagementService delegates to extracted services
+ * - ProjectManagementService exposes every feature service through a typed getter
  * - Service dependencies are properly wired
  */
 import { beforeEach, describe, expect, it } from "vitest";
 import { configureContainer, container, createProjectManagementService } from "../../container";
+import { createAppInstallationAuth } from "../../infrastructure/github/auth/credentials";
+import { FieldValueService } from "../../services/FieldValueService";
+import { IssueService } from "../../services/IssueService";
+import { IterationService } from "../../services/IterationService";
+import { LabelService } from "../../services/LabelService";
+import { MilestoneService } from "../../services/MilestoneService";
+import { ProjectAutomationService } from "../../services/ProjectAutomationService";
+import { ProjectLinkingService } from "../../services/ProjectLinkingService";
 import { ProjectManagementService } from "../../services/ProjectManagementService";
+import { ProjectStatusService } from "../../services/ProjectStatusService";
+import { ProjectTemplateService } from "../../services/ProjectTemplateService";
+import { PullRequestService } from "../../services/PullRequestService";
+import { RoadmapService } from "../../services/RoadmapService";
+import { SprintPlanningService } from "../../services/SprintPlanningService";
+import { SubIssueService } from "../../services/SubIssueService";
 import { tokenAuth } from "../helpers/githubAuth";
+
+const pat = tokenAuth();
+const app = createAppInstallationAuth({
+  appId: "1",
+  privateKey: "test-private-key",
+  installationId: "2",
+});
 
 describe("Facade Wiring Integration", () => {
   beforeEach(() => {
@@ -19,18 +40,18 @@ describe("Facade Wiring Integration", () => {
 
   describe("Container Configuration", () => {
     it("should configure container with test credentials", () => {
-      const configured = configureContainer(tokenAuth(), "test-owner", "test-repo");
+      const configured = configureContainer(pat, "test-owner", "test-repo");
       expect(configured).toBeDefined();
     });
 
     it("should resolve GitHubRepositoryFactory from container", () => {
-      configureContainer(tokenAuth(), "test-owner", "test-repo");
+      configureContainer(pat, "test-owner", "test-repo");
       const factory = container.resolve("GitHubRepositoryFactory");
       expect(factory).toBeDefined();
     });
 
     it("should resolve all extracted services from container", () => {
-      configureContainer(tokenAuth(), "test-owner", "test-repo");
+      configureContainer(pat, "test-owner", "test-repo");
 
       expect(container.resolve("SubIssueService")).toBeDefined();
       expect(container.resolve("MilestoneService")).toBeDefined();
@@ -41,10 +62,37 @@ describe("Facade Wiring Integration", () => {
     });
 
     it("should resolve ProjectManagementService from container", () => {
-      configureContainer(tokenAuth(), "test-owner", "test-repo");
+      configureContainer(pat, "test-owner", "test-repo");
       const service = container.resolve("ProjectManagementService");
       expect(service).toBeDefined();
       expect(service).toBeInstanceOf(ProjectManagementService);
+    });
+  });
+
+  describe("Entry-point components and App-only auth", () => {
+    it("configures the container with GitHub App credentials and no PAT", () => {
+      configureContainer(app, "test-owner", "test-repo");
+      expect(container.resolve("ProjectManagementService")).toBeInstanceOf(
+        ProjectManagementService
+      );
+    });
+
+    it("resolves the entry-point singletons", () => {
+      configureContainer(pat, "test-owner", "test-repo");
+      const names = [
+        "ResourceCache",
+        "FilePersistenceAdapter",
+        "GitHubWebhookHandler",
+        "EventStore",
+        "EventSubscriptionManager",
+        "GracefulShutdown",
+        "MutationAuditLog",
+        "TelemetryConfig",
+      ];
+      for (const name of names) {
+        expect(container.resolve(name)).toBeDefined();
+      }
+      expect(container.resolve("EventStore")).toBe(container.resolve("EventStore"));
     });
   });
 
@@ -55,100 +103,22 @@ describe("Facade Wiring Integration", () => {
       expect(service).toBeInstanceOf(ProjectManagementService);
     });
 
-    it("should have all expected methods on the facade", () => {
+    it("exposes every feature service through its typed getter", () => {
       const service = createProjectManagementService("test-owner", "test-repo", tokenAuth());
 
-      // SubIssue delegations
-      expect(typeof service.updateIssueStatus).toBe("function");
-      expect(typeof service.addIssueDependency).toBe("function");
-      expect(typeof service.getIssueDependencies).toBe("function");
-      expect(typeof service.assignIssueToMilestone).toBe("function");
-      expect(typeof service.getIssueHistory).toBe("function");
-
-      // Milestone delegations
-      expect(typeof service.getMilestoneMetrics).toBe("function");
-      expect(typeof service.getOverdueMilestones).toBe("function");
-      expect(typeof service.getUpcomingMilestones).toBe("function");
-      expect(typeof service.createMilestone).toBe("function");
-      expect(typeof service.listMilestones).toBe("function");
-
-      // Sprint delegations
-      expect(typeof service.planSprint).toBe("function");
-      expect(typeof service.createSprint).toBe("function");
-      expect(typeof service.listSprints).toBe("function");
-      expect(typeof service.getCurrentSprint).toBe("function");
-      expect(typeof service.getSprintMetrics).toBe("function");
-
-      // ProjectStatus delegations
-      expect(typeof service.createProject).toBe("function");
-      expect(typeof service.listProjects).toBe("function");
-      expect(typeof service.getProject).toBe("function");
-      expect(typeof service.updateProject).toBe("function");
-      expect(typeof service.deleteProject).toBe("function");
-
-      // ProjectTemplate delegations
-      expect(typeof service.getProjectReadme).toBe("function");
-      expect(typeof service.updateProjectReadme).toBe("function");
-      expect(typeof service.listProjectFields).toBe("function");
-      expect(typeof service.createProjectView).toBe("function");
-      expect(typeof service.listProjectViews).toBe("function");
-
-      // ProjectLinking delegations
-      expect(typeof service.addProjectItem).toBe("function");
-      expect(typeof service.removeProjectItem).toBe("function");
-      expect(typeof service.listProjectItems).toBe("function");
-      expect(typeof service.archiveProjectItem).toBe("function");
-      expect(typeof service.unarchiveProjectItem).toBe("function");
-
-      // Direct implementations (coordination/non-delegated)
-      expect(typeof service.createRoadmap).toBe("function");
-      expect(typeof service.createIssue).toBe("function");
-      expect(typeof service.listIssues).toBe("function");
-      expect(typeof service.setFieldValue).toBe("function");
-      expect(typeof service.getRepositoryFactory).toBe("function");
-    });
-  });
-
-  describe("Delegation Verification", () => {
-    it("should return factory from getRepositoryFactory", () => {
-      const service = createProjectManagementService("test-owner", "test-repo", tokenAuth());
-      const factory = service.getRepositoryFactory();
-      expect(factory).toBeDefined();
-      expect(factory.getConfig).toBeDefined();
-    });
-
-    it("should have factory configured with correct owner and repo", () => {
-      const service = createProjectManagementService("my-owner", "my-repo", tokenAuth("my-token"));
-      const factory = service.getRepositoryFactory();
-      const config = factory.getConfig();
-      expect(config.owner).toBe("my-owner");
-      expect(config.repo).toBe("my-repo");
-    });
-  });
-
-  describe("Service Independence", () => {
-    it("should create independent service instances", () => {
-      const service1 = createProjectManagementService("owner1", "repo1", tokenAuth("token1"));
-      const service2 = createProjectManagementService("owner2", "repo2", tokenAuth("token2"));
-
-      const config1 = service1.getRepositoryFactory().getConfig();
-      const config2 = service2.getRepositoryFactory().getConfig();
-
-      expect(config1.owner).toBe("owner1");
-      expect(config2.owner).toBe("owner2");
-      expect(config1.repo).toBe("repo1");
-      expect(config2.repo).toBe("repo2");
-    });
-  });
-
-  describe("Type Exports", () => {
-    it("should re-export types from extracted services", () => {
-      // Types are re-exported at compile time, verify the module loads correctly
-      const service = createProjectManagementService("test-owner", "test-repo", tokenAuth());
-      // If getMilestoneMetrics exists, MilestoneMetrics type is usable
-      expect(typeof service.getMilestoneMetrics).toBe("function");
-      // If getSprintMetrics exists, SprintMetrics type is usable
-      expect(typeof service.getSprintMetrics).toBe("function");
+      expect(service.issues).toBeInstanceOf(IssueService);
+      expect(service.subIssues).toBeInstanceOf(SubIssueService);
+      expect(service.milestones).toBeInstanceOf(MilestoneService);
+      expect(service.sprints).toBeInstanceOf(SprintPlanningService);
+      expect(service.projects).toBeInstanceOf(ProjectStatusService);
+      expect(service.templates).toBeInstanceOf(ProjectTemplateService);
+      expect(service.linking).toBeInstanceOf(ProjectLinkingService);
+      expect(service.roadmap).toBeInstanceOf(RoadmapService);
+      expect(service.automation).toBeInstanceOf(ProjectAutomationService);
+      expect(service.pullRequests).toBeInstanceOf(PullRequestService);
+      expect(service.fieldValues).toBeInstanceOf(FieldValueService);
+      expect(service.labels).toBeInstanceOf(LabelService);
+      expect(service.iterations).toBeInstanceOf(IterationService);
     });
   });
 });

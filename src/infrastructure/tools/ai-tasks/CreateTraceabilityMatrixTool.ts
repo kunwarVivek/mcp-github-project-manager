@@ -1,7 +1,7 @@
 import { z } from "zod";
 import {
   type FeatureRequirement,
-  type MockPRD,
+  type PRDSummary,
   type TaskComplexity,
   type TaskPriority,
   TaskStatus,
@@ -12,7 +12,7 @@ import { RequirementsTraceabilityService } from "../../../services/RequirementsT
 import { ANNOTATION_PATTERNS } from "../annotations/tool-annotations.js";
 import { TraceabilityMatrixOutputSchema } from "../schemas/ai-schemas.js";
 import { ToolResultFormatter } from "../ToolResultFormatter.js";
-import type { ToolDefinition, ToolSchema } from "../ToolValidator.js";
+import { type ToolDefinition, type ToolSchema, ToolValidator } from "../ToolValidator.js";
 
 // Schema for create_traceability_matrix tool
 const createTraceabilityMatrixSchema = z.object({
@@ -66,9 +66,12 @@ export type CreateTraceabilityMatrixArgs = z.infer<typeof createTraceabilityMatr
 /**
  * Implementation function for create_traceability_matrix tool
  */
-async function executeCreateTraceabilityMatrix(
-  args: CreateTraceabilityMatrixArgs
-): Promise<MCPResponse> {
+async function executeCreateTraceabilityMatrix(rawArgs: unknown): Promise<MCPResponse> {
+  const args = ToolValidator.validate(
+    "create_traceability_matrix",
+    rawArgs,
+    createTraceabilityMatrixSchema as unknown as ToolSchema<CreateTraceabilityMatrixArgs>
+  );
   const traceabilityService = new RequirementsTraceabilityService();
 
   try {
@@ -80,8 +83,8 @@ async function executeCreateTraceabilityMatrix(
       dependencies: [], // Default empty dependencies
     }));
 
-    // Create mock PRD from content
-    const mockPRD: MockPRD = {
+    // Summarise the user-supplied PRD content for traceability (no stored PRD exists)
+    const prdSummary: PRDSummary = {
       id: `prd-${args.projectId}`,
       title: `PRD for ${args.projectId}`,
       overview: args.prdContent.substring(0, 500),
@@ -119,7 +122,7 @@ async function executeCreateTraceabilityMatrix(
     // Create comprehensive traceability matrix
     const traceabilityMatrix = traceabilityService.createTraceabilityMatrix(
       args.projectId,
-      mockPRD,
+      prdSummary,
       features,
       aiTasks
     );

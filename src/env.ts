@@ -53,7 +53,10 @@ const RESOLVED_CONFIG_KEYS = [
   "AI_RESEARCH_API_KEY",
   "AI_FALLBACK_API_KEY",
   "AI_PRD_API_KEY",
+  "AI_EMBEDDING_API_KEY",
+  "GOOGLE_VERTEX_PROJECT",
   "WEBHOOK_SECRET",
+  "EVENTS_AUTH_TOKEN",
 ] as const;
 
 /**
@@ -299,26 +302,29 @@ export const WEBHOOK_TIMEOUT_MS = getNumericConfigValue("WEBHOOK_TIMEOUT_MS", 50
 export const WEBHOOK_ALLOWED_ORIGINS = getOptionalConfigValue("WEBHOOK_ALLOWED_ORIGINS", "");
 export const WEBHOOK_RATE_LIMIT = getNumericConfigValue("WEBHOOK_RATE_LIMIT", 100);
 export const WEBHOOK_RATE_WINDOW_MS = getNumericConfigValue("WEBHOOK_RATE_WINDOW_MS", 60000);
-// Reverse-proxy trust for client-address resolution (rate limiting, audit log).
-// Unset/false: ignore X-Forwarded-For and use the socket peer address.
-// Positive integer N: trust N proxy hops and take the address N-from-the-right
-// in X-Forwarded-For (Express `trust proxy` hop semantics). `true` is rejected
-// at startup: it is ambiguous and lets clients spoof their address.
-export const TRUST_PROXY = getOptionalConfigValue("TRUST_PROXY", "");
+// Network exposure: the HTTP server binds loopback by default. Set WEBHOOK_HOST=0.0.0.0
+// (or a specific interface) explicitly to accept external traffic, e.g. GitHub webhook
+// deliveries or remote SSE clients.
+export const WEBHOOK_HOST = getOptionalConfigValue("WEBHOOK_HOST", "127.0.0.1");
+// Comma-separated exact IPs of reverse proxies whose X-Forwarded-For header is trusted
+// for client-address resolution (rate limiting, audit log). Empty = never trust
+// X-Forwarded-For; the socket peer address is used.
+export const WEBHOOK_TRUSTED_PROXIES = getOptionalConfigValue("WEBHOOK_TRUSTED_PROXIES", "");
 
 // --- Inbound HTTP authentication (/events/*) -------------------------------
-// The events surface fails closed: with neither EVENTS_AUTH_TOKEN nor an OAuth
-// issuer configured, every /events/* request is rejected with 401 unless
-// EVENTS_ALLOW_UNAUTHENTICATED=true (trusted local/dev only; logs a warning).
+// The events surface fails closed: with neither an EVENTS_AUTH_TOKEN nor an OAuth
+// issuer configured, every /events/* request is rejected (503 "Events API disabled")
+// unless EVENTS_ALLOW_UNAUTHENTICATED=true (trusted local/dev only; logs a warning).
 // POST /webhooks/github is unaffected: it is authenticated by its HMAC signature.
-//   EVENTS_AUTH_TOKEN      static shared bearer token (compared in constant time)
+//   EVENTS_AUTH_TOKEN      static shared bearer token (compared in constant time);
+//                          read through getSecret() at request time so a rotated
+//                          SECRETS_DIR file takes effect without a restart
 //   OAUTH_ISSUER           authorization server issuer; enables OAuth 2.1 resource-server mode
 //   OAUTH_AUDIENCE         resource identifier tokens must be minted for (required with OAUTH_ISSUER)
 //   OAUTH_JWKS_URI         optional JWKS endpoint; discovered from the issuer when unset
 //   OAUTH_REQUIRED_SCOPES  space-separated scopes every token must carry
 //   OAUTH_RESOURCE_URL     public URL of this server, published as RFC 9728 `resource`
 //                          (defaults to OAUTH_AUDIENCE when that is a URL)
-export const EVENTS_AUTH_TOKEN = getOptionalConfigValue("EVENTS_AUTH_TOKEN", "");
 export const EVENTS_ALLOW_UNAUTHENTICATED = getBooleanConfigValue(
   "EVENTS_ALLOW_UNAUTHENTICATED",
   false
@@ -329,6 +335,24 @@ export const OAUTH_JWKS_URI = getOptionalConfigValue("OAUTH_JWKS_URI", "");
 export const OAUTH_REQUIRED_SCOPES = getOptionalConfigValue("OAUTH_REQUIRED_SCOPES", "");
 export const OAUTH_RESOURCE_URL = getOptionalConfigValue("OAUTH_RESOURCE_URL", "");
 // --- end inbound HTTP authentication ----------------------------------------
+
+// Mutation audit log (JSONL file). Off by default.
+export const AUDIT_LOG_ENABLED = getBooleanConfigValue("AUDIT_LOG_ENABLED", false);
+export const DEFAULT_AUDIT_LOG_PATH = ".mcp-audit/mutations.jsonl";
+export const AUDIT_LOG_PATH = getOptionalConfigValue("AUDIT_LOG_PATH", DEFAULT_AUDIT_LOG_PATH);
+
+// OpenTelemetry export. Tracing export is active only when an endpoint is set.
+export const OTEL_EXPORTER_OTLP_ENDPOINT = getOptionalConfigValue(
+  "OTEL_EXPORTER_OTLP_ENDPOINT",
+  ""
+);
+export const OTEL_SERVICE_NAME = getOptionalConfigValue(
+  "OTEL_SERVICE_NAME",
+  "mcp-github-project-manager"
+);
+
+// GitHub GraphQL rate-limit floor: below this many remaining points, callers back off.
+export const RATE_LIMIT_FLOOR = getNumericConfigValue("RATE_LIMIT_FLOOR", 100);
 
 // AI Provider configuration
 export const ANTHROPIC_API_KEY = getOptionalConfigValue("ANTHROPIC_API_KEY", "");
@@ -398,6 +422,11 @@ export const INCLUDE_IMPLEMENTATION_GUIDANCE = getBooleanConfigValue(
 // GitHub AI Integration
 export const AUTO_CREATE_PROJECT_FIELDS = getBooleanConfigValue("AUTO_CREATE_PROJECT_FIELDS", true);
 export const AI_BATCH_SIZE = getNumericConfigValue("AI_BATCH_SIZE", 10);
+// Per-session token budget for the AI task pipeline (0 = unlimited).
+export const AI_SESSION_TOKEN_LIMIT = Math.max(
+  0,
+  getNumericConfigValue("AI_SESSION_TOKEN_LIMIT", 0)
+);
 
 // Export CLI options for use in other modules
 

@@ -10,12 +10,17 @@ import type { SecurityAuditLog } from "../../../../infrastructure/observability/
 // The rate limiter and window are read from env at call time; pinning them to
 // small values keeps the isRateLimited tests fast and exact regardless of
 // what happens to be configured in the ambient environment.
+const secrets = vi.hoisted(() => ({ values: new Map<string, string>() }));
+
 vi.mock("../../../../env", async () => {
   const actual = await vi.importActual<Record<string, unknown>>("../../../../env");
   return {
     ...actual,
     WEBHOOK_RATE_LIMIT: 5,
     WEBHOOK_RATE_WINDOW_MS: 1000,
+    // Ephemeral port so the bind-host test never collides with a real listener.
+    WEBHOOK_PORT: 0,
+    getSecret: (name: string) => secrets.values.get(name),
   };
 });
 
@@ -123,6 +128,10 @@ interface WebhookServerInternals {
   setSecurityHeaders(res: MockResponse): void;
   handleGitHubWebhook(req: MockRequest, res: MockResponse): Promise<void>;
   trackDelivery(delivery: string): void;
+  handleRequest(req: MockRequest, res: MockResponse): Promise<void>;
+  evictExpiredRateLimits(now?: number): void;
+  rateLimitMap: Map<string, unknown>;
+  server?: { address(): { address: string; port: number } | string | null };
 }
 
 // WebhookServer's HTTP handling is intentionally private; these tests exercise
@@ -358,6 +367,185 @@ describe("WebhookServer", () => {
       expect(webhookHandler.validateSignature).toHaveBeenCalledTimes(1);
       expect(res.statusCode).toBe(200);
       expect(JSON.parse(res.body ?? "")).toMatchObject({ success: true });
+    });
+  });
+
+  describe("/events/* authentication", () => {
+    const TOKEN = "s3cret-events-token";
+
+    function eventsReq(path: string, headers: Record<string, string> = {}, method = "GET") {
+      const req = createMockReq(headers);
+      req.url = path;
+      req.method = method;
+      return req;
+    }
+
+    beforeEach(() => {
+      secrets.values.clear();
+    });
+
+    afterEach(() => {
+      secrets.values.clear();
+    });
+
+    it.each([
+      ["/events/recent", "GET"],
+      ["/events/stream", "GET"],
+      ["/events/subscribe", "POST"],
+      ["/events/subscribe/abc", "DELETE"],
+      ["/events/replay/2025-01-01", "GET"],
+    ])("fails closed with 503 on %s when no token is configured", async (path, method) => {
+      const res = createMockRes();
+      await internals(server).handleRequest(eventsReq(path, {}, method), res);
+      expect(res.statusCode).toBe(503);
+      expect(eventStore.getRecentEvents).not.toHaveBeenCalled();
+      expect(subscriptionManager.subscribe).not.toHaveBeenCalled();
+    });
+
+    it("rejects a missing bearer token with 401 and records it", async () => {
+      secrets.values.set("EVENTS_AUTH_TOKEN", TOKEN);
+      const res = createMockRes();
+      await internals(server).handleRequest(eventsReq("/events/recent"), res);
+      expect(res.statusCode).toBe(401);
+      expect(res.headers["WWW-Authenticate"]).toBe('Bearer realm="github-project-manager-events"');
+      expect(eventStore.getRecentEvents).not.toHaveBeenCalled();
+      expect(securityLog.record).toHaveBeenCalledWith(
+        expect.objectContaining({ type: "unauthorized_access" })
+      );
+    });
+
+    it("rejects a wrong bearer token with 401", async () => {
+      secrets.values.set("EVENTS_AUTH_TOKEN", TOKEN);
+      const res = createMockRes();
+      await internals(server).handleRequest(
+        eventsReq("/events/recent", { authorization: "Bearer nope" }),
+        res
+      );
+      expect(res.statusCode).toBe(401);
+    });
+
+    it("accepts the configured bearer token", async () => {
+      secrets.values.set("EVENTS_AUTH_TOKEN", TOKEN);
+      const res = createMockRes();
+      await internals(server).handleRequest(
+        eventsReq("/events/recent?limit=3", { authorization: `Bearer ${TOKEN}` }),
+        res
+      );
+      expect(res.statusCode).toBe(200);
+      expect(eventStore.getRecentEvents).toHaveBeenCalledWith(3);
+    });
+
+    it("leaves /health open without a token", async () => {
+      const req = eventsReq("/health");
+      const res = createMockRes();
+      await internals(server).handleRequest(req, res);
+      expect(res.statusCode).toBe(200);
+    });
+
+    it("allows unauthenticated access only with the explicit opt-out, and warns", async () => {
+      const open = new WebhookServer(
+        webhookHandler as unknown as GitHubWebhookHandler,
+        subscriptionManager as unknown as EventSubscriptionManager,
+        eventStore as unknown as EventStore,
+        { allowUnauthenticatedEvents: true },
+        logger,
+        securityLog as unknown as SecurityAuditLog
+      );
+      expect(logger.warn).toHaveBeenCalledWith(
+        expect.stringContaining("EVENTS_ALLOW_UNAUTHENTICATED")
+      );
+      const res = createMockRes();
+      await internals(open).handleRequest(eventsReq("/events/recent"), res);
+      expect(res.statusCode).toBe(200);
+    });
+  });
+
+  describe("client IP resolution for rate limiting", () => {
+    function limitedServer(trustedProxies?: string[]) {
+      return new WebhookServer(
+        webhookHandler as unknown as GitHubWebhookHandler,
+        subscriptionManager as unknown as EventSubscriptionManager,
+        eventStore as unknown as EventStore,
+        { trustedProxies },
+        logger,
+        securityLog as unknown as SecurityAuditLog
+      );
+    }
+
+    async function hit(s: WebhookServer, socketIp: string, xff: string, times: number) {
+      let last: MockResponse | undefined;
+      for (let i = 0; i < times; i++) {
+        const req = createMockReq({ "x-forwarded-for": xff }, socketIp);
+        req.url = "/nope";
+        req.method = "GET";
+        last = createMockRes();
+        await internals(s).handleRequest(req, last);
+      }
+      return last?.statusCode;
+    }
+
+    it("ignores X-Forwarded-For when the peer is not a trusted proxy", async () => {
+      const s = limitedServer([]);
+      // Rotating the spoofed header must not dodge the limit (5 allowed per window).
+      let status: number | undefined;
+      for (let i = 0; i < 6; i++) {
+        status = await hit(s, "9.9.9.9", `1.1.1.${i}`, 1);
+      }
+      expect(status).toBe(429);
+    });
+
+    it("keys on the forwarded client when the peer is a trusted proxy", async () => {
+      const s = limitedServer(["10.0.0.1"]);
+      for (let i = 0; i < 6; i++) {
+        expect(await hit(s, "10.0.0.1", `2.2.2.${i}`, 1)).toBe(404);
+      }
+      // Same forwarded client repeatedly trips the limit.
+      expect(await hit(s, "10.0.0.1", "3.3.3.3", 6)).toBe(429);
+    });
+  });
+
+  describe("rate-limit eviction", () => {
+    beforeEach(() => {
+      vi.useFakeTimers();
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("drops expired windows and keeps live ones", () => {
+      internals(server).isRateLimited("old");
+      vi.advanceTimersByTime(1001); // window mocked to 1000ms
+      internals(server).isRateLimited("fresh");
+
+      internals(server).evictExpiredRateLimits();
+
+      expect([...internals(server).rateLimitMap.keys()]).toEqual(["fresh"]);
+    });
+
+    it("sweeps on a timer while running and stops it on stop()", async () => {
+      await server.start();
+      try {
+        internals(server).isRateLimited("old");
+        vi.advanceTimersByTime(2001);
+        expect(internals(server).rateLimitMap.size).toBe(0);
+      } finally {
+        await server.stop();
+      }
+      expect(vi.getTimerCount()).toBe(0);
+    });
+  });
+
+  describe("bind host", () => {
+    it("binds loopback by default", async () => {
+      await server.start();
+      try {
+        const addr = internals(server).server?.address();
+        expect(typeof addr === "object" && addr?.address).toBe("127.0.0.1");
+        expect(server.getStatus().host).toBe("127.0.0.1");
+      } finally {
+        await server.stop();
+      }
     });
   });
 });

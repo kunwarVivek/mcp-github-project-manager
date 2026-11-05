@@ -6,15 +6,14 @@
  */
 
 import { z } from "zod";
-import { GITHUB_OWNER, GITHUB_REPO } from "../../env.js";
 import { AIServiceFactory } from "../../services/ai/AIServiceFactory.js";
 import { ResourceCache } from "../cache/ResourceCache.js";
 import { GitHubAuthUnavailableError } from "../github/auth/GitHubAuth.js";
-import { resolveGitHubAuth } from "../github/auth/resolveGitHubAuth.js";
-import { GitHubRepositoryFactory } from "../github/GitHubRepositoryFactory.js";
+import type { GitHubRepositoryFactory } from "../github/GitHubRepositoryFactory.js";
 import { HealthService } from "../health/index.js";
 import { ToolTelemetry } from "./ToolTelemetry.js";
 import type { ToolDefinition, ToolSchema } from "./ToolValidator.js";
+import { createGitHubFactory } from "./tool-factory.js";
 
 /**
  * Schema for health_check tool input (no parameters required)
@@ -105,7 +104,7 @@ export const healthCheckTool: ToolDefinition<HealthCheckArgs, HealthStatusOutput
  */
 function createHealthGitHubFactory(): GitHubRepositoryFactory | undefined {
   try {
-    return new GitHubRepositoryFactory(resolveGitHubAuth(), GITHUB_OWNER, GITHUB_REPO);
+    return createGitHubFactory();
   } catch (error) {
     if (error instanceof GitHubAuthUnavailableError) return undefined;
     throw error;

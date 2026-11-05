@@ -123,4 +123,77 @@ describe("AI usage metering middleware", () => {
     expect(a.tokens).toBe(10);
     expect(b.tokens).toBe(99);
   });
+
+  describe("wrapStream", () => {
+    async function drain(
+      parts: unknown[],
+      store: ReturnType<typeof trace> | undefined
+    ): Promise<unknown[]> {
+      const call = async () => {
+        const { stream } = await (
+          usageMeteringMiddleware.wrapStream as unknown as (a: {
+            doStream: () => Promise<{ stream: ReadableStream<unknown> }>;
+          }) => Promise<{ stream: ReadableStream<unknown> }>
+        )({
+          doStream: async () => ({
+            stream: new ReadableStream({
+              start(controller) {
+                for (const p of parts) controller.enqueue(p);
+                controller.close();
+              },
+            }),
+          }),
+        });
+        const out: unknown[] = [];
+        for await (const chunk of stream) out.push(chunk);
+        return out;
+      };
+      return store ? traceContext.run(store, call) : call();
+    }
+
+    const finish = {
+      type: "finish",
+      usage: { inputTokens: { total: 70 }, outputTokens: { total: 30 } },
+    };
+
+    it("accumulates usage reported on the finish part and passes every part through", async () => {
+      const usage = { tokens: 0 };
+      const parts = [{ type: "text-delta", delta: "hi" }, finish];
+      const out = await drain(parts, trace("agent-1", usage));
+      expect(out).toEqual(parts);
+      expect(usage.tokens).toBe(100);
+    });
+
+    it("does not meter before the stream finishes", async () => {
+      const usage = { tokens: 0 };
+      await drain([{ type: "text-delta", delta: "hi" }], trace("agent-1", usage));
+      expect(usage.tokens).toBe(0);
+    });
+
+    it("is a pass-through with no trace context", async () => {
+      expect(await drain([finish], undefined)).toEqual([finish]);
+    });
+  });
+
+  it("meters the MCP sampling fallback model", async () => {
+    factory.setSamplingProvider(async () => ({
+      role: "assistant",
+      content: { type: "text", text: "x".repeat(40) },
+    }));
+    const model = must(Reflect.get(factory, "samplingModel"), "sampling model") as {
+      doGenerate: (o: unknown) => Promise<unknown>;
+    };
+    try {
+      const usage = { tokens: 0 };
+      await traceContext.run(trace("agent-1", usage), () =>
+        model.doGenerate({
+          prompt: [{ role: "user", content: [{ type: "text", text: "y".repeat(8) }] }],
+        })
+      );
+      // 8 input chars -> 2 tokens, 40 output chars -> 10 tokens (4 chars/token estimate)
+      expect(usage.tokens).toBe(12);
+    } finally {
+      Reflect.set(factory, "samplingModel", null);
+    }
+  });
 });

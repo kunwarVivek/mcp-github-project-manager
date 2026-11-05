@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { validateConfig } from "../../../domain/config-schema";
+import { validateConfig, validateConfigWarnings } from "../../../domain/config-schema";
 
 const requiredGithub = {
   GITHUB_OWNER: "owner",
@@ -48,5 +48,61 @@ describe("config-schema boolean flags", () => {
     ["GITHUB_REPO", { GITHUB_OWNER: "o" }],
   ])("still requires %s", (name, env) => {
     expect(() => validateConfig(env)).toThrow(new RegExp(name));
+  });
+
+  it("defaults the webhook bind host to loopback and events auth to closed", () => {
+    const cfg = validateConfig({ ...requiredGithub });
+    expect(cfg.webhook?.WEBHOOK_HOST).toBe("127.0.0.1");
+    expect(cfg.webhook?.EVENTS_ALLOW_UNAUTHENTICATED).toBe(false);
+    expect(cfg.webhook?.WEBHOOK_TRUSTED_PROXIES).toBe("");
+  });
+
+  it("EVENTS_ALLOW_UNAUTHENTICATED=false stays closed", () => {
+    const cfg = validateConfig({ ...requiredGithub, EVENTS_ALLOW_UNAUTHENTICATED: "false" });
+    expect(cfg.webhook?.EVENTS_ALLOW_UNAUTHENTICATED).toBe(false);
+  });
+
+  it("parses the observability and runtime options", () => {
+    const cfg = validateConfig({
+      ...requiredGithub,
+      AUDIT_LOG_ENABLED: "true",
+      RATE_LIMIT_FLOOR: "250",
+      OTEL_EXPORTER_OTLP_ENDPOINT: "http://localhost:4318",
+      EVENT_RETENTION_DAYS: "14",
+      AGENT_RECLAIM_INTERVAL_MS: "0",
+    });
+    expect(cfg.observability).toMatchObject({
+      AUDIT_LOG_ENABLED: true,
+      AUDIT_LOG_PATH: ".mcp-audit/mutations.jsonl",
+      OTEL_SERVICE_NAME: "mcp-github-project-manager",
+      OTEL_EXPORTER_OTLP_ENDPOINT: "http://localhost:4318",
+      RATE_LIMIT_FLOOR: 250,
+    });
+    expect(cfg.sync?.EVENT_RETENTION_DAYS).toBe(14);
+    expect(cfg.agent?.AGENT_RECLAIM_INTERVAL_MS).toBe(0);
+  });
+
+  it("treats empty-string values as unset", () => {
+    const cfg = validateConfig({ ...requiredGithub, EVENT_RETENTION_DAYS: "", WEBHOOK_HOST: "" });
+    expect(cfg.sync?.EVENT_RETENTION_DAYS).toBe(7);
+    expect(cfg.webhook?.WEBHOOK_HOST).toBe("127.0.0.1");
+  });
+});
+
+describe("validateConfigWarnings AI provider check", () => {
+  it("warns when no AI provider is configured", () => {
+    expect(validateConfigWarnings({})).toEqual([
+      expect.stringMatching(/No AI provider configured.*GOOGLE_VERTEX_PROJECT/),
+    ]);
+  });
+
+  // Regression: Vertex authenticates via Google ADC (no API key), so a Vertex-only
+  // setup was reported as having no AI provider at all.
+  it.each([
+    ["GOOGLE_VERTEX_PROJECT", { GOOGLE_VERTEX_PROJECT: "my-gcp-project" }],
+    ["ANTHROPIC_API_KEY", { ANTHROPIC_API_KEY: "sk-ant-x" }],
+    ["AI_MAIN_API_KEY", { AI_MAIN_API_KEY: "k" }],
+  ])("does not warn when %s is set", (_name, env) => {
+    expect(validateConfigWarnings(env)).toEqual([]);
   });
 });

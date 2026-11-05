@@ -1,11 +1,16 @@
+import type { PromptRegistry, PromptVariables } from "./PromptRegistry";
+
 /**
  * Prompt Templates for Issue Intelligence AI Services
  *
- * System prompts and formatters for:
+ * System prompts and user templates for:
  * - Issue enrichment (AI-17)
  * - Label suggestions (AI-18)
  * - Duplicate detection (AI-19)
  * - Related issue linking (AI-20)
+ *
+ * Templates are registered in the PromptRegistry; the `*PromptVariables` builders
+ * compute the conditional sections that fill their {{variable}} placeholders.
  */
 
 // ============================================================================
@@ -16,7 +21,7 @@
  * System prompt for issue enrichment.
  * Used by IssueEnrichmentAIService for structured issue improvements.
  */
-export const ENRICHMENT_SYSTEM_PROMPT = `You are an expert issue analysis assistant specializing in improving issue quality.
+const ENRICHMENT_SYSTEM_PROMPT = `You are an expert issue analysis assistant specializing in improving issue quality.
 
 Your role is to analyze issues and generate structured, comprehensive content that improves clarity and actionability.
 
@@ -52,19 +57,34 @@ Output requirements:
 - Suggest labels based on content analysis (bug, feature, documentation, etc.)
 - Suggest assignees only if domain expertise is clearly apparent from content`;
 
+const ENRICHMENT_USER_PROMPT = `Analyze and enrich the following issue:
+
+Issue Title: {{issueTitle}}
+
+Issue Description:
+{{issueDescription}}
+{{projectSection}}
+{{labelsList}}
+
+Instructions:
+{{originalInstruction}}
+- Generate structured sections: Problem, Solution, Context, Impact, Acceptance Criteria
+- Provide confidence scores (0-1) for each section
+- Suggest relevant labels from the available repository labels
+- Only suggest assignees if domain expertise is clearly apparent
+
+Output a JSON object matching the EnrichedIssue schema.`;
+
 /**
- * Format the user prompt for issue enrichment.
- *
- * @param params - Parameters for enrichment
- * @returns Formatted prompt string
+ * Variables for the issue enrichment user prompt.
  */
-export function formatEnrichmentPrompt(params: {
+export function enrichmentPromptVariables(params: {
   issueTitle: string;
   issueDescription: string;
   projectContext?: string;
   preserveOriginal: boolean;
   repositoryLabels?: string[];
-}): string {
+}): PromptVariables {
   const labelsList = params.repositoryLabels?.length
     ? `\nAvailable repository labels: ${params.repositoryLabels.join(", ")}`
     : "";
@@ -73,27 +93,15 @@ export function formatEnrichmentPrompt(params: {
     ? `\nProject Context:\n${params.projectContext}`
     : "";
 
-  return `Analyze and enrich the following issue:
-
-Issue Title: ${params.issueTitle}
-
-Issue Description:
-${params.issueDescription || "(No description provided)"}
-${projectSection}
-${labelsList}
-
-Instructions:
-${
-  params.preserveOriginal
-    ? "- The original description is substantial. Preserve it and add structured sections below it."
-    : "- The original description is brief. Create a comprehensive rewrite integrating all available information."
-}
-- Generate structured sections: Problem, Solution, Context, Impact, Acceptance Criteria
-- Provide confidence scores (0-1) for each section
-- Suggest relevant labels from the available repository labels
-- Only suggest assignees if domain expertise is clearly apparent
-
-Output a JSON object matching the EnrichedIssue schema.`;
+  return {
+    issueTitle: params.issueTitle,
+    issueDescription: params.issueDescription || "(No description provided)",
+    projectSection,
+    labelsList,
+    originalInstruction: params.preserveOriginal
+      ? "- The original description is substantial. Preserve it and add structured sections below it."
+      : "- The original description is brief. Create a comprehensive rewrite integrating all available information.",
+  };
 }
 
 // ============================================================================
@@ -104,7 +112,7 @@ Output a JSON object matching the EnrichedIssue schema.`;
  * System prompt for label suggestions.
  * Used by LabelSuggestionService for multi-tier label recommendations.
  */
-export const LABEL_SUGGESTION_SYSTEM_PROMPT = `You are an expert repository label analyst specializing in issue categorization.
+const LABEL_SUGGESTION_SYSTEM_PROMPT = `You are an expert repository label analyst specializing in issue categorization.
 
 Your role is to suggest the most appropriate labels for issues based on content analysis.
 
@@ -137,18 +145,34 @@ Output requirements:
 - New label proposals only when truly needed
 - Overall confidence score for the suggestion set`;
 
+const LABEL_SUGGESTION_USER_PROMPT = `Suggest labels for the following issue:
+
+Issue Title: {{issueTitle}}
+
+Issue Description:
+{{issueDescription}}
+
+Available Repository Labels:
+{{labelsSection}}
+{{historySection}}
+
+Instructions:
+- Select the most appropriate labels from the available list
+- Group suggestions by confidence tier (high >= 0.8, medium >= 0.5, low < 0.5)
+- Provide rationale and matched patterns for each suggestion
+- Only propose new labels if no existing label fits AND the pattern is common
+
+Output a JSON object matching the LabelSuggestionResult schema.`;
+
 /**
- * Format the user prompt for label suggestions.
- *
- * @param params - Parameters for label suggestion
- * @returns Formatted prompt string
+ * Variables for the label suggestion user prompt.
  */
-export function formatLabelPrompt(params: {
+export function labelPromptVariables(params: {
   issueTitle: string;
   issueDescription: string;
   existingLabels: Array<{ name: string; description?: string; color?: string }>;
   issueHistory?: Array<{ labels: string[]; title: string }>;
-}): string {
+}): PromptVariables {
   const labelsSection = params.existingLabels
     .map((label) => `- ${label.name}${label.description ? `: ${label.description}` : ""}`)
     .join("\n");
@@ -160,24 +184,12 @@ export function formatLabelPrompt(params: {
         .join("\n")}`
     : "";
 
-  return `Suggest labels for the following issue:
-
-Issue Title: ${params.issueTitle}
-
-Issue Description:
-${params.issueDescription || "(No description provided)"}
-
-Available Repository Labels:
-${labelsSection || "(No labels defined)"}
-${historySection}
-
-Instructions:
-- Select the most appropriate labels from the available list
-- Group suggestions by confidence tier (high >= 0.8, medium >= 0.5, low < 0.5)
-- Provide rationale and matched patterns for each suggestion
-- Only propose new labels if no existing label fits AND the pattern is common
-
-Output a JSON object matching the LabelSuggestionResult schema.`;
+  return {
+    issueTitle: params.issueTitle,
+    issueDescription: params.issueDescription || "(No description provided)",
+    labelsSection: labelsSection || "(No labels defined)",
+    historySection,
+  };
 }
 
 // ============================================================================
@@ -188,7 +200,7 @@ Output a JSON object matching the LabelSuggestionResult schema.`;
  * System prompt for duplicate detection.
  * Used for identifying duplicate or near-duplicate issues.
  */
-export const DUPLICATE_DETECTION_SYSTEM_PROMPT = `You are an expert issue similarity analyst specializing in duplicate detection.
+const DUPLICATE_DETECTION_SYSTEM_PROMPT = `You are an expert issue similarity analyst specializing in duplicate detection.
 
 Your role is to identify potential duplicate issues based on semantic similarity, not just keyword matching.
 
@@ -217,13 +229,25 @@ Output requirements:
 - Recommend action: auto_link, flag_for_review, or ignore
 - Provide overall assessment of duplicate likelihood`;
 
+const DUPLICATE_DETECTION_USER_PROMPT = `Analyze the following issue for potential duplicates:
+
+{{sourceSection}}
+
+Candidate Issues:
+{{candidatesSection}}
+
+Instructions:
+- Calculate semantic similarity (0-1) between source and each candidate
+- Classify as duplicate (>=0.92), near-duplicate (0.75-0.92), related (0.5-0.75), or distinct (<0.5)
+- Provide reasoning for each similarity assessment
+- Recommend action for each candidate
+
+Output a JSON object matching the DuplicateDetectionResult schema.`;
+
 /**
- * Format the user prompt for duplicate detection.
- *
- * @param params - Parameters for duplicate detection
- * @returns Formatted prompt string
+ * Variables for the duplicate detection user prompt.
  */
-export function formatDuplicatePrompt(params: {
+export function duplicatePromptVariables(params: {
   sourceIssue: {
     title: string;
     body: string;
@@ -236,7 +260,7 @@ export function formatDuplicatePrompt(params: {
     body: string;
     labels?: string[];
   }>;
-}): string {
+}): PromptVariables {
   const sourceSection = `Source Issue:
 Title: ${params.sourceIssue.title}
 Description: ${params.sourceIssue.body || "(No description)"}${params.sourceIssue.labels?.length ? `\nLabels: ${params.sourceIssue.labels.join(", ")}` : ""}`;
@@ -249,20 +273,7 @@ Description: ${params.sourceIssue.body || "(No description)"}${params.sourceIssu
     )
     .join("\n\n");
 
-  return `Analyze the following issue for potential duplicates:
-
-${sourceSection}
-
-Candidate Issues:
-${candidatesSection}
-
-Instructions:
-- Calculate semantic similarity (0-1) between source and each candidate
-- Classify as duplicate (>=0.92), near-duplicate (0.75-0.92), related (0.5-0.75), or distinct (<0.5)
-- Provide reasoning for each similarity assessment
-- Recommend action for each candidate
-
-Output a JSON object matching the DuplicateDetectionResult schema.`;
+  return { sourceSection, candidatesSection };
 }
 
 // ============================================================================
@@ -273,7 +284,7 @@ Output a JSON object matching the DuplicateDetectionResult schema.`;
  * System prompt for related issue linking.
  * Used for detecting semantic, dependency, and component relationships.
  */
-export const RELATED_ISSUE_SYSTEM_PROMPT = `You are an expert issue relationship analyst specializing in linking related issues.
+const RELATED_ISSUE_SYSTEM_PROMPT = `You are an expert issue relationship analyst specializing in linking related issues.
 
 Your role is to detect meaningful relationships between issues beyond simple duplicates.
 
@@ -304,13 +315,26 @@ Output requirements:
 - Provide clear reasoning for each detected relationship
 - Avoid suggesting links for clearly unrelated issues`;
 
+const RELATED_ISSUE_USER_PROMPT = `Analyze the following issue for related issues:
+
+{{sourceSection}}
+{{componentSection}}
+
+Candidate Issues:
+{{candidatesSection}}
+
+Instructions:
+- Detect relationships: semantic, dependency, component
+- For dependency relationships, identify subtype: blocks, blocked_by, related_to
+- Provide relevance score (0-1) and confidence for each relationship
+- Include reasoning explaining why the relationship exists
+
+Output a JSON object matching the RelatedIssueResult schema.`;
+
 /**
- * Format the user prompt for related issue detection.
- *
- * @param params - Parameters for related issue linking
- * @returns Formatted prompt string
+ * Variables for the related issue detection user prompt.
  */
-export function formatRelatedIssuePrompt(params: {
+export function relatedIssuePromptVariables(params: {
   sourceIssue: {
     id: string;
     title: string;
@@ -326,7 +350,7 @@ export function formatRelatedIssuePrompt(params: {
     state: "open" | "closed";
   }>;
   componentHints?: string[];
-}): string {
+}): PromptVariables {
   const sourceSection = `Source Issue:
 ID: ${params.sourceIssue.id}
 Title: ${params.sourceIssue.title}
@@ -345,19 +369,44 @@ Description: ${params.sourceIssue.body || "(No description)"}${params.sourceIssu
     ? `\nKnown Components:\n${params.componentHints.map((c) => `- ${c}`).join("\n")}`
     : "";
 
-  return `Analyze the following issue for related issues:
+  return { sourceSection, componentSection, candidatesSection };
+}
 
-${sourceSection}
-${componentSection}
+// ============================================================================
+// Registration
+// ============================================================================
 
-Candidate Issues:
-${candidatesSection}
+export const ISSUE_PROMPT_IDS = {
+  enrichmentSystem: "issue.enrichment.system",
+  enrichmentUser: "issue.enrichment.user",
+  labelSuggestionSystem: "issue.label-suggestion.system",
+  labelSuggestionUser: "issue.label-suggestion.user",
+  duplicateDetectionSystem: "issue.duplicate-detection.system",
+  duplicateDetectionUser: "issue.duplicate-detection.user",
+  relatedSystem: "issue.related.system",
+  relatedUser: "issue.related.user",
+} as const;
 
-Instructions:
-- Detect relationships: semantic, dependency, component
-- For dependency relationships, identify subtype: blocks, blocked_by, related_to
-- Provide relevance score (0-1) and confidence for each relationship
-- Include reasoning explaining why the relationship exists
-
-Output a JSON object matching the RelatedIssueResult schema.`;
+/** Register every issue-intelligence prompt (version 1.0.0). */
+export function registerIssuePrompts(registry: PromptRegistry): void {
+  registry.register(ISSUE_PROMPT_IDS.enrichmentSystem, "1.0.0", ENRICHMENT_SYSTEM_PROMPT);
+  registry.register(ISSUE_PROMPT_IDS.enrichmentUser, "1.0.0", ENRICHMENT_USER_PROMPT);
+  registry.register(
+    ISSUE_PROMPT_IDS.labelSuggestionSystem,
+    "1.0.0",
+    LABEL_SUGGESTION_SYSTEM_PROMPT
+  );
+  registry.register(ISSUE_PROMPT_IDS.labelSuggestionUser, "1.0.0", LABEL_SUGGESTION_USER_PROMPT);
+  registry.register(
+    ISSUE_PROMPT_IDS.duplicateDetectionSystem,
+    "1.0.0",
+    DUPLICATE_DETECTION_SYSTEM_PROMPT
+  );
+  registry.register(
+    ISSUE_PROMPT_IDS.duplicateDetectionUser,
+    "1.0.0",
+    DUPLICATE_DETECTION_USER_PROMPT
+  );
+  registry.register(ISSUE_PROMPT_IDS.relatedSystem, "1.0.0", RELATED_ISSUE_SYSTEM_PROMPT);
+  registry.register(ISSUE_PROMPT_IDS.relatedUser, "1.0.0", RELATED_ISSUE_USER_PROMPT);
 }

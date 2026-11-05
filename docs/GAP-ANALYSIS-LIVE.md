@@ -6,6 +6,8 @@
 > and an over-claimed god-class. Its graph stats (513 nodes) are ~10× stale.
 > **Authoritative live status:** [`docs/remediation/GAP-TRACKER.md`](remediation/GAP-TRACKER.md)
 > and [`docs/remediation/PLAN.md`](remediation/PLAN.md). Kept for history only.
+> Module names it mentions (for example `ResourceManager`, since deleted) are as of
+> the 2026-05-02 snapshot and do not describe the current code.
 
 **Generated:** 2026-05-02
 **Source:** PROJECT.md requirements vs implementation analysis

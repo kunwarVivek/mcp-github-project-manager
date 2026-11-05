@@ -1,29 +1,20 @@
 # Codebase Concerns
 
-**Analysis Date:** 2026-10-21
+**Analysis Date:** 2026-11-02
 
-**Updated:** 2026-10-21 — re-audited against the current tree. Several previously listed concerns are now resolved (webhook signature validation, cache persistence, health endpoint, request tracing, circuit breaker, PRD input sanitization, token estimation, AI response caching, event-buffer eviction) and are marked as such below. New concerns specific to the current stack were added.
+**Updated:** 2026-11-02 — re-audited against the current tree. Resolved since the last audit: residual `as any`, the dual test trees, the missing analytics surface, and the lack of any tracing export. See "Resolved Since the Last Audit" below.
 
 ## Tech Debt
 
-**Residual `any` Type Usage:**
-- Issue: roughly 10 `as any` assertions remain in production code (down from 30+ before the service extraction and the MCP v2 migration)
-- Files: `src/services/context/CodeExampleGenerator.ts` (3), `src/infrastructure/tools/compound/compound-executors.ts` (3), `src/index.ts` (2 — both at MCP handler boundaries), `src/infrastructure/github/repositories/GitHubMilestoneRepository.ts` (1)
-- Impact: type safety compromised at the edges; IDE assistance degraded
-- Fix approach: define proper interfaces for the AI response objects; add type guards for unknown data
-
-**Two Live Test Trees:**
-- Issue: tests live in **both** `src/__tests__/` (~79 files) and the legacy root `tests/` tree (48 files). `vitest.config.ts` includes both, so all 127 files run on every `pnpm test`
-- Files: `vitest.config.ts`, `src/__tests__/**`, `tests/**`
-- Impact: real risk of two suites covering the same behavior with different expectations; harder to reason about coverage; slower CI
-- Note: the root tree is **not** a set of removable duplicates — it holds live coverage (AI services/tools, resilience, observability, health, cache persistence, tool suites) with no `src/__tests__/` equivalent
-- Fix approach: migrate the remaining root suites into `src/__tests__/` mirroring the source layout, then drop the `tests/**` include from the config — a deliberate, one-file-at-a-time move, not a bulk delete
+**Type Assertions (no open concern):**
+- State: a repo-wide search finds no real `as any` in production code under `src/`. The only textual matches are comments in `src/index.ts` and `src/domain/type-guards.ts`, and sample code inside a template string in `src/services/context/CodeExampleGenerator.ts`
+- Guard: Biome (`suspicious.noExplicitAny: "warn"`, lint runs with `--error-on-warnings`)
 
 **Two Lockfiles to Keep in Sync:**
-- Issue: `package-lock.json` and `pnpm-lock.yaml` are both committed and must stay in sync; nothing enforces that locally
+- Issue: `package-lock.json` and `pnpm-lock.yaml` are both committed and must stay in sync; run `npm run check:lockfiles` locally to verify
 - Files: `package-lock.json`, `pnpm-lock.yaml`
 - Impact: a dependency added under one manager but not the other produces an install that differs between contributors and CI
-- Mitigation: CI runs the full `build → typecheck → test` gate under **both** npm and pnpm, so drift fails the build rather than shipping
+- Mitigation: CI runs the full `build → typecheck → test` gate under **both** npm and pnpm, and a `check:lockfiles` job (`scripts/check-lockfiles.js`) fails when the lockfiles disagree
 - Fix approach: regenerate both lockfiles in the same commit whenever a dependency changes
 
 **Single-Threaded Tool Dispatch:**
@@ -37,7 +28,7 @@
 **Vitest Rejects Pre-Migration Runner CLI Flags:**
 - Symptoms: `CACError: Unknown option` when passing the old `--testPathPattern` / `--testPathIgnorePatterns` flags
 - Trigger: copying a command from an older runbook or chat log
-- Workaround: filter with a **positional pattern** (`vitest run ai-services`) and exclude with `--exclude='**/tests/ai-services/**'`
+- Workaround: filter with a **positional pattern** (`vitest run ai-services`) and exclude with `--exclude='**/ai-services/**'`
 
 **Mocks That Are Not Constructible:**
 - Symptoms: "is not a constructor" when the code under test calls `new` on a mocked class
@@ -60,8 +51,8 @@
 **Webhook Signature Validation (now fails closed):**
 - Risk: accepted unsigned webhooks would allow forged events
 - Files: `src/infrastructure/events/GitHubWebhookHandler.ts`, `src/env.ts`
-- Current state: signature validation fails closed. With no `WEBHOOK_SECRET`, webhooks are rejected unless `WEBHOOK_ALLOW_UNSIGNED=true` is set explicitly (trusted dev only)
-- Residual risk: `WEBHOOK_ALLOW_UNSIGNED=true` in a production environment silently disables verification
+- Current state: signature validation fails closed. With no `WEBHOOK_SECRET`, webhooks are rejected unless `WEBHOOK_ALLOW_UNSIGNED=true` is set explicitly (trusted dev only). The HTTP server also binds loopback by default (`WEBHOOK_HOST`), requires `EVENTS_AUTH_TOKEN` on `/events/*`, and trusts `X-Forwarded-For` only from `WEBHOOK_TRUSTED_PROXIES`
+- Residual risk: `WEBHOOK_ALLOW_UNSIGNED=true`, `EVENTS_ALLOW_UNAUTHENTICATED=true` or `WEBHOOK_HOST=0.0.0.0` in a production environment silently widens exposure (startup warns for SSE with neither auth token nor opt-out)
 
 **Secrets in Environment Variables (partially mitigated):**
 - Risk: API keys (AI providers, GitHub token) can still be supplied as plain env vars
@@ -122,7 +113,7 @@
 - Test coverage: partial — not all field types have dedicated tests
 
 **Tool Registry Size:**
-- Files: `src/infrastructure/tools/ToolRegistry.ts` (~890 lines), `src/infrastructure/tools/ToolSchemas.ts` and the `*-tools.ts` family
+- Files: `src/infrastructure/tools/ToolRegistry.ts` (~550 lines), `src/infrastructure/tools/ToolSchemas.ts` and the `*-tools.ts` family
 - Why fragile: every tool's JSON Schema is generated here, so a schema bug affects every registration path
 - Safe modification: keep the schema-generation path in one place and keep its regression test green (see below)
 
@@ -169,14 +160,13 @@
 
 ## Missing Critical Features
 
-**No Analytics / Reporting Surface:**
-- Problem: the original phase-11 scope ("Analytics & Reporting") was delivered as AI Issue Intelligence instead; no analytics surface exists
-- Blocks: reporting on project health, throughput, and agent performance
-- Tracking: feature proposal G6-01 (see `.planning/STATUS.md` and `docs/remediation/GAP-TRACKER.md`)
+**Analytics Surface Is Minimal:**
+- State: the original phase-11 scope ("Analytics & Reporting") is delivered as the read-only `analytics` tool: `sprint_velocity`, `sprint_burndown`, `cycle_time`, `throughput`, `project_summary` (ANLY-01–05)
+- Limit: only those five reports exist; anything beyond them (e.g. cross-project or agent-performance dashboards) is not built
 
-**No Distributed Tracing:**
-- Problem: `CorrelationContext` correlates within a single process, but there is no cross-service trace propagation
-- Blocks: debugging across the MCP client, this server, and GitHub's API
+**Tracing Is Per Tool Call:**
+- State: `CorrelationContext` correlates within a process, and OpenTelemetry (`OTEL_EXPORTER_OTLP_ENDPOINT`, opt-in) exports one `tool.<name>` span per tool call
+- Limit: no trace-context propagation into GitHub's API or across the MCP client boundary
 
 **No Secret Manager Integration:**
 - Problem: Vault / AWS Secrets Manager are documented as an extension point but not implemented
@@ -185,14 +175,9 @@
 
 ## Test Coverage Gaps
 
-**Legacy Root Test Tree Migration:**
-- What's not migrated: the 48 files under `tests/` have no `src/__tests__/` counterpart, so the migration to a single tree is incomplete
-- Risk: the split layout makes it easy to miss that a suite is running
-- Priority: Medium — migrate incrementally, one directory at a time
-
-**Coverage Thresholds Are Low:**
-- What's not tested: `vitest.config.ts` sets thresholds of lines 55, functions 57, branches 45, statements 54 — a low bar for a server that mutates production repositories
-- Risk: regressions slip through in the least-covered paths
+**Coverage Thresholds:**
+- State: `vitest.config.ts` enforces coverage thresholds (lines, functions, branches, statements); measured results: see CI
+- Risk: a low floor lets regressions slip through in the least-covered paths of a server that mutates production repositories
 - Priority: Medium — raise the floor as coverage improves, rather than lowering it
 
 **E2E Test Reliability:**
@@ -206,6 +191,16 @@
 - Risk: silent coercion regressions on the project-field write path
 - Priority: Medium
 
+## Resolved Since the Last Audit
+
+- Residual `as any` in production code — gone (see Type Assertions)
+- Dual test trees — the legacy root `tests/` tree was merged into `src/__tests__/` and removed; `vitest.config.ts` includes only `src/__tests__/**`
+- Missing analytics surface — the `analytics` tool
+- GitHub rate-limit exhaustion — one `GitHubRequestExecutor` plus `RateLimitManager` backs off below `RATE_LIMIT_FLOOR`
+- Webhook/SSE exposure — loopback bind, bearer-token-protected `/events/*`, fail-closed signatures
+- Dead modules (`infrastructure/validation`, `infrastructure/resource`, `StructuredLogger`/`TracingLogger`, `project-types.ts`, `MCPErrorHandler`) — deleted
+- No audit trail for mutations — opt-in `MutationAuditLog`
+
 ## Watch Items (Regression Guards, Not Open Bugs)
 
 **Tool JSON Schema Generation:**
@@ -218,4 +213,4 @@
 
 ---
 
-*Concerns audit: 2026-10-21*
+*Concerns audit: 2026-11-02*

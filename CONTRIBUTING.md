@@ -104,6 +104,20 @@ npm/pnpm matrix is deliberate: it is what catches a dependency that only
 resolves under one of them (for example a package imported directly that is
 only present as a hoisted transitive under npm).
 
+CI also runs these repository checks; run them locally when you touch
+dependencies or the tool surface:
+
+```bash
+npm run check:lockfiles   # package-lock.json and pnpm-lock.yaml resolve the same direct dependencies
+npm run check:docs        # tool/action counts in README, docs and package.json match the ToolRegistry
+```
+
+`check:docs` reads the counts from `<!-- count:tools -->N<!-- /count -->` and
+`<!-- count:actions -->N<!-- /count -->` marker spans; update the marker values
+when the number of tools or actions changes. CI additionally runs
+`npm audit --audit-level=high` and CodeQL (`.github/workflows/codeql.yml`), and
+the release workflow attaches a CycloneDX SBOM to each GitHub release.
+
 Toolchain notes:
 
 - **TypeScript 7** with `isolatedModules: true`. A type re-exported as a value

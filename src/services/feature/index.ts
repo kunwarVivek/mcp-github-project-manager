@@ -1,4 +1,4 @@
-export { FeatureAnalysisService } from "./FeatureAnalysisService.js";
-export { FeatureExpansionService } from "./FeatureExpansionService.js";
-export { FeaturePRDService } from "./FeaturePRDService.js";
-export { TaskLifecycleService } from "./TaskLifecycleService.js";
+export { FeatureAnalysisService } from "./FeatureAnalysisService";
+export { FeatureExpansionService } from "./FeatureExpansionService";
+export { FeaturePRDService } from "./FeaturePRDService";
+export { TaskLifecycleService } from "./TaskLifecycleService";

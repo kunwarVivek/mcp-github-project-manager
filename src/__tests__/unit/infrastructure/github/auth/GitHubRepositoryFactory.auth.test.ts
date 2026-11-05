@@ -49,7 +49,7 @@ describe("GitHubRepositoryFactory authentication", () => {
 
   it("authenticates requests with the token the auth object supplies", async () => {
     fetchMock.mockResolvedValue(json({ login: "octocat" }));
-    const factory = new GitHubRepositoryFactory(tokenAuth("ghp_static123"), "o", "r");
+    const factory = GitHubRepositoryFactory.fromAuth(tokenAuth("ghp_static123"), "o", "r");
 
     await factory.getOctokit().rest.users.getAuthenticated();
 
@@ -74,7 +74,7 @@ describe("GitHubRepositoryFactory authentication", () => {
       return json({ login: "app-bot" });
     });
     const auth = createAppInstallationAuth({ appId: "123", privateKey, installationId: "456" });
-    const factory = new GitHubRepositoryFactory(auth, "o", "r");
+    const factory = GitHubRepositoryFactory.fromAuth(auth, "o", "r");
 
     await factory.getOctokit().rest.users.getAuthenticated();
 
@@ -137,7 +137,7 @@ describe("GitHubRepositoryFactory authentication", () => {
         ghCliToken: () => undefined,
       });
       expect(auth.source).toBe("secrets-dir");
-      const factory = new GitHubRepositoryFactory(auth, "o", "r");
+      const factory = GitHubRepositoryFactory.fromAuth(auth, "o", "r");
 
       await factory.getOctokit().rest.users.getAuthenticated();
       writeFileSync(join(dir, "GITHUB_TOKEN"), "ghp_after\n");
@@ -156,7 +156,7 @@ describe("GitHubRepositoryFactory authentication", () => {
         () => readSecretFromTier("GITHUB_TOKEN", "secrets-dir", { SECRETS_DIR: dir }),
         "secrets-dir"
       );
-      const factory = new GitHubRepositoryFactory(auth, "o", "r");
+      const factory = GitHubRepositoryFactory.fromAuth(auth, "o", "r");
 
       await factory.getOctokit().rest.users.getAuthenticated();
       rmSync(join(dir, "GITHUB_TOKEN"));
@@ -170,7 +170,7 @@ describe("GitHubRepositoryFactory authentication", () => {
     it("keeps a cli-flag token constant", async () => {
       fetchMock.mockImplementation(async () => json({ login: "octocat" }));
       const auth = createTokenAuth(() => "ghp_flag", "cli-flag");
-      const factory = new GitHubRepositoryFactory(auth, "o", "r");
+      const factory = GitHubRepositoryFactory.fromAuth(auth, "o", "r");
 
       await factory.getOctokit().rest.users.getAuthenticated();
       await factory.getOctokit().rest.users.getAuthenticated();
@@ -184,7 +184,7 @@ describe("GitHubRepositoryFactory authentication", () => {
 
   it("applies the default and overridden base URL", async () => {
     fetchMock.mockResolvedValue(json({ login: "octocat" }));
-    const factory = new GitHubRepositoryFactory(tokenAuth(), "o", "r", {
+    const factory = GitHubRepositoryFactory.fromAuth(tokenAuth(), "o", "r", {
       baseUrl: "https://ghe.example.com/api/v3",
     });
 
@@ -193,13 +193,14 @@ describe("GitHubRepositoryFactory authentication", () => {
     expect(recordedRequests(fetchMock)[0].url).toBe("https://ghe.example.com/api/v3/user");
   });
 
-  it("GitHubRepositoryFactory.create rejects a missing owner or repo", () => {
-    expect(() => GitHubRepositoryFactory.create(tokenAuth(), { owner: "", repo: "r" })).toThrow(
-      "Missing required GitHub configuration"
+  it("GitHubRepositoryFactory.fromAuth rejects a missing owner or repo", () => {
+    expect(() => GitHubRepositoryFactory.fromAuth(tokenAuth(), "", "r")).toThrow(
+      "Owner is required"
     );
-    expect(
-      GitHubRepositoryFactory.create(tokenAuth(), { owner: "o", repo: "r" }).getConfig()
-    ).toMatchObject({
+    expect(() => GitHubRepositoryFactory.fromAuth(tokenAuth(), "o", "")).toThrow(
+      "Repository is required"
+    );
+    expect(GitHubRepositoryFactory.fromAuth(tokenAuth(), "o", "r").getConfig()).toMatchObject({
       owner: "o",
       repo: "r",
     });

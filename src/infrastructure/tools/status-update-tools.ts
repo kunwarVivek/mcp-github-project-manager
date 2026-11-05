@@ -7,6 +7,7 @@
  * - get_status_update (GHAPI-08): Get a single status update by ID
  */
 
+import { ProjectStatusService } from "../../services/ProjectStatusService";
 import { StatusUpdateStatus } from "../github/repositories/types";
 import { ANNOTATION_PATTERNS } from "./annotations/tool-annotations";
 import {
@@ -29,12 +30,12 @@ import { createGitHubFactory } from "./tool-factory";
 // ============================================================================
 
 /**
- * Create a GitHubRepositoryFactory from environment variables.
- *
- * Status updates operate at the project level (via projectId), so owner/repo
- * are only needed for factory initialization. We use defaults since status
- * update operations don't actually require a specific repo context.
+ * Builds the project status service. Status updates operate at the project
+ * level (via projectId), so the factory's owner/repo context is unused.
  */
+function projectStatusService(): ProjectStatusService {
+  return new ProjectStatusService(createGitHubFactory());
+}
 
 /**
  * Convert status string to StatusUpdateStatus enum value.
@@ -165,10 +166,7 @@ export async function executeCreateStatusUpdate(args: CreateStatusUpdateInput): 
   content: Array<{ type: "text"; text: string }>;
   structuredContent: StatusUpdateOutput;
 }> {
-  const factory = createGitHubFactory();
-  const repository = factory.createStatusUpdateRepository();
-
-  const statusUpdate = await repository.createStatusUpdate(args.projectId, args.body, {
+  const statusUpdate = await projectStatusService().createStatusUpdate(args.projectId, args.body, {
     status: toStatusEnum(args.status),
     startDate: args.startDate,
     targetDate: args.targetDate,
@@ -212,10 +210,7 @@ export async function executeListStatusUpdates(args: ListStatusUpdatesInput): Pr
   content: Array<{ type: "text"; text: string }>;
   structuredContent: StatusUpdateListOutput;
 }> {
-  const factory = createGitHubFactory();
-  const repository = factory.createStatusUpdateRepository();
-
-  const listResult = await repository.listStatusUpdates(
+  const listResult = await projectStatusService().listStatusUpdates(
     args.projectId,
     args.first ?? 10,
     args.after
@@ -266,10 +261,7 @@ export async function executeGetStatusUpdate(args: GetStatusUpdateInput): Promis
   content: Array<{ type: "text"; text: string }>;
   structuredContent: StatusUpdateOutput | null;
 }> {
-  const factory = createGitHubFactory();
-  const repository = factory.createStatusUpdateRepository();
-
-  const statusUpdate = await repository.getStatusUpdate(args.statusUpdateId);
+  const statusUpdate = await projectStatusService().getStatusUpdate(args.statusUpdateId);
 
   if (!statusUpdate) {
     return {

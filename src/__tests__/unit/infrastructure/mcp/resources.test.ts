@@ -112,11 +112,16 @@ function makeDeps(
     listMilestones: vi.fn().mockResolvedValue([]),
     ...overrides.service,
   };
+  const pms = {
+    projects: { listProjects: service.listProjects },
+    sprints: { getCurrentSprint: service.getCurrentSprint },
+    milestones: { listMilestones: service.listMilestones },
+  };
   const agentStore = overrides.agentStore ?? { listAgents: vi.fn().mockResolvedValue([]) };
   const toolRegistry = overrides.toolRegistry ?? { getToolsForMCP: vi.fn().mockReturnValue([]) };
 
   return {
-    service: service as unknown as ProjectManagementService,
+    service: pms as unknown as ProjectManagementService,
     toolRegistry: toolRegistry as unknown as ToolRegistry,
     agentStore: agentStore as unknown as AgentStore,
     aiFactory: aiFactory as unknown as AIServiceFactory,
@@ -269,7 +274,7 @@ describe("registerResources", () => {
   });
 
   describe("github://milestones", () => {
-    it("lists open milestones by calling listMilestones('open')", async () => {
+    it("lists open milestones by calling listMilestones('open', 'due_on', 'asc')", async () => {
       const milestones = [{ id: "m1", title: "v1.0", status: "open" }];
       const listMilestones = vi.fn().mockResolvedValue(milestones);
       const { server, resources } = createCapturingServer();
@@ -278,7 +283,7 @@ describe("registerResources", () => {
 
       const data = expectValidResourceResult(await getCallback(resources, "milestones")(uri), uri);
 
-      expect(listMilestones).toHaveBeenCalledWith("open");
+      expect(listMilestones).toHaveBeenCalledWith("open", "due_on", "asc");
       expect(data).toEqual(milestones);
     });
 

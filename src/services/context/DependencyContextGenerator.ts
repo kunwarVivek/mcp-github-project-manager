@@ -2,7 +2,7 @@ import { generateObject } from "ai";
 import { z } from "zod";
 import type { AITask, EnhancedTaskDependency, TaskDependency } from "../../domain/ai-types";
 import type { Dependency, DependencyContext } from "../../domain/task-context-schemas";
-import { type ILogger, Logger } from "../../infrastructure/logger";
+import { getLogger, type ILogger } from "../../infrastructure/logger";
 import { AIServiceFactory } from "../ai/AIServiceFactory";
 import { InputSanitizer } from "../utils/InputSanitizer";
 
@@ -48,7 +48,7 @@ export class DependencyContextGenerator {
 
   constructor(aiFactory?: AIServiceFactory, logger?: ILogger) {
     this.aiFactory = aiFactory ?? AIServiceFactory.getInstance();
-    this.logger = logger ?? Logger.getInstance();
+    this.logger = logger ?? getLogger("DependencyContextGenerator");
   }
 
   /**

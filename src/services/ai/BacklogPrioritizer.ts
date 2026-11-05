@@ -30,10 +30,8 @@ import type {
 import { InputSanitizer } from "../utils/InputSanitizer";
 import { AIServiceFactory } from "./AIServiceFactory";
 import { calculateWeightedScore, getConfidenceTier } from "./ConfidenceScorer";
-import {
-  formatPrioritizationPrompt,
-  SPRINT_PRIORITIZATION_SYSTEM_PROMPT,
-} from "./prompts/SprintPlanningPrompts";
+import { defaultPromptRegistry } from "./prompts";
+import { prioritizationPromptVariables, SPRINT_PROMPT_IDS } from "./prompts/SprintPlanningPrompts";
 
 // ============================================================================
 // Zod Schemas for AI Response Validation
@@ -211,10 +209,13 @@ export class BacklogPrioritizer {
     try {
       const result = await generateObject({
         model,
-        system: SPRINT_PRIORITIZATION_SYSTEM_PROMPT,
-        prompt: formatPrioritizationPrompt(
-          items.map((item) => ({ ...item, title: InputSanitizer.sanitizeText(item.title) })),
-          goals?.map((g) => InputSanitizer.sanitizeText(g)) ?? []
+        system: defaultPromptRegistry.render(SPRINT_PROMPT_IDS.prioritizationSystem),
+        prompt: defaultPromptRegistry.render(
+          SPRINT_PROMPT_IDS.prioritizationUser,
+          prioritizationPromptVariables(
+            items.map((item) => ({ ...item, title: InputSanitizer.sanitizeText(item.title) })),
+            goals?.map((g) => InputSanitizer.sanitizeText(g)) ?? []
+          )
         ),
         schema: AIBusinessValueSchema,
         temperature: 0.3,

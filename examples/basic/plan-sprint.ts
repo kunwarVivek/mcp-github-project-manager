@@ -53,7 +53,7 @@ async function planSprint() {
     endDate.setDate(startDate.getDate() + 14); // 2-week sprint
 
     // Plan a sprint with the specified issues
-    const result = await service.planSprint({
+    const result = await service.sprints.planSprint({
       sprint: {
         title: "Sprint 1: Project Setup",
         description: "Complete the initial project setup and implement core functionality",

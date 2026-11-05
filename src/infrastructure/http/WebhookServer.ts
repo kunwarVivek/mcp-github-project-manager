@@ -1,16 +1,16 @@
 import * as http from "node:http";
-import type { ParsedUrlQuery } from "node:querystring";
-import * as url from "node:url";
 import {
-  EVENTS_AUTH_TOKEN,
+  EVENTS_ALLOW_UNAUTHENTICATED,
+  getSecret,
   OAUTH_ISSUER,
   SSE_ENABLED,
-  TRUST_PROXY,
   WEBHOOK_ALLOWED_ORIGINS,
+  WEBHOOK_HOST,
   WEBHOOK_PORT,
   WEBHOOK_RATE_LIMIT,
   WEBHOOK_RATE_WINDOW_MS,
   WEBHOOK_TIMEOUT_MS,
+  WEBHOOK_TRUSTED_PROXIES,
 } from "../../env";
 import type { EventStore } from "../events/EventStore";
 import type {
@@ -20,13 +20,13 @@ import type {
 import type { GitHubWebhookHandler, ResourceEvent } from "../events/GitHubWebhookHandler";
 import { type ILogger, Logger } from "../logger/index";
 import { SecurityAuditLog } from "../observability/SecurityAuditLog";
-import { RejectAllAuthenticator } from "./auth/createInboundAuthenticator";
+import { createInboundAuthenticator } from "./auth/createInboundAuthenticator";
 import {
   buildWwwAuthenticate,
   type InboundAuthenticator,
   type InboundAuthRejected,
+  NO_AUTHENTICATOR_REASON,
 } from "./auth/InboundAuthenticator";
-import { parseTrustProxy, resolveClientAddress } from "./clientAddress";
 
 export interface SSEConnection {
   id: string;
@@ -39,10 +39,10 @@ export interface SSEConnection {
 
 export interface WebhookServerOptions {
   port: number;
+  /** Interface to bind. Defaults to loopback; set 0.0.0.0 explicitly to expose externally. */
+  host: string;
   enableSSE: boolean;
   timeout: number;
-  /** Raw `TRUST_PROXY` value; see `parseTrustProxy`. Defaults to the env setting. */
-  trustProxy: string;
   /** Raw `WEBHOOK_ALLOWED_ORIGINS` value. Defaults to the env setting. */
   allowedOrigins: string;
   /**
@@ -51,12 +51,18 @@ export interface WebhookServerOptions {
    * refused when true.
    */
   credentialsConfigured: boolean;
+  /** Exact socket IPs of reverse proxies whose X-Forwarded-For is honored. */
+  trustedProxies: string[];
+  /**
+   * Allow /events/* without credentials (trusted dev only). Applies only when no
+   * `inboundAuth` is injected; an injected authenticator carries its own opt-out.
+   */
+  allowUnauthenticatedEvents: boolean;
 }
 
 export class WebhookServer {
   private readonly logger: ILogger;
   private readonly options: WebhookServerOptions;
-  private readonly trustedProxyHops: number;
   private readonly webhookHandler: GitHubWebhookHandler;
   private readonly subscriptionManager: EventSubscriptionManager;
   private readonly eventStore: EventStore;
@@ -66,6 +72,8 @@ export class WebhookServer {
   private isRunning = false;
   private boundPort?: number;
   private readonly rateLimitMap = new Map<string, { count: number; windowStart: number }>();
+  private rateLimitSweepTimer?: NodeJS.Timeout;
+  private static readonly MAX_RATE_LIMIT_ENTRIES = 10_000;
   private readonly securityLog: SecurityAuditLog;
   private readonly inboundAuth: InboundAuthenticator;
   private readonly processedDeliveries = new Set<string>();
@@ -85,20 +93,24 @@ export class WebhookServer {
   ) {
     this.logger = logger ?? Logger.getInstance();
     this.securityLog = securityLog ?? new SecurityAuditLog(this.logger);
-    // Fail closed: a server built without an explicit authenticator rejects /events/*.
-    this.inboundAuth = inboundAuth ?? new RejectAllAuthenticator();
     this.options = {
       port: options?.port ?? WEBHOOK_PORT,
+      host: options?.host || WEBHOOK_HOST,
       enableSSE: options?.enableSSE ?? SSE_ENABLED,
       timeout: options?.timeout || WEBHOOK_TIMEOUT_MS,
-      trustProxy: options?.trustProxy ?? TRUST_PROXY,
       allowedOrigins: options?.allowedOrigins ?? WEBHOOK_ALLOWED_ORIGINS,
       credentialsConfigured:
-        options?.credentialsConfigured ?? Boolean(EVENTS_AUTH_TOKEN || OAUTH_ISSUER),
+        options?.credentialsConfigured ?? Boolean(getSecret("EVENTS_AUTH_TOKEN") || OAUTH_ISSUER),
+      trustedProxies:
+        options?.trustedProxies ??
+        WEBHOOK_TRUSTED_PROXIES.split(",")
+          .map((ip) => ip.trim())
+          .filter(Boolean),
+      allowUnauthenticatedEvents:
+        options?.allowUnauthenticatedEvents ?? EVENTS_ALLOW_UNAUTHENTICATED,
     };
 
     // Fail fast on misconfiguration that would silently weaken security.
-    this.trustedProxyHops = parseTrustProxy(this.options.trustProxy);
     if (this.options.allowedOrigins.trim() === "*") {
       if (this.options.credentialsConfigured) {
         throw new Error(
@@ -113,6 +125,16 @@ export class WebhookServer {
           "Acceptable only for trusted local/dev use; list exact origins in production."
       );
     }
+
+    this.inboundAuth =
+      inboundAuth ??
+      createInboundAuthenticator(
+        {
+          sharedToken: () => getSecret("EVENTS_AUTH_TOKEN"),
+          allowUnauthenticated: this.options.allowUnauthenticatedEvents,
+        },
+        this.logger
+      );
 
     this.webhookHandler = webhookHandler;
     this.subscriptionManager = subscriptionManager;
@@ -139,11 +161,12 @@ export class WebhookServer {
 
       this.server.setTimeout(this.options.timeout);
 
-      this.server.listen(this.options.port, () => {
+      this.server.listen(this.options.port, this.options.host, () => {
         const address = this.server?.address();
         this.boundPort = typeof address === "object" && address ? address.port : this.options.port;
         this.isRunning = true;
-        this.logger.info(`Webhook server started on port ${this.boundPort}`);
+        this.startRateLimitSweep();
+        this.logger.info(`Webhook server started on ${this.options.host}:${this.boundPort}`);
         resolve();
       });
 
@@ -164,6 +187,8 @@ export class WebhookServer {
     }
 
     return new Promise((resolve) => {
+      this.stopRateLimitSweep();
+      this.rateLimitMap.clear();
       // Close all SSE connections
       for (const connection of this.sseConnections.values()) {
         connection.response.end();
@@ -181,10 +206,11 @@ export class WebhookServer {
   /**
    * Get server status
    */
-  getStatus(): { running: boolean; port: number; connections: number } {
+  getStatus(): { running: boolean; host: string; port: number; connections: number } {
     return {
       running: this.isRunning,
       port: this.boundPort ?? this.options.port,
+      host: this.options.host,
       connections: this.sseConnections.size,
     };
   }
@@ -193,8 +219,8 @@ export class WebhookServer {
    * Handle incoming HTTP requests
    */
   private async handleRequest(req: http.IncomingMessage, res: http.ServerResponse): Promise<void> {
-    const parsedUrl = url.parse(req.url || "", true);
-    const pathname = parsedUrl.pathname || "";
+    const parsedUrl = new URL(req.url || "/", "http://localhost");
+    const pathname = parsedUrl.pathname;
     const method = req.method || "GET";
 
     // Security headers on every response
@@ -211,7 +237,7 @@ export class WebhookServer {
     }
 
     // Rate limiting
-    const clientIp = this.clientAddress(req);
+    const clientIp = this.resolveClientIp(req);
     if (this.isRateLimited(clientIp)) {
       this.securityLog.record({
         type: "rate_limit_exceeded",
@@ -235,7 +261,7 @@ export class WebhookServer {
     // authenticated by its HMAC signature and /health is handled below.
     let credentialExpiresAt: number | null = null;
     if (pathname.startsWith("/events/")) {
-      const accepted = await this.authorize(req, res, clientIp);
+      const accepted = await this.authorize(req, res, clientIp, pathname);
       if (!accepted) {
         return;
       }
@@ -260,7 +286,7 @@ export class WebhookServer {
           await this.handleEventReplay(req, res, pathname);
           break;
         case pathname === "/events/recent" && method === "GET":
-          await this.handleRecentEvents(req, res, parsedUrl.query);
+          await this.handleRecentEvents(req, res, parsedUrl.searchParams);
           break;
         case pathname === "/health" && method === "GET":
           await this.handleHealthCheck(req, res);
@@ -301,7 +327,7 @@ export class WebhookServer {
     if (!contentType.startsWith("application/json")) {
       this.securityLog.record({
         type: "content_type_invalid",
-        source: this.clientAddress(req),
+        source: this.resolveClientIp(req),
         details: { contentType },
         severity: "low",
       });
@@ -330,7 +356,7 @@ export class WebhookServer {
     if (!isValidSignature) {
       this.securityLog.record({
         type: signature ? "webhook_signature_invalid" : "webhook_signature_missing",
-        source: this.clientAddress(req),
+        source: this.resolveClientIp(req),
         details: { eventType, delivery },
         severity: "high",
       });
@@ -405,8 +431,9 @@ export class WebhookServer {
       return;
     }
 
-    const parsedUrl = url.parse(req.url || "", true);
-    const clientId = (parsedUrl.query.clientId as string) || `client-${Date.now()}`;
+    const clientId =
+      new URL(req.url || "/", "http://localhost").searchParams.get("clientId") ||
+      `client-${Date.now()}`;
     const lastEventId = req.headers["last-event-id"] as string;
 
     // Set SSE headers
@@ -569,9 +596,9 @@ export class WebhookServer {
   private async handleRecentEvents(
     _req: http.IncomingMessage,
     res: http.ServerResponse,
-    query: ParsedUrlQuery
+    query: URLSearchParams
   ): Promise<void> {
-    const limit = parseInt(String(query.limit), 10) || 100;
+    const limit = parseInt(query.get("limit") ?? "", 10) || 100;
 
     try {
       const events = await this.eventStore.getRecentEvents(limit);
@@ -591,7 +618,8 @@ export class WebhookServer {
   private async authorize(
     req: http.IncomingMessage,
     res: http.ServerResponse,
-    clientIp: string
+    clientIp: string,
+    pathname: string
   ): Promise<{ expiresAt: number | null } | undefined> {
     const result = await this.inboundAuth.authenticate(req.headers.authorization);
     if (result.ok) {
@@ -601,7 +629,7 @@ export class WebhookServer {
       type: "unauthorized_access",
       source: clientIp,
       details: {
-        path: url.parse(req.url || "").pathname,
+        path: pathname,
         method: req.method,
         reason: result.reason,
       },
@@ -612,6 +640,16 @@ export class WebhookServer {
   }
 
   private sendAuthRejection(res: http.ServerResponse, rejection: InboundAuthRejected): void {
+    if (rejection.status === 503 && rejection.reason === NO_AUTHENTICATOR_REASON) {
+      // Nothing is configured to authenticate against: the API is disabled, not
+      // the caller unauthorized, so there is no Bearer challenge to offer.
+      this.sendErrorResponse(
+        res,
+        503,
+        "Events API disabled: EVENTS_AUTH_TOKEN or OAUTH_ISSUER is not configured"
+      );
+      return;
+    }
     const challenge = buildWwwAuthenticate(rejection, this.inboundAuth.protectedResource?.url);
     res.setHeader("WWW-Authenticate", challenge);
     res.setHeader("Cache-Control", "no-store");
@@ -728,7 +766,7 @@ export class WebhookServer {
     } else if (req.headers.origin) {
       this.securityLog.record({
         type: "cors_origin_rejected",
-        source: this.clientAddress(req),
+        source: this.resolveClientIp(req),
         details: { origin: req.headers.origin },
         severity: "medium",
       });
@@ -753,18 +791,6 @@ export class WebhookServer {
   }
 
   /**
-   * Client address for rate limiting and audit records: the socket peer unless
-   * TRUST_PROXY opts in to forwarded headers.
-   */
-  private clientAddress(req: http.IncomingMessage): string {
-    return resolveClientAddress(
-      req.socket.remoteAddress,
-      req.headers["x-forwarded-for"],
-      this.trustedProxyHops
-    );
-  }
-
-  /**
    * Set security response headers
    */
   private setSecurityHeaders(res: http.ServerResponse): void {
@@ -774,7 +800,32 @@ export class WebhookServer {
   }
 
   /**
-   * Simple in-memory per-IP rate limiter (sliding window).
+   * Resolve the client address used for rate limiting. The socket address is
+   * authoritative; X-Forwarded-For is honored only when the socket peer is a
+   * configured trusted proxy, and then the right-most entry that is not itself a
+   * trusted proxy is used (left-most entries are client-controlled).
+   */
+  private resolveClientIp(req: http.IncomingMessage): string {
+    const socketIp = req.socket.remoteAddress || "unknown";
+    const trusted = this.options.trustedProxies;
+    if (!trusted.includes(socketIp)) return socketIp;
+    const forwarded = req.headers["x-forwarded-for"];
+    const header = Array.isArray(forwarded) ? forwarded.join(",") : forwarded;
+    if (!header) return socketIp;
+    const hops = header
+      .split(",")
+      .map((h) => h.trim())
+      .filter(Boolean);
+    for (let i = hops.length - 1; i >= 0; i--) {
+      if (!trusted.includes(hops[i])) return hops[i];
+    }
+    return socketIp;
+  }
+
+  /**
+   * Fixed-window per-IP rate limiter. Expired windows are evicted by a periodic
+   * sweep while running, and the map is hard-capped so spoofed keys cannot grow it
+   * without bound.
    */
   private isRateLimited(ip: string): boolean {
     const now = Date.now();
@@ -782,11 +833,43 @@ export class WebhookServer {
     const window = WEBHOOK_RATE_WINDOW_MS;
     const entry = this.rateLimitMap.get(ip);
     if (!entry || now - entry.windowStart >= window) {
+      if (!entry && this.rateLimitMap.size >= WebhookServer.MAX_RATE_LIMIT_ENTRIES) {
+        this.evictExpiredRateLimits(now);
+        if (this.rateLimitMap.size >= WebhookServer.MAX_RATE_LIMIT_ENTRIES) {
+          const oldest = this.rateLimitMap.keys().next().value;
+          if (oldest !== undefined) this.rateLimitMap.delete(oldest);
+        }
+      }
       this.rateLimitMap.set(ip, { count: 1, windowStart: now });
       return false;
     }
     entry.count++;
     return entry.count > limit;
+  }
+
+  /** Drop every rate-limit window that has already expired. */
+  private evictExpiredRateLimits(now = Date.now()): void {
+    for (const [ip, entry] of this.rateLimitMap) {
+      if (now - entry.windowStart >= WEBHOOK_RATE_WINDOW_MS) {
+        this.rateLimitMap.delete(ip);
+      }
+    }
+  }
+
+  private startRateLimitSweep(): void {
+    this.stopRateLimitSweep();
+    this.rateLimitSweepTimer = setInterval(
+      () => this.evictExpiredRateLimits(),
+      WEBHOOK_RATE_WINDOW_MS
+    );
+    this.rateLimitSweepTimer.unref();
+  }
+
+  private stopRateLimitSweep(): void {
+    if (this.rateLimitSweepTimer) {
+      clearInterval(this.rateLimitSweepTimer);
+      this.rateLimitSweepTimer = undefined;
+    }
   }
 
   /**

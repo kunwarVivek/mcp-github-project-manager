@@ -10,7 +10,9 @@
  * draft issues to real issues in specified repositories.
  */
 
-import type { GitHubRepositoryFactory } from "../github/GitHubRepositoryFactory";
+import type { Project } from "../../domain/types";
+import { ProjectItemService } from "../../services/ProjectItemService";
+import { ProjectStatusService } from "../../services/ProjectStatusService";
 import { ANNOTATION_PATTERNS } from "./annotations/tool-annotations";
 import {
   type CloseProjectInput,
@@ -27,114 +29,12 @@ import {
 import type { ToolDefinition, ToolSchema } from "./ToolValidator";
 import { createGitHubFactory } from "./tool-factory";
 
-// ============================================================================
-// GraphQL Queries and Mutations
-// ============================================================================
-
-const UPDATE_PROJECT_MUTATION = `
-  mutation UpdateProjectV2($input: UpdateProjectV2Input!) {
-    updateProjectV2(input: $input) {
-      projectV2 {
-        id
-        title
-        closed
-        url
-      }
-    }
-  }
-`;
-
-const CONVERT_DRAFT_ISSUE_MUTATION = `
-  mutation ConvertProjectV2DraftIssueItemToIssue($input: ConvertProjectV2DraftIssueItemToIssueInput!) {
-    convertProjectV2DraftIssueItemToIssue(input: $input) {
-      item {
-        id
-        content {
-          ... on Issue {
-            id
-            number
-            title
-            url
-            repository {
-              nameWithOwner
-            }
-          }
-        }
-      }
-    }
-  }
-`;
-
-const RESOLVE_REPOSITORY_ID_QUERY = `
-  query ResolveRepositoryId($owner: String!, $name: String!) {
-    repository(owner: $owner, name: $name) {
-      id
-    }
-  }
-`;
-
-// ============================================================================
-// Helper Functions
-// ============================================================================
-
-/**
- * Resolves a repository owner/name to its GitHub node ID.
- *
- * This is needed because convertProjectV2DraftIssueItemToIssue requires
- * the repository's node ID, but users provide owner/name for convenience.
- */
-async function resolveRepositoryId(
-  factory: GitHubRepositoryFactory,
-  owner: string,
-  name: string
-): Promise<string> {
-  interface RepositoryIdResponse {
-    repository: {
-      id: string;
-    } | null;
-  }
-
-  const response = await factory.graphql<RepositoryIdResponse>(RESOLVE_REPOSITORY_ID_QUERY, {
-    owner,
-    name,
-  });
-
-  if (!response.repository) {
-    throw new Error(`Repository '${owner}/${name}' not found`);
-  }
-
-  return response.repository.id;
-}
-
-// ============================================================================
-// GraphQL Response Types
-// ============================================================================
-
-interface UpdateProjectV2Response {
-  updateProjectV2: {
-    projectV2: {
-      id: string;
-      title: string;
-      closed: boolean;
-      url: string;
-    };
-  };
-}
-
-interface ConvertDraftIssueResponse {
-  convertProjectV2DraftIssueItemToIssue: {
-    item: {
-      id: string;
-      content: {
-        id: string;
-        number: number;
-        title: string;
-        url: string;
-        repository: {
-          nameWithOwner: string;
-        };
-      };
-    };
+function toLifecycleOutput(project: Project): ProjectLifecycleOutput {
+  return {
+    id: project.id,
+    title: project.title,
+    closed: project.closed,
+    url: project.url,
   };
 }
 
@@ -226,7 +126,7 @@ export const convertDraftIssueTool: ToolDefinition<ConvertDraftIssueInput, Conve
 /**
  * Execute the close_project tool.
  *
- * Closes a project by setting closed=true via the GraphQL API.
+ * Closes a project via ProjectStatusService.
  *
  * @param args - Validated input arguments
  * @returns The closed project details
@@ -236,23 +136,10 @@ export async function executeCloseProject(args: CloseProjectInput): Promise<{
   content: Array<{ type: "text"; text: string }>;
   structuredContent: ProjectLifecycleOutput;
 }> {
-  const factory = createGitHubFactory();
-
-  const response = await factory.graphql<UpdateProjectV2Response>(UPDATE_PROJECT_MUTATION, {
-    input: {
-      projectId: args.projectId,
-      closed: true,
-    },
-  });
-
-  const project = response.updateProjectV2.projectV2;
-
-  const result: ProjectLifecycleOutput = {
-    id: project.id,
-    title: project.title,
-    closed: project.closed,
-    url: project.url,
-  };
+  const project = await new ProjectStatusService(createGitHubFactory()).closeProject(
+    args.projectId
+  );
+  const result = toLifecycleOutput(project);
 
   return {
     content: [
@@ -268,8 +155,6 @@ export async function executeCloseProject(args: CloseProjectInput): Promise<{
 /**
  * Execute the reopen_project tool.
  *
- * Reopens a project by setting closed=false via the GraphQL API.
- *
  * @param args - Validated input arguments
  * @returns The reopened project details
  * @throws Error if no GitHub credential is available or the API call fails
@@ -278,23 +163,10 @@ export async function executeReopenProject(args: ReopenProjectInput): Promise<{
   content: Array<{ type: "text"; text: string }>;
   structuredContent: ProjectLifecycleOutput;
 }> {
-  const factory = createGitHubFactory();
-
-  const response = await factory.graphql<UpdateProjectV2Response>(UPDATE_PROJECT_MUTATION, {
-    input: {
-      projectId: args.projectId,
-      closed: false,
-    },
-  });
-
-  const project = response.updateProjectV2.projectV2;
-
-  const result: ProjectLifecycleOutput = {
-    id: project.id,
-    title: project.title,
-    closed: project.closed,
-    url: project.url,
-  };
+  const project = await new ProjectStatusService(createGitHubFactory()).reopenProject(
+    args.projectId
+  );
+  const result = toLifecycleOutput(project);
 
   return {
     content: [
@@ -320,29 +192,9 @@ export async function executeConvertDraftIssue(args: ConvertDraftIssueInput): Pr
   content: Array<{ type: "text"; text: string }>;
   structuredContent: ConvertedIssueOutput;
 }> {
-  const factory = createGitHubFactory();
-
-  // Resolve the repository owner/name to its node ID
-  const repositoryId = await resolveRepositoryId(factory, args.owner, args.repo);
-
-  const response = await factory.graphql<ConvertDraftIssueResponse>(CONVERT_DRAFT_ISSUE_MUTATION, {
-    input: {
-      itemId: args.itemId,
-      repositoryId: repositoryId,
-    },
-  });
-
-  const item = response.convertProjectV2DraftIssueItemToIssue.item;
-  const issue = item.content;
-
-  const result: ConvertedIssueOutput = {
-    itemId: item.id,
-    issueId: issue.id,
-    issueNumber: issue.number,
-    title: issue.title,
-    url: issue.url,
-    repository: issue.repository.nameWithOwner,
-  };
+  const result: ConvertedIssueOutput = await new ProjectItemService(
+    createGitHubFactory()
+  ).convertDraftIssue(args);
 
   return {
     content: [

@@ -21,7 +21,7 @@ describe("Stdio Transport Layer Tests", () => {
   });
   const serverPath = join(projectRoot, "build/index.js");
   let serverProcess: ChildProcess;
-  const testTimeout = 15000;
+  const testTimeout = 30000;
 
   beforeAll(() => {
     // Ensure server build exists
@@ -252,7 +252,12 @@ describe("Stdio Transport Layer Tests", () => {
         );
 
         // Wait for all responses
-        await new Promise((resolve) => setTimeout(resolve, 3000));
+        // Poll instead of a fixed sleep: server start-up and tools/list can be slow
+        // when the machine is loaded.
+        const pollDeadline = Date.now() + 20000;
+        while (jsonMessages.length < messageCount && Date.now() < pollDeadline) {
+          await new Promise((resolve) => setTimeout(resolve, 100));
+        }
 
         // Process any remaining buffer content
         if (stdoutBuffer.trim()) {

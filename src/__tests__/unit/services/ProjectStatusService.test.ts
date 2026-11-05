@@ -3,6 +3,8 @@ import { ResourceStatus, ResourceType } from "../../../domain/resource-types";
 import type { Project } from "../../../domain/types";
 import type { GitHubRepositoryFactory } from "../../../infrastructure/github/GitHubRepositoryFactory";
 import type { GitHubProjectRepository } from "../../../infrastructure/github/repositories/GitHubProjectRepository";
+import type { GitHubStatusUpdateRepository } from "../../../infrastructure/github/repositories/GitHubStatusUpdateRepository";
+import { StatusUpdateStatus } from "../../../infrastructure/github/repositories/types";
 import { ProjectStatusService } from "../../../services/ProjectStatusService";
 
 // Mock tsyringe decorators
@@ -18,6 +20,7 @@ describe("ProjectStatusService", () => {
   let service: ProjectStatusService;
   let mockFactory: Mocked<GitHubRepositoryFactory>;
   let mockProjectRepo: Mocked<GitHubProjectRepository>;
+  let mockStatusUpdateRepo: Mocked<GitHubStatusUpdateRepository>;
 
   const mockProject: Project = {
     id: "project-1",
@@ -56,9 +59,16 @@ describe("ProjectStatusService", () => {
       delete: vi.fn(),
     } as unknown as Mocked<GitHubProjectRepository>;
 
+    mockStatusUpdateRepo = {
+      createStatusUpdate: vi.fn(),
+      listStatusUpdates: vi.fn(),
+      getStatusUpdate: vi.fn(),
+    } as unknown as Mocked<GitHubStatusUpdateRepository>;
+
     // Create mock factory
     mockFactory = {
       createProjectRepository: vi.fn().mockReturnValue(mockProjectRepo),
+      createStatusUpdateRepository: vi.fn().mockReturnValue(mockStatusUpdateRepo),
       getConfig: vi.fn().mockReturnValue({ owner: "test-owner", repo: "test-repo" }),
     } as unknown as Mocked<GitHubRepositoryFactory>;
 
@@ -280,6 +290,96 @@ describe("ProjectStatusService", () => {
       mockProjectRepo.delete.mockRejectedValue(new Error("Delete failed"));
 
       await expect(service.deleteProject({ projectId: "project-1" })).rejects.toThrow();
+    });
+  });
+
+  describe("closeProject / reopenProject", () => {
+    it("closes a project through the repository update", async () => {
+      mockProjectRepo.update.mockResolvedValue(mockClosedProject);
+
+      const result = await service.closeProject("project-1");
+
+      expect(result.status).toBe(ResourceStatus.CLOSED);
+      expect(mockProjectRepo.update).toHaveBeenCalledWith("project-1", {
+        status: ResourceStatus.CLOSED,
+      });
+    });
+
+    it("reopens a project through the repository update", async () => {
+      mockProjectRepo.update.mockResolvedValue(mockProject);
+
+      const result = await service.reopenProject("project-1");
+
+      expect(result.status).toBe(ResourceStatus.ACTIVE);
+      expect(mockProjectRepo.update).toHaveBeenCalledWith("project-1", {
+        status: ResourceStatus.ACTIVE,
+      });
+    });
+
+    it("maps repository failures", async () => {
+      mockProjectRepo.update.mockRejectedValue(new Error("boom"));
+
+      await expect(service.closeProject("project-1")).rejects.toThrow();
+    });
+  });
+
+  describe("status updates", () => {
+    it("delegates createStatusUpdate with its arguments", async () => {
+      const created = {
+        id: "SU_1",
+        body: "at risk",
+        bodyHTML: "<p>at risk</p>",
+        status: StatusUpdateStatus.AT_RISK,
+        createdAt: "2026-01-01T00:00:00Z",
+        creator: { login: "pm" },
+      };
+      mockStatusUpdateRepo.createStatusUpdate.mockResolvedValue(created);
+      const options = { status: StatusUpdateStatus.AT_RISK, targetDate: "2026-03-31" };
+
+      const result = await service.createStatusUpdate("PVT_1", "at risk", options);
+
+      expect(result).toBe(created);
+      expect(mockStatusUpdateRepo.createStatusUpdate).toHaveBeenCalledWith(
+        "PVT_1",
+        "at risk",
+        options
+      );
+    });
+
+    it("delegates listStatusUpdates with paging args and default page size", async () => {
+      mockStatusUpdateRepo.listStatusUpdates.mockResolvedValue({
+        statusUpdates: [],
+        pageInfo: { hasNextPage: false },
+        totalCount: 0,
+      });
+
+      await service.listStatusUpdates("PVT_1");
+      await service.listStatusUpdates("PVT_1", 5, "cursor");
+
+      expect(mockStatusUpdateRepo.listStatusUpdates).toHaveBeenNthCalledWith(
+        1,
+        "PVT_1",
+        10,
+        undefined
+      );
+      expect(mockStatusUpdateRepo.listStatusUpdates).toHaveBeenNthCalledWith(
+        2,
+        "PVT_1",
+        5,
+        "cursor"
+      );
+    });
+
+    it("returns null when the status update does not exist", async () => {
+      mockStatusUpdateRepo.getStatusUpdate.mockResolvedValue(null);
+
+      expect(await service.getStatusUpdate("SU_missing")).toBeNull();
+    });
+
+    it("maps repository failures", async () => {
+      mockStatusUpdateRepo.getStatusUpdate.mockRejectedValue(new Error("boom"));
+
+      await expect(service.getStatusUpdate("SU_1")).rejects.toThrow();
     });
   });
 });

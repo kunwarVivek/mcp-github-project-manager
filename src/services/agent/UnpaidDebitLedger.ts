@@ -1,3 +1,15 @@
+import { type ILogger, Logger } from "../../infrastructure/logger";
+
+const DEFAULT_MAX_ENTRIES = 1000;
+const DEFAULT_TTL_MS = 24 * 60 * 60 * 1000;
+
+export interface UnpaidDebitLedgerOptions {
+  /** Entries kept before the oldest are dropped. */
+  maxEntries?: number;
+  /** Age after which an unsettled entry is dropped. */
+  ttlMs?: number;
+}
+
 /** A metered token debit that could not be written to the registry. */
 export interface UnpaidDebit {
   /** Ledger-local id. */
@@ -36,6 +48,15 @@ export class UnpaidDebitLedger {
   private static instance: UnpaidDebitLedger | undefined;
   private readonly entries = new Map<number, UnpaidDebit>();
   private nextId = 1;
+  private readonly maxEntries: number;
+  private readonly ttlMs: number;
+  private readonly logger: ILogger;
+
+  constructor(options: UnpaidDebitLedgerOptions = {}, logger?: ILogger) {
+    this.maxEntries = options.maxEntries ?? DEFAULT_MAX_ENTRIES;
+    this.ttlMs = options.ttlMs ?? DEFAULT_TTL_MS;
+    this.logger = logger ?? Logger.getInstance();
+  }
 
   /** The process-wide ledger. */
   static shared(): UnpaidDebitLedger {
@@ -59,6 +80,7 @@ export class UnpaidDebitLedger {
       attempts: 1,
     };
     this.entries.set(debit.id, debit);
+    this.evict(Date.now());
     return debit;
   }
 
@@ -82,5 +104,37 @@ export class UnpaidDebitLedger {
 
   get size(): number {
     return this.entries.size;
+  }
+
+  /**
+   * Drop entries older than the TTL, then the oldest beyond the size cap.
+   * One error log per drop batch: a dropped debit is spend the budget never sees.
+   */
+  private evict(now: number): void {
+    const dropped: UnpaidDebit[] = [];
+    for (const entry of this.entries.values()) {
+      if (now - Date.parse(entry.recordedAt) >= this.ttlMs) dropped.push(entry);
+    }
+    for (const entry of dropped) this.entries.delete(entry.id);
+
+    // Map iteration is insertion order, so the oldest entries come first.
+    for (const entry of this.entries.values()) {
+      if (this.entries.size <= this.maxEntries) break;
+      this.entries.delete(entry.id);
+      dropped.push(entry);
+    }
+
+    if (dropped.length === 0) return;
+    const tokens = dropped.reduce((sum, entry) => sum + entry.tokens, 0);
+    this.logger.error(
+      `[UnpaidDebitLedger] dropped ${dropped.length} unpaid budget debit(s) (${tokens} tokens) ` +
+        `over the ${this.maxEntries}-entry cap or ${this.ttlMs}ms TTL; this spend is no longer tracked`,
+      dropped.map((e) => ({
+        agentId: e.agentId,
+        budgetOwnerId: e.budgetOwnerId,
+        tokens: e.tokens,
+        recordedAt: e.recordedAt,
+      }))
+    );
   }
 }

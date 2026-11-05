@@ -1,22 +1,26 @@
 import { beforeEach, describe, expect, it, type Mock, vi } from "vitest";
 import { ProjectTemplateService } from "../../../services/ProjectTemplateService";
-import { type AsyncFn, asFactory, type GraphqlFn } from "../../helpers/mockTypes";
+import { type AsyncFn, asFactory } from "../../helpers/mockTypes";
 
 describe("ProjectTemplateService", () => {
   let service: ProjectTemplateService;
-  let mockGraphql: Mock<GraphqlFn>;
   let mockProjectRepo: Record<
     "findById" | "createView" | "listViews" | "updateView" | "updateField" | "deleteView",
+    Mock<AsyncFn>
+  >;
+  let mockTemplateRepo: Record<
+    | "getReadme"
+    | "updateReadme"
+    | "markAsTemplate"
+    | "unmarkAsTemplate"
+    | "copyFromTemplate"
+    | "listOrganizationTemplates",
     Mock<AsyncFn>
   >;
 
   beforeEach(() => {
     vi.clearAllMocks();
 
-    // Create mock GraphQL function
-    mockGraphql = vi.fn<GraphqlFn>();
-
-    // Create mock project repository
     mockProjectRepo = {
       findById: vi.fn(),
       createView: vi.fn(),
@@ -26,13 +30,20 @@ describe("ProjectTemplateService", () => {
       deleteView: vi.fn(),
     };
 
-    // Create mock factory
-    const mockFactory = {
-      graphql: mockGraphql,
-      createProjectRepository: vi.fn().mockReturnValue(mockProjectRepo),
+    mockTemplateRepo = {
+      getReadme: vi.fn(),
+      updateReadme: vi.fn(),
+      markAsTemplate: vi.fn(),
+      unmarkAsTemplate: vi.fn(),
+      copyFromTemplate: vi.fn(),
+      listOrganizationTemplates: vi.fn(),
     };
 
-    // Create service with mock factory
+    const mockFactory = {
+      createProjectRepository: vi.fn().mockReturnValue(mockProjectRepo),
+      createProjectTemplateRepository: vi.fn().mockReturnValue(mockTemplateRepo),
+    };
+
     service = new ProjectTemplateService(asFactory(mockFactory));
   });
 
@@ -42,53 +53,25 @@ describe("ProjectTemplateService", () => {
 
   describe("getProjectReadme", () => {
     it("should get project README successfully", async () => {
-      mockGraphql.mockResolvedValueOnce({
-        node: {
-          readme: "# Project README\n\nThis is the project description.",
-        },
-      });
+      mockTemplateRepo.getReadme.mockResolvedValueOnce("# Project README");
 
       const result = await service.getProjectReadme({ projectId: "PROJECT_123" });
 
-      expect(result).toEqual({
-        readme: "# Project README\n\nThis is the project description.",
-      });
-      expect(mockGraphql).toHaveBeenCalledWith(
-        expect.stringContaining("query($projectId: ID!)"),
-        expect.objectContaining({ projectId: "PROJECT_123" })
+      expect(result).toEqual({ readme: "# Project README" });
+      expect(mockTemplateRepo.getReadme).toHaveBeenCalledWith("PROJECT_123");
+    });
+
+    it("should handle repository errors", async () => {
+      mockTemplateRepo.getReadme.mockRejectedValueOnce(new Error("GraphQL error"));
+
+      await expect(service.getProjectReadme({ projectId: "PROJECT_123" })).rejects.toThrow(
+        "GraphQL error"
       );
-    });
-
-    it("should return empty string when README is null", async () => {
-      mockGraphql.mockResolvedValueOnce({
-        node: {
-          readme: null,
-        },
-      });
-
-      const result = await service.getProjectReadme({ projectId: "PROJECT_123" });
-
-      expect(result).toEqual({ readme: "" });
-    });
-
-    it("should handle GraphQL errors", async () => {
-      mockGraphql.mockRejectedValueOnce(new Error("GraphQL error"));
-
-      await expect(service.getProjectReadme({ projectId: "PROJECT_123" })).rejects.toThrow();
     });
   });
 
   describe("updateProjectReadme", () => {
     it("should update project README successfully", async () => {
-      mockGraphql.mockResolvedValueOnce({
-        updateProjectV2: {
-          projectV2: {
-            id: "PROJECT_123",
-            readme: "# Updated README",
-          },
-        },
-      });
-
       const result = await service.updateProjectReadme({
         projectId: "PROJECT_123",
         readme: "# Updated README",
@@ -98,26 +81,66 @@ describe("ProjectTemplateService", () => {
         success: true,
         message: "Project README updated successfully",
       });
-      expect(mockGraphql).toHaveBeenCalledWith(
-        expect.stringContaining("mutation($input: UpdateProjectV2Input!)"),
-        expect.objectContaining({
-          input: {
-            projectId: "PROJECT_123",
-            readme: "# Updated README",
-          },
-        })
-      );
+      expect(mockTemplateRepo.updateReadme).toHaveBeenCalledWith("PROJECT_123", "# Updated README");
     });
 
     it("should handle update errors", async () => {
-      mockGraphql.mockRejectedValueOnce(new Error("Update failed"));
+      mockTemplateRepo.updateReadme.mockRejectedValueOnce(new Error("Update failed"));
 
       await expect(
         service.updateProjectReadme({
           projectId: "PROJECT_123",
           readme: "# Test",
         })
-      ).rejects.toThrow();
+      ).rejects.toThrow("Update failed");
+    });
+  });
+
+  describe("template operations", () => {
+    it("marks and unmarks a project as a template", async () => {
+      const project = { id: "PVT_1", title: "Tpl", url: "https://github.com/orgs/o/projects/1" };
+      mockTemplateRepo.markAsTemplate.mockResolvedValueOnce(project);
+      mockTemplateRepo.unmarkAsTemplate.mockResolvedValueOnce(project);
+
+      expect(await service.markProjectAsTemplate({ projectId: "PVT_1" })).toBe(project);
+      expect(await service.unmarkProjectAsTemplate({ projectId: "PVT_1" })).toBe(project);
+      expect(mockTemplateRepo.markAsTemplate).toHaveBeenCalledWith("PVT_1");
+      expect(mockTemplateRepo.unmarkAsTemplate).toHaveBeenCalledWith("PVT_1");
+    });
+
+    it("copies from a template without draft issues by default", async () => {
+      await service.copyProjectFromTemplate({
+        projectId: "PVT_tpl",
+        targetOwner: "my-org",
+        title: "Q1 Board",
+      });
+
+      expect(mockTemplateRepo.copyFromTemplate).toHaveBeenCalledWith({
+        projectId: "PVT_tpl",
+        targetOwner: "my-org",
+        title: "Q1 Board",
+        includeDraftIssues: false,
+      });
+    });
+
+    it("lists organization templates with a default page size of 20", async () => {
+      await service.listOrganizationTemplates({ org: "my-org" });
+
+      expect(mockTemplateRepo.listOrganizationTemplates).toHaveBeenCalledWith({
+        org: "my-org",
+        first: 20,
+        after: undefined,
+      });
+    });
+
+    it("maps template repository errors", async () => {
+      mockTemplateRepo.listOrganizationTemplates.mockRejectedValueOnce(
+        new Error("Organization 'ghost' not found")
+      );
+
+      await expect(service.listOrganizationTemplates({ org: "ghost" })).rejects.toThrow(
+        "Organization 'ghost' not found"
+      );
     });
   });
 
