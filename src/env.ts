@@ -2,8 +2,11 @@ import { join, resolve } from "node:path";
 import * as dotenv from "dotenv";
 import { parseCommandLineArgs } from "./cli";
 import { validateConfig, validateConfigWarnings } from "./domain/config-schema";
+import { readGitHubAppCredentials } from "./infrastructure/github/auth/appCredentials";
+import type { GitHubAppCredentials } from "./infrastructure/github/auth/credentials";
+import { GhTokenSource } from "./infrastructure/github/auth/gh/GhTokenSource";
+import type { ConfiguredGitHubToken } from "./infrastructure/github/auth/selectGitHubAuth";
 import { redactSecretPatterns } from "./infrastructure/logger/redaction";
-import { GhCliSecretProvider } from "./infrastructure/secrets/GhCliSecretProvider";
 import {
   createDefaultSecretResolver,
   isGhCliFallbackAllowed,
@@ -210,13 +213,6 @@ export function getCliGitHubToken(): string | undefined {
   return cliOptions.token || undefined;
 }
 
-/** A GitHub token found in `SECRETS_DIR` or the environment, bound to that tier. */
-export interface ConfiguredGitHubToken {
-  source: "secrets-dir" | "env";
-  /** Re-reads the same tier; undefined once that tier no longer has a token. */
-  read(): string | undefined;
-}
-
 /**
  * The tier currently supplying `GITHUB_TOKEN` (`SECRETS_DIR` file, then env var).
  * Its `read()` goes back to that tier on every call, so rotation is observed.
@@ -228,15 +224,19 @@ export function getConfiguredGitHubToken(): ConfiguredGitHubToken | undefined {
   return { source, read: () => readSecretFromTier("GITHUB_TOKEN", source) };
 }
 
-const ghCliProvider = new GhCliSecretProvider();
+/** The gh account to read the token of (`GH_CLI_USER`); unset = gh's active account. */
+export function getGhCliUser(): string | undefined {
+  return getOptionalConfigValue("GH_CLI_USER", "") || undefined;
+}
+
+const ghTokenSource = new GhTokenSource({ user: getGhCliUser });
 
 /**
- * The token of an authenticated `gh` CLI, or undefined when `gh` is absent,
- * logged out, or disabled (GH_CLI_TOKEN_FALLBACK=false, NODE_ENV=test).
+ * The GitHub CLI token source (60 s TTL, re-read on a 401), or undefined when
+ * the fallback is disabled (GH_CLI_TOKEN_FALLBACK=false, NODE_ENV=test).
  */
-export function getGhCliGitHubToken(): string | undefined {
-  if (!isGhCliFallbackAllowed()) return undefined;
-  return ghCliProvider.get("GITHUB_TOKEN");
+export function getGhCliTokenSource(): GhTokenSource | undefined {
+  return isGhCliFallbackAllowed() ? ghTokenSource : undefined;
 }
 
 // GitHub App installation auth (optional). When all three are present the
@@ -246,22 +246,9 @@ export const GITHUB_APP_ID = getOptionalConfigValue("GITHUB_APP_ID", "");
 export const GITHUB_APP_PRIVATE_KEY = getOptionalConfigValue("GITHUB_APP_PRIVATE_KEY", "");
 export const GITHUB_APP_INSTALLATION_ID = getOptionalConfigValue("GITHUB_APP_INSTALLATION_ID", "");
 
-/**
- * GitHub App credentials, or undefined when the App is not fully configured.
- * All three values are required — a partial configuration falls back to the PAT
- * rather than failing, so a half-set env cannot lock the server out.
- */
-export function getGitHubAppCredentials():
-  | { appId: string; privateKey: string; installationId: string }
-  | undefined {
-  const appId = getOptionalConfigValue("GITHUB_APP_ID", "");
-  const privateKey = getOptionalConfigValue("GITHUB_APP_PRIVATE_KEY", "");
-  const installationId = getOptionalConfigValue("GITHUB_APP_INSTALLATION_ID", "");
-  if (!appId || !privateKey || !installationId) {
-    return undefined;
-  }
-  // Private keys are commonly supplied with literal \n escapes in env vars.
-  return { appId, privateKey: privateKey.replace(/\\n/g, "\n"), installationId };
+/** GitHub App credentials, or undefined when the App is not fully configured. */
+export function getGitHubAppCredentials(): GitHubAppCredentials | undefined {
+  return readGitHubAppCredentials((name) => getOptionalConfigValue(name, ""));
 }
 
 // Sync configuration

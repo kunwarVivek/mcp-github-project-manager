@@ -42,7 +42,7 @@ Credentials are resolved per tool call; the first hit wins:
 3. `$SECRETS_DIR/GITHUB_TOKEN` file (when `SECRETS_DIR` is set)
 4. `GITHUB_TOKEN` environment variable
 5. Stored OAuth token from `mcp-github-project-manager auth login` (see [OAuth device flow](#oauth-device-flow-auth-login))
-6. `gh auth token` — a working `gh` CLI login means **no configuration at all**
+6. `gh auth token` — a working `gh` CLI login means **no configuration at all** (see [GitHub CLI tier](#github-cli-tier-gh))
 
 If nothing resolves, startup fails fast and lists all methods. The `gh`
 fallback can be disabled with `GH_CLI_TOKEN_FALLBACK=false`; it is also off
@@ -50,12 +50,30 @@ under `NODE_ENV=test`, so tests never shell out.
 
 Static tokens are rotation-aware: a `SECRETS_DIR` file or env token rewritten
 while the server runs is used on the next request (only the tier that won is
-re-read). `--token` and `gh` results are constant for the process.
+re-read). The `--token` flag is constant for the process. The `gh` token is
+cached for 60 s and re-read when GitHub answers `401` (see below).
 
 With `--verbose` the banner prints `auth: <mode> (<source>)` and never token
 characters. Modes: `app-installation`, `token`, `oauth-user`. Sources:
 `github-app`, `cli-flag`, `secrets-dir`, `env`, `oauth-store`, `gh-cli`, `test`.
 The `github://config` MCP resource reports `auth: {configured, mode, source}`.
+
+#### GitHub CLI tier (`gh`)
+
+The server runs `gh auth token --hostname github.com` (argument array, 5 s
+timeout, stderr discarded) — no OAuth app or token configuration needed.
+
+- **Freshness:** the result is cached for 60 s, so `gh auth refresh`, `gh auth switch` or a re-login is picked up without restarting. When GitHub answers `401` for a gh-sourced credential the token is re-read at once and the request retried **once**, only if the token changed. A failed read (gh missing / logged out) is retried on the next 60 s window rather than cached forever.
+- **Account:** gh's active account by default. Set `GH_CLI_USER=<login>` (also honoured from `SECRETS_DIR`) to pass `--user <login>` and pin a specific account. Only `github.com` is supported (no GitHub Enterprise Server).
+- **Scopes:** full functionality needs `repo` and `project`; `read:org` is recommended for organization projects. gh's default login grants only `repo, read:org, gist`, so `project` is usually missing. The token is still used, but the server logs one startup warning naming the account and the fix, and GitHub errors caused by a missing scope get the same hint appended on gh-sourced credentials:
+
+  ```bash
+  gh auth refresh -h github.com -s project
+  ```
+
+  `gh auth refresh` only acts on gh's *active* account; with `GH_CLI_USER` pinning an inactive account the hint is `gh auth switch -h github.com -u <login> && gh auth refresh -h github.com -s project`. Fine-grained tokens do not report scopes, so no warning is given for them.
+- **`mcp-github-project-manager auth login --gh`:** zero-registration setup. Errors with an install hint (exit `1`) if `gh` is missing; if gh is logged in it checks the scopes and runs `gh auth refresh -h github.com -s project,read:org` when any are missing; if not logged in it runs `gh auth login -h github.com -s repo,project,read:org --web`. gh runs interactively with its stdout redirected to our stderr; afterwards the account and scopes are re-read and printed, and you are told if a higher-priority credential (App, `--token`, `SECRETS_DIR`, `GITHUB_TOKEN`, stored OAuth login) would shadow gh and how to clear it. `--gh` cannot be combined with `--client-id` or `--scopes` (usage error, exit `2`). With `GH_CLI_USER` set to an account that is not gh's active one, the command stops and tells you to run `gh auth switch` first.
+- **`auth status`** adds a gh section: gh installed, account (and whether `GH_CLI_USER` pinned it), scopes, missing required/recommended scopes with the fix command, and the **effective credential** the server would use, noting when a higher tier shadows gh.
 
 #### GitHub App Authentication (tier 1)
 
@@ -75,6 +93,7 @@ Sign in with your own GitHub account — no PAT to create or paste.
 ```bash
 export GITHUB_OAUTH_CLIENT_ID=<client id>
 mcp-github-project-manager auth login [--client-id <id>] [--scopes "<s>"] [-e <env-file>]
+mcp-github-project-manager auth login --gh        # no OAuth app: use the GitHub CLI
 mcp-github-project-manager auth status
 mcp-github-project-manager auth logout
 ```
@@ -83,7 +102,7 @@ mcp-github-project-manager auth logout
 a GitHub App, enable **Device Flow**, and copy its Client ID.
 
 - `auth login` prints the verification URL and user code to **stderr**, polls at GitHub's interval (honouring `slow_down`), then saves the token and the `GET /user` login.
-- `auth status` prints to stdout: store path, mode, login, client id, scopes, token kind (non-expiring vs expiring + refresh), expiry and a permission check. It exits non-zero when not logged in or unusable, and never prints the token.
+- `auth status` prints to stdout: store path, mode, login, client id, scopes, token kind (non-expiring vs expiring + refresh), expiry and a permission check. It also prints the [GitHub CLI section](#github-cli-tier-gh). Exit code follows the **effective credential** (the server's exact precedence): `0` when any tier yields a usable credential (App, env/`SECRETS_DIR` token, a valid or refreshable stored login, or gh), `1` when none is found or the only candidate is unusable (e.g. an expired stored login with no refresh, unreadable store, insecure permissions), `2` on a usage error. A missing gh scope never changes it (an under-scoped token still exits `0`). It never prints a token.
 - `auth logout` revokes via `DELETE /applications/{client_id}/token` when `GITHUB_OAUTH_CLIENT_SECRET` is set; otherwise it prints the manual revocation URL `https://github.com/settings/connections/applications/<client_id>`. The local file is always deleted.
 - Exit codes: `0` ok, `1` failure, `2` usage error. Auth commands need no `GITHUB_TOKEN`/`GITHUB_OWNER`/`GITHUB_REPO`.
 - The `auth` subcommands live in `build/bin.js` (the package `bin`, `npm start`, Docker ENTRYPOINT). `node build/index.js` still starts the server but has no `auth` subcommands.
@@ -302,6 +321,7 @@ overrides falls back to the global key and its model-prefix-detected provider.
 | `LOG_LEVEL` | `info` | Logging level: `debug`, `info`, `warn`, `error` |
 | `LOG_FORMAT` | `text` | Log output format: `text` (human-readable) or `json` (structured JSON to stderr) |
 | `GH_CLI_TOKEN_FALLBACK` | `true` | Allow the `gh auth token` credential fallback. Automatically off under `NODE_ENV=test`. |
+| `GH_CLI_USER` | _(gh's active account)_ | Pin the gh account whose token is used (`gh auth token --user`). Honours `SECRETS_DIR`. |
 
 ### Tool Exposure
 

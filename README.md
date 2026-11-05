@@ -37,8 +37,9 @@ npm install -g mcp-github-project-manager
 
 # 2. Configure — pick ONE credential (GITHUB_TOKEN is not required)
 export GITHUB_TOKEN="ghp_..."            # a PAT, or
+# mcp-github-project-manager auth login --gh   # zero registration: sets up the GitHub CLI login, or
 # GITHUB_OAUTH_CLIENT_ID=<id> mcp-github-project-manager auth login   # OAuth device flow, or
-# nothing at all if `gh auth login` is already done
+# nothing at all if `gh auth login` is already done (needs the `project` scope: `gh auth refresh -h github.com -s project`)
 export GITHUB_OWNER="your-org-or-user"
 export GITHUB_REPO="your-repo"
 
@@ -80,7 +81,7 @@ Bind-mounting a host directory at `/data` requires it to be owned by uid `10001`
 
 Install paths: `npm install -g mcp-github-project-manager`, `npx -y mcp-github-project-manager`, `pnpm dlx mcp-github-project-manager`, or `docker compose up --build`.
 
-A GitHub token (if you use a PAT) needs `repo`, `project`, and `write:org` scopes. Prefer not to create one? Sign in with your own account via the OAuth device flow (`GITHUB_OAUTH_CLIENT_ID=<id> mcp-github-project-manager auth login`; see [OAuth device flow](docs/CONFIGURATION.md#oauth-device-flow-auth-login)). Full setup options live in the [Deployment Guide](docs/deployment.md) and the [Getting Started tutorial](docs/tutorials/getting-started.md).
+A GitHub token (if you use a PAT) needs `repo`, `project`, and `write:org` scopes. Prefer not to create one? Run `mcp-github-project-manager auth login --gh` (no OAuth app needed; it drives the GitHub CLI login and checks the `project` scope), or sign in with your own account via the OAuth device flow (`GITHUB_OAUTH_CLIENT_ID=<id> mcp-github-project-manager auth login`; see [OAuth device flow](docs/CONFIGURATION.md#oauth-device-flow-auth-login)). Full setup options live in the [Deployment Guide](docs/deployment.md) and the [Getting Started tutorial](docs/tutorials/getting-started.md).
 
 Works with any stdio MCP client — Claude Desktop, Claude Code, Codex, Cursor, Windsurf, Roo Code, VS Code + Copilot, OpenCode, and custom harnesses.
 
@@ -189,7 +190,7 @@ Where the state lives — no external database:
 | `AI_SESSION_TOKEN_LIMIT` | no | Per-operation token budget for AI task generation (distinct from per-agent budgets) |
 | `LOG_LEVEL`, `LOG_FORMAT` | no | `debug\|info\|warn\|error`, `text` or `json` |
 
-\* **Credential chain** (first hit wins, re-resolved per tool call): GitHub App installation → `--token` CLI flag → `$SECRETS_DIR/GITHUB_TOKEN` file → `GITHUB_TOKEN` env var → stored OAuth token from `auth login` → `gh auth token`. `GITHUB_TOKEN` is just one option; if you are already logged in with `gh`, you need no token configuration at all. Disable the fallback with `GH_CLI_TOKEN_FALLBACK=false`. CLI flags override env vars everywhere.
+\* **Credential chain** (first hit wins, re-resolved per tool call): GitHub App installation → `--token` CLI flag → `$SECRETS_DIR/GITHUB_TOKEN` file → `GITHUB_TOKEN` env var → stored OAuth token from `auth login` → `gh auth token`. `GITHUB_TOKEN` is just one option; if you are already logged in with `gh`, you need no token configuration at all. The gh token is re-read every 60 s (and on a `401`); pin an account with `GH_CLI_USER`. Disable the fallback with `GH_CLI_TOKEN_FALLBACK=false`. CLI flags override env vars everywhere.
 
 The `/events/*` HTTP endpoints require a bearer token (`EVENTS_AUTH_TOKEN`) or OAuth 2.1 resource-server settings (`OAUTH_ISSUER` + `OAUTH_AUDIENCE`); with neither configured they answer `503` (set `EVENTS_ALLOW_UNAUTHENTICATED=true` for trusted dev only). See [Inbound HTTP authentication](docs/CONFIGURATION.md#inbound-http-authentication-events).
 

@@ -1,6 +1,8 @@
 import { join, resolve } from "node:path";
-import { Command, CommanderError } from "commander";
+import { Command, CommanderError, Option } from "commander";
 import * as dotenv from "dotenv";
+import { describeGhStatus, loginWithGhCli } from "./infrastructure/github/auth/gh/ghAuthCli";
+import { type GhRunner, systemGhRunner } from "./infrastructure/github/auth/gh/ghRunner";
 import {
   type DeviceFlowClock,
   type FetchLike,
@@ -31,6 +33,8 @@ export interface AuthCliDeps {
   /** Load `.env` (or `--env-file`) before reading config. Off in tests. */
   readonly loadDotenv?: boolean;
   readonly now?: () => number;
+  /** The `gh` process runner. Defaults to the real binary; injectable for tests. */
+  readonly ghRunner?: GhRunner;
 }
 
 const processIo: AuthCliIo = {
@@ -74,6 +78,7 @@ export async function runAuthCli(argv: string[], deps: AuthCliDeps = {}): Promis
   const fetchImpl: FetchLike = deps.fetch ?? ((input, init) => globalThis.fetch(input, init));
   const clock = deps.clock ?? systemClock;
   const now = deps.now ?? Date.now;
+  const ghRunner = deps.ghRunner ?? systemGhRunner;
   let exitCode = EXIT_OK;
 
   const program = new Command();
@@ -93,13 +98,30 @@ export async function runAuthCli(argv: string[], deps: AuthCliDeps = {}): Promis
 
   program
     .command("login")
-    .description("Sign in with GitHub's device flow and store the token")
+    .description(
+      "Sign in with GitHub's device flow and store the token, or (--gh) set up the GitHub CLI login"
+    )
     .option(
       "--client-id <id>",
       "OAuth App / GitHub App client id (default: GITHUB_OAUTH_CLIENT_ID)"
     )
     .option("--scopes <scopes>", "Space- or comma-separated scopes (default: GITHUB_OAUTH_SCOPES)")
-    .action(async (options: { clientId?: string; scopes?: string }) => {
+    .addOption(
+      new Option(
+        "--gh",
+        "Use the GitHub CLI (gh) instead of an OAuth app: ensures gh is logged in with the repo, project and read:org scopes"
+      ).conflicts(["clientId", "scopes"])
+    )
+    .action(async (options: { clientId?: string; scopes?: string; gh?: boolean }) => {
+      if (options.gh) {
+        exitCode = await loginWithGhCli({
+          runner: ghRunner,
+          fetch: fetchImpl,
+          env,
+          stderr: io.stderr,
+        });
+        return;
+      }
       const config = readOAuthConfig(options, env);
       if (!config.clientId) {
         io.stderr(
@@ -136,12 +158,18 @@ export async function runAuthCli(argv: string[], deps: AuthCliDeps = {}): Promis
 
   program
     .command("status")
-    .description("Show the stored login (never prints the token)")
-    .action(() => {
+    .description(
+      "Show the stored login and the GitHub CLI credential (never prints a token). " +
+        "Exit code: 0 when the server would find a usable credential from any tier, 1 when none is found " +
+        "or the only candidate is unusable (e.g. an expired stored login), 2 on a usage error. " +
+        "A missing gh scope does not change the exit code."
+    )
+    .action(async () => {
       const config = readOAuthConfig({}, env);
       const store = new OAuthTokenStore(config.tokenFile);
       const state = inspectOAuthStore(store, config);
       const lines = [`Store: ${store.path}`];
+      let storedUnusable = false;
 
       if (state.state === "ready") {
         const { stored } = state;
@@ -167,20 +195,25 @@ export async function runAuthCli(argv: string[], deps: AuthCliDeps = {}): Promis
           );
         }
         lines.push("Permissions: ok (owner-only)");
-        if (!usable) exitCode = EXIT_FAILURE;
+        storedUnusable = !usable;
       } else if (state.state === "absent") {
         lines.push("Status: not logged in - run `mcp-github-project-manager auth login`");
-        exitCode = EXIT_FAILURE;
       } else if (state.state === "no-client-id") {
         lines.push(
           "Status: a token is stored but GITHUB_OAUTH_CLIENT_ID is not set; it will not be used"
         );
-        exitCode = EXIT_FAILURE;
       } else {
         lines.push(`Status: unusable - ${describeUnusableState(state, store.path)}`);
         if (state.state === "insecure-permissions") {
           lines.push(`Permissions: INSECURE (mode ${formatMode(state.mode)}, expected 0600)`);
         }
+      }
+      const gh = await describeGhStatus({ runner: ghRunner, fetch: fetchImpl, env });
+      lines.push(...gh.lines);
+      // Exit code = the credential the server would actually use: none, or an
+      // expired stored login that cannot refresh, is a failure.
+      const effective = gh.effective;
+      if (!effective || (effective.source === "oauth-store" && storedUnusable)) {
         exitCode = EXIT_FAILURE;
       }
       io.stdout(`${lines.join("\n")}\n`);

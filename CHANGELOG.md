@@ -7,7 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-No unreleased changes.
+### Added
+- `auth login --gh`: zero-registration setup through the GitHub CLI. Ensures `gh` is logged in with `repo`, `project` and `read:org` (runs `gh auth login` / `gh auth refresh` interactively), verifies the resulting scopes and warns when a higher-priority credential would shadow gh. Mutually exclusive with `--client-id`/`--scopes`.
+- `auth status` reports the GitHub CLI account, scopes, missing scopes with the fix command, and the effective credential (noting when a higher tier shadows gh).
+- `GH_CLI_USER` pins the gh account (`gh auth token --user`).
+- gh-sourced credentials missing the `project` scope: one startup warning naming the account and `gh auth refresh -h github.com -s project`, and the same hint appended to scope-related GitHub tool errors (other credential sources are unchanged).
+
+### Fixed
+- The `gh` token now refreshes without restarting the server: it is cached for 60 s instead of for the process lifetime (failures included), and a `401` triggers an immediate re-read and one retry when the token changed.
+
+### Changed
+- `auth status` exit code now reflects the effective credential (any tier, including gh) instead of only the stored OAuth login: `0` when a usable credential exists, `1` when none does or the only candidate is unusable. Scripts that used exit `0` to mean "a stored login exists" must check the `Mode:`/`Status:` output instead.
+- `GhCliSecretProvider` is replaced by `src/infrastructure/github/auth/gh/` (token source with TTL, scope inspection, injectable `gh` runner).
 
 ## [5.0.2] - 2026-11-05
 

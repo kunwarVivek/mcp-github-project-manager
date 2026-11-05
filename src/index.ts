@@ -19,6 +19,7 @@ import {
   EVENTS_ALLOW_UNAUTHENTICATED,
   GITHUB_OWNER,
   GITHUB_REPO,
+  getGhCliTokenSource,
   getSecret,
   OAUTH_AUDIENCE,
   OAUTH_ISSUER,
@@ -39,6 +40,7 @@ import type {
   ResourceEvent,
 } from "./infrastructure/events/GitHubWebhookHandler";
 import { GitHubAuthUnavailableError } from "./infrastructure/github/auth/GitHubAuth";
+import { warnOnMissingGhScopes } from "./infrastructure/github/auth/gh/ghScopeWarning";
 import { resolveGitHubAuth } from "./infrastructure/github/auth/resolveGitHubAuth";
 import type { GitHubRepositoryFactory } from "./infrastructure/github/GitHubRepositoryFactory";
 import { createInboundAuthenticator } from "./infrastructure/http/auth/createInboundAuthenticator";
@@ -125,6 +127,12 @@ class GitHubProjectManagerServer {
     // entry-point component through the DI container.
     const auth = resolveGitHubAuth();
     this.authDescription = `${auth.mode} (${auth.source})`;
+    // A gh token can lack the `project` scope. Check once, in the background:
+    // it only ever logs, so startup never waits on the network.
+    const ghTokenSource = auth.source === "gh-cli" ? getGhCliTokenSource() : undefined;
+    if (ghTokenSource) {
+      void warnOnMissingGhScopes({ tokenSource: ghTokenSource, logger: this.logger });
+    }
     this.di = configureContainer(auth, GITHUB_OWNER, GITHUB_REPO);
     this.service = this.di.resolve("ProjectManagementService");
     this.aiFactory = this.di.resolve("AIServiceFactory");

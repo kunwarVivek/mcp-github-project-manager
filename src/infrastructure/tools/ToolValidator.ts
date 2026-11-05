@@ -5,10 +5,22 @@ import {
   type MCPErrorData,
   type MCPErrorResponse,
 } from "../../domain/mcp-types";
+import { getGhCliUser } from "../../env";
+import { type GhCredentialContext, ghScopeErrorHint } from "../github/auth/gh/ghErrorHint";
+import { resolveGitHubAuth } from "../github/auth/resolveGitHubAuth";
 import { getCorrelationId } from "../observability/CorrelationContext";
 import { coerceParameters } from "./ParameterCoercion";
 
 export type ToolSchema<T> = z.ZodType<T>;
+
+/** The credential currently in force, resolved only when an error needs it. */
+function currentCredential(): GhCredentialContext {
+  try {
+    return { source: resolveGitHubAuth().source, pinnedUser: getGhCliUser() };
+  } catch {
+    return { source: undefined };
+  }
+}
 
 /**
  * Tool behavior annotations per MCP specification 2025-11-25.
@@ -153,7 +165,19 @@ export const ToolValidator = {
    * failures (Octokit `RequestError`, `GitHubApiError`, `RateLimitError`) and
    * plain errors each get a stable code and an actionable message.
    */
-  mapGitHubError(error: unknown, toolName: string): MappedToolError {
+  mapGitHubError(
+    error: unknown,
+    toolName: string,
+    credential: () => GhCredentialContext = currentCredential
+  ): MappedToolError {
+    const mapped = ToolValidator.classifyError(error, toolName);
+    // A missing OAuth scope on a GitHub CLI credential is fixable with one gh
+    // command; no other credential source gets the hint.
+    const hint = ghScopeErrorHint(error, credential);
+    return hint ? { ...mapped, message: `${mapped.message} ${hint}` } : mapped;
+  },
+
+  classifyError(error: unknown, toolName: string): MappedToolError {
     const data: MCPErrorData = { tool: toolName };
 
     if (error instanceof ToolArgumentError) {

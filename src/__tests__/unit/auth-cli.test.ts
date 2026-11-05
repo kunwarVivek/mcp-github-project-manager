@@ -19,6 +19,7 @@ import {
   OAuthTokenStore,
   type StoredOAuthToken,
 } from "../../infrastructure/github/auth/oauth/OAuthTokenStore";
+import { fakeGhRunner } from "../helpers/fakeGhRunner";
 import {
   createFakeClock,
   createFakeFetch,
@@ -78,6 +79,7 @@ describe("auth CLI", () => {
       fetch: (options.fetch ?? successfulGitHub()).fetch,
       clock: createFakeClock(),
       loadDotenv: false,
+      ghRunner: fakeGhRunner({ failToken: true }),
       env: {
         NODE_ENV: "test",
         GITHUB_OAUTH_CLIENT_ID: CLIENT_ID,

@@ -134,7 +134,7 @@ describe("GitHubRepositoryFactory authentication", () => {
         cliToken: () => undefined,
         configuredToken: getConfiguredGitHubToken,
         storedOAuth: () => undefined,
-        ghCliToken: () => undefined,
+        ghTokenSource: () => undefined,
       });
       expect(auth.source).toBe("secrets-dir");
       const factory = GitHubRepositoryFactory.fromAuth(auth, "o", "r");

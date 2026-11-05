@@ -81,8 +81,12 @@ exactly like `pnpm run <script>`, and `npm test` like `pnpm test`.
   3. `$SECRETS_DIR/GITHUB_TOKEN` file
   4. `GITHUB_TOKEN` env
   5. stored OAuth token from `mcp-github-project-manager auth login`
-  6. `gh auth token` (disable with `GH_CLI_TOKEN_FALLBACK=false`; off under
-     `NODE_ENV=test`, so tests never shell out)
+  6. `gh auth token --hostname github.com` via `src/infrastructure/github/auth/gh/`
+     (cached 60 s, re-read + one retry on a 401; `GH_CLI_USER` pins the account;
+     missing `project` scope → startup warning + hint `gh auth refresh -h
+     github.com -s project`; set up with `auth login --gh`; disable with
+     `GH_CLI_TOKEN_FALLBACK=false`; off under `NODE_ENV=test`, so tests never
+     shell out)
   None → boot fails listing all methods. Static tokens are rotation-aware.
 - OAuth device flow (`build/bin.js auth login|status|logout`):
   `GITHUB_OAUTH_CLIENT_ID` (required), `GITHUB_OAUTH_CLIENT_SECRET` (only for

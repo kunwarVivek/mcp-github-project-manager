@@ -4,11 +4,18 @@ import {
   type GitHubAuth,
   GitHubAuthUnavailableError,
 } from "../../../../../infrastructure/github/auth/GitHubAuth";
+import { GhTokenSource } from "../../../../../infrastructure/github/auth/gh/GhTokenSource";
 import {
   type GitHubAuthSources,
   resolveGitHubAuth,
 } from "../../../../../infrastructure/github/auth/resolveGitHubAuth";
+import { fakeGhRunner } from "../../../../helpers/fakeGhRunner";
 import { tokenAuth } from "../../../../helpers/githubAuth";
+
+/** A GhTokenSource backed by a fake runner that always answers `token`. */
+function ghSource(token: string): GhTokenSource {
+  return new GhTokenSource({ runner: fakeGhRunner({ token }) });
+}
 
 const APP = { appId: "123", privateKey: "pem", installationId: "456" };
 
@@ -27,7 +34,7 @@ function sources(overrides: Partial<GitHubAuthSources> = {}): GitHubAuthSources 
     cliToken: () => "cli-token",
     configuredToken: () => ({ source: "secrets-dir", read: () => "dir-token" }),
     storedOAuth: () => storedOAuth,
-    ghCliToken: () => "gh-token",
+    ghTokenSource: () => ghSource("gh-token"),
     ...overrides,
   };
 }
@@ -37,7 +44,7 @@ const none = {
   cliToken: () => undefined,
   configuredToken: () => undefined,
   storedOAuth: () => undefined,
-  ghCliToken: () => undefined,
+  ghTokenSource: () => undefined,
 } satisfies Partial<GitHubAuthSources>;
 
 describe("resolveGitHubAuth precedence", () => {
@@ -86,7 +93,7 @@ describe("resolveGitHubAuth precedence", () => {
   });
 
   it("falls back to gh auth token last", async () => {
-    const auth = resolveGitHubAuth(sources({ ...none, ghCliToken: () => "gh-token" }));
+    const auth = resolveGitHubAuth(sources({ ...none, ghTokenSource: () => ghSource("gh-token") }));
     expect(auth).toMatchObject({ mode: "token", source: "gh-cli" });
     expect(await auth.getToken()).toBe("gh-token");
   });
@@ -107,7 +114,7 @@ describe("resolveGitHubAuth precedence", () => {
           touched.push("stored");
           return undefined;
         },
-        ghCliToken: () => {
+        ghTokenSource: () => {
           touched.push("gh");
           return undefined;
         },
@@ -142,7 +149,7 @@ describe("resolveGitHubAuth precedence", () => {
       cliToken: spy("cli"),
       configuredToken: spy("configured"),
       storedOAuth: spy("stored"),
-      ghCliToken: spy("gh"),
+      ghTokenSource: spy("gh"),
     });
     expect(auth).toMatchObject({ mode: "token", source: "test" });
     expect(await auth.getToken()).toBe("test-token");

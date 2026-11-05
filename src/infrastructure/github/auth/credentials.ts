@@ -26,6 +26,22 @@ function authorizationHeader(token: string): string {
   return token.split(".").length === 3 ? `bearer ${token}` : `token ${token}`;
 }
 
+/** Opt-in behaviour for suppliers whose token can change underneath a running server. */
+export interface TokenAuthOptions {
+  /**
+   * Called when GitHub answers 401. Must drop any cached token and re-read it,
+   * returning the new token (or undefined when none is available). The request
+   * is retried ONCE, and only if the token actually changed.
+   */
+  refresh?: () => string | undefined;
+}
+
+function isUnauthorized(error: unknown): boolean {
+  return (
+    typeof error === "object" && error !== null && (error as { status?: unknown }).status === 401
+  );
+}
+
 /**
  * A bearer-token credential read through `supplier` on every use.
  *
@@ -34,10 +50,15 @@ function authorizationHeader(token: string): string {
  * built from is rotated (e.g. a mounted secret file rewritten). When the tier
  * stops yielding a token the request fails with `GitHubAuthUnavailableError`
  * instead of being sent unauthenticated.
+ *
+ * With `options.refresh`, a 401 triggers one re-read of the token and a single
+ * retry with the new value (see {@link TokenAuthOptions}); every other tier is
+ * unaffected.
  */
 export function createTokenAuth(
   supplier: TokenSupplier,
-  source: Exclude<GitHubAuthSource, "github-app" | "oauth-store">
+  source: Exclude<GitHubAuthSource, "github-app" | "oauth-store">,
+  options: TokenAuthOptions = {}
 ): GitHubAuth {
   const fresh = (): string => {
     const token = supplier();
@@ -47,21 +68,38 @@ export function createTokenAuth(
     return token;
   };
 
-  const hook = async (
+  const send = (
     request: RequestInterface,
     route: Route | EndpointOptions,
-    parameters?: RequestParameters
+    parameters: RequestParameters | undefined,
+    token: string
   ): Promise<OctokitResponse<unknown>> => {
     const endpoint =
       typeof route === "string"
         ? request.endpoint.merge(route, parameters)
         : request.endpoint.merge(route);
-    endpoint.headers.authorization = authorizationHeader(fresh());
+    endpoint.headers.authorization = authorizationHeader(token);
     const { url } = endpoint;
     if (url === undefined) {
       throw new Error("GitHub request is missing a URL");
     }
     return request({ ...endpoint, url });
+  };
+
+  const hook = async (
+    request: RequestInterface,
+    route: Route | EndpointOptions,
+    parameters?: RequestParameters
+  ): Promise<OctokitResponse<unknown>> => {
+    const token = fresh();
+    try {
+      return await send(request, route, parameters, token);
+    } catch (error) {
+      if (!options.refresh || !isUnauthorized(error)) throw error;
+      const renewed = options.refresh();
+      if (!renewed || renewed === token) throw error;
+      return send(request, route, parameters, renewed);
+    }
   };
 
   const strategy = () =>
