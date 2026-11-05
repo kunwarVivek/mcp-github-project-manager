@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+No unreleased changes.
+
+## [5.0.0] - 2026-11-05
+
 ### Added
 - **GitHub OAuth device flow** — `mcp-github-project-manager auth login | status | logout` signs in with a GitHub OAuth App or GitHub App (`GITHUB_OAUTH_CLIENT_ID`, `GITHUB_OAUTH_CLIENT_SECRET`, `GITHUB_OAUTH_SCOPES`, `GITHUB_OAUTH_TOKEN_FILE`). Tokens are stored `0600` (a group/other-readable file is refused), expiring GitHub App user tokens are refreshed automatically (single-flight, persisted), and the stored token is a new tier in the credential chain.
 - **Six-tier GitHub credential chain** — GitHub App installation → `--token` → `$SECRETS_DIR/GITHUB_TOKEN` → `GITHUB_TOKEN` → stored OAuth token → `gh auth token`, behind one `GitHubAuth` seam (`resolveGitHubAuth()` in `src/infrastructure/github/auth/`). Static tokens are rotation-aware: a token rewritten in its tier is used on the next request.
