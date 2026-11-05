@@ -24,6 +24,7 @@ import {
   type SprintRisk,
   type SprintRiskAssessment,
 } from "../../domain/sprint-planning-types";
+import { logger } from "../../infrastructure/logger";
 import { InputSanitizer } from "../utils/InputSanitizer";
 import { AIServiceFactory } from "./AIServiceFactory";
 import { calculateWeightedScore, getConfidenceTier } from "./ConfidenceScorer";
@@ -142,7 +143,7 @@ export class SprintRiskAssessor {
         confidence,
       };
     } catch (error) {
-      console.error("AI risk assessment failed:", error);
+      logger.error("AI risk assessment failed:", error);
       return this.getFallbackAssessment(params);
     }
   }

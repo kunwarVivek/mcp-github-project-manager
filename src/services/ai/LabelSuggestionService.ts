@@ -21,6 +21,7 @@ import type {
   LabelSuggestionResult,
   NewLabelProposal,
 } from "../../domain/issue-intelligence-types";
+import { logger } from "../../infrastructure/logger";
 import { InputSanitizer } from "../utils/InputSanitizer";
 import { AIServiceFactory } from "./AIServiceFactory";
 import { calculateWeightedScore, getConfidenceTier } from "./ConfidenceScorer";
@@ -147,7 +148,7 @@ export class LabelSuggestionService {
       return this.formatLabelResult(result.object, params);
     } catch (error) {
       // Fallback on AI error
-      console.error("Label suggestion AI call failed:", error);
+      logger.error("Label suggestion AI call failed:", error);
       return this.getFallbackSuggestions(params);
     }
   }

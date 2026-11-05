@@ -1,3 +1,5 @@
+import { logger } from "../logger";
+
 /**
  * Manages graceful server shutdown: tracks in-flight requests,
  * waits for completion on SIGTERM/SIGINT, and force-exits after timeout.
@@ -25,11 +27,7 @@ export class GracefulShutdown {
     } = {}
   ) {
     this.shutdownTimeoutMs = options.shutdownTimeoutMs ?? 30_000;
-    this.logger = options.logger ?? {
-      info: console.error,
-      warn: console.error,
-      error: console.error,
-    };
+    this.logger = options.logger ?? logger;
   }
 
   /** Whether the server is shutting down. Tools should check this. */

@@ -2,6 +2,7 @@ import { z } from "zod";
 import { type TaskComplexity, TaskPriority, TaskStatus } from "../../../domain/ai-types.js";
 import type { MCPResponse } from "../../../domain/mcp-types.js";
 import { TaskGenerationService } from "../../../services/TaskGenerationService.js";
+import { logger, redactSecretPatterns } from "../../logger/index.js";
 import { ANNOTATION_PATTERNS } from "../annotations/tool-annotations.js";
 import { TaskComplexityOutputSchema } from "../schemas/ai-schemas.js";
 import { ToolResultFormatter } from "../ToolResultFormatter.js";
@@ -94,9 +95,9 @@ async function executeAnalyzeTaskComplexity(rawArgs: unknown): Promise<MCPRespon
       },
     });
   } catch (error) {
-    process.stderr.write(`Error in analyze_task_complexity tool: ${error}\n`);
+    logger.error(`Error in analyze_task_complexity tool: ${error}`);
     return ToolResultFormatter.formatSuccess("analyze_task_complexity", {
-      error: `Failed to analyze task complexity: ${error instanceof Error ? error.message : "Unknown error"}`,
+      error: `Failed to analyze task complexity: ${redactSecretPatterns(error instanceof Error ? error.message : "Unknown error")}`,
       success: false,
     });
   }

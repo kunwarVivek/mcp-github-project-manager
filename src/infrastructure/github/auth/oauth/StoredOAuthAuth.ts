@@ -1,6 +1,7 @@
 import { createOAuthUserAuth } from "@octokit/auth-oauth-user";
 import { Octokit } from "@octokit/rest";
 import type { EndpointOptions, RequestInterface } from "@octokit/types";
+import { redactSecretPatterns } from "../../../logger/redaction";
 import type { GitHubAuth, GitHubOctokitAuth } from "../GitHubAuth";
 import type { FetchLike } from "./deviceFlow";
 import { OAuthTokenStore, type StoredOAuthToken } from "./OAuthTokenStore";
@@ -95,7 +96,7 @@ export interface StoredOAuthAuthDeps {
 }
 
 function defaultWarn(message: string): void {
-  process.stderr.write(`[oauth] ${message}\n`);
+  process.stderr.write(`[oauth] ${redactSecretPatterns(message)}\n`);
 }
 
 /**

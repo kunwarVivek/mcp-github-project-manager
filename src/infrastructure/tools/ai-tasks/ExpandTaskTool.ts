@@ -9,7 +9,7 @@ import {
 } from "../../../domain/ai-types.js";
 import type { MCPResponse } from "../../../domain/mcp-types.js";
 import { TaskGenerationService } from "../../../services/TaskGenerationService.js";
-import { Logger } from "../../logger/index.js";
+import { Logger, redactSecretPatterns } from "../../logger/index.js";
 import { ANNOTATION_PATTERNS } from "../annotations/tool-annotations.js";
 import { TaskExpandOutputSchema } from "../schemas/ai-schemas.js";
 import { ToolResultFormatter } from "../ToolResultFormatter.js";
@@ -154,7 +154,9 @@ async function executeExpandTask(rawArgs: unknown): Promise<MCPResponse> {
     // Check if this is an AI availability error (same heuristic as
     // GeneratePRDTool) so transient no-provider-configured failures still
     // degrade gracefully instead of surfacing as a hard tool error.
-    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    const errorMessage = redactSecretPatterns(
+      error instanceof Error ? error.message : "Unknown error"
+    );
     const isAIUnavailable =
       errorMessage.includes("AI service is not available") ||
       errorMessage.includes("API key") ||

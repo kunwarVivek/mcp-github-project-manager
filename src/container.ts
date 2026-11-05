@@ -53,6 +53,7 @@
  */
 import "reflect-metadata";
 import { container, type DependencyContainer, instanceCachingFactory } from "tsyringe";
+import { domainEventBus } from "./domain/events/DomainEventBus";
 import {
   AGENT_RECLAIM_ENABLED,
   AGENT_RECLAIM_INTERVAL_MS,
@@ -131,6 +132,9 @@ export function configureContainer(
 ): DependencyContainer {
   // Clear any previous registrations to ensure clean state
   container.clearInstances();
+
+  // Route domain event handler failures through the redacting logger.
+  domainEventBus.setErrorReporter((message, error) => logger.error(message, error));
 
   // Register factory instance - root of dependency tree
   const factory = GitHubRepositoryFactory.fromAuth(auth, owner, repo);
@@ -431,6 +435,7 @@ export function createProjectManagementService(
 ): ProjectManagementService {
   const factory = GitHubRepositoryFactory.fromAuth(auth, owner, repo);
   const logger = Logger.getInstance();
+  domainEventBus.setErrorReporter((message, error) => logger.error(message, error));
   const templateService = new ProjectTemplateService(factory);
   const linkingService = new ProjectLinkingService(factory);
   const fieldValueService = new FieldValueService(factory);

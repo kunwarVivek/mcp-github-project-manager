@@ -2,6 +2,7 @@ import { join, resolve } from "node:path";
 import * as dotenv from "dotenv";
 import { parseCommandLineArgs } from "./cli";
 import { validateConfig, validateConfigWarnings } from "./domain/config-schema";
+import { redactSecretPatterns } from "./infrastructure/logger/redaction";
 import { GhCliSecretProvider } from "./infrastructure/secrets/GhCliSecretProvider";
 import {
   createDefaultSecretResolver,
@@ -87,11 +88,11 @@ if (process.env.NODE_ENV !== "test") {
   try {
     validateConfig(resolvedEnv);
   } catch (error) {
-    process.stderr.write(`[CONFIG] ${(error as Error).message}\n`);
+    process.stderr.write(`[CONFIG] ${redactSecretPatterns((error as Error).message)}\n`);
     process.exit(1);
   }
   for (const w of validateConfigWarnings(resolvedEnv)) {
-    process.stderr.write(`[CONFIG WARNING] ${w}\n`);
+    process.stderr.write(`[CONFIG WARNING] ${redactSecretPatterns(w)}\n`);
   }
 }
 

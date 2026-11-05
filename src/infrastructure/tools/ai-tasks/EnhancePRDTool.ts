@@ -6,6 +6,7 @@ import {
 } from "../../../domain/ai-types.js";
 import type { MCPResponse } from "../../../domain/mcp-types.js";
 import { PRDGenerationService } from "../../../services/PRDGenerationService.js";
+import { logger, redactSecretPatterns } from "../../logger/index.js";
 import { ANNOTATION_PATTERNS } from "../annotations/tool-annotations.js";
 import { PRDEnhanceOutputSchema } from "../schemas/ai-schemas.js";
 import { ToolResultFormatter } from "../ToolResultFormatter.js";
@@ -106,9 +107,9 @@ async function executeEnhancePRD(rawArgs: unknown): Promise<MCPResponse> {
       qualityScore: validation?.score || 0,
     });
   } catch (error) {
-    process.stderr.write(`Error in enhance_prd tool: ${error}\n`);
+    logger.error(`Error in enhance_prd tool: ${error}`);
     return ToolResultFormatter.formatSuccess("enhance_prd", {
-      error: `Failed to enhance PRD: ${error instanceof Error ? error.message : "Unknown error"}`,
+      error: `Failed to enhance PRD: ${redactSecretPatterns(error instanceof Error ? error.message : "Unknown error")}`,
       success: false,
     });
   }

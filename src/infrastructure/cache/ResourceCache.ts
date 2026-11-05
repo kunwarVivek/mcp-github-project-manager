@@ -5,6 +5,7 @@ import type {
   SyncMetadata,
 } from "../../domain/resource-types";
 import { isCacheableResource } from "../../domain/type-guards";
+import { redactSecretPatterns } from "../logger/redaction";
 import { CachePersistence, type CacheEntry as PersistenceCacheEntry } from "./CachePersistence";
 
 interface CacheEntry<T> {
@@ -556,7 +557,9 @@ export class ResourceCache {
       try {
         await this.persist();
       } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
+        const message = redactSecretPatterns(
+          error instanceof Error ? error.message : String(error)
+        );
         process.stderr.write(`[ResourceCache] Periodic persist failed: ${message}\n`);
       }
     }, this.PERSIST_INTERVAL_MS);
@@ -615,7 +618,7 @@ export class ResourceCache {
       this.lastPersistTime = new Date().toISOString();
       process.stderr.write(`[ResourceCache] Persisted ${entries.size} entries\n`);
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
+      const message = redactSecretPatterns(error instanceof Error ? error.message : String(error));
       process.stderr.write(`[ResourceCache] Persist failed: ${message}\n`);
       throw error;
     }
@@ -674,7 +677,7 @@ export class ResourceCache {
       process.stderr.write(`[ResourceCache] Restored ${count} entries from disk\n`);
       return count;
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
+      const message = redactSecretPatterns(error instanceof Error ? error.message : String(error));
       process.stderr.write(`[ResourceCache] Restore failed: ${message}\n`);
       return 0;
     }
@@ -700,7 +703,9 @@ export class ResourceCache {
         await this.persist();
         process.stderr.write("[ResourceCache] Final persist complete\n");
       } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
+        const message = redactSecretPatterns(
+          error instanceof Error ? error.message : String(error)
+        );
         process.stderr.write(`[ResourceCache] Final persist failed: ${message}\n`);
       }
     }

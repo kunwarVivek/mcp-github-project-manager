@@ -33,6 +33,9 @@
 
 import type { DomainEvent } from "./DomainEvent";
 
+/** Receives a description and the error thrown by a subscriber. */
+export type HandlerErrorReporter = (message: string, error: unknown) => void;
+
 /**
  * Event handler function type
  */
@@ -84,7 +87,23 @@ export class DomainEventBus {
    */
   private enableHistory = true;
 
+  /**
+   * Sink for handler failures. The default prints only the error's name, never
+   * its message or stack (those can carry credentials); the composition root
+   * replaces it with the redacting logger via setErrorReporter.
+   */
+  private errorReporter: HandlerErrorReporter = (message, error) => {
+    process.stderr.write(`${message} (${error instanceof Error ? error.name : typeof error})\n`);
+  };
+
   private constructor() {}
+
+  /**
+   * Replace the handler-error sink (wired once at the composition root).
+   */
+  setErrorReporter(reporter: HandlerErrorReporter): void {
+    this.errorReporter = reporter;
+  }
 
   /**
    * Get the singleton instance
@@ -192,7 +211,7 @@ export class DomainEventBus {
           // This maintains the sync API while still executing async handlers
           (record.handler as AsyncEventHandler<T>)(event).catch((error) => {
             if (!record.options.catchErrors) {
-              console.error(`Error in async event handler for ${event.eventType}:`, error);
+              this.errorReporter(`Error in async event handler for ${event.eventType}:`, error);
             }
           });
         } else {
@@ -200,7 +219,7 @@ export class DomainEventBus {
         }
       } catch (error) {
         if (!record.options.catchErrors) {
-          console.error(`Error in event handler for ${event.eventType}:`, error);
+          this.errorReporter(`Error in event handler for ${event.eventType}:`, error);
         }
       }
     }
@@ -231,7 +250,7 @@ export class DomainEventBus {
           }
         } catch (error) {
           if (!record.options.catchErrors) {
-            console.error(`Error in event handler for ${event.eventType}:`, error);
+            this.errorReporter(`Error in event handler for ${event.eventType}:`, error);
             throw error;
           }
         }

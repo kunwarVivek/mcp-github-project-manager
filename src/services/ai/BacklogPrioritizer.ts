@@ -27,6 +27,7 @@ import type {
   PriorityFactors,
   PriorityTier,
 } from "../../domain/sprint-planning-types";
+import { logger } from "../../infrastructure/logger";
 import { InputSanitizer } from "../utils/InputSanitizer";
 import { AIServiceFactory } from "./AIServiceFactory";
 import { calculateWeightedScore, getConfidenceTier } from "./ConfidenceScorer";
@@ -224,7 +225,7 @@ export class BacklogPrioritizer {
       return result.object;
     } catch (error) {
       // Fallback on AI error
-      console.error("AI business value scoring failed:", error);
+      logger.error("AI business value scoring failed:", error);
       return {
         items: items.map((item) => ({
           itemId: item.id,

@@ -17,6 +17,7 @@
 
 import { AsyncLocalStorage } from "node:async_hooks";
 import { v4 as uuidv4 } from "uuid";
+import { redactSecretPatterns } from "../logger/redaction.js";
 
 /**
  * Context stored for each trace
@@ -142,5 +143,5 @@ function logTraceEvent(
     }
   }
 
-  process.stderr.write(`[TRACE] ${JSON.stringify(logEntry)}\n`);
+  process.stderr.write(`[TRACE] ${redactSecretPatterns(JSON.stringify(logEntry))}\n`);
 }

@@ -5,6 +5,7 @@ import {
   NextTaskService,
   type TaskRecommendation,
 } from "../../../services/NextTaskService.js";
+import { logger, redactSecretPatterns } from "../../logger/index.js";
 import { ANNOTATION_PATTERNS } from "../annotations/tool-annotations.js";
 import { NextTaskOutputSchema } from "../schemas/ai-schemas.js";
 import { ToolResultFormatter } from "../ToolResultFormatter.js";
@@ -114,9 +115,9 @@ async function executeGetNextTask(rawArgs: unknown): Promise<MCPResponse> {
       },
     });
   } catch (error) {
-    process.stderr.write(`Error in get_next_task tool: ${error}\n`);
+    logger.error(`Error in get_next_task tool: ${error}`);
     return ToolResultFormatter.formatSuccess("get_next_task", {
-      error: `Failed to get task recommendations: ${error instanceof Error ? error.message : "Unknown error"}`,
+      error: `Failed to get task recommendations: ${redactSecretPatterns(error instanceof Error ? error.message : "Unknown error")}`,
       success: false,
     });
   }

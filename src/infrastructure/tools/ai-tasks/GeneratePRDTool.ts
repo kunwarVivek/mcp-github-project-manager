@@ -2,7 +2,7 @@ import { z } from "zod";
 import { type PRDDocument, TaskPriority } from "../../../domain/ai-types.js";
 import type { MCPResponse } from "../../../domain/mcp-types.js";
 import { PRDGenerationService } from "../../../services/PRDGenerationService.js";
-import { Logger } from "../../logger/index.js";
+import { Logger, redactSecretPatterns } from "../../logger/index.js";
 import { ANNOTATION_PATTERNS } from "../annotations/tool-annotations.js";
 import { PRDOutputSchema } from "../schemas/ai-schemas.js";
 import { ToolResultFormatter } from "../ToolResultFormatter.js";
@@ -74,7 +74,9 @@ async function executeGeneratePRD(rawArgs: unknown): Promise<MCPResponse> {
     logger.error(`Error in generate_prd tool: ${error}`);
 
     // Check if this is an AI availability error
-    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    const errorMessage = redactSecretPatterns(
+      error instanceof Error ? error.message : "Unknown error"
+    );
     const isAIUnavailable =
       errorMessage.includes("AI service is not available") ||
       errorMessage.includes("API key") ||

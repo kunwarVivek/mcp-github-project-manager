@@ -14,6 +14,7 @@
 import { existsSync } from "node:fs";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
+import { redactSecretPatterns } from "../logger/redaction";
 
 /**
  * A single cache entry for persistence
@@ -92,7 +93,7 @@ export class CachePersistence {
         `[CachePersistence] Saved ${snapshot.entries.length} entries to ${this.filePath}\n`
       );
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
+      const message = redactSecretPatterns(error instanceof Error ? error.message : String(error));
       process.stderr.write(`[CachePersistence] Failed to save cache: ${message}\n`);
       throw error;
     }
@@ -150,7 +151,9 @@ export class CachePersistence {
       );
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
-        const message = error instanceof Error ? error.message : String(error);
+        const message = redactSecretPatterns(
+          error instanceof Error ? error.message : String(error)
+        );
         process.stderr.write(`[CachePersistence] Failed to restore cache: ${message}\n`);
       }
     }

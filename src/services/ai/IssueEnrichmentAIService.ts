@@ -20,6 +20,7 @@ import type {
   EnrichedSection,
   IssueEnrichmentConfig,
 } from "../../domain/issue-intelligence-types";
+import { logger } from "../../infrastructure/logger";
 import { InputSanitizer } from "../utils/InputSanitizer";
 import { AIServiceFactory } from "./AIServiceFactory";
 import { calculateWeightedScore, getConfidenceTier } from "./ConfidenceScorer";
@@ -147,7 +148,7 @@ export class IssueEnrichmentAIService {
       return this.formatEnrichmentResult(result.object, params, preserveOriginal, this.config);
     } catch (error) {
       // Fallback on AI error
-      console.error("Issue enrichment AI call failed:", error);
+      logger.error("Issue enrichment AI call failed:", error);
       return this.getFallbackEnrichment({
         ...params,
         preserveOriginal,

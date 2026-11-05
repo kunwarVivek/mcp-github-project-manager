@@ -21,6 +21,7 @@ import {
   timeout,
   wrap,
 } from "cockatiel";
+import { redactSecretPatterns } from "../logger/redaction.js";
 import { CircuitBreakerService, type CircuitBreakerState } from "./CircuitBreakerService.js";
 
 /**
@@ -165,9 +166,9 @@ export class AIResiliencePolicy {
       const result = fallbackFn?.() ?? defaultFallback();
       const isDegraded = result !== null && typeof result === "object" && "degraded" in result;
       process.stderr.write(
-        `[AIResiliencePolicy] Fallback triggered: ${
+        `[AIResiliencePolicy] Fallback triggered: ${redactSecretPatterns(
           isDegraded ? (result as DegradedResult).message : "custom fallback"
-        }\n`
+        )}\n`
       );
       return result;
     });

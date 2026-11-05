@@ -7,7 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-No unreleased changes.
+### Security
+- **No unredacted error sinks left** — every remaining `console.*` / raw stderr path in production code now goes through the redacting logger or `redactSecretPatterns`: AI task tools (stderr *and* the error text returned to the MCP client), AI services (backlog prioritizer, issue enrichment, label suggestion, sprint risk), the AI fallback policy, trace events, graceful shutdown, cache persistence, config warnings/errors, the stored-OAuth warning, and the `tool`/`action`/`target`/`idempotencyKey` fields of the mutation audit log.
+
+### Changed
+- `DomainEventBus` reports handler errors through a domain-owned `setErrorReporter()` port, wired to the logger by the composition root; before wiring it prints only the message and error name. The domain layer keeps no dependency on infrastructure.
+- Redaction patterns live in dependency-free `src/infrastructure/logger/redaction.ts` (re-exported from the logger) so low-level modules can use them without import cycles.
+
+### Removed
+- `bun.lock` is no longer tracked (it was gitignored and stale); npm and pnpm are the supported package managers.
 
 ## [5.0.1] - 2026-11-05
 

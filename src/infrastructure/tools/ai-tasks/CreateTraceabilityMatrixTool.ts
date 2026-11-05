@@ -9,6 +9,7 @@ import {
 } from "../../../domain/ai-types.js";
 import type { MCPResponse } from "../../../domain/mcp-types.js";
 import { RequirementsTraceabilityService } from "../../../services/RequirementsTraceabilityService.js";
+import { logger, redactSecretPatterns } from "../../logger/index.js";
 import { ANNOTATION_PATTERNS } from "../annotations/tool-annotations.js";
 import { TraceabilityMatrixOutputSchema } from "../schemas/ai-schemas.js";
 import { ToolResultFormatter } from "../ToolResultFormatter.js";
@@ -147,9 +148,9 @@ async function executeCreateTraceabilityMatrix(rawArgs: unknown): Promise<MCPRes
       totalTasks: traceabilityMatrix.tasks.length,
     });
   } catch (error) {
-    process.stderr.write(`Error in create_traceability_matrix tool: ${error}\n`);
+    logger.error(`Error in create_traceability_matrix tool: ${error}`);
     return ToolResultFormatter.formatSuccess("create_traceability_matrix", {
-      error: `Failed to create traceability matrix: ${error instanceof Error ? error.message : "Unknown error"}`,
+      error: `Failed to create traceability matrix: ${redactSecretPatterns(error instanceof Error ? error.message : "Unknown error")}`,
       success: false,
     });
   }

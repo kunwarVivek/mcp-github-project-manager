@@ -8,6 +8,7 @@ import type {
 } from "../../../domain/ai-types.js";
 import type { MCPResponse } from "../../../domain/mcp-types.js";
 import { FeatureManagementService } from "../../../services/FeatureManagementService.js";
+import { logger, redactSecretPatterns } from "../../logger/index.js";
 import { ANNOTATION_PATTERNS } from "../annotations/tool-annotations.js";
 import { AddFeatureOutputSchema } from "../schemas/ai-schemas.js";
 import { ToolResultFormatter } from "../ToolResultFormatter.js";
@@ -72,9 +73,9 @@ async function executeAddFeature(rawArgs: unknown): Promise<MCPResponse> {
       estimatedEffort: result.expansionResult?.estimatedEffort || 0,
     });
   } catch (error) {
-    process.stderr.write(`Error in add_feature tool: ${error}\n`);
+    logger.error(`Error in add_feature tool: ${error}`);
     return ToolResultFormatter.formatSuccess("add_feature", {
-      error: `Failed to add feature: ${error instanceof Error ? error.message : "Unknown error"}`,
+      error: `Failed to add feature: ${redactSecretPatterns(error instanceof Error ? error.message : "Unknown error")}`,
       success: false,
     });
   }

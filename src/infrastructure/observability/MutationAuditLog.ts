@@ -237,9 +237,9 @@ export class MutationAuditLog {
         ts: new Date().toISOString(),
         correlationId: input.correlationId ?? getCorrelationId() ?? "none",
         actor: input.actor ?? "token",
-        tool: input.tool,
-        action: input.action,
-        target: input.target,
+        tool: redactSecretPatterns(input.tool),
+        action: redactSecretPatterns(input.action),
+        target: redactSecretPatterns(input.target),
         outcome: input.outcome,
         durationMs: input.durationMs,
         args: redactSecrets(input.args ?? {}),
@@ -250,7 +250,7 @@ export class MutationAuditLog {
         );
       }
       if (input.idempotencyKey !== undefined) {
-        record.idempotencyKey = input.idempotencyKey;
+        record.idempotencyKey = redactSecretPatterns(input.idempotencyKey);
       }
       if (input.fingerprint !== undefined) {
         record.fingerprint = input.fingerprint;

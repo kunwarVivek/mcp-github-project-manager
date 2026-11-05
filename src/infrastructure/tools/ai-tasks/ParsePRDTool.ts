@@ -10,6 +10,7 @@ import type { MCPResponse } from "../../../domain/mcp-types.js";
 import { PRDGenerationService } from "../../../services/PRDGenerationService.js";
 import { RequirementsTraceabilityService } from "../../../services/RequirementsTraceabilityService.js";
 import { TaskGenerationService } from "../../../services/TaskGenerationService.js";
+import { logger, redactSecretPatterns } from "../../logger/index.js";
 import { ANNOTATION_PATTERNS } from "../annotations/tool-annotations.js";
 import { PRDParseOutputSchema } from "../schemas/ai-schemas.js";
 import { ToolResultFormatter } from "../ToolResultFormatter.js";
@@ -196,9 +197,9 @@ async function executeParsePRD(rawArgs: unknown): Promise<MCPResponse> {
       totalUseCases: traceabilityMatrix?.useCases.length || 0,
     });
   } catch (error) {
-    process.stderr.write(`Error in parse_prd tool: ${error}\n`);
+    logger.error(`Error in parse_prd tool: ${error}`);
     return ToolResultFormatter.formatSuccess("parse_prd", {
-      error: `Failed to parse PRD: ${error instanceof Error ? error.message : "Unknown error"}`,
+      error: `Failed to parse PRD: ${redactSecretPatterns(error instanceof Error ? error.message : "Unknown error")}`,
       success: false,
     });
   }
