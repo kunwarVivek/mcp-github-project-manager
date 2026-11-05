@@ -4,6 +4,7 @@
 
 [![npm version](https://img.shields.io/npm/v/mcp-github-project-manager.svg)](https://www.npmjs.com/package/mcp-github-project-manager)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![MseeP.ai Security Assessment Badge](https://mseep.net/pr/kunwarvivek-mcp-github-project-manager-badge.png)](https://mseep.ai/app/kunwarvivek-mcp-github-project-manager)
 
 **The task substrate for AI coding agents.** An [MCP](https://modelcontextprotocol.io) server that turns GitHub Projects v2 into an agentic project-management layer: agents register, self-assign work, heartbeat, submit work products for review, and spend against token budgets — through **<!-- count:tools -->21<!-- /count --> compound tools exposing <!-- count:actions -->175<!-- /count --> actions**, backed entirely by GitHub-native storage. No database, no Redis, no external infra.
 
